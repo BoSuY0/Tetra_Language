@@ -1,0 +1,114 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/bootstrap.sh
+
+      - name: Test
+        shell: bash
+        run: bash scripts/test.sh
+
+      - name: Verify docs manifest
+        shell: bash
+        run: |
+          go run ./tools/cmd/gen-manifest -o docs/generated/manifest.json
+          go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+          git diff --exit-code -- docs/generated/manifest.json
+
+      - name: Smoke
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Linux)   target="linux-x64" ;;
+            Windows) target="windows-x64" ;;
+            macOS)   target="macos-x64" ;;
+            *) echo "unknown runner.os=${{ runner.os }}"; exit 1 ;;
+          esac
+          tetra_bin="./tetra"
+          if [[ -f "./tetra.exe" ]]; then tetra_bin="./tetra.exe"; fi
+          "${tetra_bin}" version
+          "${tetra_bin}" smoke --target "${target}" --run=true --report "smoke_${target}.json"
+          "${tetra_bin}" smoke --target "${target}" --run=true --islands-debug --report "smoke_${target}_islands_debug.json"
+
+      - name: Smoke summary
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Linux)   target="linux-x64" ;;
+            Windows) target="windows-x64" ;;
+            macOS)   target="macos-x64" ;;
+            *) echo "unknown runner.os=${{ runner.os }}"; exit 1 ;;
+          esac
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          
+          def render(path: Path, title: str) -> str:
+              data = json.loads(path.read_text(encoding="utf-8"))
+              cases = data.get("cases", [])
+              passed = sum(1 for c in cases if c.get("pass"))
+              total = len(cases)
+              lines = []
+              lines.append(f"### {title}")
+              lines.append("")
+              lines.append(f"- Target: `{data.get('target','')}`")
+              lines.append(f"- Version: `{data.get('version','')}`")
+              lines.append(f"- Git HEAD: `{data.get('git_head','')}`")
+              lines.append(f"- Islands debug: `{data.get('islands_debug', False)}`")
+              lines.append(f"- Result: **{passed}/{total} passed**")
+              lines.append("")
+              lines.append("| Case | Build | Run | Expected | Actual | Pass |")
+              lines.append("|---|---:|---:|---:|---:|---:|")
+              for c in cases:
+                  name = c.get("name","")
+                  ran = bool(c.get("ran"))
+                  actual = c.get("actual_exit")
+                  expected = c.get("expected_exit")
+                  ok = bool(c.get("pass"))
+                  build_ok = "✅" if ok or (c.get("error","").startswith("run:")) else "❌"
+                  run_cell = "✅" if ran and ok else ("❌" if ran else "—")
+                  actual_cell = "—" if actual is None else str(actual)
+                  lines.append(f"| `{name}` | {build_ok} | {run_cell} | {expected} | {actual_cell} | {'✅' if ok else '❌'} |")
+              lines.append("")
+              return "\n".join(lines)
+          
+          target = os.environ.get("TARGET","")
+          if not target:
+              print("missing TARGET env", file=sys.stderr)
+              sys.exit(2)
+          out = []
+          out.append("## Smoke report")
+          out.append("")
+          out.append(render(Path(f"smoke_{target}.json"), "Normal"))
+          out.append(render(Path(f"smoke_{target}_islands_debug.json"), "Islands debug"))
+          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text("\n".join(out), encoding="utf-8")
+          PY
+        env:
+          TARGET: ${{ runner.os == 'Linux' && 'linux-x64' || runner.os == 'Windows' && 'windows-x64' || 'macos-x64' }}
+
+      - name: Upload smoke report
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report-${{ runner.os }}
+          path: |
+            smoke_*.json

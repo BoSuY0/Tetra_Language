@@ -1,0 +1,254 @@
+// Self-hosted actors runtime PoC (Win64 ABI: windows-x64)
+//
+// Same high-level logic as the SysV PoC, but the bootstrap stack layout matches
+// the registers saved/restored by `core.ctx_switch` on Win64.
+//
+// This runtime is intentionally minimal: it supports exactly two actors:
+// - actor 0: the program main entry
+// - actor 1: the first spawned actor (e.g. "pong" in examples/actors_pingpong.tetra)
+
+module __rt.actors_poc_win64
+
+val STATUS_READY: i32 = 0;
+val STATUS_BLOCKED: i32 = 1;
+val STATUS_DONE: i32 = 2;
+
+var g_sched_slot: ptr;
+var g_main_slot: ptr;
+var g_pong_slot: ptr;
+
+var g_current: i32;
+
+var g_main_status: i32;
+var g_pong_status: i32;
+
+var g_pong_spawned: i32;
+var g_pong_entry_id: i32;
+
+var g_main_has: i32;
+var g_main_val: i32;
+var g_main_msg_sender: i32;
+var g_main_last_sender: i32;
+
+var g_pong_has: i32;
+var g_pong_val: i32;
+var g_pong_msg_sender: i32;
+var g_pong_last_sender: i32;
+
+var g_main_exit: i32;
+var g_pong_exit: i32;
+
+fun actor_slot(idx: i32): ptr {
+    if (idx == 0) {
+        return g_main_slot
+    }
+    return g_pong_slot
+}
+
+fun set_actor_status(idx: i32, st: i32): i32 {
+    if (idx == 0) {
+        g_main_status = st
+        return 0
+    }
+    g_pong_status = st
+    return 0
+}
+
+fun mailbox_has(idx: i32): i32 {
+    if (idx == 0) {
+        return g_main_has
+    }
+    return g_pong_has
+}
+
+fun mailbox_take(idx: i32): i32 {
+    if (idx == 0) {
+        g_main_has = 0
+        g_main_last_sender = g_main_msg_sender
+        return g_main_val
+    }
+    g_pong_has = 0
+    g_pong_last_sender = g_pong_msg_sender
+    return g_pong_val
+}
+
+fun mailbox_put(idx: i32, v: i32, sender: i32): i32 {
+    if (idx == 0) {
+        g_main_val = v
+        g_main_msg_sender = sender
+        g_main_has = 1
+        if (g_main_status == STATUS_BLOCKED) {
+            g_main_status = STATUS_READY
+        }
+        return 0
+    }
+    g_pong_val = v
+    g_pong_msg_sender = sender
+    g_pong_has = 1
+    if (g_pong_status == STATUS_BLOCKED) {
+        g_pong_status = STATUS_READY
+    }
+    return 0
+}
+
+fun mailbox_last_sender(idx: i32): i32 {
+    if (idx == 0) {
+        return g_main_last_sender
+    }
+    return g_pong_last_sender
+}
+
+fun build_actor_stack(slot: ptr): ptr {
+    unsafe {
+        let mem: cap.mem = core.cap_mem()
+        let stack: ptr = core.alloc_bytes(65536)
+        var sp: ptr = core.ptr_add(stack, 65536, mem)
+
+        sp = core.ptr_add(sp, -8, mem)
+        let _ret: ptr = core.store_ptr(sp, core.sym_addr("__tetra_actor_trampoline"), mem)
+
+        // Win64 callee-saved set used by ctx_switch: rbx, rbp, rdi, rsi, r12-r15.
+        sp = core.ptr_add(sp, -8, mem)
+        let _rbx: ptr = core.store_ptr(sp, 0, mem)
+        sp = core.ptr_add(sp, -8, mem)
+        let _rbp: ptr = core.store_ptr(sp, 0, mem)
+        sp = core.ptr_add(sp, -8, mem)
+        let _rdi: ptr = core.store_ptr(sp, 0, mem)
+        sp = core.ptr_add(sp, -8, mem)
+        let _rsi: ptr = core.store_ptr(sp, 0, mem)
+        sp = core.ptr_add(sp, -8, mem)
+        let _r12: ptr = core.store_ptr(sp, 0, mem)
+        sp = core.ptr_add(sp, -8, mem)
+        let _r13: ptr = core.store_ptr(sp, 0, mem)
+        sp = core.ptr_add(sp, -8, mem)
+        let _r14: ptr = core.store_ptr(sp, 0, mem)
+        sp = core.ptr_add(sp, -8, mem)
+        let _r15: ptr = core.store_ptr(sp, 0, mem)
+
+        let _set: ptr = core.store_ptr(slot, sp, mem)
+        return slot
+    }
+    return slot
+}
+
+@export("__tetra_actor_trampoline")
+fun actor_trampoline(): i32 {
+    unsafe {
+        let mem: cap.mem = core.cap_mem()
+        let idx: i32 = g_current
+        var exit: i32 = 0
+        if (idx == 0) {
+            let entry: i32 = core.actor_main_entry_id()
+            exit = core.actor_dispatch(entry)
+            g_main_exit = exit
+            g_main_status = STATUS_DONE
+            exit = core.ctx_switch(g_main_slot, g_sched_slot, mem)
+            return 0
+        }
+        exit = core.actor_dispatch(g_pong_entry_id)
+        g_pong_exit = exit
+        g_pong_status = STATUS_DONE
+        exit = core.ctx_switch(g_pong_slot, g_sched_slot, mem)
+        return 0
+    }
+    return 0
+}
+
+@export("__tetra_entry")
+fun tetra_entry(): i32 {
+    unsafe {
+        let mem: cap.mem = core.cap_mem()
+        var sw: i32 = 0
+        g_sched_slot = core.alloc_bytes(8)
+        g_main_slot = core.alloc_bytes(8)
+
+        g_current = 0
+        g_main_status = STATUS_READY
+        g_pong_status = STATUS_DONE
+
+        g_pong_spawned = 0
+        g_main_has = 0
+        g_pong_has = 0
+
+        let _ms: ptr = build_actor_stack(g_main_slot)
+        sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
+
+        while (1) {
+            if (g_main_status == STATUS_DONE) {
+                return g_main_exit
+            }
+
+            if (g_pong_spawned == 1) {
+                if (g_pong_status == STATUS_READY) {
+                    g_current = 1
+                    sw = core.ctx_switch(g_sched_slot, g_pong_slot, mem)
+                    g_current = 0
+                } else {
+                    if (g_main_status == STATUS_READY) {
+                        g_current = 0
+                        sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
+                    } else {
+                        return 1
+                    }
+                }
+            } else {
+                if (g_main_status == STATUS_READY) {
+                    g_current = 0
+                    sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
+                } else {
+                    return 1
+                }
+            }
+        }
+    }
+    return 1
+}
+
+@export("__tetra_actor_spawn")
+fun actor_spawn(entry_id: i32): i32 {
+    unsafe {
+        if (g_pong_spawned == 1) {
+            return 1
+        }
+        g_pong_entry_id = entry_id
+        g_pong_slot = core.alloc_bytes(8)
+        let _ps: ptr = build_actor_stack(g_pong_slot)
+        g_pong_status = STATUS_READY
+        g_pong_spawned = 1
+        return 1
+    }
+    return 1
+}
+
+@export("__tetra_actor_send")
+fun actor_send(to: i32, v: i32): i32 {
+    let _ok: i32 = mailbox_put(to, v, g_current)
+    return v
+}
+
+@export("__tetra_actor_recv")
+fun actor_recv(): i32 {
+    unsafe {
+        let mem: cap.mem = core.cap_mem()
+        while (1) {
+            let idx: i32 = g_current
+            if (mailbox_has(idx) == 1) {
+                return mailbox_take(idx)
+            }
+            let _st: i32 = set_actor_status(idx, STATUS_BLOCKED)
+            let _y: i32 = core.ctx_switch(actor_slot(idx), g_sched_slot, mem)
+        }
+    }
+    return 0
+}
+
+@export("__tetra_actor_self")
+fun actor_self(): i32 {
+    return g_current
+}
+
+@export("__tetra_actor_sender")
+fun actor_sender(): i32 {
+    return mailbox_last_sender(g_current)
+}
+

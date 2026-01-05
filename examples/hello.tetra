@@ -1,0 +1,4 @@
+fun main(): i32 {
+  print("Hello from Tetra!\n")
+  return 0
+}

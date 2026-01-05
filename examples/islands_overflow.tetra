@@ -1,0 +1,13 @@
+// Islands overflow test
+// Creates a 16-user-byte scoped island and tries to allocate 20 bytes.
+// Expected: program exits with code 1
+
+fun main(): i32 {
+    island(16) as isl {
+        // 16 bytes of user data -> total=32, end=32
+        // Try to allocate 20 bytes - should fail (16+20=36 > 32)
+        var buf: []u8 = core.island_make_u8(isl, 20)
+        // If we get here, something went wrong
+    }
+    return 0
+}

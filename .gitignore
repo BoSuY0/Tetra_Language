@@ -1,0 +1,30 @@
+# Go build/cache artifacts
+.gocache/
+.cache/
+*.test
+*.out
+
+# Tetra build/cache artifacts
+.tetra_cache/
+tetra_cache/
+examples/.tetra_cache/
+*.tobj
+
+# Build outputs
+dumps/
+bin/
+dist/
+out/
+app
+app.exe
+tetra
+*.exe
+*.dll
+*.so
+*.dylib
+islands_hello
+islands_i32
+islands_overflow
+
+# OS/editor junk
+.DS_Store

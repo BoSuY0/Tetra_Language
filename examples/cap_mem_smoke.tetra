@@ -1,0 +1,16 @@
+fun main(): i32 {
+  var out: i32 = 1
+  unsafe {
+    let mem: cap.mem = core.cap_mem()
+    let p: ptr = core.alloc_bytes(8)
+    let q: ptr = core.ptr_add(p, 4, mem)
+    let _: i32 = core.store_i32(q, 123, mem)
+    let v: i32 = core.load_i32(q, mem)
+    if (v == 123) {
+      out = 77
+    } else {
+      out = 1
+    }
+  }
+  return out
+}

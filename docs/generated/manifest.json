@@ -1,0 +1,393 @@
+{
+  "compiler_version": "v0.13",
+  "targets": [
+    {
+      "triple": "linux-x64",
+      "os": "linux",
+      "arch": "x64",
+      "abi": "sysv",
+      "format": "elf",
+      "exe_ext": "",
+      "collect_imports": false
+    },
+    {
+      "triple": "windows-x64",
+      "os": "windows",
+      "arch": "x64",
+      "abi": "win64",
+      "format": "pe",
+      "exe_ext": ".exe",
+      "collect_imports": true
+    },
+    {
+      "triple": "macos-x64",
+      "os": "macos",
+      "arch": "x64",
+      "abi": "sysv",
+      "format": "macho",
+      "exe_ext": "",
+      "collect_imports": false
+    }
+  ],
+  "builtins": [
+    {
+      "name": "core.actor_dispatch",
+      "aliases": [
+        "actor_dispatch"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.actor_main_entry_id",
+      "aliases": [
+        "actor_main_entry_id"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.alloc_bytes",
+      "aliases": [
+        "alloc_bytes"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "alloc",
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.cap_io",
+      "return_type": "cap.io",
+      "effects": [
+        "capability",
+        "io"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.cap_mem",
+      "return_type": "cap.mem",
+      "effects": [
+        "capability",
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.ctx_switch",
+      "aliases": [
+        "ctx_switch"
+      ],
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "control",
+        "runtime"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.island_make_i32",
+      "aliases": [
+        "island_make_i32"
+      ],
+      "param_types": [
+        "island",
+        "i32"
+      ],
+      "return_type": "[]i32",
+      "effects": [
+        "alloc",
+        "islands",
+        "mem"
+      ],
+      "unsafe_policy": "conditional",
+      "unsafe_details": "requires unsafe when the island argument is not a scoped island variable"
+    },
+    {
+      "name": "core.island_make_u8",
+      "aliases": [
+        "island_make_u8"
+      ],
+      "param_types": [
+        "island",
+        "i32"
+      ],
+      "return_type": "[]u8",
+      "effects": [
+        "alloc",
+        "islands",
+        "mem"
+      ],
+      "unsafe_policy": "conditional",
+      "unsafe_details": "requires unsafe when the island argument is not a scoped island variable"
+    },
+    {
+      "name": "core.island_new",
+      "aliases": [
+        "island_new"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "island",
+      "effects": [
+        "alloc",
+        "islands",
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.load_i32",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.load_ptr",
+      "aliases": [
+        "load_ptr"
+      ],
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.load_u8",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.make_i32",
+      "aliases": [
+        "make_i32"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "[]i32",
+      "effects": [
+        "alloc",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.make_u8",
+      "aliases": [
+        "make_u8"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "[]u8",
+      "effects": [
+        "alloc",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.mmio_read_i32",
+      "param_types": [
+        "ptr",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io",
+        "mmio"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.mmio_write_i32",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io",
+        "mmio"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.ptr_add",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.recv",
+      "return_type": "i32",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.self",
+      "return_type": "actor",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.send",
+      "param_types": [
+        "actor",
+        "i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.sender",
+      "return_type": "actor",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.spawn",
+      "param_types": [
+        "str"
+      ],
+      "return_type": "actor",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.store_i32",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.store_ptr",
+      "aliases": [
+        "store_ptr"
+      ],
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.store_u8",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.sym_addr",
+      "aliases": [
+        "sym_addr"
+      ],
+      "param_types": [
+        "str"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "link"
+      ],
+      "unsafe_policy": "always"
+    }
+  ],
+  "runtime_abi": {
+    "reserved_prefix": "__tetra_",
+    "actors_supported_targets": [
+      "linux-x64",
+      "macos-x64",
+      "windows-x64"
+    ],
+    "actors_required_symbols": [
+      "__tetra_entry",
+      "__tetra_actor_spawn",
+      "__tetra_actor_send",
+      "__tetra_actor_recv",
+      "__tetra_actor_self",
+      "__tetra_actor_sender"
+    ],
+    "actors_program_glue_symbols": [
+      "__tetra_actor_dispatch",
+      "__tetra_actor_main_entry_id"
+    ]
+  }
+}

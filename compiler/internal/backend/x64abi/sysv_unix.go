@@ -1,0 +1,351 @@
+package x64abi
+
+import (
+	"fmt"
+
+	"tetra_language/compiler/internal/backend/x64"
+	"tetra_language/compiler/internal/backend/x64obj"
+	"tetra_language/compiler/internal/ir"
+)
+
+type SysVUnix struct {
+	SysExit     uint32
+	SysWrite    uint32
+	SysMmap     uint32
+	SysMunmap   uint32
+	SysMprotect uint32
+}
+
+func LinuxSysV() *SysVUnix {
+	return &SysVUnix{
+		SysExit:     60,
+		SysWrite:    1,
+		SysMmap:     9,
+		SysMunmap:   11,
+		SysMprotect: 10,
+	}
+}
+
+func MacSysV() *SysVUnix {
+	return &SysVUnix{
+		SysExit:     0x2000001,
+		SysWrite:    0x2000004,
+		SysMmap:     0x20000C5,
+		SysMunmap:   0x2000049,
+		SysMprotect: 0x200000A,
+	}
+}
+
+func (a *SysVUnix) SpillParams(e *x64.Emitter, fn ir.IRFunc) {
+	for i := 0; i < fn.ParamSlots; i++ {
+		off := -int32((i + 1) * 8)
+		switch i {
+		case 0:
+			e.MovMem64RbpDispRdi(off)
+		case 1:
+			e.MovMem64RbpDispRsi(off)
+		case 2:
+			e.MovMem64RbpDispRdx(off)
+		case 3:
+			e.MovMem64RbpDispRcx(off)
+		case 4:
+			e.MovMem64RbpDispR8(off)
+		case 5:
+			e.MovMem64RbpDispR9(off)
+		default:
+			stackOff := int32(16 + 8*(i-6))
+			e.MovRaxFromRbpDisp(stackOff)
+			e.MovMem64RbpDispRax(off)
+		}
+	}
+}
+
+func (a *SysVUnix) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, callPatches *[]x64obj.CallPatch) error {
+	if stackDepth == nil || callPatches == nil {
+		return fmt.Errorf("internal error: missing stackDepth/callPatches")
+	}
+	if instr.ArgSlots < 0 {
+		return fmt.Errorf("invalid argument count")
+	}
+	if *stackDepth < instr.ArgSlots {
+		return fmt.Errorf("stack underflow in call to '%s'", instr.Name)
+	}
+	*stackDepth -= instr.ArgSlots
+
+	extra := 0
+	if instr.ArgSlots > 6 {
+		extra = instr.ArgSlots - 6
+	}
+	if extra > 0 {
+		tempSize := int32(extra * 8)
+		e.SubRspImm32(tempSize)
+		for i := 6; i < instr.ArgSlots; i++ {
+			srcOffset := tempSize + int32(8*(instr.ArgSlots-1-i))
+			dstOffset := int32(8 * (i - 6))
+			e.MovRaxFromRspDisp(srcOffset)
+			e.MovMem64RspDispRax(dstOffset)
+		}
+		e.AddRspImm32(tempSize)
+	}
+	for i := instr.ArgSlots - 1; i >= 0; i-- {
+		switch i {
+		case 0:
+			e.PopRdi()
+		case 1:
+			e.PopRsi()
+		case 2:
+			e.PopRdx()
+		case 3:
+			e.PopRcx()
+		case 4:
+			e.PopR8()
+		case 5:
+			e.PopR9()
+		default:
+			e.PopRax()
+		}
+	}
+	if extra > 0 {
+		e.SubRspImm32(int32(extra * 8))
+	}
+	needAlign := (*stackDepth+extra)%2 != 0
+	alignBytes := int32(0)
+	if needAlign {
+		e.SubRspImm32(8)
+		alignBytes = 8
+	}
+	if extra > 0 {
+		tempBaseOffset := -int32(instr.ArgSlots*8) + alignBytes
+		for i := 6; i < instr.ArgSlots; i++ {
+			tempOffset := tempBaseOffset + int32(8*(i-6))
+			dstOffset := int32(8 * (i - 6))
+			e.MovRaxFromRspDisp(tempOffset)
+			e.MovMem64RspDispRax(dstOffset)
+		}
+	}
+	at := e.CallRel32()
+	*callPatches = append(*callPatches, x64obj.CallPatch{At: at, Name: instr.Name})
+	if needAlign {
+		e.AddRspImm32(8)
+	}
+	if extra > 0 {
+		e.AddRspImm32(int32(extra * 8))
+	}
+	if instr.RetSlots > 0 {
+		e.PushRax()
+		*stackDepth++
+	}
+	if instr.RetSlots > 1 {
+		e.PushRdx()
+		*stackDepth++
+	}
+	return nil
+}
+
+func (a *SysVUnix) EmitWriteStdout(e *x64.Emitter, stackDepth *int, importPatches *[]x64obj.ImportPatch) error {
+	_ = importPatches
+	if stackDepth == nil {
+		return fmt.Errorf("internal error: missing stackDepth")
+	}
+	if *stackDepth < 2 {
+		return fmt.Errorf("stack underflow in write")
+	}
+	*stackDepth -= 2
+	e.PopRdx()
+	e.PopRsi()
+	e.MovEaxImm32(a.SysWrite)
+	e.MovEdiImm32(1)
+	e.Syscall()
+	return nil
+}
+
+func (a *SysVUnix) EmitExit(e *x64.Emitter, code int32, stackSlots int, importPatches *[]x64obj.ImportPatch) error {
+	_ = stackSlots
+	_ = importPatches
+	e.MovEdiImm32(uint32(code))
+	e.MovEaxImm32(a.SysExit)
+	e.Syscall()
+	return nil
+}
+
+func (a *SysVUnix) EmitAllocBytes(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+	_ = opt
+	_ = importPatches
+	if stackDepth == nil {
+		return fmt.Errorf("internal error: missing stackDepth")
+	}
+	if *stackDepth < 1 {
+		return fmt.Errorf("stack underflow in alloc_bytes")
+	}
+	*stackDepth--
+	e.PopRsi()
+	e.MovEdiImm32(0)
+	e.MovEdxImm32(3)
+	e.MovR10dImm32(0x22)
+	e.MovR8dImm32(0xFFFFFFFF)
+	e.MovR9dImm32(0)
+	e.MovEaxImm32(a.SysMmap)
+	e.Syscall()
+	e.PushRax()
+	*stackDepth++
+	return nil
+}
+
+func (a *SysVUnix) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+	_ = opt
+	_ = importPatches
+	if stackDepth == nil {
+		return fmt.Errorf("internal error: missing stackDepth")
+	}
+	if *stackDepth < 1 {
+		return fmt.Errorf("stack underflow in make_slice")
+	}
+	*stackDepth--
+	e.PopRax()
+	e.PushRax()
+	*stackDepth++
+	if kind == ir.IRMakeSliceI32 {
+		e.ShlRaxImm8(2)
+	}
+	e.MovRsiRax()
+	e.MovEdiImm32(0)
+	e.MovEdxImm32(3)
+	e.MovR10dImm32(0x22)
+	e.MovR8dImm32(0xFFFFFFFF)
+	e.MovR9dImm32(0)
+	e.MovEaxImm32(a.SysMmap)
+	e.Syscall()
+	*stackDepth--
+	e.PopRcx()
+	e.PushRax()
+	*stackDepth++
+	e.PushRcx()
+	*stackDepth++
+	return nil
+}
+
+func (a *SysVUnix) EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+	_ = importPatches
+	if stackDepth == nil {
+		return fmt.Errorf("internal error: missing stackDepth")
+	}
+	if *stackDepth < 1 {
+		return fmt.Errorf("stack underflow in island_new")
+	}
+	*stackDepth--
+	e.PopRax()
+	headerSize := int32(16)
+	if opt.IslandsDebug {
+		headerSize = x64.IslandsDebugPageSize
+	}
+	e.AddEaxImm32(headerSize)
+	e.MovRsiRax()
+	e.PushRax()
+	*stackDepth++
+	e.MovEdiImm32(0)
+	e.MovEdxImm32(3)
+	e.MovR10dImm32(0x22)
+	e.MovR8dImm32(0xFFFFFFFF)
+	e.MovR9dImm32(0)
+	e.MovEaxImm32(a.SysMmap)
+	e.Syscall()
+	*stackDepth--
+	e.PopRcx()
+	e.MovMem32RaxPtrImm32(0, headerSize)
+	e.MovMem32Disp32RaxPtrEcx(4)
+	e.MovMem32Disp32RaxPtrEcx(8)
+	e.MovMem32RaxPtrImm32(12, 0)
+	e.PushRax()
+	*stackDepth++
+	return nil
+}
+
+func (a *SysVUnix) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+	_ = opt
+	_ = importPatches
+	if stackDepth == nil {
+		return fmt.Errorf("internal error: missing stackDepth")
+	}
+	if *stackDepth < 2 {
+		return fmt.Errorf("stack underflow in island_make_slice")
+	}
+	*stackDepth -= 2
+	e.PopRcx()
+	e.PopRax()
+	e.PushRax()
+	*stackDepth++
+	e.PushRcx()
+	*stackDepth++
+	e.MovRsiRcx()
+	if kind == ir.IRIslandMakeSliceI32 {
+		e.ShlRsiImm8(2)
+	}
+	e.MovEdxFromRaxPtrDisp0()
+	e.MovR8dFromRaxPtrDisp4()
+	e.MovR9Rdx()
+	e.AddR9Rsi()
+	e.CmpR9R8()
+	failAt := e.JaRel32()
+	e.AddRdxRax()
+	e.MovMem32RaxPtrFromR9d()
+
+	*stackDepth -= 2
+	e.PopRcx()
+	e.PopRax()
+	e.PushRdx()
+	*stackDepth++
+	e.PushRcx()
+	*stackDepth++
+	doneAt := e.JmpRel32()
+
+	failOff := len(e.Buf)
+	if err := a.EmitExit(e, 1, *stackDepth, nil); err != nil {
+		return err
+	}
+	doneOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *SysVUnix) EmitIslandFree(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+	_ = importPatches
+	if stackDepth == nil {
+		return fmt.Errorf("internal error: missing stackDepth")
+	}
+	if *stackDepth < 1 {
+		return fmt.Errorf("stack underflow in island_free")
+	}
+	*stackDepth--
+	e.PopRdi()
+	if opt.IslandsDebug {
+		e.MovEaxFromRdiDisp(12)
+		e.TestEaxEax()
+		okAt := e.JzRel32()
+		if err := a.EmitExit(e, 2, *stackDepth, nil); err != nil {
+			return err
+		}
+		okOff := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, okAt, okOff); err != nil {
+			return err
+		}
+		e.MovRaxRdi()
+		e.MovMem32RaxPtrImm32(12, 1)
+		e.MovEaxFromRdiDisp(8)
+		e.SubEaxImm32(x64.IslandsDebugPageSize)
+		e.MovRsiRax()
+		e.AddRdiImm32(x64.IslandsDebugPageSize)
+		e.MovEdxImm32(0)
+		e.MovEaxImm32(a.SysMprotect)
+		e.Syscall()
+		return nil
+	}
+	e.MovEsiFromRdiDisp(8)
+	e.MovEaxImm32(a.SysMunmap)
+	e.Syscall()
+	return nil
+}

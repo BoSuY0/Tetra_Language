@@ -1,0 +1,16 @@
+// Islands smoke test
+// Creates a scoped island, allocates a []u8, writes "Hello\n", prints it.
+
+fun main(): i32 {
+    island(64) as isl {
+        var msg: []u8 = core.island_make_u8(isl, 6)
+        msg[0] = 72   // 'H'
+        msg[1] = 101  // 'e'
+        msg[2] = 108  // 'l'
+        msg[3] = 108  // 'l'
+        msg[4] = 111  // 'o'
+        msg[5] = 10   // '\n'
+        print(msg)
+    }
+    return 0
+}

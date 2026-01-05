@@ -1,0 +1,72 @@
+{
+  "timestamp": "2025-12-30T19:05:00Z",
+  "target": "linux-x64",
+  "host": "linux-x64",
+  "version": "v0.13",
+  "islands_debug": false,
+  "cases": [
+    {
+      "name": "islands_hello",
+      "src_path": "examples/islands_hello.tetra",
+      "out_path": "/tmp/tetra-smoke-1918787067/islands_hello",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "islands_i32",
+      "src_path": "examples/islands_i32.tetra",
+      "out_path": "/tmp/tetra-smoke-1918787067/islands_i32",
+      "expected_exit": 55,
+      "actual_exit": 55,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "islands_overflow",
+      "src_path": "examples/islands_overflow.tetra",
+      "out_path": "/tmp/tetra-smoke-1918787067/islands_overflow",
+      "expected_exit": 1,
+      "actual_exit": 1,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "mmio_smoke",
+      "src_path": "examples/mmio_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1918787067/mmio_smoke",
+      "expected_exit": 123,
+      "actual_exit": 123,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "cap_mem_smoke",
+      "src_path": "examples/cap_mem_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1918787067/cap_mem_smoke",
+      "expected_exit": 77,
+      "actual_exit": 77,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "memset_smoke",
+      "src_path": "examples/memset_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1918787067/memset_smoke",
+      "expected_exit": 88,
+      "actual_exit": 88,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "actors_pingpong",
+      "src_path": "examples/actors_pingpong.tetra",
+      "out_path": "/tmp/tetra-smoke-1918787067/actors_pingpong",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    }
+  ]
+}

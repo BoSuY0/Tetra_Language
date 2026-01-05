@@ -1,0 +1,24 @@
+// Globals smoke test
+// Exercises top-level var/val globals and module-local access.
+
+var g_x: i32;
+val g_y: i32 = 40;
+var g_p: ptr;
+val g_null: ptr = 0;
+
+fun main(): i32 {
+    var out: i32 = 0
+    g_x = g_y + 2
+    unsafe {
+        let mem1: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(4)
+        g_p = p
+        let _w: i32 = core.store_i32(g_p, 7, mem1)
+    }
+    unsafe {
+        let mem2: cap.mem = core.cap_mem()
+        let v: i32 = core.load_i32(g_p, mem2)
+        out = v + g_x
+    }
+    return out
+}

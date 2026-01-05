@@ -1,0 +1,23 @@
+// cap.mem ptr smoke test
+// Exercises core.load_ptr / core.store_ptr.
+
+fun main(): i32 {
+    var out: i32 = 1
+    unsafe {
+        let mem: cap.mem = core.cap_mem()
+        let buf: ptr = core.alloc_bytes(4)
+        let slot: ptr = core.alloc_bytes(8)
+
+        let _sp: ptr = core.store_ptr(slot, buf, mem)
+        let p2: ptr = core.load_ptr(slot, mem)
+        let _w: i32 = core.store_i32(buf, 123, mem)
+        let v: i32 = core.load_i32(p2, mem)
+
+        if (v == 123) {
+            out = 77
+        } else {
+            out = 1
+        }
+    }
+    return out
+}
