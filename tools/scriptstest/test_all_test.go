@@ -447,13 +447,16 @@ func TestTestAllValidatesHostSmokeReport(t *testing.T) {
 		t.Fatalf("read test_all: %v", err)
 	}
 	text := string(raw)
-	run := `./tetra smoke --target linux-x64 --run=true --report "$report_dir/host-smoke.json"`
+	run := `run_release_smoke_target "linux-x64" "true" "$report_dir/host-smoke.json"`
 	if !strings.Contains(text, run) {
 		t.Fatalf("test_all missing host smoke report command %q", run)
 	}
 	validate := `go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_dir/host-smoke.json"`
 	if !strings.Contains(text, validate) {
 		t.Fatalf("test_all missing host smoke report validation %q", validate)
+	}
+	if strings.Contains(text, `./tetra smoke --target linux-x64 --run=true`) {
+		t.Fatalf("test_all should not use legacy full smoke coverage for host run")
 	}
 }
 
@@ -561,8 +564,8 @@ func TestTestAllValidatesSmokeListJSONReport(t *testing.T) {
 	text := string(raw)
 	for _, want := range []string{
 		`run_step "smoke list json report" check_smoke_list`,
-		`./tetra smoke --list --format=json >"$report_dir/smoke-list.json"`,
-		`go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json"`,
+		`write_release_smoke_list "$report_dir/smoke-list.json"`,
+		`go run ./tools/cmd/validate-flow-only examples/flow_hello.tetra examples/flow_struct_smoke.tetra examples/flow_islands_smoke.tetra examples/flow_unsafe_cap_mem_smoke.tetra`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("test_all missing smoke list validation %q", want)

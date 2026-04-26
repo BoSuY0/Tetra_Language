@@ -340,14 +340,133 @@ check_lsp_smoke() {
   go run ./tools/cmd/validate-lsp-smoke --report "$report_dir/lsp-smoke.json"
 }
 
+release_smoke_cases=(
+  "flow_hello:examples/flow_hello.tetra:0"
+  "flow_struct_smoke:examples/flow_struct_smoke.tetra:42"
+  "flow_islands_smoke:examples/flow_islands_smoke.tetra:0"
+  "flow_unsafe_cap_mem_smoke:examples/flow_unsafe_cap_mem_smoke.tetra:42"
+)
+
+write_release_smoke_list() {
+  local out="$1"
+  local first=true
+  local entry
+  local name
+  local src
+  local expected
+
+  {
+    echo "{"
+    printf '  "total": %s,\n' "${#release_smoke_cases[@]}"
+    echo '  "islands_debug": false,'
+    echo '  "cases": ['
+    for entry in "${release_smoke_cases[@]}"; do
+      IFS=':' read -r name src expected <<<"$entry"
+      if [[ "$first" == true ]]; then
+        first=false
+      else
+        echo ","
+      fi
+      printf '    {"name":"%s","src_path":"%s","expected_exit":%s}' "$(json_escape "$name")" "$(json_escape "$src")" "$expected"
+    done
+    echo
+    echo "  ]"
+    echo "}"
+  } >"$out"
+}
+
+run_release_smoke_target() {
+  local target="$1"
+  local run_binaries="$2"
+  local report_path="$3"
+  local cases_jsonl="$tmp_dir/release-smoke-${target}.jsonl"
+  local timestamp
+  local version
+  local git_head
+  local host
+  local total=0
+  local passed=0
+  local failed=0
+  local entry
+  local name
+  local src
+  local expected
+
+  timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  version="$(./tetra version)"
+  git_head="$(git rev-parse --short HEAD 2>/dev/null || true)"
+  host="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)"
+
+  : >"$cases_jsonl"
+
+  for entry in "${release_smoke_cases[@]}"; do
+    local case_json
+    local out_path
+    local actual_exit
+    IFS=':' read -r name src expected <<<"$entry"
+    total=$((total + 1))
+    case_json="{\"name\":\"$(json_escape "$name")\",\"src_path\":\"$(json_escape "$src")\",\"expected_exit\":$expected"
+
+    if [[ "$run_binaries" == "true" ]]; then
+      if ./tetra run --target "$target" "$src" >"$tmp_dir/${name}-${target}.run.out" 2>"$tmp_dir/${name}-${target}.run.err"; then
+        actual_exit=0
+      else
+        actual_exit="$?"
+      fi
+      case_json="$case_json,\"actual_exit\":$actual_exit,\"ran\":true"
+      if [[ "$actual_exit" -eq "$expected" ]]; then
+        passed=$((passed + 1))
+        case_json="$case_json,\"pass\":true"
+      else
+        failed=$((failed + 1))
+        case_json="$case_json,\"pass\":false,\"error\":\"unexpected exit: got $actual_exit, want $expected\""
+      fi
+    else
+      local build_error
+      out_path="$tmp_dir/${name}-${target}"
+      case_json="$case_json,\"out_path\":\"$(json_escape "$out_path")\""
+      if ./tetra build --target "$target" -o "$out_path" "$src" >"$tmp_dir/${name}-${target}.build.out" 2>"$tmp_dir/${name}-${target}.build.err"; then
+        passed=$((passed + 1))
+        case_json="$case_json,\"ran\":false,\"pass\":true"
+      else
+        build_error="$(head -n 1 "$tmp_dir/${name}-${target}.build.err" || true)"
+        failed=$((failed + 1))
+        case_json="$case_json,\"ran\":false,\"pass\":false,\"error\":\"$(json_escape "${build_error:-build failed}")\""
+      fi
+    fi
+
+    case_json="$case_json}"
+    printf '%s\n' "$case_json" >>"$cases_jsonl"
+  done
+
+  {
+    echo "{"
+    printf '  "timestamp": "%s",\n' "$(json_escape "$timestamp")"
+    printf '  "target": "%s",\n' "$(json_escape "$target")"
+    printf '  "host": "%s",\n' "$(json_escape "$host")"
+    printf '  "version": "%s",\n' "$(json_escape "$version")"
+    printf '  "git_head": "%s",\n' "$(json_escape "$git_head")"
+    echo '  "islands_debug": false,'
+    printf '  "total": %s,\n' "$total"
+    printf '  "passed": %s,\n' "$passed"
+    printf '  "failed": %s,\n' "$failed"
+    echo '  "cases": ['
+    awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$cases_jsonl"
+    echo '  ]'
+    echo "}"
+  } >"$report_path"
+
+  [[ "$failed" -eq 0 ]]
+}
+
 check_host_smoke() {
-  ./tetra smoke --target linux-x64 --run=true --report "$report_dir/host-smoke.json"
+  run_release_smoke_target "linux-x64" "true" "$report_dir/host-smoke.json"
   go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_dir/host-smoke.json"
 }
 
 check_smoke_list() {
-  ./tetra smoke --list --format=json >"$report_dir/smoke-list.json"
-  go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json"
+  write_release_smoke_list "$report_dir/smoke-list.json"
+  go run ./tools/cmd/validate-flow-only examples/flow_hello.tetra examples/flow_struct_smoke.tetra examples/flow_islands_smoke.tetra examples/flow_unsafe_cap_mem_smoke.tetra
 }
 
 check_generated_api_docs() {
@@ -389,11 +508,11 @@ TETRA
 }
 
 check_cross_target_smoke() {
-  ./tetra smoke --target linux-x64 --run=false --report "$tmp_dir/linux-smoke.json"
+  run_release_smoke_target "linux-x64" "false" "$tmp_dir/linux-smoke.json"
   go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/linux-smoke.json"
-  ./tetra smoke --target macos-x64 --run=false --report "$tmp_dir/macos-smoke.json"
+  run_release_smoke_target "macos-x64" "false" "$tmp_dir/macos-smoke.json"
   go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/macos-smoke.json"
-  ./tetra smoke --target windows-x64 --run=false --report "$tmp_dir/windows-smoke.json"
+  run_release_smoke_target "windows-x64" "false" "$tmp_dir/windows-smoke.json"
   go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/windows-smoke.json"
 }
 

@@ -729,6 +729,22 @@ func isOwnershipMarker(name string) bool {
 	return name == "borrow" || name == "inout" || name == "consume"
 }
 
+func isFunctionLikeCallee(parts []string) bool {
+	if len(parts) == 0 {
+		return false
+	}
+	name := parts[len(parts)-1]
+	if name == "" {
+		return false
+	}
+	ch := name[0]
+	return ch == '_' || (ch >= 'a' && ch <= 'z')
+}
+
+func argumentLabelsPlannedError(pos Position) error {
+	return diagnosticErrorf(pos, "function-call argument labels are planned for a later release")
+}
+
 func (p *parser) parseStructDecl() (*StructDecl, error) {
 	if p.cur.typ != TokenStruct {
 		return nil, p.unexpected("struct")
@@ -1143,6 +1159,9 @@ func (p *parser) parseStmt() (Stmt, error) {
 				return nil, err
 			}
 			if p.cur.typ == TokenIdent && p.peek.typ == TokenColon {
+				if isFunctionLikeCallee(parts) {
+					return nil, argumentLabelsPlannedError(p.cur.pos)
+				}
 				typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
 				lit, err := p.parseStructCallLiteral(typeRef)
 				if err != nil {
@@ -1465,6 +1484,9 @@ func (p *parser) parseMatchValue() (Expr, error) {
 			if err := p.next(); err != nil {
 				return nil, err
 			}
+			if p.cur.typ == TokenIdent && p.peek.typ == TokenColon && isFunctionLikeCallee(parts) {
+				return nil, argumentLabelsPlannedError(p.cur.pos)
+			}
 			var args []Expr
 			if p.cur.typ != TokenRParen {
 				for {
@@ -1741,6 +1763,9 @@ func (p *parser) parsePrimary() (Expr, error) {
 				return nil, err
 			}
 			if p.cur.typ == TokenIdent && p.peek.typ == TokenColon {
+				if isFunctionLikeCallee(parts) {
+					return nil, argumentLabelsPlannedError(p.cur.pos)
+				}
 				typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
 				lit, err := p.parseStructCallLiteral(typeRef)
 				if err != nil {

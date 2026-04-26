@@ -308,6 +308,7 @@ func checkCallExprWithEffects(
 	}
 	argRegions := make([]int, len(e.Args))
 	consumeArgs := make([]string, len(e.Args))
+	consumeArgPositions := make(map[string]frontend.Position)
 	borrowArgs := make(map[string]frontend.Position)
 	inoutArgs := make(map[string]frontend.Position)
 	for i, arg := range e.Args {
@@ -323,7 +324,11 @@ func checkCallExprWithEffects(
 			if !ok {
 				return "", regionNone, fmt.Errorf("%s: consume argument for '%s' must be a local value", frontend.FormatPos(arg.Pos()), resolved)
 			}
+			if firstPos, exists := inoutArgs[id.Name]; exists {
+				return "", regionNone, fmt.Errorf("%s: consumed argument '%s' aliases inout argument in call to '%s' (inout at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+			}
 			consumeArgs[i] = id.Name
+			consumeArgPositions[id.Name] = arg.Pos()
 		}
 		if i < len(sig.ParamOwnership) && sig.ParamOwnership[i] == "borrow" {
 			id, ok := arg.(*frontend.IdentExpr)
@@ -348,6 +353,9 @@ func checkCallExprWithEffects(
 			}
 			if firstPos, exists := borrowArgs[id.Name]; exists {
 				return "", regionNone, fmt.Errorf("%s: inout argument '%s' aliases borrowed argument in call to '%s' (borrow at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+			}
+			if firstPos, exists := consumeArgPositions[id.Name]; exists {
+				return "", regionNone, fmt.Errorf("%s: inout argument '%s' aliases consumed argument in call to '%s' (consume at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
 			}
 			inoutArgs[id.Name] = arg.Pos()
 		}

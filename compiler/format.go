@@ -15,13 +15,34 @@ func FormatSource(src []byte, filename string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := frontend.ParseFile(src, filename)
+	file, err := frontend.ParseFile(stripStandaloneBlockComments(src), filename)
 	if err != nil {
 		return nil, err
 	}
 	var p sourcePrinter
 	p.file(file)
 	return applyLineComments([]byte(p.b.String()), comments), nil
+}
+
+func stripStandaloneBlockComments(src []byte) []byte {
+	lines := strings.Split(string(src), "\n")
+	out := make([]string, 0, len(lines))
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimRight(lines[i], "\r")
+		commentAt, block := commentStart(line)
+		if commentAt >= 0 && block && strings.TrimSpace(line[:commentAt]) == "" {
+			out = append(out, "")
+			commentLine := line[commentAt:]
+			for strings.Index(commentLine, "*/") < 0 && i+1 < len(lines) {
+				i++
+				commentLine = strings.TrimRight(lines[i], "\r")
+				out = append(out, "")
+			}
+			continue
+		}
+		out = append(out, line)
+	}
+	return []byte(strings.Join(out, "\n"))
 }
 
 type lineComments struct {
@@ -33,9 +54,10 @@ func collectLineComments(src []byte, filename string) (lineComments, error) {
 	out := lineComments{before: make(map[int][]string)}
 	var pending []string
 	codeLine := 0
-	for i, raw := range strings.Split(string(src), "\n") {
-		line := strings.TrimRight(raw, "\r")
-		commentAt := lineCommentStart(line)
+	lines := strings.Split(string(src), "\n")
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimRight(lines[i], "\r")
+		commentAt, block := commentStart(line)
 		if commentAt >= 0 {
 			if strings.TrimSpace(line[:commentAt]) != "" {
 				return lineComments{}, &frontend.DiagnosticError{Info: frontend.Diagnostic{
@@ -48,7 +70,46 @@ func collectLineComments(src []byte, filename string) (lineComments, error) {
 					Hint:     "Move the comment to its own line before running tetra fmt.",
 				}}
 			}
-			pending = append(pending, strings.TrimSpace(line[commentAt:]))
+			if !block {
+				pending = append(pending, strings.TrimSpace(line[commentAt:]))
+				continue
+			}
+
+			commentLine := line[commentAt:]
+			for {
+				end := strings.Index(commentLine, "*/")
+				if end >= 0 {
+					pending = append(pending, strings.TrimSpace(commentLine[:end+2]))
+					if strings.TrimSpace(commentLine[end+2:]) != "" {
+						col := commentAt + end + 3
+						return lineComments{}, &frontend.DiagnosticError{Info: frontend.Diagnostic{
+							Code:     "TETRA_FMT001",
+							Message:  "inline comments are not supported by tetra fmt v0.18; move the comment to its own line or format manually",
+							File:     filename,
+							Line:     i + 1,
+							Column:   col,
+							Severity: "error",
+							Hint:     "Move the comment to its own line before running tetra fmt.",
+						}}
+					}
+					break
+				}
+
+				pending = append(pending, strings.TrimSpace(commentLine))
+				i++
+				if i >= len(lines) {
+					return lineComments{}, &frontend.DiagnosticError{Info: frontend.Diagnostic{
+						Code:     "TETRA_FMT002",
+						Message:  "unterminated block comment",
+						File:     filename,
+						Line:     len(lines),
+						Column:   1,
+						Severity: "error",
+					}}
+				}
+				commentLine = strings.TrimRight(lines[i], "\r")
+				commentAt = 0
+			}
 			continue
 		}
 		if strings.TrimSpace(line) == "" {
@@ -72,7 +133,7 @@ func formattedCodeLineCount(line string) int {
 	return 1
 }
 
-func lineCommentStart(line string) int {
+func commentStart(line string) (int, bool) {
 	inString := false
 	escaped := false
 	for i := 0; i+1 < len(line); i++ {
@@ -95,10 +156,13 @@ func lineCommentStart(line string) int {
 			continue
 		}
 		if ch == '/' && line[i+1] == '/' {
-			return i
+			return i, false
+		}
+		if ch == '/' && line[i+1] == '*' {
+			return i, true
 		}
 	}
-	return -1
+	return -1, false
 }
 
 func applyLineComments(formatted []byte, comments lineComments) []byte {

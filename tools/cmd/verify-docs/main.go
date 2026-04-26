@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"tetra_language/compiler"
+	ctarget "tetra_language/compiler/target"
 )
 
 type manifest struct {
@@ -81,6 +82,9 @@ func main() {
 	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md"}); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifyWASMBackendPlan("docs/backend/wasm_backend_plan.md", ctarget.PlannedTriples()); err != nil {
+		errs = append(errs, err.Error())
+	}
 
 	if len(errs) > 0 {
 		for _, e := range errs {
@@ -88,6 +92,36 @@ func main() {
 		}
 		os.Exit(1)
 	}
+}
+
+func verifyWASMBackendPlan(path string, plannedTargets []string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("%s: %v", path, err)
+	}
+	text := string(raw)
+	required := []string{
+		"Status: planned",
+		"Phase 0: Target contract",
+		"Phase 1: WASM IR emitter",
+		"Phase 2: WASI runner",
+		"Phase 3: Web runtime",
+		"Phase 4: v1.0 release gate",
+		"go run ./tools/cmd/validate-targets",
+		"bash scripts/release_v1_0_gate.sh",
+		"wasmtime",
+		"browser automation",
+	}
+	for _, target := range plannedTargets {
+		required = append(required, "`"+target+"`")
+		required = append(required, "./tetra smoke --target "+target+" --run=false")
+	}
+	for _, want := range required {
+		if !strings.Contains(text, want) {
+			return fmt.Errorf("%s: missing %q", path, want)
+		}
+	}
+	return nil
 }
 
 func verifyDoctestBlocks(paths []string) error {

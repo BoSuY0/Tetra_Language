@@ -33,6 +33,12 @@ v0.17 enforces the first MVP effect set: `alloc`, `mem`, `io`, `mmio`,
 `islands`, `capability`, `link`, `control`, `runtime`, and `actors`.
 Aliases `cap.mem` and `cap.io` are accepted for `mem` and `io`.
 
+Function-call argument labels such as `add(a: 1, b: 2)` are planned for a later
+release. The MVP parser keeps `TypeName(field: value)` syntax for type-like
+struct constructors such as `Vec2(x: 40)`, so lowercase/function-like callees
+with labels currently produce an explicit planned-feature diagnostic instead of
+being treated as calls.
+
 Tests:
 
 ```tetra doctest

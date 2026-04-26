@@ -792,7 +792,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				state.throwType = sig.ThrowsType
 				state.async = sig.Async
 				effects := newEffectContext(fullName, sig.Effects, strings.HasPrefix(module, "__"))
-				if err := checkStmts(fn.Body, locals, globals, checked.FuncSigs, types, module, imports, sig.ReturnType, state, effects); err != nil {
+				borrowedParams := make(map[string]struct{})
+				for _, param := range fn.Params {
+					if param.Ownership == "borrow" {
+						borrowedParams[param.Name] = struct{}{}
+					}
+				}
+				if err := checkStmts(fn.Body, locals, globals, checked.FuncSigs, types, module, imports, sig.ReturnType, borrowedParams, state, effects); err != nil {
 					return nil, err
 				}
 				newReturnParam := regionNone
@@ -1185,6 +1191,7 @@ func checkStmts(
 	module string,
 	imports map[string]string,
 	returnType string,
+	borrowedParams map[string]struct{},
 	state *regionState,
 	effects *effectContext,
 ) error {
@@ -1228,6 +1235,11 @@ func checkStmts(
 			if err != nil {
 				return err
 			}
+			if id, ok := s.Value.(*frontend.IdentExpr); ok {
+				if _, borrowed := borrowedParams[id.Name]; borrowed && typeMayContainRegion(tname, types) {
+					return fmt.Errorf("%s: borrowed local '%s' cannot escape via return", frontend.FormatPos(s.At), id.Name)
+				}
+			}
 			if err := state.recordReturnRegion(regionID, s.At); err != nil {
 				return err
 			}
@@ -1259,7 +1271,7 @@ func checkStmts(
 			if err := state.enterIsland(s.Name); err != nil {
 				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
 			}
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 				return err
 			}
 			state.exitIsland()
@@ -1390,14 +1402,14 @@ func checkStmts(
 			}
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
-			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 				return err
 			}
 			thenVars := copyRegionVars(state.regionVars)
 			var elseVars map[string]int
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
-				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 					return err
 				}
 				elseVars = copyRegionVars(state.regionVars)
@@ -1417,14 +1429,14 @@ func checkStmts(
 			}
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
-			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 				return err
 			}
 			thenVars := copyRegionVars(state.regionVars)
 			var elseVars map[string]int
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
-				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 					return err
 				}
 				elseVars = copyRegionVars(state.regionVars)
@@ -1445,7 +1457,7 @@ func checkStmts(
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
 			state.loopDepth++
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 				state.loopDepth--
 				return err
 			}
@@ -1483,7 +1495,7 @@ func checkStmts(
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
 			state.loopDepth++
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 				state.loopDepth--
 				return err
 			}
@@ -1543,7 +1555,7 @@ func checkStmts(
 					}
 				}
 				state.regionVars = copyRegionVars(before)
-				if err := checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+				if err := checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 					return err
 				}
 				caseVars := copyRegionVars(state.regionVars)
@@ -1561,7 +1573,7 @@ func checkStmts(
 			markUnknownRegions(state)
 		case *frontend.UnsafeStmt:
 			state.enterUnsafe()
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
 				return err
 			}
 			state.exitUnsafe()

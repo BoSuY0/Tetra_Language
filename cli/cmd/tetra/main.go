@@ -558,9 +558,22 @@ type lspHoverParams struct {
 	} `json:"position"`
 }
 
+type lspDefinitionParams struct {
+	TextDocument lspTextDocumentIdentifier `json:"textDocument"`
+	Position     struct {
+		Line      int `json:"line"`
+		Character int `json:"character"`
+	} `json:"position"`
+}
+
+type lspOpenDocument struct {
+	Text     string
+	Analysis compiler.LSPAnalysis
+}
+
 func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 	reader := bufio.NewReader(stdin)
-	openDocs := map[string]compiler.LSPAnalysis{}
+	openDocs := map[string]lspOpenDocument{}
 	shutdown := false
 	for {
 		body, err := readLSPMessage(reader)
@@ -581,9 +594,11 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 			if req.ID != nil {
 				result := map[string]any{
 					"capabilities": map[string]any{
-						"textDocumentSync":       1,
-						"documentSymbolProvider": true,
-						"hoverProvider":          true,
+						"textDocumentSync":           1,
+						"documentSymbolProvider":     true,
+						"hoverProvider":              true,
+						"definitionProvider":         true,
+						"documentFormattingProvider": true,
 						"completionProvider": map[string]any{
 							"resolveProvider": false,
 						},
@@ -614,7 +629,7 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 				return 1
 			}
 			analysis := compiler.AnalyzeLSPSource([]byte(params.TextDocument.Text), params.TextDocument.URI)
-			openDocs[params.TextDocument.URI] = analysis
+			openDocs[params.TextDocument.URI] = lspOpenDocument{Text: params.TextDocument.Text, Analysis: analysis}
 			if err := writeLSPNotification(stdout, "textDocument/publishDiagnostics", map[string]any{
 				"uri":         params.TextDocument.URI,
 				"diagnostics": lspDiagnostics(analysis.Diagnostics),
@@ -633,7 +648,7 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 			}
 			text := params.ContentChanges[len(params.ContentChanges)-1].Text
 			analysis := compiler.AnalyzeLSPSource([]byte(text), params.TextDocument.URI)
-			openDocs[params.TextDocument.URI] = analysis
+			openDocs[params.TextDocument.URI] = lspOpenDocument{Text: text, Analysis: analysis}
 			if err := writeLSPNotification(stdout, "textDocument/publishDiagnostics", map[string]any{
 				"uri":         params.TextDocument.URI,
 				"diagnostics": lspDiagnostics(analysis.Diagnostics),
@@ -662,7 +677,7 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 				return 1
 			}
 			if req.ID != nil {
-				if err := writeLSPResponse(stdout, *req.ID, lspDocumentSymbols(openDocs[params.TextDocument.URI])); err != nil {
+				if err := writeLSPResponse(stdout, *req.ID, lspDocumentSymbols(openDocs[params.TextDocument.URI].Analysis)); err != nil {
 					fmt.Fprintln(stderr, err)
 					return 1
 				}
@@ -674,7 +689,23 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 				return 1
 			}
 			if req.ID != nil {
-				if err := writeLSPResponse(stdout, *req.ID, lspHoverAt(openDocs[params.TextDocument.URI], params.Position.Line)); err != nil {
+				if err := writeLSPResponse(stdout, *req.ID, lspHoverAt(openDocs[params.TextDocument.URI].Analysis, params.Position.Line)); err != nil {
+					fmt.Fprintln(stderr, err)
+					return 1
+				}
+			}
+		case "textDocument/definition":
+			var params lspDefinitionParams
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+			if req.ID != nil {
+				var result any
+				if doc, ok := openDocs[params.TextDocument.URI]; ok {
+					result = lspDefinitionLocations(doc, params.TextDocument.URI, params.Position.Line, params.Position.Character)
+				}
+				if err := writeLSPResponse(stdout, *req.ID, result); err != nil {
 					fmt.Fprintln(stderr, err)
 					return 1
 				}
@@ -686,7 +717,27 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 				return 1
 			}
 			if req.ID != nil {
-				if err := writeLSPResponse(stdout, *req.ID, lspCompletionItems(openDocs[params.TextDocument.URI])); err != nil {
+				if err := writeLSPResponse(stdout, *req.ID, lspCompletionItems(openDocs[params.TextDocument.URI].Analysis)); err != nil {
+					fmt.Fprintln(stderr, err)
+					return 1
+				}
+			}
+		case "textDocument/formatting":
+			var params lspTextDocumentParams
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+			if req.ID != nil {
+				edits := []map[string]any{}
+				if doc, ok := openDocs[params.TextDocument.URI]; ok {
+					var err error
+					edits, err = lspFormattingEdits(doc.Text, params.TextDocument.URI)
+					if err != nil {
+						edits = []map[string]any{}
+					}
+				}
+				if err := writeLSPResponse(stdout, *req.ID, edits); err != nil {
 					fmt.Fprintln(stderr, err)
 					return 1
 				}
@@ -812,6 +863,83 @@ func lspHoverAt(analysis compiler.LSPAnalysis, zeroBasedLine int) any {
 	return nil
 }
 
+func lspDefinitionLocations(doc lspOpenDocument, uri string, zeroBasedLine int, zeroBasedCharacter int) any {
+	name := lspIdentifierAt(doc.Text, zeroBasedLine, zeroBasedCharacter)
+	if name == "" {
+		return nil
+	}
+	for _, sym := range doc.Analysis.Symbols {
+		if sym.Name != name {
+			continue
+		}
+		line := maxInt(sym.Line-1, 0)
+		col := lspDefinitionColumn(doc.Text, sym)
+		return []map[string]any{{
+			"uri": uri,
+			"range": map[string]any{
+				"start": map[string]int{"line": line, "character": col},
+				"end":   map[string]int{"line": line, "character": col + len(name)},
+			},
+		}}
+	}
+	return nil
+}
+
+func lspIdentifierAt(text string, zeroBasedLine int, zeroBasedCharacter int) string {
+	if zeroBasedLine < 0 || zeroBasedCharacter < 0 {
+		return ""
+	}
+	lines := strings.Split(text, "\n")
+	if zeroBasedLine >= len(lines) {
+		return ""
+	}
+	line := lines[zeroBasedLine]
+	if len(line) == 0 {
+		return ""
+	}
+	idx := zeroBasedCharacter
+	if idx >= len(line) {
+		idx = len(line) - 1
+	}
+	if !isLSPIdentifierChar(line[idx]) {
+		if idx > 0 && isLSPIdentifierChar(line[idx-1]) {
+			idx--
+		} else {
+			return ""
+		}
+	}
+	start := idx
+	for start > 0 && isLSPIdentifierChar(line[start-1]) {
+		start--
+	}
+	end := idx + 1
+	for end < len(line) && isLSPIdentifierChar(line[end]) {
+		end++
+	}
+	return line[start:end]
+}
+
+func isLSPIdentifierChar(ch byte) bool {
+	return ch == '_' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9'
+}
+
+func lspDefinitionColumn(text string, sym compiler.LSPSymbol) int {
+	line := maxInt(sym.Line-1, 0)
+	col := maxInt(sym.Column-1, 0)
+	lines := strings.Split(text, "\n")
+	if line < 0 || line >= len(lines) {
+		return col
+	}
+	lineText := lines[line]
+	if col >= 0 && col+len(sym.Name) <= len(lineText) && lineText[col:col+len(sym.Name)] == sym.Name {
+		return col
+	}
+	if idx := strings.Index(lineText, sym.Name); idx >= 0 {
+		return idx
+	}
+	return col
+}
+
 func lspCompletionItems(analysis compiler.LSPAnalysis) []map[string]any {
 	out := make([]map[string]any, 0, len(analysis.Symbols))
 	for _, sym := range analysis.Symbols {
@@ -842,6 +970,29 @@ func lspCompletionKind(kind string) int {
 	default:
 		return 6
 	}
+}
+
+func lspFormattingEdits(text string, uri string) ([]map[string]any, error) {
+	formatted, err := compiler.FormatSource([]byte(text), uri)
+	if err != nil {
+		return nil, err
+	}
+	if string(formatted) == text {
+		return []map[string]any{}, nil
+	}
+	line, character := lspFullDocumentEnd(text)
+	return []map[string]any{{
+		"range": map[string]any{
+			"start": map[string]int{"line": 0, "character": 0},
+			"end":   map[string]int{"line": line, "character": character},
+		},
+		"newText": string(formatted),
+	}}, nil
+}
+
+func lspFullDocumentEnd(text string) (int, int) {
+	parts := strings.Split(text, "\n")
+	return len(parts) - 1, len(parts[len(parts)-1])
 }
 
 func lspSymbolKind(kind string) int {

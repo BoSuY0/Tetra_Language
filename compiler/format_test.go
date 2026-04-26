@@ -55,6 +55,26 @@ func main() -> Int:
 	}
 }
 
+func TestFormatSourcePreservesFlowBlockComments(t *testing.T) {
+	src := []byte(`/* module note */
+func main() -> Int:
+    /* before return */
+    return 0
+`)
+	got, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `/* module note */
+func main() -> Int:
+    /* before return */
+    return 0
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
 func TestFormatSourcePreservesExportAttributes(t *testing.T) {
 	src := []byte(`@export("__tetra_entry")
 fun tetra_entry(): i32 {

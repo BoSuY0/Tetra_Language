@@ -223,7 +223,7 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 
 ### TODO 7: Make Flow Syntax the Canonical Frontend
 
-**Status:** Partial. Flow-only source scanning and formatter checks are green, expression-bodied functions are implemented, and planned-feature diagnostics now cover more deferred syntax. A native canonical Flow parser, argument labels, closures, legacy smoke removal, and semantic clauses remain incomplete or explicitly deferred.
+**Status:** Partial. Flow-only source scanning, formatter checks, and release smoke coverage are green; expression-bodied functions are implemented, and planned-feature diagnostics now cover more deferred syntax. A native canonical Flow parser, full argument labels, closures, and semantic clauses remain incomplete or explicitly deferred.
 
 **Goal:** Move from Flow-as-normalized-legacy-input to Flow as the official v1.0 syntax path.
 
@@ -235,7 +235,7 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 - [x] Audit every release-covered `.tetra` file for legacy brace syntax.
 - [x] Add migration diagnostics for legacy syntax before removing the canonical path.
 - [ ] Decide whether `normalizeFlowSyntax` stays as compatibility tooling or is replaced by a Flow parser.
-- [ ] Remove legacy examples from release smoke coverage.
+- [x] Remove legacy examples from release smoke coverage.
 - [ ] Finish argument labels.
 - [x] Finish expression-bodied functions.
 - [x] Implement `elif` or document `else if` as the final spelling.
@@ -293,7 +293,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 9: Build the Real Borrow/Lifetime Checker
 
-**Status:** Partial/blocked. The controller fixed one concrete mutable-aliasing bug (`borrow` + `inout` same local in a call). Full v1 borrow scopes, escaping borrow rejection, actor/task transfer rules, and complete lifetime modeling remain blocked by missing design/implementation.
+**Status:** Partial/blocked. The controller fixed concrete mutable-aliasing bugs (`borrow` + `inout`, `consume` + `inout` same-local call arguments) and now rejects direct-return escape of borrowed region-carrying params. Full v1 borrow scopes, broader escaping-borrow coverage, actor/task transfer rules, and complete lifetime modeling remain blocked by missing design/implementation.
 
 **Goal:** Turn `borrow`, `inout`, and `consume` markers into memory-safety enforcement.
 
@@ -302,7 +302,7 @@ bash scripts/test_all.sh --full
 **Approach:**
 
 - [ ] Model local lifetimes and borrow scopes.
-- [ ] Reject escaping borrowed locals.
+- [x] Reject escaping borrowed locals for the current direct-return borrow slice.
 - [x] Reject use-after-move within the current `consume` marker slice.
 - [x] Reject mutable aliasing for `borrow` + `inout` same-local call arguments.
 - [x] Reject invalid island transfers in safe code within the current scoped-island slice.
@@ -373,7 +373,7 @@ bash scripts/test_all.sh --full
 - [ ] Add typed async error propagation.
 - [ ] Expand actors beyond `i32` messages.
 - [x] Keep self-host x64 runtime paths covered.
-- [ ] Plan WASM runtime coverage with the WASM backend.
+- [x] Plan WASM runtime coverage with the WASM backend.
 - [x] Keep builtin actor fallback tested while migration is in progress.
 
 **Verification:**
@@ -391,7 +391,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 12: Stabilize Native x64 and Add WASM
 
-**Status:** Partial/blocked. Native x64 target, object/link/runtime/cache/determinism checks are green. WASM, debug info, and release-optimization coverage remain unimplemented v1 work.
+**Status:** Partial/blocked. Native x64 target, object/link/runtime/cache/determinism checks are green. The WASM backend/runtime plan is now documented and verifier-enforced, but WASM codegen/packaging, debug info, and release-optimization coverage remain unimplemented v1 work.
 
 **Goal:** Meet the v1.0 target requirement: `linux-x64`, `macos-x64`, `windows-x64`, `wasm32-wasi`, and `wasm32-web`.
 
@@ -476,7 +476,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 14: Stabilize CLI, Formatter, Reports, LSP, and Docs
 
-**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion basics are green. LSP go-to definition, references, rename, formatting, and code actions remain incomplete.
+**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition basics are green. LSP references, rename, and code actions remain incomplete.
 
 **Goal:** Make the developer toolchain reliable enough for daily use and CI.
 
@@ -487,7 +487,7 @@ bash scripts/test_all.sh --full
 - [x] Keep `tetra` and `t` entrypoints stable.
 - [x] Stabilize `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`, `clean`, and `version` for the current v0.6 surface.
 - [x] Make formatter idempotent for the current supported surface.
-- [ ] Preserve supported line and block comments in formatter output.
+- [x] Preserve supported line and block comments in formatter output.
 - [x] Stabilize JSON diagnostics schema for the current supported surface.
 - [x] Stabilize test report schema.
 - [x] Stabilize smoke report schema.
@@ -495,11 +495,11 @@ bash scripts/test_all.sh --full
 - [x] Stabilize LSP responses for current smoke-covered methods.
 - [x] Complete LSP diagnostics for the current MVP.
 - [x] Complete LSP hover for the current MVP.
-- [ ] Add go-to definition.
+- [x] Add go-to definition.
 - [ ] Add references.
 - [ ] Add rename.
 - [x] Add completion for current open-document symbols.
-- [ ] Add formatting.
+- [x] Add formatting.
 - [ ] Add code actions.
 
 **Verification:**

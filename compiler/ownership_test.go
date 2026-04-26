@@ -91,6 +91,27 @@ func main() -> Int:
 	}
 }
 
+func TestOwnershipRejectsReturningBorrowedParam(t *testing.T) {
+	src := []byte(`
+func leak(x: borrow []u8) -> []u8:
+    return x
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected escaping borrowed local error")
+	}
+	if !strings.Contains(err.Error(), "borrow") || !strings.Contains(err.Error(), "escape") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestOwnershipConsumeArgumentCannotBeReused(t *testing.T) {
 	src := []byte(`
 func take(x: consume Int) -> Int:
@@ -157,6 +178,29 @@ func main() -> Int:
 		t.Fatalf("expected borrow/inout aliasing error")
 	}
 	if !strings.Contains(err.Error(), "alias") && !strings.Contains(err.Error(), "borrow") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestOwnershipRejectsConsumeInoutAlias(t *testing.T) {
+	src := []byte(`
+func mix(taken: consume Int, write: inout Int) -> Int:
+    write = write + taken
+    return write
+
+func main() -> Int:
+    var a: Int = 1
+    return mix(a, a)
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected consume/inout aliasing error")
+	}
+	if !strings.Contains(err.Error(), "alias") && !strings.Contains(err.Error(), "consume") {
 		t.Fatalf("error = %v", err)
 	}
 }

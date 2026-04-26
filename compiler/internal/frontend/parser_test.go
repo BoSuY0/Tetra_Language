@@ -709,6 +709,7 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 		want string
 	}{
 		{"capsule", "capsule app:\n  name: \"app\"\n", "planned feature 'capsule'"},
+		{"function call argument label", "func add(a: Int, b: Int) -> Int:\n  return a + b\n\nfunc main() -> Int:\n  return add(a: 40, b: 2)\n", "function-call argument labels are planned"},
 		{"generic protocol requirement", "protocol P:\n  func id<T>(x: T) -> T\n", "generic protocol requirements are planned"},
 		{"generic struct", "struct Box<T>:\n  value: T\n", "generic structs are planned"},
 		{"enum payload case", "enum Option:\n  case some(Int)\n", "enum payload cases are planned"},
