@@ -3,6 +3,7 @@ package semantics
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"tetra_language/compiler/internal/frontend"
@@ -62,7 +63,11 @@ func monomorphizeGenerics(world *module.World) error {
 		item := work[i]
 		env := map[string]string{}
 		for _, param := range item.fn.Params {
-			env[param.Name] = genericTypeName(param.Type)
+			resolved, err := resolveTypeName(&param.Type, item.module, item.imports)
+			if err != nil {
+				return err
+			}
+			env[param.Name] = resolved
 		}
 		if err := monomorphizeStmts(item.fn.Body, env, generics, created, createdByFile, &work, fileImports, item.module, item.imports); err != nil {
 			return err
@@ -126,7 +131,11 @@ func monomorphizeStmts(
 				return err
 			}
 			if s.Type.Name != "" || s.Type.Elem != nil {
-				env[s.Name] = genericTypeName(s.Type)
+				resolved, err := resolveTypeName(&s.Type, module, imports)
+				if err != nil {
+					return err
+				}
+				env[s.Name] = resolved
 			} else {
 				env[s.Name] = valType
 			}
@@ -304,7 +313,12 @@ func monomorphizeExpr(
 				return "", err
 			}
 		}
-		return genericTypeName(e.Type), nil
+		resolved, err := resolveTypeName(&e.Type, module, imports)
+		if err != nil {
+			return "", err
+		}
+		e.Type.Name = resolved
+		return resolved, nil
 	case *frontend.CallExpr:
 		argTypes := make([]string, 0, len(e.Args))
 		for _, arg := range e.Args {
@@ -543,12 +557,28 @@ func mangleGenericName(base string, order []string, subst map[string]string) str
 	for _, tp := range order {
 		parts = append(parts, tp+"_"+sanitizeGenericType(subst[tp]))
 	}
-	return base + "__" + strings.Join(parts, "_")
+	return base + "__" + strings.Join(parts, "__")
 }
 
 func sanitizeGenericType(tname string) string {
-	replacer := strings.NewReplacer(".", "_", "[", "slice_", "]", "", "?", "_opt", " ", "_")
-	return replacer.Replace(tname)
+	if tname == "" {
+		return "unknown"
+	}
+	var b strings.Builder
+	for _, r := range tname {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			continue
+		}
+		if r == '_' {
+			b.WriteString("__")
+			continue
+		}
+		b.WriteString("_")
+		b.WriteString(strconv.FormatInt(int64(r), 16))
+		b.WriteString("_")
+	}
+	return b.String()
 }
 
 func genericTypeName(ref frontend.TypeRef) string {

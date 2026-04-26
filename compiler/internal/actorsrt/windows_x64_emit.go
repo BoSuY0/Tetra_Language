@@ -417,6 +417,20 @@ func emitActorSendWrapperWindowsX64(e *x64.Emitter, jmpPatches *[]callPatch) err
 	return nil
 }
 
+func emitActorSendMsgWrapperWindowsX64(e *x64.Emitter, jmpPatches *[]callPatch) error {
+	// Win64: rcx=to, rdx=value, r8=tag -> internal: rdi=to, rsi=value, rdx=tag.
+	if jmpPatches == nil {
+		return fmt.Errorf("missing jmpPatches")
+	}
+	e.MovRdiRcx()
+	e.MovRaxRdx()
+	e.MovRsiRax()
+	e.MovRdxR8()
+	at := e.JmpRel32()
+	*jmpPatches = append(*jmpPatches, callPatch{at: at, name: "__tetra_actor_send_msg_impl"})
+	return nil
+}
+
 func emitActorNoArgWrapperWindowsX64(e *x64.Emitter, target string, jmpPatches *[]callPatch) error {
 	if jmpPatches == nil {
 		return fmt.Errorf("missing jmpPatches")

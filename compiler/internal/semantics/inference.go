@@ -90,9 +90,14 @@ func inferExprTypeForDecl(
 		}
 		return resolved, nil
 	case *frontend.CallExpr:
+		if ctorType, ok, err := resolveStructConstructorCallType(e, types, module, imports); ok {
+			return ctorType, err
+		}
 		resolved := ""
 		if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
 			resolved = builtin
+		} else if _, ok := funcs[e.Name]; ok {
+			resolved = e.Name
 		} else {
 			name, err := resolveCallName(e.Name, module, imports, e.At)
 			if err != nil {
@@ -105,7 +110,7 @@ func inferExprTypeForDecl(
 			return "", fmt.Errorf("unknown function '%s'", resolved)
 		}
 		if sig.Generic {
-			return "", fmt.Errorf("generic function '%s' could not be monomorphized in v0.5; use inferable value arguments", e.Name)
+			return "", fmt.Errorf("generic function '%s' could not be monomorphized; use inferable value arguments", e.Name)
 		}
 		return sig.ReturnType, nil
 	case *frontend.ClosureExpr:
@@ -118,6 +123,8 @@ func inferExprTypeForDecl(
 		resolved := ""
 		if builtin, ok := ResolveBuiltinAlias(call.Name); ok {
 			resolved = builtin
+		} else if _, ok := funcs[call.Name]; ok {
+			resolved = call.Name
 		} else {
 			name, err := resolveCallName(call.Name, module, imports, call.At)
 			if err != nil {
@@ -141,6 +148,8 @@ func inferExprTypeForDecl(
 		resolved := ""
 		if builtin, ok := ResolveBuiltinAlias(call.Name); ok {
 			resolved = builtin
+		} else if _, ok := funcs[call.Name]; ok {
+			resolved = call.Name
 		} else {
 			name, err := resolveCallName(call.Name, module, imports, call.At)
 			if err != nil {
@@ -159,4 +168,50 @@ func inferExprTypeForDecl(
 	default:
 		return "", fmt.Errorf("unsupported expression for type inference")
 	}
+}
+
+func resolveStructConstructorCallType(
+	e *frontend.CallExpr,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (string, bool, error) {
+	if len(e.Args) == 0 || len(e.ArgLabels) != len(e.Args) {
+		return "", false, nil
+	}
+	for _, label := range e.ArgLabels {
+		if label == "" {
+			return "", false, nil
+		}
+	}
+
+	ref := frontend.TypeRef{At: e.At, Kind: frontend.TypeRefNamed, Name: e.Name}
+	resolved, err := resolveTypeName(&ref, module, imports)
+	if err != nil {
+		return "", false, nil
+	}
+	info, ok := types[resolved]
+	if !ok || info.Kind != TypeStruct {
+		return "", false, nil
+	}
+	if len(e.Args) != len(info.Fields) {
+		return "", true, fmt.Errorf("wrong field count for '%s'", resolved)
+	}
+
+	seen := make(map[string]struct{}, len(e.ArgLabels))
+	for _, label := range e.ArgLabels {
+		if _, exists := seen[label]; exists {
+			return "", true, fmt.Errorf("duplicate field '%s'", label)
+		}
+		seen[label] = struct{}{}
+		if _, ok := info.FieldMap[label]; !ok {
+			return "", true, fmt.Errorf("unknown field '%s'", label)
+		}
+	}
+	for _, field := range info.Fields {
+		if _, ok := seen[field.Name]; !ok {
+			return "", true, fmt.Errorf("missing field '%s'", field.Name)
+		}
+	}
+	return resolved, true, nil
 }

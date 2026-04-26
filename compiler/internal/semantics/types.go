@@ -145,18 +145,61 @@ func makeStrTypeInfo() *TypeInfo {
 	return info
 }
 
-func baseTypes() map[string]*TypeInfo {
-	return map[string]*TypeInfo{
-		"i32":     {Name: "i32", Kind: TypeI32, SlotCount: 1},
-		"u8":      {Name: "u8", Kind: TypeU8, SlotCount: 1},
-		"bool":    {Name: "bool", Kind: TypeBool, SlotCount: 1},
-		"ptr":     {Name: "ptr", Kind: TypePtr, SlotCount: 1},
-		"str":     makeStrTypeInfo(),
-		"actor":   {Name: "actor", Kind: TypeActor, SlotCount: 1},
-		"island":  {Name: "island", Kind: TypeIsland, SlotCount: 1},
-		"cap.io":  {Name: "cap.io", Kind: TypeCap, SlotCount: 1},
-		"cap.mem": {Name: "cap.mem", Kind: TypeCap, SlotCount: 1},
+func makeStructTypeInfo(name string, fields []FieldInfo) *TypeInfo {
+	fieldMap := make(map[string]FieldInfo, len(fields))
+	offset := 0
+	structFields := make([]FieldInfo, 0, len(fields))
+	for _, field := range fields {
+		slotCount := field.SlotCount
+		if slotCount <= 0 {
+			slotCount = 1
+		}
+		resolved := FieldInfo{
+			Name:      field.Name,
+			TypeName:  field.TypeName,
+			Offset:    offset,
+			SlotCount: slotCount,
+		}
+		offset += slotCount
+		structFields = append(structFields, resolved)
+		fieldMap[resolved.Name] = resolved
 	}
+	return &TypeInfo{
+		Name:      name,
+		Kind:      TypeStruct,
+		Fields:    structFields,
+		FieldMap:  fieldMap,
+		SlotCount: offset,
+	}
+}
+
+func baseTypes() map[string]*TypeInfo {
+	types := map[string]*TypeInfo{
+		"i32":        {Name: "i32", Kind: TypeI32, SlotCount: 1},
+		"u8":         {Name: "u8", Kind: TypeU8, SlotCount: 1},
+		"bool":       {Name: "bool", Kind: TypeBool, SlotCount: 1},
+		"ptr":        {Name: "ptr", Kind: TypePtr, SlotCount: 1},
+		"str":        makeStrTypeInfo(),
+		"actor":      {Name: "actor", Kind: TypeActor, SlotCount: 1},
+		"task.error": {Name: "task.error", Kind: TypeI32, SlotCount: 1},
+		"task.group": {Name: "task.group", Kind: TypeI32, SlotCount: 1},
+		"island":     {Name: "island", Kind: TypeIsland, SlotCount: 1},
+		"cap.io":     {Name: "cap.io", Kind: TypeCap, SlotCount: 1},
+		"cap.mem":    {Name: "cap.mem", Kind: TypeCap, SlotCount: 1},
+	}
+	types["task.i32"] = makeStructTypeInfo("task.i32", []FieldInfo{
+		{Name: "value", TypeName: "i32"},
+		{Name: "error", TypeName: "task.error"},
+	})
+	types["task.result_i32"] = makeStructTypeInfo("task.result_i32", []FieldInfo{
+		{Name: "value", TypeName: "i32"},
+		{Name: "error", TypeName: "task.error"},
+	})
+	types["actor.msg"] = makeStructTypeInfo("actor.msg", []FieldInfo{
+		{Name: "value", TypeName: "i32"},
+		{Name: "tag", TypeName: "i32"},
+	})
+	return types
 }
 
 func ensureTypeInfo(name string, types map[string]*TypeInfo) (*TypeInfo, error) {
@@ -207,10 +250,7 @@ func typesCompatible(expected, actual string) bool {
 	if elem, ok := optionalElemName(expected); ok && typesCompatible(elem, actual) {
 		return true
 	}
-	if expected == "u8" && actual == "i32" {
-		return true
-	}
-	if expected == "i32" && actual == "u8" {
+	if isInt32Like(expected) && isInt32Like(actual) {
 		return true
 	}
 	return false
@@ -250,7 +290,7 @@ func constI32(expr frontend.Expr) (int32, bool) {
 }
 
 func isInt32Like(name string) bool {
-	return name == "i32" || name == "u8"
+	return name == "i32" || name == "u8" || name == "task.error"
 }
 
 func isConditionType(name string) bool {
@@ -259,7 +299,10 @@ func isConditionType(name string) bool {
 
 func isReservedTypeName(name string) bool {
 	switch name {
-	case "i32", "u8", "bool", "Bool", "ptr", "str", "String", "actor", "island", "cap.io", "cap.mem":
+	case "i32", "u8", "bool", "Bool", "ptr", "str", "String",
+		"actor", "actor.msg",
+		"task.error", "task.group", "task.i32", "task.result_i32",
+		"island", "cap.io", "cap.mem":
 		return true
 	default:
 		return false

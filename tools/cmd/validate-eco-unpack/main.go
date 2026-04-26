@@ -15,11 +15,15 @@ import (
 )
 
 type ecoPackageMetadata struct {
-	Schema      string                   `json:"schema"`
-	Compression string                   `json:"compression"`
-	MTimeUnix   int64                    `json:"mtime_unix"`
-	FileCount   int                      `json:"file_count"`
-	Files       []ecoPackageMetadataFile `json:"files"`
+	Schema           string                   `json:"schema"`
+	Compression      string                   `json:"compression"`
+	MTimeUnix        int64                    `json:"mtime_unix"`
+	Reproducible     bool                     `json:"reproducible,omitempty"`
+	BuildInputsSHA   string                   `json:"build_inputs_sha256,omitempty"`
+	ManifestSchema   string                   `json:"manifest_schema,omitempty"`
+	PermissionsModel string                   `json:"permissions_model,omitempty"`
+	FileCount        int                      `json:"file_count"`
+	Files            []ecoPackageMetadataFile `json:"files"`
 }
 
 type ecoPackageMetadataFile struct {
@@ -156,6 +160,17 @@ func validatePackageMetadata(dir string) error {
 	}
 	if metadata.MTimeUnix != 0 {
 		return fmt.Errorf("package metadata mtime_unix must be 0")
+	}
+	if metadata.ManifestSchema != "" && metadata.ManifestSchema != "tetra.capsule.v1" {
+		return fmt.Errorf("unsupported package metadata manifest_schema %q", metadata.ManifestSchema)
+	}
+	if metadata.PermissionsModel != "" && metadata.PermissionsModel != "tetra.eco.permissions.v1" {
+		return fmt.Errorf("unsupported package metadata permissions_model %q", metadata.PermissionsModel)
+	}
+	if metadata.BuildInputsSHA != "" {
+		if _, err := parseSHA256Hash(metadata.BuildInputsSHA); err != nil {
+			return fmt.Errorf("package metadata build_inputs_sha256: %w", err)
+		}
 	}
 	if metadata.FileCount != len(metadata.Files) {
 		return fmt.Errorf("package metadata file_count mismatch: expected %d, got %d", len(metadata.Files), metadata.FileCount)

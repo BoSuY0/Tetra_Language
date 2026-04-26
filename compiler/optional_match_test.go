@@ -56,6 +56,9 @@ func main() -> Int:
 	if !strings.Contains(err.Error(), "optional match supports only 'none'") {
 		t.Fatalf("error = %v", err)
 	}
+	if strings.Contains(err.Error(), "v0.") {
+		t.Fatalf("optional match diagnostic should be versionless: %v", err)
+	}
 }
 
 func TestOptionalMatchSomeBindingCheckAndLower(t *testing.T) {

@@ -13,7 +13,23 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 	if err != nil {
 		return nil, err
 	}
+	actorMsgInfo, err := ensureTypeInfo("actor.msg", types)
+	if err != nil {
+		return nil, err
+	}
 	ptrInfo, err := ensureTypeInfo("ptr", types)
+	if err != nil {
+		return nil, err
+	}
+	taskGroupInfo, err := ensureTypeInfo("task.group", types)
+	if err != nil {
+		return nil, err
+	}
+	taskHandleI32, err := ensureTypeInfo("task.i32", types)
+	if err != nil {
+		return nil, err
+	}
+	taskResultI32, err := ensureTypeInfo("task.result_i32", types)
 	if err != nil {
 		return nil, err
 	}
@@ -40,34 +56,41 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 	}
 
 	sigs := map[string]FuncSig{
-		"core.alloc_bytes":         {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.make_u8":             {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: sliceU8.Name, ReturnSlots: sliceU8.SlotCount, ReturnRegionParam: regionNone},
-		"core.make_i32":            {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: sliceI32.Name, ReturnSlots: sliceI32.SlotCount, ReturnRegionParam: regionNone},
-		"core.island_new":          {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "island", ReturnSlots: islandInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.island_make_u8":      {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceU8.Name, ReturnSlots: sliceU8.SlotCount, ReturnRegionParam: 0},
-		"core.island_make_i32":     {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceI32.Name, ReturnSlots: sliceI32.SlotCount, ReturnRegionParam: 0},
-		"core.cap_io":              {ParamTypes: nil, ParamSlots: 0, ReturnType: capIO.Name, ReturnSlots: capIO.SlotCount, ReturnRegionParam: regionNone},
-		"core.cap_mem":             {ParamTypes: nil, ParamSlots: 0, ReturnType: capMem.Name, ReturnSlots: capMem.SlotCount, ReturnRegionParam: regionNone},
-		"core.load_i32":            {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.store_i32":           {ParamTypes: []string{"ptr", "i32", capMem.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.load_u8":             {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "u8", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.store_u8":            {ParamTypes: []string{"ptr", "u8", capMem.Name}, ParamSlots: 3, ReturnType: "u8", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.load_ptr":            {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.store_ptr":           {ParamTypes: []string{"ptr", "ptr", capMem.Name}, ParamSlots: 3, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.ptr_add":             {ParamTypes: []string{"ptr", "i32", capMem.Name}, ParamSlots: 3, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.mmio_read_i32":       {ParamTypes: []string{"ptr", capIO.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.mmio_write_i32":      {ParamTypes: []string{"ptr", "i32", capIO.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.sym_addr":            {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.ctx_switch":          {ParamTypes: []string{"ptr", "ptr", capMem.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.task_spawn_i32":      {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.task_join_i32":       {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.actor_dispatch":      {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.actor_main_entry_id": {ParamTypes: nil, ParamSlots: 0, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.spawn":               {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.send":                {ParamTypes: []string{"actor", "i32"}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.recv":                {ParamTypes: nil, ParamSlots: 0, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.self":                {ParamTypes: nil, ParamSlots: 0, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.sender":              {ParamTypes: nil, ParamSlots: 0, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.alloc_bytes":          {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.make_u8":              {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: sliceU8.Name, ReturnSlots: sliceU8.SlotCount, ReturnRegionParam: regionNone},
+		"core.make_i32":             {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: sliceI32.Name, ReturnSlots: sliceI32.SlotCount, ReturnRegionParam: regionNone},
+		"core.island_new":           {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "island", ReturnSlots: islandInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.island_make_u8":       {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceU8.Name, ReturnSlots: sliceU8.SlotCount, ReturnRegionParam: 0},
+		"core.island_make_i32":      {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceI32.Name, ReturnSlots: sliceI32.SlotCount, ReturnRegionParam: 0},
+		"core.cap_io":               {ParamTypes: nil, ParamSlots: 0, ReturnType: capIO.Name, ReturnSlots: capIO.SlotCount, ReturnRegionParam: regionNone},
+		"core.cap_mem":              {ParamTypes: nil, ParamSlots: 0, ReturnType: capMem.Name, ReturnSlots: capMem.SlotCount, ReturnRegionParam: regionNone},
+		"core.load_i32":             {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.store_i32":            {ParamTypes: []string{"ptr", "i32", capMem.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.load_u8":              {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "u8", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.store_u8":             {ParamTypes: []string{"ptr", "u8", capMem.Name}, ParamSlots: 3, ReturnType: "u8", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.load_ptr":             {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.store_ptr":            {ParamTypes: []string{"ptr", "ptr", capMem.Name}, ParamSlots: 3, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.ptr_add":              {ParamTypes: []string{"ptr", "i32", capMem.Name}, ParamSlots: 3, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.mmio_read_i32":        {ParamTypes: []string{"ptr", capIO.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.mmio_write_i32":       {ParamTypes: []string{"ptr", "i32", capIO.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.sym_addr":             {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.ctx_switch":           {ParamTypes: []string{"ptr", "ptr", capMem.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.task_group_open":      {ParamTypes: nil, ParamSlots: 0, ReturnType: taskGroupInfo.Name, ReturnSlots: taskGroupInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.task_group_close":     {ParamTypes: []string{"task.group"}, ParamSlots: taskGroupInfo.SlotCount, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.task_group_cancel":    {ParamTypes: []string{"task.group"}, ParamSlots: taskGroupInfo.SlotCount, ReturnType: "task.group", ReturnSlots: taskGroupInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.task_spawn_i32":       {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: taskHandleI32.Name, ReturnSlots: taskHandleI32.SlotCount, ReturnRegionParam: regionNone},
+		"core.task_spawn_group_i32": {ParamTypes: []string{"task.group", "str"}, ParamSlots: taskGroupInfo.SlotCount + 2, ReturnType: taskHandleI32.Name, ReturnSlots: taskHandleI32.SlotCount, ReturnRegionParam: regionNone},
+		"core.task_join_i32":        {ParamTypes: []string{"task.i32"}, ParamSlots: taskHandleI32.SlotCount, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.task_join_result_i32": {ParamTypes: []string{"task.i32"}, ParamSlots: taskHandleI32.SlotCount, ReturnType: taskResultI32.Name, ReturnSlots: taskResultI32.SlotCount, ReturnRegionParam: regionNone},
+		"core.actor_dispatch":       {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.actor_main_entry_id":  {ParamTypes: nil, ParamSlots: 0, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.spawn":                {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.send":                 {ParamTypes: []string{"actor", "i32"}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.send_msg":             {ParamTypes: []string{"actor", "i32", "i32"}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.recv":                 {ParamTypes: nil, ParamSlots: 0, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.recv_msg":             {ParamTypes: nil, ParamSlots: 0, ReturnType: actorMsgInfo.Name, ReturnSlots: actorMsgInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.self":                 {ParamTypes: nil, ParamSlots: 0, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.sender":               {ParamTypes: nil, ParamSlots: 0, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
 	}
 	for name, sig := range sigs {
 		sig.Effects = builtinEffects(name)
@@ -135,8 +158,22 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 		return "core.ctx_switch", true
 	case "task_spawn_i32":
 		return "core.task_spawn_i32", true
+	case "task_spawn_group_i32":
+		return "core.task_spawn_group_i32", true
 	case "task_join_i32":
 		return "core.task_join_i32", true
+	case "task_join_result_i32":
+		return "core.task_join_result_i32", true
+	case "task_group_open":
+		return "core.task_group_open", true
+	case "task_group_close":
+		return "core.task_group_close", true
+	case "task_group_cancel":
+		return "core.task_group_cancel", true
+	case "send_msg":
+		return "core.send_msg", true
+	case "recv_msg":
+		return "core.recv_msg", true
 	case "actor_dispatch":
 		return "core.actor_dispatch", true
 	case "actor_main_entry_id":
@@ -144,7 +181,10 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 	case "core.alloc_bytes", "core.make_u8", "core.make_i32",
 		"core.island_new", "core.island_make_u8", "core.island_make_i32",
 		"core.load_ptr", "core.store_ptr", "core.sym_addr", "core.ctx_switch",
-		"core.task_spawn_i32", "core.task_join_i32",
+		"core.task_group_open", "core.task_group_close", "core.task_group_cancel",
+		"core.task_spawn_i32", "core.task_spawn_group_i32",
+		"core.task_join_i32", "core.task_join_result_i32",
+		"core.send_msg", "core.recv_msg",
 		"core.actor_dispatch", "core.actor_main_entry_id":
 		return name, true
 	default:

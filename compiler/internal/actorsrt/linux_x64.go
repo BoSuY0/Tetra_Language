@@ -43,6 +43,7 @@ const (
 // BuildLinuxX64 returns a runtime object that provides:
 // - __tetra_entry
 // - __tetra_actor_spawn / send / recv / self / sender
+// - __tetra_actor_send_msg / __tetra_actor_recv_msg
 //
 // entries[0] must be the program entry symbol (main).
 // Actor entry IDs are computed as FNV-1a 32-bit hashes of the string literals used in `core.spawn(...)`.
@@ -92,7 +93,13 @@ func buildSysVUnixX64(entries []string, sysMmap uint32, mapFlags uint32) (*tobj.
 	if err := emitFunc("__tetra_actor_send", func() error { return emitSend(e) }); err != nil {
 		return nil, err
 	}
+	if err := emitFunc("__tetra_actor_send_msg", func() error { return emitSendMsg(e) }); err != nil {
+		return nil, err
+	}
 	if err := emitFunc("__tetra_actor_recv", func() error { return emitRecv(e, &callPatches) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_recv_msg", func() error { return emitRecvMsg(e, &callPatches) }); err != nil {
 		return nil, err
 	}
 	if err := emitFunc("__tetra_actor_self", func() error { return emitSelf(e) }); err != nil {

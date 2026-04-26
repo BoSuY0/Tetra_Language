@@ -12,8 +12,13 @@ import (
 )
 
 type ecoLockEnvelope struct {
-	CapsulesRaw json.RawMessage `json:"capsules"`
-	Capsules    []ecoLockCapsule
+	Schema           string          `json:"schema,omitempty"`
+	ManifestSchema   string          `json:"manifest_schema,omitempty"`
+	PermissionsModel string          `json:"permissions_model,omitempty"`
+	GeneratedUnix    int64           `json:"generated_at_unix,omitempty"`
+	GraphSHA256      string          `json:"graph_sha256,omitempty"`
+	CapsulesRaw      json.RawMessage `json:"capsules"`
+	Capsules         []ecoLockCapsule
 }
 
 type ecoLockCapsule struct {
@@ -23,6 +28,7 @@ type ecoLockCapsule struct {
 	Path         string              `json:"path"`
 	Targets      []string            `json:"targets"`
 	Effects      []string            `json:"effects,omitempty"`
+	Permissions  []string            `json:"permissions,omitempty"`
 	Dependencies []ecoLockDependency `json:"dependencies,omitempty"`
 }
 
@@ -45,6 +51,32 @@ var knownCapsuleEffects = map[string]string{
 	"mmio":       "mmio",
 	"runtime":    "runtime",
 }
+
+var knownCapsulePermissions = map[string]string{
+	"actors":       "actors",
+	"alloc":        "alloc",
+	"cap.io":       "io",
+	"cap.mem":      "mem",
+	"capability":   "capability",
+	"control":      "control",
+	"io":           "io",
+	"io.read":      "io",
+	"io.write":     "io",
+	"islands":      "islands",
+	"link":         "link",
+	"mem":          "mem",
+	"mem.read":     "mem",
+	"mem.write":    "mem",
+	"mmio":         "mmio",
+	"runtime":      "runtime",
+	"runtime.exec": "runtime",
+}
+
+const (
+	lockSchemaV1       = "tetra.eco.lock.v1"
+	manifestSchemaV1   = "tetra.capsule.v1"
+	permissionsModelV1 = "tetra.eco.permissions.v1"
+)
 
 func main() {
 	var lockPath string
@@ -72,6 +104,20 @@ func validateEcoLock(raw []byte) error {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&lock); err != nil {
 		return err
+	}
+	if lock.Schema != "" && lock.Schema != lockSchemaV1 {
+		return fmt.Errorf("unsupported lock schema %s", lock.Schema)
+	}
+	if lock.ManifestSchema != "" && lock.ManifestSchema != manifestSchemaV1 {
+		return fmt.Errorf("unsupported manifest schema %s", lock.ManifestSchema)
+	}
+	if lock.PermissionsModel != "" && lock.PermissionsModel != permissionsModelV1 {
+		return fmt.Errorf("unsupported permissions model %s", lock.PermissionsModel)
+	}
+	if lock.GraphSHA256 != "" {
+		if _, err := parseSHA256Hash(lock.GraphSHA256); err != nil {
+			return err
+		}
 	}
 	if err := unmarshalCapsules(lock.CapsulesRaw, &lock.Capsules); err != nil {
 		return err
@@ -121,6 +167,11 @@ func validateEcoLock(raw []byte) error {
 			for _, effect := range resolved.Effects {
 				if !containsString(capsule.Effects, effect) {
 					return fmt.Errorf("capsule %s missing required effect %s for dependency %s", capsule.ID, effect, dep.ID)
+				}
+			}
+			for _, permission := range resolved.Permissions {
+				if !containsString(capsule.Permissions, permission) {
+					return fmt.Errorf("capsule %s missing required permission %s for dependency %s", capsule.ID, permission, dep.ID)
 				}
 			}
 		}
@@ -192,6 +243,7 @@ func validateCapsule(capsule ecoLockCapsule) (ecoLockCapsule, error) {
 		seenTargets[target] = true
 	}
 	seenEffects := map[string]bool{}
+	seenPermissions := map[string]bool{}
 	for _, effect := range capsule.Effects {
 		normalized, err := normalizeCapsuleEffect(effect)
 		if err != nil {
@@ -202,8 +254,22 @@ func validateCapsule(capsule ecoLockCapsule) (ecoLockCapsule, error) {
 		}
 		seenEffects[normalized] = true
 		normalizedEffects = append(normalizedEffects, normalized)
+		capsule.Permissions = append(capsule.Permissions, normalized)
 	}
 	capsule.Effects = normalizedEffects
+	normalizedPermissions := make([]string, 0, len(capsule.Permissions))
+	for _, permission := range capsule.Permissions {
+		normalized, err := normalizeCapsulePermission(permission)
+		if err != nil {
+			return ecoLockCapsule{}, fmt.Errorf("capsule %s %v", capsule.ID, err)
+		}
+		if seenPermissions[normalized] {
+			continue
+		}
+		seenPermissions[normalized] = true
+		normalizedPermissions = append(normalizedPermissions, normalized)
+	}
+	capsule.Permissions = normalizedPermissions
 	return capsule, nil
 }
 
@@ -211,6 +277,14 @@ func normalizeCapsuleEffect(name string) (string, error) {
 	normalized, ok := knownCapsuleEffects[name]
 	if !ok {
 		return "", fmt.Errorf("has unknown effect %s", name)
+	}
+	return normalized, nil
+}
+
+func normalizeCapsulePermission(name string) (string, error) {
+	normalized, ok := knownCapsulePermissions[name]
+	if !ok {
+		return "", fmt.Errorf("has unknown permission %s", name)
 	}
 	return normalized, nil
 }
@@ -247,4 +321,24 @@ func isCapsuleSemver(version string) bool {
 		}
 	}
 	return true
+}
+
+func parseSHA256Hash(hash string) (string, error) {
+	const prefix = "sha256:"
+	if !strings.HasPrefix(hash, prefix) {
+		return "", fmt.Errorf("invalid sha256 hash %s", hash)
+	}
+	hexHash := strings.TrimPrefix(hash, prefix)
+	if len(hexHash) != 64 {
+		return "", fmt.Errorf("invalid sha256 hash %s", hash)
+	}
+	for _, ch := range hexHash {
+		switch {
+		case ch >= '0' && ch <= '9':
+		case ch >= 'a' && ch <= 'f':
+		default:
+			return "", fmt.Errorf("invalid sha256 hash %s", hash)
+		}
+	}
+	return hexHash, nil
 }

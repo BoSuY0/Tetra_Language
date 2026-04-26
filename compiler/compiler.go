@@ -691,7 +691,7 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 						}
 					}
 				}
-			case "core.send", "core.recv", "core.self", "core.sender":
+			case "core.send", "core.send_msg", "core.recv", "core.recv_msg", "core.self", "core.sender":
 				used = true
 			}
 			for _, arg := range e.Args {

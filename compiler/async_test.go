@@ -124,7 +124,7 @@ func worker() -> Int:
 
 func main() -> Int
 uses runtime:
-    let task: Int = core.task_spawn_i32("worker")
+    let task: task.i32 = core.task_spawn_i32("worker")
     return core.task_join_i32(task)
 `)
 	prog, err := Parse(src)
@@ -145,7 +145,7 @@ func TestTaskSpawnRequiresRuntimeUse(t *testing.T) {
 func worker() -> Int:
     return 42
 
-func main() -> Int:
+func main() -> task.i32:
     return core.task_spawn_i32("worker")
 `)
 	prog, err := Parse(src)
@@ -166,7 +166,7 @@ func TestTaskSpawnRejectsInvalidTargetShape(t *testing.T) {
 func worker(x: Int) -> Int:
     return x
 
-func main() -> Int
+func main() -> task.i32
 uses runtime:
     return core.task_spawn_i32("worker")
 `)
@@ -188,7 +188,7 @@ func TestTaskSpawnRejectsAsyncTarget(t *testing.T) {
 async func worker() -> Int:
     return 42
 
-func main() -> Int
+func main() -> task.i32
 uses runtime:
     return core.task_spawn_i32("worker")
 `)
@@ -241,7 +241,7 @@ func worker() -> Int:
 
 func main() -> Int
 uses runtime:
-    let task: Int = core.task_spawn_i32("worker")
+    let task: task.i32 = core.task_spawn_i32("worker")
     return core.task_join_i32(task)
 `, "task_spawn_i32 target")
 }
@@ -271,7 +271,53 @@ func worker() -> Int:
 
 func main() -> Int
 uses runtime:
-    let task: Int = core.task_spawn_i32("worker")
+    let task: task.i32 = core.task_spawn_i32("worker")
     return core.task_join_i32(task)
+`)
+}
+
+func TestTaskGroupsTypedHandlesAndJoinResultCheckAndLower(t *testing.T) {
+	src := []byte(`
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let _closed: Int = core.task_group_close(group)
+    return result.value
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTaskGroupCancelAllowsTypedErrorResult(t *testing.T) {
+	requireCheckFileOK(t, `
+func worker() -> Int:
+    return 99
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    group = core.task_group_cancel(group)
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let err: task.error = result.error
+    if core.task_join_i32(task) != 0:
+        return 1
+    if err == err:
+        return 0
+    return 1
 `)
 }

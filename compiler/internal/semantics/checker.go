@@ -220,6 +220,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 	if err := monomorphizeGenerics(world); err != nil {
 		return nil, err
 	}
+	if err := normalizeExtensionMethodNames(world); err != nil {
+		return nil, err
+	}
 
 	types := baseTypes()
 
@@ -251,6 +254,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 	}
 	exportedSymbols := make(map[string]string)
 
+	seenImpls := map[string]frontend.Position{}
 	for _, file := range world.Files {
 		module := file.Module
 		imports, err := collectImportAliases(file)
@@ -460,43 +464,6 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		}
 	}
 
-	for _, file := range world.Files {
-		module := file.Module
-		imports, err := collectImportAliases(file)
-		if err != nil {
-			return nil, err
-		}
-		for _, impl := range file.Impls {
-			typeName, err := resolveTypeName(&impl.Type, module, imports)
-			if err != nil {
-				return nil, err
-			}
-			protoName, err := resolveTypeName(&impl.Protocol, module, imports)
-			if err != nil {
-				return nil, err
-			}
-			impl.Type.Name = typeName
-			impl.Protocol.Name = protoName
-			if _, ok := types[typeName]; !ok {
-				return nil, fmt.Errorf("%s: impl target type '%s' is not defined", frontend.FormatPos(impl.Type.At), typeName)
-			}
-			proto, ok := protocols[protoName]
-			if !ok {
-				return nil, fmt.Errorf("%s: protocol '%s' is not defined", frontend.FormatPos(impl.Protocol.At), protoName)
-			}
-			for _, req := range proto.decl.Requirements {
-				methodName := typeName + "." + req.Name
-				method := findFuncDecl(world, methodName)
-				if method == nil {
-					return nil, fmt.Errorf("%s: type '%s' is missing protocol requirement '%s'", frontend.FormatPos(impl.At), typeName, req.Name)
-				}
-				if err := compareProtocolRequirement(typeName, protoName, req, method); err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-
 	builtinSigs, err := builtinFuncSigs(types)
 	if err != nil {
 		return nil, err
@@ -621,7 +588,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			return nil, err
 		}
 		for _, fn := range file.Funcs {
-			fullName := qualifyName(module, fn.Name)
+			fullName := checkedFuncFullName(module, fn)
 			if fn.ExportName != "" {
 				if fn.ExportName == "core" || strings.HasPrefix(fn.ExportName, "core.") {
 					return nil, fmt.Errorf("%s: @export name must not use the 'core.' namespace", frontend.FormatPos(fn.Pos))
@@ -729,6 +696,48 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		}
 	}
 
+	for _, file := range world.Files {
+		module := file.Module
+		imports, err := collectImportAliases(file)
+		if err != nil {
+			return nil, err
+		}
+		for _, impl := range file.Impls {
+			typeName, err := resolveTypeName(&impl.Type, module, imports)
+			if err != nil {
+				return nil, err
+			}
+			protoName, err := resolveTypeName(&impl.Protocol, module, imports)
+			if err != nil {
+				return nil, err
+			}
+			impl.Type.Name = typeName
+			impl.Protocol.Name = protoName
+			if _, ok := types[typeName]; !ok {
+				return nil, fmt.Errorf("%s: impl target type '%s' is not defined", frontend.FormatPos(impl.Type.At), typeName)
+			}
+			implKey := typeName + "->" + protoName
+			if first, exists := seenImpls[implKey]; exists {
+				return nil, fmt.Errorf("%s: duplicate impl conformance '%s: %s' (first at %s)", frontend.FormatPos(impl.At), typeName, protoName, frontend.FormatPos(first))
+			}
+			seenImpls[implKey] = impl.At
+			proto, ok := protocols[protoName]
+			if !ok {
+				return nil, fmt.Errorf("%s: protocol '%s' is not defined", frontend.FormatPos(impl.Protocol.At), protoName)
+			}
+			for _, req := range proto.decl.Requirements {
+				methodName := typeName + "." + req.Name
+				method := findFuncDecl(world, methodName)
+				if method == nil {
+					return nil, fmt.Errorf("%s: type '%s' is missing protocol requirement '%s'", frontend.FormatPos(impl.At), typeName, req.Name)
+				}
+				if err := compareProtocolRequirement(typeName, protoName, req, method); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	for name, sig := range builtinSigs {
 		checked.FuncSigs[name] = sig
 	}
@@ -752,7 +761,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			}
 			globals := checked.GlobalsByModule[module]
 			for _, fn := range file.Funcs {
-				fullName := qualifyName(module, fn.Name)
+				fullName := checkedFuncFullName(module, fn)
 				if len(fn.TypeParams) > 0 {
 					continue
 				}
@@ -841,7 +850,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		}
 		globals := checked.GlobalsByModule[module]
 		for _, fn := range file.Funcs {
-			fullName := qualifyName(module, fn.Name)
+			fullName := checkedFuncFullName(module, fn)
 			if len(fn.TypeParams) > 0 {
 				continue
 			}
@@ -925,6 +934,46 @@ func stmtListEndsWithReturn(stmts []frontend.Stmt) bool {
 		return false
 	}
 	return stmtEndsWithReturn(stmts[len(stmts)-1])
+}
+
+func normalizeExtensionMethodNames(world *module.World) error {
+	for _, file := range world.Files {
+		imports, err := collectImportAliases(file)
+		if err != nil {
+			return err
+		}
+		for _, fn := range file.Funcs {
+			if fn.ExtensionOf == "" {
+				continue
+			}
+			targetRef := frontend.TypeRef{At: fn.Pos, Kind: frontend.TypeRefNamed, Name: fn.ExtensionOf}
+			resolvedTarget, err := resolveTypeName(&targetRef, file.Module, imports)
+			if err != nil {
+				return err
+			}
+			methodName := extensionMethodNamePart(fn.Name)
+			if methodName == "" {
+				return fmt.Errorf("%s: invalid extension method name '%s'", frontend.FormatPos(fn.Pos), fn.Name)
+			}
+			fn.ExtensionOf = resolvedTarget
+			fn.Name = resolvedTarget + "." + methodName
+		}
+	}
+	return nil
+}
+
+func extensionMethodNamePart(name string) string {
+	if idx := strings.LastIndex(name, "."); idx >= 0 && idx+1 < len(name) {
+		return name[idx+1:]
+	}
+	return name
+}
+
+func checkedFuncFullName(module string, fn *frontend.FuncDecl) string {
+	if fn != nil && fn.ExtensionOf != "" {
+		return fn.Name
+	}
+	return qualifyName(module, fn.Name)
 }
 
 func stmtListEndsWithReturnTyped(
@@ -1697,7 +1746,7 @@ func checkStmts(
 						}
 					}
 					if scrutInfoOK && scrutInfo.Kind == TypeOptional && patType != "none" && patType != optionalSomePatternType {
-						return fmt.Errorf("%s: optional match supports only 'none', 'some(name)', and '_' patterns in v0.7", frontend.FormatPos(c.At))
+						return fmt.Errorf("%s: optional match supports only 'none', 'some(name)', and '_' patterns", frontend.FormatPos(c.At))
 					}
 					if !matchPatternCompatible(scrutType, patType, types) {
 						return fmt.Errorf("%s: match pattern type mismatch: expected '%s', got '%s'", frontend.FormatPos(c.At), scrutType, patType)

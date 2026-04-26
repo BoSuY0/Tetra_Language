@@ -127,6 +127,34 @@ func TestValidateEcoUnpackRejectsMetadataHashMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateEcoUnpackAcceptsReproducibleMetadataFields(t *testing.T) {
+	root := makeUnpackedProject(t, true, true)
+	raw, err := os.ReadFile(filepath.Join(root, "tetra.package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta unpackPackageMetadata
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		t.Fatal(err)
+	}
+	meta.Reproducible = true
+	meta.BuildInputsSHA = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	meta.ManifestSchema = "tetra.capsule.v1"
+	meta.PermissionsModel = "tetra.eco.permissions.v1"
+	raw, err = json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if err := os.WriteFile(filepath.Join(root, "tetra.package.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runUnpackValidator(t, root)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
 func makeUnpackedProject(t *testing.T, manifest bool, source bool) string {
 	t.Helper()
 	if manifest {
@@ -160,11 +188,15 @@ func makeUnpackedProjectWithManifest(t *testing.T, manifest string, source bool)
 }
 
 type unpackPackageMetadata struct {
-	Schema      string                  `json:"schema"`
-	Compression string                  `json:"compression"`
-	MTimeUnix   int64                   `json:"mtime_unix"`
-	FileCount   int                     `json:"file_count"`
-	Files       []unpackPackageFileMeta `json:"files"`
+	Schema           string                  `json:"schema"`
+	Compression      string                  `json:"compression"`
+	MTimeUnix        int64                   `json:"mtime_unix"`
+	Reproducible     bool                    `json:"reproducible,omitempty"`
+	BuildInputsSHA   string                  `json:"build_inputs_sha256,omitempty"`
+	ManifestSchema   string                  `json:"manifest_schema,omitempty"`
+	PermissionsModel string                  `json:"permissions_model,omitempty"`
+	FileCount        int                     `json:"file_count"`
+	Files            []unpackPackageFileMeta `json:"files"`
 }
 
 type unpackPackageFileMeta struct {

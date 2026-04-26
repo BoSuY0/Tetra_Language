@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -120,5 +121,64 @@ func main() -> Int:
 	}
 	if _, err := Lower(checked); err != nil {
 		t.Fatalf("lower: %v", err)
+	}
+}
+
+func TestOptionalMatchExhaustiveNoDefaultWithMultiSlotPayload(t *testing.T) {
+	src := []byte(`
+func maybe(flag: Bool) -> String?:
+    if flag:
+        return "ok"
+    else:
+        return none
+
+func main() -> Int:
+    let value: String? = maybe(true)
+    match value:
+    case some(s):
+        return s.len
+    case none:
+        return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	if got := checked.Funcs[1].Locals["s"].TypeName; got != "str" {
+		t.Fatalf("some binding type = %q, want str", got)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+}
+
+func TestOptionalMatchMissingSomeCaseNeedsReturn(t *testing.T) {
+	src := []byte(`
+func maybe(flag: Bool) -> String?:
+    if flag:
+        return "ok"
+    else:
+        return none
+
+func main() -> Int:
+    let value: String? = maybe(true)
+    match value:
+    case none:
+        return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected non-exhaustive optional match error")
+	}
+	if !strings.Contains(err.Error(), "must end with return") {
+		t.Fatalf("error = %v", err)
 	}
 }

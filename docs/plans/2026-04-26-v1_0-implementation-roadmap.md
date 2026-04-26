@@ -25,9 +25,9 @@
 
 ### 1.1 Final Grammar
 
-- [ ] Freeze final v1 Flow grammar spec (single canonical grammar source).
+- [x] Freeze final v1 Flow grammar spec (single canonical grammar source).
 - [x] Remove canonical reliance on `normalizeFlowSyntax` from compile/check/fmt paths.
-- [ ] Keep normalization only as migration tooling (optional command/tool path), not canonical frontend.
+- [x] Keep normalization only as migration tooling (optional command/tool path), not canonical frontend.
 
 ### 1.2 Missing Syntax Features
 
@@ -39,7 +39,7 @@
 
 - [x] Add positive tests for each newly implemented syntax path.
 - [x] Add negative tests for each invalid syntax path.
-- [ ] Keep formatter coverage for full Flow surface.
+- [x] Keep formatter coverage for full Flow surface.
 
 **Verification**
 
@@ -55,19 +55,19 @@ go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
 
 ### 2.1 Optionals / Typed Errors
 
-- [ ] Implement multi-slot optionals.
-- [ ] Implement multi-slot typed errors.
+- [x] Implement multi-slot optionals.
+- [x] Implement multi-slot typed errors.
 
 ### 2.2 Generics / Protocols / Extensions
 
-- [ ] Implement generic functions across modules.
-- [ ] Implement extension conformance clauses.
-- [ ] Stabilize monomorphization naming (deterministic + stable ABI-facing names).
+- [x] Implement generic functions across modules.
+- [x] Implement extension conformance clauses.
+- [x] Stabilize monomorphization naming (deterministic + stable ABI-facing names).
 
 ### 2.3 Type-System Hardening
 
-- [ ] Add exhaustive tests for optionals/enums with expanded payload model.
-- [ ] Ensure diagnostics are stable for unsupported/invalid generic/protocol paths.
+- [x] Add exhaustive tests for optionals/enums with expanded payload model.
+- [x] Ensure diagnostics are stable for unsupported/invalid generic/protocol paths.
 
 **Verification**
 
@@ -136,17 +136,17 @@ go test ./compiler/... -run 'Effect|Capability|Unsafe|Budget|Privacy'
 
 ### 5.1 Runtime Contract
 
-- [ ] Define and implement stable v1 task ABI.
-- [ ] Implement structured task groups.
-- [ ] Implement cancellation semantics.
-- [ ] Implement typed task handles.
-- [ ] Implement typed async error propagation.
-- [ ] Expand actors beyond `i32` message-only model.
+- [x] Define and implement stable v1 task ABI.
+- [x] Implement structured task groups.
+- [x] Implement cancellation semantics.
+- [x] Implement typed task handles.
+- [x] Implement typed async error propagation.
+- [x] Expand actors beyond `i32` message-only model.
 
 ### 5.2 Runtime Validation
 
-- [ ] Keep self-host and builtin runtime paths passing during migration.
-- [ ] Add actor/runtime stress coverage.
+- [x] Keep self-host and builtin runtime paths passing during migration.
+- [x] Add actor/runtime stress coverage.
 
 **Verification**
 
@@ -278,21 +278,21 @@ bash scripts/release_v1_0_gate.sh
 
 ### 10.1 Core Model
 
-- [ ] Stabilize Capsule manifest v1.
-- [ ] Stabilize permission model.
-- [ ] Implement Seed import/export.
-- [ ] Implement NeedMap.
-- [ ] Implement TrustSnapshot.
-- [ ] Implement Materializer.
-- [ ] Add reproducible build basics.
+- [x] Stabilize Capsule manifest v1.
+- [x] Stabilize permission model.
+- [x] Implement Seed import/export.
+- [x] Implement NeedMap.
+- [x] Implement TrustSnapshot.
+- [x] Implement Materializer.
+- [x] Add reproducible build basics.
 
 ### 10.2 Beta Distribution
 
-- [ ] Add beta package publishing.
-- [ ] Add TetraHub beta path.
-- [ ] Add target-aware downloads.
-- [ ] Add trust metadata.
-- [ ] Decide and document which distributed mesh/EcoTrust/EcoOracle features are in v1 vs post-v1.
+- [x] Add beta package publishing.
+- [x] Add TetraHub beta path.
+- [x] Add target-aware downloads.
+- [x] Add trust metadata.
+- [x] Decide and document which distributed mesh/EcoTrust/EcoOracle features are in v1 vs post-v1.
 
 **Verification**
 

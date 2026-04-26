@@ -34,6 +34,15 @@ func DescribeBuiltins() ([]BuiltinManifest, error) {
 		"store_ptr",
 		"sym_addr",
 		"ctx_switch",
+		"task_group_open",
+		"task_group_close",
+		"task_group_cancel",
+		"task_spawn_i32",
+		"task_spawn_group_i32",
+		"task_join_i32",
+		"task_join_result_i32",
+		"send_msg",
+		"recv_msg",
 		"actor_dispatch",
 		"actor_main_entry_id",
 	} {
@@ -101,10 +110,12 @@ func builtinEffects(name string) []string {
 		effects = []string{"link"}
 	case "core.ctx_switch":
 		effects = []string{"control", "runtime"}
-	case "core.task_spawn_i32", "core.task_join_i32":
+	case "core.task_group_open", "core.task_group_close", "core.task_group_cancel",
+		"core.task_spawn_i32", "core.task_spawn_group_i32",
+		"core.task_join_i32", "core.task_join_result_i32":
 		effects = []string{"runtime"}
 	case "core.actor_dispatch", "core.actor_main_entry_id",
-		"core.spawn", "core.send", "core.recv", "core.self", "core.sender":
+		"core.spawn", "core.send", "core.send_msg", "core.recv", "core.recv_msg", "core.self", "core.sender":
 		effects = []string{"actors"}
 	}
 	sort.Strings(effects)

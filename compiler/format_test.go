@@ -576,3 +576,111 @@ func main() -> Int uses io:
 		}
 	}
 }
+
+func TestFormatSourceFlowFullSurfaceIdempotent(t *testing.T) {
+	src := []byte(`module app.main
+
+import app.io as io
+
+enum Mode:
+    case fast
+    case slow
+
+enum ReadError:
+    case eof
+
+struct Box:
+    value: Int
+
+protocol Runner:
+    func run(self: Box) -> Int
+
+extension Box:
+    func run(self: Box) -> Int:
+        return self.value
+
+impl Box: Runner
+
+const answer: Int = 42
+
+func read(flag: Bool) -> Int throws ReadError:
+    if flag:
+        return answer
+    throw ReadError.eof
+
+async func worker(flag: Bool) -> Int throws ReadError uses runtime:
+    return try read(flag)
+
+async func caller(flag: Bool) -> Int throws ReadError:
+    return await worker(flag)
+
+func main() -> Int uses io, runtime:
+    let maybe: Int? = none
+    if let value = maybe:
+        return value
+
+    var total: Int = 0
+    for i in 0..<3:
+        total += i
+
+    let text: String = "*"
+    for ch in text:
+        total += ch
+
+    while total < answer:
+        if total == 1:
+            continue
+        if total > 8:
+            break
+        total += 1
+
+    match Mode.fast:
+    case Mode.fast:
+        total += 1
+    case Mode.slow:
+        total += 2
+    case _:
+        total += 3
+
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        total += core.load_i32(core.store_i32(core.alloc_bytes(4), total, mem), mem)
+
+    island(64) as isl:
+        var buf: []UInt8 = core.island_make_u8(isl, 1)
+        buf[0] = 1
+
+    return total
+
+test "math":
+    expect 40 + 2 == 42
+`)
+
+	once, err := FormatSource(src, "full_surface.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource once: %v", err)
+	}
+	twice, err := FormatSource(once, "full_surface.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource twice: %v", err)
+	}
+	if string(twice) != string(once) {
+		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+	}
+	for _, expected := range []string{
+		"module app.main",
+		"async func worker(flag: Bool) -> Int throws ReadError",
+		"return await worker(flag)",
+		"if let value = maybe:",
+		"for i in 0..<3:",
+		"for ch in text:",
+		"match Mode.fast:",
+		"unsafe:",
+		"island(64) as isl:",
+		"test \"math\":",
+	} {
+		if !strings.Contains(string(once), expected) {
+			t.Fatalf("formatted source missing %q:\n%s", expected, string(once))
+		}
+	}
+}

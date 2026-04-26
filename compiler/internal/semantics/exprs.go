@@ -270,6 +270,8 @@ func checkCallExprWithEffects(
 	if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
 		resolved = builtin
 		isBuiltin = true
+	} else if _, ok := funcs[e.Name]; ok {
+		resolved = e.Name
 	} else {
 		var err error
 		resolved, err = resolveCallName(e.Name, module, imports, e.At)
@@ -279,10 +281,13 @@ func checkCallExprWithEffects(
 	}
 	sig, ok := funcs[resolved]
 	if !ok {
+		if ctorType, ctorRegion, handled, err := checkStructConstructorCallWithEffects(e, locals, globals, funcs, types, module, imports, state, effects, analysis); handled {
+			return ctorType, ctorRegion, err
+		}
 		return "", regionNone, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), resolved)
 	}
 	if sig.Generic {
-		return "", regionNone, fmt.Errorf("%s: generic function '%s' could not be monomorphized in v0.5; use inferable value arguments", frontend.FormatPos(e.At), e.Name)
+		return "", regionNone, fmt.Errorf("%s: generic function '%s' could not be monomorphized; use inferable value arguments", frontend.FormatPos(e.At), e.Name)
 	}
 	if analysis != nil && !isBuiltin && sig.TouchesMutableGlobals {
 		analysis.touchesMutableGlobals = true
@@ -495,6 +500,46 @@ func checkCallExprWithEffects(
 		}
 		lit.Value = []byte(target)
 	}
+	if resolved == "core.task_spawn_group_i32" {
+		if len(e.Args) != 2 {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 expects 2 arguments", frontend.FormatPos(e.At))
+		}
+		lit, ok := e.Args[1].(*frontend.StringLitExpr)
+		if !ok {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 expects a string literal worker name", frontend.FormatPos(e.At))
+		}
+		raw := string(lit.Value)
+		if raw == "" {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 expects a non-empty name", frontend.FormatPos(e.At))
+		}
+		target, err := resolveCallName(raw, module, imports, e.At)
+		if err != nil {
+			return "", regionNone, err
+		}
+		if strings.HasPrefix(target, "core.") {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target must be a user function, got '%s'", frontend.FormatPos(e.At), target)
+		}
+		targetSig, ok := funcs[target]
+		if !ok {
+			return "", regionNone, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), target)
+		}
+		if len(targetSig.ParamTypes) != 0 || targetSig.ReturnType != "i32" {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target must have shape func %s() -> i32", frontend.FormatPos(e.At), target)
+		}
+		if targetSig.Async {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target must be synchronous", frontend.FormatPos(e.At))
+		}
+		if targetSig.ThrowsType != "" {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target must not throw", frontend.FormatPos(e.At))
+		}
+		if targetSig.TouchesMutableGlobals {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target '%s' touches mutable global state and cannot cross task boundary", frontend.FormatPos(e.At), target)
+		}
+		if !funcSigActorTaskTransferSafe(targetSig, types) {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target '%s' is not sendable across task boundary", frontend.FormatPos(e.At), target)
+		}
+		lit.Value = []byte(target)
+	}
 	if resolved == "core.sym_addr" {
 		if len(e.Args) != 1 {
 			return "", regionNone, fmt.Errorf("%s: sym_addr expects 1 argument", frontend.FormatPos(e.At))
@@ -533,6 +578,82 @@ func checkCallExprWithEffects(
 		}
 	}
 	return sig.ReturnType, regionID, nil
+}
+
+func checkStructConstructorCallWithEffects(
+	e *frontend.CallExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+	effects *effectContext,
+	analysis *functionAnalysisState,
+) (string, int, bool, error) {
+	if len(e.Args) == 0 || len(e.ArgLabels) != len(e.Args) {
+		return "", regionNone, false, nil
+	}
+	for _, label := range e.ArgLabels {
+		if label == "" {
+			return "", regionNone, false, nil
+		}
+	}
+
+	typeRef := frontend.TypeRef{At: e.At, Kind: frontend.TypeRefNamed, Name: e.Name}
+	resolvedType, err := resolveTypeName(&typeRef, module, imports)
+	if err != nil {
+		return "", regionNone, false, nil
+	}
+	info, ok := types[resolvedType]
+	if !ok || info.Kind != TypeStruct {
+		return "", regionNone, false, nil
+	}
+	if len(e.Args) != len(info.Fields) {
+		return "", regionNone, true, fmt.Errorf("%s: wrong field count for '%s'", frontend.FormatPos(e.At), resolvedType)
+	}
+
+	argByLabel := make(map[string]frontend.Expr, len(e.Args))
+	for i, label := range e.ArgLabels {
+		if _, exists := argByLabel[label]; exists {
+			return "", regionNone, true, fmt.Errorf("%s: duplicate field '%s'", frontend.FormatPos(e.Args[i].Pos()), label)
+		}
+		argByLabel[label] = e.Args[i]
+	}
+	for label, expr := range argByLabel {
+		if _, ok := info.FieldMap[label]; !ok {
+			return "", regionNone, true, fmt.Errorf("%s: unknown field '%s'", frontend.FormatPos(expr.Pos()), label)
+		}
+	}
+
+	orderedArgs := make([]frontend.Expr, 0, len(info.Fields))
+	orderedLabels := make([]string, 0, len(info.Fields))
+	structRegion := regionNone
+	for _, field := range info.Fields {
+		arg, ok := argByLabel[field.Name]
+		if !ok {
+			return "", regionNone, true, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
+		}
+		valType, valRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
+		if err != nil {
+			return "", regionNone, true, err
+		}
+		if !typesCompatibleWithNullPtr(field.TypeName, valType, arg) {
+			return "", regionNone, true, fmt.Errorf("%s: type mismatch for field '%s'", frontend.FormatPos(arg.Pos()), field.Name)
+		}
+		structRegion = joinRegion(structRegion, valRegion)
+		if structRegion == regionUnknown {
+			return "", regionNone, true, fmt.Errorf("%s: struct constructor mixes values from different regions", frontend.FormatPos(arg.Pos()))
+		}
+		orderedArgs = append(orderedArgs, arg)
+		orderedLabels = append(orderedLabels, field.Name)
+	}
+
+	e.Name = resolvedType
+	e.Args = orderedArgs
+	e.ArgLabels = orderedLabels
+	return resolvedType, structRegion, true, nil
 }
 
 func comparableTypes(left, right string, types map[string]*TypeInfo) bool {

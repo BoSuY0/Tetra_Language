@@ -25,9 +25,9 @@ Decision labels used here:
 
 ## Spec Alignment
 
-- Flow/Core syntax remains as documented in
-  [flow_syntax_mvp.md](./flow_syntax_mvp.md): closures and semantic clauses are
-  diagnostics-only in the current MVP.
+- Canonical Flow grammar/source surface is documented in
+  [flow_syntax_v1.md](./flow_syntax_v1.md). The previous
+  [flow_syntax_mvp.md](./flow_syntax_mvp.md) path is retained only as an alias.
 - `unsafe` and capability behavior remain as documented in
   [unsafe.md](./unsafe.md) and [capabilities.md](./capabilities.md); privacy
   clauses are not part of the currently enforced v1-safe surface until their

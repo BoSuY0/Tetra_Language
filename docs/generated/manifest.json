@@ -275,6 +275,17 @@
       "unsafe_policy": "never"
     },
     {
+      "name": "core.recv_msg",
+      "aliases": [
+        "recv_msg"
+      ],
+      "return_type": "actor.msg",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.self",
       "return_type": "actor",
       "effects": [
@@ -286,6 +297,22 @@
       "name": "core.send",
       "param_types": [
         "actor",
+        "i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.send_msg",
+      "aliases": [
+        "send_msg"
+      ],
+      "param_types": [
+        "actor",
+        "i32",
         "i32"
       ],
       "return_type": "i32",
@@ -370,9 +397,26 @@
       "unsafe_policy": "always"
     },
     {
-      "name": "core.task_join_i32",
+      "name": "core.task_group_cancel",
+      "aliases": [
+        "task_group_cancel"
+      ],
       "param_types": [
-        "i32"
+        "task.group"
+      ],
+      "return_type": "task.group",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_group_close",
+      "aliases": [
+        "task_group_close"
+      ],
+      "param_types": [
+        "task.group"
       ],
       "return_type": "i32",
       "effects": [
@@ -381,11 +425,68 @@
       "unsafe_policy": "never"
     },
     {
+      "name": "core.task_group_open",
+      "aliases": [
+        "task_group_open"
+      ],
+      "return_type": "task.group",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_join_i32",
+      "aliases": [
+        "task_join_i32"
+      ],
+      "param_types": [
+        "task.i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_join_result_i32",
+      "aliases": [
+        "task_join_result_i32"
+      ],
+      "param_types": [
+        "task.i32"
+      ],
+      "return_type": "task.result_i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_spawn_group_i32",
+      "aliases": [
+        "task_spawn_group_i32"
+      ],
+      "param_types": [
+        "task.group",
+        "str"
+      ],
+      "return_type": "task.i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.task_spawn_i32",
+      "aliases": [
+        "task_spawn_i32"
+      ],
       "param_types": [
         "str"
       ],
-      "return_type": "i32",
+      "return_type": "task.i32",
       "effects": [
         "runtime"
       ],

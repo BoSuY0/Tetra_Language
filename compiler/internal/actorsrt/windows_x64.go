@@ -15,6 +15,7 @@ const (
 // BuildWindowsX64 returns a runtime object that provides:
 // - __tetra_entry
 // - __tetra_actor_spawn / send / recv / self / sender
+// - __tetra_actor_send_msg / __tetra_actor_recv_msg
 //
 // entries[0] must be the program entry symbol (main).
 // Actor entry IDs are computed as FNV-1a 32-bit hashes of the string literals used in `core.spawn(...)`.
@@ -60,7 +61,13 @@ func BuildWindowsX64(entries []string) (*tobj.Object, error) {
 	if err := emitFunc("__tetra_actor_send_impl", func() error { return emitSend(e) }); err != nil {
 		return nil, err
 	}
+	if err := emitFunc("__tetra_actor_send_msg_impl", func() error { return emitSendMsg(e) }); err != nil {
+		return nil, err
+	}
 	if err := emitFunc("__tetra_actor_recv_impl", func() error { return emitRecv(e, &callPatches) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_recv_msg_impl", func() error { return emitRecvMsg(e, &callPatches) }); err != nil {
 		return nil, err
 	}
 	if err := emitFunc("__tetra_actor_self_impl", func() error { return emitSelf(e) }); err != nil {
@@ -76,7 +83,13 @@ func BuildWindowsX64(entries []string) (*tobj.Object, error) {
 	if err := emitFunc("__tetra_actor_send", func() error { return emitActorSendWrapperWindowsX64(e, &jmpPatches) }); err != nil {
 		return nil, err
 	}
+	if err := emitFunc("__tetra_actor_send_msg", func() error { return emitActorSendMsgWrapperWindowsX64(e, &jmpPatches) }); err != nil {
+		return nil, err
+	}
 	if err := emitFunc("__tetra_actor_recv", func() error { return emitActorNoArgWrapperWindowsX64(e, "__tetra_actor_recv_impl", &jmpPatches) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_recv_msg", func() error { return emitActorNoArgWrapperWindowsX64(e, "__tetra_actor_recv_msg_impl", &jmpPatches) }); err != nil {
 		return nil, err
 	}
 	if err := emitFunc("__tetra_actor_self", func() error { return emitActorNoArgWrapperWindowsX64(e, "__tetra_actor_self_impl", &jmpPatches) }); err != nil {

@@ -43,6 +43,10 @@ func ParseFile(src []byte, filename string) (*FileAST, error) {
 	return frontend.ParseFile(src, filename)
 }
 
+func NormalizeFlowForMigration(src []byte, filename string) ([]byte, error) {
+	return frontend.NormalizeFlowForMigration(src, filename)
+}
+
 func LoadWorld(entryPath string) (*World, error) {
 	return module.LoadWorld(entryPath)
 }

@@ -80,7 +80,8 @@ uses alloc, capability, mem:
 func TestStabilizationTaskJoinRequiresRuntimeEffect(t *testing.T) {
 	requireCheckErrorContains(t, `
 func main() -> Int:
-    return core.task_join_i32(1)
+    let task: task.i32 = task.i32{ value: 1, error: 0 }
+    return core.task_join_i32(task)
 `, "uses effect 'runtime'")
 }
 

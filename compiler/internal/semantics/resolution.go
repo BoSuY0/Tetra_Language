@@ -150,10 +150,14 @@ func resolveCallName(name string, module string, imports map[string]string, pos 
 		return qualifyName(module, name), nil
 	}
 	if target, ok := imports[parts[0]]; ok {
-		if len(parts) != 2 {
+		if len(parts) < 2 {
 			return "", fmt.Errorf("%s: expected '%s.<func>'", frontend.FormatPos(pos), parts[0])
 		}
-		return target + "." + parts[1], nil
+		suffix := strings.Join(parts[1:], ".")
+		if suffix == "" {
+			return "", fmt.Errorf("%s: expected '%s.<func>'", frontend.FormatPos(pos), parts[0])
+		}
+		return target + "." + suffix, nil
 	}
 	modPath := strings.Join(parts[:len(parts)-1], ".")
 	return modPath + "." + parts[len(parts)-1], nil

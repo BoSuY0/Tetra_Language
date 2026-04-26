@@ -1,0 +1,30 @@
+// Tagged actor message stress smoke.
+// Exercises the extended actor message ABI with value+tag envelopes.
+val ITERATIONS: i32 = 256
+
+func worker() -> Int
+uses actors:
+    var i: i32 = 0
+    while i < ITERATIONS:
+        var msg: actor.msg = core.recv_msg()
+        if msg.tag != 1:
+            return 11
+        var _sent: i32 = core.send_msg(core.sender(), msg.value + 1, 2)
+        i = i + 1
+    return 0
+
+func main() -> Int
+uses actors:
+    var peer: actor = core.spawn("worker")
+    var i: i32 = 0
+    var drift: i32 = 0
+    while i < ITERATIONS:
+        var _sent: i32 = core.send_msg(peer, i, 1)
+        var msg: actor.msg = core.recv_msg()
+        if msg.tag != 2:
+            return 21
+        drift = drift + (msg.value - (i + 1))
+        i = i + 1
+    if drift != 0:
+        return 22
+    return 0

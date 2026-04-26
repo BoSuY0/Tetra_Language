@@ -9,7 +9,7 @@ import (
 	"tetra_language/compiler/internal/frontend"
 )
 
-// FormatSource returns canonical v0.18 Flow-style formatting for supported MVP syntax.
+// FormatSource returns canonical Flow formatting for the supported v1 surface.
 func FormatSource(src []byte, filename string) ([]byte, error) {
 	comments, err := collectLineComments(src, filename)
 	if err != nil {

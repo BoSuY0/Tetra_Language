@@ -19,10 +19,12 @@ var g_pong_spawned: i32
 var g_pong_entry_id: i32
 var g_main_has: i32
 var g_main_val: i32
+var g_main_tag: i32
 var g_main_msg_sender: i32
 var g_main_last_sender: i32
 var g_pong_has: i32
 var g_pong_val: i32
+var g_pong_tag: i32
 var g_pong_msg_sender: i32
 var g_pong_last_sender: i32
 var g_main_exit: i32
@@ -59,20 +61,27 @@ func mailbox_take(idx: i32) -> i32:
     g_pong_last_sender = g_pong_msg_sender
     return g_pong_val
 
-func mailbox_put(idx: i32, v: i32, sender: i32) -> i32:
+func mailbox_put(idx: i32, v: i32, tag: i32, sender: i32) -> i32:
     if idx == 0:
         g_main_val = v
+        g_main_tag = tag
         g_main_msg_sender = sender
         g_main_has = 1
         if g_main_status == STATUS_BLOCKED:
             g_main_status = STATUS_READY
         return 0
     g_pong_val = v
+    g_pong_tag = tag
     g_pong_msg_sender = sender
     g_pong_has = 1
     if g_pong_status == STATUS_BLOCKED:
         g_pong_status = STATUS_READY
     return 0
+
+func mailbox_take_tag(idx: i32) -> i32:
+    if idx == 0:
+        return g_main_tag
+    return g_pong_tag
 
 func mailbox_last_sender(idx: i32) -> i32:
     if idx == 0:
@@ -172,7 +181,12 @@ func actor_spawn(entry_id: i32) -> i32:
 
 @export("__tetra_actor_send")
 func actor_send(to: i32, v: i32) -> i32:
-    var _ok: i32 = mailbox_put(to, v, g_current)
+    var _ok: i32 = mailbox_put(to, v, 0, g_current)
+    return v
+
+@export("__tetra_actor_send_msg")
+func actor_send_msg(to: i32, v: i32, tag: i32) -> i32:
+    var _ok: i32 = mailbox_put(to, v, tag, g_current)
     return v
 
 @export("__tetra_actor_recv")
@@ -186,6 +200,20 @@ func actor_recv() -> i32:
             var _st: i32 = set_actor_status(idx, STATUS_BLOCKED)
             var _y: i32 = core.ctx_switch(actor_slot(idx), g_sched_slot, mem)
     return 0
+
+@export("__tetra_actor_recv_msg")
+func actor_recv_msg() -> actor.msg:
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        while 1:
+            var idx: i32 = g_current
+            if mailbox_has(idx) == 1:
+                var value: i32 = mailbox_take(idx)
+                var tag: i32 = mailbox_take_tag(idx)
+                return actor.msg(value: value, tag: tag)
+            var _st: i32 = set_actor_status(idx, STATUS_BLOCKED)
+            var _y: i32 = core.ctx_switch(actor_slot(idx), g_sched_slot, mem)
+    return actor.msg(value: 0, tag: 1)
 
 @export("__tetra_actor_self")
 func actor_self() -> i32:

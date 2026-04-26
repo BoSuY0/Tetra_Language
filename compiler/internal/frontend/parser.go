@@ -5,17 +5,6 @@ import (
 	"strings"
 )
 
-type ParseMode int
-
-const (
-	ParseModeCanonical ParseMode = iota
-	ParseModeMigrationNormalize
-)
-
-type ParseOptions struct {
-	Mode ParseMode
-}
-
 func Parse(src []byte) (*Program, error) {
 	file, err := ParseFile(src, "")
 	if err != nil {
@@ -28,14 +17,22 @@ func Parse(src []byte) (*Program, error) {
 }
 
 func ParseFile(src []byte, filename string) (*FileAST, error) {
-	return ParseFileWithOptions(src, filename, ParseOptions{Mode: ParseModeCanonical})
-}
-
-func ParseFileWithOptions(src []byte, filename string, opts ParseOptions) (*FileAST, error) {
-	parseSrc, err := parseSourceByMode(src, filename, opts.Mode)
+	parseSrc, err := canonicalizeFlowSyntax(src, filename)
 	if err != nil {
 		return nil, err
 	}
+	return parsePreparedSource(src, parseSrc, filename)
+}
+
+func ParseFileWithMigrationNormalization(src []byte, filename string) (*FileAST, error) {
+	parseSrc, err := normalizeFlowSyntax(src, filename)
+	if err != nil {
+		return nil, err
+	}
+	return parsePreparedSource(src, parseSrc, filename)
+}
+
+func parsePreparedSource(raw []byte, parseSrc []byte, filename string) (*FileAST, error) {
 	p, err := newParser(parseSrc, filename)
 	if err != nil {
 		return nil, err
@@ -45,23 +42,8 @@ func ParseFileWithOptions(src []byte, filename string, opts ParseOptions) (*File
 		return nil, err
 	}
 	file.Path = filename
-	file.Src = append([]byte(nil), src...)
+	file.Src = append([]byte(nil), raw...)
 	return file, nil
-}
-
-func ParseFileWithMigrationNormalization(src []byte, filename string) (*FileAST, error) {
-	return ParseFileWithOptions(src, filename, ParseOptions{Mode: ParseModeMigrationNormalize})
-}
-
-func parseSourceByMode(src []byte, filename string, mode ParseMode) ([]byte, error) {
-	switch mode {
-	case ParseModeCanonical:
-		return canonicalizeFlowSyntax(src, filename)
-	case ParseModeMigrationNormalize:
-		return normalizeFlowSyntax(src, filename)
-	default:
-		return nil, diagnosticErrorf(Position{File: filename, Line: 1, Col: 1}, "unknown parse mode")
-	}
 }
 
 type parser struct {

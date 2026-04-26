@@ -176,6 +176,41 @@ func (l *lowerer) emitZeroSlots(count int, pos frontend.Position) {
 	}
 }
 
+func (l *lowerer) emitConvertedThrowFromScratch(srcType, dstType string, pos frontend.Position) (int, error) {
+	return l.emitConvertedValueFromScratch(srcType, dstType, l.throwScratchBase, pos)
+}
+
+func (l *lowerer) emitConvertedValueFromScratch(srcType, dstType string, base int, pos frontend.Position) (int, error) {
+	srcInfo, ok := l.types[srcType]
+	if !ok {
+		return 0, fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(pos), srcType)
+	}
+	if srcType == dstType || (isThrowIntLike(srcType) && isThrowIntLike(dstType)) {
+		for slot := 0; slot < srcInfo.SlotCount; slot++ {
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slot, Pos: pos})
+		}
+		return srcInfo.SlotCount, nil
+	}
+	dstInfo, ok := l.types[dstType]
+	if ok && dstInfo.Kind == semantics.TypeOptional {
+		slots, err := l.emitConvertedValueFromScratch(srcType, dstInfo.ElemType, base, pos)
+		if err == nil {
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
+			return slots + 1, nil
+		}
+	}
+	return 0, fmt.Errorf("%s: try error slot mismatch", frontend.FormatPos(pos))
+}
+
+func isThrowIntLike(typeName string) bool {
+	switch typeName {
+	case "i32", "u8", "task.error":
+		return true
+	default:
+		return false
+	}
+}
+
 func (l *lowerer) pushLoop(continueLabel, breakLabel int) {
 	l.loopStack = append(l.loopStack, loopLabels{
 		continueLabel: continueLabel,
@@ -621,7 +656,7 @@ func (l *lowerer) lowerStmt(stmt frontend.Stmt) error {
 					continue
 				}
 				if !isNoneExpr(c.Pattern) {
-					return fmt.Errorf("%s: optional match supports only 'none', 'some(name)', and '_' patterns in v0.7", frontend.FormatPos(c.At))
+					return fmt.Errorf("%s: optional match supports only 'none', 'some(name)', and '_' patterns", frontend.FormatPos(c.At))
 				}
 				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: info.Base + info.SlotCount - 1, Pos: c.At})
 				l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: c.At})
@@ -821,35 +856,42 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		okLabel := l.newLabel()
 		l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: okLabel, Pos: e.At})
 
-		if !callCompact {
+		if callCompact {
+			if l.throwErrorSlots < 1 {
+				return 0, fmt.Errorf("%s: try error slot mismatch", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.throwScratchBase, Pos: e.At})
+		} else {
+			if callErrorSlots > l.throwErrorSlots {
+				return 0, fmt.Errorf("%s: try error slot mismatch", frontend.FormatPos(e.At))
+			}
 			for slot := callErrorSlots - 1; slot >= 0; slot-- {
 				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.throwScratchBase + slot, Pos: e.At})
 			}
 			for slot := 0; slot < callSuccessSlots; slot++ {
 				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.throwScratchBase, Pos: e.At})
 			}
-		} else if !l.throwCompact {
-			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.throwScratchBase, Pos: e.At})
 		}
 
+		propagatedErrorSlots := 0
 		if l.throwCompact {
-			if !callCompact {
-				if callErrorSlots != 1 {
-					return 0, fmt.Errorf("%s: try error slot mismatch", frontend.FormatPos(e.At))
-				}
-				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.throwScratchBase, Pos: e.At})
+			var convErr error
+			propagatedErrorSlots, convErr = l.emitConvertedThrowFromScratch(sig.ThrowsType, l.throwsType, e.At)
+			if convErr != nil {
+				return 0, convErr
 			}
-		} else {
-			if !callCompact && callErrorSlots != l.throwErrorSlots {
+			if propagatedErrorSlots != 1 {
 				return 0, fmt.Errorf("%s: try error slot mismatch", frontend.FormatPos(e.At))
 			}
+		} else {
 			l.emitZeroSlots(l.throwSuccessSlots, e.At)
-			if callCompact {
-				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.throwScratchBase, Pos: e.At})
-			} else {
-				for slot := 0; slot < callErrorSlots; slot++ {
-					l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.throwScratchBase + slot, Pos: e.At})
-				}
+			var convErr error
+			propagatedErrorSlots, convErr = l.emitConvertedThrowFromScratch(sig.ThrowsType, l.throwsType, e.At)
+			if convErr != nil {
+				return 0, convErr
+			}
+			if propagatedErrorSlots != l.throwErrorSlots {
+				return 0, fmt.Errorf("%s: try error slot mismatch", frontend.FormatPos(e.At))
 			}
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
@@ -878,6 +920,9 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		}
 		return l.lowerExpr(call)
 	case *frontend.CallExpr:
+		if slots, ok, err := l.lowerStructConstructorCall(e); ok {
+			return slots, err
+		}
 		if builtin, ok := semantics.ResolveBuiltinAlias(e.Name); ok {
 			e.Name = builtin
 		}
@@ -917,13 +962,66 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				return 0, fmt.Errorf("%s: unknown task target '%s'", frontend.FormatPos(e.At), name)
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: name, ArgSlots: 0, RetSlots: sig.ReturnSlots, Pos: e.At})
-			return sig.ReturnSlots, nil
+			if sig.ReturnSlots != 1 {
+				return 0, fmt.Errorf("%s: task_spawn_i32 target must return 1 slot", frontend.FormatPos(e.At))
+			}
+			// task.i32 layout: {value, error}; 0 = no error.
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			return 2, nil
+		case "core.task_spawn_group_i32":
+			if len(e.Args) != 2 {
+				return 0, fmt.Errorf("%s: task_spawn_group_i32 expects 2 arguments", frontend.FormatPos(e.At))
+			}
+			groupSlots, err := l.lowerExpr(e.Args[0])
+			if err != nil {
+				return 0, err
+			}
+			if groupSlots != 1 {
+				return 0, fmt.Errorf("%s: task_spawn_group_i32 expects a 1-slot task.group handle", frontend.FormatPos(e.At))
+			}
+			lit, ok := e.Args[1].(*frontend.StringLitExpr)
+			if !ok {
+				return 0, fmt.Errorf("%s: task_spawn_group_i32 expects a string literal worker name", frontend.FormatPos(e.At))
+			}
+			name := string(lit.Value)
+			if name == "" {
+				return 0, fmt.Errorf("%s: task_spawn_group_i32 expects a non-empty name", frontend.FormatPos(e.At))
+			}
+			sig, ok := l.funcs[name]
+			if !ok {
+				return 0, fmt.Errorf("%s: unknown task target '%s'", frontend.FormatPos(e.At), name)
+			}
+			if sig.ReturnSlots != 1 {
+				return 0, fmt.Errorf("%s: task_spawn_group_i32 target must return 1 slot", frontend.FormatPos(e.At))
+			}
+
+			activeLabel := l.newLabel()
+			endLabel := l.newLabel()
+			// group == 0 => canceled handle
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRCmpEqI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: activeLabel, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: endLabel, Pos: e.At})
+
+			l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: activeLabel, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: name, ArgSlots: 0, RetSlots: sig.ReturnSlots, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: endLabel, Pos: e.At})
+			return 2, nil
 		case "core.recv":
 			if len(e.Args) != 0 {
 				return 0, fmt.Errorf("%s: recv expects 0 arguments", frontend.FormatPos(e.At))
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_recv", ArgSlots: 0, RetSlots: 1, Pos: e.At})
 			return 1, nil
+		case "core.recv_msg":
+			if len(e.Args) != 0 {
+				return 0, fmt.Errorf("%s: recv_msg expects 0 arguments", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_recv_msg", ArgSlots: 0, RetSlots: 2, Pos: e.At})
+			return 2, nil
 		case "core.self":
 			if len(e.Args) != 0 {
 				return 0, fmt.Errorf("%s: self expects 0 arguments", frontend.FormatPos(e.At))
@@ -1068,11 +1166,42 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRCtxSwitch, Pos: e.At})
 			return 1, nil
-		case "core.task_join_i32":
+		case "core.task_group_open":
+			if total != 0 {
+				return 0, fmt.Errorf("%s: task_group_open expects 0 arguments", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
+			return 1, nil
+		case "core.task_group_close":
 			if total != 1 {
+				return 0, fmt.Errorf("%s: task_group_close expects 1 argument", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRMulI32, Pos: e.At})
+			return 1, nil
+		case "core.task_group_cancel":
+			if total != 1 {
+				return 0, fmt.Errorf("%s: task_group_cancel expects 1 argument", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRMulI32, Pos: e.At})
+			return 1, nil
+		case "core.task_join_i32":
+			if total != 2 {
 				return 0, fmt.Errorf("%s: task_join_i32 expects 1 argument", frontend.FormatPos(e.At))
 			}
+			// task.i32 layout: {value, error}; 0 = no error, non-zero = canceled/failed.
+			// Join returns value when error==0, otherwise 0.
+			l.emit(ir.IRInstr{Kind: ir.IRNegI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRAddI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRMulI32, Pos: e.At})
 			return 1, nil
+		case "core.task_join_result_i32":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: task_join_result_i32 expects 1 argument", frontend.FormatPos(e.At))
+			}
+			return 2, nil
 		case "core.actor_dispatch":
 			if total != 1 {
 				return 0, fmt.Errorf("%s: actor_dispatch expects 1 argument", frontend.FormatPos(e.At))
@@ -1090,6 +1219,12 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				return 0, fmt.Errorf("%s: send expects 2 arguments", frontend.FormatPos(e.At))
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_send", ArgSlots: 2, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.send_msg":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: send_msg expects 3 arguments", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_send_msg", ArgSlots: 3, RetSlots: 1, Pos: e.At})
 			return 1, nil
 		default:
 			sig, ok := l.funcs[e.Name]
@@ -1434,6 +1569,9 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 	case *frontend.StructLitExpr:
 		return e.Type.Name, nil
 	case *frontend.CallExpr:
+		if tname, ok, err := l.inferStructConstructorCallType(e); ok {
+			return tname, err
+		}
 		if builtin, ok := semantics.ResolveBuiltinAlias(e.Name); ok {
 			e.Name = builtin
 		}
@@ -1480,4 +1618,69 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 	default:
 		return "", fmt.Errorf("%s: unsupported expression", frontend.FormatPos(expr.Pos()))
 	}
+}
+
+func (l *lowerer) lowerStructConstructorCall(e *frontend.CallExpr) (int, bool, error) {
+	if len(e.Args) == 0 || len(e.ArgLabels) != len(e.Args) {
+		return 0, false, nil
+	}
+	for _, label := range e.ArgLabels {
+		if label == "" {
+			return 0, false, nil
+		}
+	}
+
+	info, ok := l.types[e.Name]
+	if !ok || info.Kind != semantics.TypeStruct {
+		return 0, false, nil
+	}
+	if len(e.Args) != len(info.Fields) {
+		return 0, true, fmt.Errorf("%s: wrong field count for '%s'", frontend.FormatPos(e.At), e.Name)
+	}
+
+	argByLabel := make(map[string]frontend.Expr, len(e.Args))
+	for i, label := range e.ArgLabels {
+		if _, exists := argByLabel[label]; exists {
+			return 0, true, fmt.Errorf("%s: duplicate field '%s'", frontend.FormatPos(e.Args[i].Pos()), label)
+		}
+		argByLabel[label] = e.Args[i]
+	}
+	for label, expr := range argByLabel {
+		if _, ok := info.FieldMap[label]; !ok {
+			return 0, true, fmt.Errorf("%s: unknown field '%s'", frontend.FormatPos(expr.Pos()), label)
+		}
+	}
+
+	total := 0
+	for _, field := range info.Fields {
+		expr, ok := argByLabel[field.Name]
+		if !ok {
+			return 0, true, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
+		}
+		slots, err := l.lowerExpr(expr)
+		if err != nil {
+			return 0, true, err
+		}
+		if slots != field.SlotCount {
+			return 0, true, fmt.Errorf("%s: slot mismatch for field '%s'", frontend.FormatPos(expr.Pos()), field.Name)
+		}
+		total += slots
+	}
+	return total, true, nil
+}
+
+func (l *lowerer) inferStructConstructorCallType(e *frontend.CallExpr) (string, bool, error) {
+	if len(e.Args) == 0 || len(e.ArgLabels) != len(e.Args) {
+		return "", false, nil
+	}
+	for _, label := range e.ArgLabels {
+		if label == "" {
+			return "", false, nil
+		}
+	}
+	info, ok := l.types[e.Name]
+	if !ok || info.Kind != semantics.TypeStruct {
+		return "", false, nil
+	}
+	return e.Name, true, nil
 }

@@ -18,6 +18,15 @@ func canonicalizeFlowSyntax(src []byte, filename string) ([]byte, error) {
 	return bridgeFlowSyntax(src, filename, flowBridgeOptions{})
 }
 
+// NormalizeFlowForMigration rewrites supported Flow syntax into migration
+// compatibility form (fun/val keywords and wrapped control-flow conditions).
+//
+// This is not used by canonical parse paths; keep it for explicit migration
+// tooling only.
+func NormalizeFlowForMigration(src []byte, filename string) ([]byte, error) {
+	return normalizeFlowSyntax(src, filename)
+}
+
 func normalizeFlowSyntax(src []byte, filename string) ([]byte, error) {
 	return bridgeFlowSyntax(src, filename, flowBridgeOptions{
 		rewriteFuncKeyword: true,

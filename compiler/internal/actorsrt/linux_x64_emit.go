@@ -11,7 +11,8 @@ const (
 	msgNextOff   = 0  // u64
 	msgSenderOff = 8  // u32
 	msgValueOff  = 12 // u32
-	msgSize      = 16
+	msgTagOff    = 16 // u32
+	msgSize      = 24
 )
 
 func fnv1a32(s string) uint32 {
@@ -410,6 +411,93 @@ func emitSend(e *x64.Emitter) error {
 
 	// msg.value = esi
 	e.MovMem32RdiDispEsi(msgValueOff)
+	// msg.tag = 0 (legacy i32 channel)
+	e.MovMem32RdiDispImm32(msgTagOff, 0)
+
+	// actorPtr = sched.actorsPtr + (to<<shift)
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedActorsPtrOff)
+	e.MovRbxRcx()
+	e.ShlRbxImm8(actorSizeShift)
+	e.AddRaxRbx()
+	e.PushRax() // save actorPtr
+	e.MovRdiRax()
+
+	// tail = actor.mailboxTail
+	e.MovRaxFromRdiDisp(actorMailboxTailOff)
+	e.TestRaxRax()
+	emptyAt := e.JzRel32()
+
+	// non-empty: tail.next = msgPtr
+	e.MovRdiRax()
+	e.MovRaxRdx()
+	e.MovMem64RdiDispRax(msgNextOff)
+	e.PopRax()
+	e.MovRdiRax()
+	e.MovRaxRdx()
+	e.MovMem64RdiDispRax(actorMailboxTailOff)
+	afterAppendAt := e.JmpRel32()
+
+	// empty: head=tail=msgPtr
+	emptyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, emptyAt, emptyTo); err != nil {
+		return err
+	}
+	e.PopRax()
+	e.MovRdiRax()
+	e.MovRaxRdx()
+	e.MovMem64RdiDispRax(actorMailboxHeadOff)
+	e.MovMem64RdiDispRax(actorMailboxTailOff)
+
+	afterAppendTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, afterAppendAt, afterAppendTo); err != nil {
+		return err
+	}
+
+	// If receiver blocked -> ready
+	e.MovEaxFromRdiDisp(actorStatusOff)
+	e.CmpEaxImm32(statusBlocked)
+	notBlockedAt := e.JnzRel32()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
+	notBlockedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, notBlockedAt, notBlockedTo); err != nil {
+		return err
+	}
+
+	e.MovEaxEsi()
+	e.Ret()
+	return nil
+}
+
+func emitSendMsg(e *x64.Emitter) error {
+	// Args: rdi=to (actor handle), rsi=value (i32), rdx=tag (i32)
+	// Returns: eax=value.
+
+	e.MovEcxEdi() // save receiver idx in ecx
+	e.PushRdx()   // preserve tag across scheduler/actor pointer loads
+
+	// msgPtr = bump; bump += msgSize
+	e.MovRdiR15()
+	e.MovRaxFromRdiDisp(schedMsgBumpOff)
+	e.MovRdxRax() // msgPtr in rdx
+	e.AddRaxImm32(msgSize)
+	e.MovMem64RdiDispRax(schedMsgBumpOff)
+
+	// msg.next = 0
+	e.MovRdiRdx()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(msgNextOff)
+
+	// msg.sender = sched.currentIdx
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedCurrentIdxOff)
+	e.MovRdiRdx()
+	e.MovMem32RdiDispEax(msgSenderOff)
+
+	// msg.value = esi; msg.tag = preserved stack value
+	e.MovMem32RdiDispEsi(msgValueOff)
+	e.PopRax()
+	e.MovMem32RdiDispEax(msgTagOff)
 
 	// actorPtr = sched.actorsPtr + (to<<shift)
 	e.MovRdiR15()
@@ -525,6 +613,72 @@ func emitRecv(e *x64.Emitter, callPatches *[]callPatch) error {
 	// value = node.value
 	e.MovRdiRcx()
 	e.MovEaxFromRdiDisp(msgValueOff)
+	e.Ret()
+	return nil
+}
+
+func emitRecvMsg(e *x64.Emitter, callPatches *[]callPatch) error {
+	loopStart := len(e.Buf)
+	actorPtrInRax(e)
+	e.MovRdxRax() // actorPtr in rdx
+
+	e.MovRdiRdx()
+	e.MovRaxFromRdiDisp(actorMailboxHeadOff) // nodePtr in rax
+	e.TestRaxRax()
+	haveMsgAt := e.JnzRel32()
+
+	// Empty: block and yield.
+	e.MovMem32RdiDispImm32(actorStatusOff, statusBlocked)
+	at := e.CallRel32()
+	*callPatches = append(*callPatches, callPatch{at: at, name: "__tetra_actor_yield"})
+	jmpAt := e.JmpRel32()
+	if err := x64.PatchRel32(e.Buf, jmpAt, loopStart); err != nil {
+		return err
+	}
+
+	// haveMsg:
+	haveMsgTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, haveMsgAt, haveMsgTo); err != nil {
+		return err
+	}
+
+	// Preserve nodePtr.
+	e.PushRax()
+
+	// next = node.next
+	e.MovRdiRax()
+	e.MovRaxFromRdiDisp(msgNextOff)
+	e.MovRcxRax() // next in rcx
+
+	// actor.mailboxHead = next
+	e.MovRdiRdx()
+	e.MovRaxRcx()
+	e.MovMem64RdiDispRax(actorMailboxHeadOff)
+	e.TestRaxRax()
+	skipClearAt := e.JnzRel32()
+	e.XorEaxEax()
+	e.MovMem64RdiDispRax(actorMailboxTailOff)
+	skipClearTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, skipClearAt, skipClearTo); err != nil {
+		return err
+	}
+
+	// nodePtr back -> rcx
+	e.PopRax()
+	e.MovRcxRax()
+
+	// sender = node.sender
+	e.MovRdiRax()
+	e.MovEaxFromRdiDisp(msgSenderOff)
+	e.MovRdiRdx()
+	e.MovMem32RdiDispEax(actorLastSenderOff)
+
+	// value/tag
+	e.MovRdiRcx()
+	e.MovEaxFromRdiDisp(msgTagOff)
+	e.PushRax()
+	e.MovEaxFromRdiDisp(msgValueOff)
+	e.PopRdx()
 	e.Ret()
 	return nil
 }

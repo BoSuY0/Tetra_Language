@@ -361,6 +361,13 @@ func TestBuildEnumMatchExhaustiveNoDefaultSmoke(t *testing.T) {
 	}
 }
 
+func TestEnumMatchExhaustiveThreeCasesNoDefaultCheck(t *testing.T) {
+	src := "enum Color:\n  case red\n  case green\n  case blue\n\nfunc main() -> Int:\n  let color: Color = Color.blue\n  match color:\n  case Color.red:\n    return 1\n  case Color.green:\n    return 2\n  case Color.blue:\n    return 3\n"
+	if err := checkProgram(src); err != nil {
+		t.Fatalf("unexpected non-exhaustive enum diagnostic: %v", err)
+	}
+}
+
 func TestEnumMatchMissingCaseStillNeedsReturn(t *testing.T) {
 	src := "enum Color:\n  case red\n  case green\n\nfunc main() -> Int:\n  let color: Color = Color.green\n  match color:\n  case Color.red:\n    return 1\n"
 	if err := checkProgram(src); err == nil {

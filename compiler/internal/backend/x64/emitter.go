@@ -137,6 +137,14 @@ func (e *Emitter) MovRdxRax() {
 	e.Emit(0x48, 0x89, 0xC2)
 }
 
+func (e *Emitter) MovR8Rdx() {
+	e.Emit(0x49, 0x89, 0xD0)
+}
+
+func (e *Emitter) MovRdxR8() {
+	e.Emit(0x4C, 0x89, 0xC2)
+}
+
 func (e *Emitter) MovRaxRdx() {
 	e.Emit(0x48, 0x89, 0xD0)
 }
@@ -249,6 +257,19 @@ func (e *Emitter) MovEaxFromRdiDisp(disp int32) {
 		e.Emit(0x8B, 0x47, byte(disp))
 	} else {
 		e.Emit(0x8B, 0x87)
+		var buf [4]byte
+		binary.LittleEndian.PutUint32(buf[:], uint32(disp))
+		e.Emit(buf[:]...)
+	}
+}
+
+func (e *Emitter) MovEdxFromRdiDisp(disp int32) {
+	if disp == 0 {
+		e.Emit(0x8B, 0x17)
+	} else if disp >= -128 && disp <= 127 {
+		e.Emit(0x8B, 0x57, byte(disp))
+	} else {
+		e.Emit(0x8B, 0x97)
 		var buf [4]byte
 		binary.LittleEndian.PutUint32(buf[:], uint32(disp))
 		e.Emit(buf[:]...)
@@ -809,6 +830,19 @@ func (e *Emitter) MovMem32RdiDispEax(disp int32) {
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], uint32(disp))
 	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) MovMem32RdiDispR8d(disp int32) {
+	if disp == 0 {
+		e.Emit(0x44, 0x89, 0x07)
+	} else if disp >= -128 && disp <= 127 {
+		e.Emit(0x44, 0x89, 0x47, byte(disp))
+	} else {
+		e.Emit(0x44, 0x89, 0x87)
+		var buf [4]byte
+		binary.LittleEndian.PutUint32(buf[:], uint32(disp))
+		e.Emit(buf[:]...)
+	}
 }
 
 func (e *Emitter) CmpEaxImm32(v int32) {

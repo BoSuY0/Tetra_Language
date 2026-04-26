@@ -4,5 +4,5 @@ func worker() -> Int:
 
 func main() -> Int
 uses runtime:
-    let task: Int = core.task_spawn_i32("worker")
+    let task: task.i32 = core.task_spawn_i32("worker")
     return core.task_join_i32(task)

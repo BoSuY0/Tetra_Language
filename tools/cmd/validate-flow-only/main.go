@@ -28,6 +28,8 @@ var legacyPatterns = []struct {
 	{regexp.MustCompile(`^\s*island\s*\(.*\)\s+as\s+\w+\s*\{\s*$`), "legacy braced island syntax; use Flow 'island(size) as name:'"},
 }
 
+var inlineStructLiteralPattern = regexp.MustCompile(`\b[A-Za-z_][A-Za-z0-9_.]*\s*\{[^{}]*\}`)
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: validate-flow-only <file-or-dir>...")
@@ -105,6 +107,7 @@ func validateFile(path string) ([]flowIssue, error) {
 		lineNo++
 		line := scanner.Text()
 		code := stripStringsAndLineComment(line)
+		braceScan := stripInlineStructLiterals(code)
 		trimmed := strings.TrimSpace(code)
 		if trimmed == "" {
 			continue
@@ -120,10 +123,10 @@ func validateFile(path string) ([]flowIssue, error) {
 		if col := strings.Index(code, "\t"); col >= 0 {
 			issues = append(issues, flowIssue{Path: path, Line: lineNo, Column: col + 1, Message: "tabs are not supported in Flow indentation"})
 		}
-		if col := strings.Index(code, "{"); col >= 0 {
+		if col := strings.Index(braceScan, "{"); col >= 0 {
 			issues = append(issues, flowIssue{Path: path, Line: lineNo, Column: col + 1, Message: "legacy brace token; Flow syntax uses indentation blocks"})
 		}
-		if col := strings.Index(code, "}"); col >= 0 {
+		if col := strings.Index(braceScan, "}"); col >= 0 {
 			issues = append(issues, flowIssue{Path: path, Line: lineNo, Column: col + 1, Message: "legacy brace token; Flow syntax uses indentation blocks"})
 		}
 	}
@@ -168,6 +171,12 @@ func stripStringsAndLineComment(line string) string {
 		out.WriteByte(ch)
 	}
 	return out.String()
+}
+
+func stripInlineStructLiterals(line string) string {
+	return inlineStructLiteralPattern.ReplaceAllStringFunc(line, func(m string) string {
+		return strings.Repeat(" ", len(m))
+	})
 }
 
 func firstCodeColumn(line string) int {
