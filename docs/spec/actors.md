@@ -1,9 +1,10 @@
-# Actors (MVP, v0.13 draft)
+# Actors (v0.5 Integrated Alpha)
 
 Actors are an isolation + message-passing concurrency model built on top of Tetra’s existing foundations:
 Islands (region memory), and the explicit safe/unsafe boundary.
 
-This document specifies the minimal (MVP) actor runtime and language surface needed to ship v0.13.
+This document specifies the actor runtime and language surface included in the
+v0.5 Integrated Alpha profile.
 
 ## Supported targets (MVP)
 
@@ -26,6 +27,7 @@ Actors are supported on x64 targets:
 - Multi-threaded scheduling.
 - Zero-copy message passing of region-backed data.
 - Generic/typed messages beyond `i32`.
+- Shared mutable actor state across OS threads.
 
 ## Model
 
@@ -42,7 +44,9 @@ Actors are supported on x64 targets:
 
 ## Core builtins (MVP)
 
-All actor builtins are **safe** (do not require `unsafe`).
+All actor builtins are **safe** (do not require `unsafe`), but v0.17 requires
+functions that call actor builtins or actor-using helpers to declare
+`uses actors`.
 
 ### `core.spawn(name: str) -> actor`
 
@@ -86,6 +90,19 @@ Returns the handle of the current actor.
 ## Memory
 
 MVP messages are `i32` values plus an implicit sender handle.
+
+## Runtime sources
+
+The canonical self-host runtime sources live under `__rt/actors_sysv.tetra` and
+`__rt/actors_win64.tetra`. The compiler embeds matching copies from
+`compiler/selfhostrt/actors_sysv.tetra` and `compiler/selfhostrt/actors_win64.tetra`
+when `--runtime=auto` or `--runtime=selfhost` is used with actor builtins.
+
+The canonical modules are `__rt.actors_sysv` for `linux-x64`/`macos-x64` and
+`__rt.actors_win64` for `windows-x64`.
+
+The older `actors_poc_*` files are retained as historical PoC snapshots and
+compatibility references.
 
 Future extensions (post-MVP):
 - Copy-based passing of `[]u8` into a receiver-owned island.

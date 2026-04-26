@@ -87,7 +87,7 @@ func findELFLoadSegment(t *testing.T, phdrs []elfProgramHeader, wantFlags uint32
 func TestELFHasRWDataSegmentAndStringNotInText(t *testing.T) {
 	tmp := t.TempDir()
 	marker := "ELF_DATA_MARKER"
-	src := "fun main(): i32 {\n  print(\"" + marker + "\")\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"" + marker + "\")\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
@@ -133,7 +133,7 @@ func TestELFHasRWDataSegmentAndStringNotInText(t *testing.T) {
 func TestELFDataRelocPointsToDataMarker(t *testing.T) {
 	tmp := t.TempDir()
 	marker := "ELF_RELOC_MARKER"
-	src := "fun main(): i32 {\n  print(\"" + marker + "\")\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"" + marker + "\")\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {

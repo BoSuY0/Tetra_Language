@@ -24,6 +24,23 @@ The following operations are gated behind `unsafe`:
 
 Scoped islands remain safe: `island(size) as isl { ... }` injects `free` automatically.
 
+## Relationship to `uses`
+
+`unsafe` and `uses` are separate gates. `unsafe` marks code that may use
+operations outside the safe subset; `uses` declares the effects a function may
+perform. For example, raw memory code typically needs both:
+
+```tetra
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(4)
+        let _: Int = core.store_i32(p, 42, mem)
+        return core.load_i32(p, mem)
+    return 0
+```
+
 ## Debug Runtime Mode
 
 The build flag `--islands-debug` enables runtime checks for islands:

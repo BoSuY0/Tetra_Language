@@ -1,23 +1,17 @@
 // Islands i32 test
 // Creates a scoped island, allocates a []i32, fills with 1..10, sums them, returns sum as exit code.
-
-fun main(): i32 {
+func main() -> i32
+uses alloc, islands, mem:
     var sum: i32 = 0
-    island(4096) as isl {
-        let n: i32 = 10
+    island(4096) as isl:
+        var n: i32 = 10
         var arr: []i32 = core.island_make_i32(isl, n)
-        
         var i: i32 = 0
-        while (i < n) {
+        while i < n:
             arr[i] = i + 1
             i = i + 1
-        }
-        
         i = 0
-        while (i < n) {
+        while i < n:
             sum = sum + arr[i]
             i = i + 1
-        }
-    }
     return sum
-}

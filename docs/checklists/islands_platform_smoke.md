@@ -3,7 +3,7 @@
 Date: 2025-12-30
 Target version: linux-x64
 Git HEAD:
-Compiler version (compilerVersion): v0.13
+Compiler version (compilerVersion): v0.6.0
 
 ## Prereqs
 

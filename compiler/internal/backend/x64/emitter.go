@@ -581,6 +581,34 @@ func (e *Emitter) SetlAl() {
 	e.Emit(0x0F, 0x9C, 0xC0)
 }
 
+func (e *Emitter) SetneAl() {
+	e.Emit(0x0F, 0x95, 0xC0)
+}
+
+func (e *Emitter) SetgAl() {
+	e.Emit(0x0F, 0x9F, 0xC0)
+}
+
+func (e *Emitter) SetgeAl() {
+	e.Emit(0x0F, 0x9D, 0xC0)
+}
+
+func (e *Emitter) SetleAl() {
+	e.Emit(0x0F, 0x9E, 0xC0)
+}
+
+func (e *Emitter) ImulEaxEcx() {
+	e.Emit(0x0F, 0xAF, 0xC1)
+}
+
+func (e *Emitter) Cdq() {
+	e.Emit(0x99)
+}
+
+func (e *Emitter) IdivEcx() {
+	e.Emit(0xF7, 0xF9)
+}
+
 func (e *Emitter) ShlRaxImm8(v byte) {
 	e.Emit(0x48, 0xC1, 0xE0, v)
 }

@@ -13,7 +13,7 @@ import (
 
 func TestBuildWindowsPEHeaders(t *testing.T) {
 	tmp := t.TempDir()
-	src := "fun main(): i32 {\n  print(\"Hi\\n\")\n  return 7\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"Hi\\n\")\n  return 7\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app.exe")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
@@ -121,7 +121,7 @@ func TestBuildWindowsPEActors(t *testing.T) {
 func TestPEHasRDataSectionAndStringNotInText(t *testing.T) {
 	tmp := t.TempDir()
 	marker := "HELLO_RDATA"
-	src := "fun main(): i32 {\n  print(\"" + marker + "\")\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"" + marker + "\")\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app.exe")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
@@ -148,7 +148,7 @@ func TestPEHasRDataSectionAndStringNotInText(t *testing.T) {
 func TestPERDataRelocPointsToRData(t *testing.T) {
 	tmp := t.TempDir()
 	marker := "RDATA_RELOC"
-	src := "fun main(): i32 {\n  print(\"" + marker + "\")\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"" + marker + "\")\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app.exe")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
@@ -196,7 +196,7 @@ func TestPERDataRelocPointsToRData(t *testing.T) {
 
 func TestPEDllCharacteristicsHasNXAndASLR(t *testing.T) {
 	tmp := t.TempDir()
-	src := "fun main(): i32 {\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app.exe")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
@@ -219,7 +219,7 @@ func TestPEDllCharacteristicsHasNXAndASLR(t *testing.T) {
 
 func TestPEHasRelocDirectoryAndRelocSection(t *testing.T) {
 	tmp := t.TempDir()
-	src := "fun main(): i32 {\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app.exe")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {

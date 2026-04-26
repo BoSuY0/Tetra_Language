@@ -315,6 +315,9 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 				return nil, err
 			}
 		}
+		if err := validateActorRuntimeObject(rt); err != nil {
+			return nil, err
+		}
 
 		for _, sym := range rt.Symbols {
 			if sym.Name == "__tetra_actor_dispatch" {
@@ -411,6 +414,33 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	}
 
 	return stats, nil
+}
+
+func requiredActorRuntimeSymbols() []string {
+	return []string{
+		"__tetra_entry",
+		"__tetra_actor_spawn",
+		"__tetra_actor_send",
+		"__tetra_actor_recv",
+		"__tetra_actor_self",
+		"__tetra_actor_sender",
+	}
+}
+
+func validateActorRuntimeObject(rt *Object) error {
+	if rt == nil {
+		return fmt.Errorf("missing actors runtime object")
+	}
+	symbols := make(map[string]struct{}, len(rt.Symbols))
+	for _, sym := range rt.Symbols {
+		symbols[sym.Name] = struct{}{}
+	}
+	for _, name := range requiredActorRuntimeSymbols() {
+		if _, ok := symbols[name]; !ok {
+			return fmt.Errorf("runtime object missing required symbol '%s'", name)
+		}
+	}
+	return nil
 }
 
 func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target, opt BuildOptions) (*BuildStats, error) {
@@ -522,7 +552,7 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 			return walkExpr(e.Right)
 		case *frontend.UnaryExpr:
 			return walkExpr(e.X)
-		case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.StringLitExpr:
+		case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.BoolLitExpr, *frontend.StringLitExpr:
 			return nil
 		default:
 			return nil
@@ -536,6 +566,10 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 			return walkExpr(s.Value)
 		case *frontend.ReturnStmt:
 			return walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			return walkExpr(s.Value)
+		case *frontend.BreakStmt, *frontend.ContinueStmt:
+			return nil
 		case *frontend.LetStmt:
 			return walkExpr(s.Value)
 		case *frontend.AssignStmt:
@@ -564,6 +598,40 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 			for _, inner := range s.Body {
 				if err := walkStmt(inner); err != nil {
 					return err
+				}
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				if err := walkExpr(s.Iterable); err != nil {
+					return err
+				}
+			} else {
+				if err := walkExpr(s.Start); err != nil {
+					return err
+				}
+				if err := walkExpr(s.End); err != nil {
+					return err
+				}
+			}
+			for _, inner := range s.Body {
+				if err := walkStmt(inner); err != nil {
+					return err
+				}
+			}
+		case *frontend.MatchStmt:
+			if err := walkExpr(s.Value); err != nil {
+				return err
+			}
+			for _, c := range s.Cases {
+				if !c.Default {
+					if err := walkExpr(c.Pattern); err != nil {
+						return err
+					}
+				}
+				for _, inner := range c.Body {
+					if err := walkStmt(inner); err != nil {
+						return err
+					}
 				}
 			}
 		case *frontend.FreeStmt:

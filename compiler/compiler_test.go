@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func TestBuildHello(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fn main() -> i32 {\n  print(\"Hello from Tetra!\\n\");\n  return 0;\n}\n"
+	src := "fn main() -> i32 uses io {\n  print(\"Hello from Tetra!\\n\");\n  return 0;\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "Hello from Tetra!\n" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -32,7 +33,7 @@ func TestBuildTwoPrints(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fn main() -> i32 {\n  print(\"A\");\n  print(\"B\\n\");\n  return 0;\n}\n"
+	src := "fn main() -> i32 uses io {\n  print(\"A\");\n  print(\"B\\n\");\n  return 0;\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "AB\n" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -47,7 +48,7 @@ func TestBuildStrLiteralValue(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fun main(): i32 {\n  val s: str = \"A\\n\"\n  print(s)\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  val s: str = \"A\\n\"\n  print(s)\n  return 0\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "A\n" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -62,7 +63,7 @@ func TestBuildStrParam(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fun echo(x: str): i32 {\n  print(x)\n  return 0\n}\nfun main(): i32 {\n  return echo(\"Hi\\n\")\n}\n"
+	src := "fun echo(x: str): i32 uses io {\n  print(x)\n  return 0\n}\nfun main(): i32 uses io {\n  return echo(\"Hi\\n\")\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "Hi\n" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -77,7 +78,7 @@ func TestBuildStrReturn(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fun greet(): str {\n  return \"Hey\\n\"\n}\nfun main(): i32 {\n  print(greet())\n  return 0\n}\n"
+	src := "fun greet(): str {\n  return \"Hey\\n\"\n}\nfun main(): i32 uses io {\n  print(greet())\n  return 0\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "Hey\n" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -92,7 +93,7 @@ func TestBuildMakeI32Slice(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fun main(): i32 {\n  var xs: []i32 = make_i32(3)\n  xs[0] = 10\n  xs[1] = 20\n  xs[2] = xs[0] + xs[1]\n  return xs[2]\n}\n"
+	src := "fun main(): i32 uses alloc, mem {\n  var xs: []i32 = make_i32(3)\n  xs[0] = 10\n  xs[1] = 20\n  xs[2] = xs[0] + xs[1]\n  return xs[2]\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -107,7 +108,7 @@ func TestBuildMakeU8Print(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fun main(): i32 {\n  var xs: []u8 = make_u8(2)\n  xs[0] = 65\n  xs[1] = 66\n  print(xs)\n  return 0\n}\n"
+	src := "fun main(): i32 uses alloc, io, mem {\n  var xs: []u8 = make_u8(2)\n  xs[0] = 65\n  xs[1] = 66\n  print(xs)\n  return 0\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "AB" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -122,7 +123,7 @@ func TestBuildMmioSmoke(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fun main(): i32 {\n  var out: i32 = 0\n  unsafe {\n    let io: cap.io = core.cap_io()\n    let p: ptr = core.alloc_bytes(4)\n    let _w: i32 = core.mmio_write_i32(p, 123, io)\n    out = core.mmio_read_i32(p, io)\n  }\n  return out\n}\n"
+	src := "fun main(): i32 uses alloc, capability, io, mem, mmio {\n  var out: i32 = 0\n  unsafe {\n    let io: cap.io = core.cap_io()\n    let p: ptr = core.alloc_bytes(4)\n    let _w: i32 = core.mmio_write_i32(p, 123, io)\n    out = core.mmio_read_i32(p, io)\n  }\n  return out\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -137,7 +138,7 @@ func TestBuildIslandsDebugDoubleFree(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fun main(): i32 {\n  unsafe {\n    let isl: island = core.island_new(64)\n    free(isl)\n    free(isl)\n  }\n  return 0\n}\n"
+	src := "fun main(): i32 uses alloc, islands, mem {\n  unsafe {\n    let isl: island = core.island_new(64)\n    free(isl)\n    free(isl)\n  }\n  return 0\n}\n"
 	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Jobs: 1, IslandsDebug: true})
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -152,7 +153,7 @@ func TestBuildSliceBoundsCheck(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fun main(): i32 {\n  var xs: []i32 = make_i32(2)\n  xs[2] = 1\n  return 0\n}\n"
+	src := "fun main(): i32 uses alloc, mem {\n  var xs: []i32 = make_i32(2)\n  xs[2] = 1\n  return 0\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -167,7 +168,7 @@ func TestBuildNonZeroReturn(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fn main() -> i32 {\n  print(\"Done\\n\");\n  return 7;\n}\n"
+	src := "fn main() -> i32 uses io {\n  print(\"Done\\n\");\n  return 7;\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "Done\n" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -227,7 +228,7 @@ func TestBuildLessThan(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fn main() -> i32 {\n  return 2 < 3;\n}\n"
+	src := "fn main() -> i32 {\n  if (2 < 3) { return 1; }\n  return 0;\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -242,7 +243,7 @@ func TestBuildEqEqFalse(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fn main() -> i32 {\n  return 2 == 3;\n}\n"
+	src := "fn main() -> i32 {\n  if (2 == 3) { return 1; }\n  return 0;\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -278,6 +279,289 @@ func TestBuildNewStyleNoSemicolons(t *testing.T) {
 		t.Fatalf("stdout mismatch: %q", stdout)
 	}
 	if exitCode != 5 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestBuildFlowSyntaxHelloWithAliases(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "func main() -> Int\nuses io:\n  let msg: String = \"Flow\\n\"\n  let ok: Bool = true\n  print(msg)\n  if ok:\n    return 0\n  else:\n    return 1\n  return 1\n"
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "Flow\n" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestBuildBoolBranchSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "func main() -> Int:\n  let ok: Bool = true\n  if ok && (3 > 2):\n    return 42\n  return 1\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildForRangeSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "func main() -> Int:\n  var total: Int = 0\n  for i in 0..<11:\n    total = total + i\n  return total\n"
+	_, code := buildAndRun(t, src)
+	if code != 55 {
+		t.Fatalf("exit code mismatch: got %d, want 55", code)
+	}
+}
+
+func TestBuildEnumMatchSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Color:\n  case red\n  case green\n  case blue\n\nfunc main() -> Int:\n  let color: Color = Color.green\n  match color:\n  case Color.red:\n    return 1\n  case Color.green:\n    return 42\n  case _:\n    return 0\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildEnumMatchExhaustiveNoDefaultSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Color:\n  case red\n  case green\n\nfunc main() -> Int:\n  let color: Color = Color.green\n  match color:\n  case Color.red:\n    return 1\n  case Color.green:\n    return 42\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestEnumMatchMissingCaseStillNeedsReturn(t *testing.T) {
+	src := "enum Color:\n  case red\n  case green\n\nfunc main() -> Int:\n  let color: Color = Color.green\n  match color:\n  case Color.red:\n    return 1\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected missing return for non-exhaustive enum match")
+	} else if !strings.Contains(err.Error(), "must end with return") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestBuildIntMatchSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "func main() -> Int:\n  let value: Int = 7\n  match value:\n  case 1:\n    return 1\n  case 7:\n    return 42\n  case _:\n    return 0\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildTypedErrorsSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "typed_errors_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildAsyncSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "async_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildTaskSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "task_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreMathSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_math_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreMemorySmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_memory_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildExtensionSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "extension_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildGenericSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "generic_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestCoreV015SemanticDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "bool from int",
+			src:  "func main() -> Int:\n  let x: Bool = 1\n  return 0\n",
+			want: "type mismatch: expected 'bool', got 'i32'",
+		},
+		{
+			name: "int from bool",
+			src:  "func main() -> Int:\n  let x: Int = true\n  return x\n",
+			want: "type mismatch: expected 'i32', got 'bool'",
+		},
+		{
+			name: "duplicate enum case",
+			src:  "enum Color:\n  case red\n  case red\nfunc main() -> Int:\n  return 0\n",
+			want: "duplicate enum case 'red'",
+		},
+		{
+			name: "unknown enum case",
+			src:  "enum Color:\n  case red\nfunc main() -> Int:\n  let c: Color = Color.blue\n  return 0\n",
+			want: "unknown enum case 'blue'",
+		},
+		{
+			name: "compare different enums",
+			src:  "enum A:\n  case one\nenum B:\n  case one\nfunc main() -> Int:\n  let a: A = A.one\n  let b: B = B.one\n  if a == b:\n    return 1\n  return 0\n",
+			want: "cannot compare 'A' and 'B'",
+		},
+		{
+			name: "invalid match pattern",
+			src:  "enum Color:\n  case red\nfunc main() -> Int:\n  let c: Color = Color.red\n  match c:\n  case 1:\n    return 1\n  return 0\n",
+			want: "match pattern type mismatch",
+		},
+		{
+			name: "multiple defaults",
+			src:  "func main() -> Int:\n  match 1:\n  case _:\n    return 1\n  case _:\n    return 2\n  return 0\n",
+			want: "match default must be last",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := buildOnly(t, tt.src)
+			if err == nil {
+				t.Fatalf("expected build error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %q, want %q", err.Error(), tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildFlowStructSyntax(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "struct Vec2:\n  x: Int\n  y: Int\n\nfunc sum(v: Vec2) -> Int:\n  return v.x + v.y\n\nfunc main() -> Int:\n  let v: Vec2 = Vec2(x: 40, y: 2)\n  return sum(v)\n"
+	_, exitCode := buildAndRun(t, src)
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestBuildFlowIslandSyntax(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "func main() -> Int\nuses alloc, islands, io, mem:\n  island(64) as isl:\n    var msg: []UInt8 = core.island_make_u8(isl, 2)\n    msg[0] = 79\n    msg[1] = 10\n    print(msg)\n  return 0\n"
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "O\n" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestBuildFlowUnsafeCapMemSyntax(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "func main() -> Int\nuses alloc, capability, mem:\n  var out: Int = 1\n  unsafe:\n    let mem: cap.mem = core.cap_mem()\n    let p: ptr = core.alloc_bytes(4)\n    let _: Int = core.store_i32(p, 42, mem)\n    out = core.load_i32(p, mem)\n  return out\n"
+	_, exitCode := buildAndRun(t, src)
+	if exitCode != 42 {
 		t.Fatalf("exit code mismatch: %d", exitCode)
 	}
 }
@@ -494,7 +778,7 @@ func TestBuildMultiFileCrossModuleCall(t *testing.T) {
 
 	files := map[string]string{
 		"engine/render.tetra": "module engine.render\nfun add_one(x: i32): i32 {\n  return x + 1\n}\n",
-		"app/game.tetra":      "module app.game\nimport engine.render as render\nfun main(): i32 {\n  val v: i32 = render.add_one(41)\n  return v == 42\n}\n",
+		"app/game.tetra":      "module app.game\nimport engine.render as render\nfun main(): i32 {\n  val v: i32 = render.add_one(41)\n  if (v == 42) { return 1 }\n  return 0\n}\n",
 	}
 	stdout, exitCode := buildAndRunFiles(t, files, "app/game.tetra")
 	if stdout != "" {
@@ -593,6 +877,298 @@ func TestBuildEmptyStatements(t *testing.T) {
 	}
 	if exitCode != 5 {
 		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func buildAndRunFile(t *testing.T, srcPath string) (string, int) {
+	t.Helper()
+
+	tmp := t.TempDir()
+	outPath := filepath.Join(tmp, "app")
+	if err := BuildFile(srcPath, outPath, "linux-x64"); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if err := verifyELF(outPath); err != nil {
+		t.Fatalf("verify ELF: %v", err)
+	}
+	return runBinary(t, outPath)
+}
+
+func projectRoot(t *testing.T) string {
+	t.Helper()
+	// Walk up from the test binary's working directory to find the project root.
+	// The go test framework runs in the package dir, so we go up from compiler/.
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	// wd is .../compiler, project root is parent
+	return filepath.Dir(wd)
+}
+
+func TestExampleHello(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "hello.tetra"))
+	if stdout != "Hello from Tetra!\n" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestExampleGlobalsSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "globals_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	// g_x = g_y + 2 = 40 + 2 = 42, store 7 at g_p, out = 7 + 42 = 49
+	if exitCode != 49 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestExampleStructCtorSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "struct_ctor_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	// v.x + v.y + 52 = 40 + 2 + 52 = 94
+	if exitCode != 94 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestExampleExperimentalMath(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "experimental_math_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	// math.add_i32(40, 2) = 42
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestExampleExperimentalMemcpy(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "experimental_memcpy_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 93 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestExampleCapMemPtr(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "cap_mem_ptr_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 77 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestNewOperatorMul(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { return 6 * 7 }"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestNewOperatorDiv(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { return 84 / 2 }"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestNewOperatorMod(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { return 47 % 5 }"
+	_, code := buildAndRun(t, src)
+	if code != 2 {
+		t.Fatalf("exit code mismatch: got %d, want 2", code)
+	}
+}
+
+func TestNewOperatorGreater(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { if (5 > 3) { return 1 } return 0 }"
+	_, code := buildAndRun(t, src)
+	if code != 1 {
+		t.Fatalf("exit code mismatch: got %d, want 1", code)
+	}
+}
+
+func TestNewOperatorGreaterEq(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { if (3 >= 3) { return 1 } return 0 }"
+	_, code := buildAndRun(t, src)
+	if code != 1 {
+		t.Fatalf("exit code mismatch: got %d, want 1", code)
+	}
+}
+
+func TestNewOperatorLessEq(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { if (3 <= 3) { return 1 } return 0 }"
+	_, code := buildAndRun(t, src)
+	if code != 1 {
+		t.Fatalf("exit code mismatch: got %d, want 1", code)
+	}
+}
+
+func TestNewOperatorBangEq(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { if (2 != 3) { return 1 } return 0 }"
+	_, code := buildAndRun(t, src)
+	if code != 1 {
+		t.Fatalf("exit code mismatch: got %d, want 1", code)
+	}
+}
+
+func TestNewOperatorAmpAmp(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { if (true && true) { return 1 } return 0 }"
+	_, code := buildAndRun(t, src)
+	if code != 1 {
+		t.Fatalf("exit code mismatch: got %d, want 1", code)
+	}
+}
+
+func TestNewOperatorAmpAmpFalse(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { if (true && false) { return 1 } return 0 }"
+	_, code := buildAndRun(t, src)
+	if code != 0 {
+		t.Fatalf("exit code mismatch: got %d, want 0", code)
+	}
+}
+
+func TestNewOperatorPipePipe(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { if (false || true) { return 1 } return 0 }"
+	_, code := buildAndRun(t, src)
+	if code != 1 {
+		t.Fatalf("exit code mismatch: got %d, want 1", code)
+	}
+}
+
+func TestNewOperatorPipePipeFalse(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fn main() -> i32 { if (false || false) { return 1 } return 0 }"
+	_, code := buildAndRun(t, src)
+	if code != 0 {
+		t.Fatalf("exit code mismatch: got %d, want 0", code)
+	}
+}
+
+func TestNewOperatorPrecedenceMixed(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	// 2 + 3 * 4 = 2 + 12 = 14
+	src := "fn main() -> i32 { return 2 + 3 * 4 }"
+	_, code := buildAndRun(t, src)
+	if code != 14 {
+		t.Fatalf("exit code mismatch: got %d, want 14", code)
+	}
+}
+
+func TestExprStmt(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `fun side(): i32 { return 0 }
+fun main(): i32 { side(); return 42 }`
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestExprStmtQualified(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	files := map[string]string{
+		"engine/render.tetra": "module engine.render\nfun noop(): i32 {\n  return 0\n}\n",
+		"app/game.tetra":      "module app.game\nimport engine.render as r\nfun main(): i32 {\n  r.noop()\n  return 42\n}\n",
+	}
+	_, code := buildAndRunFiles(t, files, "app/game.tetra")
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
 	}
 }
 

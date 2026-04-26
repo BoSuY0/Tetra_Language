@@ -7,4 +7,5 @@ case "$(go env GOOS)" in
 esac
 
 go build -o "./tetra${exe}" ./cli/cmd/tetra
-echo "Built: ./tetra${exe}"
+cp "./tetra${exe}" "./t${exe}"
+echo "Built: ./tetra${exe} ./t${exe}"

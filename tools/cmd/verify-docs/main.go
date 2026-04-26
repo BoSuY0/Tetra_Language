@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"tetra_language/compiler"
 )
 
 type manifest struct {
@@ -76,10 +78,64 @@ func main() {
 	}
 	checkContains(filepath.FromSlash("cli/cmd/tetra/main.go"), triples)
 
+	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md"}); err != nil {
+		errs = append(errs, err.Error())
+	}
+
 	if len(errs) > 0 {
 		for _, e := range errs {
 			fmt.Fprintln(os.Stderr, "verify-docs:", e)
 		}
 		os.Exit(1)
 	}
+}
+
+func verifyDoctestBlocks(paths []string) error {
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		blocks, err := extractTetraDoctests(string(raw))
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		for i, block := range blocks {
+			if _, err := compiler.ParseFile([]byte(block), fmt.Sprintf("%s#doctest%d", path, i+1)); err != nil {
+				return fmt.Errorf("%s doctest %d: %v", path, i+1, err)
+			}
+		}
+	}
+	return nil
+}
+
+func extractTetraDoctests(doc string) ([]string, error) {
+	var blocks []string
+	lines := strings.Split(doc, "\n")
+	inBlock := false
+	var current []string
+	startLine := 0
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !inBlock {
+			if trimmed == "```tetra doctest" {
+				inBlock = true
+				current = nil
+				startLine = i + 1
+			}
+			continue
+		}
+		if trimmed == "```" {
+			blocks = append(blocks, strings.Join(current, "\n")+"\n")
+			inBlock = false
+			current = nil
+			startLine = 0
+			continue
+		}
+		current = append(current, line)
+	}
+	if inBlock {
+		return nil, fmt.Errorf("unterminated tetra doctest block starting at line %d", startLine)
+	}
+	return blocks, nil
 }

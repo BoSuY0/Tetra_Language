@@ -1,4 +1,4 @@
-fun main(): i32 {
-  print("Hello from Tetra!\n")
-  return 0
-}
+func main() -> i32
+uses io:
+    print("Hello from Tetra!\n")
+    return 0

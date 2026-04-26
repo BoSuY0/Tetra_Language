@@ -1,14 +1,10 @@
 // Modern syntax smoke: struct constructor call-style literal `Type(field: ...)`.
-
 module examples.struct_ctor_smoke
 
-struct Vec2 {
-    x: i32,
-    y: i32,
-}
+struct Vec2:
+    x: i32
+    y: i32
 
-fun main(): i32 {
-    let v: Vec2 = Vec2(x: 40, y: 2)
+func main() -> i32:
+    var v: Vec2 = Vec2(x: 40, y: 2)
     return v.x + v.y + 52
-}
-

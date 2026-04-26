@@ -1,0 +1,14 @@
+// v0.5 stable core capability/memory smoke.
+module examples.core_memory_smoke
+
+import lib.core.capability as cap
+import lib.core.memory as mem
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let c: cap.mem = cap.mem()
+        let p: ptr = core.alloc_bytes(4)
+        let _: Int = mem.memset_u8(p, 42, 4, c)
+        return core.load_u8(p, c)
+    return 0

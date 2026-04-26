@@ -1,0 +1,15 @@
+func add_one(x: borrow Int) -> Int:
+    return x + 1
+
+func take(x: consume Int) -> Int:
+    return x
+
+func bump(x: inout Int) -> Int:
+    x = x + 1
+    return x
+
+func main() -> Int:
+    let a: Int = 40
+    let b: Int = add_one(a)
+    var c: Int = take(b)
+    return bump(c)

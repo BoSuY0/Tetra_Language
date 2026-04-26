@@ -1,0 +1,11 @@
+enum Color:
+    case red
+    case green
+
+func main() -> Int:
+    let color: Color = Color.green
+    match color:
+    case Color.red:
+        return 1
+    case Color.green:
+        return 42

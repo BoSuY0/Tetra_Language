@@ -3,8 +3,10 @@
 This document defines the ABI contract between a compiled Tetra program and a linked runtime object.
 
 It is primarily used by:
+- the embedded self-host actors runtime (`compiler/selfhostrt/actors_*.tetra`)
 - the built-in actors runtime (`compiler/internal/actorsrt/*`)
 - `tetra build --runtime-object <path.tobj>` (runtime override)
+- `tetra build --link-object <path.tobj>` (additional TOBJ libraries)
 
 ## Reserved symbols
 
@@ -61,6 +63,15 @@ Returns the current actor handle in `eax`.
 
 Returns the sender of the most recently received message in `eax` (valid only after a successful recv).
 
+The compiler validates these required runtime exports before linking:
+
+- `__tetra_entry`
+- `__tetra_actor_spawn`
+- `__tetra_actor_send`
+- `__tetra_actor_recv`
+- `__tetra_actor_self`
+- `__tetra_actor_sender`
+
 ## Program-provided symbols
 
 When actors are used, the compiler links (or generates) a small “glue” object that provides:
@@ -107,3 +118,15 @@ They are called by the runtime using the platform ABI for the current target.
 
 When using `--runtime-object`, the runtime `.tobj` must match the program target (for example, a `windows-x64` runtime
 object must not be linked into a `linux-x64` executable).
+
+`--runtime=auto` selects the embedded self-host runtime when actor builtins are used. `--runtime=selfhost` forces that
+path, and `--runtime=builtin` keeps the Go-emitted runtime available as a compatibility fallback.
+
+Native execution is only supported when `host == target`; cross-target builds are build-verified but not run on
+non-matching hosts.
+
+## Additional linked objects
+
+`--link-object path.tobj` appends an additional target-matching TOBJ library to the final link. The flag is repeatable.
+Linked objects participate in the same symbol table as compiler-generated objects, so duplicate exported symbols and
+unresolved relocations are reported by the linker.

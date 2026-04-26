@@ -235,8 +235,8 @@ func TestBuildCacheStructDependencyChangeRebuildsConsumer(t *testing.T) {
 func TestBuildCacheSliceModuleChangeRebuildsOnlyProducer(t *testing.T) {
 	tmp := t.TempDir()
 	files := map[string]string{
-		"engine/arr.tetra": "module engine.arr\nfun sum3(): i32 {\n  var xs: []i32 = make_i32(3)\n  xs[0] = 1\n  xs[1] = 2\n  xs[2] = xs[0] + xs[1]\n  return xs[2]\n}\n",
-		"app/game.tetra":   "module app.game\nimport engine.arr as a\nfun main(): i32 {\n  return a.sum3()\n}\n",
+		"engine/arr.tetra": "module engine.arr\nfun sum3(): i32 uses alloc, mem {\n  var xs: []i32 = make_i32(3)\n  xs[0] = 1\n  xs[1] = 2\n  xs[2] = xs[0] + xs[1]\n  return xs[2]\n}\n",
+		"app/game.tetra":   "module app.game\nimport engine.arr as a\nfun main(): i32 uses alloc, mem {\n  return a.sum3()\n}\n",
 	}
 	writeTestFiles(t, tmp, files)
 	entry := filepath.Join(tmp, filepath.FromSlash("app/game.tetra"))
@@ -260,7 +260,7 @@ func TestBuildCacheSliceModuleChangeRebuildsOnlyProducer(t *testing.T) {
 	}
 	assertModules(t, stats2.CacheHits, []string{"app.game", "engine.arr"})
 
-	updated := "module engine.arr\nfun sum3(): i32 {\n  var xs: []i32 = make_i32(2)\n  xs[0] = 3\n  xs[1] = 4\n  return xs[0] + xs[1]\n}\n"
+	updated := "module engine.arr\nfun sum3(): i32 uses alloc, mem {\n  var xs: []i32 = make_i32(2)\n  xs[0] = 3\n  xs[1] = 4\n  return xs[0] + xs[1]\n}\n"
 	arrPath := filepath.Join(tmp, filepath.FromSlash("engine/arr.tetra"))
 	if err := os.WriteFile(arrPath, []byte(updated), 0o644); err != nil {
 		t.Fatalf("update module: %v", err)

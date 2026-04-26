@@ -1,0 +1,7 @@
+// v0.5 stable core stdlib smoke.
+module examples.core_math_smoke
+
+import lib.core.math as math
+
+func main() -> Int:
+    return math.add_i32(40, 2)

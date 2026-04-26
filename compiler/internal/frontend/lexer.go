@@ -1,9 +1,6 @@
 package frontend
 
-import (
-	"fmt"
-	"strconv"
-)
+import "strconv"
 
 type TokenType int
 
@@ -17,17 +14,36 @@ const (
 	TokenLet
 	TokenVar
 	TokenVal
+	TokenConst
 	TokenModule
 	TokenImport
 	TokenAs
+	TokenUses
 	TokenStruct
 	TokenIf
 	TokenElse
 	TokenWhile
+	TokenFor
+	TokenIn
+	TokenEnum
+	TokenCase
+	TokenMatch
+	TokenTrue
+	TokenFalse
+	TokenNone
+	TokenThrows
+	TokenTry
+	TokenThrow
+	TokenAsync
+	TokenAwait
+	TokenBreak
+	TokenContinue
 	TokenReturn
 	TokenPrint
 	TokenFree
 	TokenUnsafe
+	TokenTest
+	TokenExpect
 	TokenAt
 	TokenArrow
 	TokenColon
@@ -45,6 +61,18 @@ const (
 	TokenLBrace
 	TokenRBrace
 	TokenSemicolon
+	TokenStar
+	TokenSlash
+	TokenPercent
+	TokenGreater
+	TokenGreaterEq
+	TokenLessEq
+	TokenBangEq
+	TokenAmpAmp
+	TokenPipePipe
+	TokenBang
+	TokenRangeUntil
+	TokenQuestion
 )
 
 type token struct {
@@ -96,20 +124,56 @@ func (l *lexer) nextToken() (token, error) {
 			return token{typ: TokenVar, pos: pos, lit: lit}, nil
 		case "val":
 			return token{typ: TokenVal, pos: pos, lit: lit}, nil
+		case "const":
+			return token{typ: TokenConst, pos: pos, lit: lit}, nil
 		case "module":
 			return token{typ: TokenModule, pos: pos, lit: lit}, nil
 		case "import":
 			return token{typ: TokenImport, pos: pos, lit: lit}, nil
 		case "as":
 			return token{typ: TokenAs, pos: pos, lit: lit}, nil
+		case "uses":
+			return token{typ: TokenUses, pos: pos, lit: lit}, nil
 		case "struct":
 			return token{typ: TokenStruct, pos: pos, lit: lit}, nil
+		case "func":
+			return token{typ: TokenFun, pos: pos, lit: lit}, nil
 		case "if":
 			return token{typ: TokenIf, pos: pos, lit: lit}, nil
 		case "else":
 			return token{typ: TokenElse, pos: pos, lit: lit}, nil
 		case "while":
 			return token{typ: TokenWhile, pos: pos, lit: lit}, nil
+		case "for":
+			return token{typ: TokenFor, pos: pos, lit: lit}, nil
+		case "in":
+			return token{typ: TokenIn, pos: pos, lit: lit}, nil
+		case "enum":
+			return token{typ: TokenEnum, pos: pos, lit: lit}, nil
+		case "case":
+			return token{typ: TokenCase, pos: pos, lit: lit}, nil
+		case "match":
+			return token{typ: TokenMatch, pos: pos, lit: lit}, nil
+		case "true":
+			return token{typ: TokenTrue, pos: pos, lit: lit}, nil
+		case "false":
+			return token{typ: TokenFalse, pos: pos, lit: lit}, nil
+		case "none":
+			return token{typ: TokenNone, pos: pos, lit: lit}, nil
+		case "throws":
+			return token{typ: TokenThrows, pos: pos, lit: lit}, nil
+		case "try":
+			return token{typ: TokenTry, pos: pos, lit: lit}, nil
+		case "throw":
+			return token{typ: TokenThrow, pos: pos, lit: lit}, nil
+		case "async":
+			return token{typ: TokenAsync, pos: pos, lit: lit}, nil
+		case "await":
+			return token{typ: TokenAwait, pos: pos, lit: lit}, nil
+		case "break":
+			return token{typ: TokenBreak, pos: pos, lit: lit}, nil
+		case "continue":
+			return token{typ: TokenContinue, pos: pos, lit: lit}, nil
 		case "return":
 			return token{typ: TokenReturn, pos: pos, lit: lit}, nil
 		case "print":
@@ -118,6 +182,10 @@ func (l *lexer) nextToken() (token, error) {
 			return token{typ: TokenFree, pos: pos, lit: lit}, nil
 		case "unsafe":
 			return token{typ: TokenUnsafe, pos: pos, lit: lit}, nil
+		case "test":
+			return token{typ: TokenTest, pos: pos, lit: lit}, nil
+		case "expect":
+			return token{typ: TokenExpect, pos: pos, lit: lit}, nil
 		default:
 			return token{typ: TokenIdent, pos: pos, lit: lit}, nil
 		}
@@ -163,12 +231,23 @@ func (l *lexer) nextToken() (token, error) {
 		l.advance()
 		return token{typ: TokenAssign, pos: pos, lit: "="}, nil
 	case '<':
+		if l.peekNext() == '=' {
+			l.advance()
+			l.advance()
+			return token{typ: TokenLessEq, pos: pos, lit: "<="}, nil
+		}
 		l.advance()
 		return token{typ: TokenLess, pos: pos, lit: "<"}, nil
 	case ',':
 		l.advance()
 		return token{typ: TokenComma, pos: pos, lit: ","}, nil
 	case '.':
+		if l.peekNext() == '.' && l.idx+2 < len(l.src) && l.src[l.idx+2] == '<' {
+			l.advance()
+			l.advance()
+			l.advance()
+			return token{typ: TokenRangeUntil, pos: pos, lit: "..<"}, nil
+		}
 		l.advance()
 		return token{typ: TokenDot, pos: pos, lit: "."}, nil
 	case '[':
@@ -195,6 +274,48 @@ func (l *lexer) nextToken() (token, error) {
 	case '@':
 		l.advance()
 		return token{typ: TokenAt, pos: pos, lit: "@"}, nil
+	case '*':
+		l.advance()
+		return token{typ: TokenStar, pos: pos, lit: "*"}, nil
+	case '/':
+		l.advance()
+		return token{typ: TokenSlash, pos: pos, lit: "/"}, nil
+	case '%':
+		l.advance()
+		return token{typ: TokenPercent, pos: pos, lit: "%"}, nil
+	case '?':
+		l.advance()
+		return token{typ: TokenQuestion, pos: pos, lit: "?"}, nil
+	case '>':
+		if l.peekNext() == '=' {
+			l.advance()
+			l.advance()
+			return token{typ: TokenGreaterEq, pos: pos, lit: ">="}, nil
+		}
+		l.advance()
+		return token{typ: TokenGreater, pos: pos, lit: ">"}, nil
+	case '!':
+		if l.peekNext() == '=' {
+			l.advance()
+			l.advance()
+			return token{typ: TokenBangEq, pos: pos, lit: "!="}, nil
+		}
+		l.advance()
+		return token{typ: TokenBang, pos: pos, lit: "!"}, nil
+	case '&':
+		if l.peekNext() == '&' {
+			l.advance()
+			l.advance()
+			return token{typ: TokenAmpAmp, pos: pos, lit: "&&"}, nil
+		}
+		return token{}, l.errorf(pos, "unexpected character: '&' (did you mean '&&'?)")
+	case '|':
+		if l.peekNext() == '|' {
+			l.advance()
+			l.advance()
+			return token{typ: TokenPipePipe, pos: pos, lit: "||"}, nil
+		}
+		return token{}, l.errorf(pos, "unexpected character: '|' (did you mean '||'?)")
 	default:
 		return token{}, l.errorf(pos, "unexpected character: %q", ch)
 	}
@@ -297,8 +418,7 @@ func (l *lexer) pos() Position {
 }
 
 func (l *lexer) errorf(pos Position, format string, args ...interface{}) error {
-	msg := fmt.Sprintf(format, args...)
-	return fmt.Errorf("%s: %s", FormatPos(pos), msg)
+	return diagnosticErrorf(pos, format, args...)
 }
 
 func isIdentStart(ch byte) bool {

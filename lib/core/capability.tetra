@@ -1,0 +1,13 @@
+// Stable v0.5 capability wrappers. These helpers do not grant permission by
+// themselves; callers still declare matching uses effects.
+module lib.core.capability
+
+func mem() -> cap.mem
+uses capability, mem:
+    unsafe:
+        return core.cap_mem()
+
+func io() -> cap.io
+uses capability, io:
+    unsafe:
+        return core.cap_io()

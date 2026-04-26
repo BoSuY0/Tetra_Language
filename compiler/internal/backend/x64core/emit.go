@@ -160,6 +160,79 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				e.MovzxEaxAl()
 				e.PushRax()
 				push(1)
+			case ir.IRMulI32:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRax()
+				e.ImulEaxEcx()
+				e.PushRax()
+				push(1)
+			case ir.IRDivI32:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRax()
+				e.Cdq()
+				e.IdivEcx()
+				e.PushRax()
+				push(1)
+			case ir.IRModI32:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRax()
+				e.Cdq()
+				e.IdivEcx()
+				e.PushRdx()
+				push(1)
+			case ir.IRCmpGtI32:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRax()
+				e.CmpEaxEcx()
+				e.SetgAl()
+				e.MovzxEaxAl()
+				e.PushRax()
+				push(1)
+			case ir.IRCmpGeI32:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRax()
+				e.CmpEaxEcx()
+				e.SetgeAl()
+				e.MovzxEaxAl()
+				e.PushRax()
+				push(1)
+			case ir.IRCmpLeI32:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRax()
+				e.CmpEaxEcx()
+				e.SetleAl()
+				e.MovzxEaxAl()
+				e.PushRax()
+				push(1)
+			case ir.IRCmpNeI32:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRax()
+				e.CmpEaxEcx()
+				e.SetneAl()
+				e.MovzxEaxAl()
+				e.PushRax()
+				push(1)
 			case ir.IRCall:
 				if err := abi.EmitCall(e, instr, &stackDepth, callPatches); err != nil {
 					return err

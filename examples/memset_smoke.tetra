@@ -1,31 +1,24 @@
-fun main(): i32 {
-  var out: i32 = 1
-  unsafe {
-    let mem: cap.mem = core.cap_mem()
-    let p: ptr = core.alloc_bytes(8)
-    var q: ptr = p
-
-    var i: i32 = 0
-    while (i < 8) {
-      q = core.ptr_add(p, i, mem)
-      let _: u8 = core.store_u8(q, 127, mem)
-      i = i + 1
-    }
-
-    var sum: i32 = 0
-    i = 0
-    while (i < 8) {
-      q = core.ptr_add(p, i, mem)
-      let v: u8 = core.load_u8(q, mem)
-      sum = sum + v
-      i = i + 1
-    }
-
-    if (sum == 1016) {
-      out = 88
-    } else {
-      out = 2
-    }
-  }
-  return out
-}
+func main() -> i32
+uses alloc, capability, mem:
+    var out: i32 = 1
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        var p: ptr = core.alloc_bytes(8)
+        var q: ptr = p
+        var i: i32 = 0
+        while i < 8:
+            q = core.ptr_add(p, i, mem)
+            var _: u8 = core.store_u8(q, 127, mem)
+            i = i + 1
+        var sum: i32 = 0
+        i = 0
+        while i < 8:
+            q = core.ptr_add(p, i, mem)
+            var v: u8 = core.load_u8(q, mem)
+            sum = sum + v
+            i = i + 1
+        if sum == 1016:
+            out = 88
+        else:
+            out = 2
+    return out

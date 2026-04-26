@@ -7,13 +7,18 @@ type Position struct {
 }
 
 type FileAST struct {
-	Path    string
-	Src     []byte
-	Module  string
-	Imports []ImportDecl
-	Structs []*StructDecl
-	Globals []*GlobalDecl
-	Funcs   []*FuncDecl
+	Path       string
+	Src        []byte
+	Module     string
+	Imports    []ImportDecl
+	Enums      []*EnumDecl
+	Structs    []*StructDecl
+	Protocols  []*ProtocolDecl
+	Extensions []*ExtensionDecl
+	Impls      []*ImplDecl
+	Globals    []*GlobalDecl
+	Funcs      []*FuncDecl
+	Tests      []*TestDecl
 }
 
 type ImportDecl struct {
@@ -23,8 +28,13 @@ type ImportDecl struct {
 }
 
 type Program struct {
-	Structs []*StructDecl
-	Funcs   []*FuncDecl
+	Enums      []*EnumDecl
+	Structs    []*StructDecl
+	Protocols  []*ProtocolDecl
+	Extensions []*ExtensionDecl
+	Impls      []*ImplDecl
+	Funcs      []*FuncDecl
+	Tests      []*TestDecl
 }
 
 type GlobalDecl struct {
@@ -32,16 +42,29 @@ type GlobalDecl struct {
 	Name    string
 	Type    TypeRef
 	Mutable bool
+	Const   bool
 	Init    Expr
 }
 
 type FuncDecl struct {
-	Pos        Position
-	Name       string
-	ExportName string
-	ReturnType TypeRef
-	Params     []ParamDecl
-	Body       []Stmt
+	Pos         Position
+	Name        string
+	ExportName  string
+	Async       bool
+	ExtensionOf string
+	TypeParams  []string
+	ReturnType  TypeRef
+	Throws      TypeRef
+	HasThrows   bool
+	Params      []ParamDecl
+	Uses        []string
+	Body        []Stmt
+}
+
+type TestDecl struct {
+	At   Position
+	Name string
+	Body []Stmt
 }
 
 type Stmt interface {
@@ -55,9 +78,10 @@ type Expr interface {
 }
 
 type ParamDecl struct {
-	At   Position
-	Name string
-	Type TypeRef
+	At        Position
+	Name      string
+	Type      TypeRef
+	Ownership string
 }
 
 type TypeRefKind int
@@ -66,6 +90,7 @@ const (
 	TypeRefNamed TypeRefKind = iota
 	TypeRefSlice
 	TypeRefArray
+	TypeRefOptional
 )
 
 type TypeRef struct {
@@ -88,6 +113,45 @@ type FieldDecl struct {
 	Type TypeRef
 }
 
+type EnumDecl struct {
+	At    Position
+	Name  string
+	Cases []EnumCaseDecl
+}
+
+type EnumCaseDecl struct {
+	At   Position
+	Name string
+}
+
+type ExtensionDecl struct {
+	At      Position
+	Target  TypeRef
+	Methods []*FuncDecl
+}
+
+type ProtocolDecl struct {
+	At           Position
+	Name         string
+	Requirements []FuncSigDecl
+}
+
+type ImplDecl struct {
+	At       Position
+	Type     TypeRef
+	Protocol TypeRef
+}
+
+type FuncSigDecl struct {
+	At         Position
+	Name       string
+	Async      bool
+	ReturnType TypeRef
+	Throws     TypeRef
+	HasThrows  bool
+	Params     []ParamDecl
+}
+
 type PrintStmt struct {
 	At    Position
 	Value Expr
@@ -108,11 +172,22 @@ func (s *ReturnStmt) Pos() Position {
 	return s.At
 }
 
+type ThrowStmt struct {
+	At    Position
+	Value Expr
+}
+
+func (s *ThrowStmt) stmtNode() {}
+func (s *ThrowStmt) Pos() Position {
+	return s.At
+}
+
 type LetStmt struct {
 	At      Position
 	Name    string
 	Type    TypeRef
 	Mutable bool
+	Const   bool
 	Value   Expr
 }
 
@@ -122,9 +197,11 @@ func (s *LetStmt) Pos() Position {
 }
 
 type AssignStmt struct {
-	At     Position
-	Target Expr
-	Value  Expr
+	At            Position
+	Target        Expr
+	Value         Expr
+	Op            TokenType
+	CompoundValue Expr
 }
 
 func (s *AssignStmt) stmtNode() {}
@@ -144,6 +221,20 @@ func (s *IfStmt) Pos() Position {
 	return s.At
 }
 
+type IfLetStmt struct {
+	At         Position
+	Name       string
+	Value      Expr
+	ValueLocal string
+	Then       []Stmt
+	Else       []Stmt
+}
+
+func (s *IfLetStmt) stmtNode() {}
+func (s *IfLetStmt) Pos() Position {
+	return s.At
+}
+
 type WhileStmt struct {
 	At   Position
 	Cond Expr
@@ -153,6 +244,60 @@ type WhileStmt struct {
 func (s *WhileStmt) stmtNode() {}
 func (s *WhileStmt) Pos() Position {
 	return s.At
+}
+
+type BreakStmt struct {
+	At Position
+}
+
+func (s *BreakStmt) stmtNode() {}
+func (s *BreakStmt) Pos() Position {
+	return s.At
+}
+
+type ContinueStmt struct {
+	At Position
+}
+
+func (s *ContinueStmt) stmtNode() {}
+func (s *ContinueStmt) Pos() Position {
+	return s.At
+}
+
+type ForRangeStmt struct {
+	At            Position
+	Name          string
+	Start         Expr
+	End           Expr
+	Iterable      Expr
+	IterableLocal string
+	IndexLocal    string
+	EndLocal      string
+	Body          []Stmt
+}
+
+func (s *ForRangeStmt) stmtNode() {}
+func (s *ForRangeStmt) Pos() Position {
+	return s.At
+}
+
+type MatchStmt struct {
+	At             Position
+	Value          Expr
+	ScrutineeLocal string
+	Cases          []MatchCase
+}
+
+func (s *MatchStmt) stmtNode() {}
+func (s *MatchStmt) Pos() Position {
+	return s.At
+}
+
+type MatchCase struct {
+	At      Position
+	Pattern Expr
+	Default bool
+	Body    []Stmt
 }
 
 type FreeStmt struct {
@@ -188,6 +333,26 @@ func (s *IslandStmt) Pos() Position {
 	return s.At
 }
 
+type ExprStmt struct {
+	At   Position
+	Expr Expr
+}
+
+type ExpectStmt struct {
+	At   Position
+	Cond Expr
+}
+
+func (s *ExpectStmt) stmtNode() {}
+func (s *ExpectStmt) Pos() Position {
+	return s.At
+}
+
+func (s *ExprStmt) stmtNode() {}
+func (s *ExprStmt) Pos() Position {
+	return s.At
+}
+
 type NumberExpr struct {
 	At    Position
 	Value int32
@@ -195,6 +360,35 @@ type NumberExpr struct {
 
 func (e *NumberExpr) exprNode() {}
 func (e *NumberExpr) Pos() Position {
+	return e.At
+}
+
+type BoolLitExpr struct {
+	At    Position
+	Value bool
+}
+
+func (e *BoolLitExpr) exprNode() {}
+func (e *BoolLitExpr) Pos() Position {
+	return e.At
+}
+
+type NoneLitExpr struct {
+	At Position
+}
+
+func (e *NoneLitExpr) exprNode() {}
+func (e *NoneLitExpr) Pos() Position {
+	return e.At
+}
+
+type SomePatternExpr struct {
+	At   Position
+	Name string
+}
+
+func (e *SomePatternExpr) exprNode() {}
+func (e *SomePatternExpr) Pos() Position {
 	return e.At
 }
 
@@ -228,6 +422,26 @@ type UnaryExpr struct {
 
 func (e *UnaryExpr) exprNode() {}
 func (e *UnaryExpr) Pos() Position {
+	return e.At
+}
+
+type TryExpr struct {
+	At Position
+	X  Expr
+}
+
+func (e *TryExpr) exprNode() {}
+func (e *TryExpr) Pos() Position {
+	return e.At
+}
+
+type AwaitExpr struct {
+	At Position
+	X  Expr
+}
+
+func (e *AwaitExpr) exprNode() {}
+func (e *AwaitExpr) Pos() Position {
 	return e.At
 }
 
@@ -270,9 +484,11 @@ func (e *StringLitExpr) Pos() Position {
 }
 
 type FieldAccessExpr struct {
-	At    Position
-	Base  Expr
-	Field string
+	At          Position
+	Base        Expr
+	Field       string
+	EnumType    string
+	EnumOrdinal int32
 }
 
 func (e *FieldAccessExpr) exprNode() {}

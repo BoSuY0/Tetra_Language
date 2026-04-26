@@ -175,6 +175,8 @@ func BuildTypeSigMap(types map[string]*semantics.TypeInfo) (map[string]string, e
 			sig = "i32"
 		case semantics.TypeU8:
 			sig = "u8"
+		case semantics.TypeBool:
+			sig = "bool"
 		case semantics.TypePtr:
 			sig = "ptr"
 		case semantics.TypeStr:
@@ -207,6 +209,18 @@ func BuildTypeSigMap(types map[string]*semantics.TypeInfo) (map[string]string, e
 			sig = info.Name
 		case semantics.TypeActor:
 			sig = "actor"
+		case semantics.TypeEnum:
+			parts := make([]string, 0, len(info.EnumCases))
+			for _, c := range info.EnumCases {
+				parts = append(parts, c.Name)
+			}
+			sig = "enum{" + strings.Join(parts, ",") + "}"
+		case semantics.TypeOptional:
+			elemSig, err := build(info.ElemType)
+			if err != nil {
+				return "", err
+			}
+			sig = "optional{" + elemSig + "}"
 		default:
 			return "", fmt.Errorf("unknown type kind")
 		}
@@ -264,7 +278,30 @@ func ModuleOf(fullName string) string {
 }
 
 func formatFuncSig(name string, sig semantics.FuncSig) string {
-	return fmt.Sprintf("func:%s(%s)->%s", name, strings.Join(sig.ParamTypes, ","), sig.ReturnType)
+	params := make([]string, len(sig.ParamTypes))
+	for i, typ := range sig.ParamTypes {
+		ownership := ""
+		if i < len(sig.ParamOwnership) {
+			ownership = sig.ParamOwnership[i]
+		}
+		if ownership != "" {
+			params[i] = ownership + " " + typ
+		} else {
+			params[i] = typ
+		}
+	}
+	prefix := "func"
+	if sig.Async {
+		prefix = "async func"
+	}
+	if sig.Generic {
+		prefix = "generic " + prefix
+	}
+	throws := ""
+	if sig.ThrowsType != "" {
+		throws = " throws " + sig.ThrowsType
+	}
+	return fmt.Sprintf("%s:%s(%s)->%s%s uses %s", prefix, name, strings.Join(params, ","), sig.ReturnType, throws, strings.Join(sig.Effects, ","))
 }
 
 func formatTypeSig(name, sig string) string {

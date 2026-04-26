@@ -1,28 +1,40 @@
-# Roadmap v0.14 → v0.15 (Backlog)
+# Roadmap v0.14 → v0.15 (Core Language MVP)
 
-Focus: productionize the self-hosted runtime path and continue reducing remaining OS-specific duplication.
+Focus: stabilize the first Core Alpha language surface after the v0.14 Flow
+bridge, without changing backend, linker, ABI, runtime, package manager, or IR.
 
-## P0 — Documentation hygiene
+## P0 — Core language surface
 
-- Update `docs/spec/capabilities.md` to match the current cap.mem primitives (`load/store_i32/u8/ptr`, `ptr_add`) and the
-  MMIO volatile contract.
-- Add a short spec for globals (top-level `var/val`) and their current initialization limits.
+- Add real `bool` with `true`/`false`; keep integer conditions accepted as a
+  legacy-compatible bridge.
+- Add exclusive integer range loops: `for i in start..<end:`.
+- Add no-payload enums and same-module enum case expressions such as
+  `Color.green`.
+- Add statement-level `match` over enum or integer values with enum cases,
+  integer literal cases, and `_` default.
 
-## P1 — Self-host actors runtime (3 OS)
+## P1 — Diagnostics and compatibility
 
-- Make the self-hosted actors runtime runnable on `windows-x64` (in addition to SysV hosts), and run it in CI.
-- Promote a canonical runtime source file under `__rt/` (replacing PoC naming) with a stable exported surface per
-  `docs/spec/runtime_abi.md`.
+- Remove `enum`, `for`, and `match` from planned-feature diagnostics.
+- Keep planned-feature diagnostics for `protocol`, `extension`, `actor`, `view`,
+  `state`, `test`, `property`, and `capsule`.
+- Report typed errors for bool/numeric mismatches, duplicate enum cases, unknown
+  enum cases, invalid match patterns, and misplaced match defaults.
+- Keep legacy brace syntax and v0.14 Flow examples passing.
 
-## P2 — Self-host runtime as a first-class build path
+## P2 — Examples, smoke, and docs
 
-- Add an optional build mode where the compiler auto-builds and links the canonical `__rt` runtime module when actors are
-  used (keeping `--runtime-object` as an override).
-- Deprecate the Go-emitted `actorsrt/*_emit.go` scheduler once the self-host runtime becomes stable.
+- Add `bool_smoke`, `for_range_smoke`, and `enum_match_smoke` examples.
+- Extend `tetra smoke` so the native smoke suite covers the new examples.
+- Update README and the Flow/Core MVP spec to show v0.15 as the bool/range
+  for/enum/match MVP.
 
-## P3 — Library linking ergonomics
+## Deferred runtime backlog
 
-- Add a general `--link-object path.tobj` flag (in addition to `--runtime-object`) so users can link arbitrary TOBJ
-  libraries without special runtime semantics.
-- Add e2e tests that validate `@export`-driven symbol aliases across object boundaries.
+The previous v0.15 runtime backlog is intentionally deferred to v0.16 or a
+parallel runtime track:
 
+- capabilities/globals documentation hygiene;
+- self-host actors runtime productionization across all OS targets;
+- self-host runtime auto-build/link mode;
+- broader library linking ergonomics beyond the current `--link-object` path.

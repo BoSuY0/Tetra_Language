@@ -13,11 +13,15 @@ func Parse(src []byte) (*Program, error) {
 	if file.Module != "" || len(file.Imports) > 0 || len(file.Globals) > 0 {
 		return nil, fmt.Errorf("module/import/global declarations require ParseFile")
 	}
-	return &Program{Structs: file.Structs, Funcs: file.Funcs}, nil
+	return &Program{Enums: file.Enums, Structs: file.Structs, Protocols: file.Protocols, Extensions: file.Extensions, Impls: file.Impls, Funcs: file.Funcs, Tests: file.Tests}, nil
 }
 
 func ParseFile(src []byte, filename string) (*FileAST, error) {
-	p, err := newParser(src, filename)
+	parseSrc, err := normalizeFlowSyntax(src, filename)
+	if err != nil {
+		return nil, err
+	}
+	p, err := newParser(parseSrc, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -31,9 +35,10 @@ func ParseFile(src []byte, filename string) (*FileAST, error) {
 }
 
 type parser struct {
-	l    *lexer
-	cur  token
-	peek token
+	l                     *lexer
+	cur                   token
+	peek                  token
+	suppressStructLiteral bool
 }
 
 func newParser(src []byte, filename string) (*parser, error) {
@@ -65,6 +70,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 	file := &FileAST{}
 	seenFunc := false
 	seenStruct := false
+	seenEnum := false
 	seenGlobal := false
 	for p.cur.typ != TokenEOF {
 		switch p.cur.typ {
@@ -74,11 +80,11 @@ func (p *parser) parseFile() (*FileAST, error) {
 			}
 			continue
 		case TokenModule:
-			if seenFunc || seenStruct || seenGlobal {
-				return nil, fmt.Errorf("%s: module must appear before declarations", FormatPos(p.cur.pos))
+			if seenFunc || seenStruct || seenEnum || seenGlobal {
+				return nil, diagnosticErrorf(p.cur.pos, "module must appear before declarations")
 			}
 			if file.Module != "" {
-				return nil, fmt.Errorf("%s: duplicate module declaration", FormatPos(p.cur.pos))
+				return nil, diagnosticErrorf(p.cur.pos, "duplicate module declaration")
 			}
 			if err := p.next(); err != nil {
 				return nil, err
@@ -94,8 +100,8 @@ func (p *parser) parseFile() (*FileAST, error) {
 			continue
 		case TokenImport:
 			pos := p.cur.pos
-			if seenFunc || seenStruct || seenGlobal {
-				return nil, fmt.Errorf("%s: import must appear before declarations", FormatPos(p.cur.pos))
+			if seenFunc || seenStruct || seenEnum || seenGlobal {
+				return nil, diagnosticErrorf(p.cur.pos, "import must appear before declarations")
 			}
 			if err := p.next(); err != nil {
 				return nil, err
@@ -125,7 +131,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 			continue
 		case TokenStruct:
 			if seenFunc || seenGlobal {
-				return nil, fmt.Errorf("%s: struct must appear before globals/functions", FormatPos(p.cur.pos))
+				return nil, diagnosticErrorf(p.cur.pos, "struct must appear before globals/functions")
 			}
 			seenStruct = true
 			st, err := p.parseStructDecl()
@@ -134,9 +140,59 @@ func (p *parser) parseFile() (*FileAST, error) {
 			}
 			file.Structs = append(file.Structs, st)
 			continue
-		case TokenVar, TokenVal:
+		case TokenEnum:
+			if seenFunc || seenGlobal {
+				return nil, diagnosticErrorf(p.cur.pos, "enum must appear before globals/functions")
+			}
+			seenEnum = true
+			en, err := p.parseEnumDecl()
+			if err != nil {
+				return nil, err
+			}
+			file.Enums = append(file.Enums, en)
+			continue
+		case TokenIdent:
+			switch p.cur.lit {
+			case "impl":
+				if seenFunc || seenGlobal {
+					return nil, diagnosticErrorf(p.cur.pos, "impl must appear before globals/functions")
+				}
+				impl, err := p.parseImplDecl()
+				if err != nil {
+					return nil, err
+				}
+				file.Impls = append(file.Impls, impl)
+				continue
+			case "protocol":
+				if seenFunc || seenGlobal {
+					return nil, diagnosticErrorf(p.cur.pos, "protocol must appear before globals/functions")
+				}
+				proto, err := p.parseProtocolDecl()
+				if err != nil {
+					return nil, err
+				}
+				file.Protocols = append(file.Protocols, proto)
+				continue
+			case "extension":
+				if seenFunc || seenGlobal {
+					return nil, diagnosticErrorf(p.cur.pos, "extension must appear before globals/functions")
+				}
+				ext, err := p.parseExtensionDecl()
+				if err != nil {
+					return nil, err
+				}
+				file.Extensions = append(file.Extensions, ext)
+				file.Funcs = append(file.Funcs, ext.Methods...)
+				continue
+			default:
+				if feature, ok := plannedFeatureFromToken(p.cur); ok {
+					return nil, plannedFeatureError(p.cur.pos, feature)
+				}
+				return nil, p.unexpected("module/import/enum/struct/extension/var/val/const/fn")
+			}
+		case TokenVar, TokenVal, TokenConst:
 			if seenFunc {
-				return nil, fmt.Errorf("%s: global must appear before functions", FormatPos(p.cur.pos))
+				return nil, diagnosticErrorf(p.cur.pos, "global must appear before functions")
 			}
 			seenGlobal = true
 			glob, err := p.parseGlobalDecl()
@@ -145,23 +201,231 @@ func (p *parser) parseFile() (*FileAST, error) {
 			}
 			file.Globals = append(file.Globals, glob)
 			continue
-		case TokenAt, TokenFn, TokenFun:
+		case TokenAt, TokenFn, TokenFun, TokenAsync:
 			seenFunc = true
 			fn, err := p.parseFuncDecl()
 			if err != nil {
 				return nil, err
 			}
 			file.Funcs = append(file.Funcs, fn)
+		case TokenTest:
+			seenFunc = true
+			test, err := p.parseTestDecl()
+			if err != nil {
+				return nil, err
+			}
+			file.Tests = append(file.Tests, test)
 		default:
-			return nil, p.unexpected("module/import/struct/var/val/fn")
+			if feature, ok := plannedFeatureFromToken(p.cur); ok {
+				return nil, plannedFeatureError(p.cur.pos, feature)
+			}
+			return nil, p.unexpected("module/import/enum/struct/extension/var/val/fn")
 		}
 	}
 	return file, nil
 }
 
+func (p *parser) parseImplDecl() (*ImplDecl, error) {
+	pos := p.cur.pos
+	if p.cur.typ != TokenIdent || p.cur.lit != "impl" {
+		return nil, p.unexpected("impl")
+	}
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	typePos := p.cur.pos
+	typeParts, err := p.parsePathParts()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenColon); err != nil {
+		return nil, err
+	}
+	protoPos := p.cur.pos
+	protoParts, err := p.parsePathParts()
+	if err != nil {
+		return nil, err
+	}
+	if err := p.consumeOptionalSemicolon(); err != nil {
+		return nil, err
+	}
+	return &ImplDecl{
+		At:       pos,
+		Type:     TypeRef{At: typePos, Kind: TypeRefNamed, Name: strings.Join(typeParts, ".")},
+		Protocol: TypeRef{At: protoPos, Kind: TypeRefNamed, Name: strings.Join(protoParts, ".")},
+	}, nil
+}
+
+func (p *parser) parseProtocolDecl() (*ProtocolDecl, error) {
+	pos := p.cur.pos
+	if p.cur.typ != TokenIdent || p.cur.lit != "protocol" {
+		return nil, p.unexpected("protocol")
+	}
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	nameTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenLBrace); err != nil {
+		return nil, err
+	}
+	var requirements []FuncSigDecl
+	seen := map[string]struct{}{}
+	for p.cur.typ != TokenRBrace && p.cur.typ != TokenEOF {
+		if p.cur.typ == TokenSemicolon {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		req, err := p.parseFuncSignatureDecl()
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := seen[req.Name]; exists {
+			return nil, diagnosticErrorf(req.At, "duplicate protocol requirement '%s'", req.Name)
+		}
+		seen[req.Name] = struct{}{}
+		requirements = append(requirements, req)
+	}
+	if _, err := p.expect(TokenRBrace); err != nil {
+		return nil, err
+	}
+	if len(requirements) == 0 {
+		return nil, diagnosticErrorf(pos, "protocol requires at least one requirement")
+	}
+	return &ProtocolDecl{At: pos, Name: nameTok.lit, Requirements: requirements}, nil
+}
+
+func (p *parser) parseFuncSignatureDecl() (FuncSigDecl, error) {
+	async := false
+	if p.cur.typ == TokenAsync {
+		async = true
+		if err := p.next(); err != nil {
+			return FuncSigDecl{}, err
+		}
+	}
+	if p.cur.typ != TokenFn && p.cur.typ != TokenFun {
+		return FuncSigDecl{}, p.unexpected("fn/fun")
+	}
+	if err := p.next(); err != nil {
+		return FuncSigDecl{}, err
+	}
+	nameTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return FuncSigDecl{}, err
+	}
+	typeParams, err := p.parseTypeParams()
+	if err != nil {
+		return FuncSigDecl{}, err
+	}
+	if len(typeParams) > 0 {
+		return FuncSigDecl{}, diagnosticErrorf(nameTok.pos, "generic protocol requirements are planned for a later release")
+	}
+	if _, err := p.expect(TokenLParen); err != nil {
+		return FuncSigDecl{}, err
+	}
+	params, err := p.parseParams()
+	if err != nil {
+		return FuncSigDecl{}, err
+	}
+	if _, err := p.expect(TokenRParen); err != nil {
+		return FuncSigDecl{}, err
+	}
+	switch p.cur.typ {
+	case TokenArrow, TokenColon:
+		if err := p.next(); err != nil {
+			return FuncSigDecl{}, err
+		}
+	default:
+		return FuncSigDecl{}, p.unexpected("-> or :")
+	}
+	retType, err := p.parseTypeRef()
+	if err != nil {
+		return FuncSigDecl{}, err
+	}
+	var throws TypeRef
+	hasThrows := false
+	if p.cur.typ == TokenThrows {
+		hasThrows = true
+		if err := p.next(); err != nil {
+			return FuncSigDecl{}, err
+		}
+		parsed, err := p.parseTypeRef()
+		if err != nil {
+			return FuncSigDecl{}, err
+		}
+		throws = parsed
+	}
+	if err := p.consumeOptionalSemicolon(); err != nil {
+		return FuncSigDecl{}, err
+	}
+	return FuncSigDecl{At: nameTok.pos, Name: nameTok.lit, Async: async, ReturnType: retType, Throws: throws, HasThrows: hasThrows, Params: params}, nil
+}
+
+func (p *parser) parseExtensionDecl() (*ExtensionDecl, error) {
+	pos := p.cur.pos
+	if p.cur.typ != TokenIdent || p.cur.lit != "extension" {
+		return nil, p.unexpected("extension")
+	}
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	target := TypeRef{At: p.cur.pos, Kind: TypeRefNamed}
+	parts, err := p.parsePathParts()
+	if err != nil {
+		return nil, err
+	}
+	target.Name = strings.Join(parts, ".")
+	if _, err := p.expect(TokenLBrace); err != nil {
+		return nil, err
+	}
+	var methods []*FuncDecl
+	for p.cur.typ != TokenRBrace && p.cur.typ != TokenEOF {
+		if p.cur.typ == TokenSemicolon {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		fn, err := p.parseFuncDecl()
+		if err != nil {
+			return nil, err
+		}
+		fn.ExtensionOf = target.Name
+		fn.Name = target.Name + "." + fn.Name
+		methods = append(methods, fn)
+	}
+	if _, err := p.expect(TokenRBrace); err != nil {
+		return nil, err
+	}
+	if len(methods) == 0 {
+		return nil, diagnosticErrorf(pos, "extension requires at least one method")
+	}
+	return &ExtensionDecl{At: pos, Target: target, Methods: methods}, nil
+}
+
+func (p *parser) parseTestDecl() (*TestDecl, error) {
+	pos := p.cur.pos
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	nameTok, err := p.expect(TokenString)
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &TestDecl{At: pos, Name: string(nameTok.str), Body: body}, nil
+}
+
 func (p *parser) parseGlobalDecl() (*GlobalDecl, error) {
-	if p.cur.typ != TokenVar && p.cur.typ != TokenVal {
-		return nil, p.unexpected("var/val")
+	if p.cur.typ != TokenVar && p.cur.typ != TokenVal && p.cur.typ != TokenConst {
+		return nil, p.unexpected("var/val/const")
 	}
 	pos := p.cur.pos
 	declTok := p.cur
@@ -183,16 +447,16 @@ func (p *parser) parseGlobalDecl() (*GlobalDecl, error) {
 		}
 		typeRef = parsed
 	} else if declTok.typ == TokenVar {
-		return nil, fmt.Errorf("%s: global var requires an explicit type annotation", FormatPos(p.cur.pos))
+		return nil, diagnosticErrorf(p.cur.pos, "global var requires an explicit type annotation")
 	}
 
 	var init Expr
 	switch declTok.typ {
 	case TokenVar:
 		if p.cur.typ == TokenAssign {
-			return nil, fmt.Errorf("%s: global var initializers are not supported yet", FormatPos(p.cur.pos))
+			return nil, diagnosticErrorf(p.cur.pos, "global var initializers are not supported yet")
 		}
-	case TokenVal:
+	case TokenVal, TokenConst:
 		if _, err := p.expect(TokenAssign); err != nil {
 			return nil, err
 		}
@@ -202,13 +466,13 @@ func (p *parser) parseGlobalDecl() (*GlobalDecl, error) {
 		}
 		init = expr
 	default:
-		return nil, p.unexpected("var/val")
+		return nil, p.unexpected("var/val/const")
 	}
 	if err := p.consumeOptionalSemicolon(); err != nil {
 		return nil, err
 	}
 	mutable := declTok.typ == TokenVar
-	return &GlobalDecl{At: pos, Name: nameTok.lit, Type: typeRef, Mutable: mutable, Init: init}, nil
+	return &GlobalDecl{At: pos, Name: nameTok.lit, Type: typeRef, Mutable: mutable, Const: declTok.typ == TokenConst, Init: init}, nil
 }
 
 func (p *parser) parseFuncDecl() (*FuncDecl, error) {
@@ -223,7 +487,7 @@ func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 			return nil, err
 		}
 		if nameTok.lit != "export" {
-			return nil, fmt.Errorf("%s: unknown attribute '@%s'", FormatPos(attrTok.pos), nameTok.lit)
+			return nil, diagnosticErrorf(attrTok.pos, "unknown attribute '@%s'", nameTok.lit)
 		}
 		if _, err := p.expect(TokenLParen); err != nil {
 			return nil, err
@@ -236,17 +500,24 @@ func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 			return nil, err
 		}
 		if exportName != "" {
-			return nil, fmt.Errorf("%s: duplicate @export attribute", FormatPos(attrTok.pos))
+			return nil, diagnosticErrorf(attrTok.pos, "duplicate @export attribute")
 		}
 		exportName = string(valTok.str)
 		if exportName == "" {
-			return nil, fmt.Errorf("%s: @export name must not be empty", FormatPos(valTok.pos))
+			return nil, diagnosticErrorf(valTok.pos, "@export name must not be empty")
 		}
 		if err := p.consumeOptionalSemicolon(); err != nil {
 			return nil, err
 		}
 	}
 
+	async := false
+	if p.cur.typ == TokenAsync {
+		async = true
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+	}
 	if p.cur.typ != TokenFn && p.cur.typ != TokenFun {
 		return nil, p.unexpected("fn/fun")
 	}
@@ -255,6 +526,10 @@ func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 	}
 
 	nameTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	typeParams, err := p.parseTypeParams()
 	if err != nil {
 		return nil, err
 	}
@@ -283,13 +558,79 @@ func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 		return nil, err
 	}
 
+	var throws TypeRef
+	hasThrows := false
+	if p.cur.typ == TokenThrows {
+		hasThrows = true
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		parsed, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		throws = parsed
+	}
+
+	var uses []string
+	if p.cur.typ == TokenUses {
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		for {
+			capability, err := p.parsePath()
+			if err != nil {
+				return nil, err
+			}
+			uses = append(uses, capability)
+			if p.cur.typ != TokenComma {
+				break
+			}
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	body, err := p.parseBlock()
 	if err != nil {
 		return nil, err
 	}
 
-	fn := &FuncDecl{Pos: nameTok.pos, Name: nameTok.lit, ExportName: exportName, ReturnType: retType, Params: params, Body: body}
+	fn := &FuncDecl{Pos: nameTok.pos, Name: nameTok.lit, ExportName: exportName, Async: async, TypeParams: typeParams, ReturnType: retType, Throws: throws, HasThrows: hasThrows, Params: params, Uses: uses, Body: body}
 	return fn, nil
+}
+
+func (p *parser) parseTypeParams() ([]string, error) {
+	if p.cur.typ != TokenLess {
+		return nil, nil
+	}
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	var out []string
+	seen := map[string]struct{}{}
+	for {
+		tok, err := p.expect(TokenIdent)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := seen[tok.lit]; exists {
+			return nil, diagnosticErrorf(tok.pos, "duplicate type parameter '%s'", tok.lit)
+		}
+		seen[tok.lit] = struct{}{}
+		out = append(out, tok.lit)
+		if p.cur.typ != TokenComma {
+			break
+		}
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := p.expect(TokenGreater); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (p *parser) parsePath() (string, error) {
@@ -301,7 +642,7 @@ func (p *parser) parsePath() (string, error) {
 }
 
 func (p *parser) parsePathParts() ([]string, error) {
-	first, err := p.expect(TokenIdent)
+	first, err := p.expectPathPart()
 	if err != nil {
 		return nil, err
 	}
@@ -310,13 +651,26 @@ func (p *parser) parsePathParts() ([]string, error) {
 		if err := p.next(); err != nil {
 			return nil, err
 		}
-		partTok, err := p.expect(TokenIdent)
+		partTok, err := p.expectPathPart()
 		if err != nil {
 			return nil, err
 		}
 		parts = append(parts, partTok.lit)
 	}
 	return parts, nil
+}
+
+func (p *parser) expectPathPart() (token, error) {
+	switch p.cur.typ {
+	case TokenIdent, TokenTest:
+		tok := p.cur
+		if err := p.next(); err != nil {
+			return token{}, err
+		}
+		return tok, nil
+	default:
+		return token{}, p.unexpected("identifier")
+	}
 }
 
 func (p *parser) parseParams() ([]ParamDecl, error) {
@@ -332,11 +686,18 @@ func (p *parser) parseParams() ([]ParamDecl, error) {
 		if _, err := p.expect(TokenColon); err != nil {
 			return nil, err
 		}
+		ownership := ""
+		if p.cur.typ == TokenIdent && isOwnershipMarker(p.cur.lit) {
+			ownership = p.cur.lit
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+		}
 		typeRef, err := p.parseTypeRef()
 		if err != nil {
 			return nil, err
 		}
-		params = append(params, ParamDecl{At: nameTok.pos, Name: nameTok.lit, Type: typeRef})
+		params = append(params, ParamDecl{At: nameTok.pos, Name: nameTok.lit, Type: typeRef, Ownership: ownership})
 		if p.cur.typ != TokenComma {
 			break
 		}
@@ -345,6 +706,10 @@ func (p *parser) parseParams() ([]ParamDecl, error) {
 		}
 	}
 	return params, nil
+}
+
+func isOwnershipMarker(name string) bool {
+	return name == "borrow" || name == "inout" || name == "consume"
 }
 
 func (p *parser) parseStructDecl() (*StructDecl, error) {
@@ -394,7 +759,73 @@ func (p *parser) parseStructDecl() (*StructDecl, error) {
 	return &StructDecl{At: nameTok.pos, Name: nameTok.lit, Fields: fields}, nil
 }
 
+func (p *parser) parseEnumDecl() (*EnumDecl, error) {
+	if p.cur.typ != TokenEnum {
+		return nil, p.unexpected("enum")
+	}
+	pos := p.cur.pos
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	nameTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenLBrace); err != nil {
+		return nil, err
+	}
+	var cases []EnumCaseDecl
+	for p.cur.typ != TokenRBrace && p.cur.typ != TokenEOF {
+		if p.cur.typ == TokenSemicolon || p.cur.typ == TokenComma {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		casePos := p.cur.pos
+		if _, err := p.expect(TokenCase); err != nil {
+			return nil, err
+		}
+		nameTok, err := p.expect(TokenIdent)
+		if err != nil {
+			return nil, err
+		}
+		if p.cur.typ == TokenLParen {
+			return nil, diagnosticErrorf(nameTok.pos, "enum payload cases are planned for a later release")
+		}
+		cases = append(cases, EnumCaseDecl{At: casePos, Name: nameTok.lit})
+		if p.cur.typ == TokenComma || p.cur.typ == TokenSemicolon {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if _, err := p.expect(TokenRBrace); err != nil {
+		return nil, err
+	}
+	if len(cases) == 0 {
+		return nil, diagnosticErrorf(pos, "enum '%s' must declare at least one case", nameTok.lit)
+	}
+	return &EnumDecl{At: pos, Name: nameTok.lit, Cases: cases}, nil
+}
+
 func (p *parser) parseTypeRef() (TypeRef, error) {
+	ref, err := p.parseTypeRefPrimary()
+	if err != nil {
+		return TypeRef{}, err
+	}
+	for p.cur.typ == TokenQuestion {
+		at := p.cur.pos
+		if err := p.next(); err != nil {
+			return TypeRef{}, err
+		}
+		elem := ref
+		ref = TypeRef{At: at, Kind: TypeRefOptional, Elem: &elem}
+	}
+	return ref, nil
+}
+
+func (p *parser) parseTypeRefPrimary() (TypeRef, error) {
 	if p.cur.typ == TokenLBracket {
 		at := p.cur.pos
 		if err := p.next(); err != nil {
@@ -490,6 +921,19 @@ func (p *parser) parseStmt() (Stmt, error) {
 			return nil, err
 		}
 		return &PrintStmt{At: pos, Value: expr}, nil
+	case TokenExpect:
+		pos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		cond, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if err := p.consumeOptionalSemicolon(); err != nil {
+			return nil, err
+		}
+		return &ExpectStmt{At: pos, Cond: cond}, nil
 	case TokenFree:
 		pos := p.cur.pos
 		if err := p.next(); err != nil {
@@ -524,7 +968,38 @@ func (p *parser) parseStmt() (Stmt, error) {
 			return nil, err
 		}
 		return &ReturnStmt{At: pos, Value: expr}, nil
-	case TokenLet, TokenVar, TokenVal:
+	case TokenThrow:
+		pos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if err := p.consumeOptionalSemicolon(); err != nil {
+			return nil, err
+		}
+		return &ThrowStmt{At: pos, Value: expr}, nil
+	case TokenBreak:
+		pos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		if err := p.consumeOptionalSemicolon(); err != nil {
+			return nil, err
+		}
+		return &BreakStmt{At: pos}, nil
+	case TokenContinue:
+		pos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		if err := p.consumeOptionalSemicolon(); err != nil {
+			return nil, err
+		}
+		return &ContinueStmt{At: pos}, nil
+	case TokenLet, TokenVar, TokenVal, TokenConst:
 		pos := p.cur.pos
 		declTok := p.cur
 		if err := p.next(); err != nil {
@@ -555,12 +1030,37 @@ func (p *parser) parseStmt() (Stmt, error) {
 		if err := p.consumeOptionalSemicolon(); err != nil {
 			return nil, err
 		}
-		mutable := declTok.typ != TokenVal
-		return &LetStmt{At: pos, Name: nameTok.lit, Type: typeRef, Mutable: mutable, Value: expr}, nil
+		mutable := declTok.typ == TokenLet || declTok.typ == TokenVar
+		return &LetStmt{At: pos, Name: nameTok.lit, Type: typeRef, Mutable: mutable, Const: declTok.typ == TokenConst, Value: expr}, nil
 	case TokenIf:
 		pos := p.cur.pos
 		if err := p.next(); err != nil {
 			return nil, err
+		}
+		if p.cur.typ == TokenLet {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			nameTok, err := p.expect(TokenIdent)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenAssign); err != nil {
+				return nil, err
+			}
+			value, err := p.parseIfLetValue()
+			if err != nil {
+				return nil, err
+			}
+			thenBlock, err := p.parseBlock()
+			if err != nil {
+				return nil, err
+			}
+			elseBlock, err := p.parseElseBlock()
+			if err != nil {
+				return nil, err
+			}
+			return &IfLetStmt{At: pos, Name: nameTok.lit, Value: value, Then: thenBlock, Else: elseBlock}, nil
 		}
 		if _, err := p.expect(TokenLParen); err != nil {
 			return nil, err
@@ -576,15 +1076,9 @@ func (p *parser) parseStmt() (Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
-		var elseBlock []Stmt
-		if p.cur.typ == TokenElse {
-			if err := p.next(); err != nil {
-				return nil, err
-			}
-			elseBlock, err = p.parseBlock()
-			if err != nil {
-				return nil, err
-			}
+		elseBlock, err := p.parseElseBlock()
+		if err != nil {
+			return nil, err
 		}
 		return &IfStmt{At: pos, Cond: cond, Then: thenBlock, Else: elseBlock}, nil
 	case TokenWhile:
@@ -607,29 +1101,185 @@ func (p *parser) parseStmt() (Stmt, error) {
 			return nil, err
 		}
 		return &WhileStmt{At: pos, Cond: cond, Body: body}, nil
+	case TokenFor:
+		return p.parseForRangeStmt()
+	case TokenMatch:
+		return p.parseMatchStmt()
 	case TokenIdent:
+		if feature, ok := plannedFeatureFromToken(p.cur); ok {
+			return nil, plannedFeatureError(p.cur.pos, feature)
+		}
 		if p.cur.lit == "island" && p.peek.typ == TokenLParen {
 			return p.parseIslandStmt()
 		}
 		pos := p.cur.pos
-		target, err := p.parseLValue()
+		parts, err := p.parsePathParts()
 		if err != nil {
 			return nil, err
 		}
-		if _, err := p.expect(TokenAssign); err != nil {
+		if p.cur.typ == TokenLParen {
+			name := strings.Join(parts, ".")
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			if p.cur.typ == TokenIdent && p.peek.typ == TokenColon {
+				typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
+				lit, err := p.parseStructCallLiteral(typeRef)
+				if err != nil {
+					return nil, err
+				}
+				if p.cur.typ == TokenAssign {
+					return nil, diagnosticErrorf(pos, "cannot assign to struct literal")
+				}
+				if err := p.consumeOptionalSemicolon(); err != nil {
+					return nil, err
+				}
+				return &ExprStmt{At: pos, Expr: lit}, nil
+			}
+			var args []Expr
+			if p.cur.typ != TokenRParen {
+				for {
+					arg, err := p.parseExpr()
+					if err != nil {
+						return nil, err
+					}
+					args = append(args, arg)
+					if p.cur.typ != TokenComma {
+						break
+					}
+					if err := p.next(); err != nil {
+						return nil, err
+					}
+				}
+			}
+			if _, err := p.expect(TokenRParen); err != nil {
+				return nil, err
+			}
+			callExpr := &CallExpr{At: pos, Name: name, Args: args}
+			if p.cur.typ != TokenAssign {
+				if err := p.consumeOptionalSemicolon(); err != nil {
+					return nil, err
+				}
+				return &ExprStmt{At: pos, Expr: callExpr}, nil
+			}
+			return nil, diagnosticErrorf(pos, "cannot assign to function call")
+		}
+		expr := buildFieldAccess(parts, pos)
+		for p.cur.typ == TokenLBracket {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			index, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenRBracket); err != nil {
+				return nil, err
+			}
+			expr = &IndexExpr{At: pos, Base: expr, Index: index}
+		}
+		op, opPos, err := p.parseAssignmentOp()
+		if err != nil {
 			return nil, err
 		}
 		value, err := p.parseExpr()
 		if err != nil {
 			return nil, err
 		}
+		compoundValue := Expr(nil)
+		if op != 0 {
+			compoundValue = value
+			value = &BinaryExpr{
+				At:    opPos,
+				Op:    op,
+				Left:  cloneCompoundTarget(expr),
+				Right: value,
+			}
+		}
 		if err := p.consumeOptionalSemicolon(); err != nil {
 			return nil, err
 		}
-		return &AssignStmt{At: pos, Target: target, Value: value}, nil
+		return &AssignStmt{At: pos, Target: expr, Value: value, Op: op, CompoundValue: compoundValue}, nil
 	default:
+		if feature, ok := plannedFeatureFromToken(p.cur); ok {
+			return nil, plannedFeatureError(p.cur.pos, feature)
+		}
 		return nil, p.unexpected("statement")
 	}
+}
+
+func (p *parser) parseAssignmentOp() (TokenType, Position, error) {
+	if p.cur.typ == TokenAssign {
+		pos := p.cur.pos
+		if err := p.next(); err != nil {
+			return 0, Position{}, err
+		}
+		return 0, pos, nil
+	}
+	if isCompoundAssignmentOp(p.cur.typ) && p.peek.typ == TokenAssign {
+		op := p.cur.typ
+		pos := p.cur.pos
+		if err := p.next(); err != nil {
+			return 0, Position{}, err
+		}
+		if _, err := p.expect(TokenAssign); err != nil {
+			return 0, Position{}, err
+		}
+		return op, pos, nil
+	}
+	_, err := p.expect(TokenAssign)
+	return 0, Position{}, err
+}
+
+func isCompoundAssignmentOp(tt TokenType) bool {
+	switch tt {
+	case TokenPlus, TokenMinus, TokenStar, TokenSlash, TokenPercent:
+		return true
+	default:
+		return false
+	}
+}
+
+func plannedFeatureFromToken(tok token) (string, bool) {
+	if tok.typ != TokenIdent {
+		return "", false
+	}
+	switch tok.lit {
+	case "actor", "view", "state", "property", "capsule":
+		return tok.lit, true
+	default:
+		return "", false
+	}
+}
+
+func plannedFeatureError(pos Position, feature string) error {
+	return diagnosticErrorf(pos, "planned feature '%s' is not implemented in the Tetra MVP profile", feature)
+}
+
+func (p *parser) parseIfLetValue() (Expr, error) {
+	if p.cur.typ != TokenIdent {
+		return p.parseExpr()
+	}
+	pos := p.cur.pos
+	parts, err := p.parsePathParts()
+	if err != nil {
+		return nil, err
+	}
+	expr := buildFieldAccess(parts, pos)
+	for p.cur.typ == TokenLBracket {
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		index, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.expect(TokenRBracket); err != nil {
+			return nil, err
+		}
+		expr = &IndexExpr{At: pos, Base: expr, Index: index}
+	}
+	return expr, nil
 }
 
 func (p *parser) parseIslandStmt() (Stmt, error) {
@@ -673,8 +1323,239 @@ func (p *parser) parseUnsafeStmt() (Stmt, error) {
 	return &UnsafeStmt{At: pos, Body: body}, nil
 }
 
+func (p *parser) parseForRangeStmt() (Stmt, error) {
+	pos := p.cur.pos
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	nameTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenIn); err != nil {
+		return nil, err
+	}
+	prevSuppress := p.suppressStructLiteral
+	p.suppressStructLiteral = true
+	start, err := p.parseExpr()
+	p.suppressStructLiteral = prevSuppress
+	if err != nil {
+		return nil, err
+	}
+	var end Expr
+	var iterable Expr
+	if p.cur.typ == TokenRangeUntil {
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		end, err = p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		iterable = start
+		start = nil
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ForRangeStmt{At: pos, Name: nameTok.lit, Start: start, End: end, Iterable: iterable, Body: body}, nil
+}
+
+func (p *parser) parseElseBlock() ([]Stmt, error) {
+	if p.cur.typ != TokenElse {
+		return nil, nil
+	}
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	if p.cur.typ == TokenIf {
+		stmt, err := p.parseStmt()
+		if err != nil {
+			return nil, err
+		}
+		return []Stmt{stmt}, nil
+	}
+	return p.parseBlock()
+}
+
+func (p *parser) parseMatchStmt() (Stmt, error) {
+	pos := p.cur.pos
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	value, err := p.parseMatchValue()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenLBrace); err != nil {
+		return nil, err
+	}
+	var cases []MatchCase
+	for p.cur.typ != TokenRBrace && p.cur.typ != TokenEOF {
+		if p.cur.typ == TokenSemicolon {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		casePos := p.cur.pos
+		if _, err := p.expect(TokenCase); err != nil {
+			return nil, err
+		}
+		isDefault := false
+		var pattern Expr
+		if p.cur.typ == TokenIdent && p.cur.lit == "_" {
+			isDefault = true
+			pattern = &IdentExpr{At: p.cur.pos, Name: "_"}
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+		} else {
+			pattern, err = p.parseMatchPattern()
+			if err != nil {
+				return nil, err
+			}
+		}
+		body, err := p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+		cases = append(cases, MatchCase{At: casePos, Pattern: pattern, Default: isDefault, Body: body})
+	}
+	if _, err := p.expect(TokenRBrace); err != nil {
+		return nil, err
+	}
+	if len(cases) == 0 {
+		return nil, diagnosticErrorf(pos, "match requires at least one case")
+	}
+	return &MatchStmt{At: pos, Value: value, Cases: cases}, nil
+}
+
+func (p *parser) parseMatchValue() (Expr, error) {
+	if p.cur.typ == TokenIdent {
+		pos := p.cur.pos
+		parts, err := p.parsePathParts()
+		if err != nil {
+			return nil, err
+		}
+		name := strings.Join(parts, ".")
+		if p.cur.typ == TokenLParen {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			var args []Expr
+			if p.cur.typ != TokenRParen {
+				for {
+					arg, err := p.parseExpr()
+					if err != nil {
+						return nil, err
+					}
+					args = append(args, arg)
+					if p.cur.typ != TokenComma {
+						break
+					}
+					if err := p.next(); err != nil {
+						return nil, err
+					}
+				}
+			}
+			if _, err := p.expect(TokenRParen); err != nil {
+				return nil, err
+			}
+			return p.parsePostfix(&CallExpr{At: pos, Name: name, Args: args})
+		}
+		return buildFieldAccess(parts, pos), nil
+	}
+	return p.parseExpr()
+}
+
+func (p *parser) parseMatchPattern() (Expr, error) {
+	switch p.cur.typ {
+	case TokenNumber:
+		tok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		return &NumberExpr{At: tok.pos, Value: int32(tok.num)}, nil
+	case TokenIdent:
+		pos := p.cur.pos
+		parts, err := p.parsePathParts()
+		if err != nil {
+			return nil, err
+		}
+		if p.cur.typ == TokenLParen {
+			if len(parts) == 1 && parts[0] == "some" {
+				if err := p.next(); err != nil {
+					return nil, err
+				}
+				nameTok, err := p.expect(TokenIdent)
+				if err != nil {
+					return nil, err
+				}
+				if p.cur.typ == TokenComma {
+					return nil, diagnosticErrorf(p.cur.pos, "some pattern expects one binding")
+				}
+				if _, err := p.expect(TokenRParen); err != nil {
+					return nil, err
+				}
+				return &SomePatternExpr{At: pos, Name: nameTok.lit}, nil
+			}
+			return nil, diagnosticErrorf(pos, "payload match patterns are planned for a later release")
+		}
+		return buildFieldAccess(parts, pos), nil
+	case TokenNone:
+		tok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		return &NoneLitExpr{At: tok.pos}, nil
+	default:
+		return nil, p.unexpected("match pattern")
+	}
+}
+
 func (p *parser) parseExpr() (Expr, error) {
-	return p.parseEquality()
+	return p.parseLogicalOr()
+}
+
+func (p *parser) parseLogicalOr() (Expr, error) {
+	left, err := p.parseLogicalAnd()
+	if err != nil {
+		return nil, err
+	}
+	for p.cur.typ == TokenPipePipe {
+		opTok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		right, err := p.parseLogicalAnd()
+		if err != nil {
+			return nil, err
+		}
+		left = &BinaryExpr{At: opTok.pos, Op: opTok.typ, Left: left, Right: right}
+	}
+	return left, nil
+}
+
+func (p *parser) parseLogicalAnd() (Expr, error) {
+	left, err := p.parseEquality()
+	if err != nil {
+		return nil, err
+	}
+	for p.cur.typ == TokenAmpAmp {
+		opTok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		right, err := p.parseEquality()
+		if err != nil {
+			return nil, err
+		}
+		left = &BinaryExpr{At: opTok.pos, Op: opTok.typ, Left: left, Right: right}
+	}
+	return left, nil
 }
 
 func (p *parser) parseEquality() (Expr, error) {
@@ -682,7 +1563,7 @@ func (p *parser) parseEquality() (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p.cur.typ == TokenEqEq {
+	if p.cur.typ == TokenEqEq || p.cur.typ == TokenBangEq {
 		opTok := p.cur
 		if err := p.next(); err != nil {
 			return nil, err
@@ -691,8 +1572,8 @@ func (p *parser) parseEquality() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		if p.cur.typ == TokenEqEq {
-			return nil, fmt.Errorf("%s: chaining '==' is not supported", FormatPos(p.cur.pos))
+		if p.cur.typ == TokenEqEq || p.cur.typ == TokenBangEq {
+			return nil, diagnosticErrorf(p.cur.pos, "chaining equality operators is not supported")
 		}
 		left = &BinaryExpr{At: opTok.pos, Op: opTok.typ, Left: left, Right: right}
 	}
@@ -704,7 +1585,7 @@ func (p *parser) parseRelational() (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p.cur.typ == TokenLess {
+	if p.cur.typ == TokenLess || p.cur.typ == TokenGreater || p.cur.typ == TokenGreaterEq || p.cur.typ == TokenLessEq {
 		opTok := p.cur
 		if err := p.next(); err != nil {
 			return nil, err
@@ -713,8 +1594,8 @@ func (p *parser) parseRelational() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		if p.cur.typ == TokenLess {
-			return nil, fmt.Errorf("%s: chaining '<' is not supported", FormatPos(p.cur.pos))
+		if p.cur.typ == TokenLess || p.cur.typ == TokenGreater || p.cur.typ == TokenGreaterEq || p.cur.typ == TokenLessEq {
+			return nil, diagnosticErrorf(p.cur.pos, "chaining relational operators is not supported")
 		}
 		left = &BinaryExpr{At: opTok.pos, Op: opTok.typ, Left: left, Right: right}
 	}
@@ -722,11 +1603,30 @@ func (p *parser) parseRelational() (Expr, error) {
 }
 
 func (p *parser) parseAdditive() (Expr, error) {
-	left, err := p.parseUnary()
+	left, err := p.parseMultiplicative()
 	if err != nil {
 		return nil, err
 	}
 	for p.cur.typ == TokenPlus || p.cur.typ == TokenMinus {
+		opTok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		right, err := p.parseMultiplicative()
+		if err != nil {
+			return nil, err
+		}
+		left = &BinaryExpr{At: opTok.pos, Op: opTok.typ, Left: left, Right: right}
+	}
+	return left, nil
+}
+
+func (p *parser) parseMultiplicative() (Expr, error) {
+	left, err := p.parseUnary()
+	if err != nil {
+		return nil, err
+	}
+	for p.cur.typ == TokenStar || p.cur.typ == TokenSlash || p.cur.typ == TokenPercent {
 		opTok := p.cur
 		if err := p.next(); err != nil {
 			return nil, err
@@ -741,7 +1641,29 @@ func (p *parser) parseAdditive() (Expr, error) {
 }
 
 func (p *parser) parseUnary() (Expr, error) {
-	if p.cur.typ == TokenMinus {
+	if p.cur.typ == TokenTry {
+		opTok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		x, err := p.parseUnary()
+		if err != nil {
+			return nil, err
+		}
+		return &TryExpr{At: opTok.pos, X: x}, nil
+	}
+	if p.cur.typ == TokenAwait {
+		opTok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		x, err := p.parseUnary()
+		if err != nil {
+			return nil, err
+		}
+		return &AwaitExpr{At: opTok.pos, X: x}, nil
+	}
+	if p.cur.typ == TokenMinus || p.cur.typ == TokenBang {
 		opTok := p.cur
 		if err := p.next(); err != nil {
 			return nil, err
@@ -763,6 +1685,24 @@ func (p *parser) parsePrimary() (Expr, error) {
 			return nil, err
 		}
 		return p.parsePostfix(&NumberExpr{At: tok.pos, Value: int32(tok.num)})
+	case TokenTrue:
+		tok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		return p.parsePostfix(&BoolLitExpr{At: tok.pos, Value: true})
+	case TokenFalse:
+		tok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		return p.parsePostfix(&BoolLitExpr{At: tok.pos, Value: false})
+	case TokenNone:
+		tok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		return p.parsePostfix(&NoneLitExpr{At: tok.pos})
 	case TokenString:
 		tok := p.cur
 		if err := p.next(); err != nil {
@@ -809,7 +1749,7 @@ func (p *parser) parsePrimary() (Expr, error) {
 			}
 			return p.parsePostfix(&CallExpr{At: pos, Name: name, Args: args})
 		}
-		if p.cur.typ == TokenLBrace {
+		if p.cur.typ == TokenLBrace && !p.suppressStructLiteral {
 			typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
 			lit, err := p.parseStructLiteral(typeRef)
 			if err != nil {
@@ -960,6 +1900,37 @@ func buildFieldAccess(parts []string, at Position) Expr {
 	return base
 }
 
+func cloneCompoundTarget(expr Expr) Expr {
+	switch e := expr.(type) {
+	case *IdentExpr:
+		return &IdentExpr{At: e.At, Name: e.Name}
+	case *FieldAccessExpr:
+		return &FieldAccessExpr{At: e.At, Base: cloneCompoundTarget(e.Base), Field: e.Field, EnumType: e.EnumType, EnumOrdinal: e.EnumOrdinal}
+	case *IndexExpr:
+		return &IndexExpr{At: e.At, Base: cloneCompoundTarget(e.Base), Index: cloneCompoundTarget(e.Index)}
+	case *NumberExpr:
+		return &NumberExpr{At: e.At, Value: e.Value}
+	case *BoolLitExpr:
+		return &BoolLitExpr{At: e.At, Value: e.Value}
+	case *NoneLitExpr:
+		return &NoneLitExpr{At: e.At}
+	case *StringLitExpr:
+		return &StringLitExpr{At: e.At, Value: append([]byte(nil), e.Value...)}
+	case *UnaryExpr:
+		return &UnaryExpr{At: e.At, Op: e.Op, X: cloneCompoundTarget(e.X)}
+	case *BinaryExpr:
+		return &BinaryExpr{At: e.At, Op: e.Op, Left: cloneCompoundTarget(e.Left), Right: cloneCompoundTarget(e.Right)}
+	case *CallExpr:
+		args := make([]Expr, 0, len(e.Args))
+		for _, arg := range e.Args {
+			args = append(args, cloneCompoundTarget(arg))
+		}
+		return &CallExpr{At: e.At, Name: e.Name, Args: args}
+	default:
+		return expr
+	}
+}
+
 func (p *parser) expect(tt TokenType) (token, error) {
 	if p.cur.typ != tt {
 		return token{}, p.unexpected(TokenName(tt))
@@ -979,7 +1950,7 @@ func (p *parser) consumeOptionalSemicolon() error {
 }
 
 func (p *parser) unexpected(expect string) error {
-	return fmt.Errorf("%s: expected %s, got %s", FormatPos(p.cur.pos), expect, TokenName(p.cur.typ))
+	return diagnosticErrorf(p.cur.pos, "expected %s, got %s", expect, TokenName(p.cur.typ))
 }
 
 func TokenName(tt TokenType) string {
@@ -1002,24 +1973,62 @@ func TokenName(tt TokenType) string {
 		return "var"
 	case TokenVal:
 		return "val"
+	case TokenConst:
+		return "const"
 	case TokenModule:
 		return "module"
 	case TokenImport:
 		return "import"
 	case TokenAs:
 		return "as"
+	case TokenUses:
+		return "uses"
 	case TokenIf:
 		return "if"
 	case TokenElse:
 		return "else"
 	case TokenWhile:
 		return "while"
+	case TokenFor:
+		return "for"
+	case TokenIn:
+		return "in"
+	case TokenEnum:
+		return "enum"
+	case TokenCase:
+		return "case"
+	case TokenMatch:
+		return "match"
+	case TokenTrue:
+		return "true"
+	case TokenFalse:
+		return "false"
+	case TokenNone:
+		return "none"
+	case TokenThrows:
+		return "throws"
+	case TokenTry:
+		return "try"
+	case TokenThrow:
+		return "throw"
+	case TokenAsync:
+		return "async"
+	case TokenAwait:
+		return "await"
+	case TokenBreak:
+		return "break"
+	case TokenContinue:
+		return "continue"
 	case TokenReturn:
 		return "return"
 	case TokenPrint:
 		return "print"
 	case TokenUnsafe:
 		return "unsafe"
+	case TokenTest:
+		return "test"
+	case TokenExpect:
+		return "expect"
 	case TokenStruct:
 		return "struct"
 	case TokenArrow:
@@ -1036,10 +2045,34 @@ func TokenName(tt TokenType) string {
 		return "-"
 	case TokenLess:
 		return "<"
+	case TokenStar:
+		return "*"
+	case TokenSlash:
+		return "/"
+	case TokenPercent:
+		return "%"
+	case TokenGreater:
+		return ">"
+	case TokenGreaterEq:
+		return ">="
+	case TokenLessEq:
+		return "<="
+	case TokenBangEq:
+		return "!="
+	case TokenAmpAmp:
+		return "&&"
+	case TokenPipePipe:
+		return "||"
+	case TokenBang:
+		return "!"
 	case TokenComma:
 		return ","
 	case TokenDot:
 		return "."
+	case TokenRangeUntil:
+		return "..<"
+	case TokenQuestion:
+		return "?"
 	case TokenLBracket:
 		return "["
 	case TokenRBracket:

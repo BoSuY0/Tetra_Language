@@ -1,12 +1,9 @@
 // Islands debug smoke test
 // Deliberately triggers double-free detection (expected exit code 2 with --islands-debug).
-
-fun main(): i32 {
-    unsafe {
-        let isl: island = core.island_new(64)
+func main() -> i32
+uses alloc, capability, islands, mem:
+    unsafe:
+        var isl: island = core.island_new(64)
         free(isl)
         free(isl)
-    }
     return 0
-}
-

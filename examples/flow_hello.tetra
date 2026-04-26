@@ -1,0 +1,5 @@
+func main() -> Int
+uses io:
+    let msg: String = "Hello from Flow!\n"
+    print(msg)
+    return 0

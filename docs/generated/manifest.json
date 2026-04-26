@@ -1,5 +1,5 @@
 {
-  "compiler_version": "v0.13",
+  "compiler_version": "v0.6.0",
   "targets": [
     {
       "triple": "linux-x64",
@@ -368,6 +368,28 @@
         "link"
       ],
       "unsafe_policy": "always"
+    },
+    {
+      "name": "core.task_join_i32",
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_spawn_i32",
+      "param_types": [
+        "str"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
     }
   ],
   "runtime_abi": {

@@ -9,124 +9,8 @@ import (
 	"tetra_language/compiler/internal/module"
 )
 
-type CheckedProgram struct {
-	Funcs              []CheckedFunc
-	Structs            []CheckedStruct
-	FuncSigs           map[string]FuncSig
-	Types              map[string]*TypeInfo
-	GlobalsByModule    map[string]map[string]GlobalInfo
-	GlobalDataByModule map[string][][]byte
-	MainIndex          int
-	MainName           string
-}
-
-type CheckedFunc struct {
-	Name        string
-	Module      string
-	Decl        *frontend.FuncDecl
-	Locals      map[string]LocalInfo
-	LocalSlots  int
-	ParamSlots  int
-	ReturnType  string
-	ReturnSlots int
-}
-
-type LocalInfo struct {
-	Base      int
-	SlotCount int
-	TypeName  string
-	Mutable   bool
-}
-
-type GlobalInfo struct {
-	DataIndex int
-	TypeName  string
-	Mutable   bool
-}
-
-type FuncSig struct {
-	ParamTypes        []string
-	ParamSlots        int
-	ReturnType        string
-	ReturnSlots       int
-	ReturnRegionParam int
-}
-
-type CheckedStruct struct {
-	Name   string
-	Module string
-	Decl   *frontend.StructDecl
-}
-
-type TypeKind int
-
-const (
-	TypeI32 TypeKind = iota
-	TypeU8
-	TypePtr
-	TypeSlice
-	TypeStr
-	TypeStruct
-	TypeArray
-	TypeIsland
-	TypeCap
-	TypeActor
-)
-
-type FieldInfo struct {
-	Name      string
-	TypeName  string
-	Offset    int
-	SlotCount int
-}
-
-type TypeInfo struct {
-	Name      string
-	Kind      TypeKind
-	Fields    []FieldInfo
-	FieldMap  map[string]FieldInfo
-	SlotCount int
-	ElemType  string
-	ArrayLen  int
-}
-
-func makeSliceTypeInfo(name, elem string) *TypeInfo {
-	fieldMap := map[string]FieldInfo{
-		"ptr": {Name: "ptr", TypeName: "ptr", Offset: 0, SlotCount: 1},
-		"len": {Name: "len", TypeName: "i32", Offset: 1, SlotCount: 1},
-	}
-	fields := []FieldInfo{fieldMap["ptr"], fieldMap["len"]}
-	return &TypeInfo{
-		Name:      name,
-		Kind:      TypeSlice,
-		Fields:    fields,
-		FieldMap:  fieldMap,
-		SlotCount: 2,
-		ElemType:  elem,
-	}
-}
-
-func makeStrTypeInfo() *TypeInfo {
-	info := makeSliceTypeInfo("str", "u8")
-	info.Kind = TypeStr
-	return info
-}
-
-func baseTypes() map[string]*TypeInfo {
-	return map[string]*TypeInfo{
-		"i32":     {Name: "i32", Kind: TypeI32, SlotCount: 1},
-		"u8":      {Name: "u8", Kind: TypeU8, SlotCount: 1},
-		"ptr":     {Name: "ptr", Kind: TypePtr, SlotCount: 1},
-		"str":     makeStrTypeInfo(),
-		"actor":   {Name: "actor", Kind: TypeActor, SlotCount: 1},
-		"island":  {Name: "island", Kind: TypeIsland, SlotCount: 1},
-		"cap.io":  {Name: "cap.io", Kind: TypeCap, SlotCount: 1},
-		"cap.mem": {Name: "cap.mem", Kind: TypeCap, SlotCount: 1},
-	}
-}
-
 func Check(prog *frontend.Program) (*CheckedProgram, error) {
-	file := &frontend.FileAST{Module: "", Structs: prog.Structs, Funcs: prog.Funcs}
+	file := &frontend.FileAST{Module: "", Enums: prog.Enums, Structs: prog.Structs, Protocols: prog.Protocols, Extensions: prog.Extensions, Impls: prog.Impls, Funcs: prog.Funcs, Tests: prog.Tests}
 	world := &module.World{
 		EntryModule: "",
 		Files:       []*frontend.FileAST{file},
@@ -139,6 +23,192 @@ type CheckOptions struct {
 	RequireMain bool
 }
 
+type globalConstValue struct {
+	TypeName string
+	I32      int32
+	Bool     bool
+}
+
+func inferGlobalConstExprType(expr frontend.Expr, values map[string]globalConstValue) (string, bool) {
+	if _, ok := evalGlobalConstBool(expr, values); ok {
+		return "bool", true
+	}
+	if _, ok := evalGlobalConstI32(expr, values); ok {
+		return "i32", true
+	}
+	return "", false
+}
+
+func validateGlobalConstExpr(expr frontend.Expr, values map[string]globalConstValue) error {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		if _, ok := values[e.Name]; !ok {
+			return fmt.Errorf("%s: unknown constant '%s' in global const expression", frontend.FormatPos(e.At), e.Name)
+		}
+	case *frontend.UnaryExpr:
+		return validateGlobalConstExpr(e.X, values)
+	case *frontend.BinaryExpr:
+		if err := validateGlobalConstExpr(e.Left, values); err != nil {
+			return err
+		}
+		if err := validateGlobalConstExpr(e.Right, values); err != nil {
+			return err
+		}
+		switch e.Op {
+		case frontend.TokenSlash, frontend.TokenPercent:
+			right, ok := evalGlobalConstI32(e.Right, values)
+			if ok && right == 0 {
+				if e.Op == frontend.TokenSlash {
+					return fmt.Errorf("%s: division by zero in global const expression", frontend.FormatPos(e.At))
+				}
+				return fmt.Errorf("%s: modulo by zero in global const expression", frontend.FormatPos(e.At))
+			}
+		}
+	}
+	return nil
+}
+
+func evalGlobalConstI32(expr frontend.Expr, values map[string]globalConstValue) (int32, bool) {
+	switch e := expr.(type) {
+	case *frontend.NumberExpr:
+		return e.Value, true
+	case *frontend.IdentExpr:
+		v, ok := values[e.Name]
+		if !ok || v.TypeName != "i32" {
+			return 0, false
+		}
+		return v.I32, true
+	case *frontend.UnaryExpr:
+		if e.Op != frontend.TokenMinus {
+			return 0, false
+		}
+		v, ok := evalGlobalConstI32(e.X, values)
+		if !ok {
+			return 0, false
+		}
+		return -v, true
+	case *frontend.BinaryExpr:
+		left, ok := evalGlobalConstI32(e.Left, values)
+		if !ok {
+			return 0, false
+		}
+		right, ok := evalGlobalConstI32(e.Right, values)
+		if !ok {
+			return 0, false
+		}
+		switch e.Op {
+		case frontend.TokenPlus:
+			return left + right, true
+		case frontend.TokenMinus:
+			return left - right, true
+		case frontend.TokenStar:
+			return left * right, true
+		case frontend.TokenSlash:
+			if right == 0 {
+				return 0, false
+			}
+			return left / right, true
+		case frontend.TokenPercent:
+			if right == 0 {
+				return 0, false
+			}
+			return left % right, true
+		default:
+			return 0, false
+		}
+	default:
+		return 0, false
+	}
+}
+
+func evalGlobalConstBool(expr frontend.Expr, values map[string]globalConstValue) (bool, bool) {
+	switch e := expr.(type) {
+	case *frontend.BoolLitExpr:
+		return e.Value, true
+	case *frontend.IdentExpr:
+		v, ok := values[e.Name]
+		if !ok || v.TypeName != "bool" {
+			return false, false
+		}
+		return v.Bool, true
+	case *frontend.UnaryExpr:
+		if e.Op != frontend.TokenBang {
+			return false, false
+		}
+		v, ok := evalGlobalConstBool(e.X, values)
+		if !ok {
+			return false, false
+		}
+		return !v, true
+	case *frontend.BinaryExpr:
+		switch e.Op {
+		case frontend.TokenAmpAmp:
+			left, ok := evalGlobalConstBool(e.Left, values)
+			if !ok {
+				return false, false
+			}
+			right, ok := evalGlobalConstBool(e.Right, values)
+			if !ok {
+				return false, false
+			}
+			return left && right, true
+		case frontend.TokenPipePipe:
+			left, ok := evalGlobalConstBool(e.Left, values)
+			if !ok {
+				return false, false
+			}
+			right, ok := evalGlobalConstBool(e.Right, values)
+			if !ok {
+				return false, false
+			}
+			return left || right, true
+		case frontend.TokenEqEq, frontend.TokenBangEq:
+			if left, ok := evalGlobalConstI32(e.Left, values); ok {
+				right, ok := evalGlobalConstI32(e.Right, values)
+				if !ok {
+					return false, false
+				}
+				if e.Op == frontend.TokenEqEq {
+					return left == right, true
+				}
+				return left != right, true
+			}
+			left, ok := evalGlobalConstBool(e.Left, values)
+			if !ok {
+				return false, false
+			}
+			right, ok := evalGlobalConstBool(e.Right, values)
+			if !ok {
+				return false, false
+			}
+			if e.Op == frontend.TokenEqEq {
+				return left == right, true
+			}
+			return left != right, true
+		case frontend.TokenLess, frontend.TokenLessEq, frontend.TokenGreater, frontend.TokenGreaterEq:
+			left, ok := evalGlobalConstI32(e.Left, values)
+			if !ok {
+				return false, false
+			}
+			right, ok := evalGlobalConstI32(e.Right, values)
+			if !ok {
+				return false, false
+			}
+			switch e.Op {
+			case frontend.TokenLess:
+				return left < right, true
+			case frontend.TokenLessEq:
+				return left <= right, true
+			case frontend.TokenGreater:
+				return left > right, true
+			case frontend.TokenGreaterEq:
+				return left >= right, true
+			}
+		}
+	}
+	return false, false
+}
+
 func CheckWorld(world *module.World) (*CheckedProgram, error) {
 	return CheckWorldOpt(world, CheckOptions{RequireMain: true})
 }
@@ -146,6 +216,9 @@ func CheckWorld(world *module.World) (*CheckedProgram, error) {
 func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, error) {
 	if world == nil || len(world.Files) == 0 {
 		return nil, fmt.Errorf("no functions found")
+	}
+	if err := monomorphizeGenerics(world); err != nil {
+		return nil, err
 	}
 
 	types := baseTypes()
@@ -155,8 +228,20 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		imports map[string]string
 		decl    *frontend.StructDecl
 	}
+	type enumContext struct {
+		module  string
+		imports map[string]string
+		decl    *frontend.EnumDecl
+	}
+	type protocolContext struct {
+		module  string
+		imports map[string]string
+		decl    *frontend.ProtocolDecl
+	}
 
 	structs := make(map[string]structContext)
+	enums := make(map[string]enumContext)
+	protocols := make(map[string]protocolContext)
 	checked := CheckedProgram{
 		MainIndex:          -1,
 		Types:              types,
@@ -172,16 +257,64 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		if err != nil {
 			return nil, err
 		}
+		for _, en := range file.Enums {
+			fullName := qualifyName(module, en.Name)
+			if isReservedTypeName(en.Name) {
+				return nil, fmt.Errorf("%s: reserved type name '%s'", frontend.FormatPos(en.At), en.Name)
+			}
+			if _, exists := enums[fullName]; exists {
+				return nil, fmt.Errorf("duplicate enum '%s'", fullName)
+			}
+			if _, exists := structs[fullName]; exists {
+				return nil, fmt.Errorf("duplicate type '%s'", fullName)
+			}
+			enums[fullName] = enumContext{module: module, imports: imports, decl: en}
+			checked.Enums = append(checked.Enums, CheckedEnum{Name: fullName, Module: module, Decl: en})
+		}
 		for _, st := range file.Structs {
 			fullName := qualifyName(module, st.Name)
-			if st.Name == "i32" || st.Name == "u8" || st.Name == "ptr" || st.Name == "str" || st.Name == "actor" {
+			if isReservedTypeName(st.Name) {
 				return nil, fmt.Errorf("%s: reserved type name '%s'", frontend.FormatPos(st.At), st.Name)
 			}
 			if _, exists := structs[fullName]; exists {
 				return nil, fmt.Errorf("duplicate struct '%s'", fullName)
 			}
+			if _, exists := enums[fullName]; exists {
+				return nil, fmt.Errorf("duplicate type '%s'", fullName)
+			}
 			structs[fullName] = structContext{module: module, imports: imports, decl: st}
 			checked.Structs = append(checked.Structs, CheckedStruct{Name: fullName, Module: module, Decl: st})
+		}
+		for _, proto := range file.Protocols {
+			fullName := qualifyName(module, proto.Name)
+			if isReservedTypeName(proto.Name) {
+				return nil, fmt.Errorf("%s: reserved type name '%s'", frontend.FormatPos(proto.At), proto.Name)
+			}
+			if _, exists := protocols[fullName]; exists {
+				return nil, fmt.Errorf("duplicate protocol '%s'", fullName)
+			}
+			protocols[fullName] = protocolContext{module: module, imports: imports, decl: proto}
+			checked.Protocols = append(checked.Protocols, CheckedProtocol{Name: fullName, Module: module, Decl: proto})
+		}
+	}
+
+	for name, ctx := range enums {
+		caseMap := make(map[string]EnumCaseInfo, len(ctx.decl.Cases))
+		cases := make([]EnumCaseInfo, 0, len(ctx.decl.Cases))
+		for i, c := range ctx.decl.Cases {
+			if _, exists := caseMap[c.Name]; exists {
+				return nil, fmt.Errorf("%s: duplicate enum case '%s'", frontend.FormatPos(c.At), c.Name)
+			}
+			info := EnumCaseInfo{Name: c.Name, Ordinal: int32(i)}
+			caseMap[c.Name] = info
+			cases = append(cases, info)
+		}
+		types[name] = &TypeInfo{
+			Name:      name,
+			Kind:      TypeEnum,
+			SlotCount: 1,
+			EnumCases: cases,
+			CaseMap:   caseMap,
 		}
 	}
 
@@ -189,6 +322,23 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 	var buildType func(name string) (*TypeInfo, error)
 	buildType = func(name string) (*TypeInfo, error) {
 		if info, ok := types[name]; ok {
+			return info, nil
+		}
+		if elem, ok := optionalElemName(name); ok {
+			elemInfo, err := buildType(elem)
+			if err != nil {
+				return nil, err
+			}
+			if elemInfo.SlotCount != 1 {
+				return nil, fmt.Errorf("optional payload type '%s' is not supported yet (payload must be single-slot)", elem)
+			}
+			info := &TypeInfo{
+				Name:      name,
+				Kind:      TypeOptional,
+				SlotCount: elemInfo.SlotCount + 1,
+				ElemType:  elem,
+			}
+			types[name] = info
 			return info, nil
 		}
 		if elem, ok := sliceElemName(name); ok {
@@ -268,6 +418,83 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		}
 	}
 
+	for name, ctx := range protocols {
+		seenReqs := map[string]struct{}{}
+		for i := range ctx.decl.Requirements {
+			req := &ctx.decl.Requirements[i]
+			if _, exists := seenReqs[req.Name]; exists {
+				return nil, fmt.Errorf("%s: duplicate protocol requirement '%s'", frontend.FormatPos(req.At), req.Name)
+			}
+			seenReqs[req.Name] = struct{}{}
+			retName, err := resolveTypeName(&req.ReturnType, ctx.module, ctx.imports)
+			if err != nil {
+				return nil, err
+			}
+			req.ReturnType.Name = retName
+			if _, err := buildType(retName); err != nil {
+				return nil, fmt.Errorf("%s: protocol '%s' requirement '%s': %v", frontend.FormatPos(req.At), name, req.Name, err)
+			}
+			if req.HasThrows {
+				throwName, err := resolveTypeName(&req.Throws, ctx.module, ctx.imports)
+				if err != nil {
+					return nil, err
+				}
+				req.Throws.Name = throwName
+				if _, err := buildType(throwName); err != nil {
+					return nil, fmt.Errorf("%s: protocol '%s' requirement '%s': %v", frontend.FormatPos(req.At), name, req.Name, err)
+				}
+			}
+			for j := range req.Params {
+				param := &req.Params[j]
+				resolved, err := resolveTypeName(&param.Type, ctx.module, ctx.imports)
+				if err != nil {
+					return nil, err
+				}
+				param.Type.Name = resolved
+				if _, err := buildType(resolved); err != nil {
+					return nil, fmt.Errorf("%s: protocol '%s' requirement '%s': %v", frontend.FormatPos(param.At), name, req.Name, err)
+				}
+			}
+		}
+	}
+
+	for _, file := range world.Files {
+		module := file.Module
+		imports, err := collectImportAliases(file)
+		if err != nil {
+			return nil, err
+		}
+		for _, impl := range file.Impls {
+			typeName, err := resolveTypeName(&impl.Type, module, imports)
+			if err != nil {
+				return nil, err
+			}
+			protoName, err := resolveTypeName(&impl.Protocol, module, imports)
+			if err != nil {
+				return nil, err
+			}
+			impl.Type.Name = typeName
+			impl.Protocol.Name = protoName
+			if _, ok := types[typeName]; !ok {
+				return nil, fmt.Errorf("%s: impl target type '%s' is not defined", frontend.FormatPos(impl.Type.At), typeName)
+			}
+			proto, ok := protocols[protoName]
+			if !ok {
+				return nil, fmt.Errorf("%s: protocol '%s' is not defined", frontend.FormatPos(impl.Protocol.At), protoName)
+			}
+			for _, req := range proto.decl.Requirements {
+				methodName := typeName + "." + req.Name
+				method := findFuncDecl(world, methodName)
+				if method == nil {
+					return nil, fmt.Errorf("%s: type '%s' is missing protocol requirement '%s'", frontend.FormatPos(impl.At), typeName, req.Name)
+				}
+				if err := compareProtocolRequirement(typeName, protoName, req, method); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	builtinSigs, err := builtinFuncSigs(types)
 	if err != nil {
 		return nil, err
@@ -289,6 +516,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		}
 
 		globals := make(map[string]GlobalInfo, len(file.Globals))
+		constValues := make(map[string]globalConstValue, len(file.Globals))
 		var dataBlobs [][]byte
 		for _, glob := range file.Globals {
 			if glob == nil {
@@ -301,9 +529,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				return nil, fmt.Errorf("%s: global '%s' conflicts with function '%s'", frontend.FormatPos(glob.At), glob.Name, glob.Name)
 			}
 
-			resolved, err := resolveTypeName(&glob.Type, module, imports)
-			if err != nil {
-				return nil, err
+			resolved := ""
+			if glob.Type.Name != "" || glob.Type.Elem != nil {
+				var err error
+				resolved, err = resolveTypeName(&glob.Type, module, imports)
+				if err != nil {
+					return nil, err
+				}
 			}
 			if resolved == "" {
 				if glob.Mutable {
@@ -312,31 +544,25 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if glob.Init == nil {
 					return nil, fmt.Errorf("%s: global val requires an initializer to infer its type", frontend.FormatPos(glob.At))
 				}
-				switch init := glob.Init.(type) {
-				case *frontend.NumberExpr:
-					resolved = "i32"
-				case *frontend.UnaryExpr:
-					if init.Op != frontend.TokenMinus {
-						return nil, fmt.Errorf("%s: unsupported global val initializer", frontend.FormatPos(glob.At))
-					}
-					if _, ok := init.X.(*frontend.NumberExpr); !ok {
-						return nil, fmt.Errorf("%s: unsupported global val initializer", frontend.FormatPos(glob.At))
-					}
-					resolved = "i32"
-				default:
-					return nil, fmt.Errorf("%s: unsupported global val initializer (type inference supports only numeric literals)", frontend.FormatPos(glob.At))
+				if err := validateGlobalConstExpr(glob.Init, constValues); err != nil {
+					return nil, err
 				}
+				inferred, ok := inferGlobalConstExprType(glob.Init, constValues)
+				if !ok {
+					return nil, fmt.Errorf("%s: unsupported global val initializer (type inference supports constant numeric/bool expressions)", frontend.FormatPos(glob.At))
+				}
+				resolved = inferred
 			}
 			glob.Type.Name = resolved
-			if resolved != "i32" && resolved != "ptr" {
-				return nil, fmt.Errorf("%s: global '%s' has unsupported type '%s' (allowed: i32, ptr)", frontend.FormatPos(glob.At), glob.Name, resolved)
+			if resolved != "i32" && resolved != "ptr" && resolved != "bool" {
+				return nil, fmt.Errorf("%s: global '%s' has unsupported type '%s' (allowed: i32, bool, ptr)", frontend.FormatPos(glob.At), glob.Name, resolved)
 			}
 			if _, err := ensureTypeInfo(resolved, types); err != nil {
 				return nil, fmt.Errorf("%s: %v", frontend.FormatPos(glob.At), err)
 			}
 
 			dataIndex := len(dataBlobs)
-			globals[glob.Name] = GlobalInfo{DataIndex: dataIndex, TypeName: resolved, Mutable: glob.Mutable}
+			globals[glob.Name] = GlobalInfo{DataIndex: dataIndex, TypeName: resolved, Mutable: glob.Mutable, Const: glob.Const}
 
 			buf := make([]byte, 8)
 			if glob.Mutable {
@@ -353,11 +579,29 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				}
 				binary.LittleEndian.PutUint64(buf, 0)
 			case "i32":
-				v, ok := constI32(glob.Init)
+				if err := validateGlobalConstExpr(glob.Init, constValues); err != nil {
+					return nil, err
+				}
+				v, ok := evalGlobalConstI32(glob.Init, constValues)
 				if !ok {
-					return nil, fmt.Errorf("%s: global val '%s' initializer must be an i32 literal", frontend.FormatPos(glob.Init.Pos()), glob.Name)
+					return nil, fmt.Errorf("%s: global val '%s' initializer must be an i32 constant expression", frontend.FormatPos(glob.Init.Pos()), glob.Name)
 				}
 				binary.LittleEndian.PutUint64(buf, uint64(int64(v)))
+				constValues[glob.Name] = globalConstValue{TypeName: "i32", I32: v}
+			case "bool":
+				if err := validateGlobalConstExpr(glob.Init, constValues); err != nil {
+					return nil, err
+				}
+				v, ok := evalGlobalConstBool(glob.Init, constValues)
+				if !ok {
+					return nil, fmt.Errorf("%s: global val '%s' initializer must be a bool constant expression", frontend.FormatPos(glob.Init.Pos()), glob.Name)
+				}
+				if v {
+					binary.LittleEndian.PutUint64(buf, 1)
+				} else {
+					binary.LittleEndian.PutUint64(buf, 0)
+				}
+				constValues[glob.Name] = globalConstValue{TypeName: "bool", Bool: v}
 			default:
 				return nil, fmt.Errorf("%s: unsupported global type '%s'", frontend.FormatPos(glob.At), resolved)
 			}
@@ -394,6 +638,28 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if _, exists := checked.FuncSigs[fullName]; exists {
 				return nil, fmt.Errorf("duplicate function '%s'", fullName)
 			}
+			if len(fn.TypeParams) > 0 {
+				if err := validateGenericFuncDecl(fn); err != nil {
+					return nil, err
+				}
+				effects, err := normalizeEffects(fn.Uses, fn.Pos)
+				if err != nil {
+					return nil, err
+				}
+				checked.FuncSigs[fullName] = FuncSig{
+					Generic:           true,
+					ParamTypes:        genericParamTypeNames(fn.Params),
+					ParamOwnership:    genericParamOwnership(fn.Params),
+					ParamSlots:        0,
+					ReturnType:        fn.ReturnType.Name,
+					ThrowsType:        fn.Throws.Name,
+					Async:             fn.Async,
+					ReturnSlots:       0,
+					ReturnRegionParam: regionNone,
+					Effects:           effects,
+				}
+				continue
+			}
 			retName, err := resolveTypeName(&fn.ReturnType, module, imports)
 			if err != nil {
 				return nil, err
@@ -406,7 +672,33 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if retInfo.SlotCount > 2 {
 				return nil, fmt.Errorf("function '%s' return type too large", fullName)
 			}
+			throwsType := ""
+			returnSlots := retInfo.SlotCount
+			if fn.HasThrows {
+				if retInfo.SlotCount != 1 {
+					return nil, fmt.Errorf("%s: throwing function '%s' must return a single-slot success type in v0.5", frontend.FormatPos(fn.Pos), fullName)
+				}
+				resolvedThrows, err := resolveTypeName(&fn.Throws, module, imports)
+				if err != nil {
+					return nil, err
+				}
+				fn.Throws.Name = resolvedThrows
+				throwInfo, err := buildType(resolvedThrows)
+				if err != nil {
+					return nil, err
+				}
+				if throwInfo.SlotCount != 1 {
+					return nil, fmt.Errorf("%s: throwing function '%s' must use a single-slot error type in v0.5", frontend.FormatPos(fn.Pos), fullName)
+				}
+				throwsType = resolvedThrows
+				returnSlots = 2
+			}
+			effects, err := normalizeEffects(fn.Uses, fn.Pos)
+			if err != nil {
+				return nil, err
+			}
 			paramTypes := make([]string, 0, len(fn.Params))
+			paramOwnership := make([]string, 0, len(fn.Params))
 			paramSlots := 0
 			for i := range fn.Params {
 				param := &fn.Params[i]
@@ -420,14 +712,19 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					return nil, err
 				}
 				paramTypes = append(paramTypes, resolved)
+				paramOwnership = append(paramOwnership, param.Ownership)
 				paramSlots += info.SlotCount
 			}
 			checked.FuncSigs[fullName] = FuncSig{
 				ParamTypes:        paramTypes,
+				ParamOwnership:    paramOwnership,
 				ParamSlots:        paramSlots,
 				ReturnType:        retName,
-				ReturnSlots:       retInfo.SlotCount,
+				ThrowsType:        throwsType,
+				Async:             fn.Async,
+				ReturnSlots:       returnSlots,
 				ReturnRegionParam: regionNone,
+				Effects:           effects,
 			}
 		}
 	}
@@ -456,11 +753,11 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			globals := checked.GlobalsByModule[module]
 			for _, fn := range file.Funcs {
 				fullName := qualifyName(module, fn.Name)
+				if len(fn.TypeParams) > 0 {
+					continue
+				}
 				if len(fn.Body) == 0 {
 					return nil, fmt.Errorf("function '%s' must have a body", fullName)
-				}
-				if _, ok := fn.Body[len(fn.Body)-1].(*frontend.ReturnStmt); !ok {
-					return nil, fmt.Errorf("function '%s' must end with return", fullName)
 				}
 
 				locals := make(map[string]LocalInfo)
@@ -478,7 +775,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 						Base:      slotIndex,
 						SlotCount: info.SlotCount,
 						TypeName:  param.Type.Name,
-						Mutable:   false,
+						Mutable:   param.Ownership == "inout",
 					}
 					scopeInfo.localScopes[param.Name] = regionNone
 					slotIndex += info.SlotCount
@@ -486,9 +783,16 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if err := collectLocals(fn.Body, locals, &slotIndex, checked.FuncSigs, types, module, imports, scopeInfo, globals); err != nil {
 					return nil, err
 				}
+				if !stmtListEndsWithReturnTyped(fn.Body, locals, globals, checked.FuncSigs, types, module, imports) {
+					return nil, fmt.Errorf("function '%s' must end with return", fullName)
+				}
 				state := newRegionState(scopeInfo.localScopes, scopeInfo.islandScopes)
 				initParamRegions(fn.Params, state, types)
-				if err := checkStmts(fn.Body, locals, globals, checked.FuncSigs, types, module, imports, checked.FuncSigs[fullName].ReturnType, state); err != nil {
+				sig := checked.FuncSigs[fullName]
+				state.throwType = sig.ThrowsType
+				state.async = sig.Async
+				effects := newEffectContext(fullName, sig.Effects, strings.HasPrefix(module, "__"))
+				if err := checkStmts(fn.Body, locals, globals, checked.FuncSigs, types, module, imports, sig.ReturnType, state, effects); err != nil {
 					return nil, err
 				}
 				newReturnParam := regionNone
@@ -499,7 +803,6 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					}
 					newReturnParam = idx
 				}
-				sig := checked.FuncSigs[fullName]
 				if sig.ReturnRegionParam != newReturnParam {
 					sig.ReturnRegionParam = newReturnParam
 					checked.FuncSigs[fullName] = sig
@@ -524,6 +827,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		globals := checked.GlobalsByModule[module]
 		for _, fn := range file.Funcs {
 			fullName := qualifyName(module, fn.Name)
+			if len(fn.TypeParams) > 0 {
+				continue
+			}
 			if fn.Name == "main" {
 				if module != world.EntryModule {
 					return nil, fmt.Errorf("%s: main must be in entry module", frontend.FormatPos(fn.Pos))
@@ -533,6 +839,12 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				}
 				if checked.FuncSigs[fullName].ReturnType != "i32" {
 					return nil, fmt.Errorf("%s: main must return i32", frontend.FormatPos(fn.Pos))
+				}
+				if checked.FuncSigs[fullName].ThrowsType != "" {
+					return nil, fmt.Errorf("%s: main must not throw", frontend.FormatPos(fn.Pos))
+				}
+				if checked.FuncSigs[fullName].Async {
+					return nil, fmt.Errorf("%s: main must not be async", frontend.FormatPos(fn.Pos))
 				}
 				checked.MainIndex = len(checked.Funcs)
 				checked.MainName = fullName
@@ -568,6 +880,8 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				LocalSlots:  slotIndex,
 				ParamSlots:  checked.FuncSigs[fullName].ParamSlots,
 				ReturnType:  checked.FuncSigs[fullName].ReturnType,
+				ThrowsType:  checked.FuncSigs[fullName].ThrowsType,
+				Async:       checked.FuncSigs[fullName].Async,
 				ReturnSlots: checked.FuncSigs[fullName].ReturnSlots,
 			})
 		}
@@ -582,478 +896,284 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 	return &checked, nil
 }
 
-func collectImportAliases(file *frontend.FileAST) (map[string]string, error) {
-	aliases := make(map[string]string)
-	for _, imp := range file.Imports {
-		if imp.Alias == "" {
-			return nil, fmt.Errorf("%s: import alias required", frontend.FormatPos(imp.At))
-		}
-		if _, exists := aliases[imp.Alias]; exists {
-			return nil, fmt.Errorf("%s: duplicate import alias '%s'", frontend.FormatPos(imp.At), imp.Alias)
-		}
-		aliases[imp.Alias] = imp.Path
+func stmtListEndsWithReturn(stmts []frontend.Stmt) bool {
+	if len(stmts) == 0 {
+		return false
 	}
-	return aliases, nil
+	return stmtEndsWithReturn(stmts[len(stmts)-1])
 }
 
-func qualifyName(module, name string) string {
-	if module == "" {
-		return name
+func stmtListEndsWithReturnTyped(
+	stmts []frontend.Stmt,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) bool {
+	if len(stmts) == 0 {
+		return false
 	}
-	return module + "." + name
+	return stmtEndsWithReturnTyped(stmts[len(stmts)-1], locals, globals, funcs, types, module, imports)
 }
 
-func resolveTypeName(ref *frontend.TypeRef, module string, imports map[string]string) (string, error) {
-	if ref == nil {
-		return "", fmt.Errorf("missing type")
+func stmtEndsWithReturnTyped(
+	stmt frontend.Stmt,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) bool {
+	switch s := stmt.(type) {
+	case *frontend.ReturnStmt, *frontend.ThrowStmt:
+		return true
+	case *frontend.IfStmt:
+		return len(s.Then) > 0 && len(s.Else) > 0 &&
+			stmtListEndsWithReturnTyped(s.Then, locals, globals, funcs, types, module, imports) &&
+			stmtListEndsWithReturnTyped(s.Else, locals, globals, funcs, types, module, imports)
+	case *frontend.IfLetStmt:
+		return len(s.Then) > 0 && len(s.Else) > 0 &&
+			stmtListEndsWithReturnTyped(s.Then, locals, globals, funcs, types, module, imports) &&
+			stmtListEndsWithReturnTyped(s.Else, locals, globals, funcs, types, module, imports)
+	case *frontend.MatchStmt:
+		for _, c := range s.Cases {
+			if !stmtListEndsWithReturnTyped(c.Body, locals, globals, funcs, types, module, imports) {
+				return false
+			}
+		}
+		if matchHasDefault(s) || matchHasCompleteOptionalPatterns(s) {
+			return true
+		}
+		return matchHasCompleteEnumPatterns(s, locals, globals, funcs, types, module, imports)
+	case *frontend.UnsafeStmt:
+		return stmtListEndsWithReturnTyped(s.Body, locals, globals, funcs, types, module, imports)
+	default:
+		return false
 	}
+}
+
+func matchHasDefault(s *frontend.MatchStmt) bool {
+	for _, c := range s.Cases {
+		if c.Default {
+			return true
+		}
+	}
+	return false
+}
+
+func matchHasCompleteOptionalPatterns(s *frontend.MatchStmt) bool {
+	hasNone := false
+	hasSome := false
+	for _, c := range s.Cases {
+		if c.Default {
+			return true
+		}
+		if _, ok := c.Pattern.(*frontend.NoneLitExpr); ok {
+			hasNone = true
+		}
+		if _, ok := c.Pattern.(*frontend.SomePatternExpr); ok {
+			hasSome = true
+		}
+	}
+	return hasNone && hasSome
+}
+
+func matchHasCompleteEnumPatterns(
+	s *frontend.MatchStmt,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) bool {
+	scrutType, err := inferExprTypeForDecl(s.Value, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return false
+	}
+	info, ok := types[scrutType]
+	if !ok || info.Kind != TypeEnum || len(info.EnumCases) == 0 {
+		return false
+	}
+	seen := make(map[string]struct{}, len(info.EnumCases))
+	for _, c := range s.Cases {
+		if c.Default {
+			return true
+		}
+		patType, err := inferExprTypeForDecl(c.Pattern, locals, globals, funcs, types, module, imports)
+		if err != nil || patType != scrutType {
+			return false
+		}
+		field, ok := c.Pattern.(*frontend.FieldAccessExpr)
+		if !ok || field.EnumType != scrutType {
+			return false
+		}
+		seen[field.Field] = struct{}{}
+	}
+	for _, enumCase := range info.EnumCases {
+		if _, ok := seen[enumCase.Name]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func stmtEndsWithReturn(stmt frontend.Stmt) bool {
+	switch s := stmt.(type) {
+	case *frontend.ReturnStmt:
+		return true
+	case *frontend.ThrowStmt:
+		return true
+	case *frontend.IfStmt:
+		return len(s.Then) > 0 && len(s.Else) > 0 && stmtListEndsWithReturn(s.Then) && stmtListEndsWithReturn(s.Else)
+	case *frontend.IfLetStmt:
+		return len(s.Then) > 0 && len(s.Else) > 0 && stmtListEndsWithReturn(s.Then) && stmtListEndsWithReturn(s.Else)
+	case *frontend.MatchStmt:
+		hasDefault := false
+		hasNone := false
+		hasSome := false
+		for _, c := range s.Cases {
+			if c.Default {
+				hasDefault = true
+			} else if _, ok := c.Pattern.(*frontend.NoneLitExpr); ok {
+				hasNone = true
+			} else if _, ok := c.Pattern.(*frontend.SomePatternExpr); ok {
+				hasSome = true
+			}
+			if !stmtListEndsWithReturn(c.Body) {
+				return false
+			}
+		}
+		return hasDefault || (hasNone && hasSome)
+	case *frontend.UnsafeStmt:
+		return stmtListEndsWithReturn(s.Body)
+	default:
+		return false
+	}
+}
+
+func validateGenericFuncDecl(fn *frontend.FuncDecl) error {
+	if len(fn.TypeParams) == 0 {
+		return nil
+	}
+	params := map[string]struct{}{}
+	for _, name := range fn.TypeParams {
+		params[name] = struct{}{}
+	}
+	if err := validateGenericTypeRef(fn.ReturnType, params); err != nil {
+		return fmt.Errorf("%s: %v", frontend.FormatPos(fn.ReturnType.At), err)
+	}
+	if fn.HasThrows {
+		if err := validateGenericTypeRef(fn.Throws, params); err != nil {
+			return fmt.Errorf("%s: %v", frontend.FormatPos(fn.Throws.At), err)
+		}
+	}
+	for _, param := range fn.Params {
+		if err := validateGenericTypeRef(param.Type, params); err != nil {
+			return fmt.Errorf("%s: %v", frontend.FormatPos(param.At), err)
+		}
+	}
+	return nil
+}
+
+func findFuncDecl(world *module.World, name string) *frontend.FuncDecl {
+	for _, file := range world.Files {
+		for _, fn := range file.Funcs {
+			if qualifyName(file.Module, fn.Name) == name || fn.Name == name {
+				return fn
+			}
+		}
+	}
+	return nil
+}
+
+func compareProtocolRequirement(typeName, protoName string, req frontend.FuncSigDecl, method *frontend.FuncDecl) error {
+	if len(req.Params) != len(method.Params) {
+		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': parameter count differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
+	}
+	for i := range req.Params {
+		if genericTypeName(req.Params[i].Type) != genericTypeName(method.Params[i].Type) {
+			return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': parameter %d type differs", frontend.FormatPos(method.Params[i].At), method.Name, protoName, req.Name, i+1)
+		}
+	}
+	if genericTypeName(req.ReturnType) != genericTypeName(method.ReturnType) {
+		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': return type differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
+	}
+	if req.Async != method.Async {
+		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': async marker differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
+	}
+	if req.HasThrows != method.HasThrows || genericTypeName(req.Throws) != genericTypeName(method.Throws) {
+		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': throws type differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
+	}
+	_ = typeName
+	return nil
+}
+
+func validateGenericTypeRef(ref frontend.TypeRef, params map[string]struct{}) error {
+	switch ref.Kind {
+	case frontend.TypeRefNamed:
+		if ref.Name == "" {
+			return fmt.Errorf("missing type name")
+		}
+		if _, ok := params[ref.Name]; ok {
+			return nil
+		}
+		if _, ok := canonicalBuiltinType(ref.Name); ok {
+			return nil
+		}
+		if strings.Contains(ref.Name, ".") {
+			return nil
+		}
+		return nil
+	case frontend.TypeRefSlice, frontend.TypeRefArray, frontend.TypeRefOptional:
+		if ref.Elem == nil {
+			return fmt.Errorf("missing element type")
+		}
+		return validateGenericTypeRef(*ref.Elem, params)
+	default:
+		return fmt.Errorf("unsupported type")
+	}
+}
+
+func genericParamTypeNames(params []frontend.ParamDecl) []string {
+	out := make([]string, 0, len(params))
+	for _, param := range params {
+		out = append(out, formatGenericTypeRef(param.Type))
+	}
+	return out
+}
+
+func genericParamOwnership(params []frontend.ParamDecl) []string {
+	out := make([]string, 0, len(params))
+	for _, param := range params {
+		out = append(out, param.Ownership)
+	}
+	return out
+}
+
+func formatGenericTypeRef(ref frontend.TypeRef) string {
 	switch ref.Kind {
 	case frontend.TypeRefSlice:
 		if ref.Elem == nil {
-			return "", fmt.Errorf("%s: missing slice element type", frontend.FormatPos(ref.At))
+			return "[]?"
 		}
-		elem, err := resolveTypeName(ref.Elem, module, imports)
-		if err != nil {
-			return "", err
-		}
-		return "[]" + elem, nil
+		return "[]" + formatGenericTypeRef(*ref.Elem)
 	case frontend.TypeRefArray:
 		if ref.Elem == nil {
-			return "", fmt.Errorf("%s: missing array element type", frontend.FormatPos(ref.At))
+			return fmt.Sprintf("[%d]?", ref.Len)
 		}
-		if ref.Len < 0 {
-			return "", fmt.Errorf("%s: invalid array length", frontend.FormatPos(ref.At))
+		return fmt.Sprintf("[%d]%s", ref.Len, formatGenericTypeRef(*ref.Elem))
+	case frontend.TypeRefOptional:
+		if ref.Elem == nil {
+			return "?"
 		}
-		elem, err := resolveTypeName(ref.Elem, module, imports)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("[%d]%s", ref.Len, elem), nil
-	case frontend.TypeRefNamed:
-		if ref.Name == "" {
-			return "", fmt.Errorf("%s: missing type name", frontend.FormatPos(ref.At))
-		}
-		if ref.Name == "i32" || ref.Name == "u8" || ref.Name == "ptr" || ref.Name == "str" || ref.Name == "island" || ref.Name == "cap.io" || ref.Name == "cap.mem" || ref.Name == "actor" {
-			return ref.Name, nil
-		}
-		parts := strings.Split(ref.Name, ".")
-		if len(parts) == 1 {
-			return qualifyName(module, ref.Name), nil
-		}
-		if target, ok := imports[parts[0]]; ok {
-			if len(parts) != 2 {
-				return "", fmt.Errorf("%s: expected '%s.<type>'", frontend.FormatPos(ref.At), parts[0])
-			}
-			return target + "." + parts[1], nil
-		}
-		return ref.Name, nil
+		return formatGenericTypeRef(*ref.Elem) + "?"
 	default:
-		return "", fmt.Errorf("%s: unsupported type", frontend.FormatPos(ref.At))
+		return ref.Name
 	}
-}
-
-func resolveCallName(name string, module string, imports map[string]string, pos frontend.Position) (string, error) {
-	parts := strings.Split(name, ".")
-	if len(parts) == 1 {
-		return qualifyName(module, name), nil
-	}
-	if target, ok := imports[parts[0]]; ok {
-		if len(parts) != 2 {
-			return "", fmt.Errorf("%s: expected '%s.<func>'", frontend.FormatPos(pos), parts[0])
-		}
-		return target + "." + parts[1], nil
-	}
-	modPath := strings.Join(parts[:len(parts)-1], ".")
-	return modPath + "." + parts[len(parts)-1], nil
-}
-
-const (
-	regionNone       = -1
-	regionUnknown    = -2
-	regionParamStart = -3
-)
-
-type scopeInfo struct {
-	localScopes  map[string]int
-	islandScopes map[string]int
-	scopeStack   []int
-	nextScopeID  int
-}
-
-func newScopeInfo() *scopeInfo {
-	return &scopeInfo{
-		localScopes:  make(map[string]int),
-		islandScopes: make(map[string]int),
-	}
-}
-
-func (s *scopeInfo) currentScopeID() int {
-	if len(s.scopeStack) == 0 {
-		return regionNone
-	}
-	return s.scopeStack[len(s.scopeStack)-1]
-}
-
-func (s *scopeInfo) enterScope() int {
-	id := s.nextScopeID
-	s.nextScopeID++
-	s.scopeStack = append(s.scopeStack, id)
-	return id
-}
-
-func (s *scopeInfo) exitScope() {
-	if len(s.scopeStack) == 0 {
-		return
-	}
-	s.scopeStack = s.scopeStack[:len(s.scopeStack)-1]
-}
-
-type regionState struct {
-	localScopes      map[string]int
-	islandScopes     map[string]int
-	islandNameByID   map[int]string
-	regionVars       map[string]int
-	paramRegionIndex map[int]int
-	paramNames       []string
-	unknownVars      map[string]bool
-	unknownConflicts map[string]regionConflict
-	activeScopes     []int
-	activeIndex      map[int]int
-	unsafeDepth      int
-	returnRegion     int
-	returnRegionSet  bool
-}
-
-func newRegionState(localScopes map[string]int, islandScopes map[string]int) *regionState {
-	islandNameByID := make(map[int]string, len(islandScopes))
-	for name, id := range islandScopes {
-		islandNameByID[id] = name
-	}
-	return &regionState{
-		localScopes:      localScopes,
-		islandScopes:     islandScopes,
-		islandNameByID:   islandNameByID,
-		regionVars:       make(map[string]int),
-		paramRegionIndex: make(map[int]int),
-		unknownConflicts: make(map[string]regionConflict),
-		unknownVars:      make(map[string]bool),
-		activeIndex:      make(map[int]int),
-	}
-}
-
-type regionConflict struct {
-	leftLabel  string
-	leftRegion int
-
-	rightLabel  string
-	rightRegion int
-}
-
-func (s *regionState) enterIsland(name string) error {
-	id, ok := s.islandScopes[name]
-	if !ok {
-		return fmt.Errorf("unknown island scope '%s'", name)
-	}
-	s.activeScopes = append(s.activeScopes, id)
-	s.activeIndex[id] = len(s.activeScopes) - 1
-	s.regionVars[name] = id
-	return nil
-}
-
-func (s *regionState) exitIsland() {
-	if len(s.activeScopes) == 0 {
-		return
-	}
-	id := s.activeScopes[len(s.activeScopes)-1]
-	delete(s.activeIndex, id)
-	s.activeScopes = s.activeScopes[:len(s.activeScopes)-1]
-}
-
-func (s *regionState) isScopeActive(id int) bool {
-	if id < 0 {
-		return true
-	}
-	_, ok := s.activeIndex[id]
-	return ok
-}
-
-func (s *regionState) scopeIndex(id int) (int, bool) {
-	idx, ok := s.activeIndex[id]
-	return idx, ok
-}
-
-func (s *regionState) isScopeWithin(targetID, regionID int) bool {
-	if regionID < 0 {
-		return true
-	}
-	if targetID < 0 {
-		return false
-	}
-	regionIdx, ok := s.scopeIndex(regionID)
-	if !ok {
-		return false
-	}
-	targetIdx, ok := s.scopeIndex(targetID)
-	if !ok {
-		return false
-	}
-	return targetIdx >= regionIdx
-}
-
-func copyRegionVars(src map[string]int) map[string]int {
-	if len(src) == 0 {
-		return make(map[string]int)
-	}
-	dst := make(map[string]int, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
-}
-
-func mergeRegionVars(a, b map[string]int) map[string]int {
-	if len(a) == 0 && len(b) == 0 {
-		return make(map[string]int)
-	}
-	merged := make(map[string]int)
-	for k, va := range a {
-		vb, ok := b[k]
-		if !ok {
-			vb = regionNone
-		}
-		if va == vb {
-			if va != regionNone {
-				merged[k] = va
-			}
-			continue
-		}
-		merged[k] = regionUnknown
-	}
-	for k, vb := range b {
-		if _, ok := a[k]; ok {
-			continue
-		}
-		if vb != regionNone {
-			merged[k] = regionUnknown
-		}
-	}
-	return merged
-}
-
-func joinRegion(a, b int) int {
-	if a == regionNone {
-		return b
-	}
-	if b == regionNone {
-		return a
-	}
-	if a == b {
-		return a
-	}
-	return regionUnknown
-}
-
-func markUnknownRegions(state *regionState) {
-	if state == nil {
-		return
-	}
-	for name := range state.unknownVars {
-		if state.regionVars[name] != regionUnknown {
-			delete(state.unknownVars, name)
-		}
-	}
-	for name := range state.unknownConflicts {
-		if state.regionVars[name] != regionUnknown {
-			delete(state.unknownConflicts, name)
-		}
-	}
-	for name, regionID := range state.regionVars {
-		if regionID == regionUnknown {
-			state.unknownVars[name] = true
-			continue
-		}
-		delete(state.unknownVars, name)
-		delete(state.unknownConflicts, name)
-	}
-}
-
-func initParamRegions(params []frontend.ParamDecl, state *regionState, types map[string]*TypeInfo) {
-	if state != nil && (state.paramNames == nil || len(state.paramNames) != len(params)) {
-		state.paramNames = make([]string, len(params))
-		for i := range params {
-			state.paramNames[i] = params[i].Name
-		}
-	}
-	next := regionParamStart
-	for i := range params {
-		param := params[i]
-		if typeMayContainRegion(param.Type.Name, types) {
-			state.regionVars[param.Name] = next
-			state.paramRegionIndex[next] = i
-			next--
-		}
-	}
-}
-
-func formatRegionID(state *regionState, regionID int) string {
-	switch {
-	case regionID == regionNone:
-		return "none"
-	case regionID == regionUnknown:
-		return "unknown"
-	case regionID >= 0:
-		if state != nil {
-			if name, ok := state.islandNameByID[regionID]; ok && name != "" {
-				return fmt.Sprintf("isl#%d(%s)", regionID, name)
-			}
-		}
-		return fmt.Sprintf("isl#%d", regionID)
-	default:
-		if state != nil {
-			if idx, ok := state.paramRegionIndex[regionID]; ok {
-				if idx >= 0 && idx < len(state.paramNames) {
-					return fmt.Sprintf("param#%d(%s)", idx, state.paramNames[idx])
-				}
-				return fmt.Sprintf("param#%d", idx)
-			}
-		}
-		return fmt.Sprintf("param(%d)", regionID)
-	}
-}
-
-func formatScopeID(state *regionState, scopeID int) string {
-	if scopeID == regionNone {
-		return "root"
-	}
-	if scopeID == regionUnknown {
-		return "unknown"
-	}
-	if state != nil {
-		if name, ok := state.islandNameByID[scopeID]; ok && name != "" {
-			return fmt.Sprintf("scope#%d(%s)", scopeID, name)
-		}
-	}
-	return fmt.Sprintf("scope#%d", scopeID)
-}
-
-func recordMergeConflicts(state *regionState, leftVars, rightVars map[string]int, leftLabel, rightLabel string) {
-	if state == nil {
-		return
-	}
-	for name, left := range leftVars {
-		right, ok := rightVars[name]
-		if !ok {
-			right = regionNone
-		}
-		if left == right {
-			continue
-		}
-		if left == regionNone && right == regionNone {
-			continue
-		}
-		state.unknownConflicts[name] = regionConflict{
-			leftLabel:   leftLabel,
-			leftRegion:  left,
-			rightLabel:  rightLabel,
-			rightRegion: right,
-		}
-	}
-	for name, right := range rightVars {
-		if _, ok := leftVars[name]; ok {
-			continue
-		}
-		if right == regionNone {
-			continue
-		}
-		state.unknownConflicts[name] = regionConflict{
-			leftLabel:   leftLabel,
-			leftRegion:  regionNone,
-			rightLabel:  rightLabel,
-			rightRegion: right,
-		}
-	}
-}
-
-func (s *regionState) enterUnsafe() {
-	s.unsafeDepth++
-}
-
-func (s *regionState) exitUnsafe() {
-	if s.unsafeDepth > 0 {
-		s.unsafeDepth--
-	}
-}
-
-func (s *regionState) inUnsafe() bool {
-	return s.unsafeDepth > 0
-}
-
-func (s *regionState) recordReturnRegion(regionID int, pos frontend.Position) error {
-	if regionID == regionUnknown {
-		return fmt.Errorf("%s: ambiguous region for return", frontend.FormatPos(pos))
-	}
-	if regionID >= 0 {
-		return fmt.Errorf("%s: return from scoped island is not allowed", frontend.FormatPos(pos))
-	}
-	if !s.returnRegionSet {
-		s.returnRegion = regionID
-		s.returnRegionSet = true
-		return nil
-	}
-	if s.returnRegion != regionID {
-		return fmt.Errorf(
-			"%s: return mixes values from different regions (first: %s, now: %s)",
-			frontend.FormatPos(pos),
-			formatRegionID(s, s.returnRegion),
-			formatRegionID(s, regionID),
-		)
-	}
-	return nil
-}
-
-func typeMayContainRegion(typeName string, types map[string]*TypeInfo) bool {
-	info, ok := types[typeName]
-	if !ok {
-		return false
-	}
-	switch info.Kind {
-	case TypeSlice:
-		return true
-	case TypeIsland:
-		return true
-	case TypeStruct:
-		for _, field := range info.Fields {
-			if typeMayContainRegion(field.TypeName, types) {
-				return true
-			}
-		}
-		return false
-	case TypeArray:
-		return typeMayContainRegion(info.ElemType, types)
-	default:
-		return false
-	}
-}
-
-func localScopeID(name string, state *regionState) int {
-	if state == nil {
-		return regionNone
-	}
-	if id, ok := state.localScopes[name]; ok {
-		return id
-	}
-	return regionNone
-}
-
-func checkLocalScope(name string, state *regionState, pos frontend.Position) error {
-	scopeID := localScopeID(name, state)
-	if scopeID == regionNone {
-		return nil
-	}
-	if !state.isScopeActive(scopeID) {
-		return fmt.Errorf("%s: identifier '%s' is out of scope", frontend.FormatPos(pos), name)
-	}
-	return nil
 }
 
 func checkStmts(
@@ -1066,19 +1186,34 @@ func checkStmts(
 	imports map[string]string,
 	returnType string,
 	state *regionState,
+	effects *effectContext,
 ) error {
 	for _, stmt := range stmts {
 		switch s := stmt.(type) {
 		case *frontend.PrintStmt:
-			tname, _, err := checkExpr(s.Value, locals, globals, funcs, types, module, imports, state)
+			if err := effects.require(s.At, "io"); err != nil {
+				return err
+			}
+			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
 			if err != nil {
 				return err
 			}
 			if !isPrintableType(tname, types) {
 				return fmt.Errorf("%s: print expects str or []u8", frontend.FormatPos(s.At))
 			}
+		case *frontend.BreakStmt:
+			if state.loopDepth == 0 {
+				return fmt.Errorf("%s: break outside loop", frontend.FormatPos(s.At))
+			}
+		case *frontend.ContinueStmt:
+			if state.loopDepth == 0 {
+				return fmt.Errorf("%s: continue outside loop", frontend.FormatPos(s.At))
+			}
 		case *frontend.FreeStmt:
-			tname, _, err := checkExpr(s.Value, locals, globals, funcs, types, module, imports, state)
+			if err := effects.requireAll(s.At, []string{"islands", "mem"}); err != nil {
+				return err
+			}
+			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
 			if err != nil {
 				return err
 			}
@@ -1089,7 +1224,7 @@ func checkStmts(
 				return fmt.Errorf("%s: free is only allowed in unsafe blocks", frontend.FormatPos(s.At))
 			}
 		case *frontend.ReturnStmt:
-			tname, regionID, err := checkExpr(s.Value, locals, globals, funcs, types, module, imports, state)
+			tname, regionID, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
 			if err != nil {
 				return err
 			}
@@ -1099,8 +1234,22 @@ func checkStmts(
 			if !typesCompatibleWithNullPtr(returnType, tname, s.Value) {
 				return fmt.Errorf("%s: return type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), returnType, tname)
 			}
+		case *frontend.ThrowStmt:
+			if state.throwType == "" {
+				return fmt.Errorf("%s: throw is only allowed in throwing functions", frontend.FormatPos(s.At))
+			}
+			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			if err != nil {
+				return err
+			}
+			if !typesCompatibleWithNullPtr(state.throwType, tname, s.Value) {
+				return fmt.Errorf("%s: throw type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), state.throwType, tname)
+			}
 		case *frontend.IslandStmt:
-			sizeType, _, err := checkExpr(s.Size, locals, globals, funcs, types, module, imports, state)
+			if err := effects.requireAll(s.At, []string{"alloc", "islands", "mem"}); err != nil {
+				return err
+			}
+			sizeType, _, err := checkExprWithEffects(s.Size, locals, globals, funcs, types, module, imports, state, effects)
 			if err != nil {
 				return err
 			}
@@ -1110,11 +1259,12 @@ func checkStmts(
 			if err := state.enterIsland(s.Name); err != nil {
 				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
 			}
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state); err != nil {
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
 				return err
 			}
 			state.exitIsland()
 		case *frontend.LetStmt:
+			state.clearConsumed(s.Name)
 			resolved, err := resolveTypeName(&s.Type, module, imports)
 			if err != nil {
 				return err
@@ -1123,7 +1273,7 @@ func checkStmts(
 			if _, err := ensureTypeInfo(resolved, types); err != nil {
 				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
 			}
-			valType, valRegion, err := checkExpr(s.Value, locals, globals, funcs, types, module, imports, state)
+			valType, valRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
 			if err != nil {
 				return err
 			}
@@ -1154,23 +1304,29 @@ func checkStmts(
 			}
 		case *frontend.AssignStmt:
 			if idx, ok := s.Target.(*frontend.IndexExpr); ok {
-				indexType, _, err := checkExpr(idx.Index, locals, globals, funcs, types, module, imports, state)
+				indexType, _, err := checkExprWithEffects(idx.Index, locals, globals, funcs, types, module, imports, state, effects)
 				if err != nil {
 					return err
 				}
 				if !isInt32Like(indexType) {
 					return fmt.Errorf("%s: index must be i32/u8", frontend.FormatPos(idx.At))
 				}
-				if _, _, err := checkExpr(idx.Base, locals, globals, funcs, types, module, imports, state); err != nil {
+				if _, _, err := checkExprWithEffects(idx.Base, locals, globals, funcs, types, module, imports, state, effects); err != nil {
 					return err
 				}
 			}
 			if id, ok := s.Target.(*frontend.IdentExpr); ok {
+				if err := state.checkNotConsumed(id.Name, s.At); err != nil {
+					return err
+				}
 				if g, ok := globals[id.Name]; ok {
 					if !g.Mutable {
+						if g.Const {
+							return fmt.Errorf("%s: cannot assign to const '%s'", frontend.FormatPos(s.At), id.Name)
+						}
 						return fmt.Errorf("%s: cannot assign to val '%s'", frontend.FormatPos(s.At), id.Name)
 					}
-					valType, _, err := checkExpr(s.Value, locals, globals, funcs, types, module, imports, state)
+					valType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
 					if err != nil {
 						return err
 					}
@@ -1188,9 +1344,12 @@ func checkStmts(
 				return err
 			}
 			if !targetInfo.Mutable {
+				if targetInfo.Const {
+					return fmt.Errorf("%s: cannot assign to const '%s'", frontend.FormatPos(s.At), targetInfo.Name)
+				}
 				return fmt.Errorf("%s: cannot assign to val '%s'", frontend.FormatPos(s.At), targetInfo.Name)
 			}
-			valType, valRegion, err := checkExpr(s.Value, locals, globals, funcs, types, module, imports, state)
+			valType, valRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
 			if err != nil {
 				return err
 			}
@@ -1222,23 +1381,50 @@ func checkStmts(
 				}
 			}
 		case *frontend.IfStmt:
-			condType, _, err := checkExpr(s.Cond, locals, globals, funcs, types, module, imports, state)
+			condType, _, err := checkExprWithEffects(s.Cond, locals, globals, funcs, types, module, imports, state, effects)
 			if err != nil {
 				return err
 			}
-			if !isInt32Like(condType) {
-				return fmt.Errorf("%s: condition must be i32/u8", frontend.FormatPos(s.At))
+			if !isConditionType(condType) {
+				return fmt.Errorf("%s: condition must be bool or i32/u8", frontend.FormatPos(s.At))
 			}
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
-			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, state); err != nil {
+			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
 				return err
 			}
 			thenVars := copyRegionVars(state.regionVars)
 			var elseVars map[string]int
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
-				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, state); err != nil {
+				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+					return err
+				}
+				elseVars = copyRegionVars(state.regionVars)
+			} else {
+				elseVars = before
+			}
+			state.regionVars = mergeRegionVars(thenVars, elseVars)
+			recordMergeConflicts(state, thenVars, elseVars, "then", "else")
+			markUnknownRegions(state)
+		case *frontend.IfLetStmt:
+			valueType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			if err != nil {
+				return err
+			}
+			if _, ok := optionalElemName(valueType); !ok {
+				return fmt.Errorf("%s: if let requires optional value, got '%s'", frontend.FormatPos(s.At), valueType)
+			}
+			before := copyRegionVars(state.regionVars)
+			state.regionVars = copyRegionVars(before)
+			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+				return err
+			}
+			thenVars := copyRegionVars(state.regionVars)
+			var elseVars map[string]int
+			if len(s.Else) > 0 {
+				state.regionVars = copyRegionVars(before)
+				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
 					return err
 				}
 				elseVars = copyRegionVars(state.regionVars)
@@ -1249,33 +1435,217 @@ func checkStmts(
 			recordMergeConflicts(state, thenVars, elseVars, "then", "else")
 			markUnknownRegions(state)
 		case *frontend.WhileStmt:
-			condType, _, err := checkExpr(s.Cond, locals, globals, funcs, types, module, imports, state)
+			condType, _, err := checkExprWithEffects(s.Cond, locals, globals, funcs, types, module, imports, state, effects)
 			if err != nil {
 				return err
 			}
-			if !isInt32Like(condType) {
-				return fmt.Errorf("%s: condition must be i32/u8", frontend.FormatPos(s.At))
+			if !isConditionType(condType) {
+				return fmt.Errorf("%s: condition must be bool or i32/u8", frontend.FormatPos(s.At))
 			}
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state); err != nil {
+			state.loopDepth++
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+				state.loopDepth--
 				return err
 			}
+			state.loopDepth--
 			bodyVars := copyRegionVars(state.regionVars)
 			state.regionVars = mergeRegionVars(before, bodyVars)
 			recordMergeConflicts(state, before, bodyVars, "before", "body")
 			markUnknownRegions(state)
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				iterType, _, err := checkExprWithEffects(s.Iterable, locals, globals, funcs, types, module, imports, state, effects)
+				if err != nil {
+					return err
+				}
+				elemType, err := collectionElementType(iterType, types)
+				if err != nil {
+					return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
+				}
+				if loopInfo, ok := locals[s.Name]; ok && loopInfo.TypeName != elemType {
+					return fmt.Errorf("%s: for collection element type mismatch: local '%s' is %s, iterable yields %s", frontend.FormatPos(s.At), s.Name, loopInfo.TypeName, elemType)
+				}
+			} else {
+				startType, _, err := checkExprWithEffects(s.Start, locals, globals, funcs, types, module, imports, state, effects)
+				if err != nil {
+					return err
+				}
+				endType, _, err := checkExprWithEffects(s.End, locals, globals, funcs, types, module, imports, state, effects)
+				if err != nil {
+					return err
+				}
+				if !isInt32Like(startType) || !isInt32Like(endType) {
+					return fmt.Errorf("%s: for range bounds must be i32/u8", frontend.FormatPos(s.At))
+				}
+			}
+			before := copyRegionVars(state.regionVars)
+			state.regionVars = copyRegionVars(before)
+			state.loopDepth++
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+				state.loopDepth--
+				return err
+			}
+			state.loopDepth--
+			bodyVars := copyRegionVars(state.regionVars)
+			state.regionVars = mergeRegionVars(before, bodyVars)
+			recordMergeConflicts(state, before, bodyVars, "before", "body")
+			markUnknownRegions(state)
+		case *frontend.MatchStmt:
+			scrutType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			if err != nil {
+				return err
+			}
+			scrutInfo, scrutInfoOK := types[scrutType]
+			if !isInt32Like(scrutType) {
+				info, ok := types[scrutType]
+				if !ok || (info.Kind != TypeEnum && info.Kind != TypeOptional) {
+					return fmt.Errorf("%s: match value must be enum or i32/u8", frontend.FormatPos(s.At))
+				}
+			}
+			seenDefault := false
+			seenPatterns := map[string]frontend.Position{}
+			before := copyRegionVars(state.regionVars)
+			merged := copyRegionVars(before)
+			labels := []string{"fallthrough"}
+			for i, c := range s.Cases {
+				if seenDefault {
+					return fmt.Errorf("%s: match default must be last", frontend.FormatPos(c.At))
+				}
+				if c.Default {
+					seenDefault = true
+				} else {
+					patType := ""
+					if some, ok := c.Pattern.(*frontend.SomePatternExpr); ok {
+						if !scrutInfoOK || scrutInfo.Kind != TypeOptional {
+							return fmt.Errorf("%s: some pattern requires optional match value", frontend.FormatPos(some.At))
+						}
+						patType = optionalSomePatternType
+					} else {
+						var err error
+						patType, _, err = checkExprWithEffects(c.Pattern, locals, globals, funcs, types, module, imports, state, effects)
+						if err != nil {
+							return err
+						}
+					}
+					if scrutInfoOK && scrutInfo.Kind == TypeOptional && patType != "none" && patType != optionalSomePatternType {
+						return fmt.Errorf("%s: optional match supports only 'none', 'some(name)', and '_' patterns in v0.7", frontend.FormatPos(c.At))
+					}
+					if !matchPatternCompatible(scrutType, patType, types) {
+						return fmt.Errorf("%s: match pattern type mismatch: expected '%s', got '%s'", frontend.FormatPos(c.At), scrutType, patType)
+					}
+					if key := matchPatternKey(c.Pattern, patType); key != "" {
+						if first, exists := seenPatterns[key]; exists {
+							return fmt.Errorf("%s: duplicate match pattern (first at %s)", frontend.FormatPos(c.At), frontend.FormatPos(first))
+						}
+						seenPatterns[key] = c.At
+					}
+				}
+				state.regionVars = copyRegionVars(before)
+				if err := checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
+					return err
+				}
+				caseVars := copyRegionVars(state.regionVars)
+				state.regionVars = mergeRegionVars(merged, caseVars)
+				recordMergeConflicts(state, merged, caseVars, strings.Join(labels, "/"), fmt.Sprintf("case %d", i+1))
+				merged = copyRegionVars(state.regionVars)
+				labels = append(labels, fmt.Sprintf("case %d", i+1))
+			}
+			if seenDefault {
+				state.regionVars = merged
+			} else {
+				state.regionVars = mergeRegionVars(before, merged)
+				recordMergeConflicts(state, before, merged, "before", "cases")
+			}
+			markUnknownRegions(state)
 		case *frontend.UnsafeStmt:
 			state.enterUnsafe()
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state); err != nil {
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, state, effects); err != nil {
 				return err
 			}
 			state.exitUnsafe()
+		case *frontend.ExprStmt:
+			_, _, err := checkExprWithEffects(s.Expr, locals, globals, funcs, types, module, imports, state, effects)
+			if err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("%s: unsupported statement", frontend.FormatPos(s.Pos()))
 		}
 	}
 	return nil
+}
+
+func matchPatternCompatible(scrutType, patternType string, types map[string]*TypeInfo) bool {
+	if scrutType == patternType {
+		return true
+	}
+	if patternType == optionalSomePatternType {
+		if scrutInfo, ok := types[scrutType]; ok && scrutInfo.Kind == TypeOptional {
+			return true
+		}
+	}
+	if patternType == "none" {
+		if scrutInfo, ok := types[scrutType]; ok && scrutInfo.Kind == TypeOptional {
+			return true
+		}
+	}
+	if isInt32Like(scrutType) && isInt32Like(patternType) {
+		return true
+	}
+	scrutInfo, scrutOK := types[scrutType]
+	patternInfo, patternOK := types[patternType]
+	if scrutOK && patternOK && (scrutInfo.Kind == TypeEnum || patternInfo.Kind == TypeEnum) {
+		return false
+	}
+	return false
+}
+
+const optionalSomePatternType = "__optional_some_pattern"
+
+func matchPatternKey(pattern frontend.Expr, patternType string) string {
+	switch p := pattern.(type) {
+	case *frontend.NumberExpr:
+		return fmt.Sprintf("i32:%d", p.Value)
+	case *frontend.NoneLitExpr:
+		return "optional:none"
+	case *frontend.SomePatternExpr:
+		return "optional:some"
+	case *frontend.FieldAccessExpr:
+		if p.EnumType != "" {
+			return "enum:" + p.EnumType + "." + p.Field
+		}
+		return patternType + ":" + p.Field
+	default:
+		return ""
+	}
+}
+
+func uniqueHiddenLocal(prefix string, pos frontend.Position, locals map[string]LocalInfo) string {
+	base := fmt.Sprintf("%s_%d_%d", prefix, pos.Line, pos.Col)
+	name := base
+	for i := 1; ; i++ {
+		if _, exists := locals[name]; !exists {
+			return name
+		}
+		name = fmt.Sprintf("%s_%d", base, i)
+	}
+}
+
+func collectionElementType(typeName string, types map[string]*TypeInfo) (string, error) {
+	info, err := ensureTypeInfo(typeName, types)
+	if err != nil {
+		return "", err
+	}
+	switch info.Kind {
+	case TypeStr:
+		return "u8", nil
+	case TypeSlice:
+		return info.ElemType, nil
+	default:
+		return "", fmt.Errorf("for collection requires slice or string, got '%s'", typeName)
+	}
 }
 
 func collectLocals(
@@ -1323,6 +1693,7 @@ func collectLocals(
 				SlotCount: info.SlotCount,
 				TypeName:  resolved,
 				Mutable:   s.Mutable,
+				Const:     s.Const,
 			}
 			if scopes != nil {
 				scopes.localScopes[s.Name] = scopes.currentScopeID()
@@ -1367,695 +1738,197 @@ func collectLocals(
 					return err
 				}
 			}
+		case *frontend.IfLetStmt:
+			if _, exists := globals[s.Name]; exists {
+				return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(s.At), s.Name, s.Name)
+			}
+			if _, exists := locals[s.Name]; exists {
+				return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(s.At), s.Name)
+			}
+			valueType, err := inferExprTypeForDecl(s.Value, locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return fmt.Errorf("%s: cannot infer if-let value type: %v", frontend.FormatPos(s.At), err)
+			}
+			valueInfo, err := ensureTypeInfo(valueType, types)
+			if err != nil {
+				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
+			}
+			if valueInfo.Kind != TypeOptional {
+				return fmt.Errorf("%s: if let requires optional value, got '%s'", frontend.FormatPos(s.At), valueType)
+			}
+			elemInfo, err := ensureTypeInfo(valueInfo.ElemType, types)
+			if err != nil {
+				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
+			}
+			s.ValueLocal = uniqueHiddenLocal("__iflet_value", s.At, locals)
+			locals[s.ValueLocal] = LocalInfo{
+				Base:      *slotIndex,
+				SlotCount: valueInfo.SlotCount,
+				TypeName:  valueType,
+				Mutable:   false,
+			}
+			if scopes != nil {
+				scopes.localScopes[s.ValueLocal] = scopes.currentScopeID()
+			}
+			*slotIndex += valueInfo.SlotCount
+			locals[s.Name] = LocalInfo{
+				Base:      *slotIndex,
+				SlotCount: elemInfo.SlotCount,
+				TypeName:  valueInfo.ElemType,
+				Mutable:   false,
+			}
+			if scopes != nil {
+				scopes.localScopes[s.Name] = scopes.currentScopeID()
+			}
+			*slotIndex += elemInfo.SlotCount
+			if err := collectLocals(s.Then, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
+				return err
+			}
+			if len(s.Else) > 0 {
+				if err := collectLocals(s.Else, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
+					return err
+				}
+			}
 		case *frontend.WhileStmt:
 			if err := collectLocals(s.Body, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
+			}
+		case *frontend.ForRangeStmt:
+			if _, exists := globals[s.Name]; exists {
+				return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(s.At), s.Name, s.Name)
+			}
+			if _, exists := locals[s.Name]; exists {
+				return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(s.At), s.Name)
+			}
+			loopType := "i32"
+			var iterableInfo *TypeInfo
+			if s.Iterable != nil {
+				iterType, err := inferExprTypeForDecl(s.Iterable, locals, globals, funcs, types, module, imports)
+				if err != nil {
+					return fmt.Errorf("%s: cannot infer for collection type: %v", frontend.FormatPos(s.At), err)
+				}
+				elemType, err := collectionElementType(iterType, types)
+				if err != nil {
+					return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
+				}
+				iterableInfo, err = ensureTypeInfo(iterType, types)
+				if err != nil {
+					return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
+				}
+				loopType = elemType
+			}
+			info, err := ensureTypeInfo(loopType, types)
+			if err != nil {
+				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
+			}
+			locals[s.Name] = LocalInfo{
+				Base:      *slotIndex,
+				SlotCount: info.SlotCount,
+				TypeName:  loopType,
+				Mutable:   false,
+			}
+			if scopes != nil {
+				scopes.localScopes[s.Name] = scopes.currentScopeID()
+			}
+			*slotIndex += info.SlotCount
+			if s.Iterable != nil {
+				s.IterableLocal = uniqueHiddenLocal("__for_iter", s.At, locals)
+				locals[s.IterableLocal] = LocalInfo{
+					Base:      *slotIndex,
+					SlotCount: iterableInfo.SlotCount,
+					TypeName:  iterableInfo.Name,
+					Mutable:   false,
+				}
+				if scopes != nil {
+					scopes.localScopes[s.IterableLocal] = scopes.currentScopeID()
+				}
+				*slotIndex += iterableInfo.SlotCount
+				s.IndexLocal = uniqueHiddenLocal("__for_index", s.At, locals)
+				indexInfo := types["i32"]
+				locals[s.IndexLocal] = LocalInfo{
+					Base:      *slotIndex,
+					SlotCount: indexInfo.SlotCount,
+					TypeName:  "i32",
+					Mutable:   false,
+				}
+				if scopes != nil {
+					scopes.localScopes[s.IndexLocal] = scopes.currentScopeID()
+				}
+				*slotIndex += indexInfo.SlotCount
+			}
+			s.EndLocal = uniqueHiddenLocal("__for_end", s.At, locals)
+			locals[s.EndLocal] = LocalInfo{
+				Base:      *slotIndex,
+				SlotCount: 1,
+				TypeName:  "i32",
+				Mutable:   false,
+			}
+			if scopes != nil {
+				scopes.localScopes[s.EndLocal] = scopes.currentScopeID()
+			}
+			*slotIndex += info.SlotCount
+			if err := collectLocals(s.Body, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
+				return err
+			}
+		case *frontend.MatchStmt:
+			scrutType, err := inferExprTypeForDecl(s.Value, locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return fmt.Errorf("%s: cannot infer match value type: %v", frontend.FormatPos(s.At), err)
+			}
+			info, err := ensureTypeInfo(scrutType, types)
+			if err != nil {
+				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
+			}
+			if info.SlotCount != 1 && info.Kind != TypeOptional {
+				return fmt.Errorf("%s: match value must be single-slot", frontend.FormatPos(s.At))
+			}
+			s.ScrutineeLocal = uniqueHiddenLocal("__match_value", s.At, locals)
+			locals[s.ScrutineeLocal] = LocalInfo{
+				Base:      *slotIndex,
+				SlotCount: info.SlotCount,
+				TypeName:  scrutType,
+				Mutable:   false,
+			}
+			if scopes != nil {
+				scopes.localScopes[s.ScrutineeLocal] = scopes.currentScopeID()
+			}
+			*slotIndex += info.SlotCount
+			for _, c := range s.Cases {
+				if some, ok := c.Pattern.(*frontend.SomePatternExpr); ok {
+					if info.Kind != TypeOptional {
+						return fmt.Errorf("%s: some pattern requires optional match value", frontend.FormatPos(some.At))
+					}
+					if _, exists := globals[some.Name]; exists {
+						return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(some.At), some.Name, some.Name)
+					}
+					if _, exists := locals[some.Name]; exists {
+						return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(some.At), some.Name)
+					}
+					elemInfo, err := ensureTypeInfo(info.ElemType, types)
+					if err != nil {
+						return fmt.Errorf("%s: %v", frontend.FormatPos(some.At), err)
+					}
+					locals[some.Name] = LocalInfo{
+						Base:      *slotIndex,
+						SlotCount: elemInfo.SlotCount,
+						TypeName:  info.ElemType,
+						Mutable:   false,
+					}
+					if scopes != nil {
+						scopes.localScopes[some.Name] = scopes.currentScopeID()
+					}
+					*slotIndex += elemInfo.SlotCount
+				}
+				if err := collectLocals(c.Body, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
+					return err
+				}
 			}
 		case *frontend.UnsafeStmt:
 			if err := collectLocals(s.Body, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
 			}
+		case *frontend.ExprStmt:
 		}
 	}
 	return nil
-}
-
-func inferExprTypeForDecl(
-	expr frontend.Expr,
-	locals map[string]LocalInfo,
-	globals map[string]GlobalInfo,
-	funcs map[string]FuncSig,
-	types map[string]*TypeInfo,
-	module string,
-	imports map[string]string,
-) (string, error) {
-	switch e := expr.(type) {
-	case *frontend.NumberExpr:
-		return "i32", nil
-	case *frontend.StringLitExpr:
-		return "str", nil
-	case *frontend.IdentExpr:
-		if info, ok := locals[e.Name]; ok {
-			if info.TypeName == "" {
-				return "", fmt.Errorf("depends on '%s' which has no type annotation", e.Name)
-			}
-			return info.TypeName, nil
-		}
-		if g, ok := globals[e.Name]; ok {
-			return g.TypeName, nil
-		}
-		return "", fmt.Errorf("unknown identifier '%s'", e.Name)
-	case *frontend.UnaryExpr:
-		if e.Op != frontend.TokenMinus {
-			return "", fmt.Errorf("unsupported unary operator")
-		}
-		return "i32", nil
-	case *frontend.BinaryExpr:
-		if e.Op != frontend.TokenPlus && e.Op != frontend.TokenMinus && e.Op != frontend.TokenEqEq && e.Op != frontend.TokenLess {
-			return "", fmt.Errorf("unsupported binary operator")
-		}
-		return "i32", nil
-	case *frontend.FieldAccessExpr:
-		_, targetType, err := ResolveFieldAccessType(e, locals, types)
-		if err != nil {
-			return "", err
-		}
-		return targetType, nil
-	case *frontend.IndexExpr:
-		baseType, err := inferExprTypeForDecl(e.Base, locals, globals, funcs, types, module, imports)
-		if err != nil {
-			return "", err
-		}
-		info, err := ensureTypeInfo(baseType, types)
-		if err != nil {
-			return "", err
-		}
-		switch info.Kind {
-		case TypeStr:
-			return "u8", nil
-		case TypeSlice:
-			return info.ElemType, nil
-		default:
-			return "", fmt.Errorf("cannot index '%s'", baseType)
-		}
-	case *frontend.StructLitExpr:
-		resolved, err := resolveTypeName(&e.Type, module, imports)
-		if err != nil {
-			return "", err
-		}
-		return resolved, nil
-	case *frontend.CallExpr:
-		resolved := ""
-		if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
-			resolved = builtin
-		} else {
-			name, err := resolveCallName(e.Name, module, imports, e.At)
-			if err != nil {
-				return "", err
-			}
-			resolved = name
-		}
-		sig, ok := funcs[resolved]
-		if !ok {
-			return "", fmt.Errorf("unknown function '%s'", resolved)
-		}
-		return sig.ReturnType, nil
-	default:
-		return "", fmt.Errorf("unsupported expression for type inference")
-	}
-}
-
-func checkExpr(
-	expr frontend.Expr,
-	locals map[string]LocalInfo,
-	globals map[string]GlobalInfo,
-	funcs map[string]FuncSig,
-	types map[string]*TypeInfo,
-	module string,
-	imports map[string]string,
-	state *regionState,
-) (string, int, error) {
-	switch e := expr.(type) {
-	case *frontend.NumberExpr:
-		return "i32", regionNone, nil
-	case *frontend.StringLitExpr:
-		return "str", regionNone, nil
-	case *frontend.IdentExpr:
-		if err := checkLocalScope(e.Name, state, e.At); err != nil {
-			return "", regionNone, err
-		}
-		info, ok := locals[e.Name]
-		if !ok {
-			if g, ok := globals[e.Name]; ok {
-				return g.TypeName, regionNone, nil
-			}
-			return "", regionNone, fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(e.At), e.Name)
-		}
-		if regionID, ok := state.regionVars[e.Name]; ok {
-			if regionID == regionUnknown {
-				if state.unknownVars[e.Name] {
-					if conflict, ok := state.unknownConflicts[e.Name]; ok {
-						return "", regionNone, fmt.Errorf(
-							"%s: ambiguous region for '%s' after control-flow merge (%s: %s, %s: %s); hint: assign to a fresh variable in each branch and use it after the merge",
-							frontend.FormatPos(e.At),
-							e.Name,
-							conflict.leftLabel,
-							formatRegionID(state, conflict.leftRegion),
-							conflict.rightLabel,
-							formatRegionID(state, conflict.rightRegion),
-						)
-					}
-					return "", regionNone, fmt.Errorf(
-						"%s: ambiguous region for '%s' after control-flow merge; hint: reassign it to a single region before use",
-						frontend.FormatPos(e.At),
-						e.Name,
-					)
-				}
-				return "", regionNone, fmt.Errorf("%s: ambiguous region for '%s'", frontend.FormatPos(e.At), e.Name)
-			}
-			if !state.isScopeActive(regionID) {
-				return "", regionNone, fmt.Errorf("%s: slice from scoped island is out of scope", frontend.FormatPos(e.At))
-			}
-			return info.TypeName, regionID, nil
-		}
-		return info.TypeName, regionNone, nil
-	case *frontend.FieldAccessExpr:
-		targetInfo, targetType, err := ResolveFieldAccessType(e, locals, types)
-		if err != nil {
-			return "", regionNone, err
-		}
-		baseType, baseRegion, err := checkExpr(e.Base, locals, globals, funcs, types, module, imports, state)
-		if err != nil {
-			return "", regionNone, err
-		}
-		if baseType == "" {
-			return "", regionNone, fmt.Errorf("%s: invalid field access base", frontend.FormatPos(e.At))
-		}
-		if err := checkLocalScope(targetInfo.Name, state, e.At); err != nil {
-			return "", regionNone, err
-		}
-		if typeMayContainRegion(targetType, types) && baseRegion != regionNone {
-			return targetType, baseRegion, nil
-		}
-		return targetType, regionNone, nil
-	case *frontend.IndexExpr:
-		baseType, _, err := checkExpr(e.Base, locals, globals, funcs, types, module, imports, state)
-		if err != nil {
-			return "", regionNone, err
-		}
-		indexType, _, err := checkExpr(e.Index, locals, globals, funcs, types, module, imports, state)
-		if err != nil {
-			return "", regionNone, err
-		}
-		if !isInt32Like(indexType) {
-			return "", regionNone, fmt.Errorf("%s: index must be i32/u8", frontend.FormatPos(e.At))
-		}
-		info, err := ensureTypeInfo(baseType, types)
-		if err != nil {
-			return "", regionNone, err
-		}
-		switch info.Kind {
-		case TypeStr:
-			return "u8", regionNone, nil
-		case TypeSlice:
-			return info.ElemType, regionNone, nil
-		default:
-			return "", regionNone, fmt.Errorf("%s: cannot index '%s'", frontend.FormatPos(e.At), baseType)
-		}
-	case *frontend.CallExpr:
-		resolved := ""
-		if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
-			resolved = builtin
-		} else {
-			var err error
-			resolved, err = resolveCallName(e.Name, module, imports, e.At)
-			if err != nil {
-				return "", regionNone, err
-			}
-		}
-		sig, ok := funcs[resolved]
-		if !ok {
-			return "", regionNone, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), resolved)
-		}
-		if (resolved == "core.actor_dispatch" || resolved == "core.actor_main_entry_id") && !strings.HasPrefix(module, "__") {
-			return "", regionNone, fmt.Errorf("%s: '%s' is reserved for internal runtime modules", frontend.FormatPos(e.At), resolved)
-		}
-		if len(e.Args) != len(sig.ParamTypes) {
-			return "", regionNone, fmt.Errorf("%s: wrong argument count for '%s'", frontend.FormatPos(e.At), resolved)
-		}
-		argRegions := make([]int, len(e.Args))
-		for i, arg := range e.Args {
-			argType, argRegion, err := checkExpr(arg, locals, globals, funcs, types, module, imports, state)
-			if err != nil {
-				return "", regionNone, err
-			}
-			if !typesCompatibleWithNullPtr(sig.ParamTypes[i], argType, arg) {
-				return "", regionNone, fmt.Errorf("%s: type mismatch for '%s' arg %d", frontend.FormatPos(arg.Pos()), resolved, i+1)
-			}
-			argRegions[i] = argRegion
-		}
-		if resolved == "core.spawn" {
-			if len(e.Args) != 1 {
-				return "", regionNone, fmt.Errorf("%s: spawn expects 1 argument", frontend.FormatPos(e.At))
-			}
-			lit, ok := e.Args[0].(*frontend.StringLitExpr)
-			if !ok {
-				return "", regionNone, fmt.Errorf("%s: spawn expects a string literal", frontend.FormatPos(e.At))
-			}
-			raw := string(lit.Value)
-			if raw == "" {
-				return "", regionNone, fmt.Errorf("%s: spawn expects a non-empty name", frontend.FormatPos(e.At))
-			}
-			target, err := resolveCallName(raw, module, imports, e.At)
-			if err != nil {
-				return "", regionNone, err
-			}
-			if strings.HasPrefix(target, "core.") {
-				return "", regionNone, fmt.Errorf("%s: spawn target must be a user function, got '%s'", frontend.FormatPos(e.At), target)
-			}
-			targetSig, ok := funcs[target]
-			if !ok {
-				return "", regionNone, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), target)
-			}
-			if len(targetSig.ParamTypes) != 0 || targetSig.ReturnType != "i32" {
-				return "", regionNone, fmt.Errorf("%s: spawn target must have shape fun %s(): i32", frontend.FormatPos(e.At), target)
-			}
-			lit.Value = []byte(target)
-		}
-		if resolved == "core.sym_addr" {
-			if len(e.Args) != 1 {
-				return "", regionNone, fmt.Errorf("%s: sym_addr expects 1 argument", frontend.FormatPos(e.At))
-			}
-			lit, ok := e.Args[0].(*frontend.StringLitExpr)
-			if !ok {
-				return "", regionNone, fmt.Errorf("%s: sym_addr expects a string literal", frontend.FormatPos(e.At))
-			}
-			if len(lit.Value) == 0 {
-				return "", regionNone, fmt.Errorf("%s: sym_addr expects a non-empty symbol name", frontend.FormatPos(e.At))
-			}
-		}
-		if (resolved == "core.island_make_u8" || resolved == "core.island_make_i32") && len(argRegions) > 0 && argRegions[0] == regionUnknown {
-			return "", regionNone, fmt.Errorf("%s: ambiguous region for '%s' argument", frontend.FormatPos(e.At), resolved)
-		}
-		if builtinNeedsUnsafe(resolved, argRegions) && !state.inUnsafe() {
-			return "", regionNone, fmt.Errorf("%s: '%s' is only allowed in unsafe blocks", frontend.FormatPos(e.At), resolved)
-		}
-		e.Name = resolved
-		regionID := regionNone
-		if sig.ReturnRegionParam >= 0 {
-			if sig.ReturnRegionParam >= len(argRegions) {
-				return "", regionNone, fmt.Errorf("%s: invalid region signature for '%s'", frontend.FormatPos(e.At), resolved)
-			}
-			regionID = argRegions[sig.ReturnRegionParam]
-			if regionID == regionUnknown {
-				return "", regionNone, fmt.Errorf("%s: ambiguous region for '%s' return", frontend.FormatPos(e.At), resolved)
-			}
-		}
-		return sig.ReturnType, regionID, nil
-	case *frontend.StructLitExpr:
-		resolved, err := resolveTypeName(&e.Type, module, imports)
-		if err != nil {
-			return "", regionNone, err
-		}
-		e.Type.Name = resolved
-		info, err := ensureTypeInfo(resolved, types)
-		if err != nil {
-			return "", regionNone, fmt.Errorf("%s: %v", frontend.FormatPos(e.At), err)
-		}
-		if info.Kind != TypeStruct {
-			return "", regionNone, fmt.Errorf("%s: '%s' is not a struct", frontend.FormatPos(e.At), resolved)
-		}
-		seen := make(map[string]frontend.StructFieldInit, len(e.Fields))
-		for _, field := range e.Fields {
-			if _, exists := info.FieldMap[field.Name]; !exists {
-				return "", regionNone, fmt.Errorf("%s: unknown field '%s'", frontend.FormatPos(field.At), field.Name)
-			}
-			if _, exists := seen[field.Name]; exists {
-				return "", regionNone, fmt.Errorf("%s: duplicate field '%s'", frontend.FormatPos(field.At), field.Name)
-			}
-			seen[field.Name] = field
-		}
-		structRegion := regionNone
-		for _, field := range info.Fields {
-			init, ok := seen[field.Name]
-			if !ok {
-				return "", regionNone, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
-			}
-			valType, valRegion, err := checkExpr(init.Value, locals, globals, funcs, types, module, imports, state)
-			if err != nil {
-				return "", regionNone, err
-			}
-			if !typesCompatibleWithNullPtr(field.TypeName, valType, init.Value) {
-				return "", regionNone, fmt.Errorf("%s: type mismatch for field '%s'", frontend.FormatPos(init.At), field.Name)
-			}
-			structRegion = joinRegion(structRegion, valRegion)
-			if structRegion == regionUnknown {
-				return "", regionNone, fmt.Errorf("%s: struct literal mixes values from different regions", frontend.FormatPos(init.At))
-			}
-		}
-		return resolved, structRegion, nil
-	case *frontend.UnaryExpr:
-		if e.Op != frontend.TokenMinus {
-			return "", regionNone, fmt.Errorf("%s: unsupported unary operator", frontend.FormatPos(e.At))
-		}
-		xtype, _, err := checkExpr(e.X, locals, globals, funcs, types, module, imports, state)
-		if err != nil {
-			return "", regionNone, err
-		}
-		if !isInt32Like(xtype) {
-			return "", regionNone, fmt.Errorf("%s: unary '-' expects i32/u8", frontend.FormatPos(e.At))
-		}
-		return "i32", regionNone, nil
-	case *frontend.BinaryExpr:
-		if e.Op != frontend.TokenPlus && e.Op != frontend.TokenMinus && e.Op != frontend.TokenEqEq && e.Op != frontend.TokenLess {
-			return "", regionNone, fmt.Errorf("%s: unsupported binary operator", frontend.FormatPos(e.At))
-		}
-		ltype, _, err := checkExpr(e.Left, locals, globals, funcs, types, module, imports, state)
-		if err != nil {
-			return "", regionNone, err
-		}
-		rtype, _, err := checkExpr(e.Right, locals, globals, funcs, types, module, imports, state)
-		if err != nil {
-			return "", regionNone, err
-		}
-		if !isInt32Like(ltype) || !isInt32Like(rtype) {
-			return "", regionNone, fmt.Errorf("%s: binary operators require i32/u8", frontend.FormatPos(e.At))
-		}
-		return "i32", regionNone, nil
-	default:
-		return "", regionNone, fmt.Errorf("%s: unsupported expression", frontend.FormatPos(expr.Pos()))
-	}
-}
-
-type assignTargetInfo struct {
-	Name     string
-	Mutable  bool
-	TypeName string
-	Offset   int
-}
-
-func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, types map[string]*TypeInfo) (assignTargetInfo, string, error) {
-	if idx, ok := expr.(*frontend.IndexExpr); ok {
-		baseName, fields, pos, ok := splitFieldPath(idx.Base)
-		if !ok {
-			return assignTargetInfo{}, "", fmt.Errorf("%s: invalid assignment target", frontend.FormatPos(pos))
-		}
-		baseInfo, ok := locals[baseName]
-		if !ok {
-			return assignTargetInfo{}, "", fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(pos), baseName)
-		}
-		if _, err := ensureTypeInfo(baseInfo.TypeName, types); err != nil {
-			return assignTargetInfo{}, "", err
-		}
-		baseType, _, _, err := resolveFieldChain(baseInfo.TypeName, baseInfo.Base, fields, types, pos)
-		if err != nil {
-			return assignTargetInfo{}, "", err
-		}
-		info, err := ensureTypeInfo(baseType, types)
-		if err != nil {
-			return assignTargetInfo{}, "", err
-		}
-		if info.Kind == TypeStr {
-			return assignTargetInfo{}, "", fmt.Errorf("%s: cannot assign into str", frontend.FormatPos(pos))
-		}
-		if info.Kind != TypeSlice {
-			return assignTargetInfo{}, "", fmt.Errorf("%s: cannot index '%s'", frontend.FormatPos(pos), baseType)
-		}
-		return assignTargetInfo{Name: baseName, Mutable: baseInfo.Mutable, TypeName: info.ElemType}, info.ElemType, nil
-	}
-
-	baseName, fields, pos, ok := splitFieldPath(expr)
-	if !ok {
-		return assignTargetInfo{}, "", fmt.Errorf("%s: invalid assignment target", frontend.FormatPos(pos))
-	}
-	info, ok := locals[baseName]
-	if !ok {
-		return assignTargetInfo{}, "", fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(pos), baseName)
-	}
-	if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
-		return assignTargetInfo{}, "", err
-	}
-	targetType, _, offset, err := resolveFieldChain(info.TypeName, info.Base, fields, types, pos)
-	if err != nil {
-		return assignTargetInfo{}, "", err
-	}
-	return assignTargetInfo{Name: baseName, Mutable: info.Mutable, TypeName: targetType, Offset: offset}, targetType, nil
-}
-
-func ResolveFieldAccessType(expr frontend.Expr, locals map[string]LocalInfo, types map[string]*TypeInfo) (assignTargetInfo, string, error) {
-	baseName, fields, pos, ok := splitFieldPath(expr)
-	if !ok {
-		return assignTargetInfo{}, "", fmt.Errorf("%s: invalid field access", frontend.FormatPos(pos))
-	}
-	info, ok := locals[baseName]
-	if !ok {
-		return assignTargetInfo{}, "", fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(pos), baseName)
-	}
-	if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
-		return assignTargetInfo{}, "", err
-	}
-	targetType, _, offset, err := resolveFieldChain(info.TypeName, info.Base, fields, types, pos)
-	if err != nil {
-		return assignTargetInfo{}, "", err
-	}
-	return assignTargetInfo{Name: baseName, Mutable: info.Mutable, TypeName: targetType, Offset: offset}, targetType, nil
-}
-
-func splitFieldPath(expr frontend.Expr) (string, []string, frontend.Position, bool) {
-	switch e := expr.(type) {
-	case *frontend.IdentExpr:
-		return e.Name, nil, e.At, true
-	case *frontend.FieldAccessExpr:
-		baseName, fields, pos, ok := splitFieldPath(e.Base)
-		if !ok {
-			return "", nil, pos, false
-		}
-		fields = append(fields, e.Field)
-		return baseName, fields, e.At, true
-	default:
-		return "", nil, expr.Pos(), false
-	}
-}
-
-func resolveFieldChain(typeName string, baseOffset int, fields []string, types map[string]*TypeInfo, pos frontend.Position) (string, int, int, error) {
-	offset := baseOffset
-	current := typeName
-	for _, field := range fields {
-		info, ok := types[current]
-		if !ok {
-			return "", 0, 0, fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(pos), current)
-		}
-		if info.Kind != TypeStruct && info.Kind != TypeSlice && info.Kind != TypeStr {
-			return "", 0, 0, fmt.Errorf("%s: '%s' is not a struct", frontend.FormatPos(pos), current)
-		}
-		fieldInfo, ok := info.FieldMap[field]
-		if !ok {
-			return "", 0, 0, fmt.Errorf("%s: unknown field '%s'", frontend.FormatPos(pos), field)
-		}
-		offset += fieldInfo.Offset
-		current = fieldInfo.TypeName
-	}
-	info, ok := types[current]
-	if !ok {
-		return "", 0, 0, fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(pos), current)
-	}
-	return current, info.SlotCount, offset, nil
-}
-
-func ensureTypeInfo(name string, types map[string]*TypeInfo) (*TypeInfo, error) {
-	if info, ok := types[name]; ok {
-		return info, nil
-	}
-	if elem, ok := sliceElemName(name); ok {
-		if elem != "i32" && elem != "u8" {
-			return nil, fmt.Errorf("slice element type '%s' is not supported", elem)
-		}
-		info := makeSliceTypeInfo(name, elem)
-		types[name] = info
-		return info, nil
-	}
-	if isArrayTypeName(name) {
-		return nil, fmt.Errorf("array types are not supported yet")
-	}
-	return nil, fmt.Errorf("unknown type '%s'", name)
-}
-
-func typesCompatible(expected, actual string) bool {
-	if expected == actual {
-		return true
-	}
-	if expected == "u8" && actual == "i32" {
-		return true
-	}
-	if expected == "i32" && actual == "u8" {
-		return true
-	}
-	return false
-}
-
-func typesCompatibleWithNullPtr(expected, actual string, expr frontend.Expr) bool {
-	if typesCompatible(expected, actual) {
-		return true
-	}
-	if expected == "ptr" && actual == "i32" && isNullPtrLiteral(expr) {
-		return true
-	}
-	return false
-}
-
-func isNullPtrLiteral(expr frontend.Expr) bool {
-	n, ok := expr.(*frontend.NumberExpr)
-	return ok && n.Value == 0
-}
-
-func constI32(expr frontend.Expr) (int32, bool) {
-	switch e := expr.(type) {
-	case *frontend.NumberExpr:
-		return e.Value, true
-	case *frontend.UnaryExpr:
-		if e.Op != frontend.TokenMinus {
-			return 0, false
-		}
-		v, ok := e.X.(*frontend.NumberExpr)
-		if !ok {
-			return 0, false
-		}
-		return -v.Value, true
-	default:
-		return 0, false
-	}
-}
-
-func isInt32Like(name string) bool {
-	return name == "i32" || name == "u8"
-}
-
-func isPrintableType(name string, types map[string]*TypeInfo) bool {
-	info, err := ensureTypeInfo(name, types)
-	if err != nil {
-		return false
-	}
-	if info.Kind == TypeStr {
-		return true
-	}
-	if info.Kind == TypeSlice && info.ElemType == "u8" {
-		return true
-	}
-	return false
-}
-
-func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
-	_, err := ensureTypeInfo("[]u8", types)
-	if err != nil {
-		return nil, err
-	}
-	_, err = ensureTypeInfo("[]i32", types)
-	if err != nil {
-		return nil, err
-	}
-	actorInfo, err := ensureTypeInfo("actor", types)
-	if err != nil {
-		return nil, err
-	}
-	ptrInfo, err := ensureTypeInfo("ptr", types)
-	if err != nil {
-		return nil, err
-	}
-	sliceU8, err := ensureTypeInfo("[]u8", types)
-	if err != nil {
-		return nil, err
-	}
-	sliceI32, err := ensureTypeInfo("[]i32", types)
-	if err != nil {
-		return nil, err
-	}
-
-	islandInfo, err := ensureTypeInfo("island", types)
-	if err != nil {
-		return nil, err
-	}
-	capIO, err := ensureTypeInfo("cap.io", types)
-	if err != nil {
-		return nil, err
-	}
-	capMem, err := ensureTypeInfo("cap.mem", types)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]FuncSig{
-		"core.alloc_bytes":         {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.make_u8":             {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: sliceU8.Name, ReturnSlots: sliceU8.SlotCount, ReturnRegionParam: regionNone},
-		"core.make_i32":            {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: sliceI32.Name, ReturnSlots: sliceI32.SlotCount, ReturnRegionParam: regionNone},
-		"core.island_new":          {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "island", ReturnSlots: islandInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.island_make_u8":      {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceU8.Name, ReturnSlots: sliceU8.SlotCount, ReturnRegionParam: 0},
-		"core.island_make_i32":     {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceI32.Name, ReturnSlots: sliceI32.SlotCount, ReturnRegionParam: 0},
-		"core.cap_io":              {ParamTypes: nil, ParamSlots: 0, ReturnType: capIO.Name, ReturnSlots: capIO.SlotCount, ReturnRegionParam: regionNone},
-		"core.cap_mem":             {ParamTypes: nil, ParamSlots: 0, ReturnType: capMem.Name, ReturnSlots: capMem.SlotCount, ReturnRegionParam: regionNone},
-		"core.load_i32":            {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.store_i32":           {ParamTypes: []string{"ptr", "i32", capMem.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.load_u8":             {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "u8", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.store_u8":            {ParamTypes: []string{"ptr", "u8", capMem.Name}, ParamSlots: 3, ReturnType: "u8", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.load_ptr":            {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.store_ptr":           {ParamTypes: []string{"ptr", "ptr", capMem.Name}, ParamSlots: 3, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.ptr_add":             {ParamTypes: []string{"ptr", "i32", capMem.Name}, ParamSlots: 3, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.mmio_read_i32":       {ParamTypes: []string{"ptr", capIO.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.mmio_write_i32":      {ParamTypes: []string{"ptr", "i32", capIO.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.sym_addr":            {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.ctx_switch":          {ParamTypes: []string{"ptr", "ptr", capMem.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.actor_dispatch":      {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.actor_main_entry_id": {ParamTypes: nil, ParamSlots: 0, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.spawn":               {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.send":                {ParamTypes: []string{"actor", "i32"}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.recv":                {ParamTypes: nil, ParamSlots: 0, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
-		"core.self":                {ParamTypes: nil, ParamSlots: 0, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
-		"core.sender":              {ParamTypes: nil, ParamSlots: 0, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
-	}, nil
-}
-
-func builtinNeedsUnsafe(name string, argRegions []int) bool {
-	switch name {
-	case "core.alloc_bytes", "core.island_new", "core.cap_io", "core.cap_mem",
-		"core.load_i32", "core.store_i32",
-		"core.load_u8", "core.store_u8",
-		"core.load_ptr", "core.store_ptr",
-		"core.ptr_add",
-		"core.mmio_read_i32", "core.mmio_write_i32",
-		"core.sym_addr", "core.ctx_switch":
-		return true
-	case "core.island_make_u8", "core.island_make_i32":
-		if len(argRegions) == 0 {
-			return true
-		}
-		return argRegions[0] == regionNone
-	default:
-		return false
-	}
-}
-
-func ResolveBuiltinAlias(name string) (string, bool) {
-	switch name {
-	case "alloc_bytes":
-		return "core.alloc_bytes", true
-	case "make_u8":
-		return "core.make_u8", true
-	case "make_i32":
-		return "core.make_i32", true
-	case "island_new":
-		return "core.island_new", true
-	case "island_make_u8":
-		return "core.island_make_u8", true
-	case "island_make_i32":
-		return "core.island_make_i32", true
-	case "load_ptr":
-		return "core.load_ptr", true
-	case "store_ptr":
-		return "core.store_ptr", true
-	case "sym_addr":
-		return "core.sym_addr", true
-	case "ctx_switch":
-		return "core.ctx_switch", true
-	case "actor_dispatch":
-		return "core.actor_dispatch", true
-	case "actor_main_entry_id":
-		return "core.actor_main_entry_id", true
-	case "core.alloc_bytes", "core.make_u8", "core.make_i32",
-		"core.island_new", "core.island_make_u8", "core.island_make_i32",
-		"core.load_ptr", "core.store_ptr", "core.sym_addr", "core.ctx_switch",
-		"core.actor_dispatch", "core.actor_main_entry_id":
-		return name, true
-	default:
-		return "", false
-	}
-}
-
-func sliceElemName(name string) (string, bool) {
-	if strings.HasPrefix(name, "[]") {
-		return name[2:], true
-	}
-	return "", false
-}
-
-func isArrayTypeName(name string) bool {
-	return strings.HasPrefix(name, "[") && strings.Contains(name, "]")
 }

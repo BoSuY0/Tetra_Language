@@ -15,9 +15,11 @@ dumps/
 bin/
 dist/
 out/
-app
-app.exe
-tetra
+reports/
+/app
+/app.exe
+/tetra
+/t
 *.exe
 *.dll
 *.so

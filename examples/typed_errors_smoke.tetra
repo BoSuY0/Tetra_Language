@@ -1,0 +1,15 @@
+enum ReadError:
+    case eof
+
+func read(flag: Bool) -> Int throws ReadError:
+    if flag:
+        return 42
+    else:
+        throw ReadError.eof
+
+func caller() -> Int throws ReadError:
+    let value: Int = try read(true)
+    return value
+
+func main() -> Int:
+    return 42

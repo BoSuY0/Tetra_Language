@@ -1,6 +1,7 @@
 # Roadmap v0.13 → v0.14 (Backlog)
 
-This roadmap focuses on soundness, runtime growth, and reducing remaining OS-specific duplication.
+This roadmap originally focused on soundness, runtime growth, and reducing remaining OS-specific duplication. v0.14 now
+also includes Flow Syntax stabilization as the bridge toward the final Tetra language surface.
 
 Status (as of 2025-12-30):
 - P0.A (CI matrix), P0.B (smoke-report-driven checklists), and P1.C (shared link core) are implemented in the repo.
@@ -66,3 +67,14 @@ Next focus (v0.14+):
 - Use the existing `@export`, `--emit=library`, and `--runtime-object` mechanisms to prototype a self-hosted runtime
   object, starting with actors.
   - Status: IN PROGRESS (PoC exists under `__rt/`, plus e2e tests)
+
+## P5 — Flow Syntax Stabilization
+
+### G) Stabilize Flow indentation syntax
+- Files: `compiler/internal/frontend/flow.go`, `compiler/internal/frontend/parser_test.go`, `compiler/compiler_test.go`, `examples/flow_*.tetra`
+- Acceptance:
+  - Flow `func`, `struct`, `if`/`else`, `while`, `unsafe`, and scoped `island` blocks parse through the existing AST/IR path.
+  - Comments and blank lines do not accidentally close Flow blocks.
+  - Tabs and missing indentation produce clear diagnostics.
+  - Flow examples are included in `tetra smoke`.
+  - Status: IN PROGRESS

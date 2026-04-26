@@ -6,8 +6,8 @@ import _ "embed"
 //
 // These are compiled into TOBJ objects on demand and linked when actors are used.
 
-//go:embed selfhostrt/actors_poc_sysv.tetra
-var embeddedActorsPocSysV []byte
+//go:embed selfhostrt/actors_sysv.tetra
+var embeddedActorsSysV []byte
 
-//go:embed selfhostrt/actors_poc_win64.tetra
-var embeddedActorsPocWin64 []byte
+//go:embed selfhostrt/actors_win64.tetra
+var embeddedActorsWin64 []byte

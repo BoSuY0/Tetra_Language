@@ -5,6 +5,18 @@ import (
 	"runtime"
 )
 
+type UnsupportedTargetError struct {
+	Triple  string
+	Planned bool
+}
+
+func (e UnsupportedTargetError) Error() string {
+	if e.Planned {
+		return fmt.Sprintf("planned target not implemented: %s", e.Triple)
+	}
+	return fmt.Sprintf("unsupported target: %s", e.Triple)
+}
+
 type OS int
 
 const (
@@ -95,14 +107,22 @@ type Target struct {
 }
 
 func All() []Target {
-	out := make([]Target, 0, 3)
-	for _, triple := range []string{"linux-x64", "windows-x64", "macos-x64"} {
+	out := make([]Target, 0, len(SupportedTriples()))
+	for _, triple := range SupportedTriples() {
 		t, err := Parse(triple)
 		if err == nil {
 			out = append(out, t)
 		}
 	}
 	return out
+}
+
+func SupportedTriples() []string {
+	return []string{"linux-x64", "windows-x64", "macos-x64"}
+}
+
+func PlannedTriples() []string {
+	return []string{"wasm32-wasi", "wasm32-web"}
 }
 
 func Parse(triple string) (Target, error) {
@@ -137,9 +157,20 @@ func Parse(triple string) (Target, error) {
 			ExeExt:         "",
 			CollectImports: false,
 		}, nil
+	case "wasm32-wasi", "wasm32-web":
+		return Target{}, UnsupportedTargetError{Triple: triple, Planned: true}
 	default:
-		return Target{}, fmt.Errorf("unsupported target: %s", triple)
+		return Target{}, UnsupportedTargetError{Triple: triple}
 	}
+}
+
+func IsPlannedTarget(triple string) bool {
+	for _, planned := range PlannedTriples() {
+		if triple == planned {
+			return true
+		}
+	}
+	return false
 }
 
 func Host() (Target, bool) {

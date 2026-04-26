@@ -1,0 +1,22 @@
+// Stable v0.5 core math helpers.
+module lib.core.math
+
+func add_i32(a: Int, b: Int) -> Int:
+    return a + b
+
+func min_i32(a: Int, b: Int) -> Int:
+    if a < b:
+        return a
+    return b
+
+func max_i32(a: Int, b: Int) -> Int:
+    if a > b:
+        return a
+    return b
+
+func clamp_i32(value: Int, lo: Int, hi: Int) -> Int:
+    if value < lo:
+        return lo
+    if value > hi:
+        return hi
+    return value

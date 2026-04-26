@@ -13,7 +13,7 @@ import (
 
 func TestBuildMachOHeaders(t *testing.T) {
 	tmp := t.TempDir()
-	src := "fun main(): i32 {\n  print(\"Hi\")\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"Hi\")\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
@@ -46,7 +46,7 @@ func TestBuildMachOHeaders(t *testing.T) {
 func TestMachOCStringInSection(t *testing.T) {
 	tmp := t.TempDir()
 	marker := "HELLO_CSTRING"
-	src := "fun main(): i32 {\n  print(\"" + marker + "\")\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"" + marker + "\")\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
@@ -73,7 +73,7 @@ func TestMachOCStringInSection(t *testing.T) {
 func TestMachOCStringRelocPointsToCstring(t *testing.T) {
 	tmp := t.TempDir()
 	marker := "CSTRING_RELOC"
-	src := "fun main(): i32 {\n  print(\"" + marker + "\")\n  return 0\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"" + marker + "\")\n  return 0\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
@@ -154,7 +154,7 @@ func TestMachORuntimeOnDarwin(t *testing.T) {
 		t.Skip("darwin only")
 	}
 	tmp := t.TempDir()
-	src := "fun main(): i32 {\n  print(\"OK\\n\")\n  return 7\n}\n"
+	src := "fun main(): i32 uses io {\n  print(\"OK\\n\")\n  return 7\n}\n"
 	srcPath := filepath.Join(tmp, "main.tetra")
 	outPath := filepath.Join(tmp, "app")
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {

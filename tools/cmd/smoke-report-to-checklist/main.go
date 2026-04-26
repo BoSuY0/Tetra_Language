@@ -8,11 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	ctarget "tetra_language/compiler/target"
 )
 
 type smokeCaseReport struct {
 	Name         string `json:"name"`
 	SrcPath      string `json:"src_path"`
+	OutPath      string `json:"out_path,omitempty"`
 	ExpectedExit int    `json:"expected_exit"`
 	ActualExit   *int   `json:"actual_exit,omitempty"`
 	Ran          bool   `json:"ran"`
@@ -27,6 +30,9 @@ type smokeReport struct {
 	Version      string            `json:"version"`
 	GitHead      string            `json:"git_head,omitempty"`
 	IslandsDebug bool              `json:"islands_debug"`
+	Total        *int              `json:"total,omitempty"`
+	Passed       *int              `json:"passed,omitempty"`
+	Failed       *int              `json:"failed,omitempty"`
 	Cases        []smokeCaseReport `json:"cases"`
 }
 
@@ -158,14 +164,110 @@ func applyToChecklist(path string, report *smokeReport, updates []checkboxUpdate
 	return os.Rename(tmp, path)
 }
 
+func validateSmokeReportCounts(report *smokeReport) error {
+	if report == nil {
+		return fmt.Errorf("missing report")
+	}
+	if report.Total == nil && report.Passed == nil && report.Failed == nil {
+		return nil
+	}
+	if report.Total == nil || report.Passed == nil || report.Failed == nil {
+		return fmt.Errorf("smoke report counts incomplete: total, passed, and failed must appear together")
+	}
+	passed := 0
+	for _, c := range report.Cases {
+		if c.Pass {
+			passed++
+		}
+	}
+	total := len(report.Cases)
+	failed := total - passed
+	if *report.Total != total || *report.Passed != passed || *report.Failed != failed {
+		return fmt.Errorf("smoke report counts mismatch: got total=%d passed=%d failed=%d, computed total=%d passed=%d failed=%d", *report.Total, *report.Passed, *report.Failed, total, passed, failed)
+	}
+	return nil
+}
+
+func validateSmokeReport(report *smokeReport) error {
+	if err := validateSmokeReportCounts(report); err != nil {
+		return err
+	}
+	if report.Total == nil && report.Passed == nil && report.Failed == nil {
+		return nil
+	}
+	if report.Target == "" {
+		return fmt.Errorf("smoke report missing target")
+	}
+	if !supportedTarget(report.Target) {
+		return fmt.Errorf("smoke report unsupported target %s", report.Target)
+	}
+	if report.Host == "" {
+		return fmt.Errorf("smoke report missing host")
+	}
+	if report.Version == "" {
+		return fmt.Errorf("smoke report missing version")
+	}
+	if !strings.HasPrefix(report.Version, "v") {
+		return fmt.Errorf("smoke report version must start with v")
+	}
+	seenNames := map[string]bool{}
+	seenSources := map[string]bool{}
+	for _, c := range report.Cases {
+		if c.Name == "" {
+			return fmt.Errorf("smoke report case missing name")
+		}
+		if seenNames[c.Name] {
+			return fmt.Errorf("duplicate smoke report case %s", c.Name)
+		}
+		seenNames[c.Name] = true
+		if c.SrcPath == "" {
+			return fmt.Errorf("smoke report case %s missing src_path", c.Name)
+		}
+		if !strings.HasSuffix(c.SrcPath, ".tetra") {
+			return fmt.Errorf("smoke report case %s src_path must be a .tetra file", c.Name)
+		}
+		if seenSources[c.SrcPath] {
+			return fmt.Errorf("duplicate smoke report src_path %s", c.SrcPath)
+		}
+		seenSources[c.SrcPath] = true
+		if c.ExpectedExit < 0 || c.ExpectedExit > 255 {
+			return fmt.Errorf("smoke report case %s expected_exit = %d, want 0..255", c.Name, c.ExpectedExit)
+		}
+		if c.Ran && c.ActualExit == nil {
+			return fmt.Errorf("smoke report case %s ran without actual_exit", c.Name)
+		}
+		if c.ActualExit != nil && (*c.ActualExit < 0 || *c.ActualExit > 255) {
+			return fmt.Errorf("smoke report case %s actual_exit = %d, want 0..255", c.Name, *c.ActualExit)
+		}
+		if c.Ran && c.Pass && c.ActualExit != nil && *c.ActualExit != c.ExpectedExit {
+			return fmt.Errorf("smoke report case %s passed with actual_exit %d, want %d", c.Name, *c.ActualExit, c.ExpectedExit)
+		}
+		if c.Pass && c.Error != "" {
+			return fmt.Errorf("smoke report case %s passed with error text", c.Name)
+		}
+	}
+	return nil
+}
+
+func supportedTarget(target string) bool {
+	for _, triple := range ctarget.SupportedTriples() {
+		if target == triple {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	var reportPath string
 	var islandsChecklist string
 	var actorsChecklist string
+	var validateOnly bool
 
 	flag.StringVar(&reportPath, "report", "", "path to tetra smoke JSON report")
 	flag.StringVar(&islandsChecklist, "islands-checklist", filepath.FromSlash("docs/checklists/islands_platform_smoke.md"), "path to islands platform checklist")
 	flag.StringVar(&actorsChecklist, "actors-checklist", filepath.FromSlash("docs/checklists/actors_platform_smoke.md"), "path to actors platform checklist")
+	flag.BoolVar(&validateOnly, "validate-only", false, "validate smoke report JSON without updating checklists")
 	flag.Parse()
 
 	if reportPath == "" {
@@ -181,6 +283,13 @@ func main() {
 	if err := json.Unmarshal(raw, &report); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+	if err := validateSmokeReport(&report); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if validateOnly {
+		return
 	}
 
 	passed := make(map[string]bool, len(report.Cases))

@@ -101,6 +101,8 @@ func builtinEffects(name string) []string {
 		effects = []string{"link"}
 	case "core.ctx_switch":
 		effects = []string{"control", "runtime"}
+	case "core.task_spawn_i32", "core.task_join_i32":
+		effects = []string{"runtime"}
 	case "core.actor_dispatch", "core.actor_main_entry_id",
 		"core.spawn", "core.send", "core.recv", "core.self", "core.sender":
 		effects = []string{"actors"}

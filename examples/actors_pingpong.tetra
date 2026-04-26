@@ -1,21 +1,18 @@
 // Actors smoke test (linux-x64)
 // Spawns a pong actor, sends a value, waits for response.
-
-fun pong(): i32 {
+func pong() -> i32
+uses actors:
     var v: i32 = core.recv()
-    if (v == 41) {
+    if v == 41:
         var _sent: i32 = core.send(core.sender(), 42)
         return 0
-    }
     return 1
-}
 
-fun main(): i32 {
+func main() -> i32
+uses actors:
     var p: actor = core.spawn("pong")
     var _sent: i32 = core.send(p, 41)
     var r: i32 = core.recv()
-    if (r == 42) {
+    if r == 42:
         return 0
-    }
     return 1
-}

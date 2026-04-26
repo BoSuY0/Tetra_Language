@@ -1,0 +1,26 @@
+// Stable v0.5 memory helpers built on explicit cap.mem values.
+module lib.core.memory
+
+func memset_u8(dst: ptr, v: UInt8, n: Int, mem: cap.mem) -> Int
+uses mem:
+    unsafe:
+        var i: Int = 0
+        while i < n:
+            let p: ptr = core.ptr_add(dst, i, mem)
+            let _: UInt8 = core.store_u8(p, v, mem)
+            i = i + 1
+        return 0
+    return 0
+
+func memcpy_u8(dst: ptr, src: ptr, n: Int, mem: cap.mem) -> Int
+uses mem:
+    unsafe:
+        var i: Int = 0
+        while i < n:
+            let sp: ptr = core.ptr_add(src, i, mem)
+            let dp: ptr = core.ptr_add(dst, i, mem)
+            let b: UInt8 = core.load_u8(sp, mem)
+            let _: UInt8 = core.store_u8(dp, b, mem)
+            i = i + 1
+        return 0
+    return 0

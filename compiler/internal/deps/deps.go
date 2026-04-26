@@ -34,6 +34,9 @@ func collectCalleesFromStmt(stmt frontend.Stmt, mod string, out map[string]struc
 		collectCalleesFromExpr(s.Value, mod, out)
 	case *frontend.ReturnStmt:
 		collectCalleesFromExpr(s.Value, mod, out)
+	case *frontend.ThrowStmt:
+		collectCalleesFromExpr(s.Value, mod, out)
+	case *frontend.BreakStmt, *frontend.ContinueStmt:
 	case *frontend.LetStmt:
 		collectCalleesFromExpr(s.Value, mod, out)
 	case *frontend.AssignStmt:
@@ -52,6 +55,28 @@ func collectCalleesFromStmt(stmt frontend.Stmt, mod string, out map[string]struc
 		for _, inner := range s.Body {
 			collectCalleesFromStmt(inner, mod, out)
 		}
+	case *frontend.ForRangeStmt:
+		if s.Iterable != nil {
+			collectCalleesFromExpr(s.Iterable, mod, out)
+		} else {
+			collectCalleesFromExpr(s.Start, mod, out)
+			collectCalleesFromExpr(s.End, mod, out)
+		}
+		for _, inner := range s.Body {
+			collectCalleesFromStmt(inner, mod, out)
+		}
+	case *frontend.MatchStmt:
+		collectCalleesFromExpr(s.Value, mod, out)
+		for _, c := range s.Cases {
+			if !c.Default {
+				collectCalleesFromExpr(c.Pattern, mod, out)
+			}
+			for _, inner := range c.Body {
+				collectCalleesFromStmt(inner, mod, out)
+			}
+		}
+	case *frontend.ExprStmt:
+		collectCalleesFromExpr(s.Expr, mod, out)
 	}
 }
 
@@ -79,7 +104,7 @@ func collectCalleesFromExpr(expr frontend.Expr, mod string, out map[string]struc
 		collectCalleesFromExpr(e.Right, mod, out)
 	case *frontend.UnaryExpr:
 		collectCalleesFromExpr(e.X, mod, out)
-	case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.StringLitExpr:
+	case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.BoolLitExpr, *frontend.StringLitExpr:
 		return
 	}
 }
@@ -140,6 +165,9 @@ func collectTypesFromStmt(stmt frontend.Stmt, mod string, addType func(string, s
 		collectTypesFromExpr(s.Value, mod, addType)
 	case *frontend.ReturnStmt:
 		collectTypesFromExpr(s.Value, mod, addType)
+	case *frontend.ThrowStmt:
+		collectTypesFromExpr(s.Value, mod, addType)
+	case *frontend.BreakStmt, *frontend.ContinueStmt:
 	case *frontend.IfStmt:
 		collectTypesFromExpr(s.Cond, mod, addType)
 		for _, inner := range s.Then {
@@ -153,8 +181,30 @@ func collectTypesFromStmt(stmt frontend.Stmt, mod string, addType func(string, s
 		for _, inner := range s.Body {
 			collectTypesFromStmt(inner, mod, addType)
 		}
+	case *frontend.ForRangeStmt:
+		if s.Iterable != nil {
+			collectTypesFromExpr(s.Iterable, mod, addType)
+		} else {
+			collectTypesFromExpr(s.Start, mod, addType)
+			collectTypesFromExpr(s.End, mod, addType)
+		}
+		for _, inner := range s.Body {
+			collectTypesFromStmt(inner, mod, addType)
+		}
+	case *frontend.MatchStmt:
+		collectTypesFromExpr(s.Value, mod, addType)
+		for _, c := range s.Cases {
+			if !c.Default {
+				collectTypesFromExpr(c.Pattern, mod, addType)
+			}
+			for _, inner := range c.Body {
+				collectTypesFromStmt(inner, mod, addType)
+			}
+		}
 	case *frontend.PrintStmt:
 		collectTypesFromExpr(s.Value, mod, addType)
+	case *frontend.ExprStmt:
+		collectTypesFromExpr(s.Expr, mod, addType)
 	}
 }
 
@@ -179,7 +229,7 @@ func collectTypesFromExpr(expr frontend.Expr, mod string, addType func(string, s
 		collectTypesFromExpr(e.Right, mod, addType)
 	case *frontend.UnaryExpr:
 		collectTypesFromExpr(e.X, mod, addType)
-	case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.StringLitExpr:
+	case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.BoolLitExpr, *frontend.StringLitExpr:
 		return
 	}
 }

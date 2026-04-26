@@ -1,52 +1,45 @@
 // ctx_switch smoke test (Win64 ABI: windows-x64)
 // Boots a second stack, switches to it, then switches back.
+var g_main_slot: ptr
+var g_fiber_slot: ptr
 
-var g_main_slot: ptr;
-var g_fiber_slot: ptr;
-
-fun trampoline(): i32 {
-    unsafe {
-        let mem: cap.mem = core.cap_mem()
-        let _r: i32 = core.ctx_switch(g_fiber_slot, g_main_slot, mem)
-    }
+func trampoline() -> i32
+uses capability, control, mem, runtime:
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        var _r: i32 = core.ctx_switch(g_fiber_slot, g_main_slot, mem)
     return 0
-}
 
-fun main(): i32 {
+func main() -> i32
+uses alloc, capability, control, link, mem, runtime:
     var out: i32 = 0
-    unsafe {
-        let mem: cap.mem = core.cap_mem()
-        let main_slot: ptr = core.alloc_bytes(8)
-        let fiber_slot: ptr = core.alloc_bytes(8)
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        var main_slot: ptr = core.alloc_bytes(8)
+        var fiber_slot: ptr = core.alloc_bytes(8)
         g_main_slot = main_slot
         g_fiber_slot = fiber_slot
-
-        let stack: ptr = core.alloc_bytes(4096)
+        var stack: ptr = core.alloc_bytes(4096)
         var sp: ptr = core.ptr_add(stack, 4096, mem)
-
         sp = core.ptr_add(sp, -8, mem)
-        let _ret: ptr = core.store_ptr(sp, core.sym_addr("trampoline"), mem)
-
+        var _ret: ptr = core.store_ptr(sp, core.sym_addr("trampoline"), mem)
         sp = core.ptr_add(sp, -8, mem)
-        let _rbx: ptr = core.store_ptr(sp, 0, mem)
+        var _rbx: ptr = core.store_ptr(sp, 0, mem)
         sp = core.ptr_add(sp, -8, mem)
-        let _rbp: ptr = core.store_ptr(sp, 0, mem)
+        var _rbp: ptr = core.store_ptr(sp, 0, mem)
         sp = core.ptr_add(sp, -8, mem)
-        let _rdi: ptr = core.store_ptr(sp, 0, mem)
+        var _rdi: ptr = core.store_ptr(sp, 0, mem)
         sp = core.ptr_add(sp, -8, mem)
-        let _rsi: ptr = core.store_ptr(sp, 0, mem)
+        var _rsi: ptr = core.store_ptr(sp, 0, mem)
         sp = core.ptr_add(sp, -8, mem)
-        let _r12: ptr = core.store_ptr(sp, 0, mem)
+        var _r12: ptr = core.store_ptr(sp, 0, mem)
         sp = core.ptr_add(sp, -8, mem)
-        let _r13: ptr = core.store_ptr(sp, 0, mem)
+        var _r13: ptr = core.store_ptr(sp, 0, mem)
         sp = core.ptr_add(sp, -8, mem)
-        let _r14: ptr = core.store_ptr(sp, 0, mem)
+        var _r14: ptr = core.store_ptr(sp, 0, mem)
         sp = core.ptr_add(sp, -8, mem)
-        let _r15: ptr = core.store_ptr(sp, 0, mem)
-
-        let _set: ptr = core.store_ptr(fiber_slot, sp, mem)
-        let _sw: i32 = core.ctx_switch(main_slot, fiber_slot, mem)
+        var _r15: ptr = core.store_ptr(sp, 0, mem)
+        var _set: ptr = core.store_ptr(fiber_slot, sp, mem)
+        var _sw: i32 = core.ctx_switch(main_slot, fiber_slot, mem)
         out = 66
-    }
     return out
-}

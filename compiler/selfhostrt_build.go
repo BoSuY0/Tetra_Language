@@ -11,9 +11,9 @@ import (
 func embeddedSelfHostActorsRuntimeSource(target string) ([]byte, string, error) {
 	switch target {
 	case "linux-x64", "macos-x64":
-		return embeddedActorsPocSysV, "<embedded selfhostrt sysv>", nil
+		return embeddedActorsSysV, "<embedded selfhostrt actors_sysv>", nil
 	case "windows-x64":
-		return embeddedActorsPocWin64, "<embedded selfhostrt win64>", nil
+		return embeddedActorsWin64, "<embedded selfhostrt actors_win64>", nil
 	default:
 		return nil, "", fmt.Errorf("self-host runtime not available for target %s", target)
 	}

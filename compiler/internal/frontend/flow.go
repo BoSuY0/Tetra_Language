@@ -1,0 +1,183 @@
+package frontend
+
+import (
+	"bytes"
+	"errors"
+	"strings"
+)
+
+var errFlowTab = errors.New("tabs are not supported in Flow indentation")
+
+func normalizeFlowSyntax(src []byte, filename string) ([]byte, error) {
+	if !looksLikeFlowSyntax(src) {
+		return src, nil
+	}
+
+	lines := strings.Split(string(src), "\n")
+	var out bytes.Buffer
+	type flowBlock struct {
+		indent int
+		kind   string
+	}
+	var blocks []flowBlock
+	pendingBlockIndent := -1
+	pendingBlockKind := ""
+	for lineNo, line := range lines {
+		trimmedRight := strings.TrimRight(line, " \t\r")
+		content := strings.TrimSpace(trimmedRight)
+		if content == "" {
+			out.WriteByte('\n')
+			continue
+		}
+		indent, col, err := flowIndent(line)
+		if err != nil {
+			return nil, diagnosticErrorf(Position{File: filename, Line: lineNo + 1, Col: col}, err.Error())
+		}
+		if strings.HasPrefix(content, "//") {
+			out.WriteString(content)
+			out.WriteByte('\n')
+			continue
+		}
+		if pendingBlockIndent >= 0 {
+			if !(pendingBlockKind == "match" && indent == pendingBlockIndent && strings.HasPrefix(content, "case ")) && indent <= pendingBlockIndent {
+				return nil, diagnosticErrorf(Position{File: filename, Line: lineNo + 1, Col: 1}, "expected indented block after ':'")
+			}
+			pendingBlockIndent = -1
+			pendingBlockKind = ""
+		}
+		for len(blocks) > 0 {
+			top := blocks[len(blocks)-1]
+			if strings.HasPrefix(content, "case ") && top.kind == "match" && indent == top.indent {
+				break
+			}
+			if indent > top.indent {
+				break
+			}
+			out.WriteString("}\n")
+			blocks = blocks[:len(blocks)-1]
+		}
+
+		content = flowRewriteLine(content)
+		if strings.HasSuffix(content, ":") {
+			header := strings.TrimSpace(strings.TrimSuffix(content, ":"))
+			content = flowRewriteBlockHeader(header) + " {"
+			kind := flowBlockKind(header)
+			blocks = append(blocks, flowBlock{indent: indent, kind: kind})
+			pendingBlockIndent = indent
+			pendingBlockKind = kind
+		}
+		out.WriteString(content)
+		out.WriteByte('\n')
+	}
+	if pendingBlockIndent >= 0 {
+		return nil, diagnosticErrorf(Position{File: filename, Line: len(lines), Col: 1}, "expected indented block after ':'")
+	}
+	for len(blocks) > 0 {
+		out.WriteString("}\n")
+		blocks = blocks[:len(blocks)-1]
+	}
+	return out.Bytes(), nil
+}
+
+func looksLikeFlowSyntax(src []byte) bool {
+	for _, line := range strings.Split(string(src), "\n") {
+		content := strings.TrimSpace(line)
+		if content == "" || strings.HasPrefix(content, "//") {
+			continue
+		}
+		if strings.HasPrefix(content, "func ") || strings.HasPrefix(content, "async func ") {
+			return true
+		}
+		if strings.HasPrefix(content, "struct ") && strings.HasSuffix(content, ":") {
+			return true
+		}
+		if strings.HasPrefix(content, "enum ") && strings.HasSuffix(content, ":") {
+			return true
+		}
+		if strings.HasPrefix(content, "extension ") && strings.HasSuffix(content, ":") {
+			return true
+		}
+		if strings.HasPrefix(content, "protocol ") && strings.HasSuffix(content, ":") {
+			return true
+		}
+		if strings.HasPrefix(content, "impl ") {
+			return true
+		}
+		if strings.HasPrefix(content, "test ") && strings.HasSuffix(content, ":") {
+			return true
+		}
+	}
+	return false
+}
+
+func flowIndent(line string) (int, int, error) {
+	indent := 0
+	col := 1
+	for _, r := range line {
+		switch r {
+		case ' ':
+			indent++
+		case '\t':
+			return 0, col, errFlowTab
+		default:
+			return indent, col, nil
+		}
+		col++
+	}
+	return indent, col, nil
+}
+
+func flowRewriteLine(content string) string {
+	if strings.HasPrefix(content, "func ") {
+		return "fun " + strings.TrimPrefix(content, "func ")
+	}
+	if strings.HasPrefix(content, "async func ") {
+		return "async fun " + strings.TrimPrefix(content, "async func ")
+	}
+	if strings.HasPrefix(content, "let ") {
+		return "val " + strings.TrimPrefix(content, "let ")
+	}
+	return content
+}
+
+func flowRewriteBlockHeader(header string) string {
+	switch {
+	case strings.HasPrefix(header, "if let "):
+		return header
+	case strings.HasPrefix(header, "else if let "):
+		return header
+	case strings.HasPrefix(header, "else if "):
+		cond := strings.TrimSpace(strings.TrimPrefix(header, "else if "))
+		if strings.HasPrefix(cond, "(") {
+			return "else if " + cond
+		}
+		return "else if (" + cond + ")"
+	case strings.HasPrefix(header, "if "):
+		cond := strings.TrimSpace(strings.TrimPrefix(header, "if "))
+		if strings.HasPrefix(cond, "(") {
+			return "if " + cond
+		}
+		return "if (" + cond + ")"
+	case strings.HasPrefix(header, "while "):
+		cond := strings.TrimSpace(strings.TrimPrefix(header, "while "))
+		if strings.HasPrefix(cond, "(") {
+			return "while " + cond
+		}
+		return "while (" + cond + ")"
+	case header == "else":
+		return "else"
+	default:
+		return header
+	}
+}
+
+func flowBlockKind(header string) string {
+	switch {
+	case strings.HasPrefix(header, "match "):
+		return "match"
+	case strings.HasPrefix(header, "case "):
+		return "case"
+	default:
+		return "block"
+	}
+}

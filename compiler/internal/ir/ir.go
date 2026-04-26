@@ -32,6 +32,13 @@ const (
 	IRNegI32
 	IRCmpEqI32
 	IRCmpLtI32
+	IRMulI32
+	IRDivI32
+	IRModI32
+	IRCmpGtI32
+	IRCmpGeI32
+	IRCmpLeI32
+	IRCmpNeI32
 	IRCall
 	IRLabel
 	IRJmp
@@ -71,6 +78,8 @@ const (
 // STORE -> pop
 // WRITE -> pop2
 // ADD/SUB/CMP -> pop2 push1
+// MUL/DIV/MOD -> pop2 push1
+// CMP_GT/GE/LE/NE -> pop2 push1
 // NEG -> pop1 push1
 // CALL -> popN pushRet
 // JMP_IF_ZERO -> pop1
