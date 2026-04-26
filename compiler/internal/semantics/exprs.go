@@ -308,6 +308,7 @@ func checkCallExprWithEffects(
 	}
 	argRegions := make([]int, len(e.Args))
 	consumeArgs := make([]string, len(e.Args))
+	borrowArgs := make(map[string]frontend.Position)
 	inoutArgs := make(map[string]frontend.Position)
 	for i, arg := range e.Args {
 		argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects)
@@ -324,6 +325,15 @@ func checkCallExprWithEffects(
 			}
 			consumeArgs[i] = id.Name
 		}
+		if i < len(sig.ParamOwnership) && sig.ParamOwnership[i] == "borrow" {
+			id, ok := arg.(*frontend.IdentExpr)
+			if ok {
+				if firstPos, exists := inoutArgs[id.Name]; exists {
+					return "", regionNone, fmt.Errorf("%s: borrowed argument '%s' aliases inout argument in call to '%s' (inout at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+				}
+				borrowArgs[id.Name] = arg.Pos()
+			}
+		}
 		if i < len(sig.ParamOwnership) && sig.ParamOwnership[i] == "inout" {
 			id, ok := arg.(*frontend.IdentExpr)
 			if !ok {
@@ -335,6 +345,9 @@ func checkCallExprWithEffects(
 			}
 			if firstPos, exists := inoutArgs[id.Name]; exists {
 				return "", regionNone, fmt.Errorf("%s: inout argument '%s' used more than once in call to '%s' (first at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+			}
+			if firstPos, exists := borrowArgs[id.Name]; exists {
+				return "", regionNone, fmt.Errorf("%s: inout argument '%s' aliases borrowed argument in call to '%s' (borrow at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
 			}
 			inoutArgs[id.Name] = arg.Pos()
 		}

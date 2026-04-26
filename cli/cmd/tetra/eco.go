@@ -99,6 +99,9 @@ func runEcoVerify(args []string, stdout io.Writer, stderr io.Writer) int {
 	target := fs.String("target", "", "validate capsule target compatibility")
 	lockPath := fs.String("lock", "", "write dependency lock/provenance JSON")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	paths := fs.Args()

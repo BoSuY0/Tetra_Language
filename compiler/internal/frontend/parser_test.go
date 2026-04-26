@@ -686,6 +686,8 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 		want string
 	}{
 		{"capsule", "capsule app:\n  name: \"app\"\n", "planned feature 'capsule'"},
+		{"generic protocol requirement", "protocol P:\n  func id<T>(x: T) -> T\n", "generic protocol requirements are planned"},
+		{"enum payload case", "enum Option:\n  case some(Int)\n", "enum payload cases are planned"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

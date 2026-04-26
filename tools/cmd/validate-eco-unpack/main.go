@@ -89,14 +89,24 @@ func validateManifestText(text string) error {
 	if !strings.Contains(trimmed, "capsule ") {
 		return fmt.Errorf("manifest missing capsule declaration")
 	}
-	if !strings.Contains(trimmed, "\n  id ") && !strings.Contains(trimmed, "\nid ") {
+	if !hasManifestField(trimmed, "id") {
 		return fmt.Errorf("manifest missing id")
 	}
-	if !strings.Contains(trimmed, "\n  version ") && !strings.Contains(trimmed, "\nversion ") {
+	if !hasManifestField(trimmed, "version") {
 		return fmt.Errorf("manifest missing version")
 	}
-	if !strings.Contains(trimmed, "\n  target ") && !strings.Contains(trimmed, "\ntarget ") {
+	if !hasManifestField(trimmed, "target") {
 		return fmt.Errorf("manifest missing target")
 	}
 	return nil
+}
+
+func hasManifestField(text string, field string) bool {
+	prefix := field + " "
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			return true
+		}
+	}
+	return false
 }

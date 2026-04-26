@@ -295,6 +295,17 @@ func TestEcoVerifyPackAndUnpack(t *testing.T) {
 	}
 }
 
+func TestEcoVerifyHelpExitsSuccessfully(t *testing.T) {
+	var stderr bytes.Buffer
+	code := runCLI([]string{"eco", "verify", "--help"}, &bytes.Buffer{}, &stderr)
+	if code != 0 {
+		t.Fatalf("eco verify --help exit code = %d, stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "Usage of eco verify:") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
 func TestEcoPackProjectBundle(t *testing.T) {
 	dir := t.TempDir()
 	capsule := filepath.Join(dir, "Tetra.capsule")

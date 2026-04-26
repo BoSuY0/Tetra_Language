@@ -137,3 +137,26 @@ func main() -> Int:
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestOwnershipRejectsBorrowInoutAlias(t *testing.T) {
+	src := []byte(`
+func mix(read: borrow Int, write: inout Int) -> Int:
+    write = write + read
+    return write
+
+func main() -> Int:
+    var a: Int = 1
+    return mix(a, a)
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected borrow/inout aliasing error")
+	}
+	if !strings.Contains(err.Error(), "alias") && !strings.Contains(err.Error(), "borrow") {
+		t.Fatalf("error = %v", err)
+	}
+}

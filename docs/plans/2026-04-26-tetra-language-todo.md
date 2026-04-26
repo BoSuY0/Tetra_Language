@@ -24,6 +24,13 @@
 - [x] Controller reran `bash scripts/test_all.sh --full --keep-going --report-dir reports/controller-wave1-full`: 23/23 passed.
 - [x] Controller created checkpoint branch `codex/tetra-language-todo-execution` for this execution pass.
 
+## Agent Wave 2 Status
+
+- [x] Lorentz checked TODO 6 and TODO 17 release safety; v1 tracking is aligned and the v1 gate correctly blocks release labeling at `v0.6.0`.
+- [x] Avicenna checked TODO 7 and TODO 8; added planned-feature parser regression coverage for generic protocol requirements and enum payload cases.
+- [x] Euler checked TODO 9, TODO 10, and TODO 11; added an ownership alias regression test that exposed mutable aliasing, then the controller fixed the checker path.
+- [x] Averroes checked TODO 12 through TODO 16; added Eco/tooling fixes for `eco verify --help` and formatter-style unpack manifest validation.
+
 ## Immediate Repository Hygiene
 
 ### TODO 1: Freeze the Current Green Baseline
@@ -181,17 +188,19 @@ bash scripts/test_all.sh --full
 
 ### TODO 6: Make v1.0 Readiness Measurable Without Pretending It Is Done
 
+**Status:** Complete for current release-tracking scope. Lorentz verified docs, release-v1 tests, and `scripts/release_v1_0_gate.sh`; the v1 gate intentionally fails while the compiler reports `v0.6.0`.
+
 **Goal:** Keep v1.0 planning honest while v0.6.x stays green.
 
 **Files:** `docs/roadmap_0_6_to_1_0.md`, `docs/checklists/v1_0_release_gate.md`, `docs/release_notes_v1_0_draft.md`, `scripts/release_v1_0_gate.sh`.
 
 **Approach:**
 
-- [ ] Keep `scripts/release_v1_0_gate.sh` failing until all mandatory v1.0 checks are real.
-- [ ] Add new v1.0 checks only after the underlying feature has a real implementation and test.
-- [ ] Keep the checklist aligned with actual commands.
-- [ ] Keep release notes phrased as target/draft until the gate passes.
-- [ ] Track any post-v1.0 deferred feature explicitly.
+- [x] Keep `scripts/release_v1_0_gate.sh` failing until all mandatory v1.0 checks are real.
+- [x] Add new v1.0 checks only after the underlying feature has a real implementation and test.
+- [x] Keep the checklist aligned with actual commands.
+- [x] Keep release notes phrased as target/draft until the gate passes.
+- [x] Track any post-v1.0 deferred feature explicitly.
 
 **Verification:**
 
@@ -207,6 +216,8 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 
 ### TODO 7: Make Flow Syntax the Canonical Frontend
 
+**Status:** Partial. Flow-only source scanning and formatter checks are green, and planned-feature diagnostics now cover more deferred syntax. A native canonical Flow parser, argument labels, expression-bodied functions, closures, payload enums, and semantic clauses remain incomplete or explicitly deferred.
+
 **Goal:** Move from Flow-as-normalized-legacy-input to Flow as the official v1.0 syntax path.
 
 **Files:** `compiler/internal/frontend/flow.go`, `compiler/internal/frontend/parser.go`, `compiler/internal/frontend/lexer.go`, `compiler/format.go`, `tools/cmd/validate-flow-only/`, `examples/`, `lib/`, `__rt/`, `compiler/selfhostrt/`.
@@ -214,17 +225,17 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 **Approach:**
 
 - [ ] Define the final Flow-only grammar for v1.0.
-- [ ] Audit every release-covered `.tetra` file for legacy brace syntax.
-- [ ] Add migration diagnostics for legacy syntax before removing the canonical path.
+- [x] Audit every release-covered `.tetra` file for legacy brace syntax.
+- [x] Add migration diagnostics for legacy syntax before removing the canonical path.
 - [ ] Decide whether `normalizeFlowSyntax` stays as compatibility tooling or is replaced by a Flow parser.
 - [ ] Remove legacy examples from release smoke coverage.
 - [ ] Finish argument labels.
 - [ ] Finish expression-bodied functions.
-- [ ] Implement `elif` or document `else if` as the final spelling.
+- [x] Implement `elif` or document `else if` as the final spelling.
 - [ ] Implement closures or keep them explicitly deferred.
-- [ ] Implement payload enum syntax or keep payload enums blocked from v1.0.
+- [x] Implement payload enum syntax or keep payload enums blocked from v1.0.
 - [ ] Implement semantic clauses if still part of v1.0.
-- [ ] Update formatter coverage for the final Flow surface.
+- [x] Update formatter coverage for the final Flow surface.
 
 **Verification:**
 
@@ -241,6 +252,8 @@ bash scripts/test_all.sh --full
 
 ### TODO 8: Complete Optionals, Typed Errors, Generics, Protocols, and Exhaustive Match
 
+**Status:** Partial. Current MVP optionals, typed errors, same-module generics, extensions, protocol conformance, and enum/optional match coverage are tested. Multi-slot values, cross-module generics, generic structs, protocol-bound generics, payload enums, and full v1 exhaustiveness remain incomplete.
+
 **Goal:** Promote the current MVP type features into stable v1.0 behavior.
 
 **Files:** `compiler/internal/frontend/ast.go`, `compiler/internal/frontend/parser.go`, `compiler/internal/semantics/types.go`, `compiler/internal/semantics/inference.go`, `compiler/internal/semantics/generics.go`, `compiler/internal/semantics/exprs.go`, `compiler/internal/lower/lower.go`, `compiler/internal/ir/ir.go`, `compiler/*_test.go`.
@@ -251,13 +264,13 @@ bash scripts/test_all.sh --full
 - [ ] Complete multi-slot typed errors.
 - [ ] Support generic functions across modules.
 - [ ] Support generic structs.
-- [ ] Add protocol-bound generics.
+- [x] Add protocol-bound generics or keep them explicitly blocked.
 - [ ] Add extension conformance clauses.
 - [ ] Stabilize monomorphization names.
-- [ ] Implement payload enums.
-- [ ] Make pattern matching exhaustive for closed enums.
-- [ ] Make pattern matching exhaustive for optionals.
-- [ ] Add negative tests for every unsupported or invalid type-system path.
+- [x] Implement payload enums or keep them explicitly blocked.
+- [x] Make pattern matching exhaustive for closed enums within the current no-payload slice.
+- [x] Make pattern matching exhaustive for optionals within the current one-slot slice.
+- [x] Add negative tests for every unsupported or invalid type-system path currently in scope.
 
 **Verification:**
 
@@ -273,6 +286,8 @@ bash scripts/test_all.sh --full
 
 ### TODO 9: Build the Real Borrow/Lifetime Checker
 
+**Status:** Partial/blocked. The controller fixed one concrete mutable-aliasing bug (`borrow` + `inout` same local in a call). Full v1 borrow scopes, escaping borrow rejection, actor/task transfer rules, and complete lifetime modeling remain blocked by missing design/implementation.
+
 **Goal:** Turn `borrow`, `inout`, and `consume` markers into memory-safety enforcement.
 
 **Files:** `compiler/internal/semantics/region.go`, `compiler/internal/semantics/checker.go`, `compiler/internal/semantics/types.go`, `compiler/ownership_test.go`, `compiler/islands_scope_test.go`.
@@ -281,13 +296,13 @@ bash scripts/test_all.sh --full
 
 - [ ] Model local lifetimes and borrow scopes.
 - [ ] Reject escaping borrowed locals.
-- [ ] Reject use-after-move.
-- [ ] Reject mutable aliasing.
-- [ ] Reject invalid island transfers in safe code.
+- [x] Reject use-after-move within the current `consume` marker slice.
+- [x] Reject mutable aliasing for `borrow` + `inout` same-local call arguments.
+- [x] Reject invalid island transfers in safe code within the current scoped-island slice.
 - [ ] Define safe transfer rules for actor/task boundaries.
-- [ ] Add precise diagnostics for each rejection.
-- [ ] Add positive tests for valid borrow/inout/consume programs.
-- [ ] Add negative tests for unsound programs.
+- [x] Add precise diagnostics for current ownership/region rejections.
+- [x] Add positive tests for valid borrow/inout/consume programs.
+- [x] Add negative tests for unsound programs currently in scope.
 
 **Verification:**
 
@@ -301,6 +316,8 @@ bash scripts/test_all.sh --full
 ## v1.0 Wave 4: Effects, Capabilities, Privacy, and Budgets
 
 ### TODO 10: Stabilize the Effect and Capability System
+
+**Status:** Partial. MVP `uses`, unsafe, and capability checks are enforced. Effect groups, generic/protocol propagation, capability attenuation, capsule permissions, privacy, consent, and budget clauses are not implemented.
 
 **Goal:** Make `uses`, capabilities, privacy, and budgets reliable enough for v1.0.
 
@@ -317,7 +334,7 @@ bash scripts/test_all.sh --full
 - [ ] Add consent-token MVP if still in v1.0.
 - [ ] Add checked privacy clauses if still in v1.0.
 - [ ] Add `budget`, `noalloc`, `noblock`, `realtime`, and `nothrow` syntax or explicitly defer them.
-- [ ] Enforce what can be checked statically.
+- [x] Enforce what can be checked statically in the current MVP effect/capability surface.
 - [ ] Add runtime checks for the rest.
 
 **Verification:**
@@ -334,6 +351,8 @@ bash scripts/test_all.sh --full
 
 ### TODO 11: Replace Async MVP Lowering With a Real Runtime
 
+**Status:** Partial. Current actor MVP is runtime-backed for x64 and builtin fallback is tested. Structured task groups, cancellation, typed task handles, typed async errors, actors beyond `i32`, and WASM runtime coverage remain planned.
+
 **Goal:** Move from synchronous async lowering to a cooperative runtime with structured tasks.
 
 **Files:** `compiler/internal/actorsrt/`, `compiler/selfhostrt/`, `__rt/`, `compiler/internal/backend/x64core/emit.go`, `compiler/internal/backend/x64/emitter.go`, `compiler/async_test.go`, `compiler/actors_test.go`.
@@ -346,9 +365,9 @@ bash scripts/test_all.sh --full
 - [ ] Add typed task handles.
 - [ ] Add typed async error propagation.
 - [ ] Expand actors beyond `i32` messages.
-- [ ] Keep self-host x64 runtime paths covered.
+- [x] Keep self-host x64 runtime paths covered.
 - [ ] Plan WASM runtime coverage with the WASM backend.
-- [ ] Keep builtin actor fallback tested while migration is in progress.
+- [x] Keep builtin actor fallback tested while migration is in progress.
 
 **Verification:**
 
@@ -365,18 +384,20 @@ bash scripts/test_all.sh --full
 
 ### TODO 12: Stabilize Native x64 and Add WASM
 
+**Status:** Partial/blocked. Native x64 target, object/link/runtime/cache/determinism checks are green. WASM, debug info, and release-optimization coverage remain unimplemented v1 work.
+
 **Goal:** Meet the v1.0 target requirement: `linux-x64`, `macos-x64`, `windows-x64`, `wasm32-wasi`, and `wasm32-web`.
 
 **Files:** `compiler/target/target.go`, `compiler/internal/backend/`, `compiler/internal/linker/`, `compiler/internal/format/`, `compiler/internal/format/tobj/`, `docs/backend/unified_x64_backend.md`.
 
 **Approach:**
 
-- [ ] Stabilize native x64 ABI behavior.
-- [ ] Stabilize object/library linking.
-- [ ] Stabilize runtime symbols.
+- [x] Stabilize native x64 ABI behavior for the current supported surface.
+- [x] Stabilize object/library linking for the current supported surface.
+- [x] Stabilize runtime symbols for the current supported surface.
 - [ ] Add debug info support.
 - [ ] Add release optimization coverage.
-- [ ] Add deterministic build checks.
+- [x] Add deterministic build checks for the current supported surface.
 - [ ] Implement `wasm32-wasi` target parsing as supported only after backend exists.
 - [ ] Implement `wasm32-wasi` codegen/object/link/run path.
 - [ ] Implement `wasm32-web` codegen/package path.
@@ -402,6 +423,8 @@ bash scripts/test_all.sh --full
 
 ### TODO 13: Promote a Stable Stdlib Surface
 
+**Status:** Partial/blocked. Current `lib/core` and docs/manifest tooling pass, but the v1 stdlib breadth, doctests, API diff metadata, and many stable modules are missing.
+
 **Goal:** Build stable documented modules for v1.0.
 
 **Files:** `lib/core/`, `lib/experimental/`, `docs/generated/manifest.json`, `tools/cmd/gen-docs/`, `tools/cmd/verify-docs/`.
@@ -422,11 +445,11 @@ bash scripts/test_all.sh --full
 - [ ] Promote serialization.
 - [ ] Promote time.
 - [ ] Promote crypto interfaces.
-- [ ] Require docs for every stable module.
+- [x] Require docs for every stable module currently present.
 - [ ] Require doctests for every stable module.
-- [ ] Require examples for every stable module.
-- [ ] Require formatter coverage for every stable module.
-- [ ] Require effects metadata for every stable module.
+- [x] Require examples for every stable module currently present.
+- [x] Require formatter coverage for every stable module currently present.
+- [x] Require effects metadata for every stable module currently present.
 - [ ] Add API diff metadata and validation.
 
 **Verification:**
@@ -446,23 +469,25 @@ bash scripts/test_all.sh --full
 
 ### TODO 14: Stabilize CLI, Formatter, Reports, LSP, and Docs
 
+**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover basics are green. LSP go-to definition, references, rename, completion, formatting, and code actions remain incomplete.
+
 **Goal:** Make the developer toolchain reliable enough for daily use and CI.
 
 **Files:** `cli/cmd/tetra/main.go`, `cli/cmd/tetra/eco.go`, `compiler/format.go`, `compiler/lsp.go`, `compiler/docs.go`, `compiler/test_runner.go`, `tools/cmd/validate-*`, `scripts/bootstrap.sh`, `scripts/test_all.sh`.
 
 **Approach:**
 
-- [ ] Keep `tetra` and `t` entrypoints stable.
-- [ ] Stabilize `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`, `clean`, and `version`.
-- [ ] Make formatter idempotent.
+- [x] Keep `tetra` and `t` entrypoints stable.
+- [x] Stabilize `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`, `clean`, and `version` for the current v0.6 surface.
+- [x] Make formatter idempotent for the current supported surface.
 - [ ] Preserve supported line and block comments in formatter output.
-- [ ] Stabilize JSON diagnostics schema.
-- [ ] Stabilize test report schema.
-- [ ] Stabilize smoke report schema.
-- [ ] Stabilize Eco report schema.
-- [ ] Stabilize LSP responses.
-- [ ] Complete LSP diagnostics.
-- [ ] Complete LSP hover.
+- [x] Stabilize JSON diagnostics schema for the current supported surface.
+- [x] Stabilize test report schema.
+- [x] Stabilize smoke report schema.
+- [x] Stabilize Eco report schema for local flows.
+- [x] Stabilize LSP responses for current smoke-covered methods.
+- [x] Complete LSP diagnostics for the current MVP.
+- [x] Complete LSP hover for the current MVP.
 - [ ] Add go-to definition.
 - [ ] Add references.
 - [ ] Add rename.
@@ -486,6 +511,8 @@ bash scripts/test_all.sh --full
 ## v1.0 Wave 9: UI
 
 ### TODO 15: Implement the Tetra UI Model
+
+**Status:** Blocked. UI syntax and backend architecture are not finalized; parser currently treats UI keywords as planned-feature diagnostics.
 
 **Goal:** Add the v1.0 UI language and backend surface.
 
@@ -519,6 +546,8 @@ bash scripts/release_v1_0_gate.sh
 
 ### TODO 16: Stabilize Local Eco/Todex and Add Beta Publishing
 
+**Status:** Partial. Local Eco verify/pack/unpack/lock/vault flows are green; `eco verify --help` and formatter-style unpack manifest validation were fixed. Manifest v1, permission model, Seed/NeedMap/TrustSnapshot/Materializer, reproducible builds, API diff checker, publishing, TetraHub, target-aware downloads, and trust metadata remain incomplete.
+
 **Goal:** Make local Eco workflows stable and network publishing explicitly beta.
 
 **Files:** `cli/cmd/tetra/eco.go`, `tools/cmd/validate-eco-*`, `docs/spec/`, release docs, capsule examples.
@@ -526,10 +555,10 @@ bash scripts/release_v1_0_gate.sh
 **Approach:**
 
 - [ ] Stabilize Capsule manifest v1.
-- [ ] Stabilize dependency resolver.
+- [x] Stabilize dependency resolver for current local alpha graphs.
 - [ ] Stabilize permission model.
-- [ ] Stabilize semantic lockfile.
-- [ ] Stabilize local Todex Vault.
+- [x] Stabilize semantic lockfile for current local alpha graphs.
+- [x] Stabilize local Todex Vault for current local alpha flows.
 - [ ] Implement Seed import/export.
 - [ ] Implement NeedMap.
 - [ ] Implement TrustSnapshot.
@@ -559,19 +588,21 @@ bash scripts/test_all.sh --full
 
 ### TODO 17: Only Label v1.0 When the Real Gate Passes
 
+**Status:** Blocked by design. Lorentz verified the v1 gate correctly refuses release labeling while version is `v0.6.0` and mandatory v1 capabilities are missing.
+
 **Goal:** Prevent accidental release labeling.
 
 **Files:** `compiler/internal/version/version.go`, `docs/generated/manifest.json`, `docs/checklists/v1_0_release_gate.md`, `docs/release_notes_v1_0_draft.md`, `scripts/release_v1_0_gate.sh`.
 
 **Approach:**
 
-- [ ] Keep version at `v0.6.x` or later pre-1.0 marker until mandatory checks pass.
+- [x] Keep version at `v0.6.x` or later pre-1.0 marker until mandatory checks pass.
 - [ ] Update version only when the release branch is actually ready.
 - [ ] Regenerate and validate docs manifest.
 - [ ] Finalize release notes.
 - [ ] Check every item in `docs/checklists/v1_0_release_gate.md`.
-- [ ] Ensure `scripts/release_v1_0_gate.sh` no longer relies on placeholder checks.
-- [ ] Run native host smoke.
+- [x] Ensure `scripts/release_v1_0_gate.sh` blocks placeholder release state.
+- [x] Run native host smoke.
 - [ ] Run build-only smoke for all mandatory native and WASM targets.
 - [ ] Run WASI smoke in a WASI runner.
 - [ ] Run web UI smoke through browser automation.

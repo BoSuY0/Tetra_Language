@@ -16,6 +16,18 @@ func TestValidateEcoUnpackAcceptsProjectBundle(t *testing.T) {
 	}
 }
 
+func TestValidateEcoUnpackAcceptsFormatterStyleIndentedManifest(t *testing.T) {
+	root := makeUnpackedProjectWithManifest(t, `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    target "linux-x64"
+`, true)
+	out, err := runUnpackValidator(t, root)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
 func TestValidateEcoUnpackRejectsMissingCapsuleManifest(t *testing.T) {
 	root := makeUnpackedProject(t, false, true)
 	out, err := runUnpackValidator(t, root)
@@ -85,14 +97,21 @@ func TestValidateEcoUnpackRejectsInvalidSource(t *testing.T) {
 
 func makeUnpackedProject(t *testing.T, manifest bool, source bool) string {
 	t.Helper()
-	root := t.TempDir()
 	if manifest {
-		raw := `capsule App:
+		return makeUnpackedProjectWithManifest(t, `capsule App:
   id "tetra://app"
   version "0.1.0"
   target "linux-x64"
-`
-		if err := os.WriteFile(filepath.Join(root, "Tetra.capsule"), []byte(raw), 0o644); err != nil {
+`, source)
+	}
+	return makeUnpackedProjectWithManifest(t, "", source)
+}
+
+func makeUnpackedProjectWithManifest(t *testing.T, manifest string, source bool) string {
+	t.Helper()
+	root := t.TempDir()
+	if manifest != "" {
+		if err := os.WriteFile(filepath.Join(root, "Tetra.capsule"), []byte(manifest), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
