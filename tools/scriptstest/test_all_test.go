@@ -785,7 +785,9 @@ case "$cmd" in
     done
     ;;
   doc)
-    printf '%s\n' '# Tetra API Docs' '' '## examples' '' '### Functions' ''
+    printf '%s\n' '# Tetra API Docs' ''
+    printf '%s\n' '<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:ede46e5e34948c25f6ec38b0b963a2d8d42f5aa09071128581ee08271e966459","module_count":1,"entry_count":1} -->' ''
+    printf '%s\n' '## examples' '' '### Functions' ''
     printf '%b\n' '- \x60func main() -> Int\x60'
     ;;
   build)

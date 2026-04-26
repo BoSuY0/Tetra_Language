@@ -31,6 +31,13 @@
 - [x] Euler checked TODO 9, TODO 10, and TODO 11; added an ownership alias regression test that exposed mutable aliasing, then the controller fixed the checker path.
 - [x] Averroes checked TODO 12 through TODO 16; added Eco/tooling fixes for `eco verify --help` and formatter-style unpack manifest validation.
 
+## Agent Wave 3 Status
+
+- [x] Wegener implemented expression-bodied functions for the current MVP slice and added parser, formatter, build/run, and spec coverage.
+- [x] Dalton added explicit planned-feature diagnostics for generic structs.
+- [x] Halley implemented LSP `textDocument/completion` for open-document symbols and tightened stdio validation.
+- [x] Mendel added alpha API metadata/hash validation to generated API docs and documented the API metadata surface.
+
 ## Immediate Repository Hygiene
 
 ### TODO 1: Freeze the Current Green Baseline
@@ -216,7 +223,7 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 
 ### TODO 7: Make Flow Syntax the Canonical Frontend
 
-**Status:** Partial. Flow-only source scanning and formatter checks are green, and planned-feature diagnostics now cover more deferred syntax. A native canonical Flow parser, argument labels, expression-bodied functions, closures, payload enums, and semantic clauses remain incomplete or explicitly deferred.
+**Status:** Partial. Flow-only source scanning and formatter checks are green, expression-bodied functions are implemented, and planned-feature diagnostics now cover more deferred syntax. A native canonical Flow parser, argument labels, closures, legacy smoke removal, and semantic clauses remain incomplete or explicitly deferred.
 
 **Goal:** Move from Flow-as-normalized-legacy-input to Flow as the official v1.0 syntax path.
 
@@ -230,7 +237,7 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 - [ ] Decide whether `normalizeFlowSyntax` stays as compatibility tooling or is replaced by a Flow parser.
 - [ ] Remove legacy examples from release smoke coverage.
 - [ ] Finish argument labels.
-- [ ] Finish expression-bodied functions.
+- [x] Finish expression-bodied functions.
 - [x] Implement `elif` or document `else if` as the final spelling.
 - [ ] Implement closures or keep them explicitly deferred.
 - [x] Implement payload enum syntax or keep payload enums blocked from v1.0.
@@ -252,7 +259,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 8: Complete Optionals, Typed Errors, Generics, Protocols, and Exhaustive Match
 
-**Status:** Partial. Current MVP optionals, typed errors, same-module generics, extensions, protocol conformance, and enum/optional match coverage are tested. Multi-slot values, cross-module generics, generic structs, protocol-bound generics, payload enums, and full v1 exhaustiveness remain incomplete.
+**Status:** Partial. Current MVP optionals, typed errors, same-module generics, extensions, protocol conformance, and enum/optional match coverage are tested. Generic structs, protocol-bound generics, and payload enums now fail with explicit planned-feature diagnostics. Multi-slot values, cross-module generics, extension conformance clauses, and full v1 exhaustiveness remain incomplete.
 
 **Goal:** Promote the current MVP type features into stable v1.0 behavior.
 
@@ -263,7 +270,7 @@ bash scripts/test_all.sh --full
 - [ ] Complete multi-slot optionals.
 - [ ] Complete multi-slot typed errors.
 - [ ] Support generic functions across modules.
-- [ ] Support generic structs.
+- [x] Support generic structs or keep them explicitly blocked.
 - [x] Add protocol-bound generics or keep them explicitly blocked.
 - [ ] Add extension conformance clauses.
 - [ ] Stabilize monomorphization names.
@@ -423,7 +430,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 13: Promote a Stable Stdlib Surface
 
-**Status:** Partial/blocked. Current `lib/core` and docs/manifest tooling pass, but the v1 stdlib breadth, doctests, API diff metadata, and many stable modules are missing.
+**Status:** Partial/blocked. Current `lib/core` and docs/manifest tooling pass, and generated API docs now include alpha metadata/hash validation. The v1 stdlib breadth, doctests, baseline-vs-current API diff policy, and many stable modules are still missing.
 
 **Goal:** Build stable documented modules for v1.0.
 
@@ -450,7 +457,7 @@ bash scripts/test_all.sh --full
 - [x] Require examples for every stable module currently present.
 - [x] Require formatter coverage for every stable module currently present.
 - [x] Require effects metadata for every stable module currently present.
-- [ ] Add API diff metadata and validation.
+- [x] Add API diff metadata and validation for the current alpha API-doc surface.
 
 **Verification:**
 
@@ -469,7 +476,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 14: Stabilize CLI, Formatter, Reports, LSP, and Docs
 
-**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover basics are green. LSP go-to definition, references, rename, completion, formatting, and code actions remain incomplete.
+**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion basics are green. LSP go-to definition, references, rename, formatting, and code actions remain incomplete.
 
 **Goal:** Make the developer toolchain reliable enough for daily use and CI.
 
@@ -491,7 +498,7 @@ bash scripts/test_all.sh --full
 - [ ] Add go-to definition.
 - [ ] Add references.
 - [ ] Add rename.
-- [ ] Add completion.
+- [x] Add completion for current open-document symbols.
 - [ ] Add formatting.
 - [ ] Add code actions.
 
@@ -546,7 +553,7 @@ bash scripts/release_v1_0_gate.sh
 
 ### TODO 16: Stabilize Local Eco/Todex and Add Beta Publishing
 
-**Status:** Partial. Local Eco verify/pack/unpack/lock/vault flows are green; `eco verify --help` and formatter-style unpack manifest validation were fixed. Manifest v1, permission model, Seed/NeedMap/TrustSnapshot/Materializer, reproducible builds, API diff checker, publishing, TetraHub, target-aware downloads, and trust metadata remain incomplete.
+**Status:** Partial. Local Eco verify/pack/unpack/lock/vault flows are green; `eco verify --help`, formatter-style unpack manifest validation, and alpha API metadata validation were fixed. Manifest v1, permission model, Seed/NeedMap/TrustSnapshot/Materializer, reproducible builds, publishing, TetraHub, target-aware downloads, and trust metadata remain incomplete.
 
 **Goal:** Make local Eco workflows stable and network publishing explicitly beta.
 
@@ -564,7 +571,7 @@ bash scripts/release_v1_0_gate.sh
 - [ ] Implement TrustSnapshot.
 - [ ] Implement Materializer.
 - [ ] Add reproducible build basics.
-- [ ] Add API diff checker.
+- [x] Add API diff checker for the current alpha generated-doc metadata surface.
 - [ ] Add beta package publishing.
 - [ ] Add TetraHub beta path.
 - [ ] Add target-aware downloads.

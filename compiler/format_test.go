@@ -133,6 +133,25 @@ uses io:
 	}
 }
 
+func TestFormatSourceExpressionBodiedFunction(t *testing.T) {
+	src := []byte(`func add(a: Int, b: Int) -> Int = a + b
+func main() -> Int = add(40, 2)
+`)
+	got, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `func add(a: Int, b: Int) -> Int:
+    return a + b
+
+func main() -> Int:
+    return add(40, 2)
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
 func TestFormatSourceCollectionFor(t *testing.T) {
 	src := []byte(`func main() -> Int:
     var total: Int = 0

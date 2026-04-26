@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,11 +30,13 @@ func GenerateAPIDocs(paths []string) ([]byte, error) {
 		file.Path = path
 		parsed = append(parsed, file)
 	}
-	var b bytes.Buffer
-	b.WriteString("# Tetra API Docs\n\n")
+	var body bytes.Buffer
 	for _, file := range parsed {
-		writeFileAPIDocs(&b, file)
+		writeFileAPIDocs(&body, file)
 	}
+	var b bytes.Buffer
+	writeAPIDocsHeader(&b, len(parsed), body.String())
+	b.Write(body.Bytes())
 	return b.Bytes(), nil
 }
 
@@ -43,10 +46,35 @@ func GenerateAPIDocsFromSource(src []byte, filename string) ([]byte, error) {
 		return nil, err
 	}
 	file.Path = filename
+	var body bytes.Buffer
+	writeFileAPIDocs(&body, file)
 	var b bytes.Buffer
-	b.WriteString("# Tetra API Docs\n\n")
-	writeFileAPIDocs(&b, file)
+	writeAPIDocsHeader(&b, 1, body.String())
+	b.Write(body.Bytes())
 	return b.Bytes(), nil
+}
+
+func writeAPIDocsHeader(b *bytes.Buffer, moduleCount int, body string) {
+	entryCount, hash := apiSurfaceMetadata(body)
+	b.WriteString("# Tetra API Docs\n\n")
+	fmt.Fprintf(b, "<!-- tetra-api-metadata: {\"schema\":\"tetra.api.v1alpha1\",\"api_hash\":\"sha256:%s\",\"module_count\":%d,\"entry_count\":%d} -->\n\n", hash, moduleCount, entryCount)
+}
+
+func apiSurfaceMetadata(body string) (int, string) {
+	var surface []string
+	entryCount := 0
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "### "):
+			surface = append(surface, trimmed)
+		case strings.HasPrefix(trimmed, "- `"):
+			surface = append(surface, trimmed)
+			entryCount++
+		}
+	}
+	sum := sha256.Sum256([]byte(strings.Join(surface, "\n")))
+	return entryCount, fmt.Sprintf("%x", sum[:])
 }
 
 func collectDocFiles(paths []string) ([]string, error) {

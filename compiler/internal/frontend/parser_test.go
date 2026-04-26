@@ -562,6 +562,29 @@ func main() -> Int:
 	}
 }
 
+func TestParseExpressionBodiedFunction(t *testing.T) {
+	src := `
+func add(a: Int, b: Int) -> Int = a + b
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) != 1 {
+		t.Fatalf("func count = %d, want 1", len(prog.Funcs))
+	}
+	if got := len(prog.Funcs[0].Body); got != 1 {
+		t.Fatalf("body len = %d, want 1", got)
+	}
+	ret, ok := prog.Funcs[0].Body[0].(*ReturnStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want ReturnStmt", prog.Funcs[0].Body[0])
+	}
+	if got := exprString(ret.Value); got != "+(a, b)" {
+		t.Fatalf("return expr = %s, want +(a, b)", got)
+	}
+}
+
 func TestParseLocalConst(t *testing.T) {
 	src := `
 func main() -> Int:
@@ -687,6 +710,7 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 	}{
 		{"capsule", "capsule app:\n  name: \"app\"\n", "planned feature 'capsule'"},
 		{"generic protocol requirement", "protocol P:\n  func id<T>(x: T) -> T\n", "generic protocol requirements are planned"},
+		{"generic struct", "struct Box<T>:\n  value: T\n", "generic structs are planned"},
 		{"enum payload case", "enum Option:\n  case some(Int)\n", "enum payload cases are planned"},
 	}
 	for _, tt := range tests {

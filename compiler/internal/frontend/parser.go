@@ -592,9 +592,26 @@ func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 		}
 	}
 
-	body, err := p.parseBlock()
-	if err != nil {
-		return nil, err
+	var body []Stmt
+	if p.cur.typ == TokenAssign {
+		returnPos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if err := p.consumeOptionalSemicolon(); err != nil {
+			return nil, err
+		}
+		body = []Stmt{&ReturnStmt{At: returnPos, Value: expr}}
+	} else {
+		var err error
+		body, err = p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	fn := &FuncDecl{Pos: nameTok.pos, Name: nameTok.lit, ExportName: exportName, Async: async, TypeParams: typeParams, ReturnType: retType, Throws: throws, HasThrows: hasThrows, Params: params, Uses: uses, Body: body}
@@ -722,6 +739,9 @@ func (p *parser) parseStructDecl() (*StructDecl, error) {
 	nameTok, err := p.expect(TokenIdent)
 	if err != nil {
 		return nil, err
+	}
+	if p.cur.typ == TokenLess {
+		return nil, diagnosticErrorf(nameTok.pos, "generic structs are planned for a later release")
 	}
 	if _, err := p.expect(TokenLBrace); err != nil {
 		return nil, err

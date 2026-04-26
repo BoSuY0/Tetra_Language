@@ -70,6 +70,9 @@ func validateLSPTranscript(raw []byte) error {
 			if !jsonObjectHasKey(capabilities, "hoverProvider") {
 				return fmt.Errorf("initialize capabilities missing hoverProvider")
 			}
+			if !jsonObjectHasKey(capabilities, "completionProvider") {
+				return fmt.Errorf("initialize capabilities missing completionProvider")
+			}
 			sawInitialize = true
 		}
 		if msg.Method == "textDocument/publishDiagnostics" {

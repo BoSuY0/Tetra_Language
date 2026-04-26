@@ -584,6 +584,9 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 						"textDocumentSync":       1,
 						"documentSymbolProvider": true,
 						"hoverProvider":          true,
+						"completionProvider": map[string]any{
+							"resolveProvider": false,
+						},
 					},
 				}
 				if err := writeLSPResponse(stdout, *req.ID, result); err != nil {
@@ -672,6 +675,18 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 			}
 			if req.ID != nil {
 				if err := writeLSPResponse(stdout, *req.ID, lspHoverAt(openDocs[params.TextDocument.URI], params.Position.Line)); err != nil {
+					fmt.Fprintln(stderr, err)
+					return 1
+				}
+			}
+		case "textDocument/completion":
+			var params lspHoverParams
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+			if req.ID != nil {
+				if err := writeLSPResponse(stdout, *req.ID, lspCompletionItems(openDocs[params.TextDocument.URI])); err != nil {
 					fmt.Fprintln(stderr, err)
 					return 1
 				}
@@ -795,6 +810,38 @@ func lspHoverAt(analysis compiler.LSPAnalysis, zeroBasedLine int) any {
 		}
 	}
 	return nil
+}
+
+func lspCompletionItems(analysis compiler.LSPAnalysis) []map[string]any {
+	out := make([]map[string]any, 0, len(analysis.Symbols))
+	for _, sym := range analysis.Symbols {
+		item := map[string]any{
+			"label": sym.Name,
+			"kind":  lspCompletionKind(sym.Kind),
+		}
+		if sym.Detail != "" {
+			item["detail"] = sym.Detail
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func lspCompletionKind(kind string) int {
+	switch kind {
+	case "function", "extension-method":
+		return 3
+	case "const":
+		return 21
+	case "enum":
+		return 13
+	case "protocol":
+		return 8
+	case "struct":
+		return 7
+	default:
+		return 6
+	}
 }
 
 func lspSymbolKind(kind string) int {

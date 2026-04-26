@@ -13,6 +13,13 @@ func add(a: Int, b: Int) -> Int:
     return a + b
 ```
 
+Single-expression functions may use an expression body. The parser lowers this
+surface form to an ordinary one-statement function body with `return`.
+
+```tetra doctest
+func add(a: Int, b: Int) -> Int = a + b
+```
+
 Functions declare observable effects with `uses`:
 
 ```tetra

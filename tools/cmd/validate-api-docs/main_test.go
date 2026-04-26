@@ -11,6 +11,8 @@ import (
 func TestValidateAPIDocsAcceptsGeneratedShape(t *testing.T) {
 	docs := `# Tetra API Docs
 
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:a5813045590b999abb9088185f7ee73c1d75b281dbbacfd2ea16fda06106dc36","module_count":1,"entry_count":1} -->
+
 ## examples/flow_hello.tetra
 
 ### Functions
@@ -20,6 +22,44 @@ func TestValidateAPIDocsAcceptsGeneratedShape(t *testing.T) {
 	out, err := runAPIDocsValidator(t, docs)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateAPIDocsRejectsMissingAPIMetadata(t *testing.T) {
+	docs := `# Tetra API Docs
+
+## examples/flow_hello.tetra
+
+### Functions
+
+- ` + "`func main() -> Int uses io`" + `
+`
+	out, err := runAPIDocsValidator(t, docs)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "missing tetra-api-metadata") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateAPIDocsRejectsAPIMetadataHashMismatch(t *testing.T) {
+	docs := `# Tetra API Docs
+
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:0000000000000000000000000000000000000000000000000000000000000000","module_count":1,"entry_count":1} -->
+
+## examples/flow_hello.tetra
+
+### Functions
+
+- ` + "`func main() -> Int uses io`" + `
+`
+	out, err := runAPIDocsValidator(t, docs)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "API metadata api_hash mismatch") {
+		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
 
@@ -35,6 +75,8 @@ func TestValidateAPIDocsRejectsEmptyDocument(t *testing.T) {
 
 func TestValidateAPIDocsRejectsMissingAPIEntries(t *testing.T) {
 	docs := `# Tetra API Docs
+
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:a38d7b1b91cba7f01c3feb0728d5bdf744b927068fee1fa4e300953670622629","module_count":1,"entry_count":0} -->
 
 ## examples/empty.tetra
 
@@ -62,6 +104,8 @@ func TestValidateAPIDocsRejectsErrorOutput(t *testing.T) {
 func TestValidateAPIDocsRejectsDuplicateModules(t *testing.T) {
 	docs := `# Tetra API Docs
 
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:f7c1f415fc85300357fe5db084ac841e64b3492e60b353a5d1a7e3a2c4d39328","module_count":2,"entry_count":2} -->
+
 ## a.tetra
 
 ### Functions
@@ -86,6 +130,8 @@ func TestValidateAPIDocsRejectsDuplicateModules(t *testing.T) {
 func TestValidateAPIDocsRejectsUnknownSection(t *testing.T) {
 	docs := `# Tetra API Docs
 
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:97530ef10760f6f6962250a0da46f4cd76a76af5d5fc31bc4a4c024e58fd6217","module_count":1,"entry_count":1} -->
+
 ## a.tetra
 
 ### Widgets
@@ -103,6 +149,8 @@ func TestValidateAPIDocsRejectsUnknownSection(t *testing.T) {
 
 func TestValidateAPIDocsRejectsEntryBeforeSection(t *testing.T) {
 	docs := `# Tetra API Docs
+
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:7102027c286a490a13f5e2f20549e0f42fa88c4f2b479d3290ab99da1dc522d3","module_count":1,"entry_count":1} -->
 
 ## a.tetra
 

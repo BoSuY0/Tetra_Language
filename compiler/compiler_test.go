@@ -88,6 +88,21 @@ func TestBuildStrReturn(t *testing.T) {
 	}
 }
 
+func TestBuildExpressionBodiedFunction(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "func add(a: Int, b: Int) -> Int = a + b\nfunc main() -> Int = add(40, 2)\n"
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
 func TestBuildMakeI32Slice(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")

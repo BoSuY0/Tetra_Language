@@ -1112,11 +1112,35 @@ func TestLSPStdioInitializeAndDidOpen(t *testing.T) {
 	if !strings.Contains(out, `"id":1`) || !strings.Contains(out, `"capabilities"`) {
 		t.Fatalf("initialize response missing: %q", out)
 	}
+	if !strings.Contains(out, `"completionProvider"`) {
+		t.Fatalf("completion capability missing: %q", out)
+	}
 	if !strings.Contains(out, `"method":"textDocument/publishDiagnostics"`) || !strings.Contains(out, `"diagnostics"`) {
 		t.Fatalf("diagnostics notification missing: %q", out)
 	}
 	if !strings.Contains(out, `"id":2`) {
 		t.Fatalf("shutdown response missing: %q", out)
+	}
+}
+
+func TestLSPStdioCompletionReturnsOpenDocumentSymbols(t *testing.T) {
+	var input bytes.Buffer
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///sample.tetra","languageId":"tetra","version":1,"text":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer\n"}}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":11}}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","method":"exit","params":{}}`)
+	var stdout, stderr bytes.Buffer
+	code := runLSPStdio(&input, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("lsp stdio exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, `"id":2`) || !strings.Contains(out, `"label":"answer"`) || !strings.Contains(out, `"label":"main"`) {
+		t.Fatalf("completion response missing expected symbols: %q", out)
+	}
+	if !strings.Contains(out, `"detail":"const answer: Int"`) {
+		t.Fatalf("completion response missing detail: %q", out)
 	}
 }
 
