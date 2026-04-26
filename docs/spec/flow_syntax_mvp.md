@@ -10,6 +10,8 @@ compatibility tooling during cutover. See
 `docs/frontend/flow_parser_plan.md`.
 Final v1 status decisions for deferred features are tracked in
 `docs/spec/v1_feature_status.md`.
+Frontend/type/ownership/effects/async runtime scope-freeze resolutions for v1
+are tracked in `docs/plans/v1_scope_freeze_frontend_runtime.md`.
 
 ## Supported
 

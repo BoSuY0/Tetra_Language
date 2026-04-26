@@ -3,6 +3,9 @@
 This document resolves TODO 658 from `docs/plans/2026-04-26-tetra-language-todo.md`
 for the current v1 planning baseline.
 
+Companion freeze decisions for unresolved TODO 12/13/15 implementation items:
+`../plans/v1_scope_freeze_backend_stdlib_ui.md`.
+
 Decision labels used here:
 
 - `implement in v1`: required in the v1 delivery scope.

@@ -2,6 +2,9 @@
 
 Use this checklist before labeling a build or branch as Tetra v1.0.
 
+Scope-freeze reference for unresolved Eco/release/execution-order TODO closure:
+`docs/plans/v1_scope_freeze_eco_release.md`.
+
 ## Language
 
 - [ ] Flow syntax is the only official syntax in examples, docs, formatter, and

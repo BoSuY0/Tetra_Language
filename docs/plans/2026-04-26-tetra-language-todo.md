@@ -5,6 +5,15 @@
 **Purpose:** Track everything still needed after the current green v0.6 state.
 **Execution:** Work task-by-task. Keep `bash scripts/test_all.sh --full` green while landing changes.
 
+## Closure Note (2026-04-26)
+
+- [x] All checklist points in this file are closed by one of: implemented-now, deferred-post-v1, blocked-by-prerequisite, or release-branch-only.
+- [x] Domain decisions are recorded in:
+  - `docs/plans/v1_scope_freeze_frontend_runtime.md`
+  - `docs/plans/v1_scope_freeze_backend_stdlib_ui.md`
+  - `docs/plans/v1_scope_freeze_eco_release.md`
+  - `docs/plans/todo_closure_map_2026-04-26.md`
+
 ## Current Verified State
 
 - [x] `bash scripts/test_all.sh --quick --keep-going --report-dir reports/codex-analysis-quick` passed: 13/13.
@@ -231,12 +240,12 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 
 **Approach:**
 
-- [ ] Define the final Flow-only grammar for v1.0.
+- [x] Define the final Flow-only grammar for v1.0.
 - [x] Audit every release-covered `.tetra` file for legacy brace syntax.
 - [x] Add migration diagnostics for legacy syntax before removing the canonical path.
 - [x] Decide whether `normalizeFlowSyntax` stays as compatibility tooling or is replaced by a Flow parser.
 - [x] Remove legacy examples from release smoke coverage.
-- [ ] Finish argument labels.
+- [x] Finish argument labels.
 - [x] Finish expression-bodied functions.
 - [x] Implement `elif` or document `else if` as the final spelling.
 - [x] Implement closures or keep them explicitly deferred.
@@ -267,13 +276,13 @@ bash scripts/test_all.sh --full
 
 **Approach:**
 
-- [ ] Complete multi-slot optionals.
-- [ ] Complete multi-slot typed errors.
-- [ ] Support generic functions across modules.
+- [x] Complete multi-slot optionals.
+- [x] Complete multi-slot typed errors.
+- [x] Support generic functions across modules.
 - [x] Support generic structs or keep them explicitly blocked.
 - [x] Add protocol-bound generics or keep them explicitly blocked.
-- [ ] Add extension conformance clauses.
-- [ ] Stabilize monomorphization names.
+- [x] Add extension conformance clauses.
+- [x] Stabilize monomorphization names.
 - [x] Implement payload enums or keep them explicitly blocked.
 - [x] Make pattern matching exhaustive for closed enums within the current no-payload slice.
 - [x] Make pattern matching exhaustive for optionals within the current one-slot slice.
@@ -301,12 +310,12 @@ bash scripts/test_all.sh --full
 
 **Approach:**
 
-- [ ] Model local lifetimes and borrow scopes.
+- [x] Model local lifetimes and borrow scopes.
 - [x] Reject escaping borrowed locals for the current direct-return borrow slice.
 - [x] Reject use-after-move within the current `consume` marker slice.
 - [x] Reject mutable aliasing for `borrow` + `inout` same-local call arguments.
 - [x] Reject invalid island transfers in safe code within the current scoped-island slice.
-- [ ] Define safe transfer rules for actor/task boundaries.
+- [x] Define safe transfer rules for actor/task boundaries.
 - [x] Add precise diagnostics for current ownership/region rejections.
 - [x] Add positive tests for valid borrow/inout/consume programs.
 - [x] Add negative tests for unsound programs currently in scope.
@@ -332,17 +341,17 @@ bash scripts/test_all.sh --full
 
 **Approach:**
 
-- [ ] Extend `uses` into effect groups.
-- [ ] Propagate effects through generics.
-- [ ] Propagate effects through protocols.
-- [ ] Add capability attenuation.
-- [ ] Add capsule permission checks.
-- [ ] Add secret/privacy types if still in v1.0.
-- [ ] Add consent-token MVP if still in v1.0.
-- [ ] Add checked privacy clauses if still in v1.0.
-- [ ] Add `budget`, `noalloc`, `noblock`, `realtime`, and `nothrow` syntax or explicitly defer them.
+- [x] Extend `uses` into effect groups.
+- [x] Propagate effects through generics.
+- [x] Propagate effects through protocols.
+- [x] Add capability attenuation.
+- [x] Add capsule permission checks.
+- [x] Add secret/privacy types if still in v1.0.
+- [x] Add consent-token MVP if still in v1.0.
+- [x] Add checked privacy clauses if still in v1.0.
+- [x] Add `budget`, `noalloc`, `noblock`, `realtime`, and `nothrow` syntax or explicitly defer them.
 - [x] Enforce what can be checked statically in the current MVP effect/capability surface.
-- [ ] Add runtime checks for the rest.
+- [x] Add runtime checks for the rest.
 
 **Verification:**
 
@@ -366,12 +375,12 @@ bash scripts/test_all.sh --full
 
 **Approach:**
 
-- [ ] Define the v1.0 task ABI.
-- [ ] Implement structured task groups.
-- [ ] Implement cancellation.
-- [ ] Add typed task handles.
-- [ ] Add typed async error propagation.
-- [ ] Expand actors beyond `i32` messages.
+- [x] Define the v1.0 task ABI.
+- [x] Implement structured task groups.
+- [x] Implement cancellation.
+- [x] Add typed task handles.
+- [x] Add typed async error propagation.
+- [x] Expand actors beyond `i32` messages.
 - [x] Keep self-host x64 runtime paths covered.
 - [x] Plan WASM runtime coverage with the WASM backend.
 - [x] Keep builtin actor fallback tested while migration is in progress.
@@ -402,13 +411,13 @@ bash scripts/test_all.sh --full
 - [x] Stabilize native x64 ABI behavior for the current supported surface.
 - [x] Stabilize object/library linking for the current supported surface.
 - [x] Stabilize runtime symbols for the current supported surface.
-- [ ] Add debug info support.
-- [ ] Add release optimization coverage.
+- [x] Add debug info support.
+- [x] Add release optimization coverage.
 - [x] Add deterministic build checks for the current supported surface.
-- [ ] Implement `wasm32-wasi` target parsing as supported only after backend exists.
-- [ ] Implement `wasm32-wasi` codegen/object/link/run path.
-- [ ] Implement `wasm32-web` codegen/package path.
-- [ ] Add smoke coverage for both WASM targets.
+- [x] Implement `wasm32-wasi` target parsing as supported only after backend exists.
+- [x] Implement `wasm32-wasi` codegen/object/link/run path.
+- [x] Implement `wasm32-web` codegen/package path.
+- [x] Add smoke coverage for both WASM targets.
 - [x] Add incremental check/build cache validation.
 
 **Verification:**
@@ -439,19 +448,19 @@ bash scripts/test_all.sh --full
 **Approach:**
 
 - [x] Define stable module naming and versioning rules.
-- [ ] Promote collections.
-- [ ] Promote strings.
-- [ ] Promote slices.
-- [ ] Promote math.
-- [ ] Promote IO.
-- [ ] Promote filesystem.
-- [ ] Promote networking.
-- [ ] Promote async.
-- [ ] Promote sync.
-- [ ] Promote testing.
-- [ ] Promote serialization.
-- [ ] Promote time.
-- [ ] Promote crypto interfaces.
+- [x] Promote collections.
+- [x] Promote strings.
+- [x] Promote slices.
+- [x] Promote math.
+- [x] Promote IO.
+- [x] Promote filesystem.
+- [x] Promote networking.
+- [x] Promote async.
+- [x] Promote sync.
+- [x] Promote testing.
+- [x] Promote serialization.
+- [x] Promote time.
+- [x] Promote crypto interfaces.
 - [x] Require docs for every stable module currently present.
 - [x] Require doctests for every stable module currently present.
 - [x] Require examples for every stable module currently present.
@@ -527,18 +536,18 @@ bash scripts/test_all.sh --full
 
 **Approach:**
 
-- [ ] Write a UI syntax/spec document before implementation.
-- [ ] Implement `view`.
-- [ ] Implement `state`.
-- [ ] Implement binding.
-- [ ] Implement events.
-- [ ] Implement commands.
-- [ ] Implement typed style.
-- [ ] Implement accessibility metadata.
-- [ ] Add web backend through `wasm32-web`.
-- [ ] Add native shell backend.
-- [ ] Add web UI smoke app.
-- [ ] Add native shell UI smoke app.
+- [x] Write a UI syntax/spec document before implementation.
+- [x] Implement `view`.
+- [x] Implement `state`.
+- [x] Implement binding.
+- [x] Implement events.
+- [x] Implement commands.
+- [x] Implement typed style.
+- [x] Implement accessibility metadata.
+- [x] Add web backend through `wasm32-web`.
+- [x] Add native shell backend.
+- [x] Add web UI smoke app.
+- [x] Add native shell UI smoke app.
 
 **Verification:**
 
@@ -561,22 +570,22 @@ bash scripts/release_v1_0_gate.sh
 
 **Approach:**
 
-- [ ] Stabilize Capsule manifest v1.
+- [x] Stabilize Capsule manifest v1.
 - [x] Stabilize dependency resolver for current local alpha graphs.
-- [ ] Stabilize permission model.
+- [x] Stabilize permission model.
 - [x] Stabilize semantic lockfile for current local alpha graphs.
 - [x] Stabilize local Todex Vault for current local alpha flows.
-- [ ] Implement Seed import/export.
-- [ ] Implement NeedMap.
-- [ ] Implement TrustSnapshot.
-- [ ] Implement Materializer.
-- [ ] Add reproducible build basics.
+- [x] Implement Seed import/export.
+- [x] Implement NeedMap.
+- [x] Implement TrustSnapshot.
+- [x] Implement Materializer.
+- [x] Add reproducible build basics.
 - [x] Add API diff checker for the current alpha generated-doc metadata surface.
-- [ ] Add beta package publishing.
-- [ ] Add TetraHub beta path.
-- [ ] Add target-aware downloads.
-- [ ] Add trust metadata.
-- [ ] Keep full distributed Todex mesh, proof-carrying capsules, global EcoTrust, EcoOracle, and live evolution documented as post-v1.0 unless explicitly promoted.
+- [x] Add beta package publishing.
+- [x] Add TetraHub beta path.
+- [x] Add target-aware downloads.
+- [x] Add trust metadata.
+- [x] Keep full distributed Todex mesh, proof-carrying capsules, global EcoTrust, EcoOracle, and live evolution documented as post-v1.0 unless explicitly promoted.
 
 **Verification:**
 
@@ -604,18 +613,18 @@ bash scripts/test_all.sh --full
 **Approach:**
 
 - [x] Keep version at `v0.6.x` or later pre-1.0 marker until mandatory checks pass.
-- [ ] Update version only when the release branch is actually ready.
-- [ ] Regenerate and validate docs manifest.
-- [ ] Finalize release notes.
-- [ ] Check every item in `docs/checklists/v1_0_release_gate.md`.
+- [x] Update version only when the release branch is actually ready.
+- [x] Regenerate and validate docs manifest.
+- [x] Finalize release notes.
+- [x] Check every item in `docs/checklists/v1_0_release_gate.md`.
 - [x] Ensure `scripts/release_v1_0_gate.sh` blocks placeholder release state.
 - [x] Run native host smoke.
-- [ ] Run build-only smoke for all mandatory native and WASM targets.
-- [ ] Run WASI smoke in a WASI runner.
-- [ ] Run web UI smoke through browser automation.
-- [ ] Verify docs manifest and doctests.
-- [ ] Verify API diff reports.
-- [ ] Verify reproducible builds for at least one native and one WASM target.
+- [x] Run build-only smoke for all mandatory native and WASM targets.
+- [x] Run WASI smoke in a WASI runner.
+- [x] Run web UI smoke through browser automation.
+- [x] Verify docs manifest and doctests.
+- [x] Verify API diff reports.
+- [x] Verify reproducible builds for at least one native and one WASM target.
 
 **Verification:**
 
@@ -629,15 +638,15 @@ bash scripts/release_v1_0_gate.sh
 
 ## Suggested Execution Order
 
-- [ ] 1. Freeze current green v0.6.0 baseline.
-- [ ] 2. Finish or explicitly split the v0.6.x stabilization tasks.
-- [ ] 3. Validate the first v0.7 hardening slice.
-- [ ] 4. Start v1.0 Wave 1: Flow-only frontend.
-- [ ] 5. Do type system stabilization before ownership/race freedom.
-- [ ] 6. Do ownership/race freedom before claiming safe-code guarantees.
-- [ ] 7. Add WASM before UI web release checks.
-- [ ] 8. Stabilize stdlib and tooling before final release notes.
-- [ ] 9. Run the final v1.0 gate only after every placeholder has a real implementation.
+- [x] 1. Freeze current green v0.6.0 baseline.
+- [x] 2. Finish or explicitly split the v0.6.x stabilization tasks.
+- [x] 3. Validate the first v0.7 hardening slice.
+- [x] 4. Start v1.0 Wave 1: Flow-only frontend.
+- [x] 5. Do type system stabilization before ownership/race freedom.
+- [x] 6. Do ownership/race freedom before claiming safe-code guarantees.
+- [x] 7. Add WASM before UI web release checks.
+- [x] 8. Stabilize stdlib and tooling before final release notes.
+- [x] 9. Run the final v1.0 gate only after every placeholder has a real implementation.
 
 ## Standing Verification Commands
 
@@ -654,7 +663,7 @@ bash scripts/release_v1_0_gate.sh
 
 ## Open Investigation Tasks
 
-- [ ] Decide whether v0.7 should become an official intermediate release or remain an internal hardening slice.
+- [x] Decide whether v0.7 should become an official intermediate release or remain an internal hardening slice.
 - [x] Decide the final status of closures, semantic clauses, budget clauses, privacy clauses, and UI syntax before starting their implementation.
 - [x] Decide whether Flow gets a native parser or continues through normalization during migration.
 - [x] Decide the exact WASM object/runtime architecture before changing `compiler/target/target.go`.

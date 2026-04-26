@@ -2,6 +2,9 @@
 
 Status: accepted for TODO 660 (2026-04-26)
 
+Related v1 scope-freeze decisions for unresolved backend/UI rollout items:
+`../plans/v1_scope_freeze_backend_stdlib_ui.md`.
+
 This document defines the concrete WASM backend architecture that must be used before changing target metadata in `compiler/target/target.go`.
 
 ## Decision Summary
