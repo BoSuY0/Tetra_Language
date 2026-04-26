@@ -1,0 +1,18 @@
+// Experimental sync helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.sync directly.
+module lib.experimental.sync
+
+import lib.core.sync as stable_sync
+
+func merge_status(lhs: Int, rhs: Int) -> Int:
+    return stable_sync.merge_status(lhs, rhs)
+
+func all_ready(lhs: Bool, rhs: Bool) -> Bool:
+    return stable_sync.all_ready(lhs, rhs)
+
+func spin_countdown(start: Int, ticks: Int) -> Int:
+    return stable_sync.spin_countdown(start, ticks)
+
+func barrier_target(workers: Int) -> Int:
+    return stable_sync.barrier_target(workers)

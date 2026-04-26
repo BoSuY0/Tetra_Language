@@ -1,0 +1,11 @@
+// Stable core networking stdlib smoke.
+module examples.core_networking_smoke
+
+import lib.core.networking as networking
+
+func main() -> Int:
+    let selected: Int = networking.choose_port(8080, networking.default_port_https())
+    let backoff: Int = networking.retry_backoff_ms(3, 7, 42)
+    if selected == 8080 && backoff == 42 && networking.is_valid_port(65535) && !networking.is_valid_port(90000):
+        return 42
+    return 1

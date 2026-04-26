@@ -82,13 +82,13 @@ go test ./compiler/... -run 'Optional|TypedError|Generic|Protocol|Extension|Matc
 
 ### 3.1 Lifetime Model
 
-- [ ] Model local lifetimes and borrow scopes in checker.
-- [ ] Enforce escaping-borrow rejection across all relevant flows (not just narrow slices).
+- [x] Model local lifetimes and borrow scopes in checker.
+- [x] Enforce escaping-borrow rejection across all relevant flows (not just narrow slices).
 
 ### 3.2 Concurrency Safety Rules
 
-- [ ] Define safe transfer rules for actor/task boundaries.
-- [ ] Enforce sendability/ownership transfer checks in actor/task APIs.
+- [x] Define safe transfer rules for actor/task boundaries.
+- [x] Enforce sendability/ownership transfer checks in actor/task APIs.
 
 ### 3.3 Ownership Coverage
 
@@ -162,8 +162,8 @@ go test ./compiler/... -run 'Async|Task|Actor|Runtime'
 
 ### 6.1 Native Backend Finalization
 
-- [ ] Add debug info support.
-- [ ] Add release optimization coverage.
+- [x] Add debug info support.
+- [x] Add release optimization coverage.
 - [x] Keep deterministic build checks stable.
 
 ### 6.2 WASM Targets (Mandatory For v1)
@@ -172,7 +172,7 @@ go test ./compiler/... -run 'Async|Task|Actor|Runtime'
 - [x] Implement `wasm32-wasi` codegen/object/link/run path.
 - [x] Implement `wasm32-web` codegen/package path.
 - [x] Add smoke coverage for both WASM targets.
-- [ ] Validate incremental build/check cache behavior for native and WASM paths.
+- [x] Validate incremental build/check cache behavior for native and WASM paths.
 
 **Verification**
 
@@ -198,14 +198,14 @@ go test ./compiler/... -run 'Target|WASM|ABI|Object|Link|Cache|Deterministic'
 - [x] Promote `slices`.
 - [x] Promote `math`.
 - [x] Promote `io`.
-- [ ] Promote `filesystem`.
-- [ ] Promote `networking`.
-- [ ] Promote `async`.
-- [ ] Promote `sync`.
+- [x] Promote `filesystem`.
+- [x] Promote `networking`.
+- [x] Promote `async`.
+- [x] Promote `sync`.
 - [x] Promote `testing`.
 - [x] Promote `serialization`.
-- [ ] Promote `time`.
-- [ ] Promote `crypto interfaces`.
+- [x] Promote `time`.
+- [x] Promote `crypto interfaces`.
 
 ### 7.2 Quality Gates
 
@@ -238,8 +238,8 @@ go run ./tools/cmd/validate-manifest --manifest reports/manifest.json
 
 ### 8.2 Formatter
 
-- [ ] Keep formatter idempotent for full v1 syntax.
-- [ ] Preserve supported line/block comments for full v1 syntax.
+- [x] Keep formatter idempotent for full v1 syntax.
+- [x] Preserve supported line/block comments for full v1 syntax.
 
 **Verification**
 

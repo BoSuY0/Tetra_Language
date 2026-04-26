@@ -1,0 +1,17 @@
+// Stable core crypto stdlib smoke.
+module examples.core_crypto_smoke
+
+import lib.core.crypto as crypto
+
+func main() -> Int
+uses alloc, mem:
+    var lhs: []u8 = core.make_u8(2)
+    lhs[0] = 20
+    lhs[1] = 22
+    var rhs: []u8 = core.make_u8(2)
+    rhs[0] = 20
+    rhs[1] = 22
+    let checksum: Int = crypto.checksum_u8(lhs)
+    if crypto.constant_time_eq_u8(lhs, rhs) && checksum == 42 && crypto.interface_strength() == 21:
+        return 42
+    return 1

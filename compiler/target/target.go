@@ -115,13 +115,15 @@ func (f Format) String() string {
 }
 
 type Target struct {
-	Triple         string
-	OS             OS
-	Arch           Arch
-	ABI            ABI
-	Format         Format
-	ExeExt         string
-	CollectImports bool
+	Triple                  string
+	OS                      OS
+	Arch                    Arch
+	ABI                     ABI
+	Format                  Format
+	ExeExt                  string
+	CollectImports          bool
+	SupportsDebugInfo       bool
+	SupportsReleaseOptimize bool
 }
 
 func All() []Target {
@@ -155,53 +157,63 @@ func Parse(triple string) (Target, error) {
 	switch triple {
 	case "linux-x64":
 		return Target{
-			Triple:         "linux-x64",
-			OS:             OSLinux,
-			Arch:           ArchX64,
-			ABI:            ABISysV,
-			Format:         FormatELF,
-			ExeExt:         "",
-			CollectImports: false,
+			Triple:                  "linux-x64",
+			OS:                      OSLinux,
+			Arch:                    ArchX64,
+			ABI:                     ABISysV,
+			Format:                  FormatELF,
+			ExeExt:                  "",
+			CollectImports:          false,
+			SupportsDebugInfo:       true,
+			SupportsReleaseOptimize: true,
 		}, nil
 	case "windows-x64":
 		return Target{
-			Triple:         "windows-x64",
-			OS:             OSWindows,
-			Arch:           ArchX64,
-			ABI:            ABIWin64,
-			Format:         FormatPE,
-			ExeExt:         ".exe",
-			CollectImports: true,
+			Triple:                  "windows-x64",
+			OS:                      OSWindows,
+			Arch:                    ArchX64,
+			ABI:                     ABIWin64,
+			Format:                  FormatPE,
+			ExeExt:                  ".exe",
+			CollectImports:          true,
+			SupportsDebugInfo:       true,
+			SupportsReleaseOptimize: true,
 		}, nil
 	case "macos-x64":
 		return Target{
-			Triple:         "macos-x64",
-			OS:             OSMacOS,
-			Arch:           ArchX64,
-			ABI:            ABISysV,
-			Format:         FormatMachO,
-			ExeExt:         "",
-			CollectImports: false,
+			Triple:                  "macos-x64",
+			OS:                      OSMacOS,
+			Arch:                    ArchX64,
+			ABI:                     ABISysV,
+			Format:                  FormatMachO,
+			ExeExt:                  "",
+			CollectImports:          false,
+			SupportsDebugInfo:       true,
+			SupportsReleaseOptimize: true,
 		}, nil
 	case "wasm32-wasi":
 		return Target{
-			Triple:         "wasm32-wasi",
-			OS:             OSWASI,
-			Arch:           ArchWASM32,
-			ABI:            ABIWASI,
-			Format:         FormatWASM,
-			ExeExt:         ".wasm",
-			CollectImports: false,
+			Triple:                  "wasm32-wasi",
+			OS:                      OSWASI,
+			Arch:                    ArchWASM32,
+			ABI:                     ABIWASI,
+			Format:                  FormatWASM,
+			ExeExt:                  ".wasm",
+			CollectImports:          false,
+			SupportsDebugInfo:       false,
+			SupportsReleaseOptimize: true,
 		}, nil
 	case "wasm32-web":
 		return Target{
-			Triple:         "wasm32-web",
-			OS:             OSWeb,
-			Arch:           ArchWASM32,
-			ABI:            ABIWeb,
-			Format:         FormatWASM,
-			ExeExt:         ".wasm",
-			CollectImports: false,
+			Triple:                  "wasm32-web",
+			OS:                      OSWeb,
+			Arch:                    ArchWASM32,
+			ABI:                     ABIWeb,
+			Format:                  FormatWASM,
+			ExeExt:                  ".wasm",
+			CollectImports:          false,
+			SupportsDebugInfo:       false,
+			SupportsReleaseOptimize: true,
 		}, nil
 	default:
 		return Target{}, UnsupportedTargetError{Triple: triple}

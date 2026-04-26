@@ -127,10 +127,64 @@ func collectLineComments(src []byte, filename string) (lineComments, error) {
 
 func formattedCodeLineCount(line string) int {
 	trimmed := strings.TrimSpace(line)
-	if strings.HasPrefix(trimmed, "func ") && strings.Contains(trimmed, " uses ") && strings.HasSuffix(trimmed, ":") {
-		return 2
+	if isFunctionHeaderLine(trimmed) {
+		count := 1
+		modifiers := countFunctionModifiers(trimmed)
+		if modifiers > 0 {
+			count += modifiers
+		}
+		if strings.Contains(trimmed, " = ") {
+			count++
+		}
+		return count
 	}
+
+	if closure, ok := closureHeaderSegment(trimmed); ok {
+		count := 1
+		modifiers := countFunctionModifiers(closure)
+		if modifiers > 0 {
+			count += modifiers
+		}
+		if strings.Contains(closure, " = ") {
+			count++
+		}
+		return count
+	}
+
 	return 1
+}
+
+func countFunctionModifiers(line string) int {
+	count := 1
+	if strings.Contains(line, " uses ") {
+		count++
+	}
+	for _, clause := range []string{" noalloc", " noblock", " realtime", " nothrow", " budget("} {
+		count += strings.Count(line, clause)
+	}
+	return count - 1
+}
+
+func isFunctionHeaderLine(trimmed string) bool {
+	return strings.HasPrefix(trimmed, "func ") ||
+		strings.HasPrefix(trimmed, "async func ") ||
+		strings.HasPrefix(trimmed, "fun ") ||
+		strings.HasPrefix(trimmed, "async fun ")
+}
+
+func closureHeaderSegment(trimmed string) (string, bool) {
+	fnAt := strings.Index(trimmed, "fn(")
+	if fnAt < 0 {
+		fnAt = strings.Index(trimmed, "fun(")
+	}
+	if fnAt < 0 {
+		return "", false
+	}
+	assignAt := strings.LastIndex(trimmed[:fnAt], "=")
+	if assignAt < 0 {
+		return "", false
+	}
+	return strings.TrimSpace(trimmed[fnAt:]), true
 }
 
 func commentStart(line string) (int, bool) {
@@ -204,10 +258,20 @@ func leadingWhitespace(line string) string {
 }
 
 type sourcePrinter struct {
-	b bytes.Buffer
+	b             bytes.Buffer
+	closures      map[string]*frontend.FuncDecl
+	emitSynthetic map[string]struct{}
 }
 
 func (p *sourcePrinter) file(file *frontend.FileAST) {
+	p.closures = make(map[string]*frontend.FuncDecl, len(file.Funcs))
+	p.emitSynthetic = make(map[string]struct{})
+	for _, fn := range file.Funcs {
+		if fn.Synthetic {
+			p.closures[fn.Name] = fn
+		}
+	}
+
 	if file.Module != "" {
 		p.line(0, "module "+file.Module)
 		p.blank()
@@ -246,6 +310,16 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 	}
 	for _, fn := range file.Funcs {
 		if fn.ExtensionOf != "" || fn.Synthetic {
+			continue
+		}
+		p.funcDecl(fn)
+		p.blank()
+	}
+	for _, fn := range file.Funcs {
+		if !fn.Synthetic {
+			continue
+		}
+		if _, ok := p.emitSynthetic[fn.Name]; !ok {
 			continue
 		}
 		p.funcDecl(fn)
@@ -305,7 +379,7 @@ func (p *sourcePrinter) globalDecl(g *frontend.GlobalDecl) {
 		line += ": " + formatTypeRef(g.Type)
 	}
 	if g.Init != nil {
-		line += " = " + formatExpr(g.Init)
+		line += " = " + p.formatExpr(g.Init)
 	}
 	p.line(0, line)
 }
@@ -322,34 +396,12 @@ func (p *sourcePrinter) funcDeclWithNameAt(fn *frontend.FuncDecl, name string, i
 	if fn.ExportName != "" {
 		p.line(indent, "@export("+strconv.Quote(fn.ExportName)+")")
 	}
-	var params []string
-	for _, param := range fn.Params {
-		typ := formatTypeRef(param.Type)
-		if param.Ownership != "" {
-			typ = param.Ownership + " " + typ
-		}
-		params = append(params, param.Name+": "+typ)
-	}
-	headerPrefix := "func "
-	if fn.Async {
-		headerPrefix = "async func "
-	}
 	typeParams := ""
 	if len(fn.TypeParams) > 0 {
 		typeParams = "<" + strings.Join(fn.TypeParams, ", ") + ">"
 	}
-	header := headerPrefix + name + typeParams + "(" + strings.Join(params, ", ") + ") -> " + formatTypeRef(fn.ReturnType)
-	if fn.HasThrows {
-		header += " throws " + formatTypeRef(fn.Throws)
-	}
-	if len(fn.Uses) > 0 {
-		p.line(indent, header)
-		uses := append([]string(nil), fn.Uses...)
-		sort.Strings(uses)
-		p.line(indent, "uses "+strings.Join(uses, ", ")+":")
-	} else {
-		p.line(indent, header+":")
-	}
+	header := p.functionHeader("func", fn.Async, name+typeParams, fn.Params, fn.ReturnType, fn.HasThrows, fn.Throws)
+	p.emitHeaderWithModifiers(indent, header, fn.Uses, fn.SemanticClauses)
 	p.stmts(fn.Body, indent+1)
 }
 
@@ -390,13 +442,13 @@ func (p *sourcePrinter) stmts(stmts []frontend.Stmt, indent int) {
 }
 
 func (p *sourcePrinter) ifStmt(s *frontend.IfStmt, indent int, prefix string) {
-	p.line(indent, prefix+" "+formatExpr(s.Cond)+":")
+	p.line(indent, prefix+" "+p.formatExpr(s.Cond)+":")
 	p.stmts(s.Then, indent+1)
 	p.elseStmts(s.Else, indent)
 }
 
 func (p *sourcePrinter) ifLetStmt(s *frontend.IfLetStmt, indent int, prefix string) {
-	p.line(indent, prefix+" let "+s.Name+" = "+formatExpr(s.Value)+":")
+	p.line(indent, prefix+" let "+s.Name+" = "+p.formatExpr(s.Value)+":")
 	p.stmts(s.Then, indent+1)
 	p.elseStmts(s.Else, indent)
 }
@@ -422,13 +474,19 @@ func (p *sourcePrinter) elseStmts(stmts []frontend.Stmt, indent int) {
 func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 	switch s := stmt.(type) {
 	case *frontend.PrintStmt:
-		p.line(indent, "print("+formatExpr(s.Value)+")")
+		p.line(indent, "print("+p.formatExpr(s.Value)+")")
 	case *frontend.ExpectStmt:
-		p.line(indent, "expect "+formatExpr(s.Cond))
+		p.line(indent, "expect "+p.formatExpr(s.Cond))
 	case *frontend.ReturnStmt:
-		p.line(indent, "return "+formatExpr(s.Value))
+		if p.emitClosureValueStatement(indent, "return ", s.Value) {
+			return
+		}
+		p.line(indent, "return "+p.formatExpr(s.Value))
 	case *frontend.ThrowStmt:
-		p.line(indent, "throw "+formatExpr(s.Value))
+		if p.emitClosureValueStatement(indent, "throw ", s.Value) {
+			return
+		}
+		p.line(indent, "throw "+p.formatExpr(s.Value))
 	case *frontend.BreakStmt:
 		p.line(indent, "break")
 	case *frontend.ContinueStmt:
@@ -444,35 +502,42 @@ func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 		if s.Type.Name != "" || s.Type.Elem != nil {
 			line += ": " + formatTypeRef(s.Type)
 		}
-		line += " = " + formatExpr(s.Value)
-		p.line(indent, line)
-	case *frontend.AssignStmt:
-		if s.Op != 0 && s.CompoundValue != nil {
-			p.line(indent, formatExpr(s.Target)+" "+compoundAssignmentOp(s.Op)+"= "+formatExpr(s.CompoundValue))
+		line += " = "
+		if p.emitClosureValueStatement(indent, line, s.Value) {
 			return
 		}
-		p.line(indent, formatExpr(s.Target)+" = "+formatExpr(s.Value))
+		p.line(indent, line+p.formatExpr(s.Value))
+	case *frontend.AssignStmt:
+		if s.Op != 0 && s.CompoundValue != nil {
+			p.line(indent, p.formatExpr(s.Target)+" "+compoundAssignmentOp(s.Op)+"= "+p.formatExpr(s.CompoundValue))
+			return
+		}
+		target := p.formatExpr(s.Target) + " = "
+		if p.emitClosureValueStatement(indent, target, s.Value) {
+			return
+		}
+		p.line(indent, target+p.formatExpr(s.Value))
 	case *frontend.IfStmt:
 		p.ifStmt(s, indent, "if")
 	case *frontend.IfLetStmt:
 		p.ifLetStmt(s, indent, "if")
 	case *frontend.WhileStmt:
-		p.line(indent, "while "+formatExpr(s.Cond)+":")
+		p.line(indent, "while "+p.formatExpr(s.Cond)+":")
 		p.stmts(s.Body, indent+1)
 	case *frontend.ForRangeStmt:
 		if s.Iterable != nil {
-			p.line(indent, "for "+s.Name+" in "+formatExpr(s.Iterable)+":")
+			p.line(indent, "for "+s.Name+" in "+p.formatExpr(s.Iterable)+":")
 		} else {
-			p.line(indent, "for "+s.Name+" in "+formatExpr(s.Start)+"..<"+formatExpr(s.End)+":")
+			p.line(indent, "for "+s.Name+" in "+p.formatExpr(s.Start)+"..<"+p.formatExpr(s.End)+":")
 		}
 		p.stmts(s.Body, indent+1)
 	case *frontend.MatchStmt:
-		p.line(indent, "match "+formatExpr(s.Value)+":")
+		p.line(indent, "match "+p.formatExpr(s.Value)+":")
 		for _, c := range s.Cases {
 			if c.Default {
 				p.line(indent, "case _:")
 			} else {
-				p.line(indent, "case "+formatExpr(c.Pattern)+":")
+				p.line(indent, "case "+p.formatExpr(c.Pattern)+":")
 			}
 			p.stmts(c.Body, indent+1)
 		}
@@ -480,12 +545,15 @@ func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 		p.line(indent, "unsafe:")
 		p.stmts(s.Body, indent+1)
 	case *frontend.IslandStmt:
-		p.line(indent, "island("+formatExpr(s.Size)+") as "+s.Name+":")
+		p.line(indent, "island("+p.formatExpr(s.Size)+") as "+s.Name+":")
 		p.stmts(s.Body, indent+1)
 	case *frontend.FreeStmt:
-		p.line(indent, "free("+formatExpr(s.Value)+")")
+		p.line(indent, "free("+p.formatExpr(s.Value)+")")
 	case *frontend.ExprStmt:
-		p.line(indent, formatExpr(s.Expr))
+		if p.emitClosureValueStatement(indent, "", s.Expr) {
+			return
+		}
+		p.line(indent, p.formatExpr(s.Expr))
 	}
 }
 
@@ -512,11 +580,112 @@ func formatTypeRef(ref frontend.TypeRef) string {
 	}
 }
 
-func formatExpr(expr frontend.Expr) string {
-	return formatExprPrec(expr, 0)
+func (p *sourcePrinter) functionHeader(keyword string, async bool, name string, params []frontend.ParamDecl, retType frontend.TypeRef, hasThrows bool, throws frontend.TypeRef) string {
+	var out []string
+	for _, param := range params {
+		typ := formatTypeRef(param.Type)
+		if param.Ownership != "" {
+			typ = param.Ownership + " " + typ
+		}
+		out = append(out, param.Name+": "+typ)
+	}
+
+	head := keyword
+	if async {
+		head = "async " + head
+	}
+	if name != "" {
+		head += " " + name
+	}
+	head += "(" + strings.Join(out, ", ") + ") -> " + formatTypeRef(retType)
+	if hasThrows {
+		head += " throws " + formatTypeRef(throws)
+	}
+	return head
 }
 
-func formatExprPrec(expr frontend.Expr, parent int) string {
+func (p *sourcePrinter) emitHeaderWithModifiers(indent int, header string, uses []string, clauses []frontend.SemanticClause) {
+	modifiers := p.functionModifiers(uses, clauses)
+	if len(modifiers) == 0 {
+		p.line(indent, header+":")
+		return
+	}
+
+	p.line(indent, header)
+	for i, mod := range modifiers {
+		if i == len(modifiers)-1 {
+			mod += ":"
+		}
+		p.line(indent, mod)
+	}
+}
+
+func (p *sourcePrinter) functionModifiers(uses []string, clauses []frontend.SemanticClause) []string {
+	out := make([]string, 0, len(clauses)+1)
+	if len(uses) > 0 {
+		sorted := append([]string(nil), uses...)
+		sort.Strings(sorted)
+		out = append(out, "uses "+strings.Join(sorted, ", "))
+	}
+	for _, clause := range clauses {
+		out = append(out, p.formatSemanticClause(clause))
+	}
+	return out
+}
+
+func (p *sourcePrinter) formatSemanticClause(clause frontend.SemanticClause) string {
+	if clause.Value == nil {
+		return clause.Name
+	}
+	return clause.Name + "(" + p.formatExpr(clause.Value) + ")"
+}
+
+func (p *sourcePrinter) closureHeader(fn *frontend.FuncDecl) string {
+	return p.functionHeader("fn", false, "", fn.Params, fn.ReturnType, fn.HasThrows, fn.Throws)
+}
+
+func (p *sourcePrinter) inlineFunctionModifiers(uses []string, clauses []frontend.SemanticClause) string {
+	return strings.Join(p.functionModifiers(uses, clauses), " ")
+}
+
+func (p *sourcePrinter) closureExprDecl(expr frontend.Expr) (*frontend.FuncDecl, bool) {
+	closureExpr, ok := expr.(*frontend.ClosureExpr)
+	if !ok {
+		return nil, false
+	}
+	closure, ok := p.closures[closureExpr.Name]
+	if !ok {
+		return nil, false
+	}
+	return closure, true
+}
+
+func (p *sourcePrinter) emitClosureValueStatement(indent int, prefix string, expr frontend.Expr) bool {
+	closure, ok := p.closureExprDecl(expr)
+	if !ok {
+		return false
+	}
+	p.emitHeaderWithModifiers(indent, prefix+p.closureHeader(closure), closure.Uses, closure.SemanticClauses)
+	p.stmts(closure.Body, indent+1)
+	return true
+}
+
+func singleReturnExpr(stmts []frontend.Stmt) (frontend.Expr, bool) {
+	if len(stmts) != 1 {
+		return nil, false
+	}
+	ret, ok := stmts[0].(*frontend.ReturnStmt)
+	if !ok || ret.Value == nil {
+		return nil, false
+	}
+	return ret.Value, true
+}
+
+func (p *sourcePrinter) formatExpr(expr frontend.Expr) string {
+	return p.formatExprPrec(expr, 0)
+}
+
+func (p *sourcePrinter) formatExprPrec(expr frontend.Expr, parent int) string {
 	switch e := expr.(type) {
 	case *frontend.NumberExpr:
 		return strconv.Itoa(int(e.Value))
@@ -535,17 +704,17 @@ func formatExprPrec(expr frontend.Expr, parent int) string {
 		return e.Name
 	case *frontend.UnaryExpr:
 		if e.Op == frontend.TokenBang {
-			return "!" + formatExprPrec(e.X, 7)
+			return "!" + p.formatExprPrec(e.X, 7)
 		}
-		return "-" + formatExprPrec(e.X, 7)
+		return "-" + p.formatExprPrec(e.X, 7)
 	case *frontend.TryExpr:
-		return "try " + formatExprPrec(e.X, 7)
+		return "try " + p.formatExprPrec(e.X, 7)
 	case *frontend.AwaitExpr:
-		return "await " + formatExprPrec(e.X, 7)
+		return "await " + p.formatExprPrec(e.X, 7)
 	case *frontend.BinaryExpr:
 		prec := exprPrecedence(e.Op)
-		left := formatExprPrec(e.Left, prec)
-		right := formatExprPrec(e.Right, prec+1)
+		left := p.formatExprPrec(e.Left, prec)
+		right := p.formatExprPrec(e.Right, prec+1)
 		out := left + " " + tokenOp(e.Op) + " " + right
 		if prec < parent {
 			return "(" + out + ")"
@@ -555,22 +724,37 @@ func formatExprPrec(expr frontend.Expr, parent int) string {
 		args := make([]string, 0, len(e.Args))
 		for i, arg := range e.Args {
 			if i < len(e.ArgLabels) && e.ArgLabels[i] != "" {
-				args = append(args, e.ArgLabels[i]+": "+formatExpr(arg))
+				args = append(args, e.ArgLabels[i]+": "+p.formatExpr(arg))
 				continue
 			}
-			args = append(args, formatExpr(arg))
+			args = append(args, p.formatExpr(arg))
 		}
 		return e.Name + "(" + strings.Join(args, ", ") + ")"
 	case *frontend.StructLitExpr:
 		fields := make([]string, 0, len(e.Fields))
 		for _, f := range e.Fields {
-			fields = append(fields, f.Name+": "+formatExpr(f.Value))
+			fields = append(fields, f.Name+": "+p.formatExpr(f.Value))
 		}
 		return formatTypeRef(e.Type) + "(" + strings.Join(fields, ", ") + ")"
+	case *frontend.ClosureExpr:
+		closure, ok := p.closures[e.Name]
+		if !ok {
+			return "<expr>"
+		}
+		value, ok := singleReturnExpr(closure.Body)
+		if !ok {
+			p.emitSynthetic[e.Name] = struct{}{}
+			return e.Name
+		}
+		header := p.closureHeader(closure)
+		if mods := p.inlineFunctionModifiers(closure.Uses, closure.SemanticClauses); mods != "" {
+			header += " " + mods
+		}
+		return header + " = " + p.formatExpr(value)
 	case *frontend.FieldAccessExpr:
-		return formatExprPrec(e.Base, 8) + "." + e.Field
+		return p.formatExprPrec(e.Base, 8) + "." + e.Field
 	case *frontend.IndexExpr:
-		return formatExprPrec(e.Base, 8) + "[" + formatExpr(e.Index) + "]"
+		return p.formatExprPrec(e.Base, 8) + "[" + p.formatExpr(e.Index) + "]"
 	default:
 		return "<expr>"
 	}

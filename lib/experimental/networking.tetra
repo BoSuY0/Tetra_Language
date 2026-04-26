@@ -1,0 +1,24 @@
+// Experimental networking helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.networking directly.
+module lib.experimental.networking
+
+import lib.core.networking as stable_networking
+
+func default_port_http() -> Int:
+    return stable_networking.default_port_http()
+
+func default_port_https() -> Int:
+    return stable_networking.default_port_https()
+
+func clamp_port(port: Int) -> Int:
+    return stable_networking.clamp_port(port)
+
+func is_valid_port(port: Int) -> Bool:
+    return stable_networking.is_valid_port(port)
+
+func choose_port(preferred: Int, fallback: Int) -> Int:
+    return stable_networking.choose_port(preferred, fallback)
+
+func retry_backoff_ms(attempt: Int, base_ms: Int, max_ms: Int) -> Int:
+    return stable_networking.retry_backoff_ms(attempt, base_ms, max_ms)

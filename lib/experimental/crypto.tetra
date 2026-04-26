@@ -1,0 +1,20 @@
+// Experimental crypto interface helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.crypto directly.
+module lib.experimental.crypto
+
+import lib.core.crypto as stable_crypto
+
+func interface_strength() -> Int:
+    return stable_crypto.interface_strength()
+
+func mix_seed(seed: Int, value: Int) -> Int:
+    return stable_crypto.mix_seed(seed, value)
+
+func checksum_u8(values: []u8) -> Int
+uses mem:
+    return stable_crypto.checksum_u8(values)
+
+func constant_time_eq_u8(lhs: []u8, rhs: []u8) -> Bool
+uses mem:
+    return stable_crypto.constant_time_eq_u8(lhs, rhs)

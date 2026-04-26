@@ -271,3 +271,41 @@ func main() -> Int:
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestOwnershipRejectsPassingBorrowedValueToOwnedParameter(t *testing.T) {
+	requireCheckErrorContains(t, `
+func sink(x: []u8) -> Int:
+    return 0
+
+func caller(x: borrow []u8) -> Int:
+    let y: []u8 = x
+    return sink(y)
+
+func main() -> Int:
+    return 0
+`, "borrowed value derived from")
+}
+
+func TestOwnershipRejectsBorrowEscapeViaInoutAssignment(t *testing.T) {
+	requireCheckErrorContains(t, `
+func leak(read: borrow []u8, write: inout []u8) -> Int:
+    write = read
+    return 0
+
+func main() -> Int:
+    return 0
+`, "cannot escape via inout")
+}
+
+func TestOwnershipAllowsBorrowToBorrowForwarding(t *testing.T) {
+	requireCheckOK(t, `
+func read(x: borrow []u8) -> Int:
+    return 0
+
+func forward(x: borrow []u8) -> Int:
+    return read(x)
+
+func main() -> Int:
+    return 0
+`)
+}

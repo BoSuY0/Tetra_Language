@@ -1,0 +1,46 @@
+// Stable v1 core networking helpers promoted from lib.experimental.networking.
+// Effects: none
+// ```tetra doctest
+// func networking_doctest() -> Int:
+//     let selected: Int = lib.core.networking.choose_port(8080, lib.core.networking.default_port_https())
+//     let backoff: Int = lib.core.networking.retry_backoff_ms(3, 7, 42)
+//     if selected == 8080 && backoff == 42:
+//         return 1
+//     return 0
+// ```
+module lib.core.networking
+
+func default_port_http() -> Int:
+    return 80
+
+func default_port_https() -> Int:
+    return 443
+
+func clamp_port(port: Int) -> Int:
+    if port < 0:
+        return 0
+    if port > 65535:
+        return 65535
+    return port
+
+func is_valid_port(port: Int) -> Bool:
+    return port >= 0 && port <= 65535
+
+func choose_port(preferred: Int, fallback: Int) -> Int:
+    if is_valid_port(preferred) && preferred != 0:
+        return preferred
+    return clamp_port(fallback)
+
+func retry_backoff_ms(attempt: Int, base_ms: Int, max_ms: Int) -> Int:
+    var value: Int = base_ms
+    if value < 0:
+        value = 0
+    var step: Int = 0
+    while step < attempt:
+        value = value * 2
+        step = step + 1
+    if max_ms < 0:
+        return value
+    if value > max_ms:
+        return max_ms
+    return value

@@ -5,6 +5,42 @@ import (
 	"testing"
 )
 
+func requireCheckFileErrorContains(t *testing.T, src string, want string) {
+	t.Helper()
+	file, err := ParseFile([]byte(src), "test.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &World{
+		EntryModule: file.Module,
+		Files:       []*FileAST{file},
+		ByModule:    map[string]*FileAST{file.Module: file},
+	}
+	_, err = CheckWorld(world)
+	if err == nil {
+		t.Fatalf("expected error containing %q, got nil", want)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("expected error containing %q, got: %v", want, err)
+	}
+}
+
+func requireCheckFileOK(t *testing.T, src string) {
+	t.Helper()
+	file, err := ParseFile([]byte(src), "test.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	world := &World{
+		EntryModule: file.Module,
+		Files:       []*FileAST{file},
+		ByModule:    map[string]*FileAST{file.Module: file},
+	}
+	if _, err := CheckWorld(world); err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+}
+
 func TestAsyncParseCheckAndLower(t *testing.T) {
 	src := []byte(`
 async func answer() -> Int:
@@ -193,4 +229,49 @@ uses actors:
 	if !strings.Contains(err.Error(), "spawn target must not throw") {
 		t.Fatalf("error = %v", err)
 	}
+}
+
+func TestTaskSpawnRejectsMutableGlobalTarget(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+var g: Int
+
+func worker() -> Int:
+    g = g + 1
+    return g
+
+func main() -> Int
+uses runtime:
+    let task: Int = core.task_spawn_i32("worker")
+    return core.task_join_i32(task)
+`, "task_spawn_i32 target")
+}
+
+func TestActorSpawnRejectsMutableGlobalTarget(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+var g: Int
+
+func worker() -> Int
+uses actors:
+    g = g + 1
+    return g
+
+func main() -> Int
+uses actors:
+    let a: actor = core.spawn("worker")
+    return 0
+`, "spawn target")
+}
+
+func TestTaskSpawnAllowsImmutableGlobalTarget(t *testing.T) {
+	requireCheckFileOK(t, `
+val g: Int = 41
+
+func worker() -> Int:
+    return g + 1
+
+func main() -> Int
+uses runtime:
+    let task: Int = core.task_spawn_i32("worker")
+    return core.task_join_i32(task)
+`)
 }

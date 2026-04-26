@@ -1,0 +1,18 @@
+// Experimental time helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.time directly.
+module lib.experimental.time
+
+import lib.core.time as stable_time
+
+func millis_from_seconds(seconds: Int) -> Int:
+    return stable_time.millis_from_seconds(seconds)
+
+func seconds_from_millis(milliseconds: Int) -> Int:
+    return stable_time.seconds_from_millis(milliseconds)
+
+func clamp_timeout_ms(value: Int, lo: Int, hi: Int) -> Int:
+    return stable_time.clamp_timeout_ms(value, lo, hi)
+
+func add_duration_ms(base: Int, delta: Int) -> Int:
+    return stable_time.add_duration_ms(base, delta)

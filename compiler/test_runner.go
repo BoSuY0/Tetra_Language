@@ -165,7 +165,7 @@ func writeTestStmt(b *strings.Builder, stmt frontend.Stmt, indent int) {
 	case *frontend.ExpectStmt:
 		b.WriteString(prefix)
 		b.WriteString("if ")
-		b.WriteString(formatExpr(s.Cond))
+		b.WriteString(formatTestExpr(s.Cond))
 		b.WriteString(":\n")
 		b.WriteString(prefix)
 		b.WriteString("    let __ok: Int = 0\n")
@@ -178,6 +178,11 @@ func writeTestStmt(b *strings.Builder, stmt frontend.Stmt, indent int) {
 		p.stmt(stmt, indent)
 		b.WriteString(p.b.String())
 	}
+}
+
+func formatTestExpr(expr frontend.Expr) string {
+	var p sourcePrinter
+	return p.formatExpr(expr)
 }
 
 var nonTestNameChar = regexp.MustCompile(`[^A-Za-z0-9_]+`)

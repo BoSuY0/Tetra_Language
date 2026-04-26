@@ -50,6 +50,8 @@ const (
 type BuildOptions struct {
 	Jobs              int
 	IslandsDebug      bool
+	DebugInfo         bool
+	ReleaseOptimize   bool
 	Emit              EmitMode
 	Runtime           RuntimeMode
 	RuntimeObjectPath string
@@ -71,6 +73,12 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	if err != nil {
 		return nil, err
 	}
+	if opt.DebugInfo && !tgt.SupportsDebugInfo {
+		return nil, fmt.Errorf("target does not support debug info: %s", tgt.Triple)
+	}
+	if opt.ReleaseOptimize && !tgt.SupportsReleaseOptimize {
+		return nil, fmt.Errorf("target does not support release optimization: %s", tgt.Triple)
+	}
 	target = tgt.Triple
 	if target == "wasm32-wasi" {
 		return buildWASM32WASIWithStatsOpt(inputPath, outputPath, tgt, opt)
@@ -91,7 +99,11 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		return nil, fmt.Errorf("unsupported emit mode: %d", opt.Emit)
 	}
 
-	codegenOptions := x64.CodegenOptions{IslandsDebug: opt.IslandsDebug}
+	codegenOptions := x64.CodegenOptions{
+		IslandsDebug:    opt.IslandsDebug,
+		DebugInfo:       opt.DebugInfo,
+		ReleaseOptimize: opt.ReleaseOptimize,
+	}
 	var codegen func([]IRFunc, [][]byte) (*Object, error)
 	switch tgt.OS {
 	case ctarget.OSLinux:
@@ -459,7 +471,11 @@ func validateActorRuntimeObject(rt *Object) error {
 
 func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target, opt BuildOptions) (*BuildStats, error) {
 	requireMain := opt.Emit == EmitObject
-	codegenOptions := x64.CodegenOptions{IslandsDebug: opt.IslandsDebug}
+	codegenOptions := x64.CodegenOptions{
+		IslandsDebug:    opt.IslandsDebug,
+		DebugInfo:       opt.DebugInfo,
+		ReleaseOptimize: opt.ReleaseOptimize,
+	}
 
 	world, err := LoadWorld(inputPath)
 	if err != nil {
@@ -638,10 +654,17 @@ func wasmWebLoaderPath(outputPath string) string {
 }
 
 func buildTagFromOptions(opt BuildOptions) string {
+	var tags []string
 	if opt.IslandsDebug {
-		return "islands-debug"
+		tags = append(tags, "islands-debug")
 	}
-	return ""
+	if opt.DebugInfo {
+		tags = append(tags, "debug-info")
+	}
+	if opt.ReleaseOptimize {
+		tags = append(tags, "release-opt")
+	}
+	return strings.Join(tags, "+")
 }
 
 func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, error) {

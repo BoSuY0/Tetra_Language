@@ -1,0 +1,15 @@
+// Experimental async helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.async directly.
+module lib.experimental.async
+
+import lib.core.async as stable_async
+
+async func ready(value: Int) -> Int:
+    return await stable_async.ready(value)
+
+async func pair_sum(lhs: Int, rhs: Int) -> Int:
+    return await stable_async.pair_sum(lhs, rhs)
+
+func select_or(value: Int, fallback: Int) -> Int:
+    return stable_async.select_or(value, fallback)

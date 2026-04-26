@@ -17,6 +17,7 @@ func checkExprWithEffects(
 	imports map[string]string,
 	state *regionState,
 	effects *effectContext,
+	analysis *functionAnalysisState,
 ) (string, int, error) {
 	switch e := expr.(type) {
 	case *frontend.NumberExpr:
@@ -37,6 +38,9 @@ func checkExprWithEffects(
 		info, ok := locals[e.Name]
 		if !ok {
 			if g, ok := globals[e.Name]; ok {
+				if analysis != nil && g.Mutable {
+					analysis.touchesMutableGlobals = true
+				}
 				return g.TypeName, regionNone, nil
 			}
 			return "", regionNone, fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(e.At), e.Name)
@@ -80,7 +84,7 @@ func checkExprWithEffects(
 		if err != nil {
 			return "", regionNone, err
 		}
-		baseType, baseRegion, err := checkExprWithEffects(e.Base, locals, globals, funcs, types, module, imports, state, effects)
+		baseType, baseRegion, err := checkExprWithEffects(e.Base, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -95,11 +99,11 @@ func checkExprWithEffects(
 		}
 		return targetType, regionNone, nil
 	case *frontend.IndexExpr:
-		baseType, _, err := checkExprWithEffects(e.Base, locals, globals, funcs, types, module, imports, state, effects)
+		baseType, _, err := checkExprWithEffects(e.Base, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
 			return "", regionNone, err
 		}
-		indexType, _, err := checkExprWithEffects(e.Index, locals, globals, funcs, types, module, imports, state, effects)
+		indexType, _, err := checkExprWithEffects(e.Index, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -119,7 +123,7 @@ func checkExprWithEffects(
 			return "", regionNone, fmt.Errorf("%s: cannot index '%s'", frontend.FormatPos(e.At), baseType)
 		}
 	case *frontend.CallExpr:
-		return checkCallExprWithEffects(e, locals, globals, funcs, types, module, imports, state, effects)
+		return checkCallExprWithEffects(e, locals, globals, funcs, types, module, imports, state, effects, analysis)
 	case *frontend.ClosureExpr:
 		return "ptr", regionNone, nil
 	case *frontend.TryExpr:
@@ -132,7 +136,7 @@ func checkExprWithEffects(
 		}
 		state.allowThrowDepth++
 		state.allowThrowCall = call
-		tname, regionID, err := checkCallExprWithEffects(call, locals, globals, funcs, types, module, imports, state, effects)
+		tname, regionID, err := checkCallExprWithEffects(call, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		state.allowThrowDepth--
 		state.allowThrowCall = nil
 		return tname, regionID, err
@@ -146,7 +150,7 @@ func checkExprWithEffects(
 		}
 		state.allowAwaitDepth++
 		state.allowAwaitCall = call
-		tname, regionID, err := checkCallExprWithEffects(call, locals, globals, funcs, types, module, imports, state, effects)
+		tname, regionID, err := checkCallExprWithEffects(call, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		state.allowAwaitDepth--
 		state.allowAwaitCall = nil
 		return tname, regionID, err
@@ -179,7 +183,7 @@ func checkExprWithEffects(
 			if !ok {
 				return "", regionNone, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
 			}
-			valType, valRegion, err := checkExprWithEffects(init.Value, locals, globals, funcs, types, module, imports, state, effects)
+			valType, valRegion, err := checkExprWithEffects(init.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return "", regionNone, err
 			}
@@ -193,7 +197,7 @@ func checkExprWithEffects(
 		}
 		return resolved, structRegion, nil
 	case *frontend.UnaryExpr:
-		xtype, _, err := checkExprWithEffects(e.X, locals, globals, funcs, types, module, imports, state, effects)
+		xtype, _, err := checkExprWithEffects(e.X, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -212,11 +216,11 @@ func checkExprWithEffects(
 			return "", regionNone, fmt.Errorf("%s: unsupported unary operator", frontend.FormatPos(e.At))
 		}
 	case *frontend.BinaryExpr:
-		ltype, _, err := checkExprWithEffects(e.Left, locals, globals, funcs, types, module, imports, state, effects)
+		ltype, _, err := checkExprWithEffects(e.Left, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
 			return "", regionNone, err
 		}
-		rtype, _, err := checkExprWithEffects(e.Right, locals, globals, funcs, types, module, imports, state, effects)
+		rtype, _, err := checkExprWithEffects(e.Right, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -259,10 +263,13 @@ func checkCallExprWithEffects(
 	imports map[string]string,
 	state *regionState,
 	effects *effectContext,
+	analysis *functionAnalysisState,
 ) (string, int, error) {
 	resolved := ""
+	isBuiltin := false
 	if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
 		resolved = builtin
+		isBuiltin = true
 	} else {
 		var err error
 		resolved, err = resolveCallName(e.Name, module, imports, e.At)
@@ -276,6 +283,9 @@ func checkCallExprWithEffects(
 	}
 	if sig.Generic {
 		return "", regionNone, fmt.Errorf("%s: generic function '%s' could not be monomorphized in v0.5; use inferable value arguments", frontend.FormatPos(e.At), e.Name)
+	}
+	if analysis != nil && !isBuiltin && sig.TouchesMutableGlobals {
+		analysis.touchesMutableGlobals = true
 	}
 	isTryCall := state != nil && state.allowThrowDepth > 0 && state.allowThrowCall == e
 	if sig.ThrowsType != "" {
@@ -330,14 +340,23 @@ func checkCallExprWithEffects(
 	borrowArgs := make(map[string]frontend.Position)
 	inoutArgs := make(map[string]frontend.Position)
 	for i, arg := range e.Args {
-		argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects)
+		argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
 			return "", regionNone, err
 		}
 		if !typesCompatibleWithNullPtr(sig.ParamTypes[i], argType, arg) {
 			return "", regionNone, fmt.Errorf("%s: type mismatch for '%s' arg %d", frontend.FormatPos(arg.Pos()), resolved, i+1)
 		}
-		if i < len(sig.ParamOwnership) && sig.ParamOwnership[i] == "consume" {
+		paramOwnership := ""
+		if i < len(sig.ParamOwnership) {
+			paramOwnership = sig.ParamOwnership[i]
+		}
+		if paramOwnership == "" {
+			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+				return "", regionNone, fmt.Errorf("%s: borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of '%s'", frontend.FormatPos(arg.Pos()), borrowedName, i+1, resolved)
+			}
+		}
+		if paramOwnership == "consume" {
 			id, ok := arg.(*frontend.IdentExpr)
 			if !ok {
 				return "", regionNone, fmt.Errorf("%s: consume argument for '%s' must be a local value", frontend.FormatPos(arg.Pos()), resolved)
@@ -351,7 +370,7 @@ func checkCallExprWithEffects(
 			consumeArgs[i] = id.Name
 			consumeArgPositions[id.Name] = arg.Pos()
 		}
-		if i < len(sig.ParamOwnership) && sig.ParamOwnership[i] == "borrow" {
+		if paramOwnership == "borrow" {
 			id, ok := arg.(*frontend.IdentExpr)
 			if ok {
 				if firstPos, exists := inoutArgs[id.Name]; exists {
@@ -360,7 +379,7 @@ func checkCallExprWithEffects(
 				borrowArgs[id.Name] = arg.Pos()
 			}
 		}
-		if i < len(sig.ParamOwnership) && sig.ParamOwnership[i] == "inout" {
+		if paramOwnership == "inout" {
 			id, ok := arg.(*frontend.IdentExpr)
 			if !ok {
 				return "", regionNone, fmt.Errorf("%s: inout argument for '%s' must be a mutable local value", frontend.FormatPos(arg.Pos()), resolved)
@@ -428,6 +447,12 @@ func checkCallExprWithEffects(
 		if targetSig.ThrowsType != "" {
 			return "", regionNone, fmt.Errorf("%s: spawn target must not throw", frontend.FormatPos(e.At))
 		}
+		if targetSig.TouchesMutableGlobals {
+			return "", regionNone, fmt.Errorf("%s: spawn target '%s' touches mutable global state and cannot cross actor boundary", frontend.FormatPos(e.At), target)
+		}
+		if !funcSigActorTaskTransferSafe(targetSig, types) {
+			return "", regionNone, fmt.Errorf("%s: spawn target '%s' is not sendable across actor boundary", frontend.FormatPos(e.At), target)
+		}
 		lit.Value = []byte(target)
 	}
 	if resolved == "core.task_spawn_i32" {
@@ -461,6 +486,12 @@ func checkCallExprWithEffects(
 		}
 		if targetSig.ThrowsType != "" {
 			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target must not throw", frontend.FormatPos(e.At))
+		}
+		if targetSig.TouchesMutableGlobals {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target '%s' touches mutable global state and cannot cross task boundary", frontend.FormatPos(e.At), target)
+		}
+		if !funcSigActorTaskTransferSafe(targetSig, types) {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target '%s' is not sendable across task boundary", frontend.FormatPos(e.At), target)
 		}
 		lit.Value = []byte(target)
 	}

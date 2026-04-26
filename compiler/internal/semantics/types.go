@@ -49,17 +49,18 @@ type GlobalInfo struct {
 }
 
 type FuncSig struct {
-	Generic           bool
-	ParamNames        []string
-	ParamTypes        []string
-	ParamOwnership    []string
-	ParamSlots        int
-	ReturnType        string
-	ThrowsType        string
-	Async             bool
-	ReturnSlots       int
-	ReturnRegionParam int
-	Effects           []string
+	Generic               bool
+	ParamNames            []string
+	ParamTypes            []string
+	ParamOwnership        []string
+	ParamSlots            int
+	ReturnType            string
+	ThrowsType            string
+	Async                 bool
+	ReturnSlots           int
+	ReturnRegionParam     int
+	Effects               []string
+	TouchesMutableGlobals bool
 }
 
 type CheckedStruct struct {
@@ -299,4 +300,46 @@ func sliceElemName(name string) (string, bool) {
 
 func isArrayTypeName(name string) bool {
 	return strings.HasPrefix(name, "[") && strings.Contains(name, "]")
+}
+
+func funcSigActorTaskTransferSafe(sig FuncSig, types map[string]*TypeInfo) bool {
+	for i, typeName := range sig.ParamTypes {
+		ownership := ""
+		if i < len(sig.ParamOwnership) {
+			ownership = sig.ParamOwnership[i]
+		}
+		if ownership == "borrow" || ownership == "inout" {
+			return false
+		}
+		if !typeActorTaskSendable(typeName, types, map[string]bool{}) {
+			return false
+		}
+	}
+	return typeActorTaskSendable(sig.ReturnType, types, map[string]bool{})
+}
+
+func typeActorTaskSendable(typeName string, types map[string]*TypeInfo, seen map[string]bool) bool {
+	if seen[typeName] {
+		return true
+	}
+	seen[typeName] = true
+	info, ok := types[typeName]
+	if !ok {
+		return false
+	}
+	switch info.Kind {
+	case TypeI32, TypeU8, TypeBool, TypeActor, TypeEnum:
+		return true
+	case TypeOptional:
+		return typeActorTaskSendable(info.ElemType, types, seen)
+	case TypeStruct:
+		for _, field := range info.Fields {
+			if !typeActorTaskSendable(field.TypeName, types, seen) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }

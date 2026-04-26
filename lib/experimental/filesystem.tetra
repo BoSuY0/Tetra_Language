@@ -1,0 +1,21 @@
+// Experimental filesystem helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.filesystem directly.
+module lib.experimental.filesystem
+
+import lib.core.filesystem as stable_filesystem
+
+func has_leading_slash(path: String) -> Bool:
+    return stable_filesystem.has_leading_slash(path)
+
+func ends_with_slash(path: String) -> Bool:
+    return stable_filesystem.ends_with_slash(path)
+
+func is_root(path: String) -> Bool:
+    return stable_filesystem.is_root(path)
+
+func slash_count(path: String) -> Int:
+    return stable_filesystem.slash_count(path)
+
+func directory_depth(path: String) -> Int:
+    return stable_filesystem.directory_depth(path)

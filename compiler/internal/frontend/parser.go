@@ -797,7 +797,7 @@ func (p *parser) parsePathParts() ([]string, error) {
 
 func (p *parser) expectPathPart() (token, error) {
 	switch p.cur.typ {
-	case TokenIdent, TokenTest:
+	case TokenIdent, TokenTest, TokenAsync:
 		tok := p.cur
 		if err := p.next(); err != nil {
 			return token{}, err

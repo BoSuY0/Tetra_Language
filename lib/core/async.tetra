@@ -1,0 +1,20 @@
+// Stable v1 core async helpers promoted from lib.experimental.async.
+// Effects: none
+// ```tetra doctest
+// async func async_doctest() -> Int:
+//     return await lib.core.async.pair_sum(20, 22)
+// ```
+module lib.core.async
+
+async func ready(value: Int) -> Int:
+    return value
+
+async func pair_sum(lhs: Int, rhs: Int) -> Int:
+    let left: Int = await ready(lhs)
+    let right: Int = await ready(rhs)
+    return left + right
+
+func select_or(value: Int, fallback: Int) -> Int:
+    if value != 0:
+        return value
+    return fallback

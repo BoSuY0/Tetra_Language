@@ -547,6 +547,96 @@ func TestBuildCoreSerializationSmoke(t *testing.T) {
 	}
 }
 
+func TestBuildCoreFilesystemSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_filesystem_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreNetworkingSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_networking_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreAsyncSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_async_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreSyncSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_sync_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreTimeSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_time_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreCryptoSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_crypto_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
 func TestBuildExtensionSmoke(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -1309,6 +1399,120 @@ func TestBuildWASMHelloWritesModule(t *testing.T) {
 			if !strings.Contains(loader, "tetra_web_v1") || !strings.Contains(loader, "tetra_main") {
 				t.Fatalf("unexpected web loader content:\n%s", loader)
 			}
+		}
+	}
+}
+
+func TestBuildCacheSeparatesNativeDebugAndReleaseModes(t *testing.T) {
+	tmp := t.TempDir()
+	files := map[string]string{
+		"engine/render.tetra": "module engine.render\nfun add_one(x: i32): i32 {\n  return x + 1\n}\n",
+		"app/game.tetra":      "module app.game\nimport engine.render as r\nfun main(): i32 {\n  return r.add_one(41)\n}\n",
+	}
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/game.tetra"))
+	outPath := filepath.Join(tmp, "out", "app")
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	baseOpt := BuildOptions{Jobs: 1}
+	stats1, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", baseOpt)
+	if err != nil {
+		t.Fatalf("build1: %v", err)
+	}
+	assertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
+	if len(stats1.CacheHits) != 0 {
+		t.Fatalf("unexpected cache hits on first base build")
+	}
+
+	stats2, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", baseOpt)
+	if err != nil {
+		t.Fatalf("build2: %v", err)
+	}
+	if len(stats2.CompiledModules) != 0 {
+		t.Fatalf("expected no compiled modules on base cache hit")
+	}
+	assertModules(t, stats2.CacheHits, []string{"app.game", "engine.render"})
+
+	debugOpt := BuildOptions{Jobs: 1, DebugInfo: true}
+	stats3, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", debugOpt)
+	if err != nil {
+		t.Fatalf("build3 debug: %v", err)
+	}
+	assertModules(t, stats3.CompiledModules, []string{"app.game", "engine.render"})
+	if len(stats3.CacheHits) != 0 {
+		t.Fatalf("unexpected cache hits on first debug build")
+	}
+
+	stats4, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", debugOpt)
+	if err != nil {
+		t.Fatalf("build4 debug: %v", err)
+	}
+	if len(stats4.CompiledModules) != 0 {
+		t.Fatalf("expected no compiled modules on debug cache hit")
+	}
+	assertModules(t, stats4.CacheHits, []string{"app.game", "engine.render"})
+
+	releaseOpt := BuildOptions{Jobs: 1, ReleaseOptimize: true}
+	stats5, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", releaseOpt)
+	if err != nil {
+		t.Fatalf("build5 release: %v", err)
+	}
+	assertModules(t, stats5.CompiledModules, []string{"app.game", "engine.render"})
+	if len(stats5.CacheHits) != 0 {
+		t.Fatalf("unexpected cache hits on first release build")
+	}
+
+	stats6, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", releaseOpt)
+	if err != nil {
+		t.Fatalf("build6 release: %v", err)
+	}
+	if len(stats6.CompiledModules) != 0 {
+		t.Fatalf("expected no compiled modules on release cache hit")
+	}
+	assertModules(t, stats6.CacheHits, []string{"app.game", "engine.render"})
+
+	stats7, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", baseOpt)
+	if err != nil {
+		t.Fatalf("build7 base: %v", err)
+	}
+	if len(stats7.CompiledModules) != 0 {
+		t.Fatalf("expected base mode cache to remain warm")
+	}
+	assertModules(t, stats7.CacheHits, []string{"app.game", "engine.render"})
+}
+
+func TestBuildWASMCacheStatsRemainColdAcrossBuilds(t *testing.T) {
+	for _, target := range []string{"wasm32-wasi", "wasm32-web"} {
+		tmp := t.TempDir()
+		files := map[string]string{
+			"engine/render.tetra": "module engine.render\nfun add_one(x: i32): i32 {\n  return x + 1\n}\n",
+			"app/game.tetra":      "module app.game\nimport engine.render as r\nfun main(): i32 {\n  return r.add_one(41)\n}\n",
+		}
+		writeTestFiles(t, tmp, files)
+		entry := filepath.Join(tmp, filepath.FromSlash("app/game.tetra"))
+		outPath := filepath.Join(tmp, "out", target+".wasm")
+		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+
+		stats1, err := BuildFileWithStatsOpt(entry, outPath, target, BuildOptions{Jobs: 1})
+		if err != nil {
+			t.Fatalf("build1 %s: %v", target, err)
+		}
+		assertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
+		if len(stats1.CacheHits) != 0 {
+			t.Fatalf("%s unexpected cache hits on first build: %#v", target, stats1.CacheHits)
+		}
+
+		stats2, err := BuildFileWithStatsOpt(entry, outPath, target, BuildOptions{Jobs: 1})
+		if err != nil {
+			t.Fatalf("build2 %s: %v", target, err)
+		}
+		assertModules(t, stats2.CompiledModules, []string{"app.game", "engine.render"})
+		if len(stats2.CacheHits) != 0 {
+			t.Fatalf("%s expected cache to stay cold: %#v", target, stats2.CacheHits)
 		}
 	}
 }

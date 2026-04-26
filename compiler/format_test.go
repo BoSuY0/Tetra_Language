@@ -367,3 +367,212 @@ func main() -> Int:
 		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
 	}
 }
+
+func TestFormatSourcePreservesSemanticClauses(t *testing.T) {
+	src := []byte(`func main() -> Int noalloc noblock realtime nothrow budget(10):
+    return 0
+`)
+	got, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `func main() -> Int
+noalloc
+noblock
+realtime
+nothrow
+budget(10):
+    return 0
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
+func TestFormatSourceClosureLiteralIsIdempotent(t *testing.T) {
+	src := []byte(`func main() -> Int:
+    let f: ptr = fn(x: Int) -> Int:
+        return x
+    return 0
+`)
+	once, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource once: %v", err)
+	}
+	if strings.Contains(string(once), "<expr>") {
+		t.Fatalf("formatted source lost closure expression:\n%s", string(once))
+	}
+	twice, err := FormatSource(once, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource twice: %v", err)
+	}
+	if string(twice) != string(once) {
+		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+	}
+}
+
+func TestFormatSourceNestedMultiStmtClosureIsIdempotent(t *testing.T) {
+	src := []byte(`func call(f: ptr) -> Int:
+    return 0
+
+func main() -> Int:
+    return call(fn(x: Int) -> Int:
+        let y: Int = x
+        return y
+    )
+`)
+	once, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource once: %v", err)
+	}
+	if strings.Contains(string(once), "<expr>") {
+		t.Fatalf("formatted source lost nested closure expression:\n%s", string(once))
+	}
+	if !strings.Contains(string(once), "func __closure_") {
+		t.Fatalf("formatted source missing synthetic closure declaration:\n%s", string(once))
+	}
+	twice, err := FormatSource(once, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource twice: %v", err)
+	}
+	if string(twice) != string(once) {
+		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+	}
+}
+
+func TestFormatSourcePreservesCommentPlacementAfterExpressionBodiedFunction(t *testing.T) {
+	src := []byte(`func add(a: Int, b: Int) -> Int = a + b
+// keep with main
+func main() -> Int = add(a: 40, b: 2)
+`)
+	got, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `func add(a: Int, b: Int) -> Int:
+    return a + b
+
+// keep with main
+func main() -> Int:
+    return add(a: 40, b: 2)
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
+func TestFormatSourcePreservesCommentPlacementAfterSemanticClauseExpansion(t *testing.T) {
+	src := []byte(`func worker() -> Int noalloc budget(8):
+    return 1
+// keep with main
+func main() -> Int:
+    return worker()
+`)
+	got, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `func worker() -> Int
+noalloc
+budget(8):
+    return 1
+
+// keep with main
+func main() -> Int:
+    return worker()
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
+func TestFormatSourcePreservesCommentPlacementAfterClosureExpansion(t *testing.T) {
+	src := []byte(`func main() -> Int:
+    let f: ptr = fn(x: Int) -> Int = x
+    // keep with return
+    return 0
+`)
+	got, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `func main() -> Int:
+    let f: ptr = fn(x: Int) -> Int:
+        return x
+    // keep with return
+    return 0
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
+func TestFormatSourceV1SurfaceIdempotentWithComments(t *testing.T) {
+	src := []byte(`// module docs
+module app.main
+
+// io import
+import app.io as io
+
+/* enum docs */
+enum Mode:
+    case fast
+    case slow
+
+// struct docs
+struct Box:
+    value: Int
+
+protocol Runner:
+    func run(self: Box) -> Int
+
+// extension docs
+extension Box:
+    func run(self: Box) -> Int:
+        return self.value
+
+impl Box: Runner
+
+// globals
+const answer: Int = 42
+
+func worker(task: Int) -> Int noalloc budget(8):
+    let f: ptr = fn(x: Int) -> Int:
+        return x + answer
+    if task > 0:
+        return task
+    return answer
+
+// entry
+func main() -> Int uses io:
+    let mode: Mode = Mode.fast
+    var box: Box = Box(value: answer)
+    if mode == Mode.fast:
+        return worker(task: box.value)
+    return 0
+`)
+	once, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource once: %v", err)
+	}
+	twice, err := FormatSource(once, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource twice: %v", err)
+	}
+	if string(twice) != string(once) {
+		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+	}
+	for _, expected := range []string{
+		"// module docs",
+		"/* enum docs */",
+		"// extension docs",
+		"// entry",
+		"noalloc",
+		"budget(8):",
+		"fn(x: Int) -> Int:",
+	} {
+		if !strings.Contains(string(once), expected) {
+			t.Fatalf("formatted source missing %q:\n%s", expected, string(once))
+		}
+	}
+}

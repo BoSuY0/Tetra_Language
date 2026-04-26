@@ -1,0 +1,11 @@
+// Stable core sync stdlib smoke.
+module examples.core_sync_smoke
+
+import lib.core.sync as sync_lib
+
+func main() -> Int:
+    let merged: Int = sync_lib.merge_status(0, 0)
+    let remaining: Int = sync_lib.spin_countdown(5, 3)
+    if merged == 0 && remaining == 2 && sync_lib.all_ready(true, true):
+        return 42
+    return 1

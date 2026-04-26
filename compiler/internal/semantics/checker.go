@@ -793,12 +793,16 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				state.async = sig.Async
 				effects := newEffectContext(fullName, sig.Effects, fn.Uses, strings.HasPrefix(module, "__"))
 				borrowedParams := make(map[string]struct{})
+				inoutParams := make(map[string]struct{})
 				for _, param := range fn.Params {
 					if param.Ownership == "borrow" {
 						borrowedParams[param.Name] = struct{}{}
+					} else if param.Ownership == "inout" {
+						inoutParams[param.Name] = struct{}{}
 					}
 				}
-				if err := checkStmts(fn.Body, locals, globals, checked.FuncSigs, types, module, imports, sig.ReturnType, borrowedParams, state, effects); err != nil {
+				analysis := &functionAnalysisState{}
+				if err := checkStmts(fn.Body, locals, globals, checked.FuncSigs, types, module, imports, sig.ReturnType, borrowedParams, inoutParams, state, effects, analysis); err != nil {
 					return nil, err
 				}
 				newReturnParam := regionNone
@@ -811,6 +815,11 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				}
 				if sig.ReturnRegionParam != newReturnParam {
 					sig.ReturnRegionParam = newReturnParam
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if sig.TouchesMutableGlobals != analysis.touchesMutableGlobals {
+					sig.TouchesMutableGlobals = analysis.touchesMutableGlobals
 					checked.FuncSigs[fullName] = sig
 					changed = true
 				}
@@ -1280,6 +1289,10 @@ func formatGenericTypeRef(ref frontend.TypeRef) string {
 	}
 }
 
+type functionAnalysisState struct {
+	touchesMutableGlobals bool
+}
+
 func checkStmts(
 	stmts []frontend.Stmt,
 	locals map[string]LocalInfo,
@@ -1290,8 +1303,10 @@ func checkStmts(
 	imports map[string]string,
 	returnType string,
 	borrowedParams map[string]struct{},
+	inoutParams map[string]struct{},
 	state *regionState,
 	effects *effectContext,
+	analysis *functionAnalysisState,
 ) error {
 	for _, stmt := range stmts {
 		switch s := stmt.(type) {
@@ -1299,7 +1314,7 @@ func checkStmts(
 			if err := effects.require(s.At, "io"); err != nil {
 				return err
 			}
-			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1318,7 +1333,7 @@ func checkStmts(
 			if err := effects.requireAll(s.At, []string{"islands", "mem"}); err != nil {
 				return err
 			}
-			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1329,7 +1344,7 @@ func checkStmts(
 				return fmt.Errorf("%s: free is only allowed in unsafe blocks", frontend.FormatPos(s.At))
 			}
 		case *frontend.ReturnStmt:
-			tname, regionID, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			tname, regionID, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1353,7 +1368,7 @@ func checkStmts(
 			if state.throwType == "" {
 				return fmt.Errorf("%s: throw is only allowed in throwing functions", frontend.FormatPos(s.At))
 			}
-			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			tname, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1364,7 +1379,7 @@ func checkStmts(
 			if err := effects.requireAll(s.At, []string{"alloc", "islands", "mem"}); err != nil {
 				return err
 			}
-			sizeType, _, err := checkExprWithEffects(s.Size, locals, globals, funcs, types, module, imports, state, effects)
+			sizeType, _, err := checkExprWithEffects(s.Size, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1374,7 +1389,7 @@ func checkStmts(
 			if err := state.enterIsland(s.Name); err != nil {
 				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
 			}
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis); err != nil {
 				state.exitIsland()
 				return err
 			}
@@ -1389,7 +1404,7 @@ func checkStmts(
 			if _, err := ensureTypeInfo(resolved, types); err != nil {
 				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
 			}
-			valType, valRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			valType, valRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1420,14 +1435,14 @@ func checkStmts(
 			}
 		case *frontend.AssignStmt:
 			if idx, ok := s.Target.(*frontend.IndexExpr); ok {
-				indexType, _, err := checkExprWithEffects(idx.Index, locals, globals, funcs, types, module, imports, state, effects)
+				indexType, _, err := checkExprWithEffects(idx.Index, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
 					return err
 				}
 				if !isInt32Like(indexType) {
 					return fmt.Errorf("%s: index must be i32/u8", frontend.FormatPos(idx.At))
 				}
-				if _, _, err := checkExprWithEffects(idx.Base, locals, globals, funcs, types, module, imports, state, effects); err != nil {
+				if _, _, err := checkExprWithEffects(idx.Base, locals, globals, funcs, types, module, imports, state, effects, analysis); err != nil {
 					return err
 				}
 			}
@@ -1442,7 +1457,7 @@ func checkStmts(
 						}
 						return fmt.Errorf("%s: cannot assign to val '%s'", frontend.FormatPos(s.At), id.Name)
 					}
-					valType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+					valType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 					if err != nil {
 						return err
 					}
@@ -1465,12 +1480,19 @@ func checkStmts(
 				}
 				return fmt.Errorf("%s: cannot assign to val '%s'", frontend.FormatPos(s.At), targetInfo.Name)
 			}
-			valType, valRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			valType, valRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
 			if !typesCompatibleWithNullPtr(targetType, valType, s.Value) {
 				return fmt.Errorf("%s: type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), targetType, valType)
+			}
+			if valRegion < regionNone {
+				if _, outParam := inoutParams[targetInfo.Name]; outParam {
+					if borrowedName, borrowed := state.borrowedParamOwner(valRegion); borrowed {
+						return fmt.Errorf("%s: borrowed local '%s' cannot escape via inout assignment to '%s'", frontend.FormatPos(s.At), borrowedName, targetInfo.Name)
+					}
+				}
 			}
 			if _, ok := s.Target.(*frontend.IndexExpr); !ok {
 				if valRegion >= 0 {
@@ -1497,7 +1519,7 @@ func checkStmts(
 				}
 			}
 		case *frontend.IfStmt:
-			condType, _, err := checkExprWithEffects(s.Cond, locals, globals, funcs, types, module, imports, state, effects)
+			condType, _, err := checkExprWithEffects(s.Cond, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1511,7 +1533,7 @@ func checkStmts(
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
 			if err := withActiveScope(state, scopeIDs.thenID, func() error {
-				return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+				return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 			}); err != nil {
 				return err
 			}
@@ -1520,7 +1542,7 @@ func checkStmts(
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
 				if err := withActiveScope(state, scopeIDs.elseID, func() error {
-					return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+					return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 				}); err != nil {
 					return err
 				}
@@ -1532,7 +1554,7 @@ func checkStmts(
 			recordMergeConflicts(state, thenVars, elseVars, "then", "else")
 			markUnknownRegions(state)
 		case *frontend.IfLetStmt:
-			valueType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			valueType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1546,7 +1568,7 @@ func checkStmts(
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
 			if err := withActiveScope(state, scopeIDs.thenID, func() error {
-				return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+				return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 			}); err != nil {
 				return err
 			}
@@ -1555,7 +1577,7 @@ func checkStmts(
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
 				if err := withActiveScope(state, scopeIDs.elseID, func() error {
-					return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+					return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 				}); err != nil {
 					return err
 				}
@@ -1567,7 +1589,7 @@ func checkStmts(
 			recordMergeConflicts(state, thenVars, elseVars, "then", "else")
 			markUnknownRegions(state)
 		case *frontend.WhileStmt:
-			condType, _, err := checkExprWithEffects(s.Cond, locals, globals, funcs, types, module, imports, state, effects)
+			condType, _, err := checkExprWithEffects(s.Cond, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1582,7 +1604,7 @@ func checkStmts(
 			state.regionVars = copyRegionVars(before)
 			state.loopDepth++
 			if err := withActiveScope(state, bodyScopeID, func() error {
-				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 			}); err != nil {
 				state.loopDepth--
 				return err
@@ -1594,7 +1616,7 @@ func checkStmts(
 			markUnknownRegions(state)
 		case *frontend.ForRangeStmt:
 			if s.Iterable != nil {
-				iterType, _, err := checkExprWithEffects(s.Iterable, locals, globals, funcs, types, module, imports, state, effects)
+				iterType, _, err := checkExprWithEffects(s.Iterable, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
 					return err
 				}
@@ -1606,11 +1628,11 @@ func checkStmts(
 					return fmt.Errorf("%s: for collection element type mismatch: local '%s' is %s, iterable yields %s", frontend.FormatPos(s.At), s.Name, loopInfo.TypeName, elemType)
 				}
 			} else {
-				startType, _, err := checkExprWithEffects(s.Start, locals, globals, funcs, types, module, imports, state, effects)
+				startType, _, err := checkExprWithEffects(s.Start, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
 					return err
 				}
-				endType, _, err := checkExprWithEffects(s.End, locals, globals, funcs, types, module, imports, state, effects)
+				endType, _, err := checkExprWithEffects(s.End, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
 					return err
 				}
@@ -1626,7 +1648,7 @@ func checkStmts(
 			state.regionVars = copyRegionVars(before)
 			state.loopDepth++
 			if err := withActiveScope(state, bodyScopeID, func() error {
-				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 			}); err != nil {
 				state.loopDepth--
 				return err
@@ -1637,7 +1659,7 @@ func checkStmts(
 			recordMergeConflicts(state, before, bodyVars, "before", "body")
 			markUnknownRegions(state)
 		case *frontend.MatchStmt:
-			scrutType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects)
+			scrutType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -1669,7 +1691,7 @@ func checkStmts(
 						patType = optionalSomePatternType
 					} else {
 						var err error
-						patType, _, err = checkExprWithEffects(c.Pattern, locals, globals, funcs, types, module, imports, state, effects)
+						patType, _, err = checkExprWithEffects(c.Pattern, locals, globals, funcs, types, module, imports, state, effects, analysis)
 						if err != nil {
 							return err
 						}
@@ -1693,7 +1715,7 @@ func checkStmts(
 					caseScopeID = caseScopes[i]
 				}
 				if err := withActiveScope(state, caseScopeID, func() error {
-					return checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+					return checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 				}); err != nil {
 					return err
 				}
@@ -1717,14 +1739,14 @@ func checkStmts(
 			}
 			state.enterUnsafe()
 			if err := withActiveScope(state, scopeID, func() error {
-				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 			}); err != nil {
 				state.exitUnsafe()
 				return err
 			}
 			state.exitUnsafe()
 		case *frontend.ExprStmt:
-			_, _, err := checkExprWithEffects(s.Expr, locals, globals, funcs, types, module, imports, state, effects)
+			_, _, err := checkExprWithEffects(s.Expr, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}

@@ -80,3 +80,38 @@ func TestParseRejectsUnknownAsUnplanned(t *testing.T) {
 		t.Fatalf("unknown target marked planned: %#v", targetErr)
 	}
 }
+
+func TestTargetCapabilitiesForDebugInfoAndReleaseOptimize(t *testing.T) {
+	native, err := Parse("linux-x64")
+	if err != nil {
+		t.Fatalf("Parse(linux-x64): %v", err)
+	}
+	if !native.SupportsDebugInfo {
+		t.Fatalf("linux-x64 SupportsDebugInfo = false")
+	}
+	if !native.SupportsReleaseOptimize {
+		t.Fatalf("linux-x64 SupportsReleaseOptimize = false")
+	}
+
+	wasmWASI, err := Parse("wasm32-wasi")
+	if err != nil {
+		t.Fatalf("Parse(wasm32-wasi): %v", err)
+	}
+	if wasmWASI.SupportsDebugInfo {
+		t.Fatalf("wasm32-wasi SupportsDebugInfo = true")
+	}
+	if !wasmWASI.SupportsReleaseOptimize {
+		t.Fatalf("wasm32-wasi SupportsReleaseOptimize = false")
+	}
+
+	wasmWeb, err := Parse("wasm32-web")
+	if err != nil {
+		t.Fatalf("Parse(wasm32-web): %v", err)
+	}
+	if wasmWeb.SupportsDebugInfo {
+		t.Fatalf("wasm32-web SupportsDebugInfo = true")
+	}
+	if !wasmWeb.SupportsReleaseOptimize {
+		t.Fatalf("wasm32-web SupportsReleaseOptimize = false")
+	}
+}

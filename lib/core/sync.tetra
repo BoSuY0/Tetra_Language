@@ -1,0 +1,34 @@
+// Stable v1 core sync helpers promoted from lib.experimental.sync.
+// Effects: none
+// ```tetra doctest
+// func sync_doctest() -> Int:
+//     let merged: Int = lib.core.sync.merge_status(0, 0)
+//     let remaining: Int = lib.core.sync.spin_countdown(5, 3)
+//     if merged == 0 && remaining == 2:
+//         return 1
+//     return 0
+// ```
+module lib.core.sync
+
+func merge_status(lhs: Int, rhs: Int) -> Int:
+    if lhs != 0:
+        return lhs
+    return rhs
+
+func all_ready(lhs: Bool, rhs: Bool) -> Bool:
+    return lhs && rhs
+
+func spin_countdown(start: Int, ticks: Int) -> Int:
+    var value: Int = start
+    var remaining: Int = ticks
+    while remaining > 0 && value > 0:
+        value = value - 1
+        remaining = remaining - 1
+    if value < 0:
+        return 0
+    return value
+
+func barrier_target(workers: Int) -> Int:
+    if workers < 0:
+        return 0
+    return workers

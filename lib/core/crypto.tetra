@@ -1,0 +1,49 @@
+// Stable v1 core crypto interface helpers promoted from lib.experimental.crypto.
+// Effects: mem
+// ```tetra doctest
+// func crypto_doctest() -> Int
+// uses alloc, mem:
+//     var payload: []u8 = core.make_u8(2)
+//     payload[0] = 20
+//     payload[1] = 22
+//     if lib.core.crypto.constant_time_eq_u8(payload, payload):
+//         return lib.core.crypto.interface_strength()
+//     return 0
+// ```
+module lib.core.crypto
+
+func interface_strength() -> Int:
+    return 21
+
+func mix_seed(seed: Int, value: Int) -> Int:
+    let mixed: Int = seed * 33 + value
+    if mixed < 0:
+        return 0 - mixed
+    return mixed % 2147483647
+
+func checksum_u8(values: []u8) -> Int
+uses mem:
+    var total: Int = 0
+    for value in values:
+        total = total + value
+    return total
+
+func constant_time_eq_u8(lhs: []u8, rhs: []u8) -> Bool
+uses mem:
+    var lhs_count: Int = 0
+    for lhs_item in lhs:
+        lhs_count = lhs_count + lhs_item * 0
+        lhs_count = lhs_count + 1
+    var rhs_count: Int = 0
+    for rhs_item in rhs:
+        rhs_count = rhs_count + rhs_item * 0
+        rhs_count = rhs_count + 1
+    if lhs_count != rhs_count:
+        return false
+    var diff: Int = 0
+    var i: Int = 0
+    while i < lhs_count:
+        if lhs[i] != rhs[i]:
+            diff = diff + 1
+        i = i + 1
+    return diff == 0

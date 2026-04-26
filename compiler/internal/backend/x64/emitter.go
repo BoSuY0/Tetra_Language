@@ -6,7 +6,9 @@ import (
 )
 
 type CodegenOptions struct {
-	IslandsDebug bool
+	IslandsDebug    bool
+	DebugInfo       bool
+	ReleaseOptimize bool
 }
 
 const IslandsDebugPageSize = 4096
