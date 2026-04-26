@@ -223,7 +223,7 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 
 ### TODO 7: Make Flow Syntax the Canonical Frontend
 
-**Status:** Partial. Flow-only source scanning, formatter checks, and release smoke coverage are green; expression-bodied functions are implemented, and planned-feature diagnostics now cover more deferred syntax. A native canonical Flow parser, full argument labels, closures, and semantic clauses remain incomplete or explicitly deferred.
+**Status:** Partial. Flow-only source scanning, formatter checks, and release smoke coverage are green; expression-bodied functions are implemented, and planned-feature diagnostics now cover more deferred syntax. The migration decision is now explicit: native Flow parser as canonical path, `normalizeFlowSyntax` as temporary compatibility tooling. Full argument labels, closures, and semantic clauses remain incomplete or explicitly deferred.
 
 **Goal:** Move from Flow-as-normalized-legacy-input to Flow as the official v1.0 syntax path.
 
@@ -234,7 +234,7 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 - [ ] Define the final Flow-only grammar for v1.0.
 - [x] Audit every release-covered `.tetra` file for legacy brace syntax.
 - [x] Add migration diagnostics for legacy syntax before removing the canonical path.
-- [ ] Decide whether `normalizeFlowSyntax` stays as compatibility tooling or is replaced by a Flow parser.
+- [x] Decide whether `normalizeFlowSyntax` stays as compatibility tooling or is replaced by a Flow parser.
 - [x] Remove legacy examples from release smoke coverage.
 - [ ] Finish argument labels.
 - [x] Finish expression-bodied functions.
@@ -391,7 +391,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 12: Stabilize Native x64 and Add WASM
 
-**Status:** Partial/blocked. Native x64 target, object/link/runtime/cache/determinism checks are green. The WASM backend/runtime plan is now documented and verifier-enforced, but WASM codegen/packaging, debug info, and release-optimization coverage remain unimplemented v1 work.
+**Status:** Partial/blocked. Native x64 target, object/link/runtime/cache/determinism checks are green; incremental cache validation now covers corrupted-cache self-heal fallback. The WASM backend/runtime plan is documented and verifier-enforced, but WASM codegen/packaging, debug info, and release-optimization coverage remain unimplemented v1 work.
 
 **Goal:** Meet the v1.0 target requirement: `linux-x64`, `macos-x64`, `windows-x64`, `wasm32-wasi`, and `wasm32-web`.
 
@@ -409,7 +409,7 @@ bash scripts/test_all.sh --full
 - [ ] Implement `wasm32-wasi` codegen/object/link/run path.
 - [ ] Implement `wasm32-web` codegen/package path.
 - [ ] Add smoke coverage for both WASM targets.
-- [ ] Add incremental check/build cache validation.
+- [x] Add incremental check/build cache validation.
 
 **Verification:**
 
@@ -430,7 +430,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 13: Promote a Stable Stdlib Surface
 
-**Status:** Partial/blocked. Current `lib/core` and docs/manifest tooling pass, and generated API docs now include alpha metadata/hash validation. The v1 stdlib breadth, doctests, baseline-vs-current API diff policy, and many stable modules are still missing.
+**Status:** Partial/blocked. Current `lib/core` and docs/manifest tooling pass, generated API docs include alpha metadata/hash validation, and `verify-docs` now enforces doctest presence for currently stable modules. The v1 stdlib breadth, baseline-vs-current API diff policy, and many stable modules are still missing.
 
 **Goal:** Build stable documented modules for v1.0.
 
@@ -453,7 +453,7 @@ bash scripts/test_all.sh --full
 - [ ] Promote time.
 - [ ] Promote crypto interfaces.
 - [x] Require docs for every stable module currently present.
-- [ ] Require doctests for every stable module.
+- [x] Require doctests for every stable module currently present.
 - [x] Require examples for every stable module currently present.
 - [x] Require formatter coverage for every stable module currently present.
 - [x] Require effects metadata for every stable module currently present.
@@ -476,7 +476,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 14: Stabilize CLI, Formatter, Reports, LSP, and Docs
 
-**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition basics are green. LSP references, rename, and code actions remain incomplete.
+**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition/references basics are green. LSP rename and code actions remain incomplete.
 
 **Goal:** Make the developer toolchain reliable enough for daily use and CI.
 
@@ -496,7 +496,7 @@ bash scripts/test_all.sh --full
 - [x] Complete LSP diagnostics for the current MVP.
 - [x] Complete LSP hover for the current MVP.
 - [x] Add go-to definition.
-- [ ] Add references.
+- [x] Add references.
 - [ ] Add rename.
 - [x] Add completion for current open-document symbols.
 - [x] Add formatting.
@@ -656,7 +656,7 @@ bash scripts/release_v1_0_gate.sh
 
 - [ ] Decide whether v0.7 should become an official intermediate release or remain an internal hardening slice.
 - [ ] Decide the final status of closures, semantic clauses, budget clauses, privacy clauses, and UI syntax before starting their implementation.
-- [ ] Decide whether Flow gets a native parser or continues through normalization during migration.
+- [x] Decide whether Flow gets a native parser or continues through normalization during migration.
 - [ ] Decide the exact WASM object/runtime architecture before changing `compiler/target/target.go`.
 - [ ] Decide the stable stdlib module list before promoting `lib/experimental/` code.
 - [ ] Decide the API diff format before making it a release gate.

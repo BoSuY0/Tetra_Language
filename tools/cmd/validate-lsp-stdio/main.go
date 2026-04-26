@@ -73,6 +73,9 @@ func validateLSPTranscript(raw []byte) error {
 			if !jsonObjectHasKey(capabilities, "definitionProvider") {
 				return fmt.Errorf("initialize capabilities missing definitionProvider")
 			}
+			if !jsonObjectHasKey(capabilities, "referencesProvider") {
+				return fmt.Errorf("initialize capabilities missing referencesProvider")
+			}
 			if !jsonObjectHasKey(capabilities, "completionProvider") {
 				return fmt.Errorf("initialize capabilities missing completionProvider")
 			}

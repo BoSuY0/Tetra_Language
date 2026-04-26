@@ -566,6 +566,17 @@ type lspDefinitionParams struct {
 	} `json:"position"`
 }
 
+type lspReferencesParams struct {
+	TextDocument lspTextDocumentIdentifier `json:"textDocument"`
+	Position     struct {
+		Line      int `json:"line"`
+		Character int `json:"character"`
+	} `json:"position"`
+	Context struct {
+		IncludeDeclaration bool `json:"includeDeclaration"`
+	} `json:"context"`
+}
+
 type lspOpenDocument struct {
 	Text     string
 	Analysis compiler.LSPAnalysis
@@ -598,6 +609,7 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 						"documentSymbolProvider":     true,
 						"hoverProvider":              true,
 						"definitionProvider":         true,
+						"referencesProvider":         true,
 						"documentFormattingProvider": true,
 						"completionProvider": map[string]any{
 							"resolveProvider": false,
@@ -704,6 +716,22 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 				var result any
 				if doc, ok := openDocs[params.TextDocument.URI]; ok {
 					result = lspDefinitionLocations(doc, params.TextDocument.URI, params.Position.Line, params.Position.Character)
+				}
+				if err := writeLSPResponse(stdout, *req.ID, result); err != nil {
+					fmt.Fprintln(stderr, err)
+					return 1
+				}
+			}
+		case "textDocument/references":
+			var params lspReferencesParams
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+			if req.ID != nil {
+				var result any
+				if doc, ok := openDocs[params.TextDocument.URI]; ok {
+					result = lspReferenceLocations(doc, params.TextDocument.URI, params.Position.Line, params.Position.Character, params.Context.IncludeDeclaration)
 				}
 				if err := writeLSPResponse(stdout, *req.ID, result); err != nil {
 					fmt.Fprintln(stderr, err)
@@ -868,21 +896,17 @@ func lspDefinitionLocations(doc lspOpenDocument, uri string, zeroBasedLine int, 
 	if name == "" {
 		return nil
 	}
-	for _, sym := range doc.Analysis.Symbols {
-		if sym.Name != name {
-			continue
-		}
-		line := maxInt(sym.Line-1, 0)
-		col := lspDefinitionColumn(doc.Text, sym)
-		return []map[string]any{{
-			"uri": uri,
-			"range": map[string]any{
-				"start": map[string]int{"line": line, "character": col},
-				"end":   map[string]int{"line": line, "character": col + len(name)},
-			},
-		}}
+	line, col, ok := lspDefinitionPosition(doc, name)
+	if !ok {
+		return nil
 	}
-	return nil
+	return []map[string]any{{
+		"uri": uri,
+		"range": map[string]any{
+			"start": map[string]int{"line": line, "character": col},
+			"end":   map[string]int{"line": line, "character": col + len(name)},
+		},
+	}}
 }
 
 func lspIdentifierAt(text string, zeroBasedLine int, zeroBasedCharacter int) string {
@@ -938,6 +962,56 @@ func lspDefinitionColumn(text string, sym compiler.LSPSymbol) int {
 		return idx
 	}
 	return col
+}
+
+func lspDefinitionPosition(doc lspOpenDocument, name string) (int, int, bool) {
+	for _, sym := range doc.Analysis.Symbols {
+		if sym.Name != name {
+			continue
+		}
+		line := maxInt(sym.Line-1, 0)
+		col := lspDefinitionColumn(doc.Text, sym)
+		return line, col, true
+	}
+	return 0, 0, false
+}
+
+func lspReferenceLocations(doc lspOpenDocument, uri string, zeroBasedLine int, zeroBasedCharacter int, includeDeclaration bool) any {
+	name := lspIdentifierAt(doc.Text, zeroBasedLine, zeroBasedCharacter)
+	if name == "" {
+		return nil
+	}
+	defLine, defCol, hasDefinition := lspDefinitionPosition(doc, name)
+	lines := strings.Split(doc.Text, "\n")
+	locations := []map[string]any{}
+	for line, text := range lines {
+		searchFrom := 0
+		for searchFrom <= len(text)-len(name) {
+			offset := strings.Index(text[searchFrom:], name)
+			if offset < 0 {
+				break
+			}
+			col := searchFrom + offset
+			startOk := col == 0 || !isLSPIdentifierChar(text[col-1])
+			end := col + len(name)
+			endOk := end == len(text) || !isLSPIdentifierChar(text[end])
+			searchFrom = end
+			if !startOk || !endOk {
+				continue
+			}
+			if !includeDeclaration && hasDefinition && line == defLine && col == defCol {
+				continue
+			}
+			locations = append(locations, map[string]any{
+				"uri": uri,
+				"range": map[string]any{
+					"start": map[string]int{"line": line, "character": col},
+					"end":   map[string]int{"line": line, "character": col + len(name)},
+				},
+			})
+		}
+	}
+	return locations
 }
 
 func lspCompletionItems(analysis compiler.LSPAnalysis) []map[string]any {

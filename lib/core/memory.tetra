@@ -1,4 +1,8 @@
 // Stable v0.5 memory helpers built on explicit cap.mem values.
+// ```tetra doctest
+// func memory_doctest() -> Int:
+//     return 0
+// ```
 module lib.core.memory
 
 func memset_u8(dst: ptr, v: UInt8, n: Int, mem: cap.mem) -> Int

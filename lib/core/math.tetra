@@ -1,4 +1,8 @@
 // Stable v0.5 core math helpers.
+// ```tetra doctest
+// func math_doctest() -> Int:
+//     return lib.core.math.clamp_i32(9, 0, 5)
+// ```
 module lib.core.math
 
 func add_i32(a: Int, b: Int) -> Int:

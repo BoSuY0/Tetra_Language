@@ -10,7 +10,7 @@ import (
 )
 
 func TestValidateLSPStdioAcceptsExpectedTranscript(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
 	out, err := runStdioValidator(t, transcript)
@@ -20,7 +20,7 @@ func TestValidateLSPStdioAcceptsExpectedTranscript(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingDiagnosticsNotification(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
 	out, err := runStdioValidator(t, transcript)
 	if err == nil {
@@ -32,7 +32,7 @@ func TestValidateLSPStdioRejectsMissingDiagnosticsNotification(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingHoverCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"definitionProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"definitionProvider":true,"referencesProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
 	out, err := runStdioValidator(t, transcript)
@@ -45,7 +45,7 @@ func TestValidateLSPStdioRejectsMissingHoverCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingCompletionCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"documentFormattingProvider":true}}}`) +
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"documentFormattingProvider":true}}}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
 	out, err := runStdioValidator(t, transcript)
@@ -58,7 +58,7 @@ func TestValidateLSPStdioRejectsMissingCompletionCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingFormattingCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"completionProvider":{"resolveProvider":false}}}}`) +
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"completionProvider":{"resolveProvider":false}}}}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
 	out, err := runStdioValidator(t, transcript)
@@ -71,7 +71,7 @@ func TestValidateLSPStdioRejectsMissingFormattingCapability(t *testing.T) {
 }
 
 func TestValidateLSPStdioRejectsMissingDefinitionCapability(t *testing.T) {
-	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"referencesProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
 	out, err := runStdioValidator(t, transcript)
@@ -90,6 +90,19 @@ func TestValidateLSPStdioRejectsMalformedFrameLength(t *testing.T) {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
 	if !strings.Contains(string(out), "message body truncated") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateLSPStdioRejectsMissingReferencesCapability(t *testing.T) {
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true}}}`) +
+		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":2,"result":null}`)
+	out, err := runStdioValidator(t, transcript)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "missing referencesProvider") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }

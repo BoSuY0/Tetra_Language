@@ -74,3 +74,65 @@ func TestVerifyWASMBackendPlanRequiresConcreteGateCommands(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestExtractTetraDoctestsParsesCommentFence(t *testing.T) {
+	doc := strings.Join([]string{
+		"// Stable module docs.",
+		"// ```tetra doctest",
+		"// func demo() -> Int:",
+		"//     return 42",
+		"// ```",
+	}, "\n")
+	blocks, err := extractTetraDoctests(doc)
+	if err != nil {
+		t.Fatalf("extractTetraDoctests: %v", err)
+	}
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 doctest block, got %d", len(blocks))
+	}
+	if !strings.Contains(blocks[0], "func demo() -> Int:") {
+		t.Fatalf("unexpected doctest block: %q", blocks[0])
+	}
+}
+
+func TestVerifyRequiredDoctestBlocksRejectsMissingDoctest(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "module.tetra")
+	if err := os.WriteFile(doc, []byte(strings.Join([]string{
+		"// Stable v0.5 module docs.",
+		"module lib.core.sample",
+		"",
+		"func add(a: Int, b: Int) -> Int:",
+		"    return a + b",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := verifyRequiredDoctestBlocks([]string{doc})
+	if err == nil {
+		t.Fatalf("expected missing doctest failure")
+	}
+	if !strings.Contains(err.Error(), "missing tetra doctest block") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVerifyRequiredDoctestBlocksAcceptsCommentFenceDoctest(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "module.tetra")
+	if err := os.WriteFile(doc, []byte(strings.Join([]string{
+		"// Stable v0.5 module docs.",
+		"// ```tetra doctest",
+		"// func demo() -> Int:",
+		"//     return 0",
+		"// ```",
+		"module lib.core.sample",
+		"",
+		"func add(a: Int, b: Int) -> Int:",
+		"    return a + b",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyRequiredDoctestBlocks([]string{doc}); err != nil {
+		t.Fatalf("verifyRequiredDoctestBlocks: %v", err)
+	}
+}

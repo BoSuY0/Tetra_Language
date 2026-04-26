@@ -1,8 +1,13 @@
 # Tetra Flow/Core Syntax MVP (v0.14-v0.18)
 
 This document describes the Flow syntax accepted by the MVP compiler.
-Flow syntax is normalized into the existing AST/IR path, so it is a frontend
-compatibility layer rather than a backend redesign.
+In v0.14-v0.18, Flow syntax is normalized into the existing AST/IR path, so it
+is a frontend compatibility layer rather than a backend redesign.
+
+Migration posture for v1.0 is decided separately: Flow moves to a native parser
+as the canonical frontend path, while normalization remains migration-only
+compatibility tooling during cutover. See
+`docs/frontend/flow_parser_plan.md`.
 
 ## Supported
 

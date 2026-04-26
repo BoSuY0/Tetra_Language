@@ -274,6 +274,53 @@ func TestBuildCacheSliceModuleChangeRebuildsOnlyProducer(t *testing.T) {
 	assertModules(t, stats3.CacheHits, []string{"app.game"})
 }
 
+func TestBuildCacheCorruptObjectFallsBackToRebuild(t *testing.T) {
+	tmp := t.TempDir()
+	files := map[string]string{
+		"engine/render.tetra": "module engine.render\nfun add_one(x: i32): i32 {\n  return x + 1\n}\n",
+		"app/game.tetra":      "module app.game\nimport engine.render as r\nfun main(): i32 {\n  return r.add_one(41)\n}\n",
+	}
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/game.tetra"))
+	outPath := filepath.Join(tmp, "out", "app")
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	stats1, err := BuildFileWithStats(entry, outPath, "linux-x64")
+	if err != nil {
+		t.Fatalf("build1: %v", err)
+	}
+	assertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
+
+	matches, err := filepath.Glob(filepath.Join(tmp, ".tetra_cache", "linux-x64", "engine", "render", "*.tobj"))
+	if err != nil {
+		t.Fatalf("glob cache path: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected one engine.render cache object, got %d", len(matches))
+	}
+	corruptPath := matches[0]
+	if err := os.WriteFile(corruptPath, []byte("corrupt object"), 0o644); err != nil {
+		t.Fatalf("corrupt cache object: %v", err)
+	}
+
+	stats2, err := BuildFileWithStats(entry, outPath, "linux-x64")
+	if err != nil {
+		t.Fatalf("build2 with corrupt cache: %v", err)
+	}
+	assertModules(t, stats2.CompiledModules, []string{"engine.render"})
+	assertModules(t, stats2.CacheHits, []string{"app.game"})
+
+	obj, err := ReadObject(corruptPath)
+	if err != nil {
+		t.Fatalf("read rebuilt cache object: %v", err)
+	}
+	if obj.Module != "engine.render" {
+		t.Fatalf("rebuilt cache module = %q, want engine.render", obj.Module)
+	}
+}
+
 func assertModules(t *testing.T, got []string, want []string) {
 	t.Helper()
 	gotSorted := append([]string(nil), got...)

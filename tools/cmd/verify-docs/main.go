@@ -82,6 +82,9 @@ func main() {
 	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md"}); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifyRequiredDoctestBlocks(currentStableModulePaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
 	if err := verifyWASMBackendPlan("docs/backend/wasm_backend_plan.md", ctarget.PlannedTriples()); err != nil {
 		errs = append(errs, err.Error())
 	}
@@ -125,6 +128,14 @@ func verifyWASMBackendPlan(path string, plannedTargets []string) error {
 }
 
 func verifyDoctestBlocks(paths []string) error {
+	return verifyDoctestBlocksWithPolicy(paths, false)
+}
+
+func verifyRequiredDoctestBlocks(paths []string) error {
+	return verifyDoctestBlocksWithPolicy(paths, true)
+}
+
+func verifyDoctestBlocksWithPolicy(paths []string, requireAtLeastOne bool) error {
 	for _, path := range paths {
 		raw, err := os.ReadFile(path)
 		if err != nil {
@@ -133,6 +144,9 @@ func verifyDoctestBlocks(paths []string) error {
 		blocks, err := extractTetraDoctests(string(raw))
 		if err != nil {
 			return fmt.Errorf("%s: %v", path, err)
+		}
+		if requireAtLeastOne && len(blocks) == 0 {
+			return fmt.Errorf("%s: missing tetra doctest block", path)
 		}
 		for i, block := range blocks {
 			if _, err := compiler.ParseFile([]byte(block), fmt.Sprintf("%s#doctest%d", path, i+1)); err != nil {
@@ -147,23 +161,41 @@ func extractTetraDoctests(doc string) ([]string, error) {
 	var blocks []string
 	lines := strings.Split(doc, "\n")
 	inBlock := false
+	commentBlock := false
 	var current []string
 	startLine := 0
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
+		commentLine, hasCommentPrefix := stripLineCommentPrefix(line)
+		commentTrimmed := strings.TrimSpace(commentLine)
 		if !inBlock {
-			if trimmed == "```tetra doctest" {
+			switch {
+			case trimmed == "```tetra doctest":
 				inBlock = true
+				commentBlock = false
+				current = nil
+				startLine = i + 1
+			case hasCommentPrefix && commentTrimmed == "```tetra doctest":
+				inBlock = true
+				commentBlock = true
 				current = nil
 				startLine = i + 1
 			}
 			continue
 		}
-		if trimmed == "```" {
+		if (!commentBlock && trimmed == "```") || (commentBlock && hasCommentPrefix && commentTrimmed == "```") {
 			blocks = append(blocks, strings.Join(current, "\n")+"\n")
 			inBlock = false
+			commentBlock = false
 			current = nil
 			startLine = 0
+			continue
+		}
+		if commentBlock {
+			if !hasCommentPrefix {
+				return nil, fmt.Errorf("non-comment line in tetra doctest block starting at line %d", startLine)
+			}
+			current = append(current, commentLine)
 			continue
 		}
 		current = append(current, line)
@@ -172,4 +204,24 @@ func extractTetraDoctests(doc string) ([]string, error) {
 		return nil, fmt.Errorf("unterminated tetra doctest block starting at line %d", startLine)
 	}
 	return blocks, nil
+}
+
+func stripLineCommentPrefix(line string) (string, bool) {
+	trimmedLeft := strings.TrimLeft(line, " \t")
+	if !strings.HasPrefix(trimmedLeft, "//") {
+		return "", false
+	}
+	afterPrefix := strings.TrimPrefix(trimmedLeft, "//")
+	if strings.HasPrefix(afterPrefix, " ") {
+		afterPrefix = strings.TrimPrefix(afterPrefix, " ")
+	}
+	return afterPrefix, true
+}
+
+func currentStableModulePaths() []string {
+	return []string{
+		filepath.FromSlash("lib/core/capability.tetra"),
+		filepath.FromSlash("lib/core/math.tetra"),
+		filepath.FromSlash("lib/core/memory.tetra"),
+	}
 }

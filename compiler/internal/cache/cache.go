@@ -3,6 +3,7 @@ package cache
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,7 +55,14 @@ func LoadCachedObject(root, target, buildTag, module string, srcHash, depSigHash
 		if os.IsNotExist(err) {
 			return nil, false, nil
 		}
-		return nil, false, err
+		// Cache entries can be truncated/corrupted by interrupted writes; treat
+		// parse failures as misses so incremental builds can self-heal.
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			return nil, false, err
+		}
+		_ = os.Remove(path)
+		return nil, false, nil
 	}
 	if obj.Target != target || obj.Module != module {
 		return nil, false, nil

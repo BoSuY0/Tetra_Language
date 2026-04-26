@@ -1118,6 +1118,9 @@ func TestLSPStdioInitializeAndDidOpen(t *testing.T) {
 	if !strings.Contains(out, `"definitionProvider":true`) {
 		t.Fatalf("definition capability missing: %q", out)
 	}
+	if !strings.Contains(out, `"referencesProvider":true`) {
+		t.Fatalf("references capability missing: %q", out)
+	}
 	if !strings.Contains(out, `"documentFormattingProvider":true`) {
 		t.Fatalf("document formatting capability missing: %q", out)
 	}
@@ -1168,6 +1171,36 @@ func TestLSPStdioDefinitionReturnsOpenDocumentSymbolLocation(t *testing.T) {
 	}
 	if !strings.Contains(out, `"start":{"character":6,"line":0}`) || !strings.Contains(out, `"end":{"character":12,"line":0}`) {
 		t.Fatalf("definition response missing expected symbol range: %q", out)
+	}
+}
+
+func TestLSPStdioReferencesReturnsOpenDocumentLocations(t *testing.T) {
+	var input bytes.Buffer
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///sample.tetra","languageId":"tetra","version":1,"text":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer + answer\n"}}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":2,"method":"textDocument/references","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":11},"context":{"includeDeclaration":true}}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","method":"exit","params":{}}`)
+	var stdout, stderr bytes.Buffer
+	code := runLSPStdio(&input, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("lsp stdio exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, `"id":2`) {
+		t.Fatalf("references response missing: %q", out)
+	}
+	if got := strings.Count(out, `"uri":"file:///sample.tetra"`); got < 3 {
+		t.Fatalf("references response missing locations: %q", out)
+	}
+	if !strings.Contains(out, `"start":{"character":6,"line":0}`) || !strings.Contains(out, `"end":{"character":12,"line":0}`) {
+		t.Fatalf("references response missing declaration location: %q", out)
+	}
+	if !strings.Contains(out, `"start":{"character":11,"line":3}`) {
+		t.Fatalf("references response missing first usage location: %q", out)
+	}
+	if !strings.Contains(out, `"start":{"character":20,"line":3}`) {
+		t.Fatalf("references response missing second usage location: %q", out)
 	}
 }
 
