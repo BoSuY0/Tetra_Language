@@ -476,7 +476,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 14: Stabilize CLI, Formatter, Reports, LSP, and Docs
 
-**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition/references/rename basics are green. LSP code actions remain incomplete.
+**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition/references/rename/code-actions basics are green. Remaining work is mostly outside the current v0.6 MVP surface (deeper refactors and broader v1 release gating).
 
 **Goal:** Make the developer toolchain reliable enough for daily use and CI.
 
@@ -500,7 +500,7 @@ bash scripts/test_all.sh --full
 - [x] Add rename.
 - [x] Add completion for current open-document symbols.
 - [x] Add formatting.
-- [ ] Add code actions.
+- [x] Add code actions.
 
 **Verification:**
 
@@ -655,8 +655,8 @@ bash scripts/release_v1_0_gate.sh
 ## Open Investigation Tasks
 
 - [ ] Decide whether v0.7 should become an official intermediate release or remain an internal hardening slice.
-- [ ] Decide the final status of closures, semantic clauses, budget clauses, privacy clauses, and UI syntax before starting their implementation.
+- [x] Decide the final status of closures, semantic clauses, budget clauses, privacy clauses, and UI syntax before starting their implementation.
 - [x] Decide whether Flow gets a native parser or continues through normalization during migration.
-- [ ] Decide the exact WASM object/runtime architecture before changing `compiler/target/target.go`.
-- [ ] Decide the stable stdlib module list before promoting `lib/experimental/` code.
+- [x] Decide the exact WASM object/runtime architecture before changing `compiler/target/target.go`.
+- [x] Decide the stable stdlib module list before promoting `lib/experimental/` code.
 - [x] Decide the API diff format before making it a release gate.

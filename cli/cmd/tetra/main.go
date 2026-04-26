@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -586,10 +587,24 @@ type lspRenameParams struct {
 	NewName string `json:"newName"`
 }
 
+type lspCodeActionParams struct {
+	TextDocument lspTextDocumentIdentifier `json:"textDocument"`
+	Context      struct {
+		Diagnostics []lspCodeActionDiagnostic `json:"diagnostics"`
+	} `json:"context"`
+}
+
+type lspCodeActionDiagnostic struct {
+	Code    json.RawMessage `json:"code,omitempty"`
+	Message string          `json:"message"`
+}
+
 type lspOpenDocument struct {
 	Text     string
 	Analysis compiler.LSPAnalysis
 }
+
+var lspMissingEffectDiagnosticRE = regexp.MustCompile(`^function '([^']+)' uses effect '([^']+)' but does not declare it$`)
 
 func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 	reader := bufio.NewReader(stdin)
@@ -621,6 +636,7 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 						"referencesProvider":         true,
 						"renameProvider":             true,
 						"documentFormattingProvider": true,
+						"codeActionProvider":         true,
 						"completionProvider": map[string]any{
 							"resolveProvider": false,
 						},
@@ -792,6 +808,22 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 					}
 				}
 				if err := writeLSPResponse(stdout, *req.ID, edits); err != nil {
+					fmt.Fprintln(stderr, err)
+					return 1
+				}
+			}
+		case "textDocument/codeAction":
+			var params lspCodeActionParams
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+			if req.ID != nil {
+				actions := []map[string]any{}
+				if doc, ok := openDocs[params.TextDocument.URI]; ok {
+					actions = lspCodeActions(doc.Text, params.TextDocument.URI, params.Context.Diagnostics, doc.Analysis.Diagnostics)
+				}
+				if err := writeLSPResponse(stdout, *req.ID, actions); err != nil {
 					fmt.Fprintln(stderr, err)
 					return 1
 				}
@@ -1098,6 +1130,135 @@ func lspCompletionItems(analysis compiler.LSPAnalysis) []map[string]any {
 		out = append(out, item)
 	}
 	return out
+}
+
+func lspCodeActions(text string, uri string, requestDiagnostics []lspCodeActionDiagnostic, analysisDiagnostics []compiler.Diagnostic) []map[string]any {
+	diagnostics := requestDiagnostics
+	if len(diagnostics) == 0 {
+		diagnostics = lspCodeActionDiagnosticsFromCompiler(analysisDiagnostics)
+	}
+	actions := []map[string]any{}
+	for _, diag := range diagnostics {
+		action, ok := lspMissingEffectCodeAction(text, uri, diag)
+		if ok {
+			actions = append(actions, action)
+		}
+	}
+	return actions
+}
+
+func lspCodeActionDiagnosticsFromCompiler(diags []compiler.Diagnostic) []lspCodeActionDiagnostic {
+	out := make([]lspCodeActionDiagnostic, 0, len(diags))
+	for _, diag := range diags {
+		code, err := json.Marshal(diag.Code)
+		if err != nil {
+			continue
+		}
+		out = append(out, lspCodeActionDiagnostic{
+			Code:    code,
+			Message: diag.Message,
+		})
+	}
+	return out
+}
+
+func lspMissingEffectCodeAction(text string, uri string, diag lspCodeActionDiagnostic) (map[string]any, bool) {
+	code := lspDiagnosticCodeString(diag.Code)
+	if code != "" && code != "TETRA2001" {
+		return nil, false
+	}
+	match := lspMissingEffectDiagnosticRE.FindStringSubmatch(diag.Message)
+	if len(match) != 3 {
+		return nil, false
+	}
+	funcName := match[1]
+	effect := match[2]
+	line, character, newText, ok := lspFindUsesInsertion(text, funcName, effect)
+	if !ok {
+		return nil, false
+	}
+	edit := map[string]any{
+		"range": map[string]any{
+			"start": map[string]int{"line": line, "character": character},
+			"end":   map[string]int{"line": line, "character": character},
+		},
+		"newText": newText,
+	}
+	return map[string]any{
+		"title": fmt.Sprintf("Add uses %s to function %s", effect, funcName),
+		"kind":  "quickfix",
+		"edit": map[string]any{
+			"changes": map[string]any{
+				uri: []map[string]any{edit},
+			},
+		},
+	}, true
+}
+
+func lspDiagnosticCodeString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var codeString string
+	if err := json.Unmarshal(raw, &codeString); err == nil {
+		return codeString
+	}
+	return ""
+}
+
+func lspFindUsesInsertion(text string, funcName string, effect string) (int, int, string, bool) {
+	lines := strings.Split(text, "\n")
+	prefix := "func " + funcName + "("
+	for lineIdx, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, prefix) {
+			continue
+		}
+		if usesIdx := strings.Index(trimmed, " uses "); usesIdx >= 0 {
+			colonIdx := strings.LastIndex(trimmed, ":")
+			if colonIdx > usesIdx {
+				existing := strings.TrimSpace(trimmed[usesIdx+len(" uses ") : colonIdx])
+				if lspUsesContainsEffect(existing, effect) {
+					return 0, 0, "", false
+				}
+				return lineIdx, lspLineIndent(line) + colonIdx, ", " + effect, true
+			}
+		}
+		if colonIdx := strings.LastIndex(trimmed, ":"); colonIdx >= 0 {
+			return lineIdx, lspLineIndent(line) + colonIdx, " uses " + effect, true
+		}
+		if lineIdx+1 >= len(lines) {
+			return 0, 0, "", false
+		}
+		nextLine := lines[lineIdx+1]
+		nextTrimmed := strings.TrimSpace(nextLine)
+		if !strings.HasPrefix(nextTrimmed, "uses ") {
+			return 0, 0, "", false
+		}
+		colonIdx := strings.LastIndex(nextTrimmed, ":")
+		if colonIdx < 0 {
+			return 0, 0, "", false
+		}
+		existing := strings.TrimSpace(nextTrimmed[len("uses "):colonIdx])
+		if lspUsesContainsEffect(existing, effect) {
+			return 0, 0, "", false
+		}
+		return lineIdx + 1, lspLineIndent(nextLine) + colonIdx, ", " + effect, true
+	}
+	return 0, 0, "", false
+}
+
+func lspLineIndent(line string) int {
+	return len(line) - len(strings.TrimLeft(line, " \t"))
+}
+
+func lspUsesContainsEffect(existing string, effect string) bool {
+	for _, item := range strings.Split(existing, ",") {
+		if strings.TrimSpace(item) == effect {
+			return true
+		}
+	}
+	return false
 }
 
 func lspCompletionKind(kind string) int {

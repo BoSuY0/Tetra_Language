@@ -85,6 +85,9 @@ func validateLSPTranscript(raw []byte) error {
 			if !jsonObjectHasKey(capabilities, "documentFormattingProvider") {
 				return fmt.Errorf("initialize capabilities missing documentFormattingProvider")
 			}
+			if !jsonObjectHasKey(capabilities, "codeActionProvider") {
+				return fmt.Errorf("initialize capabilities missing codeActionProvider")
+			}
 			sawInitialize = true
 		}
 		if msg.Method == "textDocument/publishDiagnostics" {

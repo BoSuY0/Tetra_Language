@@ -1127,11 +1127,46 @@ func TestLSPStdioInitializeAndDidOpen(t *testing.T) {
 	if !strings.Contains(out, `"documentFormattingProvider":true`) {
 		t.Fatalf("document formatting capability missing: %q", out)
 	}
+	if !strings.Contains(out, `"codeActionProvider":true`) {
+		t.Fatalf("code action capability missing: %q", out)
+	}
 	if !strings.Contains(out, `"method":"textDocument/publishDiagnostics"`) || !strings.Contains(out, `"diagnostics"`) {
 		t.Fatalf("diagnostics notification missing: %q", out)
 	}
 	if !strings.Contains(out, `"id":2`) {
 		t.Fatalf("shutdown response missing: %q", out)
+	}
+}
+
+func TestLSPStdioCodeActionReturnsMissingUsesQuickFix(t *testing.T) {
+	var input bytes.Buffer
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///sample.tetra","languageId":"tetra","version":1,"text":"func main() -> Int:\n    print(\"x\")\n    return 0\n"}}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":2,"method":"textDocument/codeAction","params":{"textDocument":{"uri":"file:///sample.tetra"},"range":{"start":{"line":1,"character":4},"end":{"line":1,"character":9}},"context":{"diagnostics":[{"range":{"start":{"line":1,"character":4},"end":{"line":1,"character":9}},"severity":1,"code":"TETRA2001","source":"tetra","message":"function 'main' uses effect 'io' but does not declare it"}]}}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","method":"exit","params":{}}`)
+
+	var stdout, stderr bytes.Buffer
+	code := runLSPStdio(&input, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("lsp stdio exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, `"id":2`) {
+		t.Fatalf("codeAction response missing: %q", out)
+	}
+	if !strings.Contains(out, `"title":"Add uses io to function main"`) {
+		t.Fatalf("codeAction title missing: %q", out)
+	}
+	if !strings.Contains(out, `"kind":"quickfix"`) {
+		t.Fatalf("codeAction kind missing: %q", out)
+	}
+	if !strings.Contains(out, `"newText":" uses io"`) {
+		t.Fatalf("codeAction edit missing insertion text: %q", out)
+	}
+	if !strings.Contains(out, `"start":{"character":18,"line":0}`) || !strings.Contains(out, `"end":{"character":18,"line":0}`) {
+		t.Fatalf("codeAction edit missing insertion range: %q", out)
 	}
 }
 

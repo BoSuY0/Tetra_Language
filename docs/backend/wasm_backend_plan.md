@@ -4,6 +4,8 @@ Status: planned
 
 This document turns the v1.0 WASM blocker into an implementation contract. It does not mark WASM as supported. The current compiler still reports `wasm32-wasi` and `wasm32-web` as planned targets until the phases below are complete and the release gate runs the real smoke checks.
 
+Exact object/runtime/package/host-binding decisions are fixed in [WASM Object and Runtime Architecture](wasm_architecture.md) and should be treated as the prerequisite contract for target metadata and backend implementation changes.
+
 ## Targets
 
 - `wasm32-wasi`: command-line and server-side runtime target. This target must produce a WASI-compatible module and pass both build-only smoke and runner smoke.

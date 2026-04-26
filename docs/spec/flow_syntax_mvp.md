@@ -8,6 +8,8 @@ Migration posture for v1.0 is decided separately: Flow moves to a native parser
 as the canonical frontend path, while normalization remains migration-only
 compatibility tooling during cutover. See
 `docs/frontend/flow_parser_plan.md`.
+Final v1 status decisions for deferred features are tracked in
+`docs/spec/v1_feature_status.md`.
 
 ## Supported
 
