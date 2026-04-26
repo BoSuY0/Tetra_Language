@@ -231,6 +231,37 @@ uses actors:
 	}
 }
 
+func TestTaskSpawnRejectsThrowingTarget(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+enum SpawnErr:
+    case boom
+
+func worker() -> Int throws SpawnErr:
+    return 0
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    return core.task_join_i32(task)
+`, "task_spawn_i32 target must not throw")
+}
+
+func TestTaskSpawnGroupRejectsThrowingTarget(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+enum SpawnErr:
+    case boom
+
+func worker() -> Int throws SpawnErr:
+    return 0
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    return core.task_join_i32(task)
+`, "task_spawn_group_i32 target must not throw")
+}
+
 func TestTaskSpawnRejectsMutableGlobalTarget(t *testing.T) {
 	requireCheckFileErrorContains(t, `
 var g: Int

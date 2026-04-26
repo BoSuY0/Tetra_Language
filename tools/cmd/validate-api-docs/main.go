@@ -64,8 +64,10 @@ func validateAPIDocs(md string) error {
 		"Globals":         true,
 		"Implementations": true,
 		"Protocols":       true,
+		"States":          true,
 		"Structs":         true,
 		"Tests":           true,
+		"Views":           true,
 	}
 	for _, line := range lines[1:] {
 		trimmed := strings.TrimSpace(line)

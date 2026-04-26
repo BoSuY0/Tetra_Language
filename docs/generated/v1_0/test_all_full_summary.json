@@ -1,0 +1,33 @@
+{
+  "mode": "full",
+  "status": "fail",
+  "started_at": "2026-04-26T19:56:20Z",
+  "ended_at": "2026-04-26T19:56:23Z",
+  "step_count": 23,
+  "failed_count": 2,
+  "steps": [
+    {"name":"go test all packages","status":"fail","duration_seconds":1,"exit_code":1,"command":"go test ./compiler/... ./cli/... ./tools/...","log":"logs/01-go-test-all-packages.log"},
+    {"name":"repo test script","status":"fail","duration_seconds":0,"exit_code":1,"command":"bash scripts/test.sh","log":"logs/02-repo-test-script.log"},
+    {"name":"bootstrap","status":"pass","duration_seconds":0,"exit_code":0,"command":"bash scripts/bootstrap.sh","log":"logs/03-bootstrap.log"},
+    {"name":"version prefix","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_version_prefix","log":"logs/04-version-prefix.log"},
+    {"name":"short alias version","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_short_alias_version","log":"logs/05-short-alias-version.log"},
+    {"name":"formatter check examples lib runtime","status":"pass","duration_seconds":0,"exit_code":0,"command":"./tetra fmt --check examples lib __rt compiler/selfhostrt","log":"logs/06-formatter-check-examples-lib-runtime.log"},
+    {"name":"flow-only source scan","status":"pass","duration_seconds":0,"exit_code":0,"command":"go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt","log":"logs/07-flow-only-source-scan.log"},
+    {"name":"targets json report","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_targets_report","log":"logs/08-targets-json-report.log"},
+    {"name":"doctor json report","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_doctor_report","log":"logs/09-doctor-json-report.log"},
+    {"name":"tetra check flow hello","status":"pass","duration_seconds":0,"exit_code":0,"command":"./tetra check examples/flow_hello.tetra","log":"logs/10-tetra-check-flow-hello.log"},
+    {"name":"json diagnostic shape","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_json_diagnostic","log":"logs/11-json-diagnostic-shape.log"},
+    {"name":"smoke list json report","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_smoke_list","log":"logs/12-smoke-list-json-report.log"},
+    {"name":"tetra test examples","status":"pass","duration_seconds":0,"exit_code":0,"command":"./tetra test examples","log":"logs/13-tetra-test-examples.log"},
+    {"name":"tetra test json report","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_test_json","log":"logs/14-tetra-test-json-report.log"},
+    {"name":"host smoke linux-x64","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_host_smoke","log":"logs/15-host-smoke-linux-x64.log"},
+    {"name":"docs manifest diff","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_docs_manifest","log":"logs/16-docs-manifest-diff.log"},
+    {"name":"docs verification","status":"pass","duration_seconds":0,"exit_code":0,"command":"go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json","log":"logs/17-docs-verification.log"},
+    {"name":"lsp stdio smoke","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_lsp_smoke","log":"logs/18-lsp-stdio-smoke.log"},
+    {"name":"lsp json-rpc stdio","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_lsp_stdio","log":"logs/19-lsp-json-rpc-stdio.log"},
+    {"name":"tetra doc examples","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_tetra_doc","log":"logs/20-tetra-doc-examples.log"},
+    {"name":"generated api docs","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_generated_api_docs","log":"logs/21-generated-api-docs.log"},
+    {"name":"eco graph bundle vault","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_eco_suite","log":"logs/22-eco-graph-bundle-vault.log"},
+    {"name":"cross-target build smoke","status":"pass","duration_seconds":0,"exit_code":0,"command":"check_cross_target_smoke","log":"logs/23-cross-target-build-smoke.log"}
+  ]
+}

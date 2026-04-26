@@ -74,7 +74,7 @@ func TestTestAllScriptKeepGoingJSONOnly(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "tetra"), []byte(`#!/usr/bin/env bash
 case "$1" in
-  version) echo "v0.6.99"; exit 0 ;;
+  version) echo "v1.0.99"; exit 0 ;;
   fmt|test|smoke) exit 0 ;;
   check)
     for arg in "$@"; do

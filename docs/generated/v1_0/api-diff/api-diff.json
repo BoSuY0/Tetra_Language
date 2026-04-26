@@ -1,0 +1,21 @@
+{
+  "schema": "tetra.api.diff.v1alpha1",
+  "baseline_path": "docs/baselines/api-diff-baseline.v1alpha1.json",
+  "candidate_path": "docs/generated/v1_0/api-diff/api-docs.md",
+  "baseline": {
+    "api_hash": "sha256:b7cdf34de1eda56ca8ebf2f6795660d3081bf5ae40581c1e3e6eb8695e655007",
+    "module_count": 62,
+    "entry_count": 113
+  },
+  "candidate": {
+    "api_hash": "sha256:b7cdf34de1eda56ca8ebf2f6795660d3081bf5ae40581c1e3e6eb8695e655007",
+    "module_count": 62,
+    "entry_count": 113
+  },
+  "summary": {
+    "added": 0,
+    "removed": 0,
+    "changed": 0
+  },
+  "changes": []
+}

@@ -137,6 +137,38 @@ func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {
 		}
 		b.WriteByte('\n')
 	}
+	if len(file.States) > 0 {
+		b.WriteString("### States\n\n")
+		for _, st := range file.States {
+			fmt.Fprintf(b, "- `state %s`\n", st.Name)
+			for _, field := range st.Fields {
+				kind := "val"
+				if field.Mutable {
+					kind = "var"
+				} else if field.Const {
+					kind = "const"
+				}
+				fmt.Fprintf(b, "  - `%s %s: %s`\n", kind, field.Name, formatLSPTypeRef(field.Type))
+			}
+		}
+		b.WriteByte('\n')
+	}
+	if len(file.Views) > 0 {
+		b.WriteString("### Views\n\n")
+		for _, view := range file.Views {
+			fmt.Fprintf(b, "- `view %s(state: %s)`\n", view.Name, formatLSPTypeRef(view.StateName))
+			for _, binding := range view.Bindings {
+				fmt.Fprintf(b, "  - `bind %s: %s`\n", binding.Name, formatLSPTypeRef(binding.Type))
+			}
+			for _, event := range view.Events {
+				fmt.Fprintf(b, "  - `event %s -> %s`\n", event.Name, event.Command)
+			}
+			for _, command := range view.Commands {
+				fmt.Fprintf(b, "  - `command %s`\n", command.Name)
+			}
+		}
+		b.WriteByte('\n')
+	}
 	if len(file.Enums) > 0 {
 		b.WriteString("### Enums\n\n")
 		for _, en := range file.Enums {

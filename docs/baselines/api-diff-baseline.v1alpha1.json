@@ -1,0 +1,805 @@
+{
+  "schema": "tetra.api.diff-baseline.v1alpha1",
+  "created_at": "2026-04-26T19:54:11.334Z",
+  "source_docs": "docs/generated/v1_0/api-diff/api-docs.md",
+  "source_docs_sha256": "sha256:a5b51502c3a232118bc88c987fdf74f0202377b370cd06d2d64ccadd38c6af69",
+  "api_metadata": {
+    "schema": "tetra.api.v1alpha1",
+    "api_hash": "sha256:b7cdf34de1eda56ca8ebf2f6795660d3081bf5ae40581c1e3e6eb8695e655007",
+    "module_count": 62,
+    "entry_count": 113
+  },
+  "symbols": [
+    {
+      "id": "examples.core_async_smoke::Functions::async func core_async_probe() -> Int",
+      "module": "examples.core_async_smoke",
+      "section": "Functions",
+      "entry": "async func core_async_probe() -> Int",
+      "symbol_hash": "sha256:362c4900222e4e74a09fea8a4d9096282d15d1cc9f3134540bfddf46a5efb280"
+    },
+    {
+      "id": "examples.core_async_smoke::Functions::func main() -> Int",
+      "module": "examples.core_async_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:dfe06a95378bae41b944aa54bf1d490b14b761b885bd8bdb9e45bdeb9439f2bf"
+    },
+    {
+      "id": "examples.core_collections_smoke::Functions::func main() -> Int uses alloc, mem",
+      "module": "examples.core_collections_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, mem",
+      "symbol_hash": "sha256:4683e79a14820c4764f1bba424daf28002d31621096d4756e167c20d043cfaa2"
+    },
+    {
+      "id": "examples.core_crypto_smoke::Functions::func main() -> Int uses alloc, mem",
+      "module": "examples.core_crypto_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, mem",
+      "symbol_hash": "sha256:b80037a429506972351f81bb60b59b18635a439ef268caf26136a57104cf657b"
+    },
+    {
+      "id": "examples.core_filesystem_smoke::Functions::func main() -> Int",
+      "module": "examples.core_filesystem_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:70e565e48207d0324d5dd4e1878b87925f3c71d918e6cfac5d7ba04d16f220be"
+    },
+    {
+      "id": "examples.core_io_smoke::Functions::func main() -> Int uses alloc, capability, io, mem, mmio",
+      "module": "examples.core_io_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, capability, io, mem, mmio",
+      "symbol_hash": "sha256:ab6473fb46513e8684c0f6a2db9714959b13e595de126f4d63eab64fc1be1199"
+    },
+    {
+      "id": "examples.core_math_smoke::Functions::func main() -> Int",
+      "module": "examples.core_math_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:a81978146c8dba4536c81679f6e09f8edd634e6422578742183bf4223d3f4f31"
+    },
+    {
+      "id": "examples.core_memory_smoke::Functions::func main() -> Int uses alloc, capability, mem",
+      "module": "examples.core_memory_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, capability, mem",
+      "symbol_hash": "sha256:ffcf4e4a3a98cdee56e97392f299ad15bbc514e23799553b476faaaf58ff18b4"
+    },
+    {
+      "id": "examples.core_networking_smoke::Functions::func main() -> Int",
+      "module": "examples.core_networking_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:4d2bc5fd4b2cfd36570200d7f93b31f81b225e0226a6789bfc4d692b311ceb7d"
+    },
+    {
+      "id": "examples.core_serialization_smoke::Functions::func main() -> Int uses alloc, mem",
+      "module": "examples.core_serialization_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, mem",
+      "symbol_hash": "sha256:452d3654edc80a4c9bf2b7a55aea05f98cb31551be6b35bdfb43e4fd9f49a32f"
+    },
+    {
+      "id": "examples.core_slices_smoke::Functions::func main() -> Int uses alloc, islands, mem",
+      "module": "examples.core_slices_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, islands, mem",
+      "symbol_hash": "sha256:cbf84971981093778b57a338cd1551afa8aa0c66e2f9dd99312ea56d085f3f11"
+    },
+    {
+      "id": "examples.core_strings_smoke::Functions::func main() -> Int",
+      "module": "examples.core_strings_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:6a9385e1a920cfd7d80ef403684bc5fc78688861c05c3b6d0e981e0c9f047452"
+    },
+    {
+      "id": "examples.core_sync_smoke::Functions::func main() -> Int",
+      "module": "examples.core_sync_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:f26e087095359cf7c6c929c859b8a2a46dd034a69bdec711250f9ce4b9a502b2"
+    },
+    {
+      "id": "examples.core_testing_smoke::Functions::func main() -> Int",
+      "module": "examples.core_testing_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:c3cd2f7d4bdfd01c4b9e2a50797724c46af0c4443f78cd4edc2717745fd4be36"
+    },
+    {
+      "id": "examples.core_time_smoke::Functions::func main() -> Int",
+      "module": "examples.core_time_smoke",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:ee8d0cf5bd51fbdb0898016997814f4a30474f28764d5682e6633d6de0a2b64e"
+    },
+    {
+      "id": "examples.experimental_math_smoke::Functions::func main() -> i32",
+      "module": "examples.experimental_math_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:b7d37c18d7182a65e4b6f1557c7069f7e310bfebcf76f3468aba8db4e879c95a"
+    },
+    {
+      "id": "examples.experimental_memcpy_smoke::Functions::func main() -> i32 uses alloc, capability, mem",
+      "module": "examples.experimental_memcpy_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:4fe51ba37f08f5dc49fdf70fd9f9c4164fe0f71b0098025a18d3ebada14fd838"
+    },
+    {
+      "id": "examples.struct_ctor_smoke::Functions::func main() -> i32",
+      "module": "examples.struct_ctor_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:2253a7235f9043a361312c9b1e8958223c2da4d8189553559ef482d9aaa0fba5"
+    },
+    {
+      "id": "examples.struct_ctor_smoke::Structs::Vec2",
+      "module": "examples.struct_ctor_smoke",
+      "section": "Structs",
+      "entry": "Vec2",
+      "symbol_hash": "sha256:00ef24d384fde9ca4aa9242f81478968a1b86fbeee417f974b9c35e3bfe93a4f"
+    },
+    {
+      "id": "examples.struct_ctor_smoke::Structs::x: i32",
+      "module": "examples.struct_ctor_smoke",
+      "section": "Structs",
+      "entry": "x: i32",
+      "symbol_hash": "sha256:7d32162d8723c4ab164b6b305c27796bb17fb0a9426b11bc1719fed15fe10450"
+    },
+    {
+      "id": "examples.struct_ctor_smoke::Structs::y: i32",
+      "module": "examples.struct_ctor_smoke",
+      "section": "Structs",
+      "entry": "y: i32",
+      "symbol_hash": "sha256:ea1a92b89a342ba3636d872e8dde2f60687e52687d2c6ef1bd268cbacfe8a649"
+    },
+    {
+      "id": "examples/actors_pingpong.tetra::Functions::func main() -> i32 uses actors",
+      "module": "examples/actors_pingpong.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses actors",
+      "symbol_hash": "sha256:78393397335761080c9689c477690e0aadb17b7f9cdebfd4c96458abbe757c71"
+    },
+    {
+      "id": "examples/actors_pingpong.tetra::Functions::func pong() -> i32 uses actors",
+      "module": "examples/actors_pingpong.tetra",
+      "section": "Functions",
+      "entry": "func pong() -> i32 uses actors",
+      "symbol_hash": "sha256:0de4f66f75120f1f6bebfd727b717349007e5b6ef4514abf87d526d08d27bd0f"
+    },
+    {
+      "id": "examples/actors_tagged_stress.tetra::Functions::func main() -> Int uses actors",
+      "module": "examples/actors_tagged_stress.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses actors",
+      "symbol_hash": "sha256:be5dead8d15e6a33459604f16e642b4154dcb69b2a9c1eb3103ad69ee615559e"
+    },
+    {
+      "id": "examples/actors_tagged_stress.tetra::Functions::func worker() -> Int uses actors",
+      "module": "examples/actors_tagged_stress.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> Int uses actors",
+      "symbol_hash": "sha256:0505a77ac609ca802ed11261e9ecf7af21d411260db75aec2993f974a68d1e12"
+    },
+    {
+      "id": "examples/actors_tagged_stress.tetra::Globals::val ITERATIONS: i32",
+      "module": "examples/actors_tagged_stress.tetra",
+      "section": "Globals",
+      "entry": "val ITERATIONS: i32",
+      "symbol_hash": "sha256:fc9eeec91881906982252a3612bef2e5720cc44c92058f0d0a7d27ca51e5370e"
+    },
+    {
+      "id": "examples/async_smoke.tetra::Functions::async func answer() -> Int",
+      "module": "examples/async_smoke.tetra",
+      "section": "Functions",
+      "entry": "async func answer() -> Int",
+      "symbol_hash": "sha256:55c6e044fda338fe3a94d533e6432863b186b9c74caf730f9ac11693c06d6835"
+    },
+    {
+      "id": "examples/async_smoke.tetra::Functions::async func caller() -> Int",
+      "module": "examples/async_smoke.tetra",
+      "section": "Functions",
+      "entry": "async func caller() -> Int",
+      "symbol_hash": "sha256:302768f85c6e4c863d55e585269916fa5d22a75ce01fb00df401059fffc50d6f"
+    },
+    {
+      "id": "examples/async_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/async_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:86549fad4f45b2badc52bf9cf2ae1e69b586c45746aefd0c219e22277e53842b"
+    },
+    {
+      "id": "examples/bool_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/bool_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:070271fb0e2cdf5a51281d19fcf6a7bf321c4b936b1f148a31a49af673daca51"
+    },
+    {
+      "id": "examples/cap_mem_ptr_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, mem",
+      "module": "examples/cap_mem_ptr_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:35958dca81a123216bb1a3a887cf4fe754bfd546b62ad36ed7eea1b69d3ce843"
+    },
+    {
+      "id": "examples/cap_mem_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, mem",
+      "module": "examples/cap_mem_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:bfd56a77d55bb8aa5cfca00e7c0a953a0ca6cbcbfdd648869e19337947cebc6a"
+    },
+    {
+      "id": "examples/compound_assignment_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/compound_assignment_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:7bf4fd09d689e5d44716d7647005c683d1711f40931040e1c3f2bb2ee2617808"
+    },
+    {
+      "id": "examples/const_bool_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/const_bool_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:e6cd53afebd25779c3b9fba7409f654d81538e295cbf66cb034f369bf6c8e612"
+    },
+    {
+      "id": "examples/const_bool_smoke.tetra::Globals::const enabled",
+      "module": "examples/const_bool_smoke.tetra",
+      "section": "Globals",
+      "entry": "const enabled",
+      "symbol_hash": "sha256:a1fa9a068a2c443871ca36dca8128146678c6bbfb232809b39c4cd4edcba3975"
+    },
+    {
+      "id": "examples/const_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/const_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:6873c34b8110b06fa5238fe37af93bb669070ef0b3a0a723d7c3f1070e5fe54f"
+    },
+    {
+      "id": "examples/const_smoke.tetra::Globals::const base: i32",
+      "module": "examples/const_smoke.tetra",
+      "section": "Globals",
+      "entry": "const base: i32",
+      "symbol_hash": "sha256:50e42d425cd6eea32b5ffefe186b82194296434829994cf353a024db8618acd2"
+    },
+    {
+      "id": "examples/const_smoke.tetra::Globals::const delta",
+      "module": "examples/const_smoke.tetra",
+      "section": "Globals",
+      "entry": "const delta",
+      "symbol_hash": "sha256:1979232595c70ccc6c147d08bddf6debd7c2813c404406e44f0aa4ca13bcf268"
+    },
+    {
+      "id": "examples/ctx_switch_sysv_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, control, link, mem, runtime",
+      "module": "examples/ctx_switch_sysv_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, control, link, mem, runtime",
+      "symbol_hash": "sha256:ce737a19d709b4800443b10211da07321e746f8ed289c0c99a510267f9227744"
+    },
+    {
+      "id": "examples/ctx_switch_sysv_smoke.tetra::Functions::func trampoline() -> i32 uses capability, control, mem, runtime",
+      "module": "examples/ctx_switch_sysv_smoke.tetra",
+      "section": "Functions",
+      "entry": "func trampoline() -> i32 uses capability, control, mem, runtime",
+      "symbol_hash": "sha256:6e41ec931d70241ab53aaedebb05dba25b75e36fcd7dfeaf36bc8d66687c0ff4"
+    },
+    {
+      "id": "examples/ctx_switch_sysv_smoke.tetra::Globals::var g_fiber_slot: ptr",
+      "module": "examples/ctx_switch_sysv_smoke.tetra",
+      "section": "Globals",
+      "entry": "var g_fiber_slot: ptr",
+      "symbol_hash": "sha256:bd83973e9d8ab84a68e3a96d7b93236d77d3bb37ad74163545cf1686acad1550"
+    },
+    {
+      "id": "examples/ctx_switch_sysv_smoke.tetra::Globals::var g_main_slot: ptr",
+      "module": "examples/ctx_switch_sysv_smoke.tetra",
+      "section": "Globals",
+      "entry": "var g_main_slot: ptr",
+      "symbol_hash": "sha256:bb922e041a024fe8b7d92c2706ee0f1e755e73ba0789c6bca3dd0805518da59f"
+    },
+    {
+      "id": "examples/ctx_switch_win64_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, control, link, mem, runtime",
+      "module": "examples/ctx_switch_win64_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, control, link, mem, runtime",
+      "symbol_hash": "sha256:3eb70def95a868e83fa063dd64da9afd40536cc32365a166b928180b9e312896"
+    },
+    {
+      "id": "examples/ctx_switch_win64_smoke.tetra::Functions::func trampoline() -> i32 uses capability, control, mem, runtime",
+      "module": "examples/ctx_switch_win64_smoke.tetra",
+      "section": "Functions",
+      "entry": "func trampoline() -> i32 uses capability, control, mem, runtime",
+      "symbol_hash": "sha256:87d871a13df454e3aa57213e328ec460fe717c8785dd0321a5028451a5155ecb"
+    },
+    {
+      "id": "examples/ctx_switch_win64_smoke.tetra::Globals::var g_fiber_slot: ptr",
+      "module": "examples/ctx_switch_win64_smoke.tetra",
+      "section": "Globals",
+      "entry": "var g_fiber_slot: ptr",
+      "symbol_hash": "sha256:980f52065e9d258741a3f5cd02cf7c2d6ce5f387bae277b698fffea85720d066"
+    },
+    {
+      "id": "examples/ctx_switch_win64_smoke.tetra::Globals::var g_main_slot: ptr",
+      "module": "examples/ctx_switch_win64_smoke.tetra",
+      "section": "Globals",
+      "entry": "var g_main_slot: ptr",
+      "symbol_hash": "sha256:793d807303eb5d53684b3360405cd69de6397e2ca8e25fdf641b4da6a2999013"
+    },
+    {
+      "id": "examples/effects_actors_smoke.tetra::Functions::func main() -> Int uses actors",
+      "module": "examples/effects_actors_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses actors",
+      "symbol_hash": "sha256:0c97f65e844fe85b722c3184746c368b536af6e8899fc6ca033e3349feec056f"
+    },
+    {
+      "id": "examples/effects_io_smoke.tetra::Functions::func main() -> Int uses io",
+      "module": "examples/effects_io_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses io",
+      "symbol_hash": "sha256:75daa2e4b345b4fa379478dd45579843a469915be5f7e45f4270e9ed105237cf"
+    },
+    {
+      "id": "examples/effects_mem_smoke.tetra::Functions::func main() -> Int uses alloc, capability, mem",
+      "module": "examples/effects_mem_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, capability, mem",
+      "symbol_hash": "sha256:e1810932617b71a0e4d199e80732f800911bb9908066e607e072180dd0e560d2"
+    },
+    {
+      "id": "examples/else_if_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/else_if_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:9e649e7051a82d6c51d14a8c4b35e49bb953386370a05371a93b9af9e3798ee6"
+    },
+    {
+      "id": "examples/enum_exhaustive_match_smoke.tetra::Enums::`Color`: red, green",
+      "module": "examples/enum_exhaustive_match_smoke.tetra",
+      "section": "Enums",
+      "entry": "`Color`: red, green",
+      "symbol_hash": "sha256:b2d62bc2f30184fa51c2ae18044c7505fb943708b97600f4e422b20331740830"
+    },
+    {
+      "id": "examples/enum_exhaustive_match_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/enum_exhaustive_match_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:8f8039c68912e133a7a9dec5d6d866e863857fd7b33f07a2fcd9bfe23e306a15"
+    },
+    {
+      "id": "examples/enum_match_smoke.tetra::Enums::`Color`: red, green, blue",
+      "module": "examples/enum_match_smoke.tetra",
+      "section": "Enums",
+      "entry": "`Color`: red, green, blue",
+      "symbol_hash": "sha256:91fef4dc36e568f2abe38f2dd3eca03a5fa5e50684b2e9768de4284298892890"
+    },
+    {
+      "id": "examples/enum_match_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/enum_match_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:62864ff3f7bbf6e17f03f657b4e7caeb0ca9df59dfb000cddfbe9cb589e44374"
+    },
+    {
+      "id": "examples/extension_smoke.tetra::Extensions::func Vec2.sum(self: Vec2) -> Int",
+      "module": "examples/extension_smoke.tetra",
+      "section": "Extensions",
+      "entry": "func Vec2.sum(self: Vec2) -> Int",
+      "symbol_hash": "sha256:9c553e6438a8d604115f1976a331a64f3006dcb68802ab696537ae5e9f3349d8"
+    },
+    {
+      "id": "examples/extension_smoke.tetra::Extensions::Vec2",
+      "module": "examples/extension_smoke.tetra",
+      "section": "Extensions",
+      "entry": "Vec2",
+      "symbol_hash": "sha256:05144e9be0a2c0c9d612e970d9e316f46d97c312a319356b7ed9796901a38c04"
+    },
+    {
+      "id": "examples/extension_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/extension_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:146301fec942596cd5583c82ec69a2cc6724e3950ce4cd9f158f18a6ec6d0f7e"
+    },
+    {
+      "id": "examples/extension_smoke.tetra::Structs::Vec2",
+      "module": "examples/extension_smoke.tetra",
+      "section": "Structs",
+      "entry": "Vec2",
+      "symbol_hash": "sha256:05e3c1468d8fac7db1efcfad99796246120d8c3385a884aae97817b94fbbc41f"
+    },
+    {
+      "id": "examples/extension_smoke.tetra::Structs::x: Int",
+      "module": "examples/extension_smoke.tetra",
+      "section": "Structs",
+      "entry": "x: Int",
+      "symbol_hash": "sha256:63e445ef89b9564f4d91e704f5ed29ca7148d4511fb208ebb86877e21fba5c2b"
+    },
+    {
+      "id": "examples/extension_smoke.tetra::Structs::y: Int",
+      "module": "examples/extension_smoke.tetra",
+      "section": "Structs",
+      "entry": "y: Int",
+      "symbol_hash": "sha256:3d2475714e51fedb83363546fef0b089df962b2988b2e55df10a6ef4f956c37e"
+    },
+    {
+      "id": "examples/flow_hello.tetra::Functions::func main() -> Int uses io",
+      "module": "examples/flow_hello.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses io",
+      "symbol_hash": "sha256:6962c05fa998b0fd2d79c1cbdad4b400280aa71fddc2429e7e8952c659bb50ac"
+    },
+    {
+      "id": "examples/flow_islands_smoke.tetra::Functions::func main() -> Int uses alloc, io, islands, mem",
+      "module": "examples/flow_islands_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, io, islands, mem",
+      "symbol_hash": "sha256:a1115079763fcf3146c7c5c5ceecdd75cfd953e1064277fe5030e0065ef95f4b"
+    },
+    {
+      "id": "examples/flow_struct_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/flow_struct_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:ef43731a505ca8fa6a35e681c8f638bb21ff65c0dcb981c78abd7343ca63cab4"
+    },
+    {
+      "id": "examples/flow_struct_smoke.tetra::Structs::Vec2",
+      "module": "examples/flow_struct_smoke.tetra",
+      "section": "Structs",
+      "entry": "Vec2",
+      "symbol_hash": "sha256:dcb223c442babc7a962f55414e6198a62dbccfc2b376d005ecfc46ecaafa087a"
+    },
+    {
+      "id": "examples/flow_struct_smoke.tetra::Structs::x: Int",
+      "module": "examples/flow_struct_smoke.tetra",
+      "section": "Structs",
+      "entry": "x: Int",
+      "symbol_hash": "sha256:c364b7e9ed103998ad8a68856b62ca16d69b648b79e5a5d248de5a5b820a534d"
+    },
+    {
+      "id": "examples/flow_struct_smoke.tetra::Structs::y: Int",
+      "module": "examples/flow_struct_smoke.tetra",
+      "section": "Structs",
+      "entry": "y: Int",
+      "symbol_hash": "sha256:4dac7eb3a7634552361185b9c49b69cda2f817811b57cebd5e25ea166d3c9c77"
+    },
+    {
+      "id": "examples/flow_unsafe_cap_mem_smoke.tetra::Functions::func main() -> Int uses alloc, capability, mem",
+      "module": "examples/flow_unsafe_cap_mem_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, capability, mem",
+      "symbol_hash": "sha256:f7c6d46c861b28636a6ad00a270492ed1715c68210073705ddcdf0bdac25fd9a"
+    },
+    {
+      "id": "examples/for_collection_smoke.tetra::Functions::func main() -> Int uses alloc, islands, mem",
+      "module": "examples/for_collection_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, islands, mem",
+      "symbol_hash": "sha256:5d89116bc865c627b3d7c4568c3b107d4c56bf9edf5dfd838cb679aed1e6f89a"
+    },
+    {
+      "id": "examples/for_collection_u8_smoke.tetra::Functions::func main() -> Int uses alloc, islands, mem",
+      "module": "examples/for_collection_u8_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses alloc, islands, mem",
+      "symbol_hash": "sha256:d1e485fec56514f9cf62e5e8c58fa0db362c4f9aa25a20340b56e2096b0846ba"
+    },
+    {
+      "id": "examples/for_range_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/for_range_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:66fc9737d41e411dd19f57b65611c8f7bd73d26ef88b154744ce71676cd9a77c"
+    },
+    {
+      "id": "examples/generic_smoke.tetra::Functions::func id<T>(x: T) -> T",
+      "module": "examples/generic_smoke.tetra",
+      "section": "Functions",
+      "entry": "func id<T>(x: T) -> T",
+      "symbol_hash": "sha256:5bc53205905ccefd50517691f24c9489eef75df99427ef7272cc667c8d486498"
+    },
+    {
+      "id": "examples/generic_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/generic_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:9332544b5fd28ab56d13f413dd475c6375d80ee18264502ea536bc6c02a24373"
+    },
+    {
+      "id": "examples/globals_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, mem",
+      "module": "examples/globals_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:a936e86fab185b8f620ad4ac12f188f7ed2bcc7195be714cf87da019404f6ec0"
+    },
+    {
+      "id": "examples/globals_smoke.tetra::Globals::val g_null: ptr",
+      "module": "examples/globals_smoke.tetra",
+      "section": "Globals",
+      "entry": "val g_null: ptr",
+      "symbol_hash": "sha256:2631629aa6d52fe180e4712e8e862f7406ab6ad4613a37de8a4c076d9c0d4bf1"
+    },
+    {
+      "id": "examples/globals_smoke.tetra::Globals::val g_y: i32",
+      "module": "examples/globals_smoke.tetra",
+      "section": "Globals",
+      "entry": "val g_y: i32",
+      "symbol_hash": "sha256:abc2c74248eaa966293d63f2ecd3fe8fcffc894da98386f34b2b739638330b1e"
+    },
+    {
+      "id": "examples/globals_smoke.tetra::Globals::var g_p: ptr",
+      "module": "examples/globals_smoke.tetra",
+      "section": "Globals",
+      "entry": "var g_p: ptr",
+      "symbol_hash": "sha256:08ed8040b9c404cb977cd5212780bde74a279e0454681d97c680b6ec265d0b7a"
+    },
+    {
+      "id": "examples/globals_smoke.tetra::Globals::var g_x: i32",
+      "module": "examples/globals_smoke.tetra",
+      "section": "Globals",
+      "entry": "var g_x: i32",
+      "symbol_hash": "sha256:ef97c21da8dccd01ff23ce4a3005be4cee3afc973f41039276d39d6151e33447"
+    },
+    {
+      "id": "examples/hello.tetra::Functions::func main() -> i32 uses io",
+      "module": "examples/hello.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses io",
+      "symbol_hash": "sha256:6d4ba98c54f65f80f4369c915b9e4a7de592459543ce078c5047d02ee36a13bd"
+    },
+    {
+      "id": "examples/islands_double_free.tetra::Functions::func main() -> i32 uses alloc, capability, islands, mem",
+      "module": "examples/islands_double_free.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, islands, mem",
+      "symbol_hash": "sha256:1d2a637028901a8ca0deb63d36f89a9ca1c43bc830ed9577dcc05ff64d44714b"
+    },
+    {
+      "id": "examples/islands_hello.tetra::Functions::func main() -> i32 uses alloc, io, islands, mem",
+      "module": "examples/islands_hello.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, io, islands, mem",
+      "symbol_hash": "sha256:21f32b106047b2fb5c1588807385595a23aeffadff50e475fc6a2004c07eecbd"
+    },
+    {
+      "id": "examples/islands_i32.tetra::Functions::func main() -> i32 uses alloc, islands, mem",
+      "module": "examples/islands_i32.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, islands, mem",
+      "symbol_hash": "sha256:23405c3163ae8068b2ca8fb60b5fbd9d77a4f2368cf6077cccc6dde2276e9e37"
+    },
+    {
+      "id": "examples/islands_overflow.tetra::Functions::func main() -> i32 uses alloc, islands, mem",
+      "module": "examples/islands_overflow.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, islands, mem",
+      "symbol_hash": "sha256:49b8682f5dca907c8f43a28c8942aefb3d624ae24fdbad3fb874e57947613d50"
+    },
+    {
+      "id": "examples/local_const_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/local_const_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:d920aa859d1b9a3aa989ae2fafd60d9167211986b402f2a71a01b04d74ae3fc3"
+    },
+    {
+      "id": "examples/loop_control_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/loop_control_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:4f145edc9869ffbcd5bc7031323c81debcb1b64ed918e04b4c205647bd0d897d"
+    },
+    {
+      "id": "examples/memset_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, mem",
+      "module": "examples/memset_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:f34c9ab7ede2e81ee1443672843c6bbfea27483759043450a878c1f6204175b3"
+    },
+    {
+      "id": "examples/mmio_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, io, mem, mmio",
+      "module": "examples/mmio_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, io, mem, mmio",
+      "symbol_hash": "sha256:8420a479b0cb5935bf1c87f107dcd3145f0e608bb27c257b1f566868c6fc4b15"
+    },
+    {
+      "id": "examples/optional_match_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/optional_match_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:2e3c0ca241a7eab7c16ca00b3c964feb24d2e1aa4f6eb460af14f9348c38c640"
+    },
+    {
+      "id": "examples/optional_match_smoke.tetra::Functions::func maybe(flag: Bool) -> Int?",
+      "module": "examples/optional_match_smoke.tetra",
+      "section": "Functions",
+      "entry": "func maybe(flag: Bool) -> Int?",
+      "symbol_hash": "sha256:a6092ca121d41d45f8a369d8aad815a117001853d1f151830468958535d76703"
+    },
+    {
+      "id": "examples/optional_match_some_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/optional_match_some_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:cdaef3c1be29fd9c6994ed7d976d3e02fb75839a87ab9c6f306a05bbb561b8f3"
+    },
+    {
+      "id": "examples/optional_match_some_smoke.tetra::Functions::func maybe(flag: Bool) -> Int?",
+      "module": "examples/optional_match_some_smoke.tetra",
+      "section": "Functions",
+      "entry": "func maybe(flag: Bool) -> Int?",
+      "symbol_hash": "sha256:165fbd9452d8aeac78a77dfe0bd04efdb718edd9e7f58291cc34f77f12a99896"
+    },
+    {
+      "id": "examples/optional_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/optional_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:6df9dc4a67702838e6a3cb828aefd729931f46ad56757d8b27fffb4e205cd240"
+    },
+    {
+      "id": "examples/optional_smoke.tetra::Functions::func maybe(flag: Bool) -> Int?",
+      "module": "examples/optional_smoke.tetra",
+      "section": "Functions",
+      "entry": "func maybe(flag: Bool) -> Int?",
+      "symbol_hash": "sha256:ce28cafe4e693aa480989c98cbccacec7463a96ba129c767ac8ea11e462395cb"
+    },
+    {
+      "id": "examples/optional_smoke.tetra::Functions::func unwrap(value: Int?) -> Int",
+      "module": "examples/optional_smoke.tetra",
+      "section": "Functions",
+      "entry": "func unwrap(value: Int?) -> Int",
+      "symbol_hash": "sha256:02d8b7805db55f32678d2c3073c6a4eb0fadfb786b3092c892292f7bf3c45db8"
+    },
+    {
+      "id": "examples/ownership_smoke.tetra::Functions::func add_one(x: borrow Int) -> Int",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Functions",
+      "entry": "func add_one(x: borrow Int) -> Int",
+      "symbol_hash": "sha256:608ab8c51b726bfe0f3b2a20892474405571f79782bede1d0afd3df1d8badcf0"
+    },
+    {
+      "id": "examples/ownership_smoke.tetra::Functions::func bump(x: inout Int) -> Int",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Functions",
+      "entry": "func bump(x: inout Int) -> Int",
+      "symbol_hash": "sha256:119f59fbb0bad86938f46501c2c3aa0ef8be85e16b6de171b5949e4c51dc6161"
+    },
+    {
+      "id": "examples/ownership_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:225bfc8bba1abfa878629da8639d6ff3558691f85544bed8f7d7eb7e7adeb7cc"
+    },
+    {
+      "id": "examples/ownership_smoke.tetra::Functions::func take(x: consume Int) -> Int",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Functions",
+      "entry": "func take(x: consume Int) -> Int",
+      "symbol_hash": "sha256:1e5bf2614fa7abddf3ec17b27676e15d6f9cb30362bf925f7a9c690f9fbaa07f"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Extensions::func Vec2.draw(self: Vec2) -> Int",
+      "module": "examples/protocol_impl_smoke.tetra",
+      "section": "Extensions",
+      "entry": "func Vec2.draw(self: Vec2) -> Int",
+      "symbol_hash": "sha256:7553826f3165e75eb00d8548b0140748e0434e6f90d7c9e2147b8804b4182f3f"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Extensions::Vec2",
+      "module": "examples/protocol_impl_smoke.tetra",
+      "section": "Extensions",
+      "entry": "Vec2",
+      "symbol_hash": "sha256:bb60d48b502fb5a9807c99ca1fc175d19ffb3986cdc047ae7c3ebe95606946cb"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/protocol_impl_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:c8e64f744cbbdb18f5588d0e56f8fa5883ed0e573261a8501f9482f249f629a6"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Implementations::impl Vec2: Renderable",
+      "module": "examples/protocol_impl_smoke.tetra",
+      "section": "Implementations",
+      "entry": "impl Vec2: Renderable",
+      "symbol_hash": "sha256:d0aa6a5b26af1e914b8d1eca256e925f844dc340c5f69cd50648867591bfe190"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Protocols::func draw(self: Vec2) -> Int",
+      "module": "examples/protocol_impl_smoke.tetra",
+      "section": "Protocols",
+      "entry": "func draw(self: Vec2) -> Int",
+      "symbol_hash": "sha256:977b77f31fdf2ad4a5e9617913e9bf5b9ef1290fec034fa2c8f4eeecf6b25743"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Protocols::protocol Renderable",
+      "module": "examples/protocol_impl_smoke.tetra",
+      "section": "Protocols",
+      "entry": "protocol Renderable",
+      "symbol_hash": "sha256:b5b4105dbfb9ef0a8c917ecc0ca032a11b8c9a9e90dd6652d42991a16a2098a8"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Structs::Vec2",
+      "module": "examples/protocol_impl_smoke.tetra",
+      "section": "Structs",
+      "entry": "Vec2",
+      "symbol_hash": "sha256:cb0fd54de04adf73e24a6707b5c8168f78e12011a5c91f372be75393692c0405"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Structs::x: Int",
+      "module": "examples/protocol_impl_smoke.tetra",
+      "section": "Structs",
+      "entry": "x: Int",
+      "symbol_hash": "sha256:125224d55fcef2e284d8659b1ab287c6ecf79a733a85e462fa401a94aaeb56e5"
+    },
+    {
+      "id": "examples/task_smoke.tetra::Functions::func main() -> Int uses runtime",
+      "module": "examples/task_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int uses runtime",
+      "symbol_hash": "sha256:ad8817fb9d73270b1b3a6ff2d719259156b0d3696cc9836edd93c696f959c099"
+    },
+    {
+      "id": "examples/task_smoke.tetra::Functions::func worker() -> Int",
+      "module": "examples/task_smoke.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> Int",
+      "symbol_hash": "sha256:c9edd96fbee20d3ff18efac30d1595a03dc5e64c39be68ffab39c06ed79e5c27"
+    },
+    {
+      "id": "examples/tooling_tests.tetra::Tests::math",
+      "module": "examples/tooling_tests.tetra",
+      "section": "Tests",
+      "entry": "math",
+      "symbol_hash": "sha256:da6367f05da138e629fee867541a8cfcd0c334d69c4c76f338e61b1815f052a5"
+    },
+    {
+      "id": "examples/typed_errors_smoke.tetra::Enums::`ReadError`: eof",
+      "module": "examples/typed_errors_smoke.tetra",
+      "section": "Enums",
+      "entry": "`ReadError`: eof",
+      "symbol_hash": "sha256:8d65a84544cba01ceb8847690fd973d87e33d4a43cc25e891f606a2f7a268543"
+    },
+    {
+      "id": "examples/typed_errors_smoke.tetra::Functions::func caller() -> Int throws ReadError",
+      "module": "examples/typed_errors_smoke.tetra",
+      "section": "Functions",
+      "entry": "func caller() -> Int throws ReadError",
+      "symbol_hash": "sha256:30ef9d8746bf4553f90a5fb9c88d6bea33c5aa3c2f4dd5285f243cbe4f559749"
+    },
+    {
+      "id": "examples/typed_errors_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/typed_errors_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:9e64ac3a3a62bf8bef380ba43dbc72501fb2f4eace9e5e999054b72c3d4e810f"
+    },
+    {
+      "id": "examples/typed_errors_smoke.tetra::Functions::func read(flag: Bool) -> Int throws ReadError",
+      "module": "examples/typed_errors_smoke.tetra",
+      "section": "Functions",
+      "entry": "func read(flag: Bool) -> Int throws ReadError",
+      "symbol_hash": "sha256:9b96fd5211b71f0ee68bf8b41e4e1eecda4bf7c4df3453f613d988f758e82d10"
+    },
+    {
+      "id": "examples/unary_not_smoke.tetra::Functions::func main() -> Int",
+      "module": "examples/unary_not_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> Int",
+      "symbol_hash": "sha256:94cd6d62c4f36cbdd45a9853bd9f0b5fed2c9fa8f988dd0a10747e60130d5415"
+    }
+  ]
+}

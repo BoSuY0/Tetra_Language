@@ -10,7 +10,18 @@ import (
 )
 
 func Check(prog *frontend.Program) (*CheckedProgram, error) {
-	file := &frontend.FileAST{Module: "", Enums: prog.Enums, Structs: prog.Structs, Protocols: prog.Protocols, Extensions: prog.Extensions, Impls: prog.Impls, Funcs: prog.Funcs, Tests: prog.Tests}
+	file := &frontend.FileAST{
+		Module:     "",
+		Enums:      prog.Enums,
+		Structs:    prog.Structs,
+		States:     prog.States,
+		Views:      prog.Views,
+		Protocols:  prog.Protocols,
+		Extensions: prog.Extensions,
+		Impls:      prog.Impls,
+		Funcs:      prog.Funcs,
+		Tests:      prog.Tests,
+	}
 	world := &module.World{
 		EntryModule: "",
 		Files:       []*frontend.FileAST{file},
@@ -288,6 +299,21 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			}
 			structs[fullName] = structContext{module: module, imports: imports, decl: st}
 			checked.Structs = append(checked.Structs, CheckedStruct{Name: fullName, Module: module, Decl: st})
+		}
+		for _, st := range file.States {
+			fullName := qualifyName(module, st.Name)
+			if isReservedTypeName(st.Name) {
+				return nil, fmt.Errorf("%s: reserved type name '%s'", frontend.FormatPos(st.At), st.Name)
+			}
+			if _, exists := structs[fullName]; exists {
+				return nil, fmt.Errorf("duplicate state '%s'", fullName)
+			}
+			if _, exists := enums[fullName]; exists {
+				return nil, fmt.Errorf("duplicate type '%s'", fullName)
+			}
+			synth := stateAsStructDecl(st)
+			structs[fullName] = structContext{module: module, imports: imports, decl: synth}
+			checked.UIStates = append(checked.UIStates, CheckedUIState{Name: fullName, Module: module, Decl: st})
 		}
 		for _, proto := range file.Protocols {
 			fullName := qualifyName(module, proto.Name)
@@ -618,6 +644,18 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if err != nil {
 					return nil, err
 				}
+				genericParamTypes := make(map[string]string, len(fn.Params))
+				for _, param := range fn.Params {
+					genericParamTypes[param.Name] = genericTypeName(param.Type)
+				}
+				returnType := genericTypeName(fn.ReturnType)
+				throwsType := ""
+				if fn.HasThrows {
+					throwsType = genericTypeName(fn.Throws)
+				}
+				if err := validateFunctionPolicyClauses(fn, effects, genericParamTypes, returnType, throwsType); err != nil {
+					return nil, err
+				}
 				checked.FuncSigs[fullName] = FuncSig{
 					Generic:           true,
 					ParamNames:        genericParamNames(fn.Params),
@@ -681,6 +719,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				paramOwnership = append(paramOwnership, param.Ownership)
 				paramSlots += info.SlotCount
 			}
+			paramTypeByName := make(map[string]string, len(paramNames))
+			for i, name := range paramNames {
+				paramTypeByName[name] = paramTypes[i]
+			}
+			if err := validateFunctionPolicyClauses(fn, effects, paramTypeByName, retName, throwsType); err != nil {
+				return nil, err
+			}
 			checked.FuncSigs[fullName] = FuncSig{
 				ParamNames:        paramNames,
 				ParamTypes:        paramTypes,
@@ -740,6 +785,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 
 	for name, sig := range builtinSigs {
 		checked.FuncSigs[name] = sig
+	}
+	if err := checkUIDecls(world, &checked, types); err != nil {
+		return nil, err
 	}
 
 	if len(checked.FuncSigs) == 0 {
@@ -1160,7 +1208,7 @@ func validateSemanticClauses(fn *frontend.FuncDecl) error {
 		}
 		seen[clause.Name] = clause.At
 		switch clause.Name {
-		case "noalloc", "noblock", "realtime":
+		case "noalloc", "noblock", "realtime", "privacy":
 			if clause.Value != nil {
 				return fmt.Errorf("%s: semantic clause '%s' does not take arguments", frontend.FormatPos(clause.At), clause.Name)
 			}
@@ -1182,11 +1230,145 @@ func validateSemanticClauses(fn *frontend.FuncDecl) error {
 			if v < 0 {
 				return fmt.Errorf("%s: semantic clause 'budget' requires a non-negative value", frontend.FormatPos(clause.Value.Pos()))
 			}
+		case "consent":
+			if clause.Value == nil {
+				return fmt.Errorf("%s: semantic clause 'consent' requires a token parameter name", frontend.FormatPos(clause.At))
+			}
+			if _, ok := clause.Value.(*frontend.IdentExpr); !ok {
+				return fmt.Errorf("%s: semantic clause 'consent' expects an identifier argument", frontend.FormatPos(clause.Value.Pos()))
+			}
 		default:
 			return fmt.Errorf("%s: unknown semantic clause '%s'", frontend.FormatPos(clause.At), clause.Name)
 		}
 	}
 	return nil
+}
+
+type functionClausePolicy struct {
+	hasNoAlloc   bool
+	hasNoBlock   bool
+	hasRealtime  bool
+	hasBudget    bool
+	hasPrivacy   bool
+	consentParam string
+}
+
+func parseFunctionClausePolicy(fn *frontend.FuncDecl) (functionClausePolicy, error) {
+	policy := functionClausePolicy{}
+	for _, clause := range fn.SemanticClauses {
+		switch clause.Name {
+		case "noalloc":
+			policy.hasNoAlloc = true
+		case "noblock":
+			policy.hasNoBlock = true
+		case "realtime":
+			policy.hasRealtime = true
+		case "budget":
+			policy.hasBudget = true
+		case "privacy":
+			policy.hasPrivacy = true
+		case "consent":
+			ident, ok := clause.Value.(*frontend.IdentExpr)
+			if !ok {
+				return functionClausePolicy{}, fmt.Errorf("%s: semantic clause 'consent' expects an identifier argument", frontend.FormatPos(clause.At))
+			}
+			policy.consentParam = ident.Name
+		}
+	}
+	return policy, nil
+}
+
+func validateFunctionPolicyClauses(
+	fn *frontend.FuncDecl,
+	effects []string,
+	paramTypes map[string]string,
+	returnType string,
+	throwsType string,
+) error {
+	policy, err := parseFunctionClausePolicy(fn)
+	if err != nil {
+		return err
+	}
+	declaredEffects := effectSet(effects)
+	hasEffect := func(name string) bool {
+		_, ok := declaredEffects[name]
+		return ok
+	}
+
+	if policy.hasBudget && !hasEffect("budget") {
+		return fmt.Errorf("%s: semantic clause 'budget' requires function '%s' to declare uses effect 'budget'", frontend.FormatPos(fn.Pos), fn.Name)
+	}
+	if policy.hasNoAlloc && hasEffect("alloc") {
+		return fmt.Errorf("%s: semantic clause 'noalloc' conflicts with declared effect 'alloc'", frontend.FormatPos(fn.Pos))
+	}
+	if policy.hasNoBlock {
+		if blocked := firstForbiddenEffect(declaredEffects, []string{"actors", "control", "io", "link", "mmio", "runtime"}); blocked != "" {
+			return fmt.Errorf("%s: semantic clause 'noblock' conflicts with declared effect '%s'", frontend.FormatPos(fn.Pos), blocked)
+		}
+	}
+	if policy.hasRealtime {
+		if blocked := firstForbiddenEffect(declaredEffects, []string{"actors", "alloc", "control", "io", "link", "mmio", "runtime"}); blocked != "" {
+			return fmt.Errorf("%s: semantic clause 'realtime' conflicts with declared effect '%s'", frontend.FormatPos(fn.Pos), blocked)
+		}
+	}
+	if policy.hasPrivacy && !hasEffect("privacy") {
+		return fmt.Errorf("%s: semantic clause 'privacy' requires function '%s' to declare uses effect 'privacy'", frontend.FormatPos(fn.Pos), fn.Name)
+	}
+	if hasEffect("privacy") && !policy.hasPrivacy {
+		return fmt.Errorf("%s: uses effect 'privacy' requires semantic clause 'privacy'", frontend.FormatPos(fn.Pos))
+	}
+
+	signatureHasSecret := typeUsesSecret(returnType) || typeUsesSecret(throwsType)
+	for _, paramType := range paramTypes {
+		if typeUsesSecret(paramType) {
+			signatureHasSecret = true
+		}
+	}
+	if signatureHasSecret && !policy.hasPrivacy {
+		return fmt.Errorf("%s: secret types in function signature require semantic clause 'privacy'", frontend.FormatPos(fn.Pos))
+	}
+	if signatureHasSecret && policy.consentParam == "" {
+		return fmt.Errorf("%s: secret types in function signature require semantic clause consent(<token>)", frontend.FormatPos(fn.Pos))
+	}
+	if policy.consentParam != "" {
+		if !policy.hasPrivacy {
+			return fmt.Errorf("%s: semantic clause 'consent' requires semantic clause 'privacy'", frontend.FormatPos(fn.Pos))
+		}
+		paramType, ok := paramTypes[policy.consentParam]
+		if !ok {
+			return fmt.Errorf("%s: semantic clause 'consent' references unknown parameter '%s'", frontend.FormatPos(fn.Pos), policy.consentParam)
+		}
+		if paramType != "consent.token" {
+			return fmt.Errorf("%s: semantic clause 'consent' parameter '%s' must have type consent.token", frontend.FormatPos(fn.Pos), policy.consentParam)
+		}
+	}
+	return nil
+}
+
+func firstForbiddenEffect(have map[string]struct{}, forbidden []string) string {
+	for _, effect := range forbidden {
+		if _, ok := have[effect]; ok {
+			return effect
+		}
+	}
+	return ""
+}
+
+func typeUsesSecret(typeName string) bool {
+	typeName = strings.TrimSpace(typeName)
+	if typeName == "" {
+		return false
+	}
+	if strings.HasPrefix(typeName, "secret.") {
+		return true
+	}
+	if strings.HasSuffix(typeName, "?") {
+		return typeUsesSecret(strings.TrimSuffix(typeName, "?"))
+	}
+	if strings.HasPrefix(typeName, "[]") {
+		return typeUsesSecret(strings.TrimPrefix(typeName, "[]"))
+	}
+	return false
 }
 
 func findFuncDecl(world *module.World, name string) *frontend.FuncDecl {

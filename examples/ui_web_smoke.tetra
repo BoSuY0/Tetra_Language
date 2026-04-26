@@ -1,0 +1,17 @@
+state CounterState:
+    var count: Int = 0
+    val title: String = "Wave 9 Web"
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+    bind titleText: String = state.title
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 320
+    style theme: String = "web"
+    accessibility role: String = "button"
+    accessibility label: String = "Increment counter"
+
+func main() -> Int:
+    return 0

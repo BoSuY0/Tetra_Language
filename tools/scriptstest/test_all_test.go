@@ -758,7 +758,7 @@ cmd="${1:-}"
 shift || true
 case "$cmd" in
   version)
-    echo "v0.6.0"
+    echo "v1.0.0"
     ;;
   fmt)
     if [[ "${TETRA_FAIL_FMT:-}" == "1" ]]; then

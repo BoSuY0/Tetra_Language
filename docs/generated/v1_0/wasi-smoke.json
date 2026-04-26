@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-04-26T19:59:34.847Z",
+  "target": "wasm32-wasi",
+  "host": "linux-x64",
+  "version": "v0.6.0",
+  "git_head": "8ec0721",
+  "islands_debug": false,
+  "total": 2,
+  "passed": 2,
+  "failed": 0,
+  "runner": "node-wasi",
+  "cases": [
+    {
+      "name": "flow_hello",
+      "src_path": "examples/flow_hello.tetra",
+      "expected_exit": 0,
+      "out_path": "/tmp/tmp.vMa3VnohBA/rebuilt-cases/flow_hello.wasm",
+      "ran": true,
+      "pass": true,
+      "actual_exit": 0
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects_io_smoke.tetra",
+      "expected_exit": 0,
+      "out_path": "/tmp/tmp.vMa3VnohBA/rebuilt-cases/effects_io_smoke.wasm",
+      "ran": true,
+      "pass": true,
+      "actual_exit": 0
+    }
+  ]
+}

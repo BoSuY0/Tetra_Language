@@ -1410,6 +1410,96 @@ func TestBuildWASMHelloWritesModule(t *testing.T) {
 	}
 }
 
+func TestBuildWASMWebUIWritesSidecars(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "ui_web.tetra")
+	src := `state CounterState:
+    var count: Int = 0
+    val title: String = "Wave 9 Web"
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 320
+    accessibility label: String = "Increment"
+
+func main() -> Int:
+    return 0
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	outPath := filepath.Join(tmp, "ui.wasm")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "wasm32-web", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build wasm32-web: %v", err)
+	}
+	uiJSON := strings.TrimSuffix(outPath, ".wasm") + ".ui.json"
+	uiModule := strings.TrimSuffix(outPath, ".wasm") + ".ui.web.mjs"
+	uiHTML := strings.TrimSuffix(outPath, ".wasm") + ".ui.html"
+
+	jsonRaw, err := os.ReadFile(uiJSON)
+	if err != nil {
+		t.Fatalf("read ui json: %v", err)
+	}
+	if !strings.Contains(string(jsonRaw), `"schema": "tetra.ui.v1"`) || !strings.Contains(string(jsonRaw), "CounterView") {
+		t.Fatalf("unexpected ui json:\n%s", string(jsonRaw))
+	}
+	moduleRaw, err := os.ReadFile(uiModule)
+	if err != nil {
+		t.Fatalf("read ui module: %v", err)
+	}
+	if !strings.Contains(string(moduleRaw), "mountTetraUI") {
+		t.Fatalf("unexpected ui module:\n%s", string(moduleRaw))
+	}
+	htmlRaw, err := os.ReadFile(uiHTML)
+	if err != nil {
+		t.Fatalf("read ui html: %v", err)
+	}
+	if !strings.Contains(string(htmlRaw), ".ui.web.mjs") || !strings.Contains(string(htmlRaw), "runTetra") {
+		t.Fatalf("unexpected ui html:\n%s", string(htmlRaw))
+	}
+}
+
+func TestBuildNativeUIWritesShellSidecar(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "ui_native.tetra")
+	src := `state ShellState:
+    var toggles: Int = 0
+    val title: String = "Wave 9 Native"
+
+view ShellView(state: ShellState):
+    bind toggles: Int = state.toggles
+    event submit -> toggle
+    command toggle:
+        state.toggles = state.toggles + 1
+    style width: Int = 80
+    accessibility label: String = "Toggle"
+
+func main() -> Int:
+    return 0
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	outPath := filepath.Join(tmp, "ui-app")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build linux-x64: %v", err)
+	}
+	sidecarPath := outPath + ".ui.shell.txt"
+	sidecar, err := os.ReadFile(sidecarPath)
+	if err != nil {
+		t.Fatalf("read native ui shell sidecar: %v", err)
+	}
+	if !strings.Contains(string(sidecar), "ShellView") || !strings.Contains(string(sidecar), "event submit -> toggle") {
+		t.Fatalf("unexpected native ui sidecar:\n%s", string(sidecar))
+	}
+}
+
 func TestBuildCacheSeparatesNativeDebugAndReleaseModes(t *testing.T) {
 	tmp := t.TempDir()
 	files := map[string]string{

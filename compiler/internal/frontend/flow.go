@@ -127,6 +127,15 @@ func looksLikeFlowSyntax(src []byte) bool {
 		if strings.HasPrefix(content, "protocol ") && strings.HasSuffix(content, ":") {
 			return true
 		}
+		if strings.HasPrefix(content, "state ") && strings.HasSuffix(content, ":") {
+			return true
+		}
+		if strings.HasPrefix(content, "view ") && strings.HasSuffix(content, ":") {
+			return true
+		}
+		if strings.HasPrefix(content, "command ") && strings.HasSuffix(content, ":") {
+			return true
+		}
 		if strings.HasPrefix(content, "impl ") {
 			return true
 		}

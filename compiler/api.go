@@ -21,6 +21,7 @@ type FileAST = frontend.FileAST
 type CheckedProgram = semantics.CheckedProgram
 type IRProgram = ir.IRProgram
 type IRFunc = ir.IRFunc
+type UILoweredBundle = lower.UILoweredBundle
 
 type Object = tobj.Object
 type Symbol = tobj.Symbol
@@ -69,6 +70,10 @@ func LowerModule(checked *CheckedProgram, module string) ([]IRFunc, error) {
 
 func LowerModules(checked *CheckedProgram) (map[string][]IRFunc, error) {
 	return lower.LowerModules(checked)
+}
+
+func LowerUI(checked *CheckedProgram) (*UILoweredBundle, error) {
+	return lower.LowerUI(checked)
 }
 
 func CodegenObjectLinuxX64(funcs []IRFunc) (*Object, error) {

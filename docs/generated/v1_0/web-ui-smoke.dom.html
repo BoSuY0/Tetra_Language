@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html><head></head><body>
+    <pre id="result">ok:0</pre>
+    <script type="module">
+      import { runTetra } from './web_smoke.mjs';
+      const el = document.getElementById('result');
+      try {
+        const code = await runTetra();
+        el.textContent = `ok:${code}`;
+      } catch (err) {
+        el.textContent = `error:${String(err)}`;
+      }
+    </script>
+  
+
+</body></html>

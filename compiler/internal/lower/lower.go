@@ -9,6 +9,65 @@ import (
 	"tetra_language/compiler/internal/semantics"
 )
 
+type runtimePolicy struct {
+	hasBudget    bool
+	budget       int32
+	consentParam string
+}
+
+func runtimePolicyFromClauses(clauses []frontend.SemanticClause) runtimePolicy {
+	policy := runtimePolicy{}
+	for _, clause := range clauses {
+		switch clause.Name {
+		case "budget":
+			if v, ok := clauseConstI32(clause.Value); ok {
+				policy.hasBudget = true
+				policy.budget = v
+			}
+		case "consent":
+			if ident, ok := clause.Value.(*frontend.IdentExpr); ok {
+				policy.consentParam = ident.Name
+			}
+		}
+	}
+	return policy
+}
+
+func clauseConstI32(expr frontend.Expr) (int32, bool) {
+	switch e := expr.(type) {
+	case *frontend.NumberExpr:
+		return e.Value, true
+	case *frontend.UnaryExpr:
+		if e.Op != frontend.TokenMinus {
+			return 0, false
+		}
+		v, ok := e.X.(*frontend.NumberExpr)
+		if !ok {
+			return 0, false
+		}
+		return -v.Value, true
+	default:
+		return 0, false
+	}
+}
+
+func budgetChargedInstr(kind ir.IRInstrKind) bool {
+	switch kind {
+	case ir.IRWrite, ir.IRCall,
+		ir.IRAllocBytes, ir.IRMakeSliceU8, ir.IRMakeSliceI32,
+		ir.IRIslandNew, ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceI32, ir.IRIslandFree,
+		ir.IRCapIO, ir.IRCapMem,
+		ir.IRMemReadI32, ir.IRMemWriteI32,
+		ir.IRMemReadU8, ir.IRMemWriteU8,
+		ir.IRMemReadPtr, ir.IRMemWritePtr,
+		ir.IRPtrAdd, ir.IRMmioReadI32, ir.IRMmioWriteI32,
+		ir.IRSymAddr, ir.IRCtxSwitch:
+		return true
+	default:
+		return false
+	}
+}
+
 func Lower(checked *semantics.CheckedProgram) (*ir.IRProgram, error) {
 	if checked == nil {
 		return nil, fmt.Errorf("missing checked program")
@@ -77,11 +136,19 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 			return ir.IRFunc{}, fmt.Errorf("internal error: invalid throwing scratch layout for '%s'", fn.Name)
 		}
 	}
+	policy := runtimePolicyFromClauses(fn.Decl.SemanticClauses)
+	localSlots := fn.LocalSlots
+	budgetLocal := -1
+	if policy.hasBudget {
+		budgetLocal = localSlots
+		localSlots++
+	}
 	l := &lowerer{
 		locals:            fn.Locals,
 		globals:           globals,
 		types:             types,
 		funcs:             funcs,
+		localSlots:        localSlots,
 		returnType:        fn.ReturnType,
 		throwsType:        fn.ThrowsType,
 		returnSlots:       fn.ReturnSlots,
@@ -89,17 +156,43 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 		throwErrorSlots:   throwErrorSlots,
 		throwCompact:      throwCompact,
 		throwScratchBase:  throwScratchBase,
+		policyFailLabel:   -1,
+		budgetEnabled:     policy.hasBudget,
+		budgetLocal:       budgetLocal,
+	}
+	if policy.hasBudget || policy.consentParam != "" {
+		l.policyFailLabel = l.newLabel()
+	}
+	if policy.hasBudget {
+		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: policy.budget, Pos: fn.Decl.Pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRStoreLocal, Local: budgetLocal, Pos: fn.Decl.Pos})
+	}
+	if policy.consentParam != "" {
+		info, ok := l.locals[policy.consentParam]
+		if !ok {
+			return ir.IRFunc{}, fmt.Errorf("%s: semantic clause 'consent' references unknown local '%s' during lowering", frontend.FormatPos(fn.Decl.Pos), policy.consentParam)
+		}
+		if info.SlotCount != 1 {
+			return ir.IRFunc{}, fmt.Errorf("%s: semantic clause 'consent' expects 1-slot token parameter '%s'", frontend.FormatPos(fn.Decl.Pos), policy.consentParam)
+		}
+		l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: info.Base, Pos: fn.Decl.Pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: fn.Decl.Pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRCmpNeI32, Pos: fn.Decl.Pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: l.policyFailLabel, Pos: fn.Decl.Pos})
 	}
 	for _, stmt := range fn.Decl.Body {
 		if err := l.lowerStmt(stmt); err != nil {
 			return ir.IRFunc{}, err
 		}
 	}
+	if l.policyFailLabel >= 0 {
+		l.emitPolicyFailureHandler(fn.Decl.Pos)
+	}
 	return ir.IRFunc{
 		Name:        fn.Name,
 		ExportName:  fn.Decl.ExportName,
 		ParamSlots:  fn.ParamSlots,
-		LocalSlots:  fn.LocalSlots,
+		LocalSlots:  localSlots,
 		ReturnSlots: fn.ReturnSlots,
 		Instrs:      l.instrs,
 	}, nil
@@ -111,6 +204,7 @@ type lowerer struct {
 	globals           map[string]semantics.GlobalInfo
 	types             map[string]*semantics.TypeInfo
 	funcs             map[string]semantics.FuncSig
+	localSlots        int
 	returnType        string
 	throwsType        string
 	returnSlots       int
@@ -118,6 +212,9 @@ type lowerer struct {
 	throwErrorSlots   int
 	throwCompact      bool
 	throwScratchBase  int
+	policyFailLabel   int
+	budgetEnabled     bool
+	budgetLocal       int
 	nextLabel         int
 	cleanupIslands    []int
 	loopStack         []loopLabels
@@ -152,7 +249,28 @@ func (l *lowerer) newLabel() int {
 }
 
 func (l *lowerer) emit(instr ir.IRInstr) {
+	if l.budgetEnabled && l.policyFailLabel >= 0 && budgetChargedInstr(instr.Kind) {
+		l.emitBudgetGuard(instr.Pos)
+	}
+	l.emitRaw(instr)
+}
+
+func (l *lowerer) emitRaw(instr ir.IRInstr) {
 	l.instrs = append(l.instrs, instr)
+}
+
+func (l *lowerer) emitBudgetGuard(pos frontend.Position) {
+	if l.budgetLocal < 0 {
+		return
+	}
+	l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.budgetLocal, Pos: pos})
+	l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
+	l.emitRaw(ir.IRInstr{Kind: ir.IRSubI32, Pos: pos})
+	l.emitRaw(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.budgetLocal, Pos: pos})
+	l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.budgetLocal, Pos: pos})
+	l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+	l.emitRaw(ir.IRInstr{Kind: ir.IRCmpGeI32, Pos: pos})
+	l.emitRaw(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: l.policyFailLabel, Pos: pos})
 }
 
 func (l *lowerer) emitCleanup(pos frontend.Position) {
@@ -170,10 +288,48 @@ func (l *lowerer) emitCleanupSince(start int, pos frontend.Position) {
 	}
 }
 
+func (l *lowerer) emitCleanupRaw(pos frontend.Position) {
+	l.emitCleanupRawSince(0, pos)
+}
+
+func (l *lowerer) emitCleanupRawSince(start int, pos frontend.Position) {
+	for i := len(l.cleanupIslands) - 1; i >= 0; i-- {
+		if i < start {
+			break
+		}
+		base := l.cleanupIslands[i]
+		l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base, Pos: pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRIslandFree, Pos: pos})
+	}
+}
+
 func (l *lowerer) emitZeroSlots(count int, pos frontend.Position) {
 	for i := 0; i < count; i++ {
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
 	}
+}
+
+func (l *lowerer) emitZeroSlotsRaw(count int, pos frontend.Position) {
+	for i := 0; i < count; i++ {
+		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+	}
+}
+
+func (l *lowerer) emitPolicyFailureHandler(pos frontend.Position) {
+	l.emitRaw(ir.IRInstr{Kind: ir.IRLabel, Label: l.policyFailLabel, Pos: pos})
+	if l.throwsType != "" {
+		if l.throwCompact {
+			l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+		} else {
+			l.emitZeroSlotsRaw(l.throwSuccessSlots, pos)
+			l.emitZeroSlotsRaw(l.throwErrorSlots, pos)
+		}
+		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
+	} else {
+		l.emitZeroSlotsRaw(l.returnSlots, pos)
+	}
+	l.emitCleanupRaw(pos)
+	l.emitRaw(ir.IRInstr{Kind: ir.IRReturn, Pos: pos})
 }
 
 func (l *lowerer) emitConvertedThrowFromScratch(srcType, dstType string, pos frontend.Position) (int, error) {
@@ -1165,6 +1321,30 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				return 0, fmt.Errorf("%s: ctx_switch expects 3 arguments", frontend.FormatPos(e.At))
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRCtxSwitch, Pos: e.At})
+			return 1, nil
+		case "core.consent_token":
+			if total != 0 {
+				return 0, fmt.Errorf("%s: consent_token expects 0 arguments", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
+			return 1, nil
+		case "core.secret_seal_i32":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: secret_seal_i32 expects 2 arguments", frontend.FormatPos(e.At))
+			}
+			// Keep the first argument (secret payload) and consume the token.
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRMulI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRAddI32, Pos: e.At})
+			return 1, nil
+		case "core.secret_unseal_i32":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: secret_unseal_i32 expects 2 arguments", frontend.FormatPos(e.At))
+			}
+			// Keep the first argument (sealed payload) and consume the token.
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRMulI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRAddI32, Pos: e.At})
 			return 1, nil
 		case "core.task_group_open":
 			if total != 0 {

@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"tetra_language/compiler/internal/actorsrt"
 	"tetra_language/compiler/internal/backend/linux_x64"
 	"tetra_language/compiler/internal/backend/macos_x64"
+	"tetra_language/compiler/internal/backend/native_shell"
 	"tetra_language/compiler/internal/backend/wasm32_wasi"
 	"tetra_language/compiler/internal/backend/wasm32_web"
 	"tetra_language/compiler/internal/backend/windows_x64"
@@ -22,6 +24,7 @@ import (
 	"tetra_language/compiler/internal/deps"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/lower"
 	"tetra_language/compiler/internal/semantics"
 	ctarget "tetra_language/compiler/target"
 )
@@ -438,6 +441,9 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	default:
 		return nil, fmt.Errorf("unsupported target format: %s", tgt.Format)
 	}
+	if err := emitUIArtifacts(outputPath, tgt.Triple, checked); err != nil {
+		return nil, err
+	}
 
 	return stats, nil
 }
@@ -578,6 +584,9 @@ func buildWASM32WASIWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 	if err := os.WriteFile(outputPath, wasmBytes, 0o755); err != nil {
 		return nil, err
 	}
+	if err := emitUIArtifacts(outputPath, tgt.Triple, checked); err != nil {
+		return nil, err
+	}
 	return stats, nil
 }
 
@@ -642,6 +651,9 @@ func buildWASM32WEBWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target
 	if err := os.WriteFile(loaderPath, loader, 0o644); err != nil {
 		return nil, err
 	}
+	if err := emitUIArtifacts(outputPath, tgt.Triple, checked); err != nil {
+		return nil, err
+	}
 	return stats, nil
 }
 
@@ -651,6 +663,59 @@ func wasmWebLoaderPath(outputPath string) string {
 		return strings.TrimSuffix(outputPath, ext) + ".mjs"
 	}
 	return outputPath + ".mjs"
+}
+
+func emitUIArtifacts(outputPath string, target string, checked *semantics.CheckedProgram) error {
+	bundle, err := lower.LowerUI(checked)
+	if err != nil {
+		return err
+	}
+	if bundle == nil || len(bundle.Views) == 0 {
+		return nil
+	}
+	base := uiArtifactBasePath(outputPath)
+	uiJSONPath := base + ".ui.json"
+	raw, err := json.MarshalIndent(bundle, "", "  ")
+	if err != nil {
+		return err
+	}
+	raw = append(raw, '\n')
+	if err := os.WriteFile(uiJSONPath, raw, 0o644); err != nil {
+		return err
+	}
+	if target == "wasm32-web" {
+		uiModulePath := base + ".ui.web.mjs"
+		uiModule := wasm32_web.UIModule(filepath.Base(uiJSONPath))
+		if err := os.WriteFile(uiModulePath, uiModule, 0o644); err != nil {
+			return err
+		}
+		htmlPath := base + ".ui.html"
+		html := wasm32_web.UIHTMLPage(filepath.Base(outputPath), filepath.Base(wasmWebLoaderPath(outputPath)), filepath.Base(uiModulePath))
+		if err := os.WriteFile(htmlPath, html, 0o644); err != nil {
+			return err
+		}
+		return nil
+	}
+	if strings.HasPrefix(target, "wasm32-") {
+		return nil
+	}
+	shellPath := base + ".ui.shell.txt"
+	if err := os.WriteFile(shellPath, native_shell.Render(bundle), 0o644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func uiArtifactBasePath(outputPath string) string {
+	ext := filepath.Ext(outputPath)
+	switch {
+	case strings.EqualFold(ext, ".wasm"):
+		return strings.TrimSuffix(outputPath, ext)
+	case strings.EqualFold(ext, ".exe"):
+		return strings.TrimSuffix(outputPath, ext)
+	default:
+		return outputPath
+	}
 }
 
 func buildTagFromOptions(opt BuildOptions) string {

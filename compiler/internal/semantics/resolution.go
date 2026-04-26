@@ -96,8 +96,12 @@ func canonicalBuiltinType(name string) (string, bool) {
 		return "str", true
 	case "bool", "Bool":
 		return "bool", true
-	case "ptr", "island", "cap.io", "cap.mem", "actor":
+	case "ptr", "island", "cap.io", "cap.mem", "actor", "consent.token", "secret.i32":
 		return name, true
+	case "ConsentToken":
+		return "consent.token", true
+	case "SecretInt":
+		return "secret.i32", true
 	default:
 		return "", false
 	}

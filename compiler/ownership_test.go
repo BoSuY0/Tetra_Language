@@ -309,3 +309,101 @@ func main() -> Int:
     return 0
 `)
 }
+
+func TestOwnershipRejectsConsumeArgumentThatIsNotLocalValue(t *testing.T) {
+	requireCheckErrorContains(t, `
+func take(x: consume Int) -> Int:
+    return x
+
+func main() -> Int:
+    return take(1)
+`, "must be a local value")
+}
+
+func TestOwnershipRejectsInoutArgumentThatIsNotLocalValue(t *testing.T) {
+	requireCheckErrorContains(t, `
+func bump(x: inout Int) -> Int:
+    x = x + 1
+    return x
+
+func main() -> Int:
+    var a: Int = 1
+    return bump(a + 1)
+`, "must be a mutable local value")
+}
+
+func TestOwnershipRejectsValueConsumedTwiceInSingleCall(t *testing.T) {
+	requireCheckErrorContains(t, `
+func add(a: consume Int, b: consume Int) -> Int:
+    return a + b
+
+func main() -> Int:
+    let x: Int = 1
+    return add(x, x)
+`, "consumed more than once")
+}
+
+func TestOwnershipRejectsInoutBorrowAliasWithInoutFirst(t *testing.T) {
+	requireCheckErrorContains(t, `
+func mix(write: inout Int, read: borrow Int) -> Int:
+    write = write + read
+    return write
+
+func main() -> Int:
+    var a: Int = 1
+    return mix(a, a)
+`, "aliases inout argument")
+}
+
+func TestOwnershipRejectsInoutConsumeAliasWithInoutFirst(t *testing.T) {
+	requireCheckErrorContains(t, `
+func mix(write: inout Int, taken: consume Int) -> Int:
+    write = write + taken
+    return write
+
+func main() -> Int:
+    var a: Int = 1
+    return mix(a, a)
+`, "aliases inout argument")
+}
+
+func TestOwnershipAllowsBorrowInoutWithDistinctLocals(t *testing.T) {
+	requireCheckOK(t, `
+func mix(read: borrow Int, write: inout Int) -> Int:
+    write = write + read
+    return write
+
+func main() -> Int:
+    var a: Int = 1
+    var b: Int = 2
+    return mix(a, b)
+`)
+}
+
+func TestOwnershipAllowsConsumeInoutWithDistinctLocals(t *testing.T) {
+	requireCheckOK(t, `
+func mix(taken: consume Int, write: inout Int) -> Int:
+    write = write + taken
+    return write
+
+func main() -> Int:
+    var a: Int = 1
+    var b: Int = 2
+    return mix(a, b)
+`)
+}
+
+func TestOwnershipRejectsBorrowDerivedValueAsInoutArgument(t *testing.T) {
+	requireCheckErrorContains(t, `
+func mutate(x: inout []u8) -> Int:
+    x[0] = 1
+    return 0
+
+func caller(x: borrow []u8) -> Int:
+    var y: []u8 = x
+    return mutate(y)
+
+func main() -> Int:
+    return 0
+`, "cannot be passed as inout")
+}

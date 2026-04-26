@@ -1,65 +1,250 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+report_dir=""
+
+usage() {
+  cat <<'USAGE'
+Usage: bash scripts/release_v1_0_gate.sh [--report-dir DIR]
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --report-dir)
+      report_dir="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "release_v1_0_gate: unknown option $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$report_dir" ]]; then
+  report_dir="/tmp/release-v1_0-gate-$(date -u +%Y%m%d-%H%M%S)"
+fi
+
+logs_dir="$report_dir/logs"
+summary_md="$report_dir/summary.md"
+summary_json="$report_dir/summary.json"
+artifacts_dir="$report_dir/artifacts"
+
+mkdir -p "$logs_dir" "$artifacts_dir"
+
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-fail() {
-  echo "release_v1_0_gate: $*" >&2
-  exit 1
+step_count=0
+failed_count=0
+started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+: >"$tmp_dir/steps.md"
+: >"$tmp_dir/steps.jsonl"
+
+json_escape() {
+  local s="${1-}"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  printf '%s' "$s"
+}
+
+slugify() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+record_step() {
+  local name="$1"
+  local status="$2"
+  local seconds="$3"
+  local exit_code="$4"
+  local log_rel="$5"
+  local command="$6"
+
+  printf -- '- `%s`: `%s` in %ss, exit `%s`, command `%s` ([%s](%s))\n' "$name" "$status" "$seconds" "$exit_code" "$command" "$log_rel" "$log_rel" >>"$tmp_dir/steps.md"
+  printf '{"name":"%s","status":"%s","duration_seconds":%s,"exit_code":%s,"command":"%s","log":"%s"}\n' \
+    "$(json_escape "$name")" \
+    "$(json_escape "$status")" \
+    "$seconds" \
+    "$exit_code" \
+    "$(json_escape "$command")" \
+    "$(json_escape "$log_rel")" >>"$tmp_dir/steps.jsonl"
+}
+
+run_step() {
+  local name="$1"
+  shift
+  step_count=$((step_count + 1))
+
+  local id
+  local slug
+  local log_rel
+  local log_path
+  local command
+  local start_s
+  local end_s
+
+  id="$(printf '%02d' "$step_count")"
+  slug="$(slugify "$name")"
+  log_rel="logs/${id}-${slug}.log"
+  log_path="$report_dir/$log_rel"
+  command="$*"
+
+  printf '== [%s] %s ==\n' "$id" "$name"
+  start_s="$(date +%s)"
+
+  if "$@" >"$log_path" 2>&1; then
+    end_s="$(date +%s)"
+    record_step "$name" "pass" "$((end_s - start_s))" 0 "$log_rel" "$command"
+    printf '   pass (%ss)\n' "$((end_s - start_s))"
+  else
+    local rc="$?"
+    end_s="$(date +%s)"
+    record_step "$name" "fail" "$((end_s - start_s))" "$rc" "$log_rel" "$command"
+    failed_count=$((failed_count + 1))
+    printf '   fail (%ss), exit %s\n' "$((end_s - start_s))" "$rc"
+    tail -n 60 "$log_path" >&2 || true
+  fi
+}
+
+write_summary() {
+  local status="$1"
+  local ended_at
+  ended_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  {
+    echo "# Tetra v1.0 Release Gate Report"
+    echo
+    echo "- status: \`$status\`"
+    echo "- started_at: \`$started_at\`"
+    echo "- ended_at: \`$ended_at\`"
+    echo "- step_count: \`$step_count\`"
+    echo "- failed_count: \`$failed_count\`"
+    echo "- report_dir: \`$report_dir\`"
+    echo
+    echo "## Steps"
+    echo
+    cat "$tmp_dir/steps.md"
+  } >"$summary_md"
+
+  {
+    echo "{"
+    printf '  "status": "%s",\n' "$(json_escape "$status")"
+    printf '  "started_at": "%s",\n' "$(json_escape "$started_at")"
+    printf '  "ended_at": "%s",\n' "$(json_escape "$ended_at")"
+    printf '  "step_count": %s,\n' "$step_count"
+    printf '  "failed_count": %s,\n' "$failed_count"
+    printf '  "report_dir": "%s",\n' "$(json_escape "$report_dir")"
+    echo '  "steps": ['
+    awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$tmp_dir/steps.jsonl"
+    echo '  ]'
+    echo "}"
+  } >"$summary_json"
+}
+
+check_v1_version() {
+  local version
+  version="$(./tetra version 2>/dev/null || true)"
+  if [[ "$version" != v1.0* ]]; then
+    echo "expected v1.0.x version, got '${version:-<missing>}'" >&2
+    return 1
+  fi
+}
+
+check_short_alias_version() {
+  local version
+  local short_version
+  version="$(./tetra version 2>/dev/null || true)"
+  short_version="$(./t version 2>/dev/null || true)"
+  if [[ "$short_version" != "$version" ]]; then
+    echo "expected ./t version to match ./tetra version ($version), got '${short_version:-<missing>}'" >&2
+    return 1
+  fi
+}
+
+check_docs_manifest() {
+  go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
+  go run ./tools/cmd/gen-manifest -o "$artifacts_dir/manifest.json"
+  go run ./tools/cmd/validate-manifest --manifest "$artifacts_dir/manifest.json"
+  diff -u docs/generated/manifest.json "$artifacts_dir/manifest.json"
+}
+
+check_api_diff() {
+  bash scripts/release_v1_0_api_diff.sh --report-dir "$artifacts_dir/api-diff" --baseline docs/baselines/api-diff-baseline.v1alpha1.json --enforce no-change
+}
+
+check_repro_build() {
+  bash scripts/release_v1_0_repro.sh --report "$artifacts_dir/reproducible-build.json"
+}
+
+check_tetra_doc_output() {
+  # Keep the canonical command text for script parity tests: ./tetra doc examples
+  mapfile -t tracked_examples < <(git ls-files 'examples/*.tetra')
+  if [[ "${#tracked_examples[@]}" -eq 0 ]]; then
+    echo "no tracked examples found under examples/" >&2
+    return 1
+  fi
+  ./tetra doc "${tracked_examples[@]}" >"$artifacts_dir/tetra-docs.md"
+  go run ./tools/cmd/validate-api-docs --docs "$artifacts_dir/tetra-docs.md"
+}
+
+check_wasi_runner_smoke() {
+  bash scripts/release_v1_0_wasi_smoke.sh --report "$artifacts_dir/wasi-smoke.json"
+}
+
+check_web_ui_smoke() {
+  bash scripts/release_v1_0_web_smoke.sh --report "$artifacts_dir/web-ui-smoke.json"
 }
 
 echo "== v1.0 preflight =="
-version="$(./tetra version 2>/dev/null || true)"
-if [[ "$version" != v1.0* ]]; then
-  fail "expected v1.0.x version, got '${version:-<missing>}'"
+echo "report_dir: $report_dir"
+
+run_step "go test packages" go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "bootstrap tetra binaries" bash scripts/bootstrap.sh
+run_step "version preflight (v1.0 required)" check_v1_version
+run_step "short alias version parity" check_short_alias_version
+run_step "full stabilization wrapper" bash scripts/test_all.sh --full --keep-going --report-dir "$artifacts_dir/test-all"
+run_step "flow-only source scan" go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
+run_step "targets report validation" sh -c './tetra targets --format=json >"$1" && go run ./tools/cmd/validate-targets --report "$1"' sh "$artifacts_dir/targets.json"
+run_step "doctor report validation" sh -c './tetra doctor --format=json >"$1" && go run ./tools/cmd/validate-doctor --report "$1"' sh "$artifacts_dir/doctor.json"
+run_step "tetra check flow hello" ./tetra check examples/flow_hello.tetra
+run_step "formatter check" ./tetra fmt --check examples lib __rt compiler/selfhostrt
+run_step "tetra test examples json" sh -c './tetra test --report=json examples >"$1" && go run ./tools/cmd/validate-test-report --report "$1"' sh "$artifacts_dir/tetra-test-report.json"
+run_step "docs manifest regenerate+validate" check_docs_manifest
+run_step "docs verification and doctests" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+run_step "tetra doc output validation" check_tetra_doc_output
+run_step "smoke list validation" sh -c './tetra smoke --list --format=json >"$1" && go run ./tools/cmd/validate-smoke-list --report "$1"' sh "$artifacts_dir/smoke-list.json"
+run_step "native host smoke linux-x64" sh -c './tetra smoke --target linux-x64 --run=true --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/host-smoke.json"
+
+run_step "build-only smoke linux-x64" sh -c './tetra smoke --target linux-x64 --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/linux-smoke.json"
+run_step "build-only smoke macos-x64" sh -c './tetra smoke --target macos-x64 --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/macos-smoke.json"
+run_step "build-only smoke windows-x64" sh -c './tetra smoke --target windows-x64 --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/windows-smoke.json"
+run_step "build-only smoke wasm32-wasi" sh -c './tetra smoke --target wasm32-wasi --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/wasm32-wasi-smoke.json"
+run_step "build-only smoke wasm32-web" sh -c './tetra smoke --target wasm32-web --run=false --report "$1" && go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$1"' sh "$artifacts_dir/wasm32-web-smoke.json"
+
+run_step "WASI runner smoke" check_wasi_runner_smoke
+run_step "Web UI browser smoke" check_web_ui_smoke
+run_step "API diff gate" check_api_diff
+run_step "reproducible build proof" check_repro_build
+run_step "eco verify command surface" sh -c 'test -x ./tetra && ./tetra eco verify --help >/dev/null'
+
+if [[ "$failed_count" -gt 0 ]]; then
+  write_summary "blocked"
+  echo
+  echo "v1.0 release gate blocked: $failed_count step(s) failed" >&2
+  echo "summary: $summary_md" >&2
+  echo "json: $summary_json" >&2
+  exit 1
 fi
-short_version="$(./t version 2>/dev/null || true)"
-if [[ "$short_version" != "$version" ]]; then
-  fail "expected ./t version to match ./tetra version ($version), got '${short_version:-<missing>}'"
-fi
 
-echo "== Go test =="
-go test ./compiler/... ./cli/... ./tools/...
-
-echo "== Full stabilization wrapper =="
-bash scripts/test_all.sh --full --report-dir "$tmp_dir/test-all"
-
-echo "== Flow-only formatter/test/docs =="
-go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
-./tetra targets --format=json >"$tmp_dir/targets.json"
-go run ./tools/cmd/validate-targets --report "$tmp_dir/targets.json"
-./tetra doctor --format=json >"$tmp_dir/doctor.json"
-go run ./tools/cmd/validate-doctor --report "$tmp_dir/doctor.json"
-./tetra check examples/flow_hello.tetra
-./tetra fmt --check examples lib __rt compiler/selfhostrt
-./tetra test --report=json examples >"$tmp_dir/tetra-test-report.json"
-go run ./tools/cmd/validate-test-report --report "$tmp_dir/tetra-test-report.json"
-go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
-go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
-./tetra doc examples >"$tmp_dir/tetra-docs.md"
-go run ./tools/cmd/validate-api-docs --docs "$tmp_dir/tetra-docs.md"
-./tetra smoke --list --format=json >"$tmp_dir/smoke-list.json"
-go run ./tools/cmd/validate-smoke-list --report "$tmp_dir/smoke-list.json"
-
-echo "== Mandatory native targets =="
-./tetra smoke --target linux-x64 --run=false --report "$tmp_dir/linux-smoke.json"
-go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/linux-smoke.json"
-./tetra smoke --target macos-x64 --run=false --report "$tmp_dir/macos-smoke.json"
-go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/macos-smoke.json"
-./tetra smoke --target windows-x64 --run=false --report "$tmp_dir/windows-smoke.json"
-go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/windows-smoke.json"
-
-echo "== Mandatory WASM targets =="
-./tetra smoke --target wasm32-wasi --run=false --report "$tmp_dir/wasm32-wasi-smoke.json"
-go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/wasm32-wasi-smoke.json"
-./tetra smoke --target wasm32-web --run=false --report "$tmp_dir/wasm32-web-smoke.json"
-go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/wasm32-web-smoke.json"
-
-echo "== Eco/UI/API release checks =="
-test -x ./tetra
-./tetra eco verify --help >/dev/null
-go run ./tools/cmd/gen-docs examples >"$tmp_dir/api-docs.md"
-go run ./tools/cmd/validate-api-docs --docs "$tmp_dir/api-docs.md"
-
+write_summary "pass"
+echo
 echo "v1.0 release gate passed"
+echo "summary: $summary_md"
+echo "json: $summary_json"

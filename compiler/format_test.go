@@ -25,6 +25,31 @@ uses io, mem:
 	}
 }
 
+func TestFormatSourceStateAndView(t *testing.T) {
+	src := []byte(`state CounterState:
+    var count: Int = 0
+    val title: String = "Wave 9"
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 320
+    accessibility label: String = "Increment"
+`)
+	got, err := FormatSource(src, "ui.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	if !strings.Contains(string(got), "view CounterView(state: CounterState):") {
+		t.Fatalf("formatted source missing view header:\n%s", string(got))
+	}
+	if !strings.Contains(string(got), "accessibility label: String = \"Increment\"") {
+		t.Fatalf("formatted source missing accessibility entry:\n%s", string(got))
+	}
+}
+
 func TestFormatSourcePreservesFlowLineComments(t *testing.T) {
 	src := []byte(`// module note
 func main() -> Int:

@@ -1,3 +1,3 @@
 package version
 
-const CompilerVersion = "v0.6.0"
+const CompilerVersion = "v1.0.0"

@@ -13,6 +13,8 @@ type FileAST struct {
 	Imports    []ImportDecl
 	Enums      []*EnumDecl
 	Structs    []*StructDecl
+	States     []*StateDecl
+	Views      []*ViewDecl
 	Protocols  []*ProtocolDecl
 	Extensions []*ExtensionDecl
 	Impls      []*ImplDecl
@@ -30,6 +32,8 @@ type ImportDecl struct {
 type Program struct {
 	Enums      []*EnumDecl
 	Structs    []*StructDecl
+	States     []*StateDecl
+	Views      []*ViewDecl
 	Protocols  []*ProtocolDecl
 	Extensions []*ExtensionDecl
 	Impls      []*ImplDecl
@@ -119,6 +123,65 @@ type FieldDecl struct {
 	At   Position
 	Name string
 	Type TypeRef
+}
+
+type StateDecl struct {
+	At     Position
+	Name   string
+	Fields []StateFieldDecl
+}
+
+type StateFieldDecl struct {
+	At      Position
+	Name    string
+	Type    TypeRef
+	Mutable bool
+	Const   bool
+	Init    Expr
+}
+
+type ViewDecl struct {
+	At            Position
+	Name          string
+	StateName     TypeRef
+	Bindings      []ViewBindingDecl
+	Events        []ViewEventDecl
+	Commands      []ViewCommandDecl
+	Styles        []ViewStyleDecl
+	Accessibility []ViewAccessibilityDecl
+}
+
+type ViewBindingDecl struct {
+	At    Position
+	Name  string
+	Type  TypeRef
+	Value Expr
+}
+
+type ViewEventDecl struct {
+	At      Position
+	Name    string
+	Command string
+}
+
+type ViewCommandDecl struct {
+	At   Position
+	Name string
+	Body []Stmt
+}
+
+type ViewStyleDecl struct {
+	At    Position
+	Name  string
+	Type  TypeRef
+	Value Expr
+}
+
+type ViewAccessibilityDecl struct {
+	At    Position
+	Name  string
+	Type  TypeRef
+	Value Expr
 }
 
 type EnumDecl struct {

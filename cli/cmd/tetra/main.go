@@ -1896,6 +1896,7 @@ func smokeCases(islandsDebug bool) []smokeCase {
 		{name: "flow_struct_smoke", srcPath: "examples/flow_struct_smoke.tetra", expectedExit: 42},
 		{name: "flow_islands_smoke", srcPath: "examples/flow_islands_smoke.tetra", expectedExit: 0},
 		{name: "flow_unsafe_cap_mem_smoke", srcPath: "examples/flow_unsafe_cap_mem_smoke.tetra", expectedExit: 42},
+		{name: "ui_native_shell_smoke", srcPath: "examples/ui_native_shell_smoke.tetra", expectedExit: 0},
 		{name: "bool_smoke", srcPath: "examples/bool_smoke.tetra", expectedExit: 42},
 		{name: "for_range_smoke", srcPath: "examples/for_range_smoke.tetra", expectedExit: 55},
 		{name: "for_collection_smoke", srcPath: "examples/for_collection_smoke.tetra", expectedExit: 42},
@@ -1936,6 +1937,7 @@ func smokeCasesForTarget(islandsDebug bool, tgt ctarget.Target) []smokeCase {
 		return []smokeCase{
 			{name: "flow_hello", srcPath: "examples/flow_hello.tetra", expectedExit: 0},
 			{name: "effects_io_smoke", srcPath: "examples/effects_io_smoke.tetra", expectedExit: 0},
+			{name: "ui_web_smoke", srcPath: "examples/ui_web_smoke.tetra", expectedExit: 0},
 		}
 	}
 	return smokeCases(islandsDebug)

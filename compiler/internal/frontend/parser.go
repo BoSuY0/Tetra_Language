@@ -13,7 +13,17 @@ func Parse(src []byte) (*Program, error) {
 	if file.Module != "" || len(file.Imports) > 0 || len(file.Globals) > 0 {
 		return nil, fmt.Errorf("module/import/global declarations require ParseFile")
 	}
-	return &Program{Enums: file.Enums, Structs: file.Structs, Protocols: file.Protocols, Extensions: file.Extensions, Impls: file.Impls, Funcs: file.Funcs, Tests: file.Tests}, nil
+	return &Program{
+		Enums:      file.Enums,
+		Structs:    file.Structs,
+		States:     file.States,
+		Views:      file.Views,
+		Protocols:  file.Protocols,
+		Extensions: file.Extensions,
+		Impls:      file.Impls,
+		Funcs:      file.Funcs,
+		Tests:      file.Tests,
+	}, nil
 }
 
 func ParseFile(src []byte, filename string) (*FileAST, error) {
@@ -85,6 +95,8 @@ func (p *parser) parseFile() (*FileAST, error) {
 	seenFunc := false
 	seenStruct := false
 	seenEnum := false
+	seenState := false
+	seenView := false
 	seenGlobal := false
 	for p.cur.typ != TokenEOF {
 		switch p.cur.typ {
@@ -94,7 +106,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 			}
 			continue
 		case TokenModule:
-			if seenFunc || seenStruct || seenEnum || seenGlobal {
+			if seenFunc || seenStruct || seenEnum || seenState || seenView || seenGlobal {
 				return nil, diagnosticErrorf(p.cur.pos, "module must appear before declarations")
 			}
 			if file.Module != "" {
@@ -114,7 +126,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 			continue
 		case TokenImport:
 			pos := p.cur.pos
-			if seenFunc || seenStruct || seenEnum || seenGlobal {
+			if seenFunc || seenStruct || seenEnum || seenState || seenView || seenGlobal {
 				return nil, diagnosticErrorf(p.cur.pos, "import must appear before declarations")
 			}
 			if err := p.next(); err != nil {
@@ -144,7 +156,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 			}
 			continue
 		case TokenStruct:
-			if seenFunc || seenGlobal {
+			if seenFunc || seenView || seenGlobal {
 				return nil, diagnosticErrorf(p.cur.pos, "struct must appear before globals/functions")
 			}
 			seenStruct = true
@@ -155,7 +167,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 			file.Structs = append(file.Structs, st)
 			continue
 		case TokenEnum:
-			if seenFunc || seenGlobal {
+			if seenFunc || seenView || seenGlobal {
 				return nil, diagnosticErrorf(p.cur.pos, "enum must appear before globals/functions")
 			}
 			seenEnum = true
@@ -167,8 +179,30 @@ func (p *parser) parseFile() (*FileAST, error) {
 			continue
 		case TokenIdent:
 			switch p.cur.lit {
-			case "impl":
+			case "state":
+				if seenFunc || seenView || seenGlobal {
+					return nil, diagnosticErrorf(p.cur.pos, "state must appear before views/globals/functions")
+				}
+				seenState = true
+				st, err := p.parseStateDecl()
+				if err != nil {
+					return nil, err
+				}
+				file.States = append(file.States, st)
+				continue
+			case "view":
 				if seenFunc || seenGlobal {
+					return nil, diagnosticErrorf(p.cur.pos, "view must appear before globals/functions")
+				}
+				seenView = true
+				view, err := p.parseViewDecl()
+				if err != nil {
+					return nil, err
+				}
+				file.Views = append(file.Views, view)
+				continue
+			case "impl":
+				if seenFunc || seenView || seenGlobal {
 					return nil, diagnosticErrorf(p.cur.pos, "impl must appear before globals/functions")
 				}
 				impl, err := p.parseImplDecl()
@@ -178,7 +212,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 				file.Impls = append(file.Impls, impl)
 				continue
 			case "protocol":
-				if seenFunc || seenGlobal {
+				if seenFunc || seenView || seenGlobal {
 					return nil, diagnosticErrorf(p.cur.pos, "protocol must appear before globals/functions")
 				}
 				proto, err := p.parseProtocolDecl()
@@ -188,7 +222,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 				file.Protocols = append(file.Protocols, proto)
 				continue
 			case "extension":
-				if seenFunc || seenGlobal {
+				if seenFunc || seenView || seenGlobal {
 					return nil, diagnosticErrorf(p.cur.pos, "extension must appear before globals/functions")
 				}
 				ext, err := p.parseExtensionDecl()
@@ -202,7 +236,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 				if feature, ok := plannedFeatureFromToken(p.cur); ok {
 					return nil, plannedFeatureError(p.cur.pos, feature)
 				}
-				return nil, p.unexpected("module/import/enum/struct/extension/var/val/const/fn")
+				return nil, p.unexpected("module/import/enum/struct/state/view/extension/var/val/const/fn")
 			}
 		case TokenVar, TokenVal, TokenConst:
 			if seenFunc {
@@ -233,7 +267,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 			if feature, ok := plannedFeatureFromToken(p.cur); ok {
 				return nil, plannedFeatureError(p.cur.pos, feature)
 			}
-			return nil, p.unexpected("module/import/enum/struct/extension/var/val/fn")
+			return nil, p.unexpected("module/import/enum/struct/state/view/extension/var/val/fn")
 		}
 	}
 	file.Funcs = append(file.Funcs, p.closureDecls...)
@@ -497,6 +531,257 @@ func (p *parser) parseGlobalDecl() (*GlobalDecl, error) {
 	return &GlobalDecl{At: pos, Name: nameTok.lit, Type: typeRef, Mutable: mutable, Const: declTok.typ == TokenConst, Init: init}, nil
 }
 
+func (p *parser) parseStateDecl() (*StateDecl, error) {
+	pos := p.cur.pos
+	if p.cur.typ != TokenIdent || p.cur.lit != "state" {
+		return nil, p.unexpected("state")
+	}
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	nameTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenLBrace); err != nil {
+		return nil, err
+	}
+	var fields []StateFieldDecl
+	seen := map[string]struct{}{}
+	for p.cur.typ != TokenRBrace && p.cur.typ != TokenEOF {
+		if p.cur.typ == TokenSemicolon {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if p.cur.typ != TokenVar && p.cur.typ != TokenVal && p.cur.typ != TokenConst {
+			return nil, p.unexpected("var/val/const")
+		}
+		declTok := p.cur
+		fieldPos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		fieldNameTok, err := p.expect(TokenIdent)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := seen[fieldNameTok.lit]; exists {
+			return nil, diagnosticErrorf(fieldNameTok.pos, "duplicate state field '%s'", fieldNameTok.lit)
+		}
+		seen[fieldNameTok.lit] = struct{}{}
+		if _, err := p.expect(TokenColon); err != nil {
+			return nil, err
+		}
+		typeRef, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.expect(TokenAssign); err != nil {
+			return nil, err
+		}
+		value, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if err := p.consumeOptionalSemicolon(); err != nil {
+			return nil, err
+		}
+		fields = append(fields, StateFieldDecl{
+			At:      fieldPos,
+			Name:    fieldNameTok.lit,
+			Type:    typeRef,
+			Mutable: declTok.typ == TokenVar,
+			Const:   declTok.typ == TokenConst,
+			Init:    value,
+		})
+	}
+	if _, err := p.expect(TokenRBrace); err != nil {
+		return nil, err
+	}
+	if len(fields) == 0 {
+		return nil, diagnosticErrorf(pos, "state requires at least one field")
+	}
+	return &StateDecl{At: pos, Name: nameTok.lit, Fields: fields}, nil
+}
+
+func (p *parser) parseViewDecl() (*ViewDecl, error) {
+	pos := p.cur.pos
+	if p.cur.typ != TokenIdent || p.cur.lit != "view" {
+		return nil, p.unexpected("view")
+	}
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	nameTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenLParen); err != nil {
+		return nil, err
+	}
+	stateTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	if stateTok.lit != "state" {
+		return nil, diagnosticErrorf(stateTok.pos, "view parameter must be named 'state'")
+	}
+	if _, err := p.expect(TokenColon); err != nil {
+		return nil, err
+	}
+	stateRef, err := p.parseTypeRef()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenRParen); err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenLBrace); err != nil {
+		return nil, err
+	}
+
+	view := &ViewDecl{At: pos, Name: nameTok.lit, StateName: stateRef}
+	for p.cur.typ != TokenRBrace && p.cur.typ != TokenEOF {
+		if p.cur.typ == TokenSemicolon {
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if p.cur.typ != TokenIdent {
+			return nil, p.unexpected("bind/event/command/style/accessibility")
+		}
+		switch p.cur.lit {
+		case "bind":
+			entryPos := p.cur.pos
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			nameTok, err := p.expect(TokenIdent)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenColon); err != nil {
+				return nil, err
+			}
+			typ, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenAssign); err != nil {
+				return nil, err
+			}
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.consumeOptionalSemicolon(); err != nil {
+				return nil, err
+			}
+			view.Bindings = append(view.Bindings, ViewBindingDecl{At: entryPos, Name: nameTok.lit, Type: typ, Value: value})
+		case "event":
+			entryPos := p.cur.pos
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			eventTok, err := p.expect(TokenIdent)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenArrow); err != nil {
+				return nil, err
+			}
+			cmdTok, err := p.expect(TokenIdent)
+			if err != nil {
+				return nil, err
+			}
+			if err := p.consumeOptionalSemicolon(); err != nil {
+				return nil, err
+			}
+			view.Events = append(view.Events, ViewEventDecl{At: entryPos, Name: eventTok.lit, Command: cmdTok.lit})
+		case "command":
+			entryPos := p.cur.pos
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			cmdTok, err := p.expect(TokenIdent)
+			if err != nil {
+				return nil, err
+			}
+			body, err := p.parseBlock()
+			if err != nil {
+				return nil, err
+			}
+			view.Commands = append(view.Commands, ViewCommandDecl{At: entryPos, Name: cmdTok.lit, Body: body})
+		case "style":
+			entryPos := p.cur.pos
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			nameTok, err := p.expect(TokenIdent)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenColon); err != nil {
+				return nil, err
+			}
+			typ, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenAssign); err != nil {
+				return nil, err
+			}
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.consumeOptionalSemicolon(); err != nil {
+				return nil, err
+			}
+			view.Styles = append(view.Styles, ViewStyleDecl{At: entryPos, Name: nameTok.lit, Type: typ, Value: value})
+		case "accessibility", "a11y":
+			entryPos := p.cur.pos
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			nameTok, err := p.expect(TokenIdent)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenColon); err != nil {
+				return nil, err
+			}
+			typ, err := p.parseTypeRef()
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenAssign); err != nil {
+				return nil, err
+			}
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			if err := p.consumeOptionalSemicolon(); err != nil {
+				return nil, err
+			}
+			view.Accessibility = append(view.Accessibility, ViewAccessibilityDecl{At: entryPos, Name: nameTok.lit, Type: typ, Value: value})
+		default:
+			return nil, p.unexpected("bind/event/command/style/accessibility")
+		}
+	}
+	if _, err := p.expect(TokenRBrace); err != nil {
+		return nil, err
+	}
+	if len(view.Commands) == 0 {
+		return nil, diagnosticErrorf(pos, "view requires at least one command")
+	}
+	return view, nil
+}
+
 func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 	exportName := ""
 	for p.cur.typ == TokenAt {
@@ -687,7 +972,7 @@ func (p *parser) parseSemanticClause() (SemanticClause, bool, error) {
 		return SemanticClause{}, false, nil
 	}
 	switch p.cur.lit {
-	case "noalloc", "noblock", "realtime", "nothrow":
+	case "noalloc", "noblock", "realtime", "nothrow", "privacy":
 		clause := SemanticClause{At: p.cur.pos, Name: p.cur.lit}
 		if err := p.next(); err != nil {
 			return SemanticClause{}, false, err
@@ -698,6 +983,23 @@ func (p *parser) parseSemanticClause() (SemanticClause, bool, error) {
 		return clause, true, nil
 	case "budget":
 		clause := SemanticClause{At: p.cur.pos, Name: "budget"}
+		if err := p.next(); err != nil {
+			return SemanticClause{}, false, err
+		}
+		if _, err := p.expect(TokenLParen); err != nil {
+			return SemanticClause{}, false, err
+		}
+		value, err := p.parseExpr()
+		if err != nil {
+			return SemanticClause{}, false, err
+		}
+		if _, err := p.expect(TokenRParen); err != nil {
+			return SemanticClause{}, false, err
+		}
+		clause.Value = value
+		return clause, true, nil
+	case "consent":
+		clause := SemanticClause{At: p.cur.pos, Name: "consent"}
 		if err := p.next(); err != nil {
 			return SemanticClause{}, false, err
 		}
@@ -1362,7 +1664,7 @@ func plannedFeatureFromToken(tok token) (string, bool) {
 		return "", false
 	}
 	switch tok.lit {
-	case "actor", "view", "state", "property", "capsule":
+	case "actor", "property", "capsule":
 		return tok.lit, true
 	case "closure":
 		return "closures", true

@@ -1,0 +1,18 @@
+{
+  "schema": "tetra.reproducible-build-proof.v1alpha1",
+  "generated_at": "2026-04-26T19:59:34Z",
+  "source": "examples/flow_hello.tetra",
+  "native": {
+    "target": "linux-x64",
+    "hash_a": "sha256:c5fb4a6b4fdef9af44edae432c20ea7b5dc40a88adc18d1207067a2632ff43be",
+    "hash_b": "sha256:c5fb4a6b4fdef9af44edae432c20ea7b5dc40a88adc18d1207067a2632ff43be",
+    "match": true
+  },
+  "wasm": {
+    "target": "wasm32-wasi",
+    "hash_a": "sha256:9635f68a422169c77e10d7dce4ca7797b04f8fbf66eaad089b5495d1b9d128b1",
+    "hash_b": "sha256:9635f68a422169c77e10d7dce4ca7797b04f8fbf66eaad089b5495d1b9d128b1",
+    "match": true
+  },
+  "status": "pass"
+}

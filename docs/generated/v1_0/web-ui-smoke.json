@@ -1,0 +1,14 @@
+{
+  "schema": "tetra.web-ui-smoke.v1alpha1",
+  "generated_at": "2026-04-26T19:59:50.686Z",
+  "target": "wasm32-web",
+  "ui_scope_active": false,
+  "source": "examples/flow_hello.tetra",
+  "used_fallback_source": true,
+  "automation": "chromium --headless --dump-dom",
+  "status": "blocked",
+  "result": "ok:0",
+  "blocker": "no UI-specific smoke source found in examples/; fallback wasm web smoke ran successfully",
+  "dom_snapshot": "docs/generated/v1_0/web-ui-smoke.dom.html",
+  "chromium_stderr": "docs/generated/v1_0/web-ui-smoke.chromium.err"
+}

@@ -54,6 +54,14 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 	if err != nil {
 		return nil, err
 	}
+	consentToken, err := ensureTypeInfo("consent.token", types)
+	if err != nil {
+		return nil, err
+	}
+	secretI32, err := ensureTypeInfo("secret.i32", types)
+	if err != nil {
+		return nil, err
+	}
 
 	sigs := map[string]FuncSig{
 		"core.alloc_bytes":          {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
@@ -91,6 +99,9 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 		"core.recv_msg":             {ParamTypes: nil, ParamSlots: 0, ReturnType: actorMsgInfo.Name, ReturnSlots: actorMsgInfo.SlotCount, ReturnRegionParam: regionNone},
 		"core.self":                 {ParamTypes: nil, ParamSlots: 0, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
 		"core.sender":               {ParamTypes: nil, ParamSlots: 0, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.consent_token":        {ParamTypes: nil, ParamSlots: 0, ReturnType: consentToken.Name, ReturnSlots: consentToken.SlotCount, ReturnRegionParam: regionNone},
+		"core.secret_seal_i32":      {ParamTypes: []string{"i32", consentToken.Name}, ParamSlots: 2, ReturnType: secretI32.Name, ReturnSlots: secretI32.SlotCount, ReturnRegionParam: regionNone},
+		"core.secret_unseal_i32":    {ParamTypes: []string{secretI32.Name, consentToken.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
 	}
 	for name, sig := range sigs {
 		sig.Effects = builtinEffects(name)
@@ -178,6 +189,12 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 		return "core.actor_dispatch", true
 	case "actor_main_entry_id":
 		return "core.actor_main_entry_id", true
+	case "consent_token":
+		return "core.consent_token", true
+	case "secret_seal_i32":
+		return "core.secret_seal_i32", true
+	case "secret_unseal_i32":
+		return "core.secret_unseal_i32", true
 	case "core.alloc_bytes", "core.make_u8", "core.make_i32",
 		"core.island_new", "core.island_make_u8", "core.island_make_i32",
 		"core.load_ptr", "core.store_ptr", "core.sym_addr", "core.ctx_switch",
@@ -185,7 +202,8 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 		"core.task_spawn_i32", "core.task_spawn_group_i32",
 		"core.task_join_i32", "core.task_join_result_i32",
 		"core.send_msg", "core.recv_msg",
-		"core.actor_dispatch", "core.actor_main_entry_id":
+		"core.actor_dispatch", "core.actor_main_entry_id",
+		"core.consent_token", "core.secret_seal_i32", "core.secret_unseal_i32":
 		return name, true
 	default:
 		return "", false

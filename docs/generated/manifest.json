@@ -1,5 +1,5 @@
 {
-  "compiler_version": "v0.6.0",
+  "compiler_version": "v1.0.0",
   "targets": [
     {
       "triple": "linux-x64",
@@ -87,6 +87,17 @@
         "mem"
       ],
       "unsafe_policy": "always"
+    },
+    {
+      "name": "core.consent_token",
+      "aliases": [
+        "consent_token"
+      ],
+      "return_type": "consent.token",
+      "effects": [
+        "privacy"
+      ],
+      "unsafe_policy": "never"
     },
     {
       "name": "core.ctx_switch",
@@ -282,6 +293,36 @@
       "return_type": "actor.msg",
       "effects": [
         "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.secret_seal_i32",
+      "aliases": [
+        "secret_seal_i32"
+      ],
+      "param_types": [
+        "i32",
+        "consent.token"
+      ],
+      "return_type": "secret.i32",
+      "effects": [
+        "privacy"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.secret_unseal_i32",
+      "aliases": [
+        "secret_unseal_i32"
+      ],
+      "param_types": [
+        "secret.i32",
+        "consent.token"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "privacy"
       ],
       "unsafe_policy": "never"
     },

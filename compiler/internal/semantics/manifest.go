@@ -45,6 +45,9 @@ func DescribeBuiltins() ([]BuiltinManifest, error) {
 		"recv_msg",
 		"actor_dispatch",
 		"actor_main_entry_id",
+		"consent_token",
+		"secret_seal_i32",
+		"secret_unseal_i32",
 	} {
 		if target, ok := ResolveBuiltinAlias(alias); ok {
 			aliasesByTarget[target] = append(aliasesByTarget[target], alias)
@@ -117,6 +120,8 @@ func builtinEffects(name string) []string {
 	case "core.actor_dispatch", "core.actor_main_entry_id",
 		"core.spawn", "core.send", "core.send_msg", "core.recv", "core.recv_msg", "core.self", "core.sender":
 		effects = []string{"actors"}
+	case "core.consent_token", "core.secret_seal_i32", "core.secret_unseal_i32":
+		effects = []string{"privacy"}
 	}
 	sort.Strings(effects)
 	return effects

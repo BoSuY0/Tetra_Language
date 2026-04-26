@@ -290,6 +290,14 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 		p.structDecl(st)
 		p.blank()
 	}
+	for _, st := range file.States {
+		p.stateDecl(st)
+		p.blank()
+	}
+	for _, view := range file.Views {
+		p.viewDecl(view)
+		p.blank()
+	}
 	for _, proto := range file.Protocols {
 		p.protocolDecl(proto)
 		p.blank()
@@ -353,6 +361,39 @@ func (p *sourcePrinter) structDecl(st *frontend.StructDecl) {
 	p.line(0, "struct "+st.Name+":")
 	for _, f := range st.Fields {
 		p.line(1, f.Name+": "+formatTypeRef(f.Type))
+	}
+}
+
+func (p *sourcePrinter) stateDecl(st *frontend.StateDecl) {
+	p.line(0, "state "+st.Name+":")
+	for _, field := range st.Fields {
+		kw := "val"
+		if field.Mutable {
+			kw = "var"
+		} else if field.Const {
+			kw = "const"
+		}
+		p.line(1, kw+" "+field.Name+": "+formatTypeRef(field.Type)+" = "+p.formatExpr(field.Init))
+	}
+}
+
+func (p *sourcePrinter) viewDecl(view *frontend.ViewDecl) {
+	p.line(0, "view "+view.Name+"(state: "+formatTypeRef(view.StateName)+"):")
+	for _, binding := range view.Bindings {
+		p.line(1, "bind "+binding.Name+": "+formatTypeRef(binding.Type)+" = "+p.formatExpr(binding.Value))
+	}
+	for _, event := range view.Events {
+		p.line(1, "event "+event.Name+" -> "+event.Command)
+	}
+	for _, cmd := range view.Commands {
+		p.line(1, "command "+cmd.Name+":")
+		p.stmts(cmd.Body, 2)
+	}
+	for _, style := range view.Styles {
+		p.line(1, "style "+style.Name+": "+formatTypeRef(style.Type)+" = "+p.formatExpr(style.Value))
+	}
+	for _, entry := range view.Accessibility {
+		p.line(1, "accessibility "+entry.Name+": "+formatTypeRef(entry.Type)+" = "+p.formatExpr(entry.Value))
 	}
 }
 

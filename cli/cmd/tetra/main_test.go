@@ -18,7 +18,7 @@ func TestVersionCommand(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("version exit code = %d, want 0", code)
 	}
-	if !strings.Contains(stdout.String(), "v0.6.0") {
+	if !strings.Contains(stdout.String(), compiler.Version()) {
 		t.Fatalf("version output = %q, want compiler version", stdout.String())
 	}
 }
@@ -200,7 +200,7 @@ func TestSmokeCommandWritesReport(t *testing.T) {
 	if err := json.Unmarshal(raw, &smokeReport); err != nil {
 		t.Fatalf("decode smoke report: %v\n%s", err, string(raw))
 	}
-	if smokeReport.Target != target || !strings.HasPrefix(smokeReport.Version, "v0.6.") || len(smokeReport.Cases) == 0 {
+	if smokeReport.Target != target || !strings.HasPrefix(smokeReport.Version, "v1.0.") || len(smokeReport.Cases) == 0 {
 		t.Fatalf("smoke report shape = %#v", smokeReport)
 	}
 	if smokeReport.Total != len(smokeReport.Cases) || smokeReport.Passed != len(smokeReport.Cases) || smokeReport.Failed != 0 {
@@ -240,13 +240,20 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 		t.Fatalf("smoke list counts = total:%d len:%d", report.Total, len(report.Cases))
 	}
 	var sawFlowHello bool
+	var sawUINative bool
 	for _, c := range report.Cases {
 		if c.Name == "flow_hello" && c.SrcPath == "examples/flow_hello.tetra" && c.ExpectedExit == 0 {
 			sawFlowHello = true
 		}
+		if c.Name == "ui_native_shell_smoke" && c.SrcPath == "examples/ui_native_shell_smoke.tetra" && c.ExpectedExit == 0 {
+			sawUINative = true
+		}
 	}
 	if !sawFlowHello {
 		t.Fatalf("smoke list missing flow_hello: %#v", report.Cases)
+	}
+	if !sawUINative {
+		t.Fatalf("smoke list missing ui_native_shell_smoke: %#v", report.Cases)
 	}
 }
 
@@ -285,12 +292,25 @@ func TestSmokeCommandListsWASMBuildOnlyTarget(t *testing.T) {
 			Target       string `json:"target"`
 			BuildOnly    bool   `json:"build_only"`
 			RunSupported bool   `json:"run_supported"`
+			Cases        []struct {
+				Name    string `json:"name"`
+				SrcPath string `json:"src_path"`
+			} `json:"cases"`
 		}
 		if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 			t.Fatalf("smoke list JSON: %v\n%s", err, stdout.String())
 		}
 		if report.Target != target || !report.BuildOnly || report.RunSupported {
 			t.Fatalf("wasm smoke list metadata = %#v", report)
+		}
+		var sawUIWeb bool
+		for _, c := range report.Cases {
+			if c.Name == "ui_web_smoke" && c.SrcPath == "examples/ui_web_smoke.tetra" {
+				sawUIWeb = true
+			}
+		}
+		if !sawUIWeb {
+			t.Fatalf("wasm smoke list missing ui_web_smoke: %#v", report.Cases)
 		}
 	}
 }
@@ -848,6 +868,59 @@ func TestBuildCommandWASMTargetWritesWasmModule(t *testing.T) {
 				t.Fatalf("unexpected web loader content:\n%s", loader)
 			}
 		}
+	}
+}
+
+func TestBuildCommandUIWritesBackendSidecars(t *testing.T) {
+	src := `state CounterState:
+    var count: Int = 0
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 320
+    accessibility label: String = "Increment"
+
+func main() -> Int:
+    return 0
+`
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "ui.tetra")
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	wasmOut := filepath.Join(dir, "ui.wasm")
+	if code := runCLI([]string{"build", "--target", "wasm32-web", "-o", wasmOut, srcPath}, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("build wasm32-web exit code = %d", code)
+	}
+	for _, path := range []string{
+		strings.TrimSuffix(wasmOut, ".wasm") + ".ui.json",
+		strings.TrimSuffix(wasmOut, ".wasm") + ".ui.web.mjs",
+		strings.TrimSuffix(wasmOut, ".wasm") + ".ui.html",
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected sidecar %s: %v", path, err)
+		}
+	}
+
+	host, ok := hostTarget()
+	if !ok {
+		t.Skip("host target unsupported")
+	}
+	nativeOut := filepath.Join(dir, "ui-native")
+	if host == "windows-x64" {
+		nativeOut += ".exe"
+	}
+	if code := runCLI([]string{"build", "--target", host, "-o", nativeOut, srcPath}, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("build host exit code = %d", code)
+	}
+	shellSidecar := strings.TrimSuffix(nativeOut, ".exe") + ".ui.shell.txt"
+	if _, err := os.Stat(shellSidecar); err != nil {
+		t.Fatalf("expected native sidecar %s: %v", shellSidecar, err)
 	}
 }
 

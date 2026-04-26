@@ -205,7 +205,8 @@ uses effects.memory:
 func TestBudgetPrivacyEffectsAndPolicyGroup(t *testing.T) {
 	requireCheckErrorContains(t, `
 func audit() -> Int
-uses budget, privacy:
+uses budget, privacy
+privacy:
   return 1
 
 func main() -> Int:
@@ -214,11 +215,86 @@ func main() -> Int:
 
 	requireCheckOK(t, `
 func audit() -> Int
-uses budget, privacy:
+uses budget, privacy
+privacy:
   return 1
 
 func main() -> Int
-uses effects.policy:
+uses effects.policy
+privacy:
   return audit()
+`)
+}
+
+func TestSemanticClauseBudgetRequiresBudgetEffect(t *testing.T) {
+	requireCheckErrorContains(t, `
+func main() -> Int
+budget(1):
+  return 0
+`, "requires function 'main' to declare uses effect 'budget'")
+}
+
+func TestSemanticClauseNoallocNoblockRealtimeChecks(t *testing.T) {
+	requireCheckErrorContains(t, `
+func main() -> Int
+uses alloc
+noalloc:
+  return 0
+`, "noalloc")
+
+	requireCheckErrorContains(t, `
+func main() -> Int
+uses io
+noblock:
+  return 0
+`, "noblock")
+
+	requireCheckErrorContains(t, `
+func main() -> Int
+uses runtime
+realtime:
+  return 0
+`, "realtime")
+}
+
+func TestPrivacyEffectRequiresPrivacyClause(t *testing.T) {
+	requireCheckErrorContains(t, `
+func main() -> Int
+uses privacy:
+  return 0
+`, "requires semantic clause 'privacy'")
+}
+
+func TestPrivacyConsentSecretSignatureChecks(t *testing.T) {
+	requireCheckErrorContains(t, `
+func seal(token: consent.token) -> secret.i32
+uses privacy
+privacy:
+  return core.secret_seal_i32(1, token)
+`, "require semantic clause consent(<token>)")
+
+	requireCheckErrorContains(t, `
+func seal(token: Int) -> secret.i32
+uses privacy
+privacy
+consent(token):
+  return 0
+`, "must have type consent.token")
+
+	requireCheckOK(t, `
+func seal(token: consent.token) -> secret.i32
+uses privacy
+privacy
+consent(token):
+  return core.secret_seal_i32(1, token)
+
+func reveal(token: consent.token, value: secret.i32) -> Int
+uses privacy
+privacy
+consent(token):
+  return core.secret_unseal_i32(value, token)
+
+func main() -> Int:
+  return 0
 `)
 }

@@ -11,6 +11,8 @@ type CheckedProgram struct {
 	Funcs              []CheckedFunc
 	Enums              []CheckedEnum
 	Structs            []CheckedStruct
+	UIStates           []CheckedUIState
+	UIViews            []CheckedUIView
 	Protocols          []CheckedProtocol
 	FuncSigs           map[string]FuncSig
 	Types              map[string]*TypeInfo
@@ -79,6 +81,18 @@ type CheckedProtocol struct {
 	Name   string
 	Module string
 	Decl   *frontend.ProtocolDecl
+}
+
+type CheckedUIState struct {
+	Name   string
+	Module string
+	Decl   *frontend.StateDecl
+}
+
+type CheckedUIView struct {
+	Name   string
+	Module string
+	Decl   *frontend.ViewDecl
 }
 
 type TypeKind int
@@ -175,17 +189,19 @@ func makeStructTypeInfo(name string, fields []FieldInfo) *TypeInfo {
 
 func baseTypes() map[string]*TypeInfo {
 	types := map[string]*TypeInfo{
-		"i32":        {Name: "i32", Kind: TypeI32, SlotCount: 1},
-		"u8":         {Name: "u8", Kind: TypeU8, SlotCount: 1},
-		"bool":       {Name: "bool", Kind: TypeBool, SlotCount: 1},
-		"ptr":        {Name: "ptr", Kind: TypePtr, SlotCount: 1},
-		"str":        makeStrTypeInfo(),
-		"actor":      {Name: "actor", Kind: TypeActor, SlotCount: 1},
-		"task.error": {Name: "task.error", Kind: TypeI32, SlotCount: 1},
-		"task.group": {Name: "task.group", Kind: TypeI32, SlotCount: 1},
-		"island":     {Name: "island", Kind: TypeIsland, SlotCount: 1},
-		"cap.io":     {Name: "cap.io", Kind: TypeCap, SlotCount: 1},
-		"cap.mem":    {Name: "cap.mem", Kind: TypeCap, SlotCount: 1},
+		"i32":           {Name: "i32", Kind: TypeI32, SlotCount: 1},
+		"u8":            {Name: "u8", Kind: TypeU8, SlotCount: 1},
+		"bool":          {Name: "bool", Kind: TypeBool, SlotCount: 1},
+		"ptr":           {Name: "ptr", Kind: TypePtr, SlotCount: 1},
+		"str":           makeStrTypeInfo(),
+		"actor":         {Name: "actor", Kind: TypeActor, SlotCount: 1},
+		"task.error":    {Name: "task.error", Kind: TypeI32, SlotCount: 1},
+		"task.group":    {Name: "task.group", Kind: TypeI32, SlotCount: 1},
+		"island":        {Name: "island", Kind: TypeIsland, SlotCount: 1},
+		"cap.io":        {Name: "cap.io", Kind: TypeCap, SlotCount: 1},
+		"cap.mem":       {Name: "cap.mem", Kind: TypeCap, SlotCount: 1},
+		"consent.token": {Name: "consent.token", Kind: TypeCap, SlotCount: 1},
+		"secret.i32":    {Name: "secret.i32", Kind: TypeStruct, SlotCount: 1},
 	}
 	types["task.i32"] = makeStructTypeInfo("task.i32", []FieldInfo{
 		{Name: "value", TypeName: "i32"},
@@ -302,7 +318,7 @@ func isReservedTypeName(name string) bool {
 	case "i32", "u8", "bool", "Bool", "ptr", "str", "String",
 		"actor", "actor.msg",
 		"task.error", "task.group", "task.i32", "task.result_i32",
-		"island", "cap.io", "cap.mem":
+		"island", "cap.io", "cap.mem", "consent.token", "secret.i32":
 		return true
 	default:
 		return false

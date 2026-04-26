@@ -6,10 +6,10 @@
 
 ## Rules For This Roadmap
 
-- [ ] A TODO is considered closed only when implementation + tests + release gates pass.
-- [ ] `deferred-post-v1`, `blocked-by-prerequisite`, and `scope-freeze` notes do not count as v1.0 completion.
-- [ ] Keep `bash scripts/test_all.sh --full` green after every merge batch.
-- [ ] No version bump to `v1.0.x` until all mandatory v1.0 checks are green.
+- [x] A TODO is considered closed only when implementation + tests + release gates pass.
+- [x] `deferred-post-v1`, `blocked-by-prerequisite`, and `scope-freeze` notes do not count as v1.0 completion.
+- [x] Keep `bash scripts/test_all.sh --full` green after every merge batch.
+- [x] No version bump to `v1.0.x` until all mandatory v1.0 checks are green.
 
 ## Baseline Commands (Must Stay Green)
 
@@ -92,7 +92,7 @@ go test ./compiler/... -run 'Optional|TypedError|Generic|Protocol|Extension|Matc
 
 ### 3.3 Ownership Coverage
 
-- [ ] Add complete positive/negative ownership test matrix for borrow/inout/consume/actor/task paths.
+- [x] Add complete positive/negative ownership test matrix for borrow/inout/consume/actor/task paths.
 
 **Verification**
 
@@ -106,22 +106,22 @@ go test ./compiler/... -run 'Ownership|Borrow|Move|Alias|Island|Actor|Task'
 
 ### 4.1 Effects Propagation
 
-- [ ] Extend `uses` into effect groups.
-- [ ] Propagate effects through generics.
-- [ ] Propagate effects through protocols.
+- [x] Extend `uses` into effect groups.
+- [x] Propagate effects through generics.
+- [x] Propagate effects through protocols.
 
 ### 4.2 Capability Model
 
-- [ ] Implement capability attenuation.
-- [ ] Implement capsule permission checks.
+- [x] Implement capability attenuation.
+- [x] Implement capsule permission checks.
 
 ### 4.3 Privacy / Consent / Budgets
 
-- [ ] Implement secret/privacy type system paths needed for v1.
-- [ ] Implement consent-token MVP.
-- [ ] Implement checked privacy clauses.
-- [ ] Implement `budget`, `noalloc`, `noblock`, `realtime`, `nothrow` syntax + semantics.
-- [ ] Add runtime checks for non-static guarantees.
+- [x] Implement secret/privacy type system paths needed for v1.
+- [x] Implement consent-token MVP.
+- [x] Implement checked privacy clauses.
+- [x] Implement `budget`, `noalloc`, `noblock`, `realtime`, `nothrow` syntax + semantics.
+- [x] Add runtime checks for non-static guarantees.
 
 **Verification**
 
@@ -252,18 +252,18 @@ go test ./compiler/... ./cli/... ./tools/...
 
 ## Wave 9: UI Language (v1 If Required By Product Scope)
 
-- [ ] Finalize UI syntax/spec.
-- [ ] Implement `view`.
-- [ ] Implement `state`.
-- [ ] Implement bindings.
-- [ ] Implement events.
-- [ ] Implement commands.
-- [ ] Implement typed style.
-- [ ] Implement accessibility metadata.
-- [ ] Add web backend through `wasm32-web`.
-- [ ] Add native shell backend.
-- [ ] Add web UI smoke app.
-- [ ] Add native shell UI smoke app.
+- [x] Finalize UI syntax/spec.
+- [x] Implement `view`.
+- [x] Implement `state`.
+- [x] Implement bindings.
+- [x] Implement events.
+- [x] Implement commands.
+- [x] Implement typed style.
+- [x] Implement accessibility metadata.
+- [x] Add web backend through `wasm32-web`.
+- [x] Add native shell backend.
+- [x] Add web UI smoke app.
+- [x] Add native shell UI smoke app.
 
 **Verification**
 
@@ -310,28 +310,28 @@ go test ./cli/... ./tools/... -run 'Eco|Vault|Capsule|Lock|API'
 
 ### Release Checklist
 
-- [ ] Update version to `v1.0.x` on release branch only when all mandatory checks pass.
-- [ ] Regenerate and validate docs manifest.
-- [ ] Finalize release notes.
-- [ ] Complete every item in `docs/checklists/v1_0_release_gate.md`.
-- [ ] Run build-only smoke for all mandatory native and WASM targets.
-- [ ] Run WASI smoke in a WASI runner.
-- [ ] Run web UI smoke via browser automation (if UI is in v1 scope).
-- [ ] Verify docs manifest + doctests.
-- [ ] Verify API diff reports.
-- [ ] Verify reproducible build proof for at least one native and one WASM target.
+- [x] Update version to `v1.0.x` on release branch only when all mandatory checks pass.
+- [x] Regenerate and validate docs manifest.
+- [x] Finalize release notes.
+- [x] Complete every item in `docs/checklists/v1_0_release_gate.md`.
+- [x] Run build-only smoke for all mandatory native and WASM targets.
+- [x] Run WASI smoke in a WASI runner.
+- [x] Run web UI smoke via browser automation (if UI is in v1 scope).
+- [x] Verify docs manifest + doctests.
+- [x] Verify API diff reports.
+- [x] Verify reproducible build proof for at least one native and one WASM target.
 
 ### Mandatory Final Gate
 
-- [ ] `go test ./compiler/... ./cli/... ./tools/...`
-- [ ] `bash scripts/test_all.sh --full`
-- [ ] `bash scripts/release_v1_0_gate.sh` (must pass fully)
+- [x] `go test ./compiler/... ./cli/... ./tools/...`
+- [x] `bash scripts/test_all.sh --full`
+- [x] `bash scripts/release_v1_0_gate.sh` (must pass fully)
 
 ---
 
 ## Definition Of Done (v1.0)
 
-- [ ] `./tetra version` returns `v1.0.x` on release branch.
-- [ ] `scripts/release_v1_0_gate.sh` passes end-to-end.
-- [ ] No mandatory v1 TODO in this roadmap remains open.
-- [ ] All generated release artifacts (docs/manifest/release notes/api diff proofs) are current and verified.
+- [x] `./tetra version` returns `v1.0.x` on release branch.
+- [x] `scripts/release_v1_0_gate.sh` passes end-to-end.
+- [x] No mandatory v1 TODO in this roadmap remains open.
+- [x] All generated release artifacts (docs/manifest/release notes/api diff proofs) are current and verified.

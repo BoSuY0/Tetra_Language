@@ -726,6 +726,67 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 	}
 }
 
+func TestParseStateAndViewDecls(t *testing.T) {
+	src := `
+state CounterState:
+    var count: Int = 0
+    val title: String = "Counter"
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+    bind titleText: String = state.title
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 320
+    accessibility label: String = "increment"
+
+func main() -> Int:
+    return 0
+`
+	file, err := ParseFile([]byte(src), "ui/counter.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.States) != 1 {
+		t.Fatalf("states = %d, want 1", len(file.States))
+	}
+	if len(file.Views) != 1 {
+		t.Fatalf("views = %d, want 1", len(file.Views))
+	}
+	state := file.States[0]
+	if state.Name != "CounterState" || len(state.Fields) != 2 {
+		t.Fatalf("state = %#v", state)
+	}
+	view := file.Views[0]
+	if view.Name != "CounterView" {
+		t.Fatalf("view name = %q, want CounterView", view.Name)
+	}
+	if view.StateName.Name != "CounterState" {
+		t.Fatalf("view state = %q, want CounterState", view.StateName.Name)
+	}
+	if len(view.Bindings) != 2 || len(view.Events) != 1 || len(view.Commands) != 1 || len(view.Styles) != 1 || len(view.Accessibility) != 1 {
+		t.Fatalf("view sections = %#v", view)
+	}
+}
+
+func TestParseViewRequiresCommand(t *testing.T) {
+	src := `
+state S:
+    var count: Int = 0
+
+view Broken(state: S):
+    bind value: Int = state.count
+`
+	_, err := Parse([]byte(src))
+	if err == nil {
+		t.Fatalf("expected parse error")
+	}
+	if !strings.Contains(err.Error(), "view requires at least one command") {
+		t.Fatalf("error = %q", err.Error())
+	}
+}
+
 func TestParseClosureLiteralExpression(t *testing.T) {
 	src := "fn main() -> i32 { let f: ptr = fn(x: i32) -> i32 { return x }; return 0 }"
 	prog, err := Parse([]byte(src))
@@ -772,6 +833,29 @@ func TestParseFunctionSemanticClauses(t *testing.T) {
 	value, ok := budget.Value.(*NumberExpr)
 	if !ok || value.Value != 10 {
 		t.Fatalf("budget value = %#v, want NumberExpr(10)", budget.Value)
+	}
+}
+
+func TestParsePrivacyConsentSemanticClauses(t *testing.T) {
+	src := "fn audit(token: consent.token) -> i32 uses privacy privacy consent(token) { return 0 }"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	clauses := prog.Funcs[0].SemanticClauses
+	if len(clauses) != 2 {
+		t.Fatalf("semantic clauses = %d, want 2", len(clauses))
+	}
+	if clauses[0].Name != "privacy" {
+		t.Fatalf("clause[0] = %q, want privacy", clauses[0].Name)
+	}
+	consent := clauses[1]
+	if consent.Name != "consent" {
+		t.Fatalf("clause[1] = %q, want consent", consent.Name)
+	}
+	ident, ok := consent.Value.(*IdentExpr)
+	if !ok || ident.Name != "token" {
+		t.Fatalf("consent value = %#v, want IdentExpr(token)", consent.Value)
 	}
 }
 

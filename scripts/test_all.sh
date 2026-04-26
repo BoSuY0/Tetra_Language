@@ -12,7 +12,7 @@ Usage: bash scripts/test_all.sh [--quick|--full] [--keep-going] [--json-only] [-
 
 Modes:
   --quick  Run the fast stabilization gate for local iteration.
-  --full   Run the full v0.6.x stabilization gate with logs and summaries.
+  --full   Run the full v1.0.x stabilization gate with logs and summaries.
 
 Output:
   --keep-going  Run remaining steps after a failure and exit 1 at the end.
@@ -105,7 +105,7 @@ write_summary() {
   ended_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   {
-    echo "# Tetra v0.6.x Test Report"
+    echo "# Tetra v1.0.x Test Report"
     echo
     echo "- mode: \`$mode\`"
     echo "- status: \`$status\`"
@@ -221,11 +221,11 @@ check_version_prefix() {
   local version
   version="$(./tetra version)"
   case "$version" in
-    v0.6.*)
+    v1.0.*)
       echo "$version"
       ;;
     *)
-      echo "expected v0.6.x, got $version" >&2
+      echo "expected v1.0.x, got $version" >&2
       exit 1
       ;;
   esac
@@ -519,7 +519,7 @@ check_cross_target_smoke() {
 }
 
 if [[ "$json_only" != true ]]; then
-  printf 'Tetra v0.6.x test wrapper\n'
+  printf 'Tetra v1.0.x test wrapper\n'
   printf 'mode: %s\n' "$mode"
   printf 'report_dir: %s\n\n' "$report_dir"
 fi

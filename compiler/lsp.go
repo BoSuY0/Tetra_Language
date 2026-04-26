@@ -93,6 +93,12 @@ func collectLSPSymbols(file *frontend.FileAST) []LSPSymbol {
 	for _, st := range file.Structs {
 		symbols = append(symbols, LSPSymbol{Name: st.Name, Kind: "struct", Line: st.At.Line, Column: st.At.Col})
 	}
+	for _, st := range file.States {
+		symbols = append(symbols, LSPSymbol{Name: st.Name, Kind: "state", Line: st.At.Line, Column: st.At.Col, Detail: "state " + st.Name})
+	}
+	for _, view := range file.Views {
+		symbols = append(symbols, LSPSymbol{Name: view.Name, Kind: "view", Line: view.At.Line, Column: view.At.Col, Detail: "view " + view.Name})
+	}
 	for _, en := range file.Enums {
 		symbols = append(symbols, LSPSymbol{Name: en.Name, Kind: "enum", Line: en.At.Line, Column: en.At.Col})
 	}
@@ -142,6 +148,12 @@ func collectLSPHovers(file *frontend.FileAST) []LSPHover {
 	}
 	for _, st := range file.Structs {
 		hovers = append(hovers, LSPHover{Name: st.Name, Line: st.At.Line, Column: st.At.Col, Contents: "struct " + st.Name})
+	}
+	for _, st := range file.States {
+		hovers = append(hovers, LSPHover{Name: st.Name, Line: st.At.Line, Column: st.At.Col, Contents: "state " + st.Name})
+	}
+	for _, view := range file.Views {
+		hovers = append(hovers, LSPHover{Name: view.Name, Line: view.At.Line, Column: view.At.Col, Contents: "view " + view.Name})
 	}
 	for _, en := range file.Enums {
 		hovers = append(hovers, LSPHover{Name: en.Name, Line: en.At.Line, Column: en.At.Col, Contents: "enum " + en.Name})
