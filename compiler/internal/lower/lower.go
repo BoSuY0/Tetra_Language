@@ -991,6 +991,9 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: e.Name, ArgSlots: total, RetSlots: sig.ReturnSlots, Pos: e.At})
 			return sig.ReturnSlots, nil
 		}
+	case *frontend.ClosureExpr:
+		l.emit(ir.IRInstr{Kind: ir.IRSymAddr, Name: e.Name, Pos: e.At})
+		return 1, nil
 	case *frontend.UnaryExpr:
 		slots, err := l.lowerExpr(e.X)
 		if err != nil {
@@ -1326,6 +1329,8 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 			return "", fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), e.Name)
 		}
 		return sig.ReturnType, nil
+	case *frontend.ClosureExpr:
+		return "ptr", nil
 	case *frontend.TryExpr:
 		call, ok := e.X.(*frontend.CallExpr)
 		if !ok {

@@ -106,7 +106,7 @@ func collectLSPSymbols(file *frontend.FileAST) []LSPSymbol {
 		symbols = append(symbols, LSPSymbol{Name: formatLSPImplName(impl), Kind: "impl", Line: impl.At.Line, Column: impl.At.Col, Detail: formatLSPImplDetail(impl)})
 	}
 	for _, fn := range file.Funcs {
-		if fn.ExtensionOf != "" {
+		if fn.ExtensionOf != "" || fn.Synthetic {
 			continue
 		}
 		symbols = append(symbols, LSPSymbol{Name: fn.Name, Kind: "function", Line: fn.Pos.Line, Column: fn.Pos.Col, Detail: formatLSPFuncDetail(fn)})
@@ -125,7 +125,7 @@ func collectLSPSymbols(file *frontend.FileAST) []LSPSymbol {
 func collectLSPHovers(file *frontend.FileAST) []LSPHover {
 	var hovers []LSPHover
 	for _, fn := range file.Funcs {
-		if fn.ExtensionOf != "" {
+		if fn.ExtensionOf != "" || fn.Synthetic {
 			continue
 		}
 		hovers = append(hovers, LSPHover{

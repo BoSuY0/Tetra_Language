@@ -47,18 +47,20 @@ type GlobalDecl struct {
 }
 
 type FuncDecl struct {
-	Pos         Position
-	Name        string
-	ExportName  string
-	Async       bool
-	ExtensionOf string
-	TypeParams  []string
-	ReturnType  TypeRef
-	Throws      TypeRef
-	HasThrows   bool
-	Params      []ParamDecl
-	Uses        []string
-	Body        []Stmt
+	Pos             Position
+	Name            string
+	ExportName      string
+	Synthetic       bool
+	Async           bool
+	ExtensionOf     string
+	TypeParams      []string
+	ReturnType      TypeRef
+	Throws          TypeRef
+	HasThrows       bool
+	Params          []ParamDecl
+	Uses            []string
+	SemanticClauses []SemanticClause
+	Body            []Stmt
 }
 
 type TestDecl struct {
@@ -82,6 +84,12 @@ type ParamDecl struct {
 	Name      string
 	Type      TypeRef
 	Ownership string
+}
+
+type SemanticClause struct {
+	At    Position
+	Name  string
+	Value Expr
 }
 
 type TypeRefKind int
@@ -454,6 +462,16 @@ type CallExpr struct {
 
 func (e *CallExpr) exprNode() {}
 func (e *CallExpr) Pos() Position {
+	return e.At
+}
+
+type ClosureExpr struct {
+	At   Position
+	Name string
+}
+
+func (e *ClosureExpr) exprNode() {}
+func (e *ClosureExpr) Pos() Position {
 	return e.At
 }
 

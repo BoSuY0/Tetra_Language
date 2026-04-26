@@ -638,6 +638,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if _, exists := checked.FuncSigs[fullName]; exists {
 				return nil, fmt.Errorf("duplicate function '%s'", fullName)
 			}
+			if err := validateSemanticClauses(fn); err != nil {
+				return nil, err
+			}
 			if len(fn.TypeParams) > 0 {
 				if err := validateGenericFuncDecl(fn); err != nil {
 					return nil, err
@@ -790,7 +793,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if !stmtListEndsWithReturnTyped(fn.Body, locals, globals, checked.FuncSigs, types, module, imports) {
 					return nil, fmt.Errorf("function '%s' must end with return", fullName)
 				}
-				state := newRegionState(scopeInfo.localScopes, scopeInfo.islandScopes)
+				state := newRegionState(scopeInfo)
 				initParamRegions(fn.Params, state, types)
 				sig := checked.FuncSigs[fullName]
 				state.throwType = sig.ThrowsType
@@ -1089,6 +1092,43 @@ func validateGenericFuncDecl(fn *frontend.FuncDecl) error {
 	return nil
 }
 
+func validateSemanticClauses(fn *frontend.FuncDecl) error {
+	seen := map[string]frontend.Position{}
+	for _, clause := range fn.SemanticClauses {
+		if first, exists := seen[clause.Name]; exists {
+			return fmt.Errorf("%s: duplicate semantic clause '%s' (first at %s)", frontend.FormatPos(clause.At), clause.Name, frontend.FormatPos(first))
+		}
+		seen[clause.Name] = clause.At
+		switch clause.Name {
+		case "noalloc", "noblock", "realtime":
+			if clause.Value != nil {
+				return fmt.Errorf("%s: semantic clause '%s' does not take arguments", frontend.FormatPos(clause.At), clause.Name)
+			}
+		case "nothrow":
+			if clause.Value != nil {
+				return fmt.Errorf("%s: semantic clause 'nothrow' does not take arguments", frontend.FormatPos(clause.At))
+			}
+			if fn.HasThrows {
+				return fmt.Errorf("%s: semantic clause 'nothrow' conflicts with explicit throws type", frontend.FormatPos(clause.At))
+			}
+		case "budget":
+			if clause.Value == nil {
+				return fmt.Errorf("%s: semantic clause 'budget' requires an integer argument", frontend.FormatPos(clause.At))
+			}
+			v, ok := constI32(clause.Value)
+			if !ok {
+				return fmt.Errorf("%s: semantic clause 'budget' expects an integer constant argument", frontend.FormatPos(clause.Value.Pos()))
+			}
+			if v < 0 {
+				return fmt.Errorf("%s: semantic clause 'budget' requires a non-negative value", frontend.FormatPos(clause.Value.Pos()))
+			}
+		default:
+			return fmt.Errorf("%s: unknown semantic clause '%s'", frontend.FormatPos(clause.At), clause.Name)
+		}
+	}
+	return nil
+}
+
 func findFuncDecl(world *module.World, name string) *frontend.FuncDecl {
 	for _, file := range world.Files {
 		for _, fn := range file.Funcs {
@@ -1247,9 +1287,14 @@ func checkStmts(
 			if err != nil {
 				return err
 			}
-			if id, ok := s.Value.(*frontend.IdentExpr); ok {
-				if _, borrowed := borrowedParams[id.Name]; borrowed && typeMayContainRegion(tname, types) {
-					return fmt.Errorf("%s: borrowed local '%s' cannot escape via return", frontend.FormatPos(s.At), id.Name)
+			if typeMayContainRegion(tname, types) {
+				if borrowedName, borrowed := state.borrowedParamOwner(regionID); borrowed {
+					return fmt.Errorf("%s: borrowed local '%s' cannot escape via return", frontend.FormatPos(s.At), borrowedName)
+				}
+				if id, ok := s.Value.(*frontend.IdentExpr); ok {
+					if _, borrowed := borrowedParams[id.Name]; borrowed {
+						return fmt.Errorf("%s: borrowed local '%s' cannot escape via return", frontend.FormatPos(s.At), id.Name)
+					}
 				}
 			}
 			if err := state.recordReturnRegion(regionID, s.At); err != nil {
@@ -1284,6 +1329,7 @@ func checkStmts(
 				return fmt.Errorf("%s: %v", frontend.FormatPos(s.At), err)
 			}
 			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+				state.exitIsland()
 				return err
 			}
 			state.exitIsland()
@@ -1412,16 +1458,24 @@ func checkStmts(
 			if !isConditionType(condType) {
 				return fmt.Errorf("%s: condition must be bool or i32/u8", frontend.FormatPos(s.At))
 			}
+			scopeIDs := branchScopeInfo{thenID: regionNone, elseID: regionNone}
+			if scoped, ok := state.ifScopes[s]; ok {
+				scopeIDs = scoped
+			}
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
-			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+			if err := withActiveScope(state, scopeIDs.thenID, func() error {
+				return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+			}); err != nil {
 				return err
 			}
 			thenVars := copyRegionVars(state.regionVars)
 			var elseVars map[string]int
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
-				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+				if err := withActiveScope(state, scopeIDs.elseID, func() error {
+					return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+				}); err != nil {
 					return err
 				}
 				elseVars = copyRegionVars(state.regionVars)
@@ -1439,16 +1493,24 @@ func checkStmts(
 			if _, ok := optionalElemName(valueType); !ok {
 				return fmt.Errorf("%s: if let requires optional value, got '%s'", frontend.FormatPos(s.At), valueType)
 			}
+			scopeIDs := branchScopeInfo{thenID: regionNone, elseID: regionNone}
+			if scoped, ok := state.ifLetScopes[s]; ok {
+				scopeIDs = scoped
+			}
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
-			if err := checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+			if err := withActiveScope(state, scopeIDs.thenID, func() error {
+				return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+			}); err != nil {
 				return err
 			}
 			thenVars := copyRegionVars(state.regionVars)
 			var elseVars map[string]int
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
-				if err := checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+				if err := withActiveScope(state, scopeIDs.elseID, func() error {
+					return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+				}); err != nil {
 					return err
 				}
 				elseVars = copyRegionVars(state.regionVars)
@@ -1466,10 +1528,16 @@ func checkStmts(
 			if !isConditionType(condType) {
 				return fmt.Errorf("%s: condition must be bool or i32/u8", frontend.FormatPos(s.At))
 			}
+			bodyScopeID := regionNone
+			if scoped, ok := state.whileScopes[s]; ok {
+				bodyScopeID = scoped
+			}
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
 			state.loopDepth++
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+			if err := withActiveScope(state, bodyScopeID, func() error {
+				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+			}); err != nil {
 				state.loopDepth--
 				return err
 			}
@@ -1504,10 +1572,16 @@ func checkStmts(
 					return fmt.Errorf("%s: for range bounds must be i32/u8", frontend.FormatPos(s.At))
 				}
 			}
+			bodyScopeID := regionNone
+			if scoped, ok := state.forScopes[s]; ok {
+				bodyScopeID = scoped
+			}
 			before := copyRegionVars(state.regionVars)
 			state.regionVars = copyRegionVars(before)
 			state.loopDepth++
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+			if err := withActiveScope(state, bodyScopeID, func() error {
+				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+			}); err != nil {
 				state.loopDepth--
 				return err
 			}
@@ -1533,6 +1607,7 @@ func checkStmts(
 			before := copyRegionVars(state.regionVars)
 			merged := copyRegionVars(before)
 			labels := []string{"fallthrough"}
+			caseScopes := state.matchCaseScopes[s]
 			for i, c := range s.Cases {
 				if seenDefault {
 					return fmt.Errorf("%s: match default must be last", frontend.FormatPos(c.At))
@@ -1567,7 +1642,13 @@ func checkStmts(
 					}
 				}
 				state.regionVars = copyRegionVars(before)
-				if err := checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+				caseScopeID := regionNone
+				if i < len(caseScopes) {
+					caseScopeID = caseScopes[i]
+				}
+				if err := withActiveScope(state, caseScopeID, func() error {
+					return checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+				}); err != nil {
 					return err
 				}
 				caseVars := copyRegionVars(state.regionVars)
@@ -1584,8 +1665,15 @@ func checkStmts(
 			}
 			markUnknownRegions(state)
 		case *frontend.UnsafeStmt:
+			scopeID := regionNone
+			if scoped, ok := state.unsafeScopes[s]; ok {
+				scopeID = scoped
+			}
 			state.enterUnsafe()
-			if err := checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects); err != nil {
+			if err := withActiveScope(state, scopeID, func() error {
+				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, state, effects)
+			}); err != nil {
+				state.exitUnsafe()
 				return err
 			}
 			state.exitUnsafe()
@@ -1754,13 +1842,30 @@ func collectLocals(
 				scopes.exitScope()
 			}
 		case *frontend.IfStmt:
+			thenScopeID := regionNone
+			elseScopeID := regionNone
+			if scopes != nil {
+				thenScopeID = scopes.enterScope()
+			}
 			if err := collectLocals(s.Then, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
 			}
+			if scopes != nil {
+				scopes.exitScope()
+			}
 			if len(s.Else) > 0 {
+				if scopes != nil {
+					elseScopeID = scopes.enterScope()
+				}
 				if err := collectLocals(s.Else, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 					return err
 				}
+				if scopes != nil {
+					scopes.exitScope()
+				}
+			}
+			if scopes != nil {
+				scopes.ifScopes[s] = branchScopeInfo{thenID: thenScopeID, elseID: elseScopeID}
 			}
 		case *frontend.IfLetStmt:
 			if _, exists := globals[s.Name]; exists {
@@ -1795,6 +1900,11 @@ func collectLocals(
 				scopes.localScopes[s.ValueLocal] = scopes.currentScopeID()
 			}
 			*slotIndex += valueInfo.SlotCount
+			thenScopeID := regionNone
+			elseScopeID := regionNone
+			if scopes != nil {
+				thenScopeID = scopes.enterScope()
+			}
 			locals[s.Name] = LocalInfo{
 				Base:      *slotIndex,
 				SlotCount: elemInfo.SlotCount,
@@ -1808,16 +1918,40 @@ func collectLocals(
 			if err := collectLocals(s.Then, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
 			}
+			if scopes != nil {
+				scopes.exitScope()
+			}
 			if len(s.Else) > 0 {
+				if scopes != nil {
+					elseScopeID = scopes.enterScope()
+				}
 				if err := collectLocals(s.Else, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 					return err
 				}
+				if scopes != nil {
+					scopes.exitScope()
+				}
+			}
+			if scopes != nil {
+				scopes.ifLetScopes[s] = branchScopeInfo{thenID: thenScopeID, elseID: elseScopeID}
 			}
 		case *frontend.WhileStmt:
+			scopeID := regionNone
+			if scopes != nil {
+				scopeID = scopes.enterScope()
+			}
 			if err := collectLocals(s.Body, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
 			}
+			if scopes != nil {
+				scopes.exitScope()
+				scopes.whileScopes[s] = scopeID
+			}
 		case *frontend.ForRangeStmt:
+			scopeID := regionNone
+			if scopes != nil {
+				scopeID = scopes.enterScope()
+			}
 			if _, exists := globals[s.Name]; exists {
 				return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(s.At), s.Name, s.Name)
 			}
@@ -1894,6 +2028,10 @@ func collectLocals(
 			if err := collectLocals(s.Body, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
 			}
+			if scopes != nil {
+				scopes.exitScope()
+				scopes.forScopes[s] = scopeID
+			}
 		case *frontend.MatchStmt:
 			scrutType, err := inferExprTypeForDecl(s.Value, locals, globals, funcs, types, module, imports)
 			if err != nil {
@@ -1917,7 +2055,13 @@ func collectLocals(
 				scopes.localScopes[s.ScrutineeLocal] = scopes.currentScopeID()
 			}
 			*slotIndex += info.SlotCount
-			for _, c := range s.Cases {
+			caseScopeIDs := make([]int, len(s.Cases))
+			for i, c := range s.Cases {
+				if scopes != nil {
+					caseScopeIDs[i] = scopes.enterScope()
+				} else {
+					caseScopeIDs[i] = regionNone
+				}
 				if some, ok := c.Pattern.(*frontend.SomePatternExpr); ok {
 					if info.Kind != TypeOptional {
 						return fmt.Errorf("%s: some pattern requires optional match value", frontend.FormatPos(some.At))
@@ -1946,10 +2090,24 @@ func collectLocals(
 				if err := collectLocals(c.Body, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 					return err
 				}
+				if scopes != nil {
+					scopes.exitScope()
+				}
+			}
+			if scopes != nil {
+				scopes.matchCaseScopes[s] = caseScopeIDs
 			}
 		case *frontend.UnsafeStmt:
+			scopeID := regionNone
+			if scopes != nil {
+				scopeID = scopes.enterScope()
+			}
 			if err := collectLocals(s.Body, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
+			}
+			if scopes != nil {
+				scopes.exitScope()
+				scopes.unsafeScopes[s] = scopeID
 			}
 		case *frontend.ExprStmt:
 		}

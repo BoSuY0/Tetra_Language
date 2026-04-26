@@ -112,6 +112,73 @@ func main() -> Int:
 	}
 }
 
+func TestOwnershipRejectsBorrowEscapeViaAliasReturn(t *testing.T) {
+	src := []byte(`
+func leak(x: borrow []u8) -> []u8:
+    let y: []u8 = x
+    return y
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected escaping borrowed alias error")
+	}
+	if !strings.Contains(err.Error(), "borrow") || !strings.Contains(err.Error(), "escape") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestOwnershipRejectsConsumeOfBorrowDerivedAlias(t *testing.T) {
+	src := []byte(`
+func take(x: consume []u8) -> Int:
+    return 0
+
+func leak(x: borrow []u8) -> Int:
+    let y: []u8 = x
+    return take(y)
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected borrowed consume rejection")
+	}
+	if !strings.Contains(err.Error(), "borrow") || !strings.Contains(err.Error(), "consume") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestOwnershipRejectsIfBlockLocalEscape(t *testing.T) {
+	src := []byte(`
+func main() -> Int:
+    if 1:
+        let x: Int = 1
+    return x
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected block-local scope error")
+	}
+	if !strings.Contains(err.Error(), "out of scope") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestOwnershipConsumeArgumentCannotBeReused(t *testing.T) {
 	src := []byte(`
 func take(x: consume Int) -> Int:

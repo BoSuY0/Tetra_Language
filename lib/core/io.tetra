@@ -1,0 +1,28 @@
+// Stable v1 core IO helpers promoted from lib.experimental.io.
+// Effects: capability, io, mmio
+// ```tetra doctest
+// func io_doctest() -> Int
+// uses alloc, capability, io, mem, mmio:
+//     unsafe:
+//         let io_cap: cap.io = lib.core.io.capability_io()
+//         let p: ptr = core.alloc_bytes(4)
+//         let _: Int = lib.core.io.mmio_write_i32(p, 9, io_cap)
+//         return lib.core.io.mmio_read_i32(p, io_cap)
+//     return 0
+// ```
+module lib.core.io
+
+func capability_io() -> cap.io
+uses capability, io:
+    unsafe:
+        return core.cap_io()
+
+func mmio_read_i32(addr: ptr, io_cap: cap.io) -> Int
+uses io, mmio:
+    unsafe:
+        return core.mmio_read_i32(addr, io_cap)
+
+func mmio_write_i32(addr: ptr, value: Int, io_cap: cap.io) -> Int
+uses io, mmio:
+    unsafe:
+        return core.mmio_write_i32(addr, value, io_cap)

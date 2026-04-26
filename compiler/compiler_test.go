@@ -487,6 +487,36 @@ func TestBuildCoreSlicesSmoke(t *testing.T) {
 	}
 }
 
+func TestBuildCoreIOSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_io_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreTestingSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_testing_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
 func TestBuildExtensionSmoke(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -1214,6 +1244,29 @@ func TestExprStmtQualified(t *testing.T) {
 	_, code := buildAndRunFiles(t, files, "app/game.tetra")
 	if code != 42 {
 		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildWASM32WASIHelloWritesModule(t *testing.T) {
+	tmp := t.TempDir()
+	outPath := filepath.Join(tmp, "app.wasm")
+	srcPath := filepath.Join("..", "examples", "hello.tetra")
+
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "wasm32-wasi", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build wasm32-wasi: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read wasm: %v", err)
+	}
+	if len(data) < 8 {
+		t.Fatalf("wasm too short: %d bytes", len(data))
+	}
+	if !bytes.Equal(data[:4], []byte{0x00, 0x61, 0x73, 0x6d}) {
+		t.Fatalf("missing wasm magic: % x", data[:4])
+	}
+	if !bytes.Equal(data[4:8], []byte{0x01, 0x00, 0x00, 0x00}) {
+		t.Fatalf("unexpected wasm version header: % x", data[4:8])
 	}
 }
 

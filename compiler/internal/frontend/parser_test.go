@@ -709,8 +709,6 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 		want string
 	}{
 		{"capsule", "capsule app:\n  name: \"app\"\n", "planned feature 'capsule'"},
-		{"closure literal", "fn main() -> i32 { val f = fn(x: i32) -> i32 { return x }; return 0 }", "planned feature 'closures'"},
-		{"semantic clause", "fn main() -> i32 budget(10) { return 0 }", "planned feature 'semantic clauses'"},
 		{"generic protocol requirement", "protocol P:\n  func id<T>(x: T) -> T\n", "generic protocol requirements are planned"},
 		{"generic struct", "struct Box<T>:\n  value: T\n", "generic structs are planned"},
 		{"enum payload case", "enum Option:\n  case some(Int)\n", "enum payload cases are planned"},
@@ -725,6 +723,55 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 				t.Fatalf("error = %q, want %q", err.Error(), tt.want)
 			}
 		})
+	}
+}
+
+func TestParseClosureLiteralExpression(t *testing.T) {
+	src := "fn main() -> i32 { let f: ptr = fn(x: i32) -> i32 { return x }; return 0 }"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) < 2 {
+		t.Fatalf("func count = %d, want at least 2 (main + synthetic closure)", len(prog.Funcs))
+	}
+	mainFn := prog.Funcs[0]
+	letStmt, ok := mainFn.Body[0].(*LetStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want LetStmt", mainFn.Body[0])
+	}
+	closure, ok := letStmt.Value.(*ClosureExpr)
+	if !ok {
+		t.Fatalf("let value = %T, want ClosureExpr", letStmt.Value)
+	}
+	if closure.Name == "" {
+		t.Fatalf("closure name = empty")
+	}
+	if !prog.Funcs[1].Synthetic || prog.Funcs[1].Name != closure.Name {
+		t.Fatalf("synthetic closure func mismatch: %#v", prog.Funcs[1])
+	}
+}
+
+func TestParseFunctionSemanticClauses(t *testing.T) {
+	src := "fn main() -> i32 noalloc noblock realtime nothrow budget(10) { return 0 }"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) != 1 {
+		t.Fatalf("func count = %d, want 1", len(prog.Funcs))
+	}
+	clauses := prog.Funcs[0].SemanticClauses
+	if len(clauses) != 5 {
+		t.Fatalf("semantic clauses = %d, want 5", len(clauses))
+	}
+	budget := clauses[len(clauses)-1]
+	if budget.Name != "budget" {
+		t.Fatalf("last clause = %q, want budget", budget.Name)
+	}
+	value, ok := budget.Value.(*NumberExpr)
+	if !ok || value.Value != 10 {
+		t.Fatalf("budget value = %#v, want NumberExpr(10)", budget.Value)
 	}
 }
 

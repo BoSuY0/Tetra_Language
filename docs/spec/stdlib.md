@@ -10,17 +10,21 @@ This page anchors stdlib-specific spec policies.
 The current stable stdlib modules under `lib/core` are:
 
 - `lib.core.capability`
+- `lib.core.io`
 - `lib.core.math`
 - `lib.core.memory`
 - `lib.core.slices`
 - `lib.core.strings`
+- `lib.core.testing`
 
 ## Promotion Notes
 
 Wave 7 promotions in this repository include:
 
+- `lib.experimental.io` -> `lib.core.io`
 - `lib.experimental.slices` -> `lib.core.slices`
 - `lib.experimental.strings` -> `lib.core.strings`
+- `lib.experimental.testing` -> `lib.core.testing`
 
 `lib.experimental.*` entries remain available as compatibility shims, but stable
 code should import `lib.core.*` directly.

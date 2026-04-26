@@ -345,8 +345,8 @@ func TestReleaseV06GateValidatesJSONDiagnosticShape(t *testing.T) {
 		`check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported"`,
 		`check_json_diagnostic_case "planned-actor-diagnostic" "planned feature 'actor'"`,
 		`--require-position`,
-		`./tetra build --diagnostics=json --target wasm32-wasi examples/flow_hello.tetra`,
-		`go run ./tools/cmd/validate-diagnostic --diagnostic "$tmp_dir/wasm-target-diagnostic.json" --severity error --contains "target backend not implemented: wasm32-wasi"`,
+		`./tetra build --target wasm32-wasi -o "$wasm_out" examples/flow_hello.tetra`,
+		`test "$(od -An -tx1 -N4 "$wasm_out" | tr -d ' \n')" = "0061736d"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release gate missing JSON diagnostic validation %q", want)
@@ -547,8 +547,8 @@ func TestTestAllValidatesJSONDiagnosticShape(t *testing.T) {
 		`check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported"`,
 		`check_json_diagnostic_case "planned-actor-diagnostic" "planned feature 'actor'"`,
 		`--require-position`,
-		`./tetra build --diagnostics=json --target wasm32-wasi examples/flow_hello.tetra`,
-		`go run ./tools/cmd/validate-diagnostic --diagnostic "$report_dir/wasm-target-diagnostic.json" --severity error --contains "target backend not implemented: wasm32-wasi"`,
+		`./tetra build --target wasm32-wasi -o "$wasm_out" examples/flow_hello.tetra`,
+		`test "$(od -An -tx1 -N4 "$wasm_out" | tr -d ' \n')" = "0061736d"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("test_all missing JSON diagnostic validation %q", want)
@@ -794,12 +794,18 @@ case "$cmd" in
     printf '%b\n' '- \x60func main() -> Int\x60'
     ;;
   build)
+    out=""
+    prev=""
     for arg in "$@"; do
-      if [[ "$arg" == "wasm32-wasi" ]]; then
-        echo '{"code":"TETRA0001","message":"target backend not implemented: wasm32-wasi (codegen/link/run blocked)","severity":"error"}' >&2
-        exit 1
+      if [[ "$prev" == "-o" ]]; then
+        out="$arg"
       fi
+      prev="$arg"
     done
+    if [[ -n "$out" ]]; then
+      mkdir -p "$(dirname "$out")"
+      printf '\x00\x61\x73\x6d\x01\x00\x00\x00' >"$out"
+    fi
     ;;
   targets)
     printf '{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi"],"planned":["wasm32-web"]}\n'

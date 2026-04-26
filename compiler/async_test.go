@@ -146,3 +146,51 @@ uses runtime:
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestTaskSpawnRejectsAsyncTarget(t *testing.T) {
+	src := []byte(`
+async func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    return core.task_spawn_i32("worker")
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected async task target rejection")
+	}
+	if !strings.Contains(err.Error(), "task_spawn_i32 target must be synchronous") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestActorSpawnRejectsThrowingTarget(t *testing.T) {
+	src := []byte(`
+enum SpawnErr:
+    case boom
+
+func worker() -> Int throws SpawnErr:
+    return 0
+
+func main() -> Int
+uses actors:
+    let a: actor = core.spawn("worker")
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected throwing actor target rejection")
+	}
+	if !strings.Contains(err.Error(), "spawn target must not throw") {
+		t.Fatalf("error = %v", err)
+	}
+}

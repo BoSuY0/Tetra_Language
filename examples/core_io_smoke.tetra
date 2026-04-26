@@ -1,0 +1,13 @@
+// Stable core io stdlib smoke.
+module examples.core_io_smoke
+
+import lib.core.io as io
+
+func main() -> Int
+uses alloc, capability, io, mem, mmio:
+    unsafe:
+        let io_cap: cap.io = io.capability_io()
+        let p: ptr = core.alloc_bytes(4)
+        let _: Int = io.mmio_write_i32(p, 42, io_cap)
+        return io.mmio_read_i32(p, io_cap)
+    return 0

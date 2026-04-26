@@ -69,6 +69,8 @@ type parser struct {
 	cur                   token
 	peek                  token
 	suppressStructLiteral bool
+	closureSeq            int
+	closureDecls          []*FuncDecl
 }
 
 func newParser(src []byte, filename string) (*parser, error) {
@@ -252,6 +254,7 @@ func (p *parser) parseFile() (*FileAST, error) {
 			return nil, p.unexpected("module/import/enum/struct/extension/var/val/fn")
 		}
 	}
+	file.Funcs = append(file.Funcs, p.closureDecls...)
 	return file, nil
 }
 
@@ -602,27 +605,9 @@ func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 		throws = parsed
 	}
 
-	var uses []string
-	if p.cur.typ == TokenUses {
-		if err := p.next(); err != nil {
-			return nil, err
-		}
-		for {
-			capability, err := p.parsePath()
-			if err != nil {
-				return nil, err
-			}
-			uses = append(uses, capability)
-			if p.cur.typ != TokenComma {
-				break
-			}
-			if err := p.next(); err != nil {
-				return nil, err
-			}
-		}
-	}
-	if feature, ok := plannedSemanticClauseFromToken(p.cur); ok {
-		return nil, plannedFeatureError(p.cur.pos, feature)
+	uses, clauses, err := p.parseFunctionModifiers()
+	if err != nil {
+		return nil, err
 	}
 
 	var body []Stmt
@@ -640,15 +625,108 @@ func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 		}
 		body = []Stmt{&ReturnStmt{At: returnPos, Value: expr}}
 	} else {
-		var err error
 		body, err = p.parseBlock()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	fn := &FuncDecl{Pos: nameTok.pos, Name: nameTok.lit, ExportName: exportName, Async: async, TypeParams: typeParams, ReturnType: retType, Throws: throws, HasThrows: hasThrows, Params: params, Uses: uses, Body: body}
+	fn := &FuncDecl{
+		Pos:             nameTok.pos,
+		Name:            nameTok.lit,
+		ExportName:      exportName,
+		Async:           async,
+		TypeParams:      typeParams,
+		ReturnType:      retType,
+		Throws:          throws,
+		HasThrows:       hasThrows,
+		Params:          params,
+		Uses:            uses,
+		SemanticClauses: clauses,
+		Body:            body,
+	}
 	return fn, nil
+}
+
+func (p *parser) parseFunctionModifiers() ([]string, []SemanticClause, error) {
+	var uses []string
+	var clauses []SemanticClause
+	seenUses := false
+	seenClauses := map[string]Position{}
+	for {
+		if p.cur.typ == TokenUses {
+			if seenUses {
+				return nil, nil, diagnosticErrorf(p.cur.pos, "duplicate uses clause")
+			}
+			seenUses = true
+			if err := p.next(); err != nil {
+				return nil, nil, err
+			}
+			for {
+				capability, err := p.parsePath()
+				if err != nil {
+					return nil, nil, err
+				}
+				uses = append(uses, capability)
+				if p.cur.typ != TokenComma {
+					break
+				}
+				if err := p.next(); err != nil {
+					return nil, nil, err
+				}
+			}
+			continue
+		}
+		clause, ok, err := p.parseSemanticClause()
+		if err != nil {
+			return nil, nil, err
+		}
+		if !ok {
+			break
+		}
+		if first, exists := seenClauses[clause.Name]; exists {
+			return nil, nil, diagnosticErrorf(clause.At, "duplicate semantic clause '%s' (first at %s)", clause.Name, FormatPos(first))
+		}
+		seenClauses[clause.Name] = clause.At
+		clauses = append(clauses, clause)
+	}
+	return uses, clauses, nil
+}
+
+func (p *parser) parseSemanticClause() (SemanticClause, bool, error) {
+	if p.cur.typ != TokenIdent {
+		return SemanticClause{}, false, nil
+	}
+	switch p.cur.lit {
+	case "noalloc", "noblock", "realtime", "nothrow":
+		clause := SemanticClause{At: p.cur.pos, Name: p.cur.lit}
+		if err := p.next(); err != nil {
+			return SemanticClause{}, false, err
+		}
+		if p.cur.typ == TokenLParen {
+			return SemanticClause{}, false, diagnosticErrorf(clause.At, "semantic clause '%s' does not take arguments", clause.Name)
+		}
+		return clause, true, nil
+	case "budget":
+		clause := SemanticClause{At: p.cur.pos, Name: "budget"}
+		if err := p.next(); err != nil {
+			return SemanticClause{}, false, err
+		}
+		if _, err := p.expect(TokenLParen); err != nil {
+			return SemanticClause{}, false, err
+		}
+		value, err := p.parseExpr()
+		if err != nil {
+			return SemanticClause{}, false, err
+		}
+		if _, err := p.expect(TokenRParen); err != nil {
+			return SemanticClause{}, false, err
+		}
+		clause.Value = value
+		return clause, true, nil
+	default:
+		return SemanticClause{}, false, nil
+	}
 }
 
 func (p *parser) parseTypeParams() ([]string, error) {
@@ -1159,7 +1237,15 @@ func (p *parser) parseStmt() (Stmt, error) {
 	case TokenMatch:
 		return p.parseMatchStmt()
 	case TokenFn, TokenFun:
-		return nil, plannedFeatureError(p.cur.pos, "closures")
+		pos := p.cur.pos
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if err := p.consumeOptionalSemicolon(); err != nil {
+			return nil, err
+		}
+		return &ExprStmt{At: pos, Expr: expr}, nil
 	case TokenIdent:
 		if feature, ok := plannedFeatureFromToken(p.cur); ok {
 			return nil, plannedFeatureError(p.cur.pos, feature)
@@ -1291,18 +1377,6 @@ func plannedFeatureFromToken(tok token) (string, bool) {
 		return tok.lit, true
 	case "closure":
 		return "closures", true
-	default:
-		return "", false
-	}
-}
-
-func plannedSemanticClauseFromToken(tok token) (string, bool) {
-	if tok.typ != TokenIdent {
-		return "", false
-	}
-	switch tok.lit {
-	case "budget", "noalloc", "noblock", "realtime", "nothrow":
-		return "semantic clauses", true
 	default:
 		return "", false
 	}
@@ -1882,10 +1956,91 @@ func (p *parser) parsePrimary() (Expr, error) {
 		}
 		return p.parsePostfix(expr)
 	case TokenFn, TokenFun:
-		return nil, plannedFeatureError(p.cur.pos, "closures")
+		return p.parseClosureExpr()
 	default:
 		return nil, p.unexpected("expression")
 	}
+}
+
+func (p *parser) parseClosureExpr() (Expr, error) {
+	pos := p.cur.pos
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	if p.cur.typ == TokenLess {
+		return nil, diagnosticErrorf(pos, "generic closures are not supported yet")
+	}
+	if _, err := p.expect(TokenLParen); err != nil {
+		return nil, err
+	}
+	params, err := p.parseParams()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenRParen); err != nil {
+		return nil, err
+	}
+	switch p.cur.typ {
+	case TokenArrow, TokenColon:
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, p.unexpected("-> or :")
+	}
+	retType, err := p.parseTypeRef()
+	if err != nil {
+		return nil, err
+	}
+	var throws TypeRef
+	hasThrows := false
+	if p.cur.typ == TokenThrows {
+		hasThrows = true
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		parsed, err := p.parseTypeRef()
+		if err != nil {
+			return nil, err
+		}
+		throws = parsed
+	}
+	uses, clauses, err := p.parseFunctionModifiers()
+	if err != nil {
+		return nil, err
+	}
+	var body []Stmt
+	if p.cur.typ == TokenAssign {
+		returnPos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		expr, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		body = []Stmt{&ReturnStmt{At: returnPos, Value: expr}}
+	} else {
+		body, err = p.parseBlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+	p.closureSeq++
+	name := "__closure_" + itoa(pos.Line) + "_" + itoa(pos.Col) + "_" + itoa(p.closureSeq)
+	p.closureDecls = append(p.closureDecls, &FuncDecl{
+		Pos:             pos,
+		Name:            name,
+		Synthetic:       true,
+		ReturnType:      retType,
+		Throws:          throws,
+		HasThrows:       hasThrows,
+		Params:          params,
+		Uses:            uses,
+		SemanticClauses: clauses,
+		Body:            body,
+	})
+	return &ClosureExpr{At: pos, Name: name}, nil
 }
 
 func (p *parser) parsePostfix(base Expr) (Expr, error) {

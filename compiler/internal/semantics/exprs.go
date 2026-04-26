@@ -120,6 +120,8 @@ func checkExprWithEffects(
 		}
 	case *frontend.CallExpr:
 		return checkCallExprWithEffects(e, locals, globals, funcs, types, module, imports, state, effects)
+	case *frontend.ClosureExpr:
+		return "ptr", regionNone, nil
 	case *frontend.TryExpr:
 		if state.throwType == "" {
 			return "", regionNone, fmt.Errorf("%s: try is only allowed in throwing functions", frontend.FormatPos(e.At))
@@ -340,6 +342,9 @@ func checkCallExprWithEffects(
 			if !ok {
 				return "", regionNone, fmt.Errorf("%s: consume argument for '%s' must be a local value", frontend.FormatPos(arg.Pos()), resolved)
 			}
+			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+				return "", regionNone, fmt.Errorf("%s: borrowed value derived from '%s' cannot be consumed by '%s'", frontend.FormatPos(arg.Pos()), borrowedName, resolved)
+			}
 			if firstPos, exists := inoutArgs[id.Name]; exists {
 				return "", regionNone, fmt.Errorf("%s: consumed argument '%s' aliases inout argument in call to '%s' (inout at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
 			}
@@ -359,6 +364,9 @@ func checkCallExprWithEffects(
 			id, ok := arg.(*frontend.IdentExpr)
 			if !ok {
 				return "", regionNone, fmt.Errorf("%s: inout argument for '%s' must be a mutable local value", frontend.FormatPos(arg.Pos()), resolved)
+			}
+			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+				return "", regionNone, fmt.Errorf("%s: borrowed value derived from '%s' cannot be passed as inout to '%s'", frontend.FormatPos(arg.Pos()), borrowedName, resolved)
 			}
 			local, ok := locals[id.Name]
 			if !ok || !local.Mutable {
@@ -414,6 +422,12 @@ func checkCallExprWithEffects(
 		if len(targetSig.ParamTypes) != 0 || targetSig.ReturnType != "i32" {
 			return "", regionNone, fmt.Errorf("%s: spawn target must have shape fun %s(): i32", frontend.FormatPos(e.At), target)
 		}
+		if targetSig.Async {
+			return "", regionNone, fmt.Errorf("%s: spawn target must be synchronous", frontend.FormatPos(e.At))
+		}
+		if targetSig.ThrowsType != "" {
+			return "", regionNone, fmt.Errorf("%s: spawn target must not throw", frontend.FormatPos(e.At))
+		}
 		lit.Value = []byte(target)
 	}
 	if resolved == "core.task_spawn_i32" {
@@ -441,6 +455,12 @@ func checkCallExprWithEffects(
 		}
 		if len(targetSig.ParamTypes) != 0 || targetSig.ReturnType != "i32" {
 			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target must have shape func %s() -> i32", frontend.FormatPos(e.At), target)
+		}
+		if targetSig.Async {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target must be synchronous", frontend.FormatPos(e.At))
+		}
+		if targetSig.ThrowsType != "" {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target must not throw", frontend.FormatPos(e.At))
 		}
 		lit.Value = []byte(target)
 	}

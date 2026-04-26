@@ -12,17 +12,34 @@ const (
 	regionParamStart = -3
 )
 
+type branchScopeInfo struct {
+	thenID int
+	elseID int
+}
+
 type scopeInfo struct {
-	localScopes  map[string]int
-	islandScopes map[string]int
-	scopeStack   []int
-	nextScopeID  int
+	localScopes     map[string]int
+	islandScopes    map[string]int
+	ifScopes        map[*frontend.IfStmt]branchScopeInfo
+	ifLetScopes     map[*frontend.IfLetStmt]branchScopeInfo
+	whileScopes     map[*frontend.WhileStmt]int
+	forScopes       map[*frontend.ForRangeStmt]int
+	matchCaseScopes map[*frontend.MatchStmt][]int
+	unsafeScopes    map[*frontend.UnsafeStmt]int
+	scopeStack      []int
+	nextScopeID     int
 }
 
 func newScopeInfo() *scopeInfo {
 	return &scopeInfo{
-		localScopes:  make(map[string]int),
-		islandScopes: make(map[string]int),
+		localScopes:     make(map[string]int),
+		islandScopes:    make(map[string]int),
+		ifScopes:        make(map[*frontend.IfStmt]branchScopeInfo),
+		ifLetScopes:     make(map[*frontend.IfLetStmt]branchScopeInfo),
+		whileScopes:     make(map[*frontend.WhileStmt]int),
+		forScopes:       make(map[*frontend.ForRangeStmt]int),
+		matchCaseScopes: make(map[*frontend.MatchStmt][]int),
+		unsafeScopes:    make(map[*frontend.UnsafeStmt]int),
 	}
 }
 
@@ -48,44 +65,76 @@ func (s *scopeInfo) exitScope() {
 }
 
 type regionState struct {
-	localScopes      map[string]int
-	islandScopes     map[string]int
-	islandNameByID   map[int]string
-	regionVars       map[string]int
-	paramRegionIndex map[int]int
-	paramNames       []string
-	unknownVars      map[string]bool
-	unknownConflicts map[string]regionConflict
-	consumedVars     map[string]frontend.Position
-	activeScopes     []int
-	activeIndex      map[int]int
-	unsafeDepth      int
-	loopDepth        int
-	throwType        string
-	allowThrowDepth  int
-	allowThrowCall   *frontend.CallExpr
-	async            bool
-	allowAwaitDepth  int
-	allowAwaitCall   *frontend.CallExpr
-	returnRegion     int
-	returnRegionSet  bool
+	localScopes         map[string]int
+	islandScopes        map[string]int
+	ifScopes            map[*frontend.IfStmt]branchScopeInfo
+	ifLetScopes         map[*frontend.IfLetStmt]branchScopeInfo
+	whileScopes         map[*frontend.WhileStmt]int
+	forScopes           map[*frontend.ForRangeStmt]int
+	matchCaseScopes     map[*frontend.MatchStmt][]int
+	unsafeScopes        map[*frontend.UnsafeStmt]int
+	islandNameByID      map[int]string
+	regionVars          map[string]int
+	paramRegionIndex    map[int]int
+	borrowedParamRegion map[int]string
+	paramNames          []string
+	unknownVars         map[string]bool
+	unknownConflicts    map[string]regionConflict
+	consumedVars        map[string]frontend.Position
+	activeScopes        []int
+	activeIndex         map[int]int
+	unsafeDepth         int
+	loopDepth           int
+	throwType           string
+	allowThrowDepth     int
+	allowThrowCall      *frontend.CallExpr
+	async               bool
+	allowAwaitDepth     int
+	allowAwaitCall      *frontend.CallExpr
+	returnRegion        int
+	returnRegionSet     bool
 }
 
-func newRegionState(localScopes map[string]int, islandScopes map[string]int) *regionState {
+func newRegionState(scopes *scopeInfo) *regionState {
+	localScopes := make(map[string]int)
+	islandScopes := make(map[string]int)
+	var ifScopes map[*frontend.IfStmt]branchScopeInfo
+	var ifLetScopes map[*frontend.IfLetStmt]branchScopeInfo
+	var whileScopes map[*frontend.WhileStmt]int
+	var forScopes map[*frontend.ForRangeStmt]int
+	var matchCaseScopes map[*frontend.MatchStmt][]int
+	var unsafeScopes map[*frontend.UnsafeStmt]int
+	if scopes != nil {
+		localScopes = scopes.localScopes
+		islandScopes = scopes.islandScopes
+		ifScopes = scopes.ifScopes
+		ifLetScopes = scopes.ifLetScopes
+		whileScopes = scopes.whileScopes
+		forScopes = scopes.forScopes
+		matchCaseScopes = scopes.matchCaseScopes
+		unsafeScopes = scopes.unsafeScopes
+	}
 	islandNameByID := make(map[int]string, len(islandScopes))
 	for name, id := range islandScopes {
 		islandNameByID[id] = name
 	}
 	return &regionState{
-		localScopes:      localScopes,
-		islandScopes:     islandScopes,
-		islandNameByID:   islandNameByID,
-		regionVars:       make(map[string]int),
-		paramRegionIndex: make(map[int]int),
-		unknownConflicts: make(map[string]regionConflict),
-		unknownVars:      make(map[string]bool),
-		consumedVars:     make(map[string]frontend.Position),
-		activeIndex:      make(map[int]int),
+		localScopes:         localScopes,
+		islandScopes:        islandScopes,
+		ifScopes:            ifScopes,
+		ifLetScopes:         ifLetScopes,
+		whileScopes:         whileScopes,
+		forScopes:           forScopes,
+		matchCaseScopes:     matchCaseScopes,
+		unsafeScopes:        unsafeScopes,
+		islandNameByID:      islandNameByID,
+		regionVars:          make(map[string]int),
+		paramRegionIndex:    make(map[int]int),
+		borrowedParamRegion: make(map[int]string),
+		unknownConflicts:    make(map[string]regionConflict),
+		unknownVars:         make(map[string]bool),
+		consumedVars:        make(map[string]frontend.Position),
+		activeIndex:         make(map[int]int),
 	}
 }
 
@@ -126,8 +175,7 @@ func (s *regionState) enterIsland(name string) error {
 	if !ok {
 		return fmt.Errorf("unknown island scope '%s'", name)
 	}
-	s.activeScopes = append(s.activeScopes, id)
-	s.activeIndex[id] = len(s.activeScopes) - 1
+	s.activateScope(id)
 	s.regionVars[name] = id
 	return nil
 }
@@ -136,9 +184,34 @@ func (s *regionState) exitIsland() {
 	if len(s.activeScopes) == 0 {
 		return
 	}
-	id := s.activeScopes[len(s.activeScopes)-1]
+	s.deactivateScope(s.activeScopes[len(s.activeScopes)-1])
+}
+
+func (s *regionState) activateScope(id int) {
+	if s == nil || id < 0 {
+		return
+	}
+	if _, exists := s.activeIndex[id]; exists {
+		return
+	}
+	s.activeScopes = append(s.activeScopes, id)
+	s.activeIndex[id] = len(s.activeScopes) - 1
+}
+
+func (s *regionState) deactivateScope(id int) {
+	if s == nil || id < 0 {
+		return
+	}
+	idx, ok := s.activeIndex[id]
+	if !ok {
+		return
+	}
 	delete(s.activeIndex, id)
+	copy(s.activeScopes[idx:], s.activeScopes[idx+1:])
 	s.activeScopes = s.activeScopes[:len(s.activeScopes)-1]
+	for i := idx; i < len(s.activeScopes); i++ {
+		s.activeIndex[s.activeScopes[i]] = i
+	}
 }
 
 func (s *regionState) isScopeActive(id int) bool {
@@ -262,9 +335,20 @@ func initParamRegions(params []frontend.ParamDecl, state *regionState, types map
 		if typeMayContainRegion(param.Type.Name, types) {
 			state.regionVars[param.Name] = next
 			state.paramRegionIndex[next] = i
+			if param.Ownership == "borrow" {
+				state.borrowedParamRegion[next] = param.Name
+			}
 			next--
 		}
 	}
+}
+
+func (s *regionState) borrowedParamOwner(regionID int) (string, bool) {
+	if s == nil || regionID >= regionNone {
+		return "", false
+	}
+	name, ok := s.borrowedParamRegion[regionID]
+	return name, ok
 }
 
 func formatRegionID(state *regionState, regionID int) string {
@@ -426,4 +510,13 @@ func checkLocalScope(name string, state *regionState, pos frontend.Position) err
 		return fmt.Errorf("%s: identifier '%s' is out of scope", frontend.FormatPos(pos), name)
 	}
 	return nil
+}
+
+func withActiveScope(state *regionState, scopeID int, run func() error) error {
+	if state == nil || scopeID == regionNone {
+		return run()
+	}
+	state.activateScope(scopeID)
+	defer state.deactivateScope(scopeID)
+	return run()
 }

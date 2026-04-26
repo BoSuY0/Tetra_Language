@@ -32,8 +32,8 @@
 ### 1.2 Missing Syntax Features
 
 - [x] Implement function call argument labels without ambiguity with struct constructors.
-- [ ] Implement closures (`fn`/`fun` expression form) with parser + semantics + lowering support.
-- [ ] Implement semantic clauses needed for v1 syntax (or remove from v1 spec if not required).
+- [x] Implement closures (`fn`/`fun` expression form) with parser + semantics + lowering support.
+- [x] Implement semantic clauses needed for v1 syntax (or remove from v1 spec if not required).
 
 ### 1.3 Frontend Validation
 
@@ -169,7 +169,7 @@ go test ./compiler/... -run 'Async|Task|Actor|Runtime'
 ### 6.2 WASM Targets (Mandatory For v1)
 
 - [x] Implement `wasm32-wasi` target parsing as supported.
-- [ ] Implement `wasm32-wasi` codegen/object/link/run path.
+- [x] Implement `wasm32-wasi` codegen/object/link/run path.
 - [ ] Implement `wasm32-web` codegen/package path.
 - [ ] Add smoke coverage for both WASM targets.
 - [ ] Validate incremental build/check cache behavior for native and WASM paths.
@@ -197,12 +197,12 @@ go test ./compiler/... -run 'Target|WASM|ABI|Object|Link|Cache|Deterministic'
 - [x] Promote `strings`.
 - [x] Promote `slices`.
 - [x] Promote `math`.
-- [ ] Promote `io`.
+- [x] Promote `io`.
 - [ ] Promote `filesystem`.
 - [ ] Promote `networking`.
 - [ ] Promote `async`.
 - [ ] Promote `sync`.
-- [ ] Promote `testing`.
+- [x] Promote `testing`.
 - [ ] Promote `serialization`.
 - [ ] Promote `time`.
 - [ ] Promote `crypto interfaces`.

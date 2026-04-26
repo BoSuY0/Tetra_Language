@@ -263,6 +263,8 @@ func monomorphizeExpr(expr frontend.Expr, env map[string]string, generics map[st
 		}
 		e.Name = name
 		return substituteGenericTypeName(generic.ReturnType, subst), nil
+	case *frontend.ClosureExpr:
+		return "ptr", nil
 	default:
 		return "", nil
 	}
@@ -288,6 +290,7 @@ func cloneGenericFunc(fn *frontend.FuncDecl, name string, subst map[string]strin
 	out.ReturnType = substituteTypeRef(fn.ReturnType, subst)
 	out.Throws = substituteTypeRef(fn.Throws, subst)
 	out.Uses = append([]string(nil), fn.Uses...)
+	out.SemanticClauses = append([]frontend.SemanticClause(nil), fn.SemanticClauses...)
 	out.Body = cloneStmts(fn.Body, subst)
 	return &out
 }
@@ -403,6 +406,8 @@ func cloneExpr(expr frontend.Expr) frontend.Expr {
 			fields = append(fields, frontend.StructFieldInit{At: field.At, Name: field.Name, Value: cloneExpr(field.Value)})
 		}
 		return &frontend.StructLitExpr{At: e.At, Type: e.Type, Fields: fields}
+	case *frontend.ClosureExpr:
+		return &frontend.ClosureExpr{At: e.At, Name: e.Name}
 	default:
 		return expr
 	}

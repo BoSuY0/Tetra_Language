@@ -245,7 +245,7 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 		p.blank()
 	}
 	for _, fn := range file.Funcs {
-		if fn.ExtensionOf != "" {
+		if fn.ExtensionOf != "" || fn.Synthetic {
 			continue
 		}
 		p.funcDecl(fn)

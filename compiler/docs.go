@@ -177,7 +177,7 @@ func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {
 	if len(file.Funcs) > 0 {
 		b.WriteString("### Functions\n\n")
 		for _, fn := range file.Funcs {
-			if fn.ExtensionOf != "" {
+			if fn.ExtensionOf != "" || fn.Synthetic {
 				continue
 			}
 			fmt.Fprintf(b, "- `%s`\n", formatLSPFuncDetail(fn))

@@ -39,9 +39,14 @@ uses io:
 ```
 
 Semantic function clauses (`budget`, `noalloc`, `noblock`, `realtime`,
-`nothrow`) are explicitly deferred on the current v0.6 path. When these
-keywords appear after a function signature, the parser reports a planned-feature
-diagnostic for semantic clauses.
+`nothrow`) are accepted in the MVP parser. Current v0.18 behavior is:
+
+- `nothrow` is rejected when combined with `throws`.
+- `budget(<int-constant>)` requires a non-negative integer constant.
+- `noalloc`, `noblock`, and `realtime` are accepted as marker clauses.
+
+These clauses are currently syntax/semantic metadata only (no codegen or
+scheduler/runtime enforcement yet).
 
 v0.17 enforces the first MVP effect set: `alloc`, `mem`, `io`, `mmio`,
 `islands`, `capability`, `link`, `control`, `runtime`, and `actors`.
@@ -53,9 +58,18 @@ struct constructors such as `Vec2(x: 40)`, so lowercase/function-like callees
 with labels currently produce an explicit planned-feature diagnostic instead of
 being treated as calls.
 
-Closures are also explicitly deferred for v0.6. Function-literal attempts
-(`fn`/`fun` in statement or expression position) produce a planned-feature
-diagnostic for closures.
+Closures are accepted in MVP as non-capturing function literals:
+
+```tetra
+func main() -> Int:
+    let f: ptr = fn(x: Int) -> Int:
+        return x
+    return 0
+```
+
+The current MVP lowering materializes closure literals as synthetic module
+functions and a `ptr` value to that symbol. Capturing outer locals and invoking
+function pointers are planned for later releases.
 
 Tests:
 
@@ -355,8 +369,8 @@ The compiler intentionally reports planned-feature diagnostics for `actor`,
 `view`, `state`, `property`, and `capsule` language declarations.
 
 Enum payloads, richer payload match patterns, exhaustive integer match checking,
-collection `for`, closures, semantic clauses (`budget`, `noalloc`, `noblock`,
-`realtime`, `nothrow`), catch/recovery syntax, effect polymorphism/inference,
-full ownership/lifetime solving, protocol-bound generics, extension conformance
+collection `for` exhaustiveness improvements, closure captures/function-pointer
+invocation, catch/recovery syntax, effect polymorphism/inference, full
+ownership/lifetime solving, protocol-bound generics, extension conformance
 clauses, task cancellation, and structured concurrency are planned for later
 releases.

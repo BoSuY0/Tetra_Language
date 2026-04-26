@@ -196,11 +196,15 @@ Stable core stdlib modules:
 import lib.core.math as math
 import lib.core.capability as cap
 import lib.core.memory as mem
+import lib.core.io as io
+import lib.core.testing as testing
 ```
 
 `lib.core.math` provides small `i32` helpers. `lib.core.capability` and
 `lib.core.memory` wrap the current explicit capability/memory builtins; callers
 still declare matching `uses` effects and raw memory remains unsafe.
+`lib.core.io` wraps capability-gated MMIO helpers and `lib.core.testing` offers
+small assertion/status combinators for smoke/test-style flows.
 
 Local Eco/Capsule alpha commands:
 

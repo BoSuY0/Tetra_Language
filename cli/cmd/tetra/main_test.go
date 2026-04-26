@@ -293,6 +293,37 @@ func TestSmokeCommandListsWASMBuildOnlyTarget(t *testing.T) {
 	}
 }
 
+func TestSmokeCommandBuildsWASMTargetWithoutRun(t *testing.T) {
+	var stdout bytes.Buffer
+	reportPath := filepath.Join(t.TempDir(), "wasm-smoke.json")
+	code := runCLI([]string{"smoke", "--target", "wasm32-wasi", "--run=false", "--report", reportPath}, &stdout, &bytes.Buffer{})
+	if code != 0 {
+		t.Fatalf("smoke exit code = %d, stdout=%q", code, stdout.String())
+	}
+	var report smokeReport
+	raw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read smoke report: %v", err)
+	}
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("decode smoke report: %v\n%s", err, string(raw))
+	}
+	if report.Target != "wasm32-wasi" || report.Total == 0 {
+		t.Fatalf("wasm smoke report = %#v", report)
+	}
+	if report.Failed != 0 || report.Passed != report.Total {
+		t.Fatalf("wasm smoke counts = %#v", report)
+	}
+	for _, c := range report.Cases {
+		if !strings.HasSuffix(c.OutPath, ".wasm") {
+			t.Fatalf("expected wasm output path, case=%#v", c)
+		}
+		if c.Error != "" {
+			t.Fatalf("unexpected wasm smoke error for %s: %s", c.Name, c.Error)
+		}
+	}
+}
+
 func TestSmokeCommandRejectsFormatWithoutList(t *testing.T) {
 	var stderr bytes.Buffer
 	code := runCLI([]string{"smoke", "--format=json"}, &bytes.Buffer{}, &stderr)
@@ -775,22 +806,31 @@ func TestBuildCommandJSONDiagnosticsForOptionValidation(t *testing.T) {
 	}
 }
 
-func TestBuildCommandJSONDiagnosticsForWASMBuildOnlyTarget(t *testing.T) {
+func TestBuildCommandWASMTargetWritesWasmModule(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	if err := os.WriteFile(srcPath, []byte("func main() -> Int\nuses io:\n    print(\"wasm hello\\n\")\n    return 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	outPath := filepath.Join(t.TempDir(), "app.wasm")
+	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := runCLI([]string{"build", "--diagnostics=json", "--target", "wasm32-wasi", "examples/hello.tetra"}, &bytes.Buffer{}, &stderr)
-	if code != 1 {
-		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+	code := runCLI([]string{"build", "--target", "wasm32-wasi", "-o", outPath, srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	var diag struct {
-		Code     string `json:"code"`
-		Message  string `json:"message"`
-		Severity string `json:"severity"`
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
 	}
-	if err := json.Unmarshal(stderr.Bytes(), &diag); err != nil {
-		t.Fatalf("json diagnostic: %v\n%s", err, stderr.String())
+	if len(data) < 8 {
+		t.Fatalf("wasm too short: %d bytes", len(data))
 	}
-	if diag.Code != "TETRA0001" || diag.Severity != "error" || !strings.Contains(diag.Message, "target backend not implemented: wasm32-wasi") {
-		t.Fatalf("diagnostic = %#v", diag)
+	if !bytes.Equal(data[:4], []byte{0x00, 0x61, 0x73, 0x6d}) {
+		t.Fatalf("missing wasm magic: % x", data[:4])
+	}
+	if !bytes.Equal(data[4:8], []byte{0x01, 0x00, 0x00, 0x00}) {
+		t.Fatalf("unexpected wasm version header: % x", data[4:8])
 	}
 }
 

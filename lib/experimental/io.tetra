@@ -1,0 +1,18 @@
+// Experimental io helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.io directly.
+module lib.experimental.io
+
+import lib.core.io as stable_io
+
+func capability_io() -> cap.io
+uses capability, io:
+    return stable_io.capability_io()
+
+func mmio_read_i32(addr: ptr, io_cap: cap.io) -> Int
+uses io, mmio:
+    return stable_io.mmio_read_i32(addr, io_cap)
+
+func mmio_write_i32(addr: ptr, value: Int, io_cap: cap.io) -> Int
+uses io, mmio:
+    return stable_io.mmio_write_i32(addr, value, io_cap)

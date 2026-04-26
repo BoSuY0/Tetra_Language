@@ -1,0 +1,18 @@
+// Experimental testing helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.testing directly.
+module lib.experimental.testing
+
+import lib.core.testing as stable_testing
+
+func assert_true(value: Bool) -> Int:
+    return stable_testing.assert_true(value)
+
+func assert_false(value: Bool) -> Int:
+    return stable_testing.assert_false(value)
+
+func assert_eq_i32(actual: Int, expected: Int) -> Int:
+    return stable_testing.assert_eq_i32(actual, expected)
+
+func combine(lhs: Int, rhs: Int) -> Int:
+    return stable_testing.combine(lhs, rhs)

@@ -1423,10 +1423,13 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 2
 	}
-	host, ok := hostTarget()
-	if !ok || host != tgt.Triple {
-		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run target %s on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH))
-		return 2
+	isWASI := tgt.Triple == "wasm32-wasi"
+	if !isWASI {
+		host, ok := hostTarget()
+		if !ok || host != tgt.Triple {
+			writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run target %s on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH))
+			return 2
+		}
 	}
 	output := *out
 	tmpDir := ""
@@ -1447,6 +1450,14 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	if _, err := compiler.BuildFileWithStatsOpt(input, output, tgt.Triple, opt); err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 1
+	}
+	if isWASI {
+		exit, err := execWASMProgram(output, stdout, stderr)
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		return exit
 	}
 	return execProgram(output, stdout, stderr)
 }
@@ -1669,7 +1680,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 			fmt.Fprintln(stderr, err)
 			return 2
 		}
-		return writeSmokeList(stdout, stderr, smokeCases(*islandsDebug), *islandsDebug, *listFormat, tgt)
+		return writeSmokeList(stdout, stderr, smokeCasesForTarget(*islandsDebug, tgt), *islandsDebug, *listFormat, tgt)
 	}
 	if *listFormat != "text" {
 		fmt.Fprintln(stderr, "--format is only supported with --list")
@@ -1697,7 +1708,17 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	if hostOK {
 		host = hostTriple
 	}
+	cases := smokeCasesForTarget(*islandsDebug, tgt)
 	shouldRun := *runBuilt && hostOK && hostTriple == tgt.Triple
+	runWASI := false
+	if *runBuilt && tgt.Triple == "wasm32-wasi" {
+		runWASI = true
+		shouldRun = true
+		if _, err := exec.LookPath("wasmtime"); err != nil {
+			fmt.Fprintln(stderr, "cannot run target wasm32-wasi: missing 'wasmtime' in PATH")
+			return 2
+		}
+	}
 	opt, err := buildOptions("exe", *runtimeMode, *islandsDebug, "", nil, *jobs)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -1712,7 +1733,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 		GitHead:      gitHead(repoRoot),
 		IslandsDebug: *islandsDebug,
 	}
-	for _, c := range smokeCases(*islandsDebug) {
+	for _, c := range cases {
 		outPath := filepath.Join(tmpDir, c.name+tgt.ExeExt)
 		srcAbs := filepath.Join(repoRoot, filepath.FromSlash(c.srcPath))
 		caseReport := smokeCaseReport{
@@ -1727,9 +1748,20 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 			continue
 		}
 		if shouldRun {
-			actual := execProgram(outPath, io.Discard, io.Discard)
-			caseReport.ActualExit = &actual
 			caseReport.Ran = true
+			var actual int
+			if runWASI {
+				actual, err = execWASMProgram(outPath, io.Discard, io.Discard)
+				if err != nil {
+					caseReport.Error = "run: " + err.Error()
+					caseReport.Pass = false
+					report.Cases = append(report.Cases, caseReport)
+					continue
+				}
+			} else {
+				actual = execProgram(outPath, io.Discard, io.Discard)
+			}
+			caseReport.ActualExit = &actual
 			caseReport.Pass = actual == c.expectedExit
 		} else {
 			caseReport.Pass = true
@@ -1899,6 +1931,16 @@ func smokeCases(islandsDebug bool) []smokeCase {
 	return cases
 }
 
+func smokeCasesForTarget(islandsDebug bool, tgt ctarget.Target) []smokeCase {
+	if tgt.Triple == "wasm32-wasi" {
+		return []smokeCase{
+			{name: "flow_hello", srcPath: "examples/flow_hello.tetra", expectedExit: 0},
+			{name: "effects_io_smoke", srcPath: "examples/effects_io_smoke.tetra", expectedExit: 0},
+		}
+	}
+	return smokeCases(islandsDebug)
+}
+
 func defaultTarget() string {
 	if target, ok := hostTarget(); ok {
 		return target
@@ -1935,6 +1977,26 @@ func execProgram(path string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func execWASMProgram(path string, stdout io.Writer, stderr io.Writer) (int, error) {
+	runner, err := exec.LookPath("wasmtime")
+	if err != nil {
+		return 0, fmt.Errorf("cannot run target wasm32-wasi: missing 'wasmtime' in PATH")
+	}
+	cmd := exec.Command(runner, "run", path)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		if exit, ok := err.(*exec.ExitError); ok {
+			return exit.ExitCode(), nil
+		}
+		return 0, err
+	}
+	if cmd.ProcessState == nil {
+		return 0, nil
+	}
+	return cmd.ProcessState.ExitCode(), nil
 }
 
 func findRepoRoot() (string, error) {
