@@ -1,0 +1,37 @@
+// Stable v1 core serialization helpers promoted from lib.experimental.serialization.
+// Effects: mem
+// ```tetra doctest
+// func serialization_doctest() -> Int:
+//     let packed: Int = lib.core.serialization.pack_u8_pair(1, 42)
+//     return lib.core.serialization.unpack_u8_low(packed)
+// ```
+module lib.core.serialization
+
+func clamp_u8(value: Int) -> Int:
+    if value < 0:
+        return 0
+    if value > 255:
+        return 255
+    return value
+
+func pack_u8_pair(high: Int, low: Int) -> Int:
+    let hi: Int = clamp_u8(high)
+    let lo: Int = clamp_u8(low)
+    return hi * 256 + lo
+
+func unpack_u8_high(packed: Int) -> Int:
+    if packed < 0:
+        return 0
+    return clamp_u8(packed / 256)
+
+func unpack_u8_low(packed: Int) -> Int:
+    if packed < 0:
+        return 0
+    return clamp_u8(packed % 256)
+
+func checksum_u8(values: []u8) -> Int
+uses mem:
+    var total: Int = 0
+    for value in values:
+        total = total + value
+    return total

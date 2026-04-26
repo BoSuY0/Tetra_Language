@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -85,23 +84,41 @@ func main() -> Int:
 	}
 }
 
-func TestOptionalRejectsMultiSlotPayload(t *testing.T) {
+func TestOptionalAllowsMultiSlotPayload(t *testing.T) {
 	src := []byte(`
-func maybe() -> String?:
-    return none
+func maybe(flag: Bool) -> String?:
+    if flag:
+        return "ok"
+    else:
+        return none
+
+func length(value: String?) -> Int:
+    if let s = value:
+        return s.len
+    else:
+        return 0
 
 func main() -> Int:
-    return 0
+    return length(maybe(true))
 `)
 	prog, err := Parse(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	_, err = Check(prog)
-	if err == nil {
-		t.Fatalf("expected check error")
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("check: %v", err)
 	}
-	if !strings.Contains(err.Error(), "optional payload type 'str' is not supported yet") {
-		t.Fatalf("unexpected error: %v", err)
+	if got := checked.FuncSigs["maybe"].ReturnSlots; got != 3 {
+		t.Fatalf("maybe return slots = %d, want 3", got)
+	}
+	if got := checked.FuncSigs["length"].ParamSlots; got != 3 {
+		t.Fatalf("length param slots = %d, want 3", got)
+	}
+	if got := checked.Funcs[1].Locals["s"].TypeName; got != "str" {
+		t.Fatalf("if-let local type = %q, want str", got)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("lower: %v", err)
 	}
 }

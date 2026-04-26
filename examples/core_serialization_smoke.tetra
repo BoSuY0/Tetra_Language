@@ -1,0 +1,17 @@
+// Stable core serialization stdlib smoke.
+module examples.core_serialization_smoke
+
+import lib.core.serialization as serialization
+
+func main() -> Int
+uses alloc, mem:
+    let packed: Int = serialization.pack_u8_pair(1, 41)
+    let hi: Int = serialization.unpack_u8_high(packed)
+    let lo: Int = serialization.unpack_u8_low(packed)
+    var payload: []u8 = core.make_u8(2)
+    payload[0] = 20
+    payload[1] = 22
+    let checksum: Int = serialization.checksum_u8(payload)
+    if hi == 1 && lo == 41 && checksum == 42:
+        return 42
+    return 1

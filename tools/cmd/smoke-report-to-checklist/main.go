@@ -255,6 +255,11 @@ func supportedTarget(target string) bool {
 			return true
 		}
 	}
+	for _, triple := range ctarget.BuildOnlyTriples() {
+		if target == triple {
+			return true
+		}
+	}
 	return false
 }
 

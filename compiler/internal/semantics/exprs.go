@@ -275,7 +275,7 @@ func checkCallExprWithEffects(
 		return "", regionNone, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), resolved)
 	}
 	if sig.Generic {
-		return "", regionNone, fmt.Errorf("%s: generic function '%s' could not be monomorphized in v0.5; use a same-module call with inferable value arguments", frontend.FormatPos(e.At), e.Name)
+		return "", regionNone, fmt.Errorf("%s: generic function '%s' could not be monomorphized in v0.5; use inferable value arguments", frontend.FormatPos(e.At), e.Name)
 	}
 	isTryCall := state != nil && state.allowThrowDepth > 0 && state.allowThrowCall == e
 	if sig.ThrowsType != "" {
@@ -484,6 +484,11 @@ func checkCallExprWithEffects(
 	}
 	if builtinNeedsUnsafe(resolved, argRegions) && !state.inUnsafe() {
 		return "", regionNone, fmt.Errorf("%s: '%s' is only allowed in unsafe blocks", frontend.FormatPos(e.At), resolved)
+	}
+	if permission, attenuatedEffect := builtinCapsulePermission(resolved); permission != "" {
+		if err := effects.requireCapsulePermission(e.At, permission, attenuatedEffect); err != nil {
+			return "", regionNone, err
+		}
 	}
 	e.Name = resolved
 	regionID := regionNone

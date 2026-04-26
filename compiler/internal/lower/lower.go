@@ -62,14 +62,33 @@ func LowerModules(checked *semantics.CheckedProgram) (map[string][]ir.IRFunc, er
 }
 
 func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.TypeInfo, funcs map[string]semantics.FuncSig, globals map[string]semantics.GlobalInfo) (ir.IRFunc, error) {
+	throwSuccessSlots := 0
+	throwErrorSlots := 0
+	throwCompact := false
+	throwScratchBase := 0
+	if fn.ThrowsType != "" {
+		var err error
+		throwSuccessSlots, throwErrorSlots, throwCompact, err = throwingLayout(fn.ReturnType, fn.ThrowsType, types)
+		if err != nil {
+			return ir.IRFunc{}, err
+		}
+		throwScratchBase = fn.LocalSlots - throwErrorSlots
+		if throwScratchBase < 0 {
+			return ir.IRFunc{}, fmt.Errorf("internal error: invalid throwing scratch layout for '%s'", fn.Name)
+		}
+	}
 	l := &lowerer{
-		locals:      fn.Locals,
-		globals:     globals,
-		types:       types,
-		funcs:       funcs,
-		returnType:  fn.ReturnType,
-		throwsType:  fn.ThrowsType,
-		returnSlots: fn.ReturnSlots,
+		locals:            fn.Locals,
+		globals:           globals,
+		types:             types,
+		funcs:             funcs,
+		returnType:        fn.ReturnType,
+		throwsType:        fn.ThrowsType,
+		returnSlots:       fn.ReturnSlots,
+		throwSuccessSlots: throwSuccessSlots,
+		throwErrorSlots:   throwErrorSlots,
+		throwCompact:      throwCompact,
+		throwScratchBase:  throwScratchBase,
 	}
 	for _, stmt := range fn.Decl.Body {
 		if err := l.lowerStmt(stmt); err != nil {
@@ -87,17 +106,37 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 }
 
 type lowerer struct {
-	instrs         []ir.IRInstr
-	locals         map[string]semantics.LocalInfo
-	globals        map[string]semantics.GlobalInfo
-	types          map[string]*semantics.TypeInfo
-	funcs          map[string]semantics.FuncSig
-	returnType     string
-	throwsType     string
-	returnSlots    int
-	nextLabel      int
-	cleanupIslands []int
-	loopStack      []loopLabels
+	instrs            []ir.IRInstr
+	locals            map[string]semantics.LocalInfo
+	globals           map[string]semantics.GlobalInfo
+	types             map[string]*semantics.TypeInfo
+	funcs             map[string]semantics.FuncSig
+	returnType        string
+	throwsType        string
+	returnSlots       int
+	throwSuccessSlots int
+	throwErrorSlots   int
+	throwCompact      bool
+	throwScratchBase  int
+	nextLabel         int
+	cleanupIslands    []int
+	loopStack         []loopLabels
+}
+
+func throwingLayout(returnType, throwsType string, types map[string]*semantics.TypeInfo) (int, int, bool, error) {
+	if throwsType == "" {
+		return 0, 0, false, nil
+	}
+	retInfo, ok := types[returnType]
+	if !ok {
+		return 0, 0, false, fmt.Errorf("unknown type '%s'", returnType)
+	}
+	throwInfo, ok := types[throwsType]
+	if !ok {
+		return 0, 0, false, fmt.Errorf("unknown type '%s'", throwsType)
+	}
+	compact := retInfo.SlotCount == 1 && throwInfo.SlotCount == 1
+	return retInfo.SlotCount, throwInfo.SlotCount, compact, nil
 }
 
 type loopLabels struct {
@@ -128,6 +167,12 @@ func (l *lowerer) emitCleanupSince(start int, pos frontend.Position) {
 		base := l.cleanupIslands[i]
 		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base, Pos: pos})
 		l.emit(ir.IRInstr{Kind: ir.IRIslandFree, Pos: pos})
+	}
+}
+
+func (l *lowerer) emitZeroSlots(count int, pos frontend.Position) {
+	for i := 0; i < count; i++ {
+		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
 	}
 }
 
@@ -177,12 +222,15 @@ func (l *lowerer) lowerStmt(stmt frontend.Stmt) error {
 		}
 		expectedSlots := l.returnSlots
 		if l.throwsType != "" {
-			expectedSlots = 1
+			expectedSlots = l.throwSuccessSlots
 		}
 		if slots != expectedSlots {
 			return fmt.Errorf("%s: return slot mismatch", frontend.FormatPos(s.At))
 		}
 		if l.throwsType != "" {
+			if !l.throwCompact {
+				l.emitZeroSlots(l.throwErrorSlots, s.At)
+			}
 			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: s.At})
 		}
 		l.emitCleanup(s.At)
@@ -191,11 +239,14 @@ func (l *lowerer) lowerStmt(stmt frontend.Stmt) error {
 		if l.throwsType == "" {
 			return fmt.Errorf("%s: throw is only allowed in throwing functions", frontend.FormatPos(s.At))
 		}
+		if !l.throwCompact {
+			l.emitZeroSlots(l.throwSuccessSlots, s.At)
+		}
 		slots, err := l.lowerExprAs(s.Value, l.throwsType)
 		if err != nil {
 			return err
 		}
-		if slots != 1 {
+		if slots != l.throwErrorSlots {
 			return fmt.Errorf("%s: throw slot mismatch", frontend.FormatPos(s.At))
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: s.At})
@@ -746,23 +797,80 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		if !ok {
 			return 0, fmt.Errorf("%s: try expects a throwing function call", frontend.FormatPos(e.At))
 		}
+		if builtin, ok := semantics.ResolveBuiltinAlias(call.Name); ok {
+			call.Name = builtin
+		}
+		sig, ok := l.funcs[call.Name]
+		if !ok {
+			return 0, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(call.At), call.Name)
+		}
+		if sig.ThrowsType == "" {
+			return 0, fmt.Errorf("%s: try expects a throwing function call", frontend.FormatPos(e.At))
+		}
+		callSuccessSlots, callErrorSlots, callCompact, err := throwingLayout(sig.ReturnType, sig.ThrowsType, l.types)
+		if err != nil {
+			return 0, err
+		}
 		slots, err := l.lowerExpr(call)
 		if err != nil {
 			return 0, err
 		}
-		if slots != 2 {
-			return 0, fmt.Errorf("%s: try expects a two-slot throwing result", frontend.FormatPos(e.At))
+		if slots != sig.ReturnSlots {
+			return 0, fmt.Errorf("%s: try result slot mismatch", frontend.FormatPos(e.At))
 		}
 		okLabel := l.newLabel()
 		l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: okLabel, Pos: e.At})
+
+		if !callCompact {
+			for slot := callErrorSlots - 1; slot >= 0; slot-- {
+				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.throwScratchBase + slot, Pos: e.At})
+			}
+			for slot := 0; slot < callSuccessSlots; slot++ {
+				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.throwScratchBase, Pos: e.At})
+			}
+		} else if !l.throwCompact {
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.throwScratchBase, Pos: e.At})
+		}
+
+		if l.throwCompact {
+			if !callCompact {
+				if callErrorSlots != 1 {
+					return 0, fmt.Errorf("%s: try error slot mismatch", frontend.FormatPos(e.At))
+				}
+				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.throwScratchBase, Pos: e.At})
+			}
+		} else {
+			if !callCompact && callErrorSlots != l.throwErrorSlots {
+				return 0, fmt.Errorf("%s: try error slot mismatch", frontend.FormatPos(e.At))
+			}
+			l.emitZeroSlots(l.throwSuccessSlots, e.At)
+			if callCompact {
+				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.throwScratchBase, Pos: e.At})
+			} else {
+				for slot := 0; slot < callErrorSlots; slot++ {
+					l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.throwScratchBase + slot, Pos: e.At})
+				}
+			}
+		}
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
 		l.emitCleanup(e.At)
 		l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: e.At})
+
 		// The x64 emitter tracks stack depth linearly. This unreachable padding
-		// mirrors the success path payload that remains on the real stack at okLabel.
-		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+		// mirrors the success-entry stack depth at okLabel.
+		successEntrySlots := callSuccessSlots
+		if !callCompact {
+			successEntrySlots += callErrorSlots
+		}
+		l.emitZeroSlots(successEntrySlots, e.At)
 		l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: okLabel, Pos: e.At})
-		return 1, nil
+
+		if !callCompact {
+			for slot := 0; slot < callErrorSlots; slot++ {
+				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.throwScratchBase, Pos: e.At})
+			}
+		}
+		return callSuccessSlots, nil
 	case *frontend.AwaitExpr:
 		call, ok := e.X.(*frontend.CallExpr)
 		if !ok {
@@ -1136,8 +1244,13 @@ func (l *lowerer) lowerExprAs(expr frontend.Expr, expectedType string) (int, err
 	if err != nil {
 		return 0, err
 	}
-	if actualType == expectedType || actualType == "none" {
+	if actualType == expectedType {
 		return l.lowerExpr(expr)
+	}
+	if actualType == "none" {
+		l.emitZeroSlots(expectedInfo.SlotCount-1, expr.Pos())
+		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: expr.Pos()})
+		return expectedInfo.SlotCount, nil
 	}
 	if actualType != expectedInfo.ElemType {
 		return l.lowerExpr(expr)

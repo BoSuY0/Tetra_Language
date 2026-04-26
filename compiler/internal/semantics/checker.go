@@ -329,9 +329,6 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if err != nil {
 				return nil, err
 			}
-			if elemInfo.SlotCount != 1 {
-				return nil, fmt.Errorf("optional payload type '%s' is not supported yet (payload must be single-slot)", elem)
-			}
 			info := &TypeInfo{
 				Name:      name,
 				Kind:      TypeOptional,
@@ -426,6 +423,11 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				return nil, fmt.Errorf("%s: duplicate protocol requirement '%s'", frontend.FormatPos(req.At), req.Name)
 			}
 			seenReqs[req.Name] = struct{}{}
+			reqEffects, err := normalizeEffects(req.Uses, req.At)
+			if err != nil {
+				return nil, fmt.Errorf("%s: protocol '%s' requirement '%s': %v", frontend.FormatPos(req.At), name, req.Name, err)
+			}
+			req.Uses = reqEffects
 			retName, err := resolveTypeName(&req.ReturnType, ctx.module, ctx.imports)
 			if err != nil {
 				return nil, err
@@ -673,15 +675,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if err != nil {
 				return nil, err
 			}
-			if retInfo.SlotCount > 2 {
-				return nil, fmt.Errorf("function '%s' return type too large", fullName)
-			}
 			throwsType := ""
 			returnSlots := retInfo.SlotCount
 			if fn.HasThrows {
-				if retInfo.SlotCount != 1 {
-					return nil, fmt.Errorf("%s: throwing function '%s' must return a single-slot success type in v0.5", frontend.FormatPos(fn.Pos), fullName)
-				}
 				resolvedThrows, err := resolveTypeName(&fn.Throws, module, imports)
 				if err != nil {
 					return nil, err
@@ -691,11 +687,8 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if err != nil {
 					return nil, err
 				}
-				if throwInfo.SlotCount != 1 {
-					return nil, fmt.Errorf("%s: throwing function '%s' must use a single-slot error type in v0.5", frontend.FormatPos(fn.Pos), fullName)
-				}
 				throwsType = resolvedThrows
-				returnSlots = 2
+				returnSlots = throwingReturnSlots(retInfo.SlotCount, throwInfo.SlotCount)
 			}
 			effects, err := normalizeEffects(fn.Uses, fn.Pos)
 			if err != nil {
@@ -798,7 +791,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				sig := checked.FuncSigs[fullName]
 				state.throwType = sig.ThrowsType
 				state.async = sig.Async
-				effects := newEffectContext(fullName, sig.Effects, strings.HasPrefix(module, "__"))
+				effects := newEffectContext(fullName, sig.Effects, fn.Uses, strings.HasPrefix(module, "__"))
 				borrowedParams := make(map[string]struct{})
 				for _, param := range fn.Params {
 					if param.Ownership == "borrow" {
@@ -885,17 +878,26 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if err := collectLocals(fn.Body, locals, &slotIndex, checked.FuncSigs, types, module, imports, scopeInfo, globals); err != nil {
 				return nil, err
 			}
+			sig := checked.FuncSigs[fullName]
+			localSlots := slotIndex
+			if sig.ThrowsType != "" {
+				throwInfo, err := ensureTypeInfo(sig.ThrowsType, types)
+				if err != nil {
+					return nil, err
+				}
+				localSlots += throwingScratchSlots(throwInfo.SlotCount)
+			}
 			checked.Funcs = append(checked.Funcs, CheckedFunc{
 				Name:        fullName,
 				Module:      module,
 				Decl:        fn,
 				Locals:      locals,
-				LocalSlots:  slotIndex,
-				ParamSlots:  checked.FuncSigs[fullName].ParamSlots,
-				ReturnType:  checked.FuncSigs[fullName].ReturnType,
-				ThrowsType:  checked.FuncSigs[fullName].ThrowsType,
-				Async:       checked.FuncSigs[fullName].Async,
-				ReturnSlots: checked.FuncSigs[fullName].ReturnSlots,
+				LocalSlots:  localSlots,
+				ParamSlots:  sig.ParamSlots,
+				ReturnType:  sig.ReturnType,
+				ThrowsType:  sig.ThrowsType,
+				Async:       sig.Async,
+				ReturnSlots: sig.ReturnSlots,
 			})
 		}
 	}
@@ -1158,8 +1160,37 @@ func compareProtocolRequirement(typeName, protoName string, req frontend.FuncSig
 	if req.HasThrows != method.HasThrows || genericTypeName(req.Throws) != genericTypeName(method.Throws) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': throws type differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
-	_ = typeName
+	reqEffects, err := normalizeEffects(req.Uses, req.At)
+	if err != nil {
+		return fmt.Errorf("%s: protocol '%s' requirement '%s': %v", frontend.FormatPos(req.At), protoName, req.Name, err)
+	}
+	methodEffects, err := normalizeEffects(method.Uses, method.Pos)
+	if err != nil {
+		return err
+	}
+	missing := missingRequiredEffects(reqEffects, methodEffects)
+	if len(missing) > 0 {
+		return fmt.Errorf("%s: method '%s' for type '%s' does not match protocol '%s' requirement '%s': missing required effects %s", frontend.FormatPos(method.Pos), method.Name, typeName, protoName, req.Name, strings.Join(missing, ", "))
+	}
 	return nil
+}
+
+func missingRequiredEffects(required []string, declared []string) []string {
+	if len(required) == 0 {
+		return nil
+	}
+	have := make(map[string]struct{}, len(declared))
+	for _, effect := range declared {
+		have[effect] = struct{}{}
+	}
+	var missing []string
+	for _, effect := range required {
+		if _, ok := have[effect]; ok {
+			continue
+		}
+		missing = append(missing, effect)
+	}
+	return missing
 }
 
 func validateGenericTypeRef(ref frontend.TypeRef, params map[string]struct{}) error {
@@ -1210,6 +1241,21 @@ func genericParamOwnership(params []frontend.ParamDecl) []string {
 		out = append(out, param.Ownership)
 	}
 	return out
+}
+
+func throwingReturnSlots(successSlots, errorSlots int) int {
+	if successSlots == 1 && errorSlots == 1 {
+		// Preserve the compact v0.5 layout for existing single-slot typed errors.
+		return 2
+	}
+	return successSlots + errorSlots + 1
+}
+
+func throwingScratchSlots(errorSlots int) int {
+	if errorSlots <= 0 {
+		return 0
+	}
+	return errorSlots
 }
 
 func formatGenericTypeRef(ref frontend.TypeRef) string {

@@ -79,7 +79,7 @@ type smokeListReport struct {
 	Cases        []smokeListCase `json:"cases"`
 }
 
-const supportedTargetsHelp = "linux-x64, windows-x64, macos-x64, wasm32-wasi (build-only)"
+const supportedTargetsHelp = "linux-x64, windows-x64, macos-x64, wasm32-wasi (build-only), wasm32-web (build-only)"
 
 func main() {
 	os.Exit(runCLI(os.Args[1:], os.Stdout, os.Stderr))
@@ -1932,7 +1932,7 @@ func smokeCases(islandsDebug bool) []smokeCase {
 }
 
 func smokeCasesForTarget(islandsDebug bool, tgt ctarget.Target) []smokeCase {
-	if tgt.Triple == "wasm32-wasi" {
+	if tgt.Triple == "wasm32-wasi" || tgt.Triple == "wasm32-web" {
 		return []smokeCase{
 			{name: "flow_hello", srcPath: "examples/flow_hello.tetra", expectedExit: 0},
 			{name: "effects_io_smoke", srcPath: "examples/effects_io_smoke.tetra", expectedExit: 0},

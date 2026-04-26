@@ -105,7 +105,7 @@ func inferExprTypeForDecl(
 			return "", fmt.Errorf("unknown function '%s'", resolved)
 		}
 		if sig.Generic {
-			return "", fmt.Errorf("generic function '%s' could not be monomorphized in v0.5; use a same-module call with inferable value arguments", e.Name)
+			return "", fmt.Errorf("generic function '%s' could not be monomorphized in v0.5; use inferable value arguments", e.Name)
 		}
 		return sig.ReturnType, nil
 	case *frontend.ClosureExpr:

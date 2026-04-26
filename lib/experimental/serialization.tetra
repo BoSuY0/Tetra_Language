@@ -1,0 +1,22 @@
+// Experimental serialization helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.serialization directly.
+module lib.experimental.serialization
+
+import lib.core.serialization as stable_serialization
+
+func clamp_u8(value: Int) -> Int:
+    return stable_serialization.clamp_u8(value)
+
+func pack_u8_pair(high: Int, low: Int) -> Int:
+    return stable_serialization.pack_u8_pair(high, low)
+
+func unpack_u8_high(packed: Int) -> Int:
+    return stable_serialization.unpack_u8_high(packed)
+
+func unpack_u8_low(packed: Int) -> Int:
+    return stable_serialization.unpack_u8_low(packed)
+
+func checksum_u8(values: []u8) -> Int
+uses mem:
+    return stable_serialization.checksum_u8(values)

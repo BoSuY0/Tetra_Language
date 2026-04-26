@@ -106,7 +106,7 @@ case "$1" in
     exit 0
     ;;
   targets)
-    echo '{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi"],"planned":["wasm32-web"]}'
+    echo '{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi","wasm32-web"],"planned":[]}'
     exit 0
     ;;
   doctor)

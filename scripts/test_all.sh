@@ -512,6 +512,10 @@ check_cross_target_smoke() {
   go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/macos-smoke.json"
   run_release_smoke_target "windows-x64" "false" "$tmp_dir/windows-smoke.json"
   go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/windows-smoke.json"
+  ./tetra smoke --target wasm32-wasi --run=false --report "$tmp_dir/wasm32-wasi-smoke.json"
+  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/wasm32-wasi-smoke.json"
+  ./tetra smoke --target wasm32-web --run=false --report "$tmp_dir/wasm32-web-smoke.json"
+  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$tmp_dir/wasm32-web-smoke.json"
 }
 
 if [[ "$json_only" != true ]]; then

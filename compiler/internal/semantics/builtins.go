@@ -96,6 +96,21 @@ func builtinNeedsUnsafe(name string, argRegions []int) bool {
 	}
 }
 
+func builtinCapsulePermission(name string) (permission string, attenuatedEffect string) {
+	switch name {
+	case "core.cap_io", "core.mmio_read_i32", "core.mmio_write_i32":
+		return "capsule.io", "io"
+	case "core.cap_mem",
+		"core.load_i32", "core.store_i32",
+		"core.load_u8", "core.store_u8",
+		"core.load_ptr", "core.store_ptr",
+		"core.ptr_add", "core.ctx_switch":
+		return "capsule.mem", "mem"
+	default:
+		return "", ""
+	}
+}
+
 func ResolveBuiltinAlias(name string) (string, bool) {
 	switch name {
 	case "alloc_bytes":

@@ -24,10 +24,10 @@ func TestTargetListsAreStable(t *testing.T) {
 	if got := SupportedTriples(); len(got) != 3 || got[0] != "linux-x64" || got[1] != "windows-x64" || got[2] != "macos-x64" {
 		t.Fatalf("supported triples = %#v", got)
 	}
-	if got := BuildOnlyTriples(); len(got) != 1 || got[0] != "wasm32-wasi" {
+	if got := BuildOnlyTriples(); len(got) != 2 || got[0] != "wasm32-wasi" || got[1] != "wasm32-web" {
 		t.Fatalf("build-only triples = %#v", got)
 	}
-	if got := PlannedTriples(); len(got) != 1 || got[0] != "wasm32-web" {
+	if got := PlannedTriples(); len(got) != 0 {
 		t.Fatalf("planned triples = %#v", got)
 	}
 }
@@ -54,20 +54,19 @@ func TestParseAcceptsWASMBuildOnlyTarget(t *testing.T) {
 	}
 }
 
-func TestParseReportsPlannedWASMWebTarget(t *testing.T) {
-	_, err := Parse("wasm32-web")
-	if err == nil {
-		t.Fatalf("Parse(wasm32-web): expected planned-target error")
+func TestParseAcceptsWASMWebBuildOnlyTarget(t *testing.T) {
+	tgt, err := Parse("wasm32-web")
+	if err != nil {
+		t.Fatalf("Parse(wasm32-web): %v", err)
 	}
-	targetErr, ok := err.(UnsupportedTargetError)
-	if !ok {
-		t.Fatalf("Parse(wasm32-web): error type = %T, want UnsupportedTargetError", err)
+	if tgt.Triple != "wasm32-web" || tgt.ExeExt != ".wasm" {
+		t.Fatalf("wasm32-web target = %#v", tgt)
 	}
-	if !targetErr.Planned || targetErr.Triple != "wasm32-web" {
-		t.Fatalf("planned target error = %#v", targetErr)
+	if !IsBuildOnlyTarget("wasm32-web") {
+		t.Fatalf("IsBuildOnlyTarget(wasm32-web) = false")
 	}
-	if !IsPlannedTarget("wasm32-web") {
-		t.Fatalf("IsPlannedTarget(wasm32-web) = false")
+	if IsPlannedTarget("wasm32-web") {
+		t.Fatalf("IsPlannedTarget(wasm32-web) = true")
 	}
 }
 

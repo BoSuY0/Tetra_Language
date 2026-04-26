@@ -170,8 +170,8 @@ go test ./compiler/... -run 'Async|Task|Actor|Runtime'
 
 - [x] Implement `wasm32-wasi` target parsing as supported.
 - [x] Implement `wasm32-wasi` codegen/object/link/run path.
-- [ ] Implement `wasm32-web` codegen/package path.
-- [ ] Add smoke coverage for both WASM targets.
+- [x] Implement `wasm32-web` codegen/package path.
+- [x] Add smoke coverage for both WASM targets.
 - [ ] Validate incremental build/check cache behavior for native and WASM paths.
 
 **Verification**
@@ -193,7 +193,7 @@ go test ./compiler/... -run 'Target|WASM|ABI|Object|Link|Cache|Deterministic'
 
 ### 7.1 Promotion
 
-- [ ] Promote `collections`.
+- [x] Promote `collections`.
 - [x] Promote `strings`.
 - [x] Promote `slices`.
 - [x] Promote `math`.
@@ -203,7 +203,7 @@ go test ./compiler/... -run 'Target|WASM|ABI|Object|Link|Cache|Deterministic'
 - [ ] Promote `async`.
 - [ ] Promote `sync`.
 - [x] Promote `testing`.
-- [ ] Promote `serialization`.
+- [x] Promote `serialization`.
 - [ ] Promote `time`.
 - [ ] Promote `crypto interfaces`.
 

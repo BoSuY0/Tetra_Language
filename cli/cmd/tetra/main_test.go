@@ -30,7 +30,7 @@ func TestTargetsCommandText(t *testing.T) {
 		t.Fatalf("targets exit code = %d, stdout=%q", code, stdout.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"Supported targets:", "linux-x64", "windows-x64", "macos-x64", "Build-only targets:", "wasm32-wasi", "Planned targets:", "wasm32-web"} {
+	for _, want := range []string{"Supported targets:", "linux-x64", "windows-x64", "macos-x64", "Build-only targets:", "wasm32-wasi", "wasm32-web", "Planned targets:"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("targets output missing %q:\n%s", want, out)
 		}
@@ -54,10 +54,10 @@ func TestTargetsCommandJSON(t *testing.T) {
 	if strings.Join(report.Supported, ",") != "linux-x64,windows-x64,macos-x64" {
 		t.Fatalf("supported targets = %#v", report.Supported)
 	}
-	if strings.Join(report.BuildOnly, ",") != "wasm32-wasi" {
+	if strings.Join(report.BuildOnly, ",") != "wasm32-wasi,wasm32-web" {
 		t.Fatalf("build-only targets = %#v", report.BuildOnly)
 	}
-	if strings.Join(report.Planned, ",") != "wasm32-web" {
+	if len(report.Planned) != 0 {
 		t.Fatalf("planned targets = %#v", report.Planned)
 	}
 }
@@ -99,7 +99,7 @@ func TestDoctorCommandJSON(t *testing.T) {
 		if check.Name == "version" && check.Status == "pass" {
 			sawVersion = true
 		}
-		if check.Name == "build-only targets" && check.Status == "pass" && strings.Contains(check.Detail, "wasm32-wasi") {
+		if check.Name == "build-only targets" && check.Status == "pass" && strings.Contains(check.Detail, "wasm32-wasi") && strings.Contains(check.Detail, "wasm32-web") {
 			sawBuildOnlyTargets = true
 		}
 		if check.Name == "__rt/actors_sysv.tetra" && check.Status == "pass" {
@@ -275,51 +275,55 @@ func TestSmokeCommandListsDebugOnlyCase(t *testing.T) {
 }
 
 func TestSmokeCommandListsWASMBuildOnlyTarget(t *testing.T) {
-	var stdout bytes.Buffer
-	code := runCLI([]string{"smoke", "--list", "--target", "wasm32-wasi", "--format=json"}, &stdout, &bytes.Buffer{})
-	if code != 0 {
-		t.Fatalf("smoke --list exit code = %d, stdout=%q", code, stdout.String())
-	}
-	var report struct {
-		Target       string `json:"target"`
-		BuildOnly    bool   `json:"build_only"`
-		RunSupported bool   `json:"run_supported"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
-		t.Fatalf("smoke list JSON: %v\n%s", err, stdout.String())
-	}
-	if report.Target != "wasm32-wasi" || !report.BuildOnly || report.RunSupported {
-		t.Fatalf("wasm smoke list metadata = %#v", report)
+	for _, target := range []string{"wasm32-wasi", "wasm32-web"} {
+		var stdout bytes.Buffer
+		code := runCLI([]string{"smoke", "--list", "--target", target, "--format=json"}, &stdout, &bytes.Buffer{})
+		if code != 0 {
+			t.Fatalf("smoke --list exit code = %d, stdout=%q", code, stdout.String())
+		}
+		var report struct {
+			Target       string `json:"target"`
+			BuildOnly    bool   `json:"build_only"`
+			RunSupported bool   `json:"run_supported"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+			t.Fatalf("smoke list JSON: %v\n%s", err, stdout.String())
+		}
+		if report.Target != target || !report.BuildOnly || report.RunSupported {
+			t.Fatalf("wasm smoke list metadata = %#v", report)
+		}
 	}
 }
 
 func TestSmokeCommandBuildsWASMTargetWithoutRun(t *testing.T) {
-	var stdout bytes.Buffer
-	reportPath := filepath.Join(t.TempDir(), "wasm-smoke.json")
-	code := runCLI([]string{"smoke", "--target", "wasm32-wasi", "--run=false", "--report", reportPath}, &stdout, &bytes.Buffer{})
-	if code != 0 {
-		t.Fatalf("smoke exit code = %d, stdout=%q", code, stdout.String())
-	}
-	var report smokeReport
-	raw, err := os.ReadFile(reportPath)
-	if err != nil {
-		t.Fatalf("read smoke report: %v", err)
-	}
-	if err := json.Unmarshal(raw, &report); err != nil {
-		t.Fatalf("decode smoke report: %v\n%s", err, string(raw))
-	}
-	if report.Target != "wasm32-wasi" || report.Total == 0 {
-		t.Fatalf("wasm smoke report = %#v", report)
-	}
-	if report.Failed != 0 || report.Passed != report.Total {
-		t.Fatalf("wasm smoke counts = %#v", report)
-	}
-	for _, c := range report.Cases {
-		if !strings.HasSuffix(c.OutPath, ".wasm") {
-			t.Fatalf("expected wasm output path, case=%#v", c)
+	for _, target := range []string{"wasm32-wasi", "wasm32-web"} {
+		var stdout bytes.Buffer
+		reportPath := filepath.Join(t.TempDir(), target+"-smoke.json")
+		code := runCLI([]string{"smoke", "--target", target, "--run=false", "--report", reportPath}, &stdout, &bytes.Buffer{})
+		if code != 0 {
+			t.Fatalf("smoke exit code = %d, stdout=%q", code, stdout.String())
 		}
-		if c.Error != "" {
-			t.Fatalf("unexpected wasm smoke error for %s: %s", c.Name, c.Error)
+		var report smokeReport
+		raw, err := os.ReadFile(reportPath)
+		if err != nil {
+			t.Fatalf("read smoke report: %v", err)
+		}
+		if err := json.Unmarshal(raw, &report); err != nil {
+			t.Fatalf("decode smoke report: %v\n%s", err, string(raw))
+		}
+		if report.Target != target || report.Total == 0 {
+			t.Fatalf("wasm smoke report = %#v", report)
+		}
+		if report.Failed != 0 || report.Passed != report.Total {
+			t.Fatalf("wasm smoke counts = %#v", report)
+		}
+		for _, c := range report.Cases {
+			if !strings.HasSuffix(c.OutPath, ".wasm") {
+				t.Fatalf("expected wasm output path, case=%#v", c)
+			}
+			if c.Error != "" {
+				t.Fatalf("unexpected wasm smoke error for %s: %s", c.Name, c.Error)
+			}
 		}
 	}
 }
@@ -812,25 +816,38 @@ func TestBuildCommandWASMTargetWritesWasmModule(t *testing.T) {
 	if err := os.WriteFile(srcPath, []byte("func main() -> Int\nuses io:\n    print(\"wasm hello\\n\")\n    return 0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	outPath := filepath.Join(t.TempDir(), "app.wasm")
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	code := runCLI([]string{"build", "--target", "wasm32-wasi", "-o", outPath, srcPath}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
-	}
-	data, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-	if len(data) < 8 {
-		t.Fatalf("wasm too short: %d bytes", len(data))
-	}
-	if !bytes.Equal(data[:4], []byte{0x00, 0x61, 0x73, 0x6d}) {
-		t.Fatalf("missing wasm magic: % x", data[:4])
-	}
-	if !bytes.Equal(data[4:8], []byte{0x01, 0x00, 0x00, 0x00}) {
-		t.Fatalf("unexpected wasm version header: % x", data[4:8])
+	for _, target := range []string{"wasm32-wasi", "wasm32-web"} {
+		outPath := filepath.Join(t.TempDir(), target+".wasm")
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := runCLI([]string{"build", "--target", target, "-o", outPath, srcPath}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		}
+		data, err := os.ReadFile(outPath)
+		if err != nil {
+			t.Fatalf("read output: %v", err)
+		}
+		if len(data) < 8 {
+			t.Fatalf("wasm too short: %d bytes", len(data))
+		}
+		if !bytes.Equal(data[:4], []byte{0x00, 0x61, 0x73, 0x6d}) {
+			t.Fatalf("missing wasm magic: % x", data[:4])
+		}
+		if !bytes.Equal(data[4:8], []byte{0x01, 0x00, 0x00, 0x00}) {
+			t.Fatalf("unexpected wasm version header: % x", data[4:8])
+		}
+		if target == "wasm32-web" {
+			loaderPath := strings.TrimSuffix(outPath, ".wasm") + ".mjs"
+			loaderRaw, err := os.ReadFile(loaderPath)
+			if err != nil {
+				t.Fatalf("read web loader: %v", err)
+			}
+			loader := string(loaderRaw)
+			if !strings.Contains(loader, "tetra_web_v1") || !strings.Contains(loader, "tetra_main") {
+				t.Fatalf("unexpected web loader content:\n%s", loader)
+			}
+		}
 	}
 }
 

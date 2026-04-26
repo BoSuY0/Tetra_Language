@@ -517,6 +517,36 @@ func TestBuildCoreTestingSmoke(t *testing.T) {
 	}
 }
 
+func TestBuildCoreCollectionsSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_collections_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreSerializationSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_serialization_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
 func TestBuildExtensionSmoke(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -1247,26 +1277,39 @@ func TestExprStmtQualified(t *testing.T) {
 	}
 }
 
-func TestBuildWASM32WASIHelloWritesModule(t *testing.T) {
+func TestBuildWASMHelloWritesModule(t *testing.T) {
 	tmp := t.TempDir()
-	outPath := filepath.Join(tmp, "app.wasm")
 	srcPath := filepath.Join("..", "examples", "hello.tetra")
 
-	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "wasm32-wasi", BuildOptions{Jobs: 1}); err != nil {
-		t.Fatalf("build wasm32-wasi: %v", err)
-	}
-	data, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatalf("read wasm: %v", err)
-	}
-	if len(data) < 8 {
-		t.Fatalf("wasm too short: %d bytes", len(data))
-	}
-	if !bytes.Equal(data[:4], []byte{0x00, 0x61, 0x73, 0x6d}) {
-		t.Fatalf("missing wasm magic: % x", data[:4])
-	}
-	if !bytes.Equal(data[4:8], []byte{0x01, 0x00, 0x00, 0x00}) {
-		t.Fatalf("unexpected wasm version header: % x", data[4:8])
+	for _, target := range []string{"wasm32-wasi", "wasm32-web"} {
+		outPath := filepath.Join(tmp, target+".wasm")
+		if _, err := BuildFileWithStatsOpt(srcPath, outPath, target, BuildOptions{Jobs: 1}); err != nil {
+			t.Fatalf("build %s: %v", target, err)
+		}
+		data, err := os.ReadFile(outPath)
+		if err != nil {
+			t.Fatalf("read wasm: %v", err)
+		}
+		if len(data) < 8 {
+			t.Fatalf("wasm too short: %d bytes", len(data))
+		}
+		if !bytes.Equal(data[:4], []byte{0x00, 0x61, 0x73, 0x6d}) {
+			t.Fatalf("missing wasm magic: % x", data[:4])
+		}
+		if !bytes.Equal(data[4:8], []byte{0x01, 0x00, 0x00, 0x00}) {
+			t.Fatalf("unexpected wasm version header: % x", data[4:8])
+		}
+		if target == "wasm32-web" {
+			loaderPath := strings.TrimSuffix(outPath, ".wasm") + ".mjs"
+			loaderRaw, err := os.ReadFile(loaderPath)
+			if err != nil {
+				t.Fatalf("read web loader: %v", err)
+			}
+			loader := string(loaderRaw)
+			if !strings.Contains(loader, "tetra_web_v1") || !strings.Contains(loader, "tetra_main") {
+				t.Fatalf("unexpected web loader content:\n%s", loader)
+			}
+		}
 	}
 }
 

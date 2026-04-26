@@ -158,6 +158,7 @@ type FuncSigDecl struct {
 	Throws     TypeRef
 	HasThrows  bool
 	Params     []ParamDecl
+	Uses       []string
 }
 
 type PrintStmt struct {

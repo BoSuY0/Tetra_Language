@@ -9,71 +9,119 @@ import (
 	"tetra_language/compiler/internal/module"
 )
 
+type genericDef struct {
+	module string
+	file   *frontend.FileAST
+	decl   *frontend.FuncDecl
+}
+
+type genericWorkItem struct {
+	fn      *frontend.FuncDecl
+	module  string
+	imports map[string]string
+}
+
 func monomorphizeGenerics(world *module.World) error {
+	fileImports := make(map[*frontend.FileAST]map[string]string, len(world.Files))
+	generics := map[string]genericDef{}
 	for _, file := range world.Files {
-		generics := map[string]*frontend.FuncDecl{}
+		imports, err := collectImportAliases(file)
+		if err != nil {
+			return err
+		}
+		fileImports[file] = imports
 		for _, fn := range file.Funcs {
 			if len(fn.TypeParams) > 0 {
-				generics[fn.Name] = fn
+				fullName := qualifyName(file.Module, fn.Name)
+				generics[fullName] = genericDef{
+					module: file.Module,
+					file:   file,
+					decl:   fn,
+				}
 			}
 		}
-		if len(generics) == 0 {
-			continue
-		}
-		created := map[string]*frontend.FuncDecl{}
+	}
+	if len(generics) == 0 {
+		return nil
+	}
+
+	created := map[string]*frontend.FuncDecl{}
+	createdByFile := map[*frontend.FileAST]map[string]*frontend.FuncDecl{}
+	var work []genericWorkItem
+	for _, file := range world.Files {
+		imports := fileImports[file]
 		for _, fn := range file.Funcs {
 			if len(fn.TypeParams) > 0 {
 				continue
 			}
-			env := map[string]string{}
-			for _, param := range fn.Params {
-				env[param.Name] = genericTypeName(param.Type)
-			}
-			if err := monomorphizeStmts(fn.Body, env, generics, created, file); err != nil {
-				return err
-			}
+			work = append(work, genericWorkItem{fn: fn, module: file.Module, imports: imports})
 		}
-		if len(created) == 0 {
+	}
+
+	for i := 0; i < len(work); i++ {
+		item := work[i]
+		env := map[string]string{}
+		for _, param := range item.fn.Params {
+			env[param.Name] = genericTypeName(param.Type)
+		}
+		if err := monomorphizeStmts(item.fn.Body, env, generics, created, createdByFile, &work, fileImports, item.module, item.imports); err != nil {
+			return err
+		}
+	}
+
+	for _, file := range world.Files {
+		perFile := createdByFile[file]
+		if len(perFile) == 0 {
 			continue
 		}
-		names := make([]string, 0, len(created))
-		for name := range created {
+		names := make([]string, 0, len(perFile))
+		for name := range perFile {
 			names = append(names, name)
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			file.Funcs = append(file.Funcs, created[name])
+			file.Funcs = append(file.Funcs, perFile[name])
 		}
 	}
 	return nil
 }
 
-func monomorphizeStmts(stmts []frontend.Stmt, env map[string]string, generics map[string]*frontend.FuncDecl, created map[string]*frontend.FuncDecl, file *frontend.FileAST) error {
+func monomorphizeStmts(
+	stmts []frontend.Stmt,
+	env map[string]string,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+) error {
 	for _, stmt := range stmts {
 		switch s := stmt.(type) {
 		case *frontend.ReturnStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.ThrowStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.BreakStmt, *frontend.ContinueStmt:
 		case *frontend.PrintStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.ExpectStmt:
-			if _, err := monomorphizeExpr(s.Cond, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Cond, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.FreeStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.LetStmt:
-			valType, err := monomorphizeExpr(s.Value, env, generics, created, file)
+			valType, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports)
 			if err != nil {
 				return err
 			}
@@ -83,88 +131,105 @@ func monomorphizeStmts(stmts []frontend.Stmt, env map[string]string, generics ma
 				env[s.Name] = valType
 			}
 		case *frontend.AssignStmt:
-			if _, err := monomorphizeExpr(s.Target, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Target, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.IfStmt:
-			if _, err := monomorphizeExpr(s.Cond, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Cond, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
-			if err := monomorphizeStmts(s.Then, cloneStringMap(env), generics, created, file); err != nil {
+			if err := monomorphizeStmts(s.Then, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
-			if err := monomorphizeStmts(s.Else, cloneStringMap(env), generics, created, file); err != nil {
+			if err := monomorphizeStmts(s.Else, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.IfLetStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, file); err != nil {
+			valueType, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports)
+			if err != nil {
 				return err
 			}
 			thenEnv := cloneStringMap(env)
-			thenEnv[s.Name] = "i32"
-			if err := monomorphizeStmts(s.Then, thenEnv, generics, created, file); err != nil {
+			if elem, ok := optionalElemName(valueType); ok {
+				thenEnv[s.Name] = elem
+			} else {
+				thenEnv[s.Name] = "i32"
+			}
+			if err := monomorphizeStmts(s.Then, thenEnv, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
-			if err := monomorphizeStmts(s.Else, cloneStringMap(env), generics, created, file); err != nil {
+			if err := monomorphizeStmts(s.Else, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.WhileStmt:
-			if _, err := monomorphizeExpr(s.Cond, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Cond, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
-			if err := monomorphizeStmts(s.Body, cloneStringMap(env), generics, created, file); err != nil {
+			if err := monomorphizeStmts(s.Body, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.ForRangeStmt:
+			bodyEnv := cloneStringMap(env)
 			if s.Iterable != nil {
-				if _, err := monomorphizeExpr(s.Iterable, env, generics, created, file); err != nil {
+				iterType, err := monomorphizeExpr(s.Iterable, env, generics, created, createdByFile, work, fileImports, module, imports)
+				if err != nil {
 					return err
+				}
+				if elem, ok := monomorphizeIterableElemType(iterType); ok {
+					bodyEnv[s.Name] = elem
+				} else {
+					bodyEnv[s.Name] = "i32"
 				}
 			} else {
-				if _, err := monomorphizeExpr(s.Start, env, generics, created, file); err != nil {
+				if _, err := monomorphizeExpr(s.Start, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 					return err
 				}
-				if _, err := monomorphizeExpr(s.End, env, generics, created, file); err != nil {
+				if _, err := monomorphizeExpr(s.End, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 					return err
 				}
+				bodyEnv[s.Name] = "i32"
 			}
-			bodyEnv := cloneStringMap(env)
-			bodyEnv[s.Name] = "i32"
-			if err := monomorphizeStmts(s.Body, bodyEnv, generics, created, file); err != nil {
+			if err := monomorphizeStmts(s.Body, bodyEnv, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.MatchStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, file); err != nil {
+			scrutType, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports)
+			if err != nil {
 				return err
 			}
+			someElemType, hasSomeElem := optionalElemName(scrutType)
 			for _, c := range s.Cases {
+				caseEnv := cloneStringMap(env)
+				if some, ok := c.Pattern.(*frontend.SomePatternExpr); ok && hasSomeElem {
+					caseEnv[some.Name] = someElemType
+				}
 				if !c.Default {
-					if _, err := monomorphizeExpr(c.Pattern, env, generics, created, file); err != nil {
+					if _, err := monomorphizeExpr(c.Pattern, caseEnv, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 						return err
 					}
 				}
-				if err := monomorphizeStmts(c.Body, cloneStringMap(env), generics, created, file); err != nil {
+				if err := monomorphizeStmts(c.Body, caseEnv, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 					return err
 				}
 			}
 		case *frontend.UnsafeStmt:
-			if err := monomorphizeStmts(s.Body, env, generics, created, file); err != nil {
+			if err := monomorphizeStmts(s.Body, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.IslandStmt:
-			if _, err := monomorphizeExpr(s.Size, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Size, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 			bodyEnv := cloneStringMap(env)
 			bodyEnv[s.Name] = "island"
-			if err := monomorphizeStmts(s.Body, bodyEnv, generics, created, file); err != nil {
+			if err := monomorphizeStmts(s.Body, bodyEnv, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		case *frontend.ExprStmt:
-			if _, err := monomorphizeExpr(s.Expr, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(s.Expr, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return err
 			}
 		}
@@ -172,7 +237,17 @@ func monomorphizeStmts(stmts []frontend.Stmt, env map[string]string, generics ma
 	return nil
 }
 
-func monomorphizeExpr(expr frontend.Expr, env map[string]string, generics map[string]*frontend.FuncDecl, created map[string]*frontend.FuncDecl, file *frontend.FileAST) (string, error) {
+func monomorphizeExpr(
+	expr frontend.Expr,
+	env map[string]string,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+) (string, error) {
 	switch e := expr.(type) {
 	case *frontend.NumberExpr:
 		return "i32", nil
@@ -185,28 +260,31 @@ func monomorphizeExpr(expr frontend.Expr, env map[string]string, generics map[st
 	case *frontend.SomePatternExpr:
 		return "", nil
 	case *frontend.IdentExpr:
-		return env[e.Name], nil
+		if tname, ok := env[e.Name]; ok {
+			return tname, nil
+		}
+		return "", nil
 	case *frontend.FieldAccessExpr:
-		if _, err := monomorphizeExpr(e.Base, env, generics, created, file); err != nil {
+		if _, err := monomorphizeExpr(e.Base, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 			return "", err
 		}
 		return "", nil
 	case *frontend.IndexExpr:
-		if _, err := monomorphizeExpr(e.Base, env, generics, created, file); err != nil {
+		if _, err := monomorphizeExpr(e.Base, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 			return "", err
 		}
-		if _, err := monomorphizeExpr(e.Index, env, generics, created, file); err != nil {
+		if _, err := monomorphizeExpr(e.Index, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 			return "", err
 		}
 		return "", nil
 	case *frontend.UnaryExpr:
-		_, err := monomorphizeExpr(e.X, env, generics, created, file)
+		_, err := monomorphizeExpr(e.X, env, generics, created, createdByFile, work, fileImports, module, imports)
 		return "i32", err
 	case *frontend.BinaryExpr:
-		if _, err := monomorphizeExpr(e.Left, env, generics, created, file); err != nil {
+		if _, err := monomorphizeExpr(e.Left, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 			return "", err
 		}
-		if _, err := monomorphizeExpr(e.Right, env, generics, created, file); err != nil {
+		if _, err := monomorphizeExpr(e.Right, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 			return "", err
 		}
 		switch e.Op {
@@ -217,12 +295,12 @@ func monomorphizeExpr(expr frontend.Expr, env map[string]string, generics map[st
 			return "i32", nil
 		}
 	case *frontend.TryExpr:
-		return monomorphizeExpr(e.X, env, generics, created, file)
+		return monomorphizeExpr(e.X, env, generics, created, createdByFile, work, fileImports, module, imports)
 	case *frontend.AwaitExpr:
-		return monomorphizeExpr(e.X, env, generics, created, file)
+		return monomorphizeExpr(e.X, env, generics, created, createdByFile, work, fileImports, module, imports)
 	case *frontend.StructLitExpr:
 		for _, field := range e.Fields {
-			if _, err := monomorphizeExpr(field.Value, env, generics, created, file); err != nil {
+			if _, err := monomorphizeExpr(field.Value, env, generics, created, createdByFile, work, fileImports, module, imports); err != nil {
 				return "", err
 			}
 		}
@@ -230,44 +308,72 @@ func monomorphizeExpr(expr frontend.Expr, env map[string]string, generics map[st
 	case *frontend.CallExpr:
 		argTypes := make([]string, 0, len(e.Args))
 		for _, arg := range e.Args {
-			tname, err := monomorphizeExpr(arg, env, generics, created, file)
+			tname, err := monomorphizeExpr(arg, env, generics, created, createdByFile, work, fileImports, module, imports)
 			if err != nil {
 				return "", err
 			}
 			argTypes = append(argTypes, tname)
 		}
-		generic, ok := generics[e.Name]
+
+		resolved := e.Name
+		if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
+			resolved = builtin
+		} else {
+			var err error
+			resolved, err = resolveCallName(e.Name, module, imports, e.At)
+			if err != nil {
+				return "", err
+			}
+		}
+		generic, ok := generics[resolved]
 		if !ok {
 			return "", nil
 		}
-		if len(e.Args) != len(generic.Params) {
+		if len(e.Args) != len(generic.decl.Params) {
 			return "", fmt.Errorf("%s: wrong argument count for generic function '%s'", frontend.FormatPos(e.At), e.Name)
 		}
 		subst := map[string]string{}
-		for i, param := range generic.Params {
+		for i, param := range generic.decl.Params {
 			if argTypes[i] == "" {
 				return "", fmt.Errorf("%s: cannot infer generic argument for '%s' arg %d", frontend.FormatPos(e.Args[i].Pos()), e.Name, i+1)
 			}
-			if err := bindGenericType(param.Type, argTypes[i], generic.TypeParams, subst); err != nil {
+			if err := bindGenericType(param.Type, argTypes[i], generic.decl.TypeParams, subst); err != nil {
 				return "", fmt.Errorf("%s: %v", frontend.FormatPos(e.Args[i].Pos()), err)
 			}
 		}
-		for _, tp := range generic.TypeParams {
+		for _, tp := range generic.decl.TypeParams {
 			if subst[tp] == "" {
 				return "", fmt.Errorf("%s: cannot infer generic argument '%s' for '%s'", frontend.FormatPos(e.At), tp, e.Name)
 			}
 		}
-		name := mangleGenericName(generic.Name, generic.TypeParams, subst)
-		if _, exists := created[name]; !exists {
-			created[name] = cloneGenericFunc(generic, name, subst)
+		name := mangleGenericName(generic.decl.Name, generic.decl.TypeParams, subst)
+		fullName := qualifyName(generic.module, name)
+		if _, exists := created[fullName]; !exists {
+			clone := cloneGenericFunc(generic.decl, name, subst)
+			created[fullName] = clone
+			if _, ok := createdByFile[generic.file]; !ok {
+				createdByFile[generic.file] = map[string]*frontend.FuncDecl{}
+			}
+			createdByFile[generic.file][name] = clone
+			*work = append(*work, genericWorkItem{fn: clone, module: generic.module, imports: fileImports[generic.file]})
 		}
-		e.Name = name
-		return substituteGenericTypeName(generic.ReturnType, subst), nil
+		e.Name = fullName
+		return substituteGenericTypeName(generic.decl.ReturnType, subst), nil
 	case *frontend.ClosureExpr:
 		return "ptr", nil
 	default:
 		return "", nil
 	}
+}
+
+func monomorphizeIterableElemType(typeName string) (string, bool) {
+	if strings.HasPrefix(typeName, "[]") {
+		return strings.TrimPrefix(typeName, "[]"), true
+	}
+	if typeName == "str" {
+		return "u8", true
+	}
+	return "", false
 }
 
 func bindGenericType(param frontend.TypeRef, actual string, typeParams []string, subst map[string]string) error {

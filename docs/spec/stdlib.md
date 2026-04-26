@@ -10,9 +10,11 @@ This page anchors stdlib-specific spec policies.
 The current stable stdlib modules under `lib/core` are:
 
 - `lib.core.capability`
+- `lib.core.collections`
 - `lib.core.io`
 - `lib.core.math`
 - `lib.core.memory`
+- `lib.core.serialization`
 - `lib.core.slices`
 - `lib.core.strings`
 - `lib.core.testing`
@@ -22,6 +24,8 @@ The current stable stdlib modules under `lib/core` are:
 Wave 7 promotions in this repository include:
 
 - `lib.experimental.io` -> `lib.core.io`
+- `lib.experimental.collections` -> `lib.core.collections`
+- `lib.experimental.serialization` -> `lib.core.serialization`
 - `lib.experimental.slices` -> `lib.core.slices`
 - `lib.experimental.strings` -> `lib.core.strings`
 - `lib.experimental.testing` -> `lib.core.testing`

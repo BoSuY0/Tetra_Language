@@ -3,14 +3,14 @@ package main
 import "testing"
 
 func TestValidateTargetsReportAcceptsExpectedShape(t *testing.T) {
-	raw := []byte(`{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi"],"planned":["wasm32-web"]}`)
+	raw := []byte(`{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi","wasm32-web"],"planned":[]}`)
 	if err := validateTargetsReport(raw); err != nil {
 		t.Fatalf("validate targets: %v", err)
 	}
 }
 
 func TestValidateTargetsReportRejectsWrongOrder(t *testing.T) {
-	raw := []byte(`{"supported":["windows-x64","linux-x64","macos-x64"],"build_only":["wasm32-wasi"],"planned":["wasm32-web"]}`)
+	raw := []byte(`{"supported":["windows-x64","linux-x64","macos-x64"],"build_only":["wasm32-wasi","wasm32-web"],"planned":[]}`)
 	if err := validateTargetsReport(raw); err == nil {
 		t.Fatalf("expected wrong-order failure")
 	}

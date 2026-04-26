@@ -40,10 +40,10 @@ func validateTargetsReport(raw []byte) error {
 	if err := validateTargetList("supported", report.Supported, []string{"linux-x64", "windows-x64", "macos-x64"}); err != nil {
 		return err
 	}
-	if err := validateTargetList("build_only", report.BuildOnly, []string{"wasm32-wasi"}); err != nil {
+	if err := validateTargetList("build_only", report.BuildOnly, []string{"wasm32-wasi", "wasm32-web"}); err != nil {
 		return err
 	}
-	if err := validateTargetList("planned", report.Planned, []string{"wasm32-web"}); err != nil {
+	if err := validateTargetList("planned", report.Planned, []string{}); err != nil {
 		return err
 	}
 	return nil

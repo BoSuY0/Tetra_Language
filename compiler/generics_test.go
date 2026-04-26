@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -74,5 +75,38 @@ func main() -> Int:
 	}
 	if !strings.Contains(err.Error(), "cannot infer generic argument") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGenericFunctionCrossModuleMonomorphizedCall(t *testing.T) {
+	files := map[string]string{
+		"engine/util.tetra": `module engine.util
+func id<T>(x: T) -> T:
+    return x
+`,
+		"app/main.tetra": `module app.main
+import engine.util as util
+
+func main() -> Int:
+    return util.id(42)
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.tetra"))
+
+	world, err := LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	if _, ok := checked.FuncSigs["engine.util.id__T_i32"]; !ok {
+		t.Fatalf("missing cross-module monomorphized signature: %#v", checked.FuncSigs)
+	}
+	if _, err := LowerModules(checked); err != nil {
+		t.Fatalf("LowerModules: %v", err)
 	}
 }

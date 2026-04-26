@@ -1,0 +1,39 @@
+// Stable v1 core collections helpers promoted from lib.experimental.collections.
+// Effects: mem
+// ```tetra doctest
+// func collections_doctest() -> Int
+// uses alloc, mem:
+//     let xs: []i32 = core.make_i32(2)
+//     if lib.core.collections.len_i32(xs) == 2:
+//         return 2
+//     return 0
+// ```
+module lib.core.collections
+
+func len_i32(values: []i32) -> Int
+uses mem:
+    var count: Int = 0
+    for value in values:
+        count = count + 1
+    return count
+
+func contains_i32(values: []i32, needle: Int) -> Bool
+uses mem:
+    for value in values:
+        if value == needle:
+            return true
+    return false
+
+func count_i32(values: []i32, needle: Int) -> Int
+uses mem:
+    var count: Int = 0
+    for value in values:
+        if value == needle:
+            count = count + 1
+    return count
+
+func first_or_i32(values: []i32, fallback: Int) -> Int
+uses mem:
+    for value in values:
+        return value
+    return fallback

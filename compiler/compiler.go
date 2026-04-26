@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 
 	"tetra_language/compiler/internal/actorsrt"
 	"tetra_language/compiler/internal/backend/linux_x64"
 	"tetra_language/compiler/internal/backend/macos_x64"
 	"tetra_language/compiler/internal/backend/wasm32_wasi"
+	"tetra_language/compiler/internal/backend/wasm32_web"
 	"tetra_language/compiler/internal/backend/windows_x64"
 	"tetra_language/compiler/internal/backend/x64"
 	"tetra_language/compiler/internal/cache"
@@ -71,6 +74,9 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	target = tgt.Triple
 	if target == "wasm32-wasi" {
 		return buildWASM32WASIWithStatsOpt(inputPath, outputPath, tgt, opt)
+	}
+	if target == "wasm32-web" {
+		return buildWASM32WEBWithStatsOpt(inputPath, outputPath, tgt, opt)
 	}
 	if ctarget.IsBuildOnlyTarget(target) {
 		return nil, fmt.Errorf("target backend not implemented: %s (codegen/link/run blocked)", target)
@@ -557,6 +563,78 @@ func buildWASM32WASIWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 		return nil, err
 	}
 	return stats, nil
+}
+
+func buildWASM32WEBWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target, opt BuildOptions) (*BuildStats, error) {
+	if tgt.Triple != "wasm32-web" {
+		return nil, fmt.Errorf("internal error: unexpected target for wasm backend: %s", tgt.Triple)
+	}
+	if opt.Emit != EmitExe {
+		return nil, fmt.Errorf("wasm32-web supports only --emit=exe in this wave")
+	}
+	if opt.RuntimeObjectPath != "" {
+		return nil, fmt.Errorf("wasm32-web does not support --runtime-object in this wave")
+	}
+	if len(opt.LinkObjectPaths) > 0 {
+		return nil, fmt.Errorf("wasm32-web does not support --link-object in this wave")
+	}
+
+	world, err := LoadWorld(inputPath)
+	if err != nil {
+		return nil, err
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		return nil, err
+	}
+
+	modules := make([]string, 0, len(world.ByModule))
+	for module := range world.ByModule {
+		modules = append(modules, module)
+	}
+	sort.Strings(modules)
+
+	var funcs []IRFunc
+	stats := &BuildStats{
+		CompiledModules: make([]string, 0, len(modules)),
+		LoweredModules:  make([]string, 0, len(modules)),
+	}
+	for _, module := range modules {
+		moduleFuncs, err := LowerModule(checked, module)
+		if err != nil {
+			return nil, err
+		}
+		stats.LoweredModules = append(stats.LoweredModules, module)
+		stats.CompiledModules = append(stats.CompiledModules, module)
+		funcs = append(funcs, moduleFuncs...)
+	}
+
+	obj, err := wasm32_web.CodegenObject(funcs, checked.MainName)
+	if err != nil {
+		return nil, err
+	}
+	wasmBytes, err := wasm32_web.LinkObject(obj)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(outputPath, wasmBytes, 0o755); err != nil {
+		return nil, err
+	}
+
+	loaderPath := wasmWebLoaderPath(outputPath)
+	loader := wasm32_web.LoaderModule(filepath.Base(outputPath))
+	if err := os.WriteFile(loaderPath, loader, 0o644); err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
+func wasmWebLoaderPath(outputPath string) string {
+	ext := filepath.Ext(outputPath)
+	if strings.EqualFold(ext, ".wasm") {
+		return strings.TrimSuffix(outputPath, ext) + ".mjs"
+	}
+	return outputPath + ".mjs"
 }
 
 func buildTagFromOptions(opt BuildOptions) string {

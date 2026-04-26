@@ -1,0 +1,22 @@
+// Experimental collections helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.collections directly.
+module lib.experimental.collections
+
+import lib.core.collections as stable_collections
+
+func len_i32(values: []i32) -> Int
+uses mem:
+    return stable_collections.len_i32(values)
+
+func contains_i32(values: []i32, needle: Int) -> Bool
+uses mem:
+    return stable_collections.contains_i32(values, needle)
+
+func count_i32(values: []i32, needle: Int) -> Int
+uses mem:
+    return stable_collections.count_i32(values, needle)
+
+func first_or_i32(values: []i32, fallback: Int) -> Int
+uses mem:
+    return stable_collections.first_or_i32(values, fallback)

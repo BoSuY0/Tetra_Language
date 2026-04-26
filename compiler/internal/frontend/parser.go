@@ -392,10 +392,17 @@ func (p *parser) parseFuncSignatureDecl() (FuncSigDecl, error) {
 		}
 		throws = parsed
 	}
+	uses, clauses, err := p.parseFunctionModifiers()
+	if err != nil {
+		return FuncSigDecl{}, err
+	}
+	if len(clauses) > 0 {
+		return FuncSigDecl{}, diagnosticErrorf(clauses[0].At, "semantic clauses are not allowed in protocol requirements")
+	}
 	if err := p.consumeOptionalSemicolon(); err != nil {
 		return FuncSigDecl{}, err
 	}
-	return FuncSigDecl{At: nameTok.pos, Name: nameTok.lit, Async: async, ReturnType: retType, Throws: throws, HasThrows: hasThrows, Params: params}, nil
+	return FuncSigDecl{At: nameTok.pos, Name: nameTok.lit, Async: async, ReturnType: retType, Throws: throws, HasThrows: hasThrows, Params: params, Uses: uses}, nil
 }
 
 func (p *parser) parseExtensionDecl() (*ExtensionDecl, error) {

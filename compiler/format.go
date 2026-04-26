@@ -370,6 +370,11 @@ func formatFuncSigDecl(sig frontend.FuncSigDecl) string {
 	if sig.HasThrows {
 		out += " throws " + formatTypeRef(sig.Throws)
 	}
+	if len(sig.Uses) > 0 {
+		uses := append([]string(nil), sig.Uses...)
+		sort.Strings(uses)
+		out += " uses " + strings.Join(uses, ", ")
+	}
 	return out
 }
 

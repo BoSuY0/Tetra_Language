@@ -167,9 +167,6 @@ func ensureTypeInfo(name string, types map[string]*TypeInfo) (*TypeInfo, error) 
 		if err != nil {
 			return nil, err
 		}
-		if elemInfo.SlotCount != 1 {
-			return nil, fmt.Errorf("optional payload type '%s' is not supported yet (payload must be single-slot)", elem)
-		}
 		info := &TypeInfo{
 			Name:      name,
 			Kind:      TypeOptional,

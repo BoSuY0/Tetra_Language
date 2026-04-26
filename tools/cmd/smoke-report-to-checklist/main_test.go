@@ -143,7 +143,7 @@ func TestValidateSmokeReportShapeRejectsUnsupportedTarget(t *testing.T) {
 	passed := 1
 	failed := 0
 	report := &smokeReport{
-		Target:  "wasm32-wasi",
+		Target:  "plan9-x64",
 		Host:    "linux-x64",
 		Version: "v0.6.0",
 		Total:   &total,
@@ -156,6 +156,26 @@ func TestValidateSmokeReportShapeRejectsUnsupportedTarget(t *testing.T) {
 	err := validateSmokeReport(report)
 	if err == nil || !strings.Contains(err.Error(), "unsupported target") {
 		t.Fatalf("expected unsupported target error, got %v", err)
+	}
+}
+
+func TestValidateSmokeReportShapeAcceptsWASMBuildOnlyTarget(t *testing.T) {
+	total := 1
+	passed := 1
+	failed := 0
+	report := &smokeReport{
+		Target:  "wasm32-web",
+		Host:    "linux-x64",
+		Version: "v0.6.0",
+		Total:   &total,
+		Passed:  &passed,
+		Failed:  &failed,
+		Cases: []smokeCaseReport{
+			{Name: "ok", SrcPath: "examples/ok.tetra", ExpectedExit: 0, Pass: true},
+		},
+	}
+	if err := validateSmokeReport(report); err != nil {
+		t.Fatalf("validateSmokeReport(wasm32-web): %v", err)
 	}
 }
 

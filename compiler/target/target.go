@@ -25,6 +25,7 @@ const (
 	OSWindows
 	OSMacOS
 	OSWASI
+	OSWeb
 )
 
 func (o OS) String() string {
@@ -37,6 +38,8 @@ func (o OS) String() string {
 		return "macos"
 	case OSWASI:
 		return "wasi"
+	case OSWeb:
+		return "web"
 	default:
 		return "unknown"
 	}
@@ -68,6 +71,7 @@ const (
 	ABISysV
 	ABIWin64
 	ABIWASI
+	ABIWeb
 )
 
 func (a ABI) String() string {
@@ -78,6 +82,8 @@ func (a ABI) String() string {
 		return "win64"
 	case ABIWASI:
 		return "wasi"
+	case ABIWeb:
+		return "web"
 	default:
 		return "unknown"
 	}
@@ -134,11 +140,11 @@ func SupportedTriples() []string {
 }
 
 func BuildOnlyTriples() []string {
-	return []string{"wasm32-wasi"}
+	return []string{"wasm32-wasi", "wasm32-web"}
 }
 
 func PlannedTriples() []string {
-	return []string{"wasm32-web"}
+	return []string{}
 }
 
 func WASMTriples() []string {
@@ -188,7 +194,15 @@ func Parse(triple string) (Target, error) {
 			CollectImports: false,
 		}, nil
 	case "wasm32-web":
-		return Target{}, UnsupportedTargetError{Triple: triple, Planned: true}
+		return Target{
+			Triple:         "wasm32-web",
+			OS:             OSWeb,
+			Arch:           ArchWASM32,
+			ABI:            ABIWeb,
+			Format:         FormatWASM,
+			ExeExt:         ".wasm",
+			CollectImports: false,
+		}, nil
 	default:
 		return Target{}, UnsupportedTargetError{Triple: triple}
 	}

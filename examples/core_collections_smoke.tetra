@@ -1,0 +1,20 @@
+// Stable core collections stdlib smoke.
+module examples.core_collections_smoke
+
+import lib.core.collections as collections
+
+func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = core.make_i32(5)
+    xs[0] = 7
+    xs[1] = 42
+    xs[2] = 7
+    xs[3] = 1
+    xs[4] = 0
+    let has_42: Bool = collections.contains_i32(xs, 42)
+    let sevens: Int = collections.count_i32(xs, 7)
+    let first: Int = collections.first_or_i32(xs, 0)
+    let n: Int = collections.len_i32(xs)
+    if has_42 && sevens == 2 && first == 7 && n == 5:
+        return 42
+    return 1

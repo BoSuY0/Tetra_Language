@@ -687,7 +687,7 @@ func TestTestAllFullValidatesCrossTargetSmokeReports(t *testing.T) {
 		t.Fatalf("read fake go log: %v", err)
 	}
 	log := string(raw)
-	for _, report := range []string{"linux-smoke.json", "macos-smoke.json", "windows-smoke.json"} {
+	for _, report := range []string{"linux-smoke.json", "macos-smoke.json", "windows-smoke.json", "wasm32-wasi-smoke.json", "wasm32-web-smoke.json"} {
 		want := "run ./tools/cmd/smoke-report-to-checklist --validate-only --report "
 		if !strings.Contains(log, want) || !strings.Contains(log, report) {
 			t.Fatalf("full gate missing validate-only call for %s in log:\n%s", report, log)
@@ -808,7 +808,7 @@ case "$cmd" in
     fi
     ;;
   targets)
-    printf '{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi"],"planned":["wasm32-web"]}\n'
+    printf '{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi","wasm32-web"],"planned":[]}\n'
     ;;
   doctor)
     printf '{"status":"pass","checks":[{"name":"version","status":"pass"},{"name":"supported targets","status":"pass"},{"name":"build-only targets","status":"pass"},{"name":"planned targets","status":"pass"},{"name":"repo root","status":"pass"},{"name":"__rt/actors_sysv.tetra","status":"pass"},{"name":"__rt/actors_win64.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_sysv.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_win64.tetra","status":"pass"},{"name":"examples/flow_hello.tetra","status":"pass"},{"name":"docs/generated/manifest.json","status":"pass"},{"name":"docs manifest version","status":"pass"},{"name":"docs manifest surface","status":"pass"},{"name":"smoke sources","status":"pass"},{"name":"runtime exports","status":"pass"}]}\n'
