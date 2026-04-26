@@ -1,0 +1,22 @@
+// Stable v1 core strings helpers promoted from lib.experimental.strings.
+// Effects: none
+// ```tetra doctest
+// func strings_doctest() -> Int:
+//     return lib.core.strings.ascii_len("***")
+// ```
+module lib.core.strings
+
+func ascii_len(text: String) -> Int:
+    var count: Int = 0
+    for ch in text:
+        count = count + 1
+    return count
+
+func ascii_sum(text: String) -> Int:
+    var total: Int = 0
+    for ch in text:
+        total = total + ch
+    return total
+
+func is_empty(text: String) -> Bool:
+    return ascii_len(text) == 0

@@ -30,7 +30,7 @@ func TestTargetsCommandText(t *testing.T) {
 		t.Fatalf("targets exit code = %d, stdout=%q", code, stdout.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"Supported targets:", "linux-x64", "windows-x64", "macos-x64", "Planned targets:", "wasm32-wasi", "wasm32-web"} {
+	for _, want := range []string{"Supported targets:", "linux-x64", "windows-x64", "macos-x64", "Build-only targets:", "wasm32-wasi", "Planned targets:", "wasm32-web"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("targets output missing %q:\n%s", want, out)
 		}
@@ -45,6 +45,7 @@ func TestTargetsCommandJSON(t *testing.T) {
 	}
 	var report struct {
 		Supported []string `json:"supported"`
+		BuildOnly []string `json:"build_only"`
 		Planned   []string `json:"planned"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
@@ -53,7 +54,10 @@ func TestTargetsCommandJSON(t *testing.T) {
 	if strings.Join(report.Supported, ",") != "linux-x64,windows-x64,macos-x64" {
 		t.Fatalf("supported targets = %#v", report.Supported)
 	}
-	if strings.Join(report.Planned, ",") != "wasm32-wasi,wasm32-web" {
+	if strings.Join(report.BuildOnly, ",") != "wasm32-wasi" {
+		t.Fatalf("build-only targets = %#v", report.BuildOnly)
+	}
+	if strings.Join(report.Planned, ",") != "wasm32-web" {
 		t.Fatalf("planned targets = %#v", report.Planned)
 	}
 }
@@ -90,9 +94,13 @@ func TestDoctorCommandJSON(t *testing.T) {
 		t.Fatalf("doctor status = %q, report=%s", report.Status, stdout.String())
 	}
 	var sawVersion, sawRuntime, sawManifest, sawManifestVersion, sawManifestSurface, sawSmokeSources, sawRuntimeExports bool
+	var sawBuildOnlyTargets bool
 	for _, check := range report.Checks {
 		if check.Name == "version" && check.Status == "pass" {
 			sawVersion = true
+		}
+		if check.Name == "build-only targets" && check.Status == "pass" && strings.Contains(check.Detail, "wasm32-wasi") {
+			sawBuildOnlyTargets = true
 		}
 		if check.Name == "__rt/actors_sysv.tetra" && check.Status == "pass" {
 			sawRuntime = true
@@ -113,7 +121,7 @@ func TestDoctorCommandJSON(t *testing.T) {
 			sawRuntimeExports = true
 		}
 	}
-	if !sawVersion || !sawRuntime || !sawManifest || !sawManifestVersion || !sawManifestSurface || !sawSmokeSources || !sawRuntimeExports {
+	if !sawVersion || !sawBuildOnlyTargets || !sawRuntime || !sawManifest || !sawManifestVersion || !sawManifestSurface || !sawSmokeSources || !sawRuntimeExports {
 		t.Fatalf("doctor missing expected checks: %#v", report.Checks)
 	}
 }
@@ -207,8 +215,11 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 		t.Fatalf("smoke --list exit code = %d, stdout=%q", code, stdout.String())
 	}
 	var report struct {
-		Total        int  `json:"total"`
-		IslandsDebug bool `json:"islands_debug"`
+		Target       string `json:"target"`
+		BuildOnly    bool   `json:"build_only"`
+		RunSupported bool   `json:"run_supported"`
+		Total        int    `json:"total"`
+		IslandsDebug bool   `json:"islands_debug"`
 		Cases        []struct {
 			Name         string `json:"name"`
 			SrcPath      string `json:"src_path"`
@@ -218,6 +229,12 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("smoke list JSON: %v\n%s", err, stdout.String())
+	}
+	if report.Target == "" {
+		t.Fatalf("smoke list missing target: %#v", report)
+	}
+	if report.BuildOnly {
+		t.Fatalf("default smoke list unexpectedly marked build-only: %#v", report)
 	}
 	if report.Total != len(report.Cases) || report.Total < 39 {
 		t.Fatalf("smoke list counts = total:%d len:%d", report.Total, len(report.Cases))
@@ -257,6 +274,25 @@ func TestSmokeCommandListsDebugOnlyCase(t *testing.T) {
 	}
 }
 
+func TestSmokeCommandListsWASMBuildOnlyTarget(t *testing.T) {
+	var stdout bytes.Buffer
+	code := runCLI([]string{"smoke", "--list", "--target", "wasm32-wasi", "--format=json"}, &stdout, &bytes.Buffer{})
+	if code != 0 {
+		t.Fatalf("smoke --list exit code = %d, stdout=%q", code, stdout.String())
+	}
+	var report struct {
+		Target       string `json:"target"`
+		BuildOnly    bool   `json:"build_only"`
+		RunSupported bool   `json:"run_supported"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("smoke list JSON: %v\n%s", err, stdout.String())
+	}
+	if report.Target != "wasm32-wasi" || !report.BuildOnly || report.RunSupported {
+		t.Fatalf("wasm smoke list metadata = %#v", report)
+	}
+}
+
 func TestSmokeCommandRejectsFormatWithoutList(t *testing.T) {
 	var stderr bytes.Buffer
 	code := runCLI([]string{"smoke", "--format=json"}, &bytes.Buffer{}, &stderr)
@@ -274,6 +310,7 @@ func TestEcoVerifyPackAndUnpack(t *testing.T) {
 	src := `capsule Demo:
     id "tetra://demo"
     version "0.1.0"
+    target "linux-x64"
 `
 	if err := os.WriteFile(capsule, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
@@ -292,6 +329,9 @@ func TestEcoVerifyPackAndUnpack(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outDir, "Tetra.capsule")); err != nil {
 		t.Fatalf("expected unpacked capsule: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "tetra.package.json")); err != nil {
+		t.Fatalf("expected unpacked package metadata: %v", err)
 	}
 }
 
@@ -339,9 +379,48 @@ func TestEcoPackProjectBundle(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outDir, "src", "main.tetra")); err != nil {
 		t.Fatalf("expected bundled source: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(outDir, "tetra.package.json")); err != nil {
+		t.Fatalf("expected bundled package metadata: %v", err)
+	}
 }
 
 func TestEcoVerifyDependencyGraphAndLock(t *testing.T) {
+	dir := t.TempDir()
+	core := filepath.Join(dir, "Core.capsule")
+	app := filepath.Join(dir, "App.capsule")
+	if err := os.WriteFile(core, []byte(`capsule Core:
+    id "tetra://core"
+    version "0.1.0"
+    target "linux-x64"
+    effect "io"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(app, []byte(`capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    target "linux-x64"
+    effect "io"
+    dependency "tetra://core" "0.1.0"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lock := filepath.Join(dir, "tetra.lock.json")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lock, app, core}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(lock)
+	if err != nil {
+		t.Fatalf("read lock: %v", err)
+	}
+	if !strings.Contains(string(raw), `"capsules"`) || !strings.Contains(string(raw), `"tetra://core"`) {
+		t.Fatalf("unexpected lock: %s", string(raw))
+	}
+}
+
+func TestEcoVerifyRejectsPermissionEscalationFromDependency(t *testing.T) {
 	dir := t.TempDir()
 	core := filepath.Join(dir, "Core.capsule")
 	app := filepath.Join(dir, "App.capsule")
@@ -361,18 +440,34 @@ func TestEcoVerifyDependencyGraphAndLock(t *testing.T) {
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	lock := filepath.Join(dir, "tetra.lock.json")
-	var stdout, stderr bytes.Buffer
-	code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lock, app, core}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	var stderr bytes.Buffer
+	code := runCLI([]string{"eco", "verify", app, core}, &bytes.Buffer{}, &stderr)
+	if code == 0 {
+		t.Fatalf("expected permission mismatch failure")
 	}
-	raw, err := os.ReadFile(lock)
-	if err != nil {
-		t.Fatalf("read lock: %v", err)
+	if !strings.Contains(stderr.String(), "missing required effect") {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
-	if !strings.Contains(string(raw), `"capsules"`) || !strings.Contains(string(raw), `"tetra://core"`) {
-		t.Fatalf("unexpected lock: %s", string(raw))
+}
+
+func TestEcoVerifyRejectsDuplicateManifestIDField(t *testing.T) {
+	dir := t.TempDir()
+	app := filepath.Join(dir, "App.capsule")
+	if err := os.WriteFile(app, []byte(`capsule App:
+    id "tetra://app"
+    id "tetra://app-2"
+    version "0.1.0"
+    target "linux-x64"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	code := runCLI([]string{"eco", "verify", app}, &bytes.Buffer{}, &stderr)
+	if code == 0 {
+		t.Fatalf("expected duplicate id field failure")
+	}
+	if !strings.Contains(stderr.String(), "duplicate id field") {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
 
@@ -680,10 +775,10 @@ func TestBuildCommandJSONDiagnosticsForOptionValidation(t *testing.T) {
 	}
 }
 
-func TestBuildCommandJSONDiagnosticsForPlannedWASMTarget(t *testing.T) {
+func TestBuildCommandJSONDiagnosticsForWASMBuildOnlyTarget(t *testing.T) {
 	var stderr bytes.Buffer
 	code := runCLI([]string{"build", "--diagnostics=json", "--target", "wasm32-wasi", "examples/hello.tetra"}, &bytes.Buffer{}, &stderr)
-	if code != 2 {
+	if code != 1 {
 		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
 	}
 	var diag struct {
@@ -694,7 +789,7 @@ func TestBuildCommandJSONDiagnosticsForPlannedWASMTarget(t *testing.T) {
 	if err := json.Unmarshal(stderr.Bytes(), &diag); err != nil {
 		t.Fatalf("json diagnostic: %v\n%s", err, stderr.String())
 	}
-	if diag.Code != "TETRA0001" || diag.Severity != "error" || !strings.Contains(diag.Message, "planned target not implemented: wasm32-wasi") {
+	if diag.Code != "TETRA0001" || diag.Severity != "error" || !strings.Contains(diag.Message, "target backend not implemented: wasm32-wasi") {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,6 +14,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
+
+	ctarget "tetra_language/compiler/target"
 )
 
 type capsuleManifest struct {
@@ -44,6 +48,20 @@ type ecoLockCapsule struct {
 	Dependencies []capsuleDependency `json:"dependencies,omitempty"`
 }
 
+type ecoPackageMetadata struct {
+	Schema      string                   `json:"schema"`
+	Compression string                   `json:"compression"`
+	MTimeUnix   int64                    `json:"mtime_unix"`
+	FileCount   int                      `json:"file_count"`
+	Files       []ecoPackageMetadataFile `json:"files"`
+}
+
+type ecoPackageMetadataFile struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+}
+
 type vaultRecord struct {
 	Hash   string `json:"hash"`
 	Kind   string `json:"kind"`
@@ -53,6 +71,21 @@ type vaultRecord struct {
 
 type vaultIndex struct {
 	Records []vaultRecord `json:"records"`
+}
+
+var knownCapsuleEffects = map[string]string{
+	"actors":     "actors",
+	"alloc":      "alloc",
+	"cap.io":     "io",
+	"cap.mem":    "mem",
+	"capability": "capability",
+	"control":    "control",
+	"io":         "io",
+	"islands":    "islands",
+	"link":       "link",
+	"mem":        "mem",
+	"mmio":       "mmio",
+	"runtime":    "runtime",
 }
 
 func runEco(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -260,34 +293,57 @@ func parseCapsule(path string) (capsuleManifest, error) {
 		return capsuleManifest{}, err
 	}
 	manifest := capsuleManifest{Path: path}
+	var (
+		sawName    bool
+		sawID      bool
+		sawVersion bool
+	)
 	for i, line := range strings.Split(string(raw), "\n") {
 		content := strings.TrimSpace(line)
 		if content == "" || strings.HasPrefix(content, "//") || strings.HasPrefix(content, "#") {
 			continue
 		}
 		if strings.HasPrefix(content, "capsule ") {
+			if sawName {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: duplicate capsule declaration", path, i+1)
+			}
 			name := strings.TrimSpace(strings.TrimPrefix(content, "capsule "))
 			name = strings.TrimSuffix(name, ":")
 			if name == "" {
 				return capsuleManifest{}, fmt.Errorf("%s:%d: capsule name is required", path, i+1)
 			}
 			manifest.Name = name
+			sawName = true
 			continue
 		}
 		if strings.HasPrefix(content, "id ") {
+			if sawID {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: duplicate id field", path, i+1)
+			}
 			value, err := parseCapsuleString(path, i+1, strings.TrimSpace(strings.TrimPrefix(content, "id ")))
 			if err != nil {
 				return capsuleManifest{}, err
 			}
+			if !strings.HasPrefix(value, "tetra://") {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: capsule id must use tetra:// prefix", path, i+1)
+			}
 			manifest.ID = value
+			sawID = true
 			continue
 		}
 		if strings.HasPrefix(content, "version ") {
+			if sawVersion {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: duplicate version field", path, i+1)
+			}
 			value, err := parseCapsuleString(path, i+1, strings.TrimSpace(strings.TrimPrefix(content, "version ")))
 			if err != nil {
 				return capsuleManifest{}, err
 			}
+			if !isCapsuleSemver(value) {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: capsule version must use semver x.y.z", path, i+1)
+			}
 			manifest.Version = value
+			sawVersion = true
 			continue
 		}
 		if strings.HasPrefix(content, "target ") {
@@ -295,7 +351,13 @@ func parseCapsule(path string) (capsuleManifest, error) {
 			if err != nil {
 				return capsuleManifest{}, err
 			}
-			manifest.Targets = appendUniqueString(manifest.Targets, value)
+			if !isSupportedCapsuleTarget(value) {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: unsupported target %s", path, i+1, value)
+			}
+			if containsString(manifest.Targets, value) {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: duplicate target %s", path, i+1, value)
+			}
+			manifest.Targets = append(manifest.Targets, value)
 			continue
 		}
 		if strings.HasPrefix(content, "effect ") {
@@ -303,7 +365,14 @@ func parseCapsule(path string) (capsuleManifest, error) {
 			if err != nil {
 				return capsuleManifest{}, err
 			}
-			manifest.Effects = appendUniqueString(manifest.Effects, value)
+			normalized, err := normalizeCapsuleEffect(value)
+			if err != nil {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: %v", path, i+1, err)
+			}
+			if containsString(manifest.Effects, normalized) {
+				return capsuleManifest{}, fmt.Errorf("%s:%d: duplicate effect %s", path, i+1, normalized)
+			}
+			manifest.Effects = append(manifest.Effects, normalized)
 			continue
 		}
 		if strings.HasPrefix(content, "dependency ") {
@@ -335,6 +404,12 @@ func parseCapsuleDependency(path string, line int, value string) (capsuleDepende
 	}
 	if len(fields) != 2 {
 		return capsuleDependency{}, fmt.Errorf("%s:%d: dependency expects quoted id and version", path, line)
+	}
+	if !strings.HasPrefix(fields[0], "tetra://") {
+		return capsuleDependency{}, fmt.Errorf("%s:%d: dependency id must use tetra:// prefix", path, line)
+	}
+	if !isCapsuleSemver(fields[1]) {
+		return capsuleDependency{}, fmt.Errorf("%s:%d: dependency version must use semver x.y.z", path, line)
 	}
 	return capsuleDependency{ID: fields[0], Version: fields[1]}, nil
 }
@@ -387,6 +462,13 @@ func validateCapsuleGraph(manifests []capsuleManifest, target string) error {
 		if target != "" && len(manifest.Targets) > 0 && !containsString(manifest.Targets, target) {
 			return fmt.Errorf("%s: target mismatch for %s: does not support %s", manifest.Path, manifest.ID, target)
 		}
+		seenEffects := map[string]struct{}{}
+		for _, effect := range manifest.Effects {
+			if _, exists := seenEffects[effect]; exists {
+				return fmt.Errorf("%s: duplicate effect %s", manifest.Path, effect)
+			}
+			seenEffects[effect] = struct{}{}
+		}
 		seenDeps := map[string]struct{}{}
 		for _, dep := range manifest.Dependencies {
 			key := dep.ID + "\x00" + dep.Version
@@ -405,6 +487,11 @@ func validateCapsuleGraph(manifests []capsuleManifest, target string) error {
 			}
 			if found.Version != dep.Version {
 				return fmt.Errorf("%s: dependency %s version mismatch: want %s, got %s", manifest.Path, dep.ID, dep.Version, found.Version)
+			}
+			for _, effect := range found.Effects {
+				if !containsString(manifest.Effects, effect) {
+					return fmt.Errorf("%s: missing required effect %s for dependency %s", manifest.Path, effect, dep.ID)
+				}
 			}
 		}
 	}
@@ -595,6 +682,48 @@ func sortedStrings(values []string) []string {
 	return out
 }
 
+func normalizeCapsuleEffect(name string) (string, error) {
+	normalized, ok := knownCapsuleEffects[name]
+	if !ok {
+		return "", fmt.Errorf("unknown effect %q", name)
+	}
+	return normalized, nil
+}
+
+func isCapsuleSemver(version string) bool {
+	if version == "" {
+		return false
+	}
+	main := version
+	if idx := strings.IndexAny(version, "-+"); idx >= 0 {
+		main = version[:idx]
+	}
+	parts := strings.Split(main, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for _, ch := range part {
+			if ch < '0' || ch > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isSupportedCapsuleTarget(target string) bool {
+	for _, triple := range ctarget.SupportedTriples() {
+		if triple == target {
+			return true
+		}
+	}
+	return false
+}
+
 func parseCapsuleString(path string, line int, value string) (string, error) {
 	out, err := strconv.Unquote(value)
 	if err != nil {
@@ -698,6 +827,15 @@ func packCapsuleProject(capsulePath string, outPath string) error {
 }
 
 func packFiles(root string, relPaths []string, outPath string) error {
+	const packageMetadataFile = "tetra.package.json"
+	zeroTime := time.Unix(0, 0).UTC()
+	cleanRelPaths := append([]string(nil), relPaths...)
+	sort.Strings(cleanRelPaths)
+	for _, rel := range cleanRelPaths {
+		if filepath.ToSlash(rel) == packageMetadataFile {
+			return fmt.Errorf("project already contains reserved file %s", packageMetadataFile)
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 		return err
 	}
@@ -707,10 +845,18 @@ func packFiles(root string, relPaths []string, outPath string) error {
 	}
 	defer out.Close()
 	gz := gzip.NewWriter(out)
+	gz.ModTime = zeroTime
+	gz.OS = 255
 	defer gz.Close()
 	tw := tar.NewWriter(gz)
 	defer tw.Close()
-	for _, rel := range relPaths {
+	metadata := ecoPackageMetadata{
+		Schema:      "tetra.eco.package.v1",
+		Compression: "gzip",
+		MTimeUnix:   0,
+		Files:       make([]ecoPackageMetadataFile, 0, len(cleanRelPaths)),
+	}
+	for _, rel := range cleanRelPaths {
 		if rel == "" || strings.HasPrefix(filepath.Clean(rel), "..") || filepath.IsAbs(rel) {
 			return fmt.Errorf("unsafe archive path %q", rel)
 		}
@@ -725,21 +871,51 @@ func packFiles(root string, relPaths []string, outPath string) error {
 			return err
 		}
 		header := &tar.Header{
-			Name: filepath.ToSlash(rel),
-			Mode: 0o644,
-			Size: info.Size(),
+			Name:       filepath.ToSlash(rel),
+			Mode:       0o644,
+			Size:       info.Size(),
+			Format:     tar.FormatPAX,
+			ModTime:    zeroTime,
+			AccessTime: zeroTime,
+			ChangeTime: zeroTime,
 		}
 		if err := tw.WriteHeader(header); err != nil {
 			_ = in.Close()
 			return err
 		}
-		if _, err := io.Copy(tw, in); err != nil {
+		hash := sha256.New()
+		if _, err := io.Copy(tw, io.TeeReader(in, hash)); err != nil {
 			_ = in.Close()
 			return err
 		}
 		if err := in.Close(); err != nil {
 			return err
 		}
+		metadata.Files = append(metadata.Files, ecoPackageMetadataFile{
+			Path:   filepath.ToSlash(rel),
+			SHA256: "sha256:" + hex.EncodeToString(hash.Sum(nil)),
+			Size:   info.Size(),
+		})
+	}
+	metadata.FileCount = len(metadata.Files)
+	rawMetadata, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return err
+	}
+	rawMetadata = append(rawMetadata, '\n')
+	if err := tw.WriteHeader(&tar.Header{
+		Name:       packageMetadataFile,
+		Mode:       0o644,
+		Size:       int64(len(rawMetadata)),
+		Format:     tar.FormatPAX,
+		ModTime:    zeroTime,
+		AccessTime: zeroTime,
+		ChangeTime: zeroTime,
+	}); err != nil {
+		return err
+	}
+	if _, err := tw.Write(rawMetadata); err != nil {
+		return err
 	}
 	return nil
 }

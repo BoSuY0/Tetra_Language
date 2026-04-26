@@ -136,3 +136,64 @@ func TestVerifyRequiredDoctestBlocksAcceptsCommentFenceDoctest(t *testing.T) {
 		t.Fatalf("verifyRequiredDoctestBlocks: %v", err)
 	}
 }
+
+func TestVerifyStableModuleEffectsMetadataRejectsMissingMetadata(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "module.tetra")
+	if err := os.WriteFile(doc, []byte(strings.Join([]string{
+		"// Stable docs.",
+		"module lib.core.sample",
+		"",
+		"func id(x: Int) -> Int:",
+		"    return x",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := verifyStableModuleEffectsMetadata([]string{doc})
+	if err == nil {
+		t.Fatalf("expected missing effects metadata failure")
+	}
+	if !strings.Contains(err.Error(), "missing effects metadata") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVerifyStableModuleEffectsMetadataAcceptsDeclaredEffects(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "module.tetra")
+	if err := os.WriteFile(doc, []byte(strings.Join([]string{
+		"// Stable docs.",
+		"// Effects: none",
+		"module lib.core.sample",
+		"",
+		"func id(x: Int) -> Int:",
+		"    return x",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyStableModuleEffectsMetadata([]string{doc}); err != nil {
+		t.Fatalf("verifyStableModuleEffectsMetadata: %v", err)
+	}
+}
+
+func TestVerifyStableModuleExamplesRejectsMissingExampleFile(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "sample.tetra")
+	if err := os.WriteFile(doc, []byte(strings.Join([]string{
+		"// Stable docs.",
+		"// Effects: none",
+		"module lib.core.sample",
+		"",
+		"func id(x: Int) -> Int:",
+		"    return x",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := verifyStableModuleExamples([]string{doc})
+	if err == nil {
+		t.Fatalf("expected missing stable module example failure")
+	}
+	if !strings.Contains(err.Error(), "missing stable module example") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

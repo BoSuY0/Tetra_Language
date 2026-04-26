@@ -67,6 +67,9 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		return nil, err
 	}
 	target = tgt.Triple
+	if ctarget.IsBuildOnlyTarget(target) {
+		return nil, fmt.Errorf("target backend not implemented: %s (codegen/link/run blocked)", target)
+	}
 
 	switch opt.Emit {
 	case EmitExe:

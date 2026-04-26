@@ -711,7 +711,6 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 		{"capsule", "capsule app:\n  name: \"app\"\n", "planned feature 'capsule'"},
 		{"closure literal", "fn main() -> i32 { val f = fn(x: i32) -> i32 { return x }; return 0 }", "planned feature 'closures'"},
 		{"semantic clause", "fn main() -> i32 budget(10) { return 0 }", "planned feature 'semantic clauses'"},
-		{"function call argument label", "func add(a: Int, b: Int) -> Int:\n  return a + b\n\nfunc main() -> Int:\n  return add(a: 40, b: 2)\n", "function-call argument labels are planned"},
 		{"generic protocol requirement", "protocol P:\n  func id<T>(x: T) -> T\n", "generic protocol requirements are planned"},
 		{"generic struct", "struct Box<T>:\n  value: T\n", "generic structs are planned"},
 		{"enum payload case", "enum Option:\n  case some(Int)\n", "enum payload cases are planned"},
@@ -829,6 +828,51 @@ func TestParseCallExpr(t *testing.T) {
 	}
 	if len(call.Args) != 2 {
 		t.Errorf("call args = %d, want 2", len(call.Args))
+	}
+	if len(call.ArgLabels) != 0 {
+		t.Errorf("call arg labels = %#v, want none", call.ArgLabels)
+	}
+}
+
+func TestParseCallExprWithArgumentLabels(t *testing.T) {
+	expr, err := parseExpr("add(a: 1, b: 2)")
+	if err != nil {
+		t.Fatalf("parseExpr: %v", err)
+	}
+	call, ok := expr.(*CallExpr)
+	if !ok {
+		t.Fatalf("expected CallExpr, got %T", expr)
+	}
+	if call.Name != "add" {
+		t.Errorf("call name = %q, want add", call.Name)
+	}
+	if len(call.Args) != 2 {
+		t.Fatalf("call args = %d, want 2", len(call.Args))
+	}
+	if len(call.ArgLabels) != 2 || call.ArgLabels[0] != "a" || call.ArgLabels[1] != "b" {
+		t.Fatalf("call arg labels = %#v, want [\"a\", \"b\"]", call.ArgLabels)
+	}
+}
+
+func TestParseStructCallLiteralStillUsesFieldLabels(t *testing.T) {
+	src := "struct Vec2 { x: i32, y: i32 }\nfn main() -> i32 { var v: Vec2 = Vec2(x: 1, y: 2); return v.x + v.y }"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) != 1 || len(prog.Funcs[0].Body) < 1 {
+		t.Fatalf("expected function with body")
+	}
+	letStmt, ok := prog.Funcs[0].Body[0].(*LetStmt)
+	if !ok {
+		t.Fatalf("expected LetStmt, got %T", prog.Funcs[0].Body[0])
+	}
+	lit, ok := letStmt.Value.(*StructLitExpr)
+	if !ok {
+		t.Fatalf("expected StructLitExpr, got %T", letStmt.Value)
+	}
+	if len(lit.Fields) != 2 || lit.Fields[0].Name != "x" || lit.Fields[1].Name != "y" {
+		t.Fatalf("struct fields = %#v, want x/y", lit.Fields)
 	}
 }
 

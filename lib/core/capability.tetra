@@ -1,5 +1,6 @@
 // Stable v0.5 capability wrappers. These helpers do not grant permission by
 // themselves; callers still declare matching uses effects.
+// Effects: capability, io, mem
 // ```tetra doctest
 // func capability_doctest() -> Int:
 //     let _: cap.mem = lib.core.capability.mem()

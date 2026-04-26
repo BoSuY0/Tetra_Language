@@ -1,0 +1,37 @@
+// Stable v1 core slice helpers promoted from lib.experimental.slices.
+// Effects: mem
+// ```tetra doctest
+// func slices_doctest() -> Int
+// uses alloc, islands, mem:
+//     island(64) as isl:
+//         var xs: []i32 = core.island_make_i32(isl, 3)
+//         xs[0] = 8
+//         xs[1] = 9
+//         xs[2] = 10
+//         return lib.core.slices.sum_i32(xs)
+//     return 0
+// ```
+module lib.core.slices
+
+func sum_i32(values: []i32) -> Int
+uses mem:
+    var total: Int = 0
+    for value in values:
+        total = total + value
+    return total
+
+func weighted_sum_i32(values: []i32) -> Int
+uses mem:
+    var total: Int = 0
+    var weight: Int = 1
+    for value in values:
+        total = total + value * weight
+        weight = weight + 1
+    return total
+
+func sum_u8(values: []u8) -> Int
+uses mem:
+    var total: Int = 0
+    for value in values:
+        total = total + value
+    return total

@@ -306,6 +306,22 @@ func checkCallExprWithEffects(
 	if len(e.Args) != len(sig.ParamTypes) {
 		return "", regionNone, fmt.Errorf("%s: wrong argument count for '%s'", frontend.FormatPos(e.At), resolved)
 	}
+	if len(e.ArgLabels) > 0 {
+		if len(e.ArgLabels) != len(e.Args) {
+			return "", regionNone, fmt.Errorf("%s: internal error: call argument labels are inconsistent", frontend.FormatPos(e.At))
+		}
+		if len(sig.ParamNames) != len(e.Args) {
+			return "", regionNone, fmt.Errorf("%s: argument labels are not supported for '%s'", frontend.FormatPos(e.At), resolved)
+		}
+		for i, label := range e.ArgLabels {
+			if label == "" {
+				return "", regionNone, fmt.Errorf("%s: cannot mix labeled and unlabeled arguments in call to '%s'", frontend.FormatPos(e.Args[i].Pos()), resolved)
+			}
+			if sig.ParamNames[i] == "" || label != sig.ParamNames[i] {
+				return "", regionNone, fmt.Errorf("%s: argument label mismatch for '%s': expected '%s', got '%s'", frontend.FormatPos(e.Args[i].Pos()), resolved, sig.ParamNames[i], label)
+			}
+		}
+	}
 	argRegions := make([]int, len(e.Args))
 	consumeArgs := make([]string, len(e.Args))
 	consumeArgPositions := make(map[string]frontend.Position)

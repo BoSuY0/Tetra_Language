@@ -1,4 +1,5 @@
 // Stable v0.5 memory helpers built on explicit cap.mem values.
+// Effects: mem
 // ```tetra doctest
 // func memory_doctest() -> Int:
 //     return 0

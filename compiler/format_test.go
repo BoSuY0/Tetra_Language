@@ -172,6 +172,28 @@ func main() -> Int:
 	}
 }
 
+func TestFormatSourceCallArgumentLabels(t *testing.T) {
+	src := []byte(`func add(a: Int, b: Int) -> Int:
+    return a + b
+
+func main() -> Int:
+    return add(a: 40, b: 2)
+`)
+	got, err := FormatSource(src, "main.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `func add(a: Int, b: Int) -> Int:
+    return a + b
+
+func main() -> Int:
+    return add(a: 40, b: 2)
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
 func TestFormatSourceCollectionFor(t *testing.T) {
 	src := []byte(`func main() -> Int:
     var total: Int = 0

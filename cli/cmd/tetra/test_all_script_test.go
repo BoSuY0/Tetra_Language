@@ -93,18 +93,18 @@ case "$1" in
   build)
     for arg in "$@"; do
       if [[ "$arg" == "wasm32-wasi" ]]; then
-        echo '{"code":"TETRA0001","message":"planned target not implemented: wasm32-wasi","severity":"error"}' >&2
-        exit 2
+        echo '{"code":"TETRA0001","message":"target backend not implemented: wasm32-wasi (codegen/link/run blocked)","severity":"error"}' >&2
+        exit 1
       fi
     done
     exit 0
     ;;
   targets)
-    echo '{"supported":["linux-x64","windows-x64","macos-x64"],"planned":["wasm32-wasi","wasm32-web"]}'
+    echo '{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi"],"planned":["wasm32-web"]}'
     exit 0
     ;;
   doctor)
-    echo '{"status":"pass","checks":[{"name":"version","status":"pass"},{"name":"supported targets","status":"pass"},{"name":"planned targets","status":"pass"},{"name":"repo root","status":"pass"},{"name":"__rt/actors_sysv.tetra","status":"pass"},{"name":"__rt/actors_win64.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_sysv.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_win64.tetra","status":"pass"},{"name":"examples/flow_hello.tetra","status":"pass"},{"name":"docs/generated/manifest.json","status":"pass"},{"name":"docs manifest version","status":"pass"},{"name":"docs manifest surface","status":"pass"},{"name":"smoke sources","status":"pass"},{"name":"runtime exports","status":"pass"}]}'
+    echo '{"status":"pass","checks":[{"name":"version","status":"pass"},{"name":"supported targets","status":"pass"},{"name":"build-only targets","status":"pass"},{"name":"planned targets","status":"pass"},{"name":"repo root","status":"pass"},{"name":"__rt/actors_sysv.tetra","status":"pass"},{"name":"__rt/actors_win64.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_sysv.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_win64.tetra","status":"pass"},{"name":"examples/flow_hello.tetra","status":"pass"},{"name":"docs/generated/manifest.json","status":"pass"},{"name":"docs manifest version","status":"pass"},{"name":"docs manifest surface","status":"pass"},{"name":"smoke sources","status":"pass"},{"name":"runtime exports","status":"pass"}]}'
     exit 0
     ;;
   *) exit 2 ;;

@@ -8,7 +8,25 @@ import (
 
 var errFlowTab = errors.New("tabs are not supported in Flow indentation")
 
+type flowBridgeOptions struct {
+	rewriteFuncKeyword bool
+	rewriteLetKeyword  bool
+	wrapIfWhileCond    bool
+}
+
+func canonicalizeFlowSyntax(src []byte, filename string) ([]byte, error) {
+	return bridgeFlowSyntax(src, filename, flowBridgeOptions{})
+}
+
 func normalizeFlowSyntax(src []byte, filename string) ([]byte, error) {
+	return bridgeFlowSyntax(src, filename, flowBridgeOptions{
+		rewriteFuncKeyword: true,
+		rewriteLetKeyword:  true,
+		wrapIfWhileCond:    true,
+	})
+}
+
+func bridgeFlowSyntax(src []byte, filename string, opts flowBridgeOptions) ([]byte, error) {
 	if !looksLikeFlowSyntax(src) {
 		return src, nil
 	}
@@ -57,10 +75,10 @@ func normalizeFlowSyntax(src []byte, filename string) ([]byte, error) {
 			blocks = blocks[:len(blocks)-1]
 		}
 
-		content = flowRewriteLine(content)
+		content = flowRewriteLine(content, opts)
 		if strings.HasSuffix(content, ":") {
 			header := strings.TrimSpace(strings.TrimSuffix(content, ":"))
-			content = flowRewriteBlockHeader(header) + " {"
+			content = flowRewriteBlockHeader(header, opts) + " {"
 			kind := flowBlockKind(header)
 			blocks = append(blocks, flowBlock{indent: indent, kind: kind})
 			pendingBlockIndent = indent
@@ -127,20 +145,23 @@ func flowIndent(line string) (int, int, error) {
 	return indent, col, nil
 }
 
-func flowRewriteLine(content string) string {
-	if strings.HasPrefix(content, "func ") {
+func flowRewriteLine(content string, opts flowBridgeOptions) string {
+	if opts.rewriteFuncKeyword && strings.HasPrefix(content, "func ") {
 		return "fun " + strings.TrimPrefix(content, "func ")
 	}
-	if strings.HasPrefix(content, "async func ") {
+	if opts.rewriteFuncKeyword && strings.HasPrefix(content, "async func ") {
 		return "async fun " + strings.TrimPrefix(content, "async func ")
 	}
-	if strings.HasPrefix(content, "let ") {
+	if opts.rewriteLetKeyword && strings.HasPrefix(content, "let ") {
 		return "val " + strings.TrimPrefix(content, "let ")
 	}
 	return content
 }
 
-func flowRewriteBlockHeader(header string) string {
+func flowRewriteBlockHeader(header string, opts flowBridgeOptions) string {
+	if !opts.wrapIfWhileCond {
+		return header
+	}
 	switch {
 	case strings.HasPrefix(header, "if let "):
 		return header

@@ -1,9 +1,13 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -95,6 +99,34 @@ func TestValidateEcoUnpackRejectsInvalidSource(t *testing.T) {
 	}
 }
 
+func TestValidateEcoUnpackRejectsMissingPackageMetadata(t *testing.T) {
+	root := makeUnpackedProject(t, true, true)
+	if err := os.Remove(filepath.Join(root, "tetra.package.json")); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runUnpackValidator(t, root)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "missing tetra.package.json") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateEcoUnpackRejectsMetadataHashMismatch(t *testing.T) {
+	root := makeUnpackedProject(t, true, true)
+	if err := os.WriteFile(filepath.Join(root, "src", "main.tetra"), []byte("func main() -> Int:\n    return 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runUnpackValidator(t, root)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "metadata hash mismatch") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func makeUnpackedProject(t *testing.T, manifest bool, source bool) string {
 	t.Helper()
 	if manifest {
@@ -123,7 +155,61 @@ func makeUnpackedProjectWithManifest(t *testing.T, manifest string, source bool)
 			t.Fatal(err)
 		}
 	}
+	writeUnpackMetadataFixture(t, root)
 	return root
+}
+
+type unpackPackageMetadata struct {
+	Schema      string                  `json:"schema"`
+	Compression string                  `json:"compression"`
+	MTimeUnix   int64                   `json:"mtime_unix"`
+	FileCount   int                     `json:"file_count"`
+	Files       []unpackPackageFileMeta `json:"files"`
+}
+
+type unpackPackageFileMeta struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+}
+
+func writeUnpackMetadataFixture(t *testing.T, root string) {
+	t.Helper()
+	var files []unpackPackageFileMeta
+	for _, rel := range []string{"Tetra.capsule", "src/main.tetra"} {
+		abs := filepath.Join(root, rel)
+		raw, err := os.ReadFile(abs)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(raw)
+		files = append(files, unpackPackageFileMeta{
+			Path:   filepath.ToSlash(rel),
+			SHA256: "sha256:" + hex.EncodeToString(sum[:]),
+			Size:   int64(len(raw)),
+		})
+	}
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Path < files[j].Path
+	})
+	meta := unpackPackageMetadata{
+		Schema:      "tetra.eco.package.v1",
+		Compression: "gzip",
+		MTimeUnix:   0,
+		FileCount:   len(files),
+		Files:       files,
+	}
+	raw, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if err := os.WriteFile(filepath.Join(root, "tetra.package.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func runUnpackValidator(t *testing.T, root string) ([]byte, error) {

@@ -1,5 +1,18 @@
 // Experimental math helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.math directly.
 module lib.experimental.math
 
+import lib.core.math as stable_math
+
 func add_i32(a: i32, b: i32) -> i32:
-    return a + b
+    return stable_math.add_i32(a, b)
+
+func min_i32(a: i32, b: i32) -> i32:
+    return stable_math.min_i32(a, b)
+
+func max_i32(a: i32, b: i32) -> i32:
+    return stable_math.max_i32(a, b)
+
+func clamp_i32(value: i32, lo: i32, hi: i32) -> i32:
+    return stable_math.clamp_i32(value, lo, hi)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"tetra_language/compiler"
@@ -79,13 +80,23 @@ func main() {
 	}
 	checkContains(filepath.FromSlash("cli/cmd/tetra/main.go"), triples)
 
+	stableModulePaths := currentStableModulePaths()
+	if err := verifyStableModuleDocs(stableModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
 	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md"}); err != nil {
 		errs = append(errs, err.Error())
 	}
-	if err := verifyRequiredDoctestBlocks(currentStableModulePaths()); err != nil {
+	if err := verifyRequiredDoctestBlocks(stableModulePaths); err != nil {
 		errs = append(errs, err.Error())
 	}
-	if err := verifyWASMBackendPlan("docs/backend/wasm_backend_plan.md", ctarget.PlannedTriples()); err != nil {
+	if err := verifyStableModuleExamples(stableModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyStableModuleEffectsMetadata(stableModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyWASMBackendPlan("docs/backend/wasm_backend_plan.md", ctarget.WASMTriples()); err != nil {
 		errs = append(errs, err.Error())
 	}
 
@@ -218,10 +229,98 @@ func stripLineCommentPrefix(line string) (string, bool) {
 	return afterPrefix, true
 }
 
-func currentStableModulePaths() []string {
-	return []string{
-		filepath.FromSlash("lib/core/capability.tetra"),
-		filepath.FromSlash("lib/core/math.tetra"),
-		filepath.FromSlash("lib/core/memory.tetra"),
+func verifyStableModuleDocs(paths []string) error {
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		lines := strings.Split(string(raw), "\n")
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" {
+				continue
+			}
+			if !strings.HasPrefix(trimmed, "//") {
+				return fmt.Errorf("%s: missing stable module docs comment", path)
+			}
+			break
+		}
 	}
+	return nil
+}
+
+func verifyStableModuleExamples(paths []string) error {
+	for _, path := range paths {
+		name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		example := stableModuleExamplePath(name)
+		if example == "" {
+			return fmt.Errorf("%s: no stable module example mapping for %q", path, name)
+		}
+		raw, err := os.ReadFile(example)
+		if err != nil {
+			return fmt.Errorf("%s: missing stable module example %q: %v", path, example, err)
+		}
+		moduleRef := "lib.core." + name
+		if !strings.Contains(string(raw), moduleRef) {
+			return fmt.Errorf("%s: stable module example %q does not reference %q", path, example, moduleRef)
+		}
+	}
+	return nil
+}
+
+func stableModuleExamplePath(moduleName string) string {
+	switch moduleName {
+	case "capability":
+		return filepath.FromSlash("examples/core_memory_smoke.tetra")
+	default:
+		return filepath.FromSlash(fmt.Sprintf("examples/core_%s_smoke.tetra", moduleName))
+	}
+}
+
+func verifyStableModuleEffectsMetadata(paths []string) error {
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		lines := strings.Split(string(raw), "\n")
+		var metadata string
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "module ") {
+				break
+			}
+			if strings.HasPrefix(trimmed, "// Effects:") {
+				metadata = strings.TrimSpace(strings.TrimPrefix(trimmed, "// Effects:"))
+			}
+		}
+		if metadata == "" {
+			return fmt.Errorf("%s: missing effects metadata", path)
+		}
+		if strings.EqualFold(metadata, "none") {
+			continue
+		}
+		for _, rawEffect := range strings.Split(metadata, ",") {
+			effect := strings.TrimSpace(rawEffect)
+			if effect == "" {
+				return fmt.Errorf("%s: invalid effects metadata %q", path, metadata)
+			}
+			for _, r := range effect {
+				if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
+					return fmt.Errorf("%s: invalid effect name %q in metadata", path, effect)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func currentStableModulePaths() []string {
+	paths, err := filepath.Glob(filepath.FromSlash("lib/core/*.tetra"))
+	if err != nil {
+		return nil
+	}
+	sort.Strings(paths)
+	return paths
 }

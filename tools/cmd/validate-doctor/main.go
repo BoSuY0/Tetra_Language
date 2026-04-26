@@ -52,6 +52,7 @@ func validateDoctorReport(raw []byte) error {
 	required := map[string]bool{
 		"version":                                false,
 		"supported targets":                      false,
+		"build-only targets":                     false,
 		"planned targets":                        false,
 		"repo root":                              false,
 		"__rt/actors_sysv.tetra":                 false,

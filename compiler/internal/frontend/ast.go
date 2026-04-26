@@ -446,9 +446,10 @@ func (e *AwaitExpr) Pos() Position {
 }
 
 type CallExpr struct {
-	At   Position
-	Name string
-	Args []Expr
+	At        Position
+	Name      string
+	Args      []Expr
+	ArgLabels []string
 }
 
 func (e *CallExpr) exprNode() {}

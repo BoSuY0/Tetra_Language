@@ -1,0 +1,7 @@
+// Stable core strings stdlib smoke.
+module examples.core_strings_smoke
+
+import lib.core.strings as strings
+
+func main() -> Int:
+    return strings.ascii_sum("*")

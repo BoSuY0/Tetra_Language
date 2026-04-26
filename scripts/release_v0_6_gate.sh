@@ -69,11 +69,11 @@ actor Worker:
     return 0
 TETRA
 if ./tetra build --diagnostics=json --target wasm32-wasi examples/flow_hello.tetra >"$tmp_dir/wasm-target-diagnostic.out" 2>"$tmp_dir/wasm-target-diagnostic.json"; then
-  echo "expected tetra build --target wasm32-wasi to report planned target diagnostic" >&2
+  echo "expected tetra build --target wasm32-wasi to report backend-not-implemented diagnostic" >&2
   exit 1
 fi
 test ! -s "$tmp_dir/wasm-target-diagnostic.out"
-go run ./tools/cmd/validate-diagnostic --diagnostic "$tmp_dir/wasm-target-diagnostic.json" --severity error --contains "planned target not implemented: wasm32-wasi"
+go run ./tools/cmd/validate-diagnostic --diagnostic "$tmp_dir/wasm-target-diagnostic.json" --severity error --contains "target backend not implemented: wasm32-wasi"
 ./tetra smoke --list --format=json >"$tmp_dir/smoke-list.json"
 go run ./tools/cmd/validate-smoke-list --report "$tmp_dir/smoke-list.json"
 ./tetra test examples

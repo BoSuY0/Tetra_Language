@@ -548,7 +548,11 @@ func formatExprPrec(expr frontend.Expr, parent int) string {
 		return out
 	case *frontend.CallExpr:
 		args := make([]string, 0, len(e.Args))
-		for _, arg := range e.Args {
+		for i, arg := range e.Args {
+			if i < len(e.ArgLabels) && e.ArgLabels[i] != "" {
+				args = append(args, e.ArgLabels[i]+": "+formatExpr(arg))
+				continue
+			}
 			args = append(args, formatExpr(arg))
 		}
 		return e.Name + "(" + strings.Join(args, ", ") + ")"

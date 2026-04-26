@@ -1,0 +1,18 @@
+// Experimental slices helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.slices directly.
+module lib.experimental.slices
+
+import lib.core.slices as stable_slices
+
+func sum_i32(values: []i32) -> Int
+uses mem:
+    return stable_slices.sum_i32(values)
+
+func weighted_sum_i32(values: []i32) -> Int
+uses mem:
+    return stable_slices.weighted_sum_i32(values)
+
+func sum_u8(values: []u8) -> Int
+uses mem:
+    return stable_slices.sum_u8(values)

@@ -5,6 +5,17 @@ import (
 	"strings"
 )
 
+type ParseMode int
+
+const (
+	ParseModeCanonical ParseMode = iota
+	ParseModeMigrationNormalize
+)
+
+type ParseOptions struct {
+	Mode ParseMode
+}
+
 func Parse(src []byte) (*Program, error) {
 	file, err := ParseFile(src, "")
 	if err != nil {
@@ -17,7 +28,11 @@ func Parse(src []byte) (*Program, error) {
 }
 
 func ParseFile(src []byte, filename string) (*FileAST, error) {
-	parseSrc, err := normalizeFlowSyntax(src, filename)
+	return ParseFileWithOptions(src, filename, ParseOptions{Mode: ParseModeCanonical})
+}
+
+func ParseFileWithOptions(src []byte, filename string, opts ParseOptions) (*FileAST, error) {
+	parseSrc, err := parseSourceByMode(src, filename, opts.Mode)
 	if err != nil {
 		return nil, err
 	}
@@ -32,6 +47,21 @@ func ParseFile(src []byte, filename string) (*FileAST, error) {
 	file.Path = filename
 	file.Src = append([]byte(nil), src...)
 	return file, nil
+}
+
+func ParseFileWithMigrationNormalization(src []byte, filename string) (*FileAST, error) {
+	return ParseFileWithOptions(src, filename, ParseOptions{Mode: ParseModeMigrationNormalize})
+}
+
+func parseSourceByMode(src []byte, filename string, mode ParseMode) ([]byte, error) {
+	switch mode {
+	case ParseModeCanonical:
+		return canonicalizeFlowSyntax(src, filename)
+	case ParseModeMigrationNormalize:
+		return normalizeFlowSyntax(src, filename)
+	default:
+		return nil, diagnosticErrorf(Position{File: filename, Line: 1, Col: 1}, "unknown parse mode")
+	}
 }
 
 type parser struct {
@@ -744,10 +774,6 @@ func isFunctionLikeCallee(parts []string) bool {
 	return ch == '_' || (ch >= 'a' && ch <= 'z')
 }
 
-func argumentLabelsPlannedError(pos Position) error {
-	return diagnosticErrorf(pos, "function-call argument labels are planned for a later release")
-}
-
 func (p *parser) parseStructDecl() (*StructDecl, error) {
 	if p.cur.typ != TokenStruct {
 		return nil, p.unexpected("struct")
@@ -1069,7 +1095,7 @@ func (p *parser) parseStmt() (Stmt, error) {
 		if err := p.consumeOptionalSemicolon(); err != nil {
 			return nil, err
 		}
-		mutable := declTok.typ == TokenLet || declTok.typ == TokenVar
+		mutable := declTok.typ == TokenVar
 		return &LetStmt{At: pos, Name: nameTok.lit, Type: typeRef, Mutable: mutable, Const: declTok.typ == TokenConst, Value: expr}, nil
 	case TokenIf:
 		pos := p.cur.pos
@@ -1101,14 +1127,8 @@ func (p *parser) parseStmt() (Stmt, error) {
 			}
 			return &IfLetStmt{At: pos, Name: nameTok.lit, Value: value, Then: thenBlock, Else: elseBlock}, nil
 		}
-		if _, err := p.expect(TokenLParen); err != nil {
-			return nil, err
-		}
-		cond, err := p.parseExpr()
+		cond, err := p.parseConditionExpr()
 		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(TokenRParen); err != nil {
 			return nil, err
 		}
 		thenBlock, err := p.parseBlock()
@@ -1125,14 +1145,8 @@ func (p *parser) parseStmt() (Stmt, error) {
 		if err := p.next(); err != nil {
 			return nil, err
 		}
-		if _, err := p.expect(TokenLParen); err != nil {
-			return nil, err
-		}
-		cond, err := p.parseExpr()
+		cond, err := p.parseConditionExpr()
 		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(TokenRParen); err != nil {
 			return nil, err
 		}
 		body, err := p.parseBlock()
@@ -1164,42 +1178,26 @@ func (p *parser) parseStmt() (Stmt, error) {
 				return nil, err
 			}
 			if p.cur.typ == TokenIdent && p.peek.typ == TokenColon {
-				if isFunctionLikeCallee(parts) {
-					return nil, argumentLabelsPlannedError(p.cur.pos)
-				}
-				typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
-				lit, err := p.parseStructCallLiteral(typeRef)
-				if err != nil {
-					return nil, err
-				}
-				if p.cur.typ == TokenAssign {
-					return nil, diagnosticErrorf(pos, "cannot assign to struct literal")
-				}
-				if err := p.consumeOptionalSemicolon(); err != nil {
-					return nil, err
-				}
-				return &ExprStmt{At: pos, Expr: lit}, nil
-			}
-			var args []Expr
-			if p.cur.typ != TokenRParen {
-				for {
-					arg, err := p.parseExpr()
+				if !isFunctionLikeCallee(parts) {
+					typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
+					lit, err := p.parseStructCallLiteral(typeRef)
 					if err != nil {
 						return nil, err
 					}
-					args = append(args, arg)
-					if p.cur.typ != TokenComma {
-						break
+					if p.cur.typ == TokenAssign {
+						return nil, diagnosticErrorf(pos, "cannot assign to struct literal")
 					}
-					if err := p.next(); err != nil {
+					if err := p.consumeOptionalSemicolon(); err != nil {
 						return nil, err
 					}
+					return &ExprStmt{At: pos, Expr: lit}, nil
 				}
 			}
-			if _, err := p.expect(TokenRParen); err != nil {
+			args, labels, err := p.parseCallArgs()
+			if err != nil {
 				return nil, err
 			}
-			callExpr := &CallExpr{At: pos, Name: name, Args: args}
+			callExpr := &CallExpr{At: pos, Name: name, Args: args, ArgLabels: labels}
 			if p.cur.typ != TokenAssign {
 				if err := p.consumeOptionalSemicolon(); err != nil {
 					return nil, err
@@ -1438,6 +1436,81 @@ func (p *parser) parseElseBlock() ([]Stmt, error) {
 	return p.parseBlock()
 }
 
+func (p *parser) parseConditionExpr() (Expr, error) {
+	if p.cur.typ == TokenLParen {
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		cond, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.expect(TokenRParen); err != nil {
+			return nil, err
+		}
+		return cond, nil
+	}
+	prevSuppress := p.suppressStructLiteral
+	p.suppressStructLiteral = true
+	cond, err := p.parseExpr()
+	p.suppressStructLiteral = prevSuppress
+	if err != nil {
+		return nil, err
+	}
+	return cond, nil
+}
+
+func (p *parser) parseCallArgs() ([]Expr, []string, error) {
+	if p.cur.typ == TokenRParen {
+		if _, err := p.expect(TokenRParen); err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, nil
+	}
+	var args []Expr
+	var labels []string
+	for {
+		label := ""
+		if p.cur.typ == TokenIdent && p.peek.typ == TokenColon {
+			label = p.cur.lit
+			if err := p.next(); err != nil {
+				return nil, nil, err
+			}
+			if _, err := p.expect(TokenColon); err != nil {
+				return nil, nil, err
+			}
+		}
+		arg, err := p.parseExpr()
+		if err != nil {
+			return nil, nil, err
+		}
+		args = append(args, arg)
+		labels = append(labels, label)
+		if p.cur.typ != TokenComma {
+			break
+		}
+		if err := p.next(); err != nil {
+			return nil, nil, err
+		}
+	}
+	if _, err := p.expect(TokenRParen); err != nil {
+		return nil, nil, err
+	}
+	if allCallLabelsEmpty(labels) {
+		return args, nil, nil
+	}
+	return args, labels, nil
+}
+
+func allCallLabelsEmpty(labels []string) bool {
+	for _, label := range labels {
+		if label != "" {
+			return false
+		}
+	}
+	return true
+}
+
 func (p *parser) parseMatchStmt() (Stmt, error) {
 	pos := p.cur.pos
 	if err := p.next(); err != nil {
@@ -1503,29 +1576,19 @@ func (p *parser) parseMatchValue() (Expr, error) {
 			if err := p.next(); err != nil {
 				return nil, err
 			}
-			if p.cur.typ == TokenIdent && p.peek.typ == TokenColon && isFunctionLikeCallee(parts) {
-				return nil, argumentLabelsPlannedError(p.cur.pos)
-			}
-			var args []Expr
-			if p.cur.typ != TokenRParen {
-				for {
-					arg, err := p.parseExpr()
-					if err != nil {
-						return nil, err
-					}
-					args = append(args, arg)
-					if p.cur.typ != TokenComma {
-						break
-					}
-					if err := p.next(); err != nil {
-						return nil, err
-					}
+			if p.cur.typ == TokenIdent && p.peek.typ == TokenColon && !isFunctionLikeCallee(parts) {
+				typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
+				lit, err := p.parseStructCallLiteral(typeRef)
+				if err != nil {
+					return nil, err
 				}
+				return p.parsePostfix(lit)
 			}
-			if _, err := p.expect(TokenRParen); err != nil {
+			args, labels, err := p.parseCallArgs()
+			if err != nil {
 				return nil, err
 			}
-			return p.parsePostfix(&CallExpr{At: pos, Name: name, Args: args})
+			return p.parsePostfix(&CallExpr{At: pos, Name: name, Args: args, ArgLabels: labels})
 		}
 		return buildFieldAccess(parts, pos), nil
 	}
@@ -1782,36 +1845,20 @@ func (p *parser) parsePrimary() (Expr, error) {
 				return nil, err
 			}
 			if p.cur.typ == TokenIdent && p.peek.typ == TokenColon {
-				if isFunctionLikeCallee(parts) {
-					return nil, argumentLabelsPlannedError(p.cur.pos)
-				}
-				typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
-				lit, err := p.parseStructCallLiteral(typeRef)
-				if err != nil {
-					return nil, err
-				}
-				return p.parsePostfix(lit)
-			}
-			var args []Expr
-			if p.cur.typ != TokenRParen {
-				for {
-					arg, err := p.parseExpr()
+				if !isFunctionLikeCallee(parts) {
+					typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
+					lit, err := p.parseStructCallLiteral(typeRef)
 					if err != nil {
 						return nil, err
 					}
-					args = append(args, arg)
-					if p.cur.typ != TokenComma {
-						break
-					}
-					if err := p.next(); err != nil {
-						return nil, err
-					}
+					return p.parsePostfix(lit)
 				}
 			}
-			if _, err := p.expect(TokenRParen); err != nil {
+			args, labels, err := p.parseCallArgs()
+			if err != nil {
 				return nil, err
 			}
-			return p.parsePostfix(&CallExpr{At: pos, Name: name, Args: args})
+			return p.parsePostfix(&CallExpr{At: pos, Name: name, Args: args, ArgLabels: labels})
 		}
 		if p.cur.typ == TokenLBrace && !p.suppressStructLiteral {
 			typeRef := TypeRef{At: pos, Kind: TypeRefNamed, Name: name}
@@ -1991,7 +2038,8 @@ func cloneCompoundTarget(expr Expr) Expr {
 		for _, arg := range e.Args {
 			args = append(args, cloneCompoundTarget(arg))
 		}
-		return &CallExpr{At: e.At, Name: e.Name, Args: args}
+		labels := append([]string(nil), e.ArgLabels...)
+		return &CallExpr{At: e.At, Name: e.Name, Args: args, ArgLabels: labels}
 	default:
 		return expr
 	}

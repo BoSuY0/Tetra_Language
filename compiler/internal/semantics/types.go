@@ -50,6 +50,7 @@ type GlobalInfo struct {
 
 type FuncSig struct {
 	Generic           bool
+	ParamNames        []string
 	ParamTypes        []string
 	ParamOwnership    []string
 	ParamSlots        int

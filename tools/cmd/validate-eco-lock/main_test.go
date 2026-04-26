@@ -160,6 +160,52 @@ func TestValidateEcoLockRejectsSelfDependency(t *testing.T) {
 	}
 }
 
+func TestValidateEcoLockRejectsUnknownTopLevelField(t *testing.T) {
+	lock := `{
+  "capsules": [
+    {"id": "tetra://app", "name": "App", "version": "0.1.0", "path": "/tmp/app.capsule", "targets": ["linux-x64"]}
+  ],
+  "unexpected": true
+}`
+	out, err := runEcoLockValidator(t, lock)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unknown field") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateEcoLockRejectsDependencyPermissionEscalation(t *testing.T) {
+	lock := `{
+  "capsules": [
+    {
+      "id": "tetra://app",
+      "name": "App",
+      "version": "0.1.0",
+      "path": "/tmp/app.capsule",
+      "targets": ["linux-x64"],
+      "dependencies": [{"id": "tetra://core", "version": "0.1.0"}]
+    },
+    {
+      "id": "tetra://core",
+      "name": "Core",
+      "version": "0.1.0",
+      "path": "/tmp/core.capsule",
+      "targets": ["linux-x64"],
+      "effects": ["io"]
+    }
+  ]
+}`
+	out, err := runEcoLockValidator(t, lock)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "missing required effect io") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func runEcoLockValidator(t *testing.T, lock string) ([]byte, error) {
 	t.Helper()
 	dir := t.TempDir()

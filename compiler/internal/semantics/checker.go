@@ -648,6 +648,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				}
 				checked.FuncSigs[fullName] = FuncSig{
 					Generic:           true,
+					ParamNames:        genericParamNames(fn.Params),
 					ParamTypes:        genericParamTypeNames(fn.Params),
 					ParamOwnership:    genericParamOwnership(fn.Params),
 					ParamSlots:        0,
@@ -698,6 +699,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				return nil, err
 			}
 			paramTypes := make([]string, 0, len(fn.Params))
+			paramNames := make([]string, 0, len(fn.Params))
 			paramOwnership := make([]string, 0, len(fn.Params))
 			paramSlots := 0
 			for i := range fn.Params {
@@ -711,11 +713,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if err != nil {
 					return nil, err
 				}
+				paramNames = append(paramNames, param.Name)
 				paramTypes = append(paramTypes, resolved)
 				paramOwnership = append(paramOwnership, param.Ownership)
 				paramSlots += info.SlotCount
 			}
 			checked.FuncSigs[fullName] = FuncSig{
+				ParamNames:        paramNames,
 				ParamTypes:        paramTypes,
 				ParamOwnership:    paramOwnership,
 				ParamSlots:        paramSlots,
@@ -1148,6 +1152,14 @@ func genericParamTypeNames(params []frontend.ParamDecl) []string {
 	out := make([]string, 0, len(params))
 	for _, param := range params {
 		out = append(out, formatGenericTypeRef(param.Type))
+	}
+	return out
+}
+
+func genericParamNames(params []frontend.ParamDecl) []string {
+	out := make([]string, 0, len(params))
+	for _, param := range params {
+		out = append(out, param.Name)
 	}
 	return out
 }

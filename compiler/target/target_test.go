@@ -24,7 +24,10 @@ func TestTargetListsAreStable(t *testing.T) {
 	if got := SupportedTriples(); len(got) != 3 || got[0] != "linux-x64" || got[1] != "windows-x64" || got[2] != "macos-x64" {
 		t.Fatalf("supported triples = %#v", got)
 	}
-	if got := PlannedTriples(); len(got) != 2 || got[0] != "wasm32-wasi" || got[1] != "wasm32-web" {
+	if got := BuildOnlyTriples(); len(got) != 1 || got[0] != "wasm32-wasi" {
+		t.Fatalf("build-only triples = %#v", got)
+	}
+	if got := PlannedTriples(); len(got) != 1 || got[0] != "wasm32-web" {
 		t.Fatalf("planned triples = %#v", got)
 	}
 }
@@ -35,22 +38,36 @@ func TestParseRejectsUnknown(t *testing.T) {
 	}
 }
 
-func TestParseReportsPlannedWASMTargets(t *testing.T) {
-	for _, triple := range []string{"wasm32-wasi", "wasm32-web"} {
-		_, err := Parse(triple)
-		if err == nil {
-			t.Fatalf("Parse(%q): expected planned-target error", triple)
-		}
-		targetErr, ok := err.(UnsupportedTargetError)
-		if !ok {
-			t.Fatalf("Parse(%q): error type = %T, want UnsupportedTargetError", triple, err)
-		}
-		if !targetErr.Planned || targetErr.Triple != triple {
-			t.Fatalf("planned target error = %#v", targetErr)
-		}
-		if !IsPlannedTarget(triple) {
-			t.Fatalf("IsPlannedTarget(%q) = false", triple)
-		}
+func TestParseAcceptsWASMBuildOnlyTarget(t *testing.T) {
+	tgt, err := Parse("wasm32-wasi")
+	if err != nil {
+		t.Fatalf("Parse(wasm32-wasi): %v", err)
+	}
+	if tgt.Triple != "wasm32-wasi" || tgt.ExeExt != ".wasm" {
+		t.Fatalf("wasm32-wasi target = %#v", tgt)
+	}
+	if !IsBuildOnlyTarget("wasm32-wasi") {
+		t.Fatalf("IsBuildOnlyTarget(wasm32-wasi) = false")
+	}
+	if IsPlannedTarget("wasm32-wasi") {
+		t.Fatalf("IsPlannedTarget(wasm32-wasi) = true")
+	}
+}
+
+func TestParseReportsPlannedWASMWebTarget(t *testing.T) {
+	_, err := Parse("wasm32-web")
+	if err == nil {
+		t.Fatalf("Parse(wasm32-web): expected planned-target error")
+	}
+	targetErr, ok := err.(UnsupportedTargetError)
+	if !ok {
+		t.Fatalf("Parse(wasm32-web): error type = %T, want UnsupportedTargetError", err)
+	}
+	if !targetErr.Planned || targetErr.Triple != "wasm32-web" {
+		t.Fatalf("planned target error = %#v", targetErr)
+	}
+	if !IsPlannedTarget("wasm32-web") {
+		t.Fatalf("IsPlannedTarget(wasm32-web) = false")
 	}
 }
 

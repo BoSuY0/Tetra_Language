@@ -346,7 +346,7 @@ func TestReleaseV06GateValidatesJSONDiagnosticShape(t *testing.T) {
 		`check_json_diagnostic_case "planned-actor-diagnostic" "planned feature 'actor'"`,
 		`--require-position`,
 		`./tetra build --diagnostics=json --target wasm32-wasi examples/flow_hello.tetra`,
-		`go run ./tools/cmd/validate-diagnostic --diagnostic "$tmp_dir/wasm-target-diagnostic.json" --severity error --contains "planned target not implemented: wasm32-wasi"`,
+		`go run ./tools/cmd/validate-diagnostic --diagnostic "$tmp_dir/wasm-target-diagnostic.json" --severity error --contains "target backend not implemented: wasm32-wasi"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("release gate missing JSON diagnostic validation %q", want)
@@ -548,7 +548,7 @@ func TestTestAllValidatesJSONDiagnosticShape(t *testing.T) {
 		`check_json_diagnostic_case "planned-actor-diagnostic" "planned feature 'actor'"`,
 		`--require-position`,
 		`./tetra build --diagnostics=json --target wasm32-wasi examples/flow_hello.tetra`,
-		`go run ./tools/cmd/validate-diagnostic --diagnostic "$report_dir/wasm-target-diagnostic.json" --severity error --contains "planned target not implemented: wasm32-wasi"`,
+		`go run ./tools/cmd/validate-diagnostic --diagnostic "$report_dir/wasm-target-diagnostic.json" --severity error --contains "target backend not implemented: wasm32-wasi"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("test_all missing JSON diagnostic validation %q", want)
@@ -796,16 +796,16 @@ case "$cmd" in
   build)
     for arg in "$@"; do
       if [[ "$arg" == "wasm32-wasi" ]]; then
-        echo '{"code":"TETRA0001","message":"planned target not implemented: wasm32-wasi","severity":"error"}' >&2
-        exit 2
+        echo '{"code":"TETRA0001","message":"target backend not implemented: wasm32-wasi (codegen/link/run blocked)","severity":"error"}' >&2
+        exit 1
       fi
     done
     ;;
   targets)
-    printf '{"supported":["linux-x64","windows-x64","macos-x64"],"planned":["wasm32-wasi","wasm32-web"]}\n'
+    printf '{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi"],"planned":["wasm32-web"]}\n'
     ;;
   doctor)
-    printf '{"status":"pass","checks":[{"name":"version","status":"pass"},{"name":"supported targets","status":"pass"},{"name":"planned targets","status":"pass"},{"name":"repo root","status":"pass"},{"name":"__rt/actors_sysv.tetra","status":"pass"},{"name":"__rt/actors_win64.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_sysv.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_win64.tetra","status":"pass"},{"name":"examples/flow_hello.tetra","status":"pass"},{"name":"docs/generated/manifest.json","status":"pass"},{"name":"docs manifest version","status":"pass"},{"name":"docs manifest surface","status":"pass"},{"name":"smoke sources","status":"pass"},{"name":"runtime exports","status":"pass"}]}\n'
+    printf '{"status":"pass","checks":[{"name":"version","status":"pass"},{"name":"supported targets","status":"pass"},{"name":"build-only targets","status":"pass"},{"name":"planned targets","status":"pass"},{"name":"repo root","status":"pass"},{"name":"__rt/actors_sysv.tetra","status":"pass"},{"name":"__rt/actors_win64.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_sysv.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_win64.tetra","status":"pass"},{"name":"examples/flow_hello.tetra","status":"pass"},{"name":"docs/generated/manifest.json","status":"pass"},{"name":"docs manifest version","status":"pass"},{"name":"docs manifest surface","status":"pass"},{"name":"smoke sources","status":"pass"},{"name":"runtime exports","status":"pass"}]}\n'
     ;;
   smoke)
     report=""

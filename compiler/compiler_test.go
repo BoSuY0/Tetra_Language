@@ -228,7 +228,7 @@ func TestBuildWhileCounter(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fn main() -> i32 {\n  let n: i32 = 3;\n  let acc: i32 = 0;\n  while (n) {\n    acc = acc + 1;\n    n = n - 1;\n  }\n  return acc;\n}\n"
+	src := "fn main() -> i32 {\n  var n: i32 = 3;\n  var acc: i32 = 0;\n  while (n) {\n    acc = acc + 1;\n    n = n - 1;\n  }\n  return acc;\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -273,7 +273,7 @@ func TestBuildWhileLess(t *testing.T) {
 		t.Skip("linux/amd64 only")
 	}
 
-	src := "fn main() -> i32 {\n  let i: i32 = 0;\n  while (i < 3) {\n    i = i + 1;\n  }\n  return i;\n}\n"
+	src := "fn main() -> i32 {\n  var i: i32 = 0;\n  while (i < 3) {\n    i = i + 1;\n  }\n  return i;\n}\n"
 	stdout, exitCode := buildAndRun(t, src)
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
@@ -449,6 +449,36 @@ func TestBuildCoreMemorySmoke(t *testing.T) {
 
 	root := projectRoot(t)
 	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_memory_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreStringsSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_strings_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreSlicesSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_slices_smoke.tetra"))
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
 	}

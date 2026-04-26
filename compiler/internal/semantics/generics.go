@@ -395,7 +395,8 @@ func cloneExpr(expr frontend.Expr) frontend.Expr {
 		for _, arg := range e.Args {
 			args = append(args, cloneExpr(arg))
 		}
-		return &frontend.CallExpr{At: e.At, Name: e.Name, Args: args}
+		labels := append([]string(nil), e.ArgLabels...)
+		return &frontend.CallExpr{At: e.At, Name: e.Name, Args: args, ArgLabels: labels}
 	case *frontend.StructLitExpr:
 		fields := make([]frontend.StructFieldInit, 0, len(e.Fields))
 		for _, field := range e.Fields {

@@ -24,6 +24,7 @@ const (
 	OSLinux
 	OSWindows
 	OSMacOS
+	OSWASI
 )
 
 func (o OS) String() string {
@@ -34,6 +35,8 @@ func (o OS) String() string {
 		return "windows"
 	case OSMacOS:
 		return "macos"
+	case OSWASI:
+		return "wasi"
 	default:
 		return "unknown"
 	}
@@ -44,12 +47,15 @@ type Arch int
 const (
 	ArchUnknown Arch = iota
 	ArchX64
+	ArchWASM32
 )
 
 func (a Arch) String() string {
 	switch a {
 	case ArchX64:
 		return "x64"
+	case ArchWASM32:
+		return "wasm32"
 	default:
 		return "unknown"
 	}
@@ -61,6 +67,7 @@ const (
 	ABIUnknown ABI = iota
 	ABISysV
 	ABIWin64
+	ABIWASI
 )
 
 func (a ABI) String() string {
@@ -69,6 +76,8 @@ func (a ABI) String() string {
 		return "sysv"
 	case ABIWin64:
 		return "win64"
+	case ABIWASI:
+		return "wasi"
 	default:
 		return "unknown"
 	}
@@ -81,6 +90,7 @@ const (
 	FormatELF
 	FormatPE
 	FormatMachO
+	FormatWASM
 )
 
 func (f Format) String() string {
@@ -91,6 +101,8 @@ func (f Format) String() string {
 		return "pe"
 	case FormatMachO:
 		return "macho"
+	case FormatWASM:
+		return "wasm"
 	default:
 		return "unknown"
 	}
@@ -121,7 +133,15 @@ func SupportedTriples() []string {
 	return []string{"linux-x64", "windows-x64", "macos-x64"}
 }
 
+func BuildOnlyTriples() []string {
+	return []string{"wasm32-wasi"}
+}
+
 func PlannedTriples() []string {
+	return []string{"wasm32-web"}
+}
+
+func WASMTriples() []string {
 	return []string{"wasm32-wasi", "wasm32-web"}
 }
 
@@ -157,11 +177,30 @@ func Parse(triple string) (Target, error) {
 			ExeExt:         "",
 			CollectImports: false,
 		}, nil
-	case "wasm32-wasi", "wasm32-web":
+	case "wasm32-wasi":
+		return Target{
+			Triple:         "wasm32-wasi",
+			OS:             OSWASI,
+			Arch:           ArchWASM32,
+			ABI:            ABIWASI,
+			Format:         FormatWASM,
+			ExeExt:         ".wasm",
+			CollectImports: false,
+		}, nil
+	case "wasm32-web":
 		return Target{}, UnsupportedTargetError{Triple: triple, Planned: true}
 	default:
 		return Target{}, UnsupportedTargetError{Triple: triple}
 	}
+}
+
+func IsBuildOnlyTarget(triple string) bool {
+	for _, buildOnly := range BuildOnlyTriples() {
+		if triple == buildOnly {
+			return true
+		}
+	}
+	return false
 }
 
 func IsPlannedTarget(triple string) bool {

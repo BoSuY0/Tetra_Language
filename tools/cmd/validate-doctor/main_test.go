@@ -8,7 +8,8 @@ func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
   "checks": [
     {"name":"version","status":"pass","detail":"v0.6.0"},
     {"name":"supported targets","status":"pass","detail":"linux-x64, windows-x64, macos-x64"},
-    {"name":"planned targets","status":"pass","detail":"wasm32-wasi, wasm32-web"},
+    {"name":"build-only targets","status":"pass","detail":"wasm32-wasi"},
+    {"name":"planned targets","status":"pass","detail":"wasm32-web"},
     {"name":"repo root","status":"pass","detail":"/tmp/tetra"},
     {"name":"__rt/actors_sysv.tetra","status":"pass","detail":"found"},
     {"name":"__rt/actors_win64.tetra","status":"pass","detail":"found"},

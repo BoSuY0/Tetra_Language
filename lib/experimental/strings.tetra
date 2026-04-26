@@ -1,0 +1,15 @@
+// Experimental strings helpers (no stability guarantees).
+//
+// Promotion note: v1 stable callers should use lib.core.strings directly.
+module lib.experimental.strings
+
+import lib.core.strings as stable_strings
+
+func ascii_len(text: String) -> Int:
+    return stable_strings.ascii_len(text)
+
+func ascii_sum(text: String) -> Int:
+    return stable_strings.ascii_sum(text)
+
+func is_empty(text: String) -> Bool:
+    return stable_strings.is_empty(text)

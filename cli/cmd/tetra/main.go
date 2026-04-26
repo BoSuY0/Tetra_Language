@@ -45,6 +45,7 @@ type smokeCaseReport struct {
 type smokeReport struct {
 	Timestamp    string            `json:"timestamp"`
 	Target       string            `json:"target"`
+	BuildOnly    bool              `json:"build_only,omitempty"`
 	Host         string            `json:"host"`
 	Version      string            `json:"version"`
 	GitHead      string            `json:"git_head,omitempty"`
@@ -70,12 +71,15 @@ type smokeListCase struct {
 }
 
 type smokeListReport struct {
+	Target       string          `json:"target"`
+	BuildOnly    bool            `json:"build_only"`
+	RunSupported bool            `json:"run_supported"`
 	Total        int             `json:"total"`
 	IslandsDebug bool            `json:"islands_debug"`
 	Cases        []smokeListCase `json:"cases"`
 }
 
-const supportedTargetsHelp = "linux-x64, windows-x64, macos-x64"
+const supportedTargetsHelp = "linux-x64, windows-x64, macos-x64, wasm32-wasi (build-only)"
 
 func main() {
 	os.Exit(runCLI(os.Args[1:], os.Stdout, os.Stderr))
@@ -123,6 +127,7 @@ func runCLI(args []string, stdout io.Writer, stderr io.Writer) int {
 
 type targetsReport struct {
 	Supported []string `json:"supported"`
+	BuildOnly []string `json:"build_only"`
 	Planned   []string `json:"planned"`
 }
 
@@ -150,12 +155,17 @@ func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	report := targetsReport{
 		Supported: ctarget.SupportedTriples(),
+		BuildOnly: ctarget.BuildOnlyTriples(),
 		Planned:   ctarget.PlannedTriples(),
 	}
 	switch *format {
 	case "text", "":
 		fmt.Fprintln(stdout, "Supported targets:")
 		for _, triple := range report.Supported {
+			fmt.Fprintf(stdout, "  %s\n", triple)
+		}
+		fmt.Fprintln(stdout, "Build-only targets:")
+		for _, triple := range report.BuildOnly {
 			fmt.Fprintf(stdout, "  %s\n", triple)
 		}
 		fmt.Fprintln(stdout, "Planned targets:")
@@ -220,6 +230,7 @@ func buildDoctorReport() doctorReport {
 	checks := []doctorCheck{
 		passCheck("version", compiler.Version()),
 		passCheck("supported targets", strings.Join(ctarget.SupportedTriples(), ", ")),
+		passCheck("build-only targets", strings.Join(ctarget.BuildOnlyTriples(), ", ")),
 		passCheck("planned targets", strings.Join(ctarget.PlannedTriples(), ", ")),
 	}
 	root, err := findRepoRoot()
@@ -1653,7 +1664,12 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 	if *listCases {
-		return writeSmokeList(stdout, stderr, smokeCases(*islandsDebug), *islandsDebug, *listFormat)
+		tgt, err := ctarget.Parse(*target)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		return writeSmokeList(stdout, stderr, smokeCases(*islandsDebug), *islandsDebug, *listFormat, tgt)
 	}
 	if *listFormat != "text" {
 		fmt.Fprintln(stderr, "--format is only supported with --list")
@@ -1690,6 +1706,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	report := smokeReport{
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
 		Target:       tgt.Triple,
+		BuildOnly:    ctarget.IsBuildOnlyTarget(tgt.Triple),
 		Host:         host,
 		Version:      compiler.Version(),
 		GitHead:      gitHead(repoRoot),
@@ -1742,8 +1759,12 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
-func writeSmokeList(stdout io.Writer, stderr io.Writer, cases []smokeCase, islandsDebug bool, format string) int {
+func writeSmokeList(stdout io.Writer, stderr io.Writer, cases []smokeCase, islandsDebug bool, format string, tgt ctarget.Target) int {
+	host, hostOK := hostTarget()
 	report := smokeListReport{
+		Target:       tgt.Triple,
+		BuildOnly:    ctarget.IsBuildOnlyTarget(tgt.Triple),
+		RunSupported: hostOK && host == tgt.Triple && !ctarget.IsBuildOnlyTarget(tgt.Triple),
 		Total:        len(cases),
 		IslandsDebug: islandsDebug,
 		Cases:        make([]smokeListCase, 0, len(cases)),

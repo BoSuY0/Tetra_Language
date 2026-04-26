@@ -1,29 +1,14 @@
 // Experimental memory helpers built on top of cap.mem primitives.
 //
-// These are intentionally small, low-level building blocks meant to support
-// runtime/driver-style code while the language and runtime surface stabilizes.
+// Promotion note: v1 stable callers should use lib.core.memory directly.
 module lib.experimental.memory
+
+import lib.core.memory as stable_memory
 
 func memset_u8(dst: ptr, v: u8, n: i32, mem: cap.mem) -> i32
 uses mem:
-    unsafe:
-        var i: i32 = 0
-        while i < n:
-            var p: ptr = core.ptr_add(dst, i, mem)
-            var _: u8 = core.store_u8(p, v, mem)
-            i = i + 1
-        return 0
-    return 0
+    return stable_memory.memset_u8(dst, v, n, mem)
 
 func memcpy_u8(dst: ptr, src: ptr, n: i32, mem: cap.mem) -> i32
 uses mem:
-    unsafe:
-        var i: i32 = 0
-        while i < n:
-            var sp: ptr = core.ptr_add(src, i, mem)
-            var dp: ptr = core.ptr_add(dst, i, mem)
-            var b: u8 = core.load_u8(sp, mem)
-            var _: u8 = core.store_u8(dp, b, mem)
-            i = i + 1
-        return 0
-    return 0
+    return stable_memory.memcpy_u8(dst, src, n, mem)
