@@ -709,6 +709,8 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 		want string
 	}{
 		{"capsule", "capsule app:\n  name: \"app\"\n", "planned feature 'capsule'"},
+		{"closure literal", "fn main() -> i32 { val f = fn(x: i32) -> i32 { return x }; return 0 }", "planned feature 'closures'"},
+		{"semantic clause", "fn main() -> i32 budget(10) { return 0 }", "planned feature 'semantic clauses'"},
 		{"function call argument label", "func add(a: Int, b: Int) -> Int:\n  return a + b\n\nfunc main() -> Int:\n  return add(a: 40, b: 2)\n", "function-call argument labels are planned"},
 		{"generic protocol requirement", "protocol P:\n  func id<T>(x: T) -> T\n", "generic protocol requirements are planned"},
 		{"generic struct", "struct Box<T>:\n  value: T\n", "generic structs are planned"},

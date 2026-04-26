@@ -1121,6 +1121,9 @@ func TestLSPStdioInitializeAndDidOpen(t *testing.T) {
 	if !strings.Contains(out, `"referencesProvider":true`) {
 		t.Fatalf("references capability missing: %q", out)
 	}
+	if !strings.Contains(out, `"renameProvider":true`) {
+		t.Fatalf("rename capability missing: %q", out)
+	}
 	if !strings.Contains(out, `"documentFormattingProvider":true`) {
 		t.Fatalf("document formatting capability missing: %q", out)
 	}
@@ -1201,6 +1204,39 @@ func TestLSPStdioReferencesReturnsOpenDocumentLocations(t *testing.T) {
 	}
 	if !strings.Contains(out, `"start":{"character":20,"line":3}`) {
 		t.Fatalf("references response missing second usage location: %q", out)
+	}
+}
+
+func TestLSPStdioRenameReturnsWorkspaceEditForOpenDocument(t *testing.T) {
+	var input bytes.Buffer
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///sample.tetra","languageId":"tetra","version":1,"text":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer + answer\n"}}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":2,"method":"textDocument/rename","params":{"textDocument":{"uri":"file:///sample.tetra"},"position":{"line":3,"character":11},"newName":"value"}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":3,"method":"shutdown","params":{}}`)
+	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","method":"exit","params":{}}`)
+	var stdout, stderr bytes.Buffer
+	code := runLSPStdio(&input, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("lsp stdio exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, `"id":2`) {
+		t.Fatalf("rename response missing: %q", out)
+	}
+	if !strings.Contains(out, `"changes":{"file:///sample.tetra":[`) {
+		t.Fatalf("rename workspace edit missing: %q", out)
+	}
+	if !strings.Contains(out, `"newText":"value"`) {
+		t.Fatalf("rename edits missing newText: %q", out)
+	}
+	if !strings.Contains(out, `"start":{"character":6,"line":0}`) {
+		t.Fatalf("rename edits missing declaration location: %q", out)
+	}
+	if !strings.Contains(out, `"start":{"character":11,"line":3}`) {
+		t.Fatalf("rename edits missing first usage location: %q", out)
+	}
+	if !strings.Contains(out, `"start":{"character":20,"line":3}`) {
+		t.Fatalf("rename edits missing second usage location: %q", out)
 	}
 }
 

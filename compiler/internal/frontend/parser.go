@@ -591,6 +591,9 @@ func (p *parser) parseFuncDecl() (*FuncDecl, error) {
 			}
 		}
 	}
+	if feature, ok := plannedSemanticClauseFromToken(p.cur); ok {
+		return nil, plannedFeatureError(p.cur.pos, feature)
+	}
 
 	var body []Stmt
 	if p.cur.typ == TokenAssign {
@@ -1141,6 +1144,8 @@ func (p *parser) parseStmt() (Stmt, error) {
 		return p.parseForRangeStmt()
 	case TokenMatch:
 		return p.parseMatchStmt()
+	case TokenFn, TokenFun:
+		return nil, plannedFeatureError(p.cur.pos, "closures")
 	case TokenIdent:
 		if feature, ok := plannedFeatureFromToken(p.cur); ok {
 			return nil, plannedFeatureError(p.cur.pos, feature)
@@ -1286,6 +1291,20 @@ func plannedFeatureFromToken(tok token) (string, bool) {
 	switch tok.lit {
 	case "actor", "view", "state", "property", "capsule":
 		return tok.lit, true
+	case "closure":
+		return "closures", true
+	default:
+		return "", false
+	}
+}
+
+func plannedSemanticClauseFromToken(tok token) (string, bool) {
+	if tok.typ != TokenIdent {
+		return "", false
+	}
+	switch tok.lit {
+	case "budget", "noalloc", "noblock", "realtime", "nothrow":
+		return "semantic clauses", true
 	default:
 		return "", false
 	}
@@ -1815,6 +1834,8 @@ func (p *parser) parsePrimary() (Expr, error) {
 			return nil, err
 		}
 		return p.parsePostfix(expr)
+	case TokenFn, TokenFun:
+		return nil, plannedFeatureError(p.cur.pos, "closures")
 	default:
 		return nil, p.unexpected("expression")
 	}

@@ -577,6 +577,15 @@ type lspReferencesParams struct {
 	} `json:"context"`
 }
 
+type lspRenameParams struct {
+	TextDocument lspTextDocumentIdentifier `json:"textDocument"`
+	Position     struct {
+		Line      int `json:"line"`
+		Character int `json:"character"`
+	} `json:"position"`
+	NewName string `json:"newName"`
+}
+
 type lspOpenDocument struct {
 	Text     string
 	Analysis compiler.LSPAnalysis
@@ -610,6 +619,7 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 						"hoverProvider":              true,
 						"definitionProvider":         true,
 						"referencesProvider":         true,
+						"renameProvider":             true,
 						"documentFormattingProvider": true,
 						"completionProvider": map[string]any{
 							"resolveProvider": false,
@@ -732,6 +742,22 @@ func runLSPStdio(stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 				var result any
 				if doc, ok := openDocs[params.TextDocument.URI]; ok {
 					result = lspReferenceLocations(doc, params.TextDocument.URI, params.Position.Line, params.Position.Character, params.Context.IncludeDeclaration)
+				}
+				if err := writeLSPResponse(stdout, *req.ID, result); err != nil {
+					fmt.Fprintln(stderr, err)
+					return 1
+				}
+			}
+		case "textDocument/rename":
+			var params lspRenameParams
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+			if req.ID != nil {
+				var result any
+				if doc, ok := openDocs[params.TextDocument.URI]; ok {
+					result = lspRenameWorkspaceEdit(doc, params.TextDocument.URI, params.Position.Line, params.Position.Character, params.NewName)
 				}
 				if err := writeLSPResponse(stdout, *req.ID, result); err != nil {
 					fmt.Fprintln(stderr, err)
@@ -982,36 +1008,81 @@ func lspReferenceLocations(doc lspOpenDocument, uri string, zeroBasedLine int, z
 		return nil
 	}
 	defLine, defCol, hasDefinition := lspDefinitionPosition(doc, name)
-	lines := strings.Split(doc.Text, "\n")
 	locations := []map[string]any{}
-	for line, text := range lines {
+	for _, ref := range lspIdentifierReferences(doc.Text, name) {
+		if !includeDeclaration && hasDefinition && ref.Line == defLine && ref.Column == defCol {
+			continue
+		}
+		locations = append(locations, map[string]any{
+			"uri": uri,
+			"range": map[string]any{
+				"start": map[string]int{"line": ref.Line, "character": ref.Column},
+				"end":   map[string]int{"line": ref.Line, "character": ref.Column + len(name)},
+			},
+		})
+	}
+	return locations
+}
+
+type lspReference struct {
+	Line   int
+	Column int
+}
+
+func lspIdentifierReferences(text string, name string) []lspReference {
+	if name == "" {
+		return nil
+	}
+	lines := strings.Split(text, "\n")
+	refs := []lspReference{}
+	for line, content := range lines {
 		searchFrom := 0
-		for searchFrom <= len(text)-len(name) {
-			offset := strings.Index(text[searchFrom:], name)
+		for searchFrom <= len(content)-len(name) {
+			offset := strings.Index(content[searchFrom:], name)
 			if offset < 0 {
 				break
 			}
 			col := searchFrom + offset
-			startOk := col == 0 || !isLSPIdentifierChar(text[col-1])
+			startOk := col == 0 || !isLSPIdentifierChar(content[col-1])
 			end := col + len(name)
-			endOk := end == len(text) || !isLSPIdentifierChar(text[end])
+			endOk := end == len(content) || !isLSPIdentifierChar(content[end])
 			searchFrom = end
 			if !startOk || !endOk {
 				continue
 			}
-			if !includeDeclaration && hasDefinition && line == defLine && col == defCol {
-				continue
-			}
-			locations = append(locations, map[string]any{
-				"uri": uri,
-				"range": map[string]any{
-					"start": map[string]int{"line": line, "character": col},
-					"end":   map[string]int{"line": line, "character": col + len(name)},
-				},
-			})
+			refs = append(refs, lspReference{Line: line, Column: col})
 		}
 	}
-	return locations
+	return refs
+}
+
+func lspRenameWorkspaceEdit(doc lspOpenDocument, uri string, zeroBasedLine int, zeroBasedCharacter int, newName string) any {
+	if strings.TrimSpace(newName) == "" {
+		return nil
+	}
+	oldName := lspIdentifierAt(doc.Text, zeroBasedLine, zeroBasedCharacter)
+	if oldName == "" {
+		return nil
+	}
+	refs := lspIdentifierReferences(doc.Text, oldName)
+	if len(refs) == 0 {
+		return nil
+	}
+	edits := make([]map[string]any, 0, len(refs))
+	for _, ref := range refs {
+		edits = append(edits, map[string]any{
+			"range": map[string]any{
+				"start": map[string]int{"line": ref.Line, "character": ref.Column},
+				"end":   map[string]int{"line": ref.Line, "character": ref.Column + len(oldName)},
+			},
+			"newText": newName,
+		})
+	}
+	return map[string]any{
+		"changes": map[string]any{
+			uri: edits,
+		},
+	}
 }
 
 func lspCompletionItems(analysis compiler.LSPAnalysis) []map[string]any {

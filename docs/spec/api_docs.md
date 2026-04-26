@@ -27,3 +27,7 @@ The hash input is the newline-joined list of:
 This keeps the prototype stable across prose-only documentation edits while still detecting public API additions, removals, and signature changes.
 
 `tools/cmd/validate-api-docs` rejects docs with missing metadata, unsupported schemas, invalid hash prefixes, mismatched counts, or mismatched hashes.
+
+## API Diff Policy
+
+The baseline artifact format, diff schema, and release-gate command contract are defined in [API Diff Policy](api_diff_policy.md).

@@ -223,7 +223,7 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 
 ### TODO 7: Make Flow Syntax the Canonical Frontend
 
-**Status:** Partial. Flow-only source scanning, formatter checks, and release smoke coverage are green; expression-bodied functions are implemented, and planned-feature diagnostics now cover more deferred syntax. The migration decision is now explicit: native Flow parser as canonical path, `normalizeFlowSyntax` as temporary compatibility tooling. Full argument labels, closures, and semantic clauses remain incomplete or explicitly deferred.
+**Status:** Partial. Flow-only source scanning, formatter checks, and release smoke coverage are green; expression-bodied functions are implemented, and planned-feature diagnostics now cover deferred syntax. The migration decision is explicit: native Flow parser as canonical path, `normalizeFlowSyntax` as temporary compatibility tooling. Closures and semantic clauses are explicitly deferred with parser diagnostics; full argument labels remain incomplete.
 
 **Goal:** Move from Flow-as-normalized-legacy-input to Flow as the official v1.0 syntax path.
 
@@ -239,9 +239,9 @@ go test ./tools/scriptstest -run 'ReleaseV1'
 - [ ] Finish argument labels.
 - [x] Finish expression-bodied functions.
 - [x] Implement `elif` or document `else if` as the final spelling.
-- [ ] Implement closures or keep them explicitly deferred.
+- [x] Implement closures or keep them explicitly deferred.
 - [x] Implement payload enum syntax or keep payload enums blocked from v1.0.
-- [ ] Implement semantic clauses if still part of v1.0.
+- [x] Implement semantic clauses if still part of v1.0.
 - [x] Update formatter coverage for the final Flow surface.
 
 **Verification:**
@@ -430,7 +430,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 13: Promote a Stable Stdlib Surface
 
-**Status:** Partial/blocked. Current `lib/core` and docs/manifest tooling pass, generated API docs include alpha metadata/hash validation, and `verify-docs` now enforces doctest presence for currently stable modules. The v1 stdlib breadth, baseline-vs-current API diff policy, and many stable modules are still missing.
+**Status:** Partial/blocked. Current `lib/core` and docs/manifest tooling pass, generated API docs include alpha metadata/hash validation, `verify-docs` enforces doctest presence for currently stable modules, and naming/versioning policy is now documented. The v1 stdlib breadth, enforced baseline-vs-current API diff gate behavior, and many stable modules are still missing.
 
 **Goal:** Build stable documented modules for v1.0.
 
@@ -438,7 +438,7 @@ bash scripts/test_all.sh --full
 
 **Approach:**
 
-- [ ] Define stable module naming and versioning rules.
+- [x] Define stable module naming and versioning rules.
 - [ ] Promote collections.
 - [ ] Promote strings.
 - [ ] Promote slices.
@@ -476,7 +476,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 14: Stabilize CLI, Formatter, Reports, LSP, and Docs
 
-**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition/references basics are green. LSP rename and code actions remain incomplete.
+**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition/references/rename basics are green. LSP code actions remain incomplete.
 
 **Goal:** Make the developer toolchain reliable enough for daily use and CI.
 
@@ -497,7 +497,7 @@ bash scripts/test_all.sh --full
 - [x] Complete LSP hover for the current MVP.
 - [x] Add go-to definition.
 - [x] Add references.
-- [ ] Add rename.
+- [x] Add rename.
 - [x] Add completion for current open-document symbols.
 - [x] Add formatting.
 - [ ] Add code actions.
@@ -659,4 +659,4 @@ bash scripts/release_v1_0_gate.sh
 - [x] Decide whether Flow gets a native parser or continues through normalization during migration.
 - [ ] Decide the exact WASM object/runtime architecture before changing `compiler/target/target.go`.
 - [ ] Decide the stable stdlib module list before promoting `lib/experimental/` code.
-- [ ] Decide the API diff format before making it a release gate.
+- [x] Decide the API diff format before making it a release gate.

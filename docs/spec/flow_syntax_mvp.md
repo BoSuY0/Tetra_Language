@@ -34,6 +34,11 @@ uses io:
     return 0
 ```
 
+Semantic function clauses (`budget`, `noalloc`, `noblock`, `realtime`,
+`nothrow`) are explicitly deferred on the current v0.6 path. When these
+keywords appear after a function signature, the parser reports a planned-feature
+diagnostic for semantic clauses.
+
 v0.17 enforces the first MVP effect set: `alloc`, `mem`, `io`, `mmio`,
 `islands`, `capability`, `link`, `control`, `runtime`, and `actors`.
 Aliases `cap.mem` and `cap.io` are accepted for `mem` and `io`.
@@ -43,6 +48,10 @@ release. The MVP parser keeps `TypeName(field: value)` syntax for type-like
 struct constructors such as `Vec2(x: 40)`, so lowercase/function-like callees
 with labels currently produce an explicit planned-feature diagnostic instead of
 being treated as calls.
+
+Closures are also explicitly deferred for v0.6. Function-literal attempts
+(`fn`/`fun` in statement or expression position) produce a planned-feature
+diagnostic for closures.
 
 Tests:
 
@@ -342,7 +351,8 @@ The compiler intentionally reports planned-feature diagnostics for `actor`,
 `view`, `state`, `property`, and `capsule` language declarations.
 
 Enum payloads, richer payload match patterns, exhaustive integer match checking,
-collection `for`, catch/recovery syntax, effect polymorphism/inference, full
-ownership/lifetime solving, protocol-bound generics, extension conformance
+collection `for`, closures, semantic clauses (`budget`, `noalloc`, `noblock`,
+`realtime`, `nothrow`), catch/recovery syntax, effect polymorphism/inference,
+full ownership/lifetime solving, protocol-bound generics, extension conformance
 clauses, task cancellation, and structured concurrency are planned for later
 releases.
