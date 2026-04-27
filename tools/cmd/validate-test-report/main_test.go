@@ -39,6 +39,25 @@ func TestValidateTestReportRejectsNullArrays(t *testing.T) {
 	}
 }
 
+func TestValidateTestReportRejectsUnknownFields(t *testing.T) {
+	report := `{
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "duration_ms": 1,
+  "files": [{"filename": "a.tetra", "total": 1, "passed": 1, "failed": 0, "duration_ms": 1}],
+  "results": [{"name": "ok", "filename": "a.tetra", "index": 0, "function_name": "__tetra_test_0_ok", "exit_code": 0, "passed": true, "duration_ms": 1}],
+  "extra": true
+}`
+	out, err := runValidator(t, report)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unknown field") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func TestValidateTestReportRejectsCountMismatch(t *testing.T) {
 	report := `{
   "total": 1,

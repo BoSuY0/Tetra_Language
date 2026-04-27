@@ -1,0 +1,13 @@
+{
+  "schema": "tetra.binary-size-thresholds.v1alpha1",
+  "source": "examples/flow_hello.tetra",
+  "threshold_policy": "soft limits require release-owner review; hard limits block the gate",
+  "artifacts": [
+    {"target":"linux-x64","artifact_name":"linux-x64","size_bytes":4113,"soft_limit_bytes":2097152,"hard_limit_bytes":4194304,"status":"pass"},
+    {"target":"macos-x64","artifact_name":"macos-x64","size_bytes":12288,"soft_limit_bytes":2097152,"hard_limit_bytes":4194304,"status":"pass"},
+    {"target":"windows-x64","artifact_name":"windows-x64.exe","size_bytes":3072,"soft_limit_bytes":2097152,"hard_limit_bytes":4194304,"status":"pass"},
+    {"target":"wasm32-wasi","artifact_name":"wasm32-wasi.wasm","size_bytes":230,"soft_limit_bytes":524288,"hard_limit_bytes":1048576,"status":"pass"},
+    {"target":"wasm32-web","artifact_name":"wasm32-web.wasm","size_bytes":163,"soft_limit_bytes":524288,"hard_limit_bytes":1048576,"status":"pass"}
+  ],
+  "status": "pass"
+}

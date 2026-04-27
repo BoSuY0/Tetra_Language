@@ -3,12 +3,17 @@ set -euo pipefail
 
 report_path=""
 
+: "${GOCACHE:=/tmp/tetra-go-cache}"
+mkdir -p "$GOCACHE"
+export GOCACHE
+
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/release_v1_0_wasi_smoke.sh --report PATH
+Usage: bash scripts/release_v1_0_wasi_smoke.sh [--report PATH]
 
 Runs WASI smoke with a real runner when available.
 Runner preference: wasmtime -> node-wasi fallback.
+Default report: docs/generated/v1_0/wasi-smoke.json
 USAGE
 }
 
@@ -31,8 +36,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$report_path" ]]; then
-  echo "release_v1_0_wasi_smoke: --report is required" >&2
-  exit 2
+  report_path="docs/generated/v1_0/wasi-smoke.json"
 fi
 
 tmp_dir="$(mktemp -d)"

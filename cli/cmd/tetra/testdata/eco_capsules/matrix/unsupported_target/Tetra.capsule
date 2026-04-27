@@ -1,0 +1,6 @@
+manifest "tetra.capsule.v1"
+capsule FixtureUnsupportedTarget:
+    id "tetra://fixture/unsupported-target"
+    version "0.1.0"
+    target "plan9-x64"
+

@@ -1,0 +1,4 @@
+func main() -> Int:
+    match value:
+    case some():
+        return 0

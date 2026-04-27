@@ -61,7 +61,7 @@ bash scripts/release_v1_0_gate.sh
 
 | Order item | Decision | Prerequisite / scope rule | Concrete gate command |
 | --- | --- | --- | --- |
-| 1. Freeze current green v0.6.0 baseline | `implemented-now` | Keep v0.6 gate authoritative during scope freeze. | `bash scripts/release_v0_6_gate.sh` |
+| 1. Freeze historical green v0.6.0 baseline | `implemented-now` | Keep v0.6 gate authoritative during scope freeze. | `bash scripts/release_v0_6_gate.sh` |
 | 2. Finish or explicitly split v0.6.x stabilization tasks | `implemented-now` | This document is the explicit split/closure decision artifact. | `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` |
 | 3. Validate first v0.7 hardening slice | `implemented-now` | Validation slice already marked complete in TODO 5. | `go test ./compiler/... -run 'Optional|Enum|Match|For|Loop|Const|Else|Compound|Format'` |
 | 4. Start v1.0 Wave 1: Flow-only frontend | `implemented-now` | Wave started; remaining feature work tracked separately in Wave 1 TODOs. | `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt` |
@@ -76,16 +76,16 @@ bash scripts/release_v1_0_gate.sh
 Decision: `implemented-now` as a scope choice.
 
 - v0.7 remains an internal hardening slice, not an official public release label.
-- Public release labeling remains `v0.6.x` until v1.0 gate criteria are genuinely satisfied.
+- Public release labeling remains `v0.1.x` until v1.0 gate criteria are genuinely satisfied.
 
 Concrete gate commands:
 
 ```sh
-bash scripts/release_v0_6_gate.sh
+bash scripts/test_all.sh --full
 bash scripts/release_v1_0_gate.sh
 ```
 
-The first command preserves the active public release line; the second enforces that v1 cannot be labeled early.
+The first command preserves the active public baseline; the second enforces that v1 cannot be labeled early.
 
 ## Checklist-Closure Rule
 

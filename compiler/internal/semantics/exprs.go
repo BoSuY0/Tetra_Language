@@ -130,6 +130,9 @@ func checkExprWithEffects(
 		if state.throwType == "" {
 			return "", regionNone, fmt.Errorf("%s: try is only allowed in throwing functions", frontend.FormatPos(e.At))
 		}
+		if _, ok := e.X.(*frontend.AwaitExpr); ok {
+			return "", regionNone, fmt.Errorf("%s: async typed-error propagation is not supported in the v1.0 profile", frontend.FormatPos(e.At))
+		}
 		call, ok := e.X.(*frontend.CallExpr)
 		if !ok {
 			return "", regionNone, fmt.Errorf("%s: try expects a throwing function call", frontend.FormatPos(e.At))
@@ -143,6 +146,9 @@ func checkExprWithEffects(
 	case *frontend.AwaitExpr:
 		if !state.async {
 			return "", regionNone, fmt.Errorf("%s: await is only allowed in async functions", frontend.FormatPos(e.At))
+		}
+		if _, ok := e.X.(*frontend.TryExpr); ok {
+			return "", regionNone, fmt.Errorf("%s: async typed-error propagation is not supported in the v1.0 profile", frontend.FormatPos(e.At))
 		}
 		call, ok := e.X.(*frontend.CallExpr)
 		if !ok {

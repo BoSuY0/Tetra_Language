@@ -114,8 +114,31 @@ func (f Format) String() string {
 	}
 }
 
+type Status int
+
+const (
+	StatusUnknown Status = iota
+	StatusSupported
+	StatusBuildOnly
+	StatusPlanned
+)
+
+func (s Status) String() string {
+	switch s {
+	case StatusSupported:
+		return "supported"
+	case StatusBuildOnly:
+		return "build_only"
+	case StatusPlanned:
+		return "planned"
+	default:
+		return "unknown"
+	}
+}
+
 type Target struct {
 	Triple                  string
+	Status                  Status
 	OS                      OS
 	Arch                    Arch
 	ABI                     ABI
@@ -158,6 +181,7 @@ func Parse(triple string) (Target, error) {
 	case "linux-x64":
 		return Target{
 			Triple:                  "linux-x64",
+			Status:                  StatusSupported,
 			OS:                      OSLinux,
 			Arch:                    ArchX64,
 			ABI:                     ABISysV,
@@ -170,6 +194,7 @@ func Parse(triple string) (Target, error) {
 	case "windows-x64":
 		return Target{
 			Triple:                  "windows-x64",
+			Status:                  StatusSupported,
 			OS:                      OSWindows,
 			Arch:                    ArchX64,
 			ABI:                     ABIWin64,
@@ -182,6 +207,7 @@ func Parse(triple string) (Target, error) {
 	case "macos-x64":
 		return Target{
 			Triple:                  "macos-x64",
+			Status:                  StatusSupported,
 			OS:                      OSMacOS,
 			Arch:                    ArchX64,
 			ABI:                     ABISysV,
@@ -194,6 +220,7 @@ func Parse(triple string) (Target, error) {
 	case "wasm32-wasi":
 		return Target{
 			Triple:                  "wasm32-wasi",
+			Status:                  StatusBuildOnly,
 			OS:                      OSWASI,
 			Arch:                    ArchWASM32,
 			ABI:                     ABIWASI,
@@ -206,6 +233,7 @@ func Parse(triple string) (Target, error) {
 	case "wasm32-web":
 		return Target{
 			Triple:                  "wasm32-web",
+			Status:                  StatusBuildOnly,
 			OS:                      OSWeb,
 			Arch:                    ArchWASM32,
 			ABI:                     ABIWeb,

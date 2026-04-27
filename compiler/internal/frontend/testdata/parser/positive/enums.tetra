@@ -1,0 +1,11 @@
+enum Status:
+    case ok
+    case failed
+
+func main() -> Int:
+    let status: Status = Status.ok
+    match status:
+    case Status.ok:
+        return 0
+    case Status.failed:
+        return 1

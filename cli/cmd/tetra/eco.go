@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
@@ -198,6 +199,8 @@ const (
 	ecoTrustSnapshotSchemaV1 = "tetra.eco.trust-snapshot.v1"
 	ecoMaterializerSchemaV1  = "tetra.eco.materialization.v1"
 	ecoPublishSchemaV1Beta   = "tetra.eco.publish.v1beta"
+	ecoPackageSchemaV1       = "tetra.eco.package.v1"
+	ecoPackageMetadataPath   = "tetra.package.json"
 )
 
 var knownCapsuleEffects = map[string]string{
@@ -239,6 +242,10 @@ func runEco(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: tetra eco <verify|pack|unpack|vault|seed|needmap|trust|materialize|publish|download|tetrahub> [options]")
 		return 2
+	}
+	if isHelpArgs(args) {
+		fmt.Fprintln(stdout, "usage: tetra eco <verify|pack|unpack|vault|seed|needmap|trust|materialize|publish|download|tetrahub> [options]")
+		return 0
 	}
 	switch args[0] {
 	case "verify":
@@ -1544,7 +1551,10 @@ func downloadPackage(registry string, id string, version string, target string, 
 	if meta.Schema != ecoPublishSchemaV1Beta || meta.Channel != "beta" {
 		return "", fmt.Errorf("unsupported publish metadata in %s", metaPath)
 	}
-	pkgPath := filepath.Join(targetDir, meta.Package.File)
+	if err := validateEcoPublishPackagePath(meta.Package.File); err != nil {
+		return "", err
+	}
+	pkgPath := filepath.Join(targetDir, filepath.FromSlash(meta.Package.File))
 	if outPath == "" {
 		outPath = fmt.Sprintf("%s-%s-%s.todex", capsuleIDDirectory(id), version, target)
 	}
@@ -1552,10 +1562,53 @@ func downloadPackage(registry string, id string, version string, target string, 
 	if err != nil {
 		return "", err
 	}
+	if int64(len(raw)) != meta.Package.Size {
+		return "", fmt.Errorf("package size mismatch for %s: metadata=%d actual=%d", pkgPath, meta.Package.Size, len(raw))
+	}
+	hashHex, err := ecoPublishPackageHashHex(meta.Package.SHA256)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(raw)
+	if hex.EncodeToString(sum[:]) != hashHex {
+		return "", fmt.Errorf("package hash mismatch for %s", pkgPath)
+	}
 	if err := os.WriteFile(outPath, raw, 0o644); err != nil {
 		return "", err
 	}
 	return outPath, nil
+}
+
+func validateEcoPublishPackagePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("package file is required")
+	}
+	if strings.Contains(path, "\\") {
+		return fmt.Errorf("unsafe package file path %s", path)
+	}
+	clean := filepath.Clean(path)
+	if clean == "." || strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
+		return fmt.Errorf("unsafe package file path %s", path)
+	}
+	if filepath.ToSlash(clean) != path {
+		return fmt.Errorf("package file path %s is not normalized", path)
+	}
+	return nil
+}
+
+func ecoPublishPackageHashHex(hash string) (string, error) {
+	const prefix = "sha256:"
+	if !strings.HasPrefix(hash, prefix) {
+		return "", fmt.Errorf("invalid package sha256 hash %s", hash)
+	}
+	hexHash := strings.TrimPrefix(hash, prefix)
+	if len(hexHash) != sha256.Size*2 {
+		return "", fmt.Errorf("invalid package sha256 hash %s", hash)
+	}
+	if _, err := hex.DecodeString(hexHash); err != nil {
+		return "", fmt.Errorf("invalid package sha256 hash %s", hash)
+	}
+	return hexHash, nil
 }
 
 func capsuleIDDirectory(id string) string {
@@ -1974,13 +2027,12 @@ func packCapsuleProject(capsulePath string, outPath string) error {
 }
 
 func packFiles(root string, relPaths []string, outPath string) error {
-	const packageMetadataFile = "tetra.package.json"
 	zeroTime := time.Unix(0, 0).UTC()
 	cleanRelPaths := append([]string(nil), relPaths...)
 	sort.Strings(cleanRelPaths)
 	for _, rel := range cleanRelPaths {
-		if filepath.ToSlash(rel) == packageMetadataFile {
-			return fmt.Errorf("project already contains reserved file %s", packageMetadataFile)
+		if filepath.ToSlash(rel) == ecoPackageMetadataPath {
+			return fmt.Errorf("project already contains reserved file %s", ecoPackageMetadataPath)
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
@@ -1998,7 +2050,7 @@ func packFiles(root string, relPaths []string, outPath string) error {
 	tw := tar.NewWriter(gz)
 	defer tw.Close()
 	metadata := ecoPackageMetadata{
-		Schema:           "tetra.eco.package.v1",
+		Schema:           ecoPackageSchemaV1,
 		Compression:      "gzip",
 		MTimeUnix:        0,
 		Reproducible:     true,
@@ -2060,7 +2112,7 @@ func packFiles(root string, relPaths []string, outPath string) error {
 	}
 	rawMetadata = append(rawMetadata, '\n')
 	if err := tw.WriteHeader(&tar.Header{
-		Name:       packageMetadataFile,
+		Name:       ecoPackageMetadataPath,
 		Mode:       0o644,
 		Size:       int64(len(rawMetadata)),
 		Format:     tar.FormatPAX,
@@ -2092,13 +2144,11 @@ func unpackCapsule(pkgPath string, outDir string) error {
 	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return err
-	}
+	entries := map[string][]byte{}
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
-			return nil
+			break
 		}
 		if err != nil {
 			return err
@@ -2107,6 +2157,34 @@ func unpackCapsule(pkgPath string, outDir string) error {
 		if name == "." || strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
 			return fmt.Errorf("unsafe archive path %q", header.Name)
 		}
+		normalizedName := filepath.ToSlash(name)
+		if normalizedName != header.Name {
+			return fmt.Errorf("archive path %q is not normalized", header.Name)
+		}
+		if _, exists := entries[normalizedName]; exists {
+			return fmt.Errorf("duplicate archive path %q", header.Name)
+		}
+		raw, err := io.ReadAll(tr)
+		if err != nil {
+			return err
+		}
+		if header.Size >= 0 && int64(len(raw)) != header.Size {
+			return fmt.Errorf("archive size mismatch for %s", header.Name)
+		}
+		entries[normalizedName] = raw
+	}
+	if err := validateEcoPackageEntries(entries); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	var names []string
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
 		outPath := filepath.Join(outDir, name)
 		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 			return err
@@ -2115,7 +2193,7 @@ func unpackCapsule(pkgPath string, outDir string) error {
 		if err != nil {
 			return err
 		}
-		if _, err := io.Copy(out, tr); err != nil {
+		if _, err := out.Write(entries[name]); err != nil {
 			_ = out.Close()
 			return err
 		}
@@ -2123,4 +2201,99 @@ func unpackCapsule(pkgPath string, outDir string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func validateEcoPackageEntries(entries map[string][]byte) error {
+	rawMetadata, ok := entries[ecoPackageMetadataPath]
+	if !ok {
+		return fmt.Errorf("missing %s", ecoPackageMetadataPath)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(rawMetadata))
+	decoder.DisallowUnknownFields()
+	var metadata ecoPackageMetadata
+	if err := decoder.Decode(&metadata); err != nil {
+		return fmt.Errorf("invalid %s: %w", ecoPackageMetadataPath, err)
+	}
+	if metadata.Schema != ecoPackageSchemaV1 {
+		return fmt.Errorf("unsupported package metadata schema %q", metadata.Schema)
+	}
+	if metadata.Compression != "gzip" {
+		return fmt.Errorf("package metadata compression must be gzip")
+	}
+	if metadata.MTimeUnix != 0 {
+		return fmt.Errorf("package metadata mtime_unix must be 0")
+	}
+	if metadata.ManifestSchema != "" && metadata.ManifestSchema != capsuleManifestSchemaV1 {
+		return fmt.Errorf("unsupported package metadata manifest_schema %q", metadata.ManifestSchema)
+	}
+	if metadata.PermissionsModel != "" && metadata.PermissionsModel != ecoPermissionsModelV1 {
+		return fmt.Errorf("unsupported package metadata permissions_model %q", metadata.PermissionsModel)
+	}
+	if metadata.FileCount != len(metadata.Files) {
+		return fmt.Errorf("package metadata file_count mismatch: expected %d, got %d", len(metadata.Files), metadata.FileCount)
+	}
+	if metadata.FileCount <= 0 {
+		return fmt.Errorf("package metadata file_count must be positive")
+	}
+	declared := map[string]struct{}{ecoPackageMetadataPath: {}}
+	lastPath := ""
+	for _, file := range metadata.Files {
+		if file.Path == "" {
+			return fmt.Errorf("package metadata has empty path")
+		}
+		cleanPath := filepath.Clean(file.Path)
+		if cleanPath == "." || strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) {
+			return fmt.Errorf("package metadata has unsafe path %s", file.Path)
+		}
+		normalizedPath := filepath.ToSlash(cleanPath)
+		if normalizedPath != file.Path {
+			return fmt.Errorf("package metadata path %s is not normalized", file.Path)
+		}
+		if normalizedPath == ecoPackageMetadataPath {
+			return fmt.Errorf("package metadata must not self-reference %s", ecoPackageMetadataPath)
+		}
+		if normalizedPath <= lastPath {
+			return fmt.Errorf("package metadata files must be strictly sorted by path")
+		}
+		lastPath = normalizedPath
+		if _, exists := declared[normalizedPath]; exists {
+			return fmt.Errorf("package metadata has duplicate file path %s", normalizedPath)
+		}
+		raw, ok := entries[normalizedPath]
+		if !ok {
+			return fmt.Errorf("package metadata references missing file %s", normalizedPath)
+		}
+		if int64(len(raw)) != file.Size {
+			return fmt.Errorf("package metadata size mismatch for %s", normalizedPath)
+		}
+		hashHex, err := ecoPublishPackageHashHex(file.SHA256)
+		if err != nil {
+			return fmt.Errorf("package metadata %s: %w", normalizedPath, err)
+		}
+		sum := sha256.Sum256(raw)
+		if hex.EncodeToString(sum[:]) != hashHex {
+			return fmt.Errorf("package metadata hash mismatch for %s", normalizedPath)
+		}
+		declared[normalizedPath] = struct{}{}
+	}
+	if _, ok := declared["Tetra.capsule"]; !ok {
+		return fmt.Errorf("package metadata missing Tetra.capsule entry")
+	}
+	for name := range entries {
+		if _, ok := declared[name]; !ok {
+			return fmt.Errorf("archive contains undeclared file %s", name)
+		}
+	}
+	if metadata.BuildInputsSHA != "" {
+		hashHex, err := ecoPublishPackageHashHex(metadata.BuildInputsSHA)
+		if err != nil {
+			return fmt.Errorf("package metadata build_inputs_sha256: %w", err)
+		}
+		sum := sha256.Sum256([]byte(packageMetadataFingerprint(metadata.Files)))
+		if hex.EncodeToString(sum[:]) != hashHex {
+			return fmt.Errorf("package metadata build_inputs_sha256 mismatch")
+		}
+	}
+	return nil
 }

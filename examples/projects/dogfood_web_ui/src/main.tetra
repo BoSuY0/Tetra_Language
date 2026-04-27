@@ -1,0 +1,17 @@
+state TodoState:
+    var count: Int = 0
+    val title: String = "Dogfood Web UI"
+
+view TodoView(state: TodoState):
+    bind countValue: Int = state.count
+    bind titleText: String = state.title
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 360
+    style theme: String = "release"
+    accessibility role: String = "button"
+    accessibility label: String = "Increment dogfood counter"
+
+func main() -> Int:
+    return 0

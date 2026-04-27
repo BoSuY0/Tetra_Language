@@ -1,0 +1,3 @@
+func main() -> Int:
+    if true:
+    return 0

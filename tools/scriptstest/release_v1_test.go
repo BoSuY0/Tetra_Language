@@ -40,12 +40,173 @@ func TestReleaseV10GateKeepsCurrentValidators(t *testing.T) {
 		"go run ./tools/cmd/validate-manifest",
 		"go run ./tools/cmd/verify-docs",
 		"go run ./tools/cmd/smoke-report-to-checklist --validate-only",
+		"go run ./tools/cmd/validate-web-ui-smoke",
 		"./tetra smoke --list --format=json",
 		"go run ./tools/cmd/validate-smoke-list",
 		"go run ./tools/cmd/validate-api-docs",
+		"bash scripts/release_v1_0_security_review.sh",
+		"bash scripts/release_v1_0_binary_size.sh",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("v1.0 release gate missing %q", want)
+		}
+	}
+}
+
+func TestReleaseV10GateRecordsBinarySizeEvidenceBeforeRepro(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+	if err != nil {
+		t.Fatalf("read v1.0 release gate: %v", err)
+	}
+	text := string(raw)
+	sizeIdx := strings.Index(text, `run_step "binary size thresholds" check_binary_size_thresholds`)
+	if sizeIdx < 0 {
+		t.Fatalf("v1.0 release gate missing binary size threshold step")
+	}
+	reproIdx := strings.Index(text, `run_step "reproducible build proof" check_repro_build`)
+	if reproIdx < 0 {
+		t.Fatalf("v1.0 release gate missing repro proof step")
+	}
+	if sizeIdx > reproIdx {
+		t.Fatalf("binary size evidence should be recorded before reproducibility proof")
+	}
+}
+
+func TestReleaseV10WebSmokeScriptValidatesReportBeforeExit(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_web_smoke.sh"))
+	if err != nil {
+		t.Fatalf("read web smoke script: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`go run ./tools/cmd/validate-web-ui-smoke --report "$report_path"`,
+		`status="blocked"`,
+		`blocker="headless chromium command failed"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("web smoke script missing %q", want)
+		}
+	}
+}
+
+func TestReleaseV10GateValidatesJSONDiagnostics(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+	if err != nil {
+		t.Fatalf("read v1.0 release gate: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "json diagnostic shape" check_json_diagnostic`,
+		`check_json_diagnostic_case "invalid-diagnostic" "unknown function"`,
+		`check_json_diagnostic_case "missing-effect-diagnostic" "uses effect 'io'"`,
+		`check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported"`,
+		`check_json_diagnostic_case "planned-actor-diagnostic" "planned feature 'actor'"`,
+		`go run ./tools/cmd/validate-diagnostic --diagnostic "$diagnostic" --severity error --contains "$contains" --require-position`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("v1.0 release gate missing JSON diagnostic validation %q", want)
+		}
+	}
+}
+
+func TestReleaseV10GateRequiresSecurityReviewSignoff(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+	if err != nil {
+		t.Fatalf("read v1.0 release gate: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`check_security_review_signoff()`,
+		`TETRA_SECURITY_REVIEW_SIGNOFF`,
+		`cp "$signoff_path" "$artifacts_dir/security-review.md"`,
+		`run_step "security review signoff" check_security_review_signoff`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("v1.0 release gate missing security review wiring %q", want)
+		}
+	}
+}
+
+func TestReleaseV10GateArchivesReleaseStateKnownIssuesAndHashes(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+	if err != nil {
+		t.Fatalf("read v1.0 release gate: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`check_release_state()`,
+		`go run ./tools/cmd/validate-release-state --format=json --report-dir "$report_dir" >"$artifacts_dir/release-state.json"`,
+		`go run ./tools/cmd/validate-release-state --format=text --report-dir "$report_dir" >"$artifacts_dir/release-state.txt"`,
+		`write_known_issues_artifact()`,
+		`"$artifacts_dir/known_issues.md"`,
+		`go run ./tools/cmd/validate-artifact-hashes --write --root "$artifacts_dir" --out "$artifacts_dir/artifact-hashes.json"`,
+		`go run ./tools/cmd/validate-artifact-hashes --manifest "$artifacts_dir/artifact-hashes.json"`,
+		`run_step "release state audit" check_release_state`,
+		`run_step "known issues artifact" write_known_issues_artifact`,
+		`run_step "artifact hash manifest" check_artifact_hash_manifest`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("v1.0 release gate missing release evidence step %q", want)
+		}
+	}
+}
+
+func TestReleaseV10GateChecksGeneratedArtifactChurn(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+	if err != nil {
+		t.Fatalf("read v1.0 release gate: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`capture_generated_artifact_state "$generated_state_before"`,
+		`check_generated_artifact_churn()`,
+		`git status --porcelain --untracked-files=no -- docs/generated docs/baselines`,
+		`git diff --binary -- docs/generated docs/baselines`,
+		`run_step "generated artifact churn check" check_generated_artifact_churn`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("v1.0 release gate missing generated churn guard %q", want)
+		}
+	}
+}
+
+func TestReleaseV10GateRunsVersionPreflightBeforePackageTests(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+	if err != nil {
+		t.Fatalf("read v1.0 release gate: %v", err)
+	}
+	text := string(raw)
+	versionIdx := strings.Index(text, `run_step "version preflight (v0.1.1 required)"`)
+	if versionIdx < 0 {
+		t.Fatalf("v1.0 release gate missing version preflight step")
+	}
+	goTestIdx := strings.Index(text, `run_step "go test packages"`)
+	if goTestIdx < 0 {
+		t.Fatalf("v1.0 release gate missing go test packages step")
+	}
+	if versionIdx > goTestIdx {
+		t.Fatalf("v1.0 release gate must hard-block on version before package tests")
+	}
+}
+
+func TestReleaseV10SmokeScriptsHaveDefaultReportPaths(t *testing.T) {
+	for _, script := range []struct {
+		Path string
+		Want string
+	}{
+		{Path: "release_v1_0_wasi_smoke.sh", Want: `docs/generated/v1_0/wasi-smoke.json`},
+		{Path: "release_v1_0_web_smoke.sh", Want: `docs/generated/v1_0/web-ui-smoke.json`},
+	} {
+		raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", script.Path))
+		if err != nil {
+			t.Fatalf("read %s: %v", script.Path, err)
+		}
+		text := string(raw)
+		if strings.Contains(text, "--report is required") {
+			t.Fatalf("%s still requires --report", script.Path)
+		}
+		if !strings.Contains(text, script.Want) {
+			t.Fatalf("%s missing default report path %q", script.Path, script.Want)
 		}
 	}
 }

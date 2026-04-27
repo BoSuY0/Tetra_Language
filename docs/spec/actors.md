@@ -1,10 +1,10 @@
-# Actors (v0.5 Integrated Alpha)
+# Actors Runtime v1
 
 Actors are an isolation + message-passing concurrency model built on top of Tetra’s existing foundations:
 Islands (region memory), and the explicit safe/unsafe boundary.
 
 This document specifies the actor runtime and language surface included in the
-v0.5 Integrated Alpha profile.
+v1 profile.
 
 ## Supported targets (MVP)
 
@@ -44,9 +44,8 @@ Actors are supported on x64 targets:
 
 ## Core builtins (MVP)
 
-All actor builtins are **safe** (do not require `unsafe`), but v0.17 requires
-functions that call actor builtins or actor-using helpers to declare
-`uses actors`.
+All actor builtins are **safe** (do not require `unsafe`), but functions that
+call actor builtins or actor-using helpers must declare `uses actors`.
 
 ### `core.spawn(name: str) -> actor`
 
@@ -54,8 +53,10 @@ Spawns a new actor that executes the function named by `name`.
 
 MVP constraints:
 - `name` must be a string literal known at compile time.
-- The target function must exist and have the shape: `fun <name>(): i32`.
-- x64 targets only in the first iteration (other architectures: planned).
+- The target function must exist and have the shape `func <name>() -> Int`.
+- The target must be synchronous, non-throwing, and must not touch mutable
+  global state.
+- x64 targets are supported for v1.
 
 ### `core.send(to: actor, v: i32) -> i32`
 
@@ -87,9 +88,11 @@ Returns the handle of the current actor.
   - finished execution.
 - Scheduler policy: round-robin over runnable actors (MVP).
 
-## Memory
+## Message Model
 
-MVP messages are `i32` values plus an implicit sender handle.
+MVP messages are `i32` values plus an implicit sender handle. Tagged messages
+are available through `core.send_msg(to, tag, value)` and `core.recv_msg()`,
+which returns `actor.msg { value, tag }`.
 
 ## Runtime sources
 
@@ -107,6 +110,7 @@ compatibility references.
 Future extensions (post-MVP):
 - Copy-based passing of `[]u8` into a receiver-owned island.
 - Ownership transfer of message islands (move/consume semantics).
+- Distributed actors and network mailboxes.
 
 ## Runtime ABI surface (internal)
 

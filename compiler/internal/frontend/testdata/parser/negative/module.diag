@@ -1,0 +1,1 @@
+testdata/parser/negative/module.tetra:5:1: module must appear before declarations

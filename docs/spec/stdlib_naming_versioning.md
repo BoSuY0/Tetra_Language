@@ -55,6 +55,10 @@ change between minor/patch releases.
 `STDLIB-VER-005` Promotion from experimental to stable MUST keep a stable name
 without version suffixes and MUST be called out in release notes/checklists.
 
+`STDLIB-VER-006` Generated API docs MUST label `lib.experimental.*` modules as
+experimental. Experimental docs entries are discoverability aids, not stable
+API compatibility promises.
+
 ## Release Gate Checks
 
 Release gating MUST fail if any rule above is violated.
@@ -66,6 +70,8 @@ Recommended checks:
 2. Reject stable module names that contain explicit version segments/suffixes.
 3. Confirm stable stdlib docs/doctests/examples/metadata checks pass through the
    existing docs + API-doc validation pipeline.
+4. Reject release-evidence examples for stable modules when they import
+   `lib.experimental.*`.
 
 Example command snippets for gate scripts:
 
@@ -74,4 +80,3 @@ rg -n '^module lib\.core\.[a-z][a-z0-9_]*$' lib/core/*.tetra
 rg -n '^module lib\.experimental\.[a-z][a-z0-9_]*$' lib/experimental/*.tetra
 ! rg -n '^module lib\.core\..*(v[0-9]+|_[vV][0-9]+)' lib/core/*.tetra
 ```
-

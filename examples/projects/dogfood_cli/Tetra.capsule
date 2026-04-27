@@ -1,0 +1,7 @@
+manifest "tetra.capsule.v1"
+capsule DogfoodCLI:
+    id "tetra://examples/dogfood-cli"
+    version "0.1.0"
+    target "linux-x64"
+    permission "io"
+

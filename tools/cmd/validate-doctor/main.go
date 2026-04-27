@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -39,7 +40,7 @@ func main() {
 
 func validateDoctorReport(raw []byte) error {
 	var report doctorReport
-	if err := json.Unmarshal(raw, &report); err != nil {
+	if err := decodeStrictJSON(raw, &report); err != nil {
 		return fmt.Errorf("invalid doctor JSON: %w", err)
 	}
 	if report.Status != "pass" {
@@ -65,6 +66,8 @@ func validateDoctorReport(raw []byte) error {
 		"docs manifest surface":                  false,
 		"smoke sources":                          false,
 		"runtime exports":                        false,
+		"target metadata":                        false,
+		"tooling commands":                       false,
 	}
 	for _, check := range report.Checks {
 		if check.Name == "" {
@@ -87,4 +90,10 @@ func validateDoctorReport(raw []byte) error {
 		}
 	}
 	return nil
+}
+
+func decodeStrictJSON(raw []byte, out any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	return dec.Decode(out)
 }

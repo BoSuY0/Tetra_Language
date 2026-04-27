@@ -44,6 +44,31 @@ func TestValidateManifestRejectsNullTargets(t *testing.T) {
 	}
 }
 
+func TestValidateManifestRejectsUnknownFields(t *testing.T) {
+	manifest := `{
+  "compiler_version": "v0.6.0",
+  "targets": [
+    {"triple":"linux-x64","os":"linux","arch":"x64","abi":"sysv","format":"elf","exe_ext":"","collect_imports":false},
+    {"triple":"windows-x64","os":"windows","arch":"x64","abi":"win64","format":"pe","exe_ext":".exe","collect_imports":true},
+    {"triple":"macos-x64","os":"macos","arch":"x64","abi":"sysv","format":"macho","exe_ext":"","collect_imports":false}
+  ],
+  "builtins": [{"name":"core.print","return_type":"i32","unsafe_policy":"never","extra":true}],
+  "runtime_abi": {
+    "reserved_prefix": "__tetra_",
+    "actors_supported_targets": ["linux-x64","macos-x64","windows-x64"],
+    "actors_required_symbols": ["__tetra_entry","__tetra_actor_spawn","__tetra_actor_send","__tetra_actor_recv","__tetra_actor_self","__tetra_actor_sender"],
+    "actors_program_glue_symbols": ["__tetra_actor_dispatch","__tetra_actor_main_entry_id"]
+  }
+}`
+	out, err := runManifestValidator(t, manifest)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unknown field") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func TestValidateManifestRejectsDuplicateBuiltin(t *testing.T) {
 	manifest := `{
   "compiler_version": "v0.6.0",

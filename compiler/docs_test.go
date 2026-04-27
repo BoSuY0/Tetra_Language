@@ -22,6 +22,17 @@ protocol Renderable:
 
 impl Vec2: Renderable
 
+state CounterState:
+    var count: Int = 0
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 320
+    accessibility label: String = "Increment"
+
 const answer: Int = 40 + 2
 
 func add(v: borrow Vec2) -> Int
@@ -43,11 +54,130 @@ test "math":
 		"# Tetra API Docs",
 		"`Vec2`",
 		"`Color`",
-		"`const answer: Int`",
+		"`const answer: i32`",
+		"`state CounterState`",
+		"`view CounterView(state: CounterState)`",
+		"`style width: i32`",
+		"`accessibility label: str`",
 		"`protocol Renderable`",
 		"`impl Vec2: Renderable`",
-		"`func add(v: borrow Vec2) -> Int uses io, mem`",
+		"`func add(v: borrow Vec2) -> i32 uses io, mem`",
 		"`math`",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("docs missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestGenerateAPIDocsLabelsExperimentalModules(t *testing.T) {
+	src := []byte(`module lib.experimental.math
+
+func unstable_add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	docs, err := GenerateAPIDocsFromSource(src, "lib/experimental/math.tetra")
+	if err != nil {
+		t.Fatalf("GenerateAPIDocsFromSource: %v", err)
+	}
+	out := string(docs)
+	for _, want := range []string{
+		"## lib.experimental.math (experimental)",
+		"Experimental module: compatibility is not guaranteed for v1.x.",
+		"- `func unstable_add(a: i32, b: i32) -> i32`",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("docs missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestGenerateAPIDocsStablePublicSurfaceSnapshot(t *testing.T) {
+	src := []byte(`struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int
+
+extension Vec2:
+    func draw(self: Vec2) -> Int
+    uses io, mem:
+        print("draw\n")
+        return self.x
+
+impl Vec2: Renderable
+
+func id<T>(x: T) -> T:
+    return x
+
+test "draw docs":
+    expect Vec2.draw(Vec2(x: 42)) == 42
+`)
+	docs, err := GenerateAPIDocsFromSource(src, "surface.tetra")
+	if err != nil {
+		t.Fatalf("GenerateAPIDocsFromSource: %v", err)
+	}
+	out := string(docs)
+	for _, want := range []string{
+		"# Tetra API Docs",
+		"<!-- tetra-api-metadata:",
+		"## surface.tetra",
+		"### Structs",
+		"- `Vec2`",
+		"  - `x: i32`",
+		"### Protocols",
+		"- `protocol Renderable`",
+		"  - `func draw(self: Vec2) -> i32`",
+		"### Implementations",
+		"- `impl Vec2: Renderable`",
+		"### Functions",
+		"- `func id<T>(x: T) -> T`",
+		"### Extensions",
+		"- `Vec2`",
+		"  - `func Vec2.draw(self: Vec2) -> i32 uses io, mem`",
+		"### Tests",
+		"- `draw docs`",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("docs missing %q:\n%s", want, out)
+		}
+	}
+	functionsStart := strings.Index(out, "### Functions")
+	extensionsStart := strings.Index(out, "### Extensions")
+	if functionsStart < 0 || extensionsStart < 0 || functionsStart > extensionsStart {
+		t.Fatalf("unexpected section order:\n%s", out)
+	}
+	functionsSection := out[functionsStart:extensionsStart]
+	if strings.Contains(functionsSection, "Vec2.draw") {
+		t.Fatalf("extension method leaked into top-level functions:\n%s", out)
+	}
+}
+
+func TestGenerateAPIDocsIncludesTestsAndDoctestFixtures(t *testing.T) {
+	src := []byte("// ```tetra doctest\n" +
+		"// func example_doctest() -> Int:\n" +
+		"//     return 42\n" +
+		"// ```\n" +
+		"module docs.fixtures\n" +
+		"\n" +
+		"func answer() -> Int:\n" +
+		"    return 42\n" +
+		"\n" +
+		"test \"answer docs\":\n" +
+		"    expect answer() == 42\n")
+	docs, err := GenerateAPIDocsFromSource(src, "fixtures.tetra")
+	if err != nil {
+		t.Fatalf("GenerateAPIDocsFromSource: %v", err)
+	}
+	out := string(docs)
+	for _, want := range []string{
+		"## docs.fixtures",
+		"### Functions",
+		"- `func answer() -> i32`",
+		"### Tests",
+		"- `answer docs`",
+		"### Doctests",
+		"- doctest 1",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("docs missing %q:\n%s", want, out)

@@ -182,3 +182,95 @@ func main() -> Int:
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestOptionalStructPayloadIfLetAndMatchLower(t *testing.T) {
+	src := []byte(`
+struct Pair:
+    x: Int
+    y: Int
+
+func maybe(flag: Bool) -> Pair?:
+    if flag:
+        return Pair(x: 20, y: 22)
+    else:
+        return none
+
+func unwrap_if(value: Pair?) -> Int:
+    if let p = value:
+        return p.x + p.y
+    else:
+        return 0
+
+func unwrap_match(value: Pair?) -> Int:
+    match value:
+    case some(p):
+        return p.x + p.y
+    case none:
+        return 0
+
+func main() -> Int:
+    return unwrap_if(maybe(true)) + unwrap_match(maybe(false))
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	if got := checked.FuncSigs["maybe"].ReturnSlots; got != 3 {
+		t.Fatalf("maybe return slots = %d, want 3", got)
+	}
+	if got := checked.Funcs[1].Locals["p"].TypeName; got != "Pair" {
+		t.Fatalf("if-let payload type = %q, want Pair", got)
+	}
+	if got := checked.Funcs[2].Locals["p"].TypeName; got != "Pair" {
+		t.Fatalf("match payload type = %q, want Pair", got)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+}
+
+func TestOptionalNarrowingBindingsDoNotEscapeCaseScope(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "if let",
+			src: `
+func main() -> Int:
+    let value: Int? = 1
+    if let x = value:
+        let y: Int = x
+    return x
+`,
+		},
+		{
+			name: "match some",
+			src: `
+func main() -> Int:
+    let value: Int? = 1
+    match value:
+    case some(x):
+        let y: Int = x
+    case none:
+        let z: Int = 0
+    return x
+`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkProgram(tt.src)
+			if err == nil {
+				t.Fatalf("expected narrowing binding scope error")
+			}
+			if !strings.Contains(err.Error(), "out of scope") && !strings.Contains(err.Error(), "unknown identifier") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}

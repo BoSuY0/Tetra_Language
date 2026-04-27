@@ -1,0 +1,89 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "version",
+      "status": "pass",
+      "detail": "v0.1.1"
+    },
+    {
+      "name": "supported targets",
+      "status": "pass",
+      "detail": "linux-x64, windows-x64, macos-x64"
+    },
+    {
+      "name": "build-only targets",
+      "status": "pass",
+      "detail": "wasm32-wasi, wasm32-web"
+    },
+    {
+      "name": "planned targets",
+      "status": "pass"
+    },
+    {
+      "name": "repo root",
+      "status": "pass",
+      "detail": "/home/tetra/Desktop/Projects/Tetra_Language"
+    },
+    {
+      "name": "__rt/actors_sysv.tetra",
+      "status": "pass",
+      "detail": "found"
+    },
+    {
+      "name": "__rt/actors_win64.tetra",
+      "status": "pass",
+      "detail": "found"
+    },
+    {
+      "name": "compiler/selfhostrt/actors_sysv.tetra",
+      "status": "pass",
+      "detail": "found"
+    },
+    {
+      "name": "compiler/selfhostrt/actors_win64.tetra",
+      "status": "pass",
+      "detail": "found"
+    },
+    {
+      "name": "examples/flow_hello.tetra",
+      "status": "pass",
+      "detail": "found"
+    },
+    {
+      "name": "docs/generated/manifest.json",
+      "status": "pass",
+      "detail": "found"
+    },
+    {
+      "name": "docs manifest version",
+      "status": "pass",
+      "detail": "v0.1.1"
+    },
+    {
+      "name": "docs manifest surface",
+      "status": "pass",
+      "detail": "3 targets, 6 runtime symbols"
+    },
+    {
+      "name": "smoke sources",
+      "status": "pass",
+      "detail": "44 sources"
+    },
+    {
+      "name": "runtime exports",
+      "status": "pass",
+      "detail": "4 files, 6 symbols"
+    },
+    {
+      "name": "target metadata",
+      "status": "pass",
+      "detail": "5 targets, 2 build-only"
+    },
+    {
+      "name": "tooling commands",
+      "status": "pass",
+      "detail": "check, build, run, fmt, test, doc, smoke, targets, doctor, lsp, eco, clean, version"
+    }
+  ]
+}

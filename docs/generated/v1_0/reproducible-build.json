@@ -1,18 +1,15 @@
 {
   "schema": "tetra.reproducible-build-proof.v1alpha1",
-  "generated_at": "2026-04-26T19:59:34Z",
+  "timestamp_policy": "no wall-clock timestamps; release gate summary records run time",
   "source": "examples/flow_hello.tetra",
-  "native": {
-    "target": "linux-x64",
-    "hash_a": "sha256:c5fb4a6b4fdef9af44edae432c20ea7b5dc40a88adc18d1207067a2632ff43be",
-    "hash_b": "sha256:c5fb4a6b4fdef9af44edae432c20ea7b5dc40a88adc18d1207067a2632ff43be",
-    "match": true
-  },
-  "wasm": {
-    "target": "wasm32-wasi",
-    "hash_a": "sha256:9635f68a422169c77e10d7dce4ca7797b04f8fbf66eaad089b5495d1b9d128b1",
-    "hash_b": "sha256:9635f68a422169c77e10d7dce4ca7797b04f8fbf66eaad089b5495d1b9d128b1",
-    "match": true
-  },
+  "native": {"target":"linux-x64","hash_a":"sha256:c5fb4a6b4fdef9af44edae432c20ea7b5dc40a88adc18d1207067a2632ff43be","hash_b":"sha256:c5fb4a6b4fdef9af44edae432c20ea7b5dc40a88adc18d1207067a2632ff43be","size_a":4113,"size_b":4113,"match":true},
+  "wasm": {"target":"wasm32-wasi","hash_a":"sha256:9635f68a422169c77e10d7dce4ca7797b04f8fbf66eaad089b5495d1b9d128b1","hash_b":"sha256:9635f68a422169c77e10d7dce4ca7797b04f8fbf66eaad089b5495d1b9d128b1","size_a":230,"size_b":230,"match":true},
+  "artifacts": [
+    {"target":"linux-x64","hash_a":"sha256:c5fb4a6b4fdef9af44edae432c20ea7b5dc40a88adc18d1207067a2632ff43be","hash_b":"sha256:c5fb4a6b4fdef9af44edae432c20ea7b5dc40a88adc18d1207067a2632ff43be","size_a":4113,"size_b":4113,"match":true},
+    {"target":"macos-x64","hash_a":"sha256:1bc140a6e126b3c063bee12adb0fbeca1a7463f924f128b1675bdd4ee5e02009","hash_b":"sha256:1bc140a6e126b3c063bee12adb0fbeca1a7463f924f128b1675bdd4ee5e02009","size_a":12288,"size_b":12288,"match":true},
+    {"target":"windows-x64","hash_a":"sha256:6a4313243b8c152738dda7a8640b2368a9f4fd4df2b0ab62ae384de824639627","hash_b":"sha256:6a4313243b8c152738dda7a8640b2368a9f4fd4df2b0ab62ae384de824639627","size_a":3072,"size_b":3072,"match":true},
+    {"target":"wasm32-wasi","hash_a":"sha256:9635f68a422169c77e10d7dce4ca7797b04f8fbf66eaad089b5495d1b9d128b1","hash_b":"sha256:9635f68a422169c77e10d7dce4ca7797b04f8fbf66eaad089b5495d1b9d128b1","size_a":230,"size_b":230,"match":true},
+    {"target":"wasm32-web","hash_a":"sha256:f7638c2dc2cc61374badcddfae4d304d750ff7cafb892abde74882591e4a301f","hash_b":"sha256:f7638c2dc2cc61374badcddfae4d304d750ff7cafb892abde74882591e4a301f","size_a":163,"size_b":163,"match":true}
+  ],
   "status": "pass"
 }

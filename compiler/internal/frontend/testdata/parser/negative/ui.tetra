@@ -1,0 +1,5 @@
+state S:
+    var count: Int = 0
+
+view Broken(state: S):
+    bind value: Int = state.count

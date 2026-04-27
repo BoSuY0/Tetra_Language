@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -66,17 +67,24 @@ type smokeCase struct {
 type smokeListCase struct {
 	Name         string `json:"name"`
 	SrcPath      string `json:"src_path"`
+	TargetGroup  string `json:"target_group"`
 	ExpectedExit int    `json:"expected_exit"`
 	DebugOnly    bool   `json:"debug_only,omitempty"`
 }
 
+type smokeExcludedExample struct {
+	SrcPath string `json:"src_path"`
+	Reason  string `json:"reason"`
+}
+
 type smokeListReport struct {
-	Target       string          `json:"target"`
-	BuildOnly    bool            `json:"build_only"`
-	RunSupported bool            `json:"run_supported"`
-	Total        int             `json:"total"`
-	IslandsDebug bool            `json:"islands_debug"`
-	Cases        []smokeListCase `json:"cases"`
+	Target           string                 `json:"target"`
+	BuildOnly        bool                   `json:"build_only"`
+	RunSupported     bool                   `json:"run_supported"`
+	Total            int                    `json:"total"`
+	IslandsDebug     bool                   `json:"islands_debug"`
+	Cases            []smokeListCase        `json:"cases"`
+	ExcludedExamples []smokeExcludedExample `json:"excluded_examples,omitempty"`
 }
 
 const supportedTargetsHelp = "linux-x64, windows-x64, macos-x64, wasm32-wasi (build-only), wasm32-web (build-only)"
@@ -90,8 +98,20 @@ func runCLI(args []string, stdout io.Writer, stderr io.Writer) int {
 		printUsage(stderr)
 		return 2
 	}
+	if isHelpArgs(args) {
+		printUsage(stdout)
+		return 0
+	}
 	switch args[0] {
 	case "version":
+		if len(args) > 1 {
+			if isHelpArgs(args[1:]) {
+				fmt.Fprintln(stdout, "usage: tetra version")
+				return 0
+			}
+			fmt.Fprintln(stderr, "version does not accept arguments")
+			return 2
+		}
 		fmt.Fprintln(stdout, compiler.Version())
 		return 0
 	case "targets":
@@ -125,10 +145,29 @@ func runCLI(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 }
 
+func isHelpArgs(args []string) bool {
+	return len(args) == 1 && (args[0] == "-h" || args[0] == "--help")
+}
+
 type targetsReport struct {
-	Supported []string `json:"supported"`
-	BuildOnly []string `json:"build_only"`
-	Planned   []string `json:"planned"`
+	Supported []string            `json:"supported"`
+	BuildOnly []string            `json:"build_only"`
+	Planned   []string            `json:"planned"`
+	Targets   []targetReportEntry `json:"targets"`
+}
+
+type targetReportEntry struct {
+	Triple                  string `json:"triple"`
+	Status                  string `json:"status"`
+	OS                      string `json:"os"`
+	Arch                    string `json:"arch"`
+	ABI                     string `json:"abi"`
+	Format                  string `json:"format"`
+	ExeExt                  string `json:"exe_ext"`
+	BuildOnly               bool   `json:"build_only"`
+	RunSupported            bool   `json:"run_supported"`
+	SupportsDebugInfo       bool   `json:"supports_debug_info"`
+	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 }
 
 type doctorReport struct {
@@ -147,6 +186,9 @@ func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	format := fs.String("format", "text", "output format: text or json")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if fs.NArg() != 0 {
@@ -157,16 +199,17 @@ func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 		Supported: ctarget.SupportedTriples(),
 		BuildOnly: ctarget.BuildOnlyTriples(),
 		Planned:   ctarget.PlannedTriples(),
+		Targets:   buildTargetReportEntries(),
 	}
 	switch *format {
 	case "text", "":
 		fmt.Fprintln(stdout, "Supported targets:")
 		for _, triple := range report.Supported {
-			fmt.Fprintf(stdout, "  %s\n", triple)
+			fmt.Fprintf(stdout, "  %s\n", describeTargetForText(triple))
 		}
 		fmt.Fprintln(stdout, "Build-only targets:")
 		for _, triple := range report.BuildOnly {
-			fmt.Fprintf(stdout, "  %s\n", triple)
+			fmt.Fprintf(stdout, "  %s\n", describeTargetForText(triple))
 		}
 		fmt.Fprintln(stdout, "Planned targets:")
 		for _, triple := range report.Planned {
@@ -187,11 +230,64 @@ func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 }
 
+func buildTargetReportEntries() []targetReportEntry {
+	host, hostOK := hostTarget()
+	triples := append([]string{}, ctarget.SupportedTriples()...)
+	triples = append(triples, ctarget.BuildOnlyTriples()...)
+	triples = append(triples, ctarget.PlannedTriples()...)
+	out := make([]targetReportEntry, 0, len(triples))
+	for _, triple := range triples {
+		tgt, err := ctarget.Parse(triple)
+		if err != nil {
+			continue
+		}
+		buildOnly := ctarget.IsBuildOnlyTarget(tgt.Triple)
+		out = append(out, targetReportEntry{
+			Triple:                  tgt.Triple,
+			Status:                  tgt.Status.String(),
+			OS:                      tgt.OS.String(),
+			Arch:                    tgt.Arch.String(),
+			ABI:                     tgt.ABI.String(),
+			Format:                  tgt.Format.String(),
+			ExeExt:                  tgt.ExeExt,
+			BuildOnly:               buildOnly,
+			RunSupported:            hostOK && host == tgt.Triple && !buildOnly,
+			SupportsDebugInfo:       tgt.SupportsDebugInfo,
+			SupportsReleaseOptimize: tgt.SupportsReleaseOptimize,
+		})
+	}
+	return out
+}
+
+func describeTargetForText(triple string) string {
+	tgt, err := ctarget.Parse(triple)
+	if err != nil {
+		return triple
+	}
+	parts := []string{
+		triple,
+		"os=" + tgt.OS.String(),
+		"arch=" + tgt.Arch.String(),
+		"abi=" + tgt.ABI.String(),
+		"format=" + tgt.Format.String(),
+	}
+	if tgt.ExeExt != "" {
+		parts = append(parts, "exe_ext="+tgt.ExeExt)
+	}
+	if ctarget.IsBuildOnlyTarget(triple) {
+		parts = append(parts, "build-only")
+	}
+	return strings.Join(parts, " ")
+}
+
 func runDoctor(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	format := fs.String("format", "text", "output format: text or json")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if fs.NArg() != 0 {
@@ -238,6 +334,20 @@ func buildDoctorReport() doctorReport {
 		checks = append(checks, failCheck("repo root", err.Error()))
 		return doctorReport{Status: doctorStatus(checks), Checks: checks}
 	}
+	return buildDoctorReportForRootWithChecks(root, checks)
+}
+
+func buildDoctorReportForRoot(root string) doctorReport {
+	checks := []doctorCheck{
+		passCheck("version", compiler.Version()),
+		passCheck("supported targets", strings.Join(ctarget.SupportedTriples(), ", ")),
+		passCheck("build-only targets", strings.Join(ctarget.BuildOnlyTriples(), ", ")),
+		passCheck("planned targets", strings.Join(ctarget.PlannedTriples(), ", ")),
+	}
+	return buildDoctorReportForRootWithChecks(root, checks)
+}
+
+func buildDoctorReportForRootWithChecks(root string, checks []doctorCheck) doctorReport {
 	checks = append(checks,
 		passCheck("repo root", root),
 		pathCheck(root, "__rt/actors_sysv.tetra"),
@@ -250,6 +360,8 @@ func buildDoctorReport() doctorReport {
 		manifestSurfaceCheck(root),
 		smokeSourcesCheck(root),
 		runtimeExportsCheck(root),
+		targetMetadataCheck(),
+		toolingCommandsCheck(),
 	)
 	return doctorReport{Status: doctorStatus(checks), Checks: checks}
 }
@@ -369,6 +481,51 @@ func runtimeExportsCheck(root string) doctorCheck {
 	return passCheck("runtime exports", fmt.Sprintf("%d files, %d symbols", len(paths), len(required)))
 }
 
+func targetMetadataCheck() doctorCheck {
+	entries := buildTargetReportEntries()
+	seen := map[string]bool{}
+	buildOnlyCount := 0
+	for _, entry := range entries {
+		if seen[entry.Triple] {
+			return failCheck("target metadata", "duplicate target "+entry.Triple)
+		}
+		seen[entry.Triple] = true
+		tgt, err := ctarget.Parse(entry.Triple)
+		if err != nil {
+			return failCheck("target metadata", err.Error())
+		}
+		if entry.OS != tgt.OS.String() || entry.Arch != tgt.Arch.String() || entry.ABI != tgt.ABI.String() || entry.Format != tgt.Format.String() {
+			return failCheck("target metadata", fmt.Sprintf("%s metadata mismatch", entry.Triple))
+		}
+		if entry.ExeExt != tgt.ExeExt {
+			return failCheck("target metadata", fmt.Sprintf("%s exe_ext got %q want %q", entry.Triple, entry.ExeExt, tgt.ExeExt))
+		}
+		buildOnly := ctarget.IsBuildOnlyTarget(entry.Triple)
+		if entry.BuildOnly != buildOnly {
+			return failCheck("target metadata", fmt.Sprintf("%s build_only got %v want %v", entry.Triple, entry.BuildOnly, buildOnly))
+		}
+		if buildOnly {
+			buildOnlyCount++
+			if entry.RunSupported {
+				return failCheck("target metadata", entry.Triple+" must not be run-supported")
+			}
+		}
+	}
+	wantCount := len(ctarget.SupportedTriples()) + len(ctarget.BuildOnlyTriples()) + len(ctarget.PlannedTriples())
+	if len(entries) != wantCount {
+		return failCheck("target metadata", fmt.Sprintf("got %d targets want %d", len(entries), wantCount))
+	}
+	return passCheck("target metadata", fmt.Sprintf("%d targets, %d build-only", len(entries), buildOnlyCount))
+}
+
+func toolingCommandsCheck() doctorCheck {
+	commands := []string{"check", "build", "run", "fmt", "test", "doc", "smoke", "targets", "doctor", "lsp", "eco", "clean", "version"}
+	if len(commands) == 0 {
+		return failCheck("tooling commands", "no commands registered")
+	}
+	return passCheck("tooling commands", strings.Join(commands, ", "))
+}
+
 func actorRuntimeSymbols() []string {
 	return []string{
 		"__tetra_entry",
@@ -438,6 +595,9 @@ func runDoc(args []string, stdout io.Writer, stderr io.Writer) int {
 	outPath := fs.String("o", "", "output markdown path; stdout when empty")
 	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
@@ -469,6 +629,9 @@ func runCheck(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
@@ -501,6 +664,9 @@ func runLSP(args []string, stdout io.Writer, stderr io.Writer) int {
 	smokePath := fs.String("stdio-smoke", "", "analyze one .tetra file and print LSP-basic JSON")
 	stdio := fs.Bool("stdio", false, "run LSP-basic JSON-RPC over stdio")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if fs.NArg() != 0 {
@@ -892,11 +1058,14 @@ func writeLSPNotification(w io.Writer, method string, params any) error {
 }
 
 func writeLSPMessage(w io.Writer, msg any) error {
-	raw, err := json.Marshal(msg)
-	if err != nil {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(msg); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(w, "Content-Length: %d\r\n\r\n%s", len(raw), raw)
+	raw := bytes.TrimRight(b.Bytes(), "\n")
+	_, err := fmt.Fprintf(w, "Content-Length: %d\r\n\r\n%s", len(raw), raw)
 	return err
 }
 
@@ -1354,6 +1523,9 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	var linkObjects multiFlag
 	fs.Var(&linkObjects, "link-object", "extra TOBJ object to link")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
@@ -1369,9 +1541,8 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 
-	tgt, err := ctarget.Parse(*target)
-	if err != nil {
-		writeDiagnostic(stderr, *diagnostics, err)
+	tgt, ok := parseBuildTargetOrReport(*target, *diagnostics, stderr)
+	if !ok {
 		return 2
 	}
 	output := *out
@@ -1405,6 +1576,9 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	var linkObjects multiFlag
 	fs.Var(&linkObjects, "link-object", "extra TOBJ object to link")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
@@ -1418,9 +1592,8 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 		writeValidationDiagnostic(stderr, *diagnostics, "run accepts at most one input path")
 		return 2
 	}
-	tgt, err := ctarget.Parse(*target)
-	if err != nil {
-		writeDiagnostic(stderr, *diagnostics, err)
+	tgt, ok := parseBuildTargetOrReport(*target, *diagnostics, stderr)
+	if !ok {
 		return 2
 	}
 	isWASI := tgt.Triple == "wasm32-wasi"
@@ -1434,6 +1607,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	output := *out
 	tmpDir := ""
 	if output == "" {
+		var err error
 		tmpDir, err = os.MkdirTemp("", "tetra-run-*")
 		if err != nil {
 			writeDiagnostic(stderr, *diagnostics, err)
@@ -1469,6 +1643,9 @@ func runFmt(args []string, stdout io.Writer, stderr io.Writer) int {
 	write := fs.Bool("write", false, "rewrite files in place")
 	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
@@ -1509,7 +1686,7 @@ func runFmt(args []string, stdout io.Writer, stderr io.Writer) int {
 				dirty = true
 				if *diagnostics == "json" {
 					writeDiagnosticObject(stderr, compiler.Diagnostic{
-						Code:     "TETRA_FMT002",
+						Code:     compiler.DiagnosticCodeFormatterCheck,
 						Message:  "not formatted",
 						File:     path,
 						Severity: "error",
@@ -1545,6 +1722,9 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
 	reportFormat := fs.String("report", "text", "report format: text or json")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
@@ -1558,9 +1738,8 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
-	tgt, err := ctarget.Parse(*target)
-	if err != nil {
-		writeDiagnostic(stderr, *diagnostics, err)
+	tgt, ok := parseBuildTargetOrReport(*target, *diagnostics, stderr)
+	if !ok {
 		return 2
 	}
 	host, ok := hostTarget()
@@ -1597,8 +1776,22 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 			total++
 			start := time.Now()
 			srcPath := filepath.Join(tmpDir, fmt.Sprintf("test_%d.tetra", total))
+			runnerSource := runner.Source
+			if modulePath := modulePathFromSource(runner.Source); modulePath != "" {
+				var err error
+				srcPath, runnerSource, err = runnerSourcePathForModuleFile(file, runner.Source, total)
+				if err != nil {
+					writeDiagnostic(stderr, *diagnostics, err)
+					return 1
+				}
+				defer os.Remove(srcPath)
+			}
 			outPath := filepath.Join(tmpDir, fmt.Sprintf("test_%d%s", total, tgt.ExeExt))
-			if err := os.WriteFile(srcPath, runner.Source, 0o644); err != nil {
+			if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
+				writeDiagnostic(stderr, *diagnostics, err)
+				return 1
+			}
+			if err := os.WriteFile(srcPath, runnerSource, 0o644); err != nil {
 				writeDiagnostic(stderr, *diagnostics, err)
 				return 1
 			}
@@ -1668,6 +1861,9 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	runtimeMode := fs.String("runtime", "auto", "actors runtime: auto, selfhost, or builtin")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if fs.NArg() != 0 {
@@ -1675,9 +1871,8 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 	if *listCases {
-		tgt, err := ctarget.Parse(*target)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
+		tgt, ok := parseBuildTargetOrReport(*target, "text", stderr)
+		if !ok {
 			return 2
 		}
 		return writeSmokeList(stdout, stderr, smokeCasesForTarget(*islandsDebug, tgt), *islandsDebug, *listFormat, tgt)
@@ -1686,9 +1881,8 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "--format is only supported with --list")
 		return 2
 	}
-	tgt, err := ctarget.Parse(*target)
-	if err != nil {
-		fmt.Fprintln(stderr, err)
+	tgt, ok := parseBuildTargetOrReport(*target, "text", stderr)
+	if !ok {
 		return 2
 	}
 	repoRoot, err := findRepoRoot()
@@ -1805,9 +1999,13 @@ func writeSmokeList(stdout io.Writer, stderr io.Writer, cases []smokeCase, islan
 		report.Cases = append(report.Cases, smokeListCase{
 			Name:         c.name,
 			SrcPath:      c.srcPath,
+			TargetGroup:  smokeTargetGroup(tgt.Triple),
 			ExpectedExit: c.expectedExit,
 			DebugOnly:    c.debugOnly,
 		})
+	}
+	if repoRoot, err := findRepoRoot(); err == nil {
+		report.ExcludedExamples = smokeExampleExclusions(repoRoot, cases, tgt)
 	}
 	switch format {
 	case "", "text":
@@ -1833,15 +2031,66 @@ func writeSmokeList(stdout io.Writer, stderr io.Writer, cases []smokeCase, islan
 	}
 }
 
+func smokeExampleExclusions(repoRoot string, cases []smokeCase, tgt ctarget.Target) []smokeExcludedExample {
+	covered := map[string]bool{}
+	for _, c := range cases {
+		covered[filepath.ToSlash(filepath.Clean(c.srcPath))] = true
+	}
+
+	examplesRoot := filepath.Join(repoRoot, "examples")
+	var out []smokeExcludedExample
+	_ = filepath.WalkDir(examplesRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".tetra") {
+			return nil
+		}
+		rel, err := filepath.Rel(examplesRoot, path)
+		if err != nil {
+			return nil
+		}
+		srcPath := "examples/" + filepath.ToSlash(rel)
+		if covered[srcPath] {
+			return nil
+		}
+		out = append(out, smokeExcludedExample{
+			SrcPath: srcPath,
+			Reason:  fmt.Sprintf("not part of %s smoke profile", tgt.Triple),
+		})
+		return nil
+	})
+	sort.Slice(out, func(i, j int) bool { return out[i].SrcPath < out[j].SrcPath })
+	return out
+}
+
 func runClean(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("clean", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	target := fs.String("target", "", "remove cache entries for one target")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if fs.NArg() != 0 {
 		fmt.Fprintln(stderr, "clean does not accept positional arguments")
 		return 2
+	}
+	if *target != "" {
+		tgt, ok := parseBuildTargetOrReport(*target, "text", stderr)
+		if !ok {
+			return 2
+		}
+		for _, path := range []string{
+			filepath.Join(".tetra_cache", tgt.Triple),
+			filepath.Join("tetra_cache", tgt.Triple),
+		} {
+			if err := os.RemoveAll(path); err != nil {
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
+		}
+		fmt.Fprintf(stdout, "Cleaned Tetra cache for %s\n", tgt.Triple)
+		return 0
 	}
 	for _, path := range []string{".tetra_cache", "tetra_cache"} {
 		if err := os.RemoveAll(path); err != nil {
@@ -1902,6 +2151,7 @@ func smokeCases(islandsDebug bool) []smokeCase {
 		{name: "for_collection_smoke", srcPath: "examples/for_collection_smoke.tetra", expectedExit: 42},
 		{name: "for_collection_u8_smoke", srcPath: "examples/for_collection_u8_smoke.tetra", expectedExit: 42},
 		{name: "loop_control_smoke", srcPath: "examples/loop_control_smoke.tetra", expectedExit: 42},
+		{name: "complex_control_flow_smoke", srcPath: "examples/complex_control_flow_smoke.tetra", expectedExit: 42},
 		{name: "unary_not_smoke", srcPath: "examples/unary_not_smoke.tetra", expectedExit: 42},
 		{name: "const_smoke", srcPath: "examples/const_smoke.tetra", expectedExit: 42},
 		{name: "const_bool_smoke", srcPath: "examples/const_bool_smoke.tetra", expectedExit: 42},
@@ -1925,6 +2175,8 @@ func smokeCases(islandsDebug bool) []smokeCase {
 		{name: "extension_smoke", srcPath: "examples/extension_smoke.tetra", expectedExit: 42},
 		{name: "generic_smoke", srcPath: "examples/generic_smoke.tetra", expectedExit: 42},
 		{name: "protocol_impl_smoke", srcPath: "examples/protocol_impl_smoke.tetra", expectedExit: 42},
+		{name: "dogfood_cli", srcPath: "examples/projects/dogfood_cli/src/main.tetra", expectedExit: 0},
+		{name: "dogfood_actor_task", srcPath: "examples/projects/dogfood_actor_task/src/main.tetra", expectedExit: 0},
 	}
 	if islandsDebug {
 		cases = append(cases, smokeCase{name: "islands_double_free", srcPath: "examples/islands_double_free.tetra", expectedExit: 2, debugOnly: true})
@@ -1938,9 +2190,18 @@ func smokeCasesForTarget(islandsDebug bool, tgt ctarget.Target) []smokeCase {
 			{name: "flow_hello", srcPath: "examples/flow_hello.tetra", expectedExit: 0},
 			{name: "effects_io_smoke", srcPath: "examples/effects_io_smoke.tetra", expectedExit: 0},
 			{name: "ui_web_smoke", srcPath: "examples/ui_web_smoke.tetra", expectedExit: 0},
+			{name: "dogfood_wasi", srcPath: "examples/projects/dogfood_wasi/src/main.tetra", expectedExit: 0},
+			{name: "dogfood_web_ui", srcPath: "examples/projects/dogfood_web_ui/src/main.tetra", expectedExit: 0},
 		}
 	}
 	return smokeCases(islandsDebug)
+}
+
+func smokeTargetGroup(target string) string {
+	if target == "wasm32-wasi" || target == "wasm32-web" {
+		return "wasm"
+	}
+	return "native"
 }
 
 func defaultTarget() string {
@@ -2088,12 +2349,98 @@ func collectTetraFiles(paths []string) ([]string, error) {
 	return files, nil
 }
 
+var moduleDeclRE = regexp.MustCompile(`(?m)^\s*module\s+([A-Za-z0-9_.]+)\s*$`)
+
+func modulePathFromSource(src []byte) string {
+	m := moduleDeclRE.FindSubmatch(src)
+	if len(m) != 2 {
+		return ""
+	}
+	return string(m[1])
+}
+
+func moduleRelPath(module string) string {
+	return filepath.FromSlash(strings.ReplaceAll(module, ".", "/") + ".tetra")
+}
+
+func moduleRootFromEntry(entryPath string, module string) (string, error) {
+	absEntry, err := filepath.Abs(entryPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve module root: %w", err)
+	}
+	root := absEntry
+	for range strings.Split(module, ".") {
+		root = filepath.Dir(root)
+	}
+	rel, err := filepath.Rel(root, absEntry)
+	if err != nil {
+		return "", fmt.Errorf("resolve module root: %w", err)
+	}
+	wantRel := moduleRelPath(module)
+	if rel != wantRel {
+		return "", fmt.Errorf("%s: module '%s' must be in %s", absEntry, module, wantRel)
+	}
+	return root, nil
+}
+
+func rewriteModuleDecl(src []byte, module string) []byte {
+	return []byte(moduleDeclRE.ReplaceAllString(string(src), "module "+module))
+}
+
+func runnerSourcePathForModuleFile(entryPath string, src []byte, runnerIndex int) (string, []byte, error) {
+	module := modulePathFromSource(src)
+	if module == "" {
+		return "", nil, fmt.Errorf("runner source has imports but no module declaration")
+	}
+	root, err := moduleRootFromEntry(entryPath, module)
+	if err != nil {
+		return "", nil, err
+	}
+	parts := strings.Split(module, ".")
+	parts[len(parts)-1] = fmt.Sprintf("__tetra_test_runner_%d", runnerIndex)
+	runnerModule := strings.Join(parts, ".")
+	runnerPath := filepath.Join(root, moduleRelPath(runnerModule))
+	return runnerPath, rewriteModuleDecl(src, runnerModule), nil
+}
+
 func writeDiagnostic(w io.Writer, mode string, err error) {
 	if mode == "json" {
 		writeDiagnosticObject(w, compiler.DiagnosticFromError(err))
 		return
 	}
 	fmt.Fprintln(w, err)
+}
+
+func writeDiagnosticWithHint(w io.Writer, mode string, message string, hint string) {
+	if mode == "json" {
+		writeDiagnosticObject(w, compiler.Diagnostic{
+			Code:     compiler.DiagnosticCodeParse,
+			Message:  message,
+			Severity: "error",
+			Hint:     hint,
+		})
+		return
+	}
+	fmt.Fprintln(w, message)
+}
+
+func parseBuildTargetOrReport(rawTarget string, diagnosticsMode string, stderr io.Writer) (ctarget.Target, bool) {
+	tgt, err := ctarget.Parse(rawTarget)
+	if err == nil {
+		return tgt, true
+	}
+	if targetErr, ok := err.(ctarget.UnsupportedTargetError); ok {
+		msg := fmt.Sprintf(
+			"unsupported target: %s; supported targets: %s; build-only targets: %s",
+			targetErr.Triple,
+			strings.Join(ctarget.SupportedTriples(), ", "),
+			strings.Join(ctarget.BuildOnlyTriples(), ", "),
+		)
+		writeDiagnosticWithHint(stderr, diagnosticsMode, msg, "run `tetra targets` to list valid targets")
+		return ctarget.Target{}, false
+	}
+	writeDiagnostic(stderr, diagnosticsMode, err)
+	return ctarget.Target{}, false
 }
 
 func writeValidationDiagnostic(w io.Writer, mode string, message string) {

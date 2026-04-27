@@ -1,7 +1,11 @@
 # Tetra Language v1.0 Implementation Roadmap (Real Delivery)
 
+> Historical checkpoint. This roadmap was produced against an older v0.6 baseline
+> and is superseded by `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+> The current public version is `v0.1.0`.
+
 **Date:** 2026-04-26  
-**Current version:** `v0.6.0`  
+**Historical starting version:** `v0.6.0`
 **Goal:** reach a true `v1.0.x` release state where `bash scripts/release_v1_0_gate.sh` passes without scope-freeze exceptions.
 
 ## Rules For This Roadmap

@@ -87,9 +87,17 @@ func TestRunnerSources(src []byte, filename string) ([]TestRunnerSource, error) 
 
 func testRunnerBaseSource(file *frontend.FileAST) string {
 	base := *file
-	base.Module = ""
-	base.Imports = nil
 	base.Tests = nil
+	if len(base.Funcs) > 0 {
+		filtered := make([]*frontend.FuncDecl, 0, len(base.Funcs))
+		for _, fn := range base.Funcs {
+			if fn != nil && fn.Name == "main" {
+				continue
+			}
+			filtered = append(filtered, fn)
+		}
+		base.Funcs = filtered
+	}
 	var p sourcePrinter
 	p.file(&base)
 	return strings.TrimSpace(p.b.String())

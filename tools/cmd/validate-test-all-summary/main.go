@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -55,7 +56,7 @@ func main() {
 
 func validateTestAllSummary(raw []byte, reportDir string) error {
 	var summary testAllSummary
-	if err := json.Unmarshal(raw, &summary); err != nil {
+	if err := decodeStrictJSON(raw, &summary); err != nil {
 		return err
 	}
 	switch summary.Mode {
@@ -106,6 +107,12 @@ func validateTestAllSummary(raw []byte, reportDir string) error {
 		return fmt.Errorf("fail summary contains no failing steps")
 	}
 	return nil
+}
+
+func decodeStrictJSON(raw []byte, out any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	return dec.Decode(out)
 }
 
 func validateStep(step testAllStep, reportDir string) error {

@@ -130,6 +130,42 @@ func TestELFHasRWDataSegmentAndStringNotInText(t *testing.T) {
 	}
 }
 
+func TestELFExecutableModeAndHeaderContract(t *testing.T) {
+	tmp := t.TempDir()
+	src := "fun main(): i32 uses io {\n  return 0\n}\n"
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "app")
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := BuildFile(srcPath, outPath, "linux-x64"); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	st, err := os.Stat(outPath)
+	if err != nil {
+		t.Fatalf("stat ELF: %v", err)
+	}
+	if st.Mode()&0o111 == 0 {
+		t.Fatalf("ELF output is not executable: mode=%v", st.Mode())
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read elf: %v", err)
+	}
+	if binary.LittleEndian.Uint64(data[40:48]) != 0 {
+		t.Fatalf("expected no ELF section header table in segment-only executable")
+	}
+	if binary.LittleEndian.Uint16(data[60:62]) != 0 {
+		t.Fatalf("expected section header count 0")
+	}
+	phdrs := parseELF64ProgramHeaders(t, data)
+	if len(phdrs) != 2 {
+		t.Fatalf("program header count = %d, want 2", len(phdrs))
+	}
+}
+
 func TestELFDataRelocPointsToDataMarker(t *testing.T) {
 	tmp := t.TempDir()
 	marker := "ELF_RELOC_MARKER"

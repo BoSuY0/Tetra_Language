@@ -59,6 +59,28 @@ func TestValidateSmokeReportCountsAcceptsLegacyReportsWithoutCounts(t *testing.T
 	}
 }
 
+func TestValidateSmokeReportRejectsUnknownFields(t *testing.T) {
+	raw := []byte(`{
+  "timestamp": "2026-04-27T00:00:00Z",
+  "target": "linux-x64",
+  "host": "linux-x64",
+  "version": "v1.0.0",
+  "islands_debug": false,
+  "total": 4,
+  "passed": 4,
+  "failed": 0,
+  "cases": [
+    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","expected_exit":0,"ran":false,"pass":true,"extra":true},
+    {"name":"flow_struct_smoke","src_path":"examples/flow_struct_smoke.tetra","expected_exit":42,"ran":false,"pass":true},
+    {"name":"flow_islands_smoke","src_path":"examples/flow_islands_smoke.tetra","expected_exit":0,"ran":false,"pass":true},
+    {"name":"flow_unsafe_cap_mem_smoke","src_path":"examples/flow_unsafe_cap_mem_smoke.tetra","expected_exit":42,"ran":false,"pass":true}
+  ]
+}`)
+	if _, err := parseSmokeReport(raw); err == nil {
+		t.Fatalf("expected unknown field failure")
+	}
+}
+
 func TestValidateSmokeReportCountsRejectsExplicitZeroCountsWithCases(t *testing.T) {
 	var report smokeReport
 	raw := []byte(`{
@@ -160,22 +182,142 @@ func TestValidateSmokeReportShapeRejectsUnsupportedTarget(t *testing.T) {
 }
 
 func TestValidateSmokeReportShapeAcceptsWASMBuildOnlyTarget(t *testing.T) {
+	total := 5
+	passed := 5
+	failed := 0
+	report := &smokeReport{
+		Target:    "wasm32-web",
+		BuildOnly: true,
+		Host:      "linux-x64",
+		Version:   "v0.6.0",
+		Total:     &total,
+		Passed:    &passed,
+		Failed:    &failed,
+		Cases: []smokeCaseReport{
+			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "dogfood_web_ui", SrcPath: "examples/projects/dogfood_web_ui/src/main.tetra", ExpectedExit: 0, Pass: true},
+		},
+	}
+	if err := validateSmokeReport(report); err != nil {
+		t.Fatalf("validateSmokeReport(wasm32-web): %v", err)
+	}
+}
+
+func TestValidateSmokeReportShapeRejectsWASMMissingDogfoodProfile(t *testing.T) {
+	total := 3
+	passed := 3
+	failed := 0
+	report := &smokeReport{
+		Target:    "wasm32-web",
+		BuildOnly: true,
+		Host:      "linux-x64",
+		Version:   "v0.6.0",
+		Total:     &total,
+		Passed:    &passed,
+		Failed:    &failed,
+		Cases: []smokeCaseReport{
+			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Pass: true},
+		},
+	}
+	err := validateSmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "missing required smoke profile") {
+		t.Fatalf("expected missing dogfood profile error, got %v", err)
+	}
+}
+
+func TestValidateSmokeReportShapeRejectsBuildOnlyTargetWithoutBuildOnlyFlag(t *testing.T) {
 	total := 1
 	passed := 1
 	failed := 0
 	report := &smokeReport{
-		Target:  "wasm32-web",
+		Target:  "wasm32-wasi",
 		Host:    "linux-x64",
 		Version: "v0.6.0",
 		Total:   &total,
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "ok", SrcPath: "examples/ok.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
+		},
+	}
+	err := validateSmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "build_only") {
+		t.Fatalf("expected build_only error, got %v", err)
+	}
+}
+
+func TestValidateSmokeReportShapeRejectsRanBuildOnlyCase(t *testing.T) {
+	total := 1
+	passed := 1
+	failed := 0
+	report := &smokeReport{
+		Target:    "wasm32-web",
+		BuildOnly: true,
+		Host:      "linux-x64",
+		Version:   "v0.6.0",
+		Total:     &total,
+		Passed:    &passed,
+		Failed:    &failed,
+		Cases: []smokeCaseReport{
+			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
+		},
+	}
+	err := validateSmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "build-only") {
+		t.Fatalf("expected build-only run error, got %v", err)
+	}
+}
+
+func TestValidateSmokeReportShapeAcceptsRanBuildOnlyCaseWithRunner(t *testing.T) {
+	total := 5
+	passed := 5
+	failed := 0
+	report := &smokeReport{
+		Target:    "wasm32-web",
+		BuildOnly: true,
+		Runner:    "node-wasi",
+		Host:      "linux-x64",
+		Version:   "v0.6.0",
+		Total:     &total,
+		Passed:    &passed,
+		Failed:    &failed,
+		Cases: []smokeCaseReport{
+			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
+			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
+			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
+			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
+			{Name: "dogfood_web_ui", SrcPath: "examples/projects/dogfood_web_ui/src/main.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
 		},
 	}
 	if err := validateSmokeReport(report); err != nil {
-		t.Fatalf("validateSmokeReport(wasm32-web): %v", err)
+		t.Fatalf("validateSmokeReport(wasm32-web with runner): %v", err)
+	}
+}
+
+func TestValidateSmokeReportShapeRejectsMissingWASMRequiredCase(t *testing.T) {
+	total := 1
+	passed := 1
+	failed := 0
+	report := &smokeReport{
+		Target:    "wasm32-wasi",
+		BuildOnly: true,
+		Host:      "linux-x64",
+		Version:   "v0.6.0",
+		Total:     &total,
+		Passed:    &passed,
+		Failed:    &failed,
+		Cases: []smokeCaseReport{
+			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
+		},
+	}
+	err := validateSmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "missing required smoke profile") {
+		t.Fatalf("expected missing required case error, got %v", err)
 	}
 }
 
@@ -250,11 +392,14 @@ func TestSmokeReportToChecklistValidateOnly(t *testing.T) {
   "target": "linux-x64",
   "host": "linux-x64",
   "version": "v0.6.0",
-  "total": 1,
-  "passed": 1,
+  "total": 4,
+  "passed": 4,
   "failed": 0,
   "cases": [
-    {"name": "islands_hello", "src_path": "examples/islands_hello.tetra", "actual_exit": 0, "ran": true, "pass": true}
+    {"name": "flow_hello", "src_path": "examples/flow_hello.tetra", "actual_exit": 0, "ran": true, "pass": true},
+    {"name": "flow_struct_smoke", "src_path": "examples/flow_struct_smoke.tetra", "expected_exit": 42, "actual_exit": 42, "ran": true, "pass": true},
+    {"name": "flow_islands_smoke", "src_path": "examples/flow_islands_smoke.tetra", "actual_exit": 0, "ran": true, "pass": true},
+    {"name": "flow_unsafe_cap_mem_smoke", "src_path": "examples/flow_unsafe_cap_mem_smoke.tetra", "expected_exit": 42, "actual_exit": 42, "ran": true, "pass": true}
   ]
 }`), 0o644); err != nil {
 		t.Fatal(err)
@@ -263,6 +408,71 @@ func TestSmokeReportToChecklistValidateOnly(t *testing.T) {
 	cmd.Dir = smokeReportToolDir(t)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("validate-only failed: %v\n%s", err, out)
+	}
+}
+
+func TestSmokeReportToChecklistUpdatesTargetSection(t *testing.T) {
+	dir := t.TempDir()
+	checklist := filepath.Join(dir, "islands.md")
+	if err := os.WriteFile(checklist, []byte(`Date:
+Target version:
+Git HEAD:
+Compiler version (compilerVersion):
+
+## Linux x64 (sanity)
+
+- [ ] build examples/islands_hello.tetra
+- [ ] run ./islands_hello
+
+## Windows x64
+
+- [ ] build examples/islands_hello.tetra
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	total, passed, failed := 1, 1, 0
+	report := &smokeReport{
+		Timestamp: "2026-04-27T12:00:00Z",
+		Target:    "linux-x64",
+		Host:      "linux-x64",
+		Version:   "v0.1.0",
+		GitHead:   "abc123",
+		Total:     &total,
+		Passed:    &passed,
+		Failed:    &failed,
+		Cases: []smokeCaseReport{{
+			Name:         "islands_hello",
+			SrcPath:      "examples/islands_hello.tetra",
+			ExpectedExit: 0,
+			ActualExit:   intPtr(0),
+			Ran:          true,
+			Pass:         true,
+		}},
+	}
+	updates := []checkboxUpdate{
+		{Contains: "examples/islands_hello.tetra", Checked: true},
+		{Contains: "./islands_hello", Checked: true},
+	}
+	if err := applyToChecklist(checklist, report, updates); err != nil {
+		t.Fatalf("applyToChecklist: %v", err)
+	}
+	raw, err := os.ReadFile(checklist)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(raw)
+	for _, want := range []string{
+		"Date: 2026-04-27",
+		"Target version: linux-x64",
+		"Git HEAD: abc123",
+		"Compiler version (compilerVersion): v0.1.0",
+		"- [x] build examples/islands_hello.tetra",
+		"- [x] run ./islands_hello",
+		"## Windows x64\n\n- [ ] build examples/islands_hello.tetra",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("checklist missing %q:\n%s", want, out)
+		}
 	}
 }
 

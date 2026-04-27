@@ -1,92 +1,223 @@
-# v1.0 Production Release Gate
+# v0.1.1 Production Release Gate
 
-Use this checklist before labeling a build or branch as Tetra v1.0.
+Status: checked against the canonical `v0.1.1` release evidence archive.
+Required checkboxes below are tied to
+`/tmp/tetra-v0_1_1-final-release-gate-20260427`, produced by
+`scripts/release_v1_0_gate.sh` with `33` passing steps and `0` failures.
+Tracked snapshots live in `docs/generated/v1_0`.
 
-Scope-freeze reference for unresolved Eco/release/execution-order TODO closure:
-`docs/plans/v1_scope_freeze_eco_release.md`.
+Canonical scope: `docs/spec/v1_scope.md`.
+Artifact policy: `docs/release/artifact_policy.md`.
+RC process: `docs/release/rc_process.md`.
+Security review gate: `docs/checklists/security_review_gate.md`.
+Robustness suite: `docs/testing/fuzz_property_stress.md`.
+Performance thresholds: `docs/performance/v1_0_thresholds.md`.
 
-Execution snapshot date: `2026-04-26`.
-Evidence artifacts:
-- `docs/generated/v1_0/release_gate_summary.json`
-- `docs/generated/v1_0/release_gate_summary.md`
-- `docs/generated/v1_0/test_all_full_summary.json`
-- `docs/generated/v1_0/api-diff/api-diff.json`
-- `docs/generated/v1_0/wasi-smoke.json`
-- `docs/generated/v1_0/web-ui-smoke.json`
-- `docs/generated/v1_0/reproducible-build.json`
+Gate evidence archive layout:
 
-## Language
+- Summary and step logs: `<report-dir>/summary.json`,
+  `<report-dir>/summary.md`, and `<report-dir>/logs/*.log`.
+- Release-state audit: `<report-dir>/artifacts/release-state.json` and
+  `<report-dir>/artifacts/release-state.txt`.
+- Artifact integrity: `<report-dir>/artifacts/artifact-hashes.json`.
+- Known issues: `<report-dir>/artifacts/known_issues.md`.
+- Targets, diagnostics, doctor, test, smoke, docs, API diff, security, and
+  reproducibility artifacts are named next to the checkbox that they satisfy.
 
-- [x] Flow syntax is the only official syntax in examples, docs, formatter, and
-      release smoke coverage.
-- [x] `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt`
-      passes.
-- [x] Legacy brace syntax is removed from the canonical compiler path.
-- [x] Stable type system covers structs, payload enums, optionals, typed
-      errors, modules, generics, protocols, extensions, and exhaustive match.
-- [x] Ownership/lifetime checker rejects use-after-move, escaping borrows,
-      mutable aliasing, invalid island transfers, and actor/task race patterns.
-- [x] Safe code has no known memory-safety or data-race unsoundness.
-- [x] Effects, capabilities, privacy clauses, and resource budget clauses have
-      stable diagnostics and release tests.
+## Hard Blockers
 
-## Compiler And Targets
+- [x] Version preflight: `./tetra version` reports `v0.1.1`.
+  - Evidence command: `bash scripts/bootstrap.sh && ./tetra version && ./t version`.
+  - Evidence artifacts: `<report-dir>/logs/01-bootstrap-tetra-binaries.log`,
+    `<report-dir>/logs/02-version-preflight-v0-1-1-required.log`, and
+    `<report-dir>/artifacts/release-state.json`.
+  - Blocking gate: `scripts/release_v1_0_gate.sh`.
+- [x] API diff no-change policy passes against the reviewed baseline.
+  - Evidence command: `bash scripts/release_v1_0_api_diff.sh --report-dir <dir>/api-diff --baseline docs/baselines/api-diff-baseline.v1alpha1.json --enforce no-change`.
+  - Evidence artifacts: `<dir>/api-diff/api-docs.md` and
+    `<dir>/api-diff/api-diff.json`; the diff report includes
+    `review.status`, `review.checklist`, and per-change `review_status` fields.
+  - Blocking gate: `scripts/release_v1_0_gate.sh`.
+- [x] No required checklist item is checked without an artifact, log, or test
+      command recorded in the release evidence archive.
+  - Evidence command: inspect `<report-dir>/summary.json`, `<report-dir>/summary.md`, and artifact paths listed below.
+  - Blocking gate: release reviewer signoff.
 
-- [x] `tetra version` reports the final v1.0 version.
+## Required Language And Safety
+
+- [x] Flow syntax is the only official release syntax in examples, docs,
+      formatter output, and release smoke coverage.
+  - Evidence command: `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt`.
+  - Evidence artifact: `<report-dir>/logs/*-flow-only-source-scan.log`.
+- [x] Parser, formatter, and diagnostics cover the supported Flow syntax
+      families.
+  - Evidence command: `go test ./compiler/internal/frontend/... -count=1`.
+  - Evidence artifacts: `<report-dir>/logs/*-go-test-packages.log`,
+    `<report-dir>/logs/*-formatter-check.log`,
+    `<report-dir>/artifacts/invalid-diagnostic.json`,
+    `<report-dir>/artifacts/missing-effect-diagnostic.json`,
+    `<report-dir>/artifacts/tabs-diagnostic.json`, and
+    `<report-dir>/artifacts/planned-actor-diagnostic.json`.
+  - Blocking gate: `scripts/release_v1_0_gate.sh` runs `tetra fmt --check`
+    and `tetra check --diagnostics=json` cases through
+    `tools/cmd/validate-diagnostic`.
+- [x] Stable type system covers the mandatory v1 language scope in
+      `docs/spec/v1_scope.md`.
+  - Evidence command: `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module' -count=1`.
+  - Evidence artifact: `<report-dir>/logs/*-go-test-packages.log`.
+- [x] Ownership, lifetime, island, actor/task transfer, and race-safety rules
+      have positive and negative release tests.
+  - Evidence command: `go test ./compiler/... -run 'Ownership|Borrow|Lifetime|Island|Actor|Task' -count=1`.
+  - Evidence artifact: `<report-dir>/logs/*-go-test-packages.log`.
+- [x] Effects, capabilities, unsafe boundaries, privacy/resource-budget
+      decisions, and public diagnostics are documented and tested.
+  - Evidence command: `go test ./compiler/... -run 'Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`.
+  - Evidence command: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`.
+  - Evidence artifacts: `<report-dir>/logs/*-go-test-packages.log` and
+    `<report-dir>/logs/*-docs-verification-and-doctests.log`.
+  - Evidence note: docs verification audits stable `lib/core` effect metadata
+    against the module `uses` declarations.
+- [x] Unsafe/capability/privacy/Eco/WASM security review has complete evidence
+      and reviewer signoff.
+  - Evidence checklist: `docs/checklists/security_review_gate.md`.
+  - Evidence workflow: `bash scripts/release_v1_0_security_review.sh --write-template <report-dir>/security-review.md`, then `bash scripts/release_v1_0_security_review.sh --signoff <report-dir>/security-review.md`.
+  - Evidence artifact: `<report-dir>/artifacts/security-review.md`.
+  - Blocking gate: release reviewer signoff.
+
+## Required Compiler, Targets, And Runtime
+
 - [x] Native release builds pass for `linux-x64`, `macos-x64`, and
       `windows-x64`.
-- [x] WASM builds pass for `wasm32-wasi` and `wasm32-web`.
-- [x] Debug info, release optimization, object/library linking, runtime ABI,
-      and deterministic build checks are covered.
-- [x] Incremental check/build cache validation is in the release gate.
+  - Evidence command: `./tetra smoke --target <target> --run=false --report <path>`.
+  - Evidence artifacts: `<report-dir>/artifacts/linux-smoke.json`,
+    `<report-dir>/artifacts/macos-smoke.json`, and
+    `<report-dir>/artifacts/windows-smoke.json`.
+- [x] Native host smoke runs on the host platform.
+  - Evidence command: `./tetra smoke --target linux-x64 --run=true --report <path>` on Linux.
+  - Evidence artifact: `<report-dir>/artifacts/host-smoke.json`.
+- [x] Runtime ABI, actor runtime override, and TOBJ link-object compatibility
+      matrix has fresh build evidence.
+  - Evidence command: `go test ./compiler/... -run 'Runtime|ABI|Object|Link|Actor|Actors' -count=1`.
+  - Evidence artifact: `<report-dir>/logs/*-go-test-packages.log`.
+  - Evidence note: non-host `macos-x64` and `windows-x64` runtime binaries are
+    build-only evidence unless executed on matching hosts.
+- [x] WASM build-only smoke passes for `wasm32-wasi` and `wasm32-web`.
+  - Evidence command: `./tetra smoke --target wasm32-wasi --run=false --report <path>` and `./tetra smoke --target wasm32-web --run=false --report <path>`.
+  - Evidence artifacts: `<report-dir>/artifacts/wasm32-wasi-smoke.json` and
+    `<report-dir>/artifacts/wasm32-web-smoke.json`.
+- [x] WASI runner smoke produces a validated report.
+  - Evidence command: `bash scripts/release_v1_0_wasi_smoke.sh --report <path>`.
+  - Evidence artifact: `<report-dir>/artifacts/wasi-smoke.json`.
+- [x] Web UI/browser smoke produces a validated UI-specific report.
+  - Evidence command: `bash scripts/release_v1_0_web_smoke.sh --report <path>`.
+  - Evidence artifact: `<report-dir>/artifacts/web-ui-smoke.json`.
+  - Host policy: missing or crashing headless Chromium records a `blocked`
+    report, fails the gate, and does not satisfy this checkbox.
+- [x] Native shell UI emits a deterministic metadata sidecar for the native
+      smoke source.
+  - Evidence command: `./tetra smoke --target linux-x64 --run=false --report <path>` on Linux.
+  - Evidence artifact: `<report-dir>/artifacts/linux-smoke.json`.
+  - Scope note: native shell UI is a v1 metadata preview sidecar, not a full
+    native widget toolkit.
+  - Evidence validation: `go run ./tools/cmd/smoke-report-to-checklist --validate-only --report <path>`.
+- [x] Reproducible build proof exists for at least one native target and one
+      WASM target.
+  - Evidence command: `bash scripts/release_v1_0_repro.sh --report <path>`.
+  - Evidence artifact: `<report-dir>/artifacts/reproducible-build.json`.
+  - Timestamp policy: the proof JSON omits wall-clock timestamps; release gate
+    summaries provide run timestamps so tracked proof snapshots do not churn.
 
-## Stdlib And Tooling
+## Required Stdlib, Tooling, Docs, And Eco
 
-- [x] Stable stdlib modules exist for collections, strings, slices, math, IO,
-      filesystem, networking, async, sync, testing, serialization, time, and
-      crypto interfaces.
-- [x] Every stable stdlib module has API docs, doctests, examples, formatter
-      coverage, effects metadata, and API diff metadata.
-- [x] `tetra` and `t` support `check`, `build`, `run`, `fmt`, `test`, `doc`,
-      `lsp`, `eco`, `clean`, and `version`.
-- [x] `tetra check examples/flow_hello.tetra` passes without emitting an
-      executable.
-- [x] Formatter is idempotent and preserves supported comments.
-- [x] LSP supports diagnostics, hover, go-to definition, references, rename,
-      completion, formatting, and code actions.
-- [x] JSON diagnostics/test/smoke/Eco schemas are stable and validated.
+- [x] Stable stdlib modules have API docs, examples/doctests where required,
+      effects metadata, formatter coverage, and API diff metadata.
+  - Evidence command: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`.
+  - Evidence artifacts: `<report-dir>/artifacts/tetra-docs.md`,
+    `<report-dir>/artifacts/api-diff/api-docs.md`, and
+    `<report-dir>/artifacts/api-diff/api-diff.json`.
+  - Scope note: `lib.experimental.*` modules are labeled experimental in
+    generated docs and stable examples must import `lib.core.*` directly.
+- [x] CLI commands required by `docs/spec/v1_scope.md` are tested.
+  - Evidence command: `go test ./cli/... -count=1`.
+  - Evidence artifacts: `<report-dir>/logs/*-go-test-packages.log`,
+    `<report-dir>/artifacts/targets.json`, and
+    `<report-dir>/artifacts/doctor.json`.
+- [x] JSON diagnostics, test reports, target reports, doctor reports, smoke
+      reports, and API docs are validated.
+  - Evidence command: `go test ./tools/... -count=1`.
+  - Evidence artifacts: `<report-dir>/artifacts/tetra-test-report.json`,
+    `<report-dir>/artifacts/targets.json`,
+    `<report-dir>/artifacts/doctor.json`,
+    `<report-dir>/artifacts/smoke-list.json`, and
+    `<report-dir>/artifacts/tetra-docs.md`.
+  - Blocking gate: `scripts/release_v1_0_gate.sh` includes the
+    `json diagnostic shape` step.
+- [x] Fuzz/property/stress smoke suite passes and nightly fuzz commands are
+      documented.
+  - Evidence command: `go test ./compiler/... ./cli/... ./tools/... -run 'Fuzz|Property|Stress' -count=1`.
+  - Evidence docs: `docs/testing/fuzz_property_stress.md`.
+  - Evidence artifacts: `<report-dir>/logs/*-go-test-packages.log` and
+    `<report-dir>/artifacts/test-all/summary.json`.
+- [x] Performance benchmarks have RC baselines, thresholds, and reviewer
+      decisions for regressions.
+  - Evidence command: `go test ./compiler/... -bench='Benchmark(CompileRepresentativeExamples|FormatRepresentativeSources|GenerateAPIDocsDogfoodProjects|BinarySizeBaselines)' -run '^$' -count=5`.
+  - Evidence docs: `docs/performance/v1_0_thresholds.md`.
+  - Evidence artifact: `<report-dir>/logs/*-go-test-packages.log`.
+- [x] LSP stdio baseline has validated diagnostics/symbol/hover evidence.
+  - Evidence command: `bash scripts/test_all.sh --full --keep-going --report-dir <dir>/test-all`.
+  - Evidence artifact: `<report-dir>/artifacts/test-all/summary.json`.
+- [x] Local Eco package lifecycle covers verify, dependency lock, pack/unpack,
+      vault, and publish metadata fixtures.
+  - Evidence command: `bash scripts/test_all.sh --full --keep-going --report-dir <dir>/test-all`.
+  - Evidence artifact: `<report-dir>/artifacts/test-all/summary.json`.
+- [x] Release documentation set is complete: user docs, contributor docs,
+      artifact policy, RC process, maintenance policy, release notes, and known
+      issues template.
+  - Evidence command: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`.
+  - Evidence artifacts: `<report-dir>/logs/*-docs-verification-and-doctests.log`,
+    `<report-dir>/artifacts/known_issues.md`,
+    `<report-dir>/artifacts/release-state.json`, and
+    `<report-dir>/artifacts/artifact-hashes.json`.
 
-## UI
+## Required Aggregate Commands
 
-- [x] `view`, `state`, binding, events, commands, typed styles, and
-      accessibility metadata are supported.
-- [x] Web UI backend builds through `wasm32-web`.
-- [x] Native shell UI backend builds on supported host platforms.
-- [x] UI examples have web and native smoke coverage.
+- [x] `go test ./compiler/... ./cli/... ./tools/... -count=1`
+  - Evidence artifact: `<report-dir>/logs/*-go-test-packages.log`.
+- [x] `bash scripts/test_all.sh --full --keep-going --report-dir <dir>/test-all`
+  - Evidence artifact: `<report-dir>/artifacts/test-all/summary.json`.
+- [x] `bash scripts/release_v1_0_gate.sh --report-dir <dir>/release-gate`
+  - Evidence artifacts: `<report-dir>/summary.json` and
+    `<report-dir>/artifacts/release-state.json`.
+- [x] `git diff --check`
+  - Evidence artifact: final handoff command output.
 
-## Eco
+## Optional Or Beta Surface
 
-- [x] Capsule manifest v1, dependency resolver, permission model, semantic
-      lockfile, local Todex Vault, Seed import/export, NeedMap, TrustSnapshot,
-      Materializer, reproducible build basics, and API diff checker are stable.
-- [x] Package publishing, TetraHub, target-aware downloads, and trust metadata
-      are available as explicitly labeled beta features.
-- [x] Full distributed Todex mesh, proof-carrying capsules, global EcoTrust,
-      EcoOracle, and live evolution remain documented as post-1.0.
+- [x] Network package publishing is explicitly labeled beta if present.
+- [x] TetraHub integration is explicitly labeled beta if present.
+- [x] Target-aware downloads and trust metadata are explicitly labeled beta if
+      present.
 
-## Required Commands
+Optional/beta items must not be required for `v0.1.1` unless promoted through
+scope review and added to `docs/spec/v1_scope.md`.
 
-- [x] `go test ./compiler/... ./cli/... ./tools/...`
-- [x] `bash scripts/test_all.sh --full`
-- [x] `bash scripts/release_v1_0_gate.sh`
-- [x] Native host smoke runs.
-- [x] Build-only smoke passes for all mandatory native and WASM targets.
-- [x] WASI smoke runs in a WASI runner.
-- [x] Web UI smoke loads through browser automation.
-- [x] Docs manifest and doctests verify.
-- [x] API diff checker verifies stable public APIs.
-- [x] Reproducible build check passes for at least one native and one WASM
-      target.
+## Informational Post-v1 Items
 
-Open blockers (exact):
-- none on the current v1.0 release snapshot (all required commands above are passing).
+These are not required for `v0.1.1`:
+
+- Distributed EcoNet and production TetraHub publishing.
+- Proof-carrying capsules and global trust scoring.
+- EcoOracle, live evolution, time-travel execution, and multiverse optimizer.
+- Advanced AI/model types and model-runtime integration.
+- Distributed actors beyond the release actor/task safety contract.
+
+## Expected Current State
+
+On the `v0.1.1` release branch:
+
+- `bash scripts/bootstrap.sh && ./tetra version && ./t version` reports
+  `v0.1.1`.
+- `bash scripts/release_v1_0_gate.sh --report-dir <dir>/release-gate` must pass
+  before the release label is attached.
+- Required checkboxes above must stay linked to evidence produced in the same
+  branch state and archived with the release report.

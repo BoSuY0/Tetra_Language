@@ -3,19 +3,30 @@
   "baseline_path": "docs/baselines/api-diff-baseline.v1alpha1.json",
   "candidate_path": "docs/generated/v1_0/api-diff/api-docs.md",
   "baseline": {
-    "api_hash": "sha256:b7cdf34de1eda56ca8ebf2f6795660d3081bf5ae40581c1e3e6eb8695e655007",
-    "module_count": 62,
-    "entry_count": 113
+    "api_hash": "sha256:40f6fcd0c427f7d88a52ef4e5cad9cb6afa266efda0b3905c7c0cd6f09a8fb8a",
+    "module_count": 72,
+    "entry_count": 199
   },
   "candidate": {
-    "api_hash": "sha256:b7cdf34de1eda56ca8ebf2f6795660d3081bf5ae40581c1e3e6eb8695e655007",
-    "module_count": 62,
-    "entry_count": 113
+    "api_hash": "sha256:40f6fcd0c427f7d88a52ef4e5cad9cb6afa266efda0b3905c7c0cd6f09a8fb8a",
+    "module_count": 72,
+    "entry_count": 199
   },
   "summary": {
     "added": 0,
     "removed": 0,
     "changed": 0
+  },
+  "review": {
+    "status": "clean",
+    "release_checklist": "docs/checklists/v1_0_release_gate.md",
+    "baseline_policy": "docs/spec/api_diff_policy.md",
+    "checklist": [
+      "Classify added entries as intentional v1 scope or remove them before baseline update.",
+      "Classify changed entries as deliberate compatibility decisions or restore the previous signature.",
+      "Classify removed entries as deliberate breaking decisions or restore the missing API surface.",
+      "Update docs/baselines/api-diff-baseline.v1alpha1.json only after review approval."
+    ]
   },
   "changes": []
 }

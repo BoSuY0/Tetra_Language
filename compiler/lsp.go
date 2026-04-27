@@ -225,6 +225,31 @@ func formatLSPFuncDetail(fn *frontend.FuncDecl) string {
 	return detail
 }
 
+func formatLSPFuncSigDecl(sig frontend.FuncSigDecl) string {
+	params := make([]string, 0, len(sig.Params))
+	for _, param := range sig.Params {
+		typ := formatLSPTypeRef(param.Type)
+		if param.Ownership != "" {
+			typ = param.Ownership + " " + typ
+		}
+		params = append(params, param.Name+": "+typ)
+	}
+	prefix := "func"
+	if sig.Async {
+		prefix = "async func"
+	}
+	detail := fmt.Sprintf("%s %s(%s) -> %s", prefix, sig.Name, strings.Join(params, ", "), formatLSPTypeRef(sig.ReturnType))
+	if sig.HasThrows {
+		detail += " throws " + formatLSPTypeRef(sig.Throws)
+	}
+	if len(sig.Uses) > 0 {
+		uses := append([]string(nil), sig.Uses...)
+		sort.Strings(uses)
+		detail += " uses " + strings.Join(uses, ", ")
+	}
+	return detail
+}
+
 func formatLSPTypeRef(ref frontend.TypeRef) string {
 	switch ref.Kind {
 	case frontend.TypeRefSlice:
@@ -234,6 +259,25 @@ func formatLSPTypeRef(ref frontend.TypeRef) string {
 	case frontend.TypeRefOptional:
 		return formatLSPTypeRef(*ref.Elem) + "?"
 	default:
-		return ref.Name
+		return canonicalLSPTypeName(ref.Name)
+	}
+}
+
+func canonicalLSPTypeName(name string) string {
+	switch name {
+	case "Int", "i32":
+		return "i32"
+	case "UInt8", "Byte", "u8":
+		return "u8"
+	case "Bool", "bool":
+		return "bool"
+	case "String", "str":
+		return "str"
+	case "ConsentToken", "consent.token":
+		return "consent.token"
+	case "SecretInt", "secret.i32":
+		return "secret.i32"
+	default:
+		return name
 	}
 }

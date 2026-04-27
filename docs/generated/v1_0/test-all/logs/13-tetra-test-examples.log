@@ -1,0 +1,4 @@
+PASS grammar surface
+PASS cli status code
+PASS math
+Tetra tests: 3/3 passed

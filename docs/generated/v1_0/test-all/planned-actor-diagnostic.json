@@ -1,0 +1,1 @@
+{"code":"TETRA0001","message":"planned feature 'actor' is not implemented in the Tetra v1.0 profile","file":"/tmp/tmp.JwFGuaIlHw/planned-actor-diagnostic.tetra","line":1,"column":1,"severity":"error","hint":"Use the supported v1.0 syntax surface, or keep this source behind a later-release feature gate."}

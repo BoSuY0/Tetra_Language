@@ -1,8 +1,12 @@
 # Tetra Language Full TODO
 
+> Historical checkpoint. This TODO list belongs to the older v0.6 stabilization
+> work and is superseded by `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+> The current public version is `v0.1.0`.
+
 **Date:** 2026-04-26
-**Current baseline:** Tetra `v0.6.0` Usable Alpha
-**Purpose:** Track everything still needed after the current green v0.6 state.
+**Historical baseline:** Tetra `v0.6.0` Usable Alpha
+**Purpose:** Track everything that was still needed after the then-green v0.6 state.
 **Execution:** Work task-by-task. Keep `bash scripts/test_all.sh --full` green while landing changes.
 
 ## Closure Note (2026-04-26)
@@ -62,7 +66,7 @@
 - [x] Review the modified and untracked files currently in the worktree.
 - [x] Separate source changes from generated reports, local artifacts, and release outputs.
 - [x] Confirm `reports/`, root `tetra`, root `t`, root `app`, `.tetra_cache/`, and other build outputs stay ignored.
-- [x] Confirm every new source/test/doc file is intentional for the current v0.6.0 baseline checkpoint.
+- [x] Confirm every new source/test/doc file is intentional for the historical v0.6.0 baseline checkpoint.
 - [x] Commit or otherwise checkpoint the green baseline before beginning v0.6.x or v1.0 work.
 
 **Verification:**
@@ -74,7 +78,7 @@ bash scripts/test_all.sh --full
 bash scripts/release_v0_6_gate.sh
 ```
 
-**Done when:** The repository has a deliberate checkpoint for the current v0.6.0 baseline, and rerunning the v0.6 gates still passes.
+**Done when:** The repository has a deliberate checkpoint for the historical v0.6.0 baseline, and rerunning the v0.6 gates still passes.
 
 ## v0.6.x Stabilization Line
 
@@ -106,7 +110,7 @@ go test ./tools/scriptstest ./tools/cmd/validate-test-all-summary
 
 ### TODO 3: Expand Negative Semantic Coverage
 
-**Status:** Complete for the current v0.6.x/v0.7 hardening scope. Tesla verified existing focused tests and full gates; no missing negative test was found.
+**Status:** Complete for the historical v0.6.x/v0.7 hardening scope. Tesla verified existing focused tests and full gates; no missing negative test was found.
 
 **Goal:** Strengthen diagnostics without expanding the public language surface unnecessarily.
 
@@ -204,7 +208,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 6: Make v1.0 Readiness Measurable Without Pretending It Is Done
 
-**Status:** Complete for current release-tracking scope. Lorentz verified docs, release-v1 tests, and `scripts/release_v1_0_gate.sh`; the v1 gate intentionally fails while the compiler reports `v0.6.0`.
+**Status:** Complete for the historical release-tracking scope. Lorentz verified docs, release-v1 tests, and `scripts/release_v1_0_gate.sh`; the v1 gate intentionally failed while the compiler reported `v0.6.0`.
 
 **Goal:** Keep v1.0 planning honest while v0.6.x stays green.
 
@@ -485,7 +489,7 @@ bash scripts/test_all.sh --full
 
 ### TODO 14: Stabilize CLI, Formatter, Reports, LSP, and Docs
 
-**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition/references/rename/code-actions basics are green. Remaining work is mostly outside the current v0.6 MVP surface (deeper refactors and broader v1 release gating).
+**Status:** Partial. CLI, formatter, diagnostics/test/smoke reports, docs, and LSP smoke/diagnostics/hover/completion/formatting/go-to-definition/references/rename/code-actions basics are green. Remaining work is mostly outside the historical v0.6 MVP surface (deeper refactors and broader v1 release gating).
 
 **Goal:** Make the developer toolchain reliable enough for daily use and CI.
 
@@ -494,7 +498,7 @@ bash scripts/test_all.sh --full
 **Approach:**
 
 - [x] Keep `tetra` and `t` entrypoints stable.
-- [x] Stabilize `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`, `clean`, and `version` for the current v0.6 surface.
+- [x] Stabilize `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`, `clean`, and `version` for the historical v0.6 surface.
 - [x] Make formatter idempotent for the current supported surface.
 - [x] Preserve supported line and block comments in formatter output.
 - [x] Stabilize JSON diagnostics schema for the current supported surface.
@@ -638,7 +642,7 @@ bash scripts/release_v1_0_gate.sh
 
 ## Suggested Execution Order
 
-- [x] 1. Freeze current green v0.6.0 baseline.
+- [x] 1. Freeze historical green v0.6.0 baseline.
 - [x] 2. Finish or explicitly split the v0.6.x stabilization tasks.
 - [x] 3. Validate the first v0.7 hardening slice.
 - [x] 4. Start v1.0 Wave 1: Flow-only frontend.

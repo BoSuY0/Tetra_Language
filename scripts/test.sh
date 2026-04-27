@@ -2,9 +2,9 @@
 set -euo pipefail
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  gofmt -w $(git ls-files '*.go')
+  git ls-files -z '*.go' | xargs -0 gofmt -w
 else
-  gofmt -w $(find . -name '*.go' -not -path './.gocache/*' -not -path './.cache/*')
+  find . -name '*.go' -not -path './.gocache/*' -not -path './.cache/*' -print0 | xargs -0 gofmt -w
 fi
 
 go test ./compiler/...

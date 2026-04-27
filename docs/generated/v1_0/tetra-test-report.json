@@ -1,0 +1,58 @@
+{
+  "total": 3,
+  "passed": 3,
+  "failed": 0,
+  "duration_ms": 3,
+  "files": [
+    {
+      "filename": "examples/flow_grammar_surface_smoke.tetra",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "duration_ms": 1
+    },
+    {
+      "filename": "examples/projects/dogfood_cli/src/main.tetra",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "duration_ms": 1
+    },
+    {
+      "filename": "examples/tooling_tests.tetra",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "duration_ms": 1
+    }
+  ],
+  "results": [
+    {
+      "name": "grammar surface",
+      "filename": "examples/flow_grammar_surface_smoke.tetra",
+      "index": 0,
+      "function_name": "__tetra_test_0_grammar_surface",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 1
+    },
+    {
+      "name": "cli status code",
+      "filename": "examples/projects/dogfood_cli/src/main.tetra",
+      "index": 0,
+      "function_name": "__tetra_test_0_cli_status_code",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 1
+    },
+    {
+      "name": "math",
+      "filename": "examples/tooling_tests.tetra",
+      "index": 0,
+      "function_name": "__tetra_test_0_math",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 1
+    }
+  ]
+}

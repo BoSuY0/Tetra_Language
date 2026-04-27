@@ -117,6 +117,38 @@ func main() -> Int:
 	}
 }
 
+func TestAsyncTypedErrorPropagationIsPostV1Diagnostic(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+enum AsyncErr:
+    case failed
+
+async func worker() -> Int throws AsyncErr:
+    throw AsyncErr.failed
+
+async func caller() -> Int throws AsyncErr:
+    return try await worker()
+
+func main() -> Int:
+    return 0
+`, "async typed-error propagation is not supported")
+}
+
+func TestAsyncTypedErrorBoundaryRejectsAwaitTryForm(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+enum AsyncErr:
+    case failed
+
+async func worker() -> Int throws AsyncErr:
+    throw AsyncErr.failed
+
+async func caller() -> Int throws AsyncErr:
+    return await try worker()
+
+func main() -> Int:
+    return 0
+`, "async typed-error propagation is not supported")
+}
+
 func TestTaskSpawnJoinCheckAndLower(t *testing.T) {
 	src := []byte(`
 func worker() -> Int:

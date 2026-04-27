@@ -1,5 +1,9 @@
 # Tetra v0.6.0 Usable Alpha Release Notes
 
+> Historical checkpoint. These notes record the v0.6.0 Usable Alpha milestone.
+> They are preserved for history and do not describe the current public
+> release truth, which is `docs/spec/v1_scope.md`.
+
 Tetra v0.6.0 is a hardening release over v0.5.0 Integrated Alpha. It keeps the
 same broad language scope and improves release identity, formatting coverage,
 LSP basics, and local Eco packaging.

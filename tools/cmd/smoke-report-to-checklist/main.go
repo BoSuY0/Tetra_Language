@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -26,6 +27,8 @@ type smokeCaseReport struct {
 type smokeReport struct {
 	Timestamp    string            `json:"timestamp"`
 	Target       string            `json:"target"`
+	BuildOnly    bool              `json:"build_only,omitempty"`
+	Runner       string            `json:"runner,omitempty"`
 	Host         string            `json:"host"`
 	Version      string            `json:"version"`
 	GitHead      string            `json:"git_head,omitempty"`
@@ -188,6 +191,16 @@ func validateSmokeReportCounts(report *smokeReport) error {
 	return nil
 }
 
+func parseSmokeReport(raw []byte) (*smokeReport, error) {
+	var report smokeReport
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&report); err != nil {
+		return nil, err
+	}
+	return &report, nil
+}
+
 func validateSmokeReport(report *smokeReport) error {
 	if err := validateSmokeReportCounts(report); err != nil {
 		return err
@@ -200,6 +213,9 @@ func validateSmokeReport(report *smokeReport) error {
 	}
 	if !supportedTarget(report.Target) {
 		return fmt.Errorf("smoke report unsupported target %s", report.Target)
+	}
+	if wantBuildOnly := ctarget.IsBuildOnlyTarget(report.Target); report.BuildOnly != wantBuildOnly {
+		return fmt.Errorf("smoke report build_only = %v, want %v for target %s", report.BuildOnly, wantBuildOnly, report.Target)
 	}
 	if report.Host == "" {
 		return fmt.Errorf("smoke report missing host")
@@ -236,6 +252,9 @@ func validateSmokeReport(report *smokeReport) error {
 		if c.Ran && c.ActualExit == nil {
 			return fmt.Errorf("smoke report case %s ran without actual_exit", c.Name)
 		}
+		if report.BuildOnly && c.Ran && report.Runner == "" {
+			return fmt.Errorf("smoke report case %s ran for build-only target %s", c.Name, report.Target)
+		}
 		if c.ActualExit != nil && (*c.ActualExit < 0 || *c.ActualExit > 255) {
 			return fmt.Errorf("smoke report case %s actual_exit = %d, want 0..255", c.Name, *c.ActualExit)
 		}
@@ -245,6 +264,31 @@ func validateSmokeReport(report *smokeReport) error {
 		if c.Pass && c.Error != "" {
 			return fmt.Errorf("smoke report case %s passed with error text", c.Name)
 		}
+	}
+	if err := validateRequiredSmokeCases(report.Target, seenNames); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateRequiredSmokeCases(target string, seen map[string]bool) error {
+	switch target {
+	case "linux-x64", "windows-x64", "macos-x64":
+		required := []string{"flow_hello", "flow_struct_smoke", "flow_islands_smoke", "flow_unsafe_cap_mem_smoke"}
+		for _, name := range required {
+			if !seen[name] {
+				return fmt.Errorf("smoke report missing required smoke case %s for target %s", name, target)
+			}
+		}
+	case "wasm32-wasi", "wasm32-web":
+		required := []string{"flow_hello", "effects_io_smoke", "ui_web_smoke", "dogfood_wasi", "dogfood_web_ui"}
+		for _, name := range required {
+			if !seen[name] {
+				return fmt.Errorf("smoke report missing required smoke profile for target %s", target)
+			}
+		}
+	default:
+		return nil
 	}
 	return nil
 }
@@ -284,12 +328,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	var report smokeReport
-	if err := json.Unmarshal(raw, &report); err != nil {
+	report, err := parseSmokeReport(raw)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateSmokeReport(&report); err != nil {
+	if err := validateSmokeReport(report); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -319,7 +363,7 @@ func main() {
 		})
 	}
 	if len(islandsUpdates) > 0 {
-		if err := applyToChecklist(islandsChecklist, &report, islandsUpdates); err != nil {
+		if err := applyToChecklist(islandsChecklist, report, islandsUpdates); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -337,7 +381,7 @@ func main() {
 		})
 	}
 	if len(actorsUpdates) > 0 {
-		if err := applyToChecklist(actorsChecklist, &report, actorsUpdates); err != nil {
+		if err := applyToChecklist(actorsChecklist, report, actorsUpdates); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

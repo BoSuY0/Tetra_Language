@@ -163,6 +163,46 @@ func TestBuildIslandsDebugDoubleFree(t *testing.T) {
 	}
 }
 
+func TestBuildScopedIslandAutoFreeRunsInDebugAndNonDebug(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fun main(): i32 uses alloc, islands, mem {\n  var out: i32 = 0\n  island(64) as isl {\n    var xs: []u8 = core.island_make_u8(isl, 1)\n    xs[0] = 7\n    out = xs[0]\n  }\n  return out\n}\n"
+	for _, tc := range []struct {
+		name string
+		opt  BuildOptions
+	}{
+		{name: "non_debug", opt: BuildOptions{Jobs: 1}},
+		{name: "debug", opt: BuildOptions{Jobs: 1, IslandsDebug: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, exitCode := buildAndRunWithOptions(t, src, tc.opt)
+			if stdout != "" {
+				t.Fatalf("stdout mismatch: %q", stdout)
+			}
+			if exitCode != 7 {
+				t.Fatalf("exit code mismatch: %d", exitCode)
+			}
+		})
+	}
+}
+
+func TestBuildIslandsDebugOverflowFails(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "fun main(): i32 uses alloc, islands, mem {\n  island(64) as isl {\n    var xs: []u8 = core.island_make_u8(isl, 65)\n    xs[0] = 1\n  }\n  return 0\n}\n"
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Jobs: 1, IslandsDebug: true})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 1 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
 func TestBuildSliceBoundsCheck(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -768,6 +808,96 @@ func TestBuildFlowUnsafeCapMemSyntax(t *testing.T) {
 	}
 }
 
+func TestBuildBudgetedUnsafeCallsPreserveIRStack(t *testing.T) {
+	src := `func main() -> Int
+uses alloc, budget, capability, mem
+budget(16):
+    var out: Int = 1
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(4)
+        let _: Int = core.store_i32(p, 42, mem)
+        out = core.load_i32(p, mem)
+    return out
+`
+	if err := buildOnly(t, src); err != nil {
+		t.Fatalf("BuildFile: %v", err)
+	}
+}
+
+func TestBuildBudgetRuntimeGuardAllowsAndFailsDeterministically(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	okSrc := `func tick() -> Int
+uses budget:
+    return 9
+
+func main() -> Int
+uses budget
+budget(4):
+    return tick()
+`
+	stdout, exitCode := buildAndRun(t, okSrc)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 9 {
+		t.Fatalf("exit code = %d, want 9", exitCode)
+	}
+
+	failSrc := `func tick() -> Int
+uses budget:
+    return 9
+
+func main() -> Int
+uses budget
+budget(0):
+    return tick()
+`
+	stdout, exitCode = buildAndRun(t, failSrc)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want policy failure return 0", exitCode)
+	}
+}
+
+func TestBuildPrivacyConsentRuntimeSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `func seal(token: consent.token) -> secret.i32
+uses privacy
+privacy
+consent(token):
+    return core.secret_seal_i32(33, token)
+
+func reveal(token: consent.token, value: secret.i32) -> Int
+uses privacy
+privacy
+consent(token):
+    return core.secret_unseal_i32(value, token)
+
+func main() -> Int
+uses privacy
+privacy:
+    let token: consent.token = core.consent_token()
+    let secret: secret.i32 = seal(token)
+    return reveal(token, secret)
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 33 {
+		t.Fatalf("exit code = %d, want 33", exitCode)
+	}
+}
+
 func TestBuildValAssignmentFails(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -1049,6 +1179,96 @@ func TestBuildMultiFileDuplicateModule(t *testing.T) {
 	}
 	if err := buildOnlyFiles(t, files, "app/game.tetra"); err == nil {
 		t.Fatalf("expected compilation error")
+	}
+}
+
+func TestLoadWorldRejectsDuplicateImportPath(t *testing.T) {
+	tmp := t.TempDir()
+	files := map[string]string{
+		"engine/render.tetra": "module engine.render\nfun add_one(x: i32): i32 {\n  return x + 1\n}\n",
+		"app/game.tetra":      "module app.game\nimport engine.render as render\nimport engine.render as r\nfun main(): i32 {\n  return render.add_one(41)\n}\n",
+	}
+	writeTestFiles(t, tmp, files)
+
+	_, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/game.tetra")))
+	if err == nil {
+		t.Fatalf("expected duplicate import path error")
+	}
+	if !strings.Contains(err.Error(), "duplicate import 'engine.render'") {
+		t.Fatalf("error = %v, want duplicate import path diagnostic", err)
+	}
+}
+
+func TestLoadWorldReportsMissingImportPath(t *testing.T) {
+	tmp := t.TempDir()
+	files := map[string]string{
+		"app/game.tetra": "module app.game\nimport engine.missing as missing\nfun main(): i32 {\n  return missing.add_one(41)\n}\n",
+	}
+	writeTestFiles(t, tmp, files)
+
+	_, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/game.tetra")))
+	if err == nil {
+		t.Fatalf("expected missing import error")
+	}
+	if !strings.Contains(err.Error(), "load module 'engine.missing'") || !strings.Contains(err.Error(), "read source") {
+		t.Fatalf("error = %v, want missing import path diagnostic", err)
+	}
+}
+
+func TestLoadWorldReportsImportCycle(t *testing.T) {
+	tmp := t.TempDir()
+	files := map[string]string{
+		"app/game.tetra": "module app.game\nimport mod.a as a\nfun main(): i32 {\n  return a.ping()\n}\n",
+		"mod/a.tetra":    "module mod.a\nimport mod.b as b\nfun ping(): i32 {\n  return b.pong()\n}\n",
+		"mod/b.tetra":    "module mod.b\nimport mod.a as a\nfun pong(): i32 {\n  return 1\n}\n",
+	}
+	writeTestFiles(t, tmp, files)
+
+	_, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/game.tetra")))
+	if err == nil {
+		t.Fatalf("expected import cycle error")
+	}
+	if !strings.Contains(err.Error(), "import cycle detected at 'mod.a'") {
+		t.Fatalf("error = %v, want import cycle diagnostic", err)
+	}
+}
+
+func TestLoadWorldReportsDuplicateModuleDeclaration(t *testing.T) {
+	tmp := t.TempDir()
+	files := map[string]string{
+		"engine/render.tetra":       "module engine.render\nfun add_one(x: i32): i32 {\n  return x + 1\n}\n",
+		"engine/render_alias.tetra": "module engine.render\nfun add_two(x: i32): i32 {\n  return x + 2\n}\n",
+		"app/game.tetra":            "module app.game\nimport engine.render as r\nimport engine.render_alias as r2\nfun main(): i32 {\n  return r.add_one(1) + r2.add_two(1)\n}\n",
+	}
+	writeTestFiles(t, tmp, files)
+
+	_, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/game.tetra")))
+	if err == nil {
+		t.Fatalf("expected duplicate module error")
+	}
+	if !strings.Contains(err.Error(), "duplicate module 'engine.render'") {
+		t.Fatalf("error = %v, want duplicate module diagnostic", err)
+	}
+}
+
+func TestCheckWorldRejectsImportAliasShadowingTopLevelName(t *testing.T) {
+	tmp := t.TempDir()
+	files := map[string]string{
+		"engine/math.tetra": "module engine.math\nfun inc(x: i32): i32 {\n  return x + 1\n}\n",
+		"app/game.tetra":    "module app.game\nimport engine.math as math\nfun math(): i32 {\n  return 1\n}\nfun main(): i32 {\n  return math()\n}\n",
+	}
+	writeTestFiles(t, tmp, files)
+
+	world, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/game.tetra")))
+	if err != nil {
+		t.Fatalf("load world: %v", err)
+	}
+	_, err = CheckWorld(world)
+	if err == nil {
+		t.Fatalf("expected alias shadowing error")
+	}
+	if !strings.Contains(err.Error(), "import alias 'math' conflicts with declaration 'math'") {
+		t.Fatalf("error = %v, want alias shadowing diagnostic", err)
 	}
 }
 

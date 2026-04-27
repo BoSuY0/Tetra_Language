@@ -1,0 +1,8 @@
+struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int
+
+func main() -> Int:
+    return 0

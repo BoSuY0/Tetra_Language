@@ -1,0 +1,16 @@
+{
+  "schema": "tetra.eco.lock.v1",
+  "manifest_schema": "tetra.capsule.v1",
+  "permissions_model": "tetra.eco.permissions.v1",
+  "graph_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "capsules": [
+    {
+      "id": "tetra://fixture/app",
+      "name": "FixtureApp",
+      "version": "0.1.0",
+      "path": "Tetra.capsule",
+      "targets": ["linux-x64"],
+      "permissions": ["io"]
+    }
+  ]
+}

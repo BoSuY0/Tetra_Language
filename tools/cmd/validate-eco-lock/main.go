@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -176,6 +178,13 @@ func validateEcoLock(raw []byte) error {
 			}
 		}
 	}
+	if lock.GraphSHA256 != "" {
+		sum := sha256.Sum256([]byte(lockGraphFingerprint(normalized)))
+		expected := "sha256:" + hex.EncodeToString(sum[:])
+		if lock.GraphSHA256 != expected {
+			return fmt.Errorf("graph_sha256 mismatch: metadata has %s, computed %s", lock.GraphSHA256, expected)
+		}
+	}
 	return nil
 }
 
@@ -296,6 +305,28 @@ func containsString(values []string, value string) bool {
 		}
 	}
 	return false
+}
+
+func lockGraphFingerprint(items []ecoLockCapsule) string {
+	var b strings.Builder
+	for _, item := range items {
+		b.WriteString(item.ID)
+		b.WriteByte('|')
+		b.WriteString(item.Version)
+		b.WriteByte('|')
+		b.WriteString(strings.Join(item.Targets, ","))
+		b.WriteByte('|')
+		b.WriteString(strings.Join(item.Permissions, ","))
+		b.WriteByte('|')
+		for _, dep := range item.Dependencies {
+			b.WriteString(dep.ID)
+			b.WriteByte('@')
+			b.WriteString(dep.Version)
+			b.WriteByte(',')
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 func isCapsuleSemver(version string) bool {

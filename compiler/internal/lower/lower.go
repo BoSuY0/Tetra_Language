@@ -82,6 +82,9 @@ func Lower(checked *semantics.CheckedProgram) (*ir.IRProgram, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := VerifyFunc(irFunc); err != nil {
+			return nil, err
+		}
 		prog.Funcs = append(prog.Funcs, irFunc)
 	}
 	return &prog, nil
@@ -100,6 +103,9 @@ func LowerModule(checked *semantics.CheckedProgram, module string) ([]ir.IRFunc,
 		if err != nil {
 			return nil, err
 		}
+		if err := VerifyFunc(irFunc); err != nil {
+			return nil, err
+		}
 		out = append(out, irFunc)
 	}
 	return out, nil
@@ -113,6 +119,9 @@ func LowerModules(checked *semantics.CheckedProgram) (map[string][]ir.IRFunc, er
 	for _, fn := range checked.Funcs {
 		irFunc, err := lowerCheckedFunc(fn, checked.Types, checked.FuncSigs, checked.GlobalsByModule[fn.Module])
 		if err != nil {
+			return nil, err
+		}
+		if err := VerifyFunc(irFunc); err != nil {
 			return nil, err
 		}
 		modules[fn.Module] = append(modules[fn.Module], irFunc)
@@ -159,6 +168,8 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 		policyFailLabel:   -1,
 		budgetEnabled:     policy.hasBudget,
 		budgetLocal:       budgetLocal,
+		discardLocal:      -1,
+		budgetScratchBase: -1,
 	}
 	if policy.hasBudget || policy.consentParam != "" {
 		l.policyFailLabel = l.newLabel()
@@ -192,32 +203,36 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 		Name:        fn.Name,
 		ExportName:  fn.Decl.ExportName,
 		ParamSlots:  fn.ParamSlots,
-		LocalSlots:  localSlots,
+		LocalSlots:  l.localSlots,
 		ReturnSlots: fn.ReturnSlots,
 		Instrs:      l.instrs,
 	}, nil
 }
 
 type lowerer struct {
-	instrs            []ir.IRInstr
-	locals            map[string]semantics.LocalInfo
-	globals           map[string]semantics.GlobalInfo
-	types             map[string]*semantics.TypeInfo
-	funcs             map[string]semantics.FuncSig
-	localSlots        int
-	returnType        string
-	throwsType        string
-	returnSlots       int
-	throwSuccessSlots int
-	throwErrorSlots   int
-	throwCompact      bool
-	throwScratchBase  int
-	policyFailLabel   int
-	budgetEnabled     bool
-	budgetLocal       int
-	nextLabel         int
-	cleanupIslands    []int
-	loopStack         []loopLabels
+	instrs             []ir.IRInstr
+	locals             map[string]semantics.LocalInfo
+	globals            map[string]semantics.GlobalInfo
+	types              map[string]*semantics.TypeInfo
+	funcs              map[string]semantics.FuncSig
+	localSlots         int
+	returnType         string
+	throwsType         string
+	returnSlots        int
+	throwSuccessSlots  int
+	throwErrorSlots    int
+	throwCompact       bool
+	throwScratchBase   int
+	policyFailLabel    int
+	budgetEnabled      bool
+	budgetLocal        int
+	discardLocal       int
+	budgetScratchBase  int
+	budgetScratchSlots int
+	stackHeight        int
+	nextLabel          int
+	cleanupIslands     []int
+	loopStack          []loopLabels
 }
 
 func throwingLayout(returnType, throwsType string, types map[string]*semantics.TypeInfo) (int, int, bool, error) {
@@ -250,13 +265,53 @@ func (l *lowerer) newLabel() int {
 
 func (l *lowerer) emit(instr ir.IRInstr) {
 	if l.budgetEnabled && l.policyFailLabel >= 0 && budgetChargedInstr(instr.Kind) {
-		l.emitBudgetGuard(instr.Pos)
+		l.emitBudgetGuardPreservingStack(instr.Pos)
 	}
 	l.emitRaw(instr)
 }
 
 func (l *lowerer) emitRaw(instr ir.IRInstr) {
 	l.instrs = append(l.instrs, instr)
+	pop, push, _ := stackEffect(instr)
+	if l.stackHeight < pop {
+		l.stackHeight = 0
+	} else {
+		l.stackHeight = l.stackHeight - pop + push
+	}
+	if instr.Kind == ir.IRReturn {
+		l.stackHeight = 0
+	}
+}
+
+func (l *lowerer) emitBudgetGuardPreservingStack(pos frontend.Position) {
+	depth := l.stackHeight
+	if depth == 0 {
+		l.emitBudgetGuard(pos)
+		return
+	}
+	base := l.ensureBudgetScratchSlots(depth)
+	for slot := depth - 1; slot >= 0; slot-- {
+		l.emitRaw(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base + slot, Pos: pos})
+	}
+	l.emitBudgetGuard(pos)
+	for slot := 0; slot < depth; slot++ {
+		l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slot, Pos: pos})
+	}
+}
+
+func (l *lowerer) ensureBudgetScratchSlots(slots int) int {
+	if l.budgetScratchBase >= 0 && l.budgetScratchSlots >= slots {
+		return l.budgetScratchBase
+	}
+	if l.budgetScratchBase >= 0 {
+		l.localSlots += slots - l.budgetScratchSlots
+		l.budgetScratchSlots = slots
+		return l.budgetScratchBase
+	}
+	l.budgetScratchBase = l.localSlots
+	l.budgetScratchSlots = slots
+	l.localSlots += slots
+	return l.budgetScratchBase
 }
 
 func (l *lowerer) emitBudgetGuard(pos frontend.Position) {
@@ -869,8 +924,9 @@ func (l *lowerer) lowerStmt(stmt frontend.Stmt) error {
 		if err != nil {
 			return err
 		}
+		discardLocal := l.ensureDiscardLocal()
 		for i := 0; i < slots; i++ {
-			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: 0, Pos: s.At})
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: discardLocal, Pos: s.At})
 		}
 	case *frontend.UnsafeStmt:
 		for _, stmt := range s.Body {
@@ -879,9 +935,18 @@ func (l *lowerer) lowerStmt(stmt frontend.Stmt) error {
 			}
 		}
 	default:
-		return fmt.Errorf("%s: unsupported statement", frontend.FormatPos(s.Pos()))
+		return fmt.Errorf("%s: unsupported statement kind %T", frontend.FormatPos(s.Pos()), s)
 	}
 	return nil
+}
+
+func (l *lowerer) ensureDiscardLocal() int {
+	if l.discardLocal >= 0 {
+		return l.discardLocal
+	}
+	l.discardLocal = l.localSlots
+	l.localSlots++
+	return l.discardLocal
 }
 
 func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
@@ -1434,7 +1499,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			l.emit(ir.IRInstr{Kind: ir.IRCmpEqI32, Pos: e.At})
 			return 1, nil
 		default:
-			return 0, fmt.Errorf("%s: unsupported unary operator", frontend.FormatPos(e.At))
+			return 0, fmt.Errorf("%s: unsupported unary operator '%s'", frontend.FormatPos(e.At), frontend.TokenName(e.Op))
 		}
 	case *frontend.BinaryExpr:
 		if (e.Op == frontend.TokenEqEq || e.Op == frontend.TokenBangEq) && (isNoneExpr(e.Left) || isNoneExpr(e.Right)) {
@@ -1542,11 +1607,11 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		case frontend.TokenGreaterEq:
 			l.emit(ir.IRInstr{Kind: ir.IRCmpGeI32, Pos: e.At})
 		default:
-			return 0, fmt.Errorf("%s: unsupported binary operator", frontend.FormatPos(e.At))
+			return 0, fmt.Errorf("%s: unsupported binary operator '%s'", frontend.FormatPos(e.At), frontend.TokenName(e.Op))
 		}
 		return 1, nil
 	default:
-		return 0, fmt.Errorf("%s: unsupported expression", frontend.FormatPos(expr.Pos()))
+		return 0, fmt.Errorf("%s: unsupported expression kind %T", frontend.FormatPos(expr.Pos()), expr)
 	}
 }
 
@@ -1796,7 +1861,7 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 	case *frontend.BinaryExpr:
 		return "i32", nil
 	default:
-		return "", fmt.Errorf("%s: unsupported expression", frontend.FormatPos(expr.Pos()))
+		return "", fmt.Errorf("%s: unsupported expression kind %T", frontend.FormatPos(expr.Pos()), expr)
 	}
 }
 

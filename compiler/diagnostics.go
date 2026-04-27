@@ -17,7 +17,40 @@ type Diagnostic struct {
 	Hint     string `json:"hint,omitempty"`
 }
 
+const (
+	DiagnosticCodeParse          = frontend.DiagnosticCodeParse
+	DiagnosticCodeSemantic       = "TETRA2001"
+	DiagnosticCodeFormatter      = "TETRA_FMT001"
+	DiagnosticCodeFormatterCheck = "TETRA_FMT002"
+)
+
 var diagnosticPosRE = regexp.MustCompile(`^(?:(.+):)?(?:line )?([0-9]+):([0-9]+): (.*)$`)
+
+type DiagnosticCodeInfo struct {
+	Severity string
+	Surface  string
+}
+
+func DiagnosticCodeRegistry() map[string]DiagnosticCodeInfo {
+	return map[string]DiagnosticCodeInfo{
+		DiagnosticCodeParse: {
+			Severity: "error",
+			Surface:  "parse/frontend",
+		},
+		DiagnosticCodeSemantic: {
+			Severity: "error",
+			Surface:  "semantic/compiler",
+		},
+		DiagnosticCodeFormatter: {
+			Severity: "error",
+			Surface:  "formatter",
+		},
+		DiagnosticCodeFormatterCheck: {
+			Severity: "error",
+			Surface:  "formatter check",
+		},
+	}
+}
 
 func DiagnosticFromError(err error) Diagnostic {
 	if err == nil {
@@ -36,13 +69,13 @@ func DiagnosticFromError(err error) Diagnostic {
 	}
 	msg := err.Error()
 	diag := Diagnostic{
-		Code:     "TETRA0001",
+		Code:     DiagnosticCodeParse,
 		Message:  msg,
 		Severity: "error",
 	}
 	m := diagnosticPosRE.FindStringSubmatch(msg)
 	if len(m) == 5 {
-		diag.Code = "TETRA2001"
+		diag.Code = DiagnosticCodeSemantic
 		diag.File = m[1]
 		diag.Line, _ = strconv.Atoi(m[2])
 		diag.Column, _ = strconv.Atoi(m[3])

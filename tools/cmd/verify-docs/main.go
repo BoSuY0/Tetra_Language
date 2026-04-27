@@ -81,16 +81,23 @@ func main() {
 	checkContains(filepath.FromSlash("cli/cmd/tetra/main.go"), triples)
 
 	stableModulePaths := currentStableModulePaths()
+	experimentalModulePaths := currentExperimentalModulePaths()
+	if err := verifyStdlibModulePaths(stableModulePaths, experimentalModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
 	if err := verifyStableModuleDocs(stableModulePaths); err != nil {
 		errs = append(errs, err.Error())
 	}
-	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md"}); err != nil {
+	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md", "docs/spec/ui_v1.md"}); err != nil {
 		errs = append(errs, err.Error())
 	}
 	if err := verifyRequiredDoctestBlocks(stableModulePaths); err != nil {
 		errs = append(errs, err.Error())
 	}
 	if err := verifyStableModuleExamples(stableModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyStableExamplesDoNotImportExperimental(stableModuleExamplePaths(stableModulePaths)); err != nil {
 		errs = append(errs, err.Error())
 	}
 	if err := verifyStableModuleEffectsMetadata(stableModulePaths); err != nil {
@@ -278,6 +285,116 @@ func stableModuleExamplePath(moduleName string) string {
 	}
 }
 
+func stableModuleExamplePaths(modulePaths []string) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	for _, path := range modulePaths {
+		name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		example := stableModuleExamplePath(name)
+		if example == "" {
+			continue
+		}
+		if _, ok := seen[example]; ok {
+			continue
+		}
+		seen[example] = struct{}{}
+		out = append(out, example)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func verifyStdlibModulePaths(stablePaths []string, experimentalPaths []string) error {
+	for _, path := range stablePaths {
+		if err := verifyStdlibModulePath(path, "core", "lib.core.", true); err != nil {
+			return err
+		}
+	}
+	for _, path := range experimentalPaths {
+		if err := verifyStdlibModulePath(path, "experimental", "lib.experimental.", false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func verifyStdlibModulePath(path string, wantDir string, wantPrefix string, stable bool) error {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	if !validStdlibLeafName(name) {
+		return fmt.Errorf("%s: invalid stdlib module leaf name %q", path, name)
+	}
+	if stable && hasStableVersionSuffix(name) {
+		return fmt.Errorf("%s: stable module name must not contain version suffix: %q", path, name)
+	}
+	if filepath.Base(filepath.Dir(path)) != wantDir {
+		return fmt.Errorf("%s: expected path under lib/%s", path, wantDir)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("%s: %v", path, err)
+	}
+	file, err := compiler.ParseFile(raw, path)
+	if err != nil {
+		return fmt.Errorf("%s: %v", path, err)
+	}
+	want := wantPrefix + name
+	if file.Module != want {
+		return fmt.Errorf("%s: expected module %s, got %s", path, want, file.Module)
+	}
+	return nil
+}
+
+func validStdlibLeafName(name string) bool {
+	if name == "" || name[0] < 'a' || name[0] > 'z' {
+		return false
+	}
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func hasStableVersionSuffix(name string) bool {
+	for _, part := range strings.Split(name, "_") {
+		if len(part) < 2 || part[0] != 'v' {
+			continue
+		}
+		allDigits := true
+		for _, r := range part[1:] {
+			if r < '0' || r > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if allDigits {
+			return true
+		}
+	}
+	return false
+}
+
+func verifyStableExamplesDoNotImportExperimental(paths []string) error {
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		file, err := compiler.ParseFile(raw, path)
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		for _, imp := range file.Imports {
+			if imp.Path == "lib.experimental" || strings.HasPrefix(imp.Path, "lib.experimental.") {
+				return fmt.Errorf("%s: stable example imports experimental module %q", path, imp.Path)
+			}
+		}
+	}
+	return nil
+}
+
 func verifyStableModuleEffectsMetadata(paths []string) error {
 	for _, path := range paths {
 		raw, err := os.ReadFile(path)
@@ -298,26 +415,162 @@ func verifyStableModuleEffectsMetadata(paths []string) error {
 		if metadata == "" {
 			return fmt.Errorf("%s: missing effects metadata", path)
 		}
-		if strings.EqualFold(metadata, "none") {
-			continue
+		metadataEffects, err := parseStableEffectsMetadata(path, metadata)
+		if err != nil {
+			return err
 		}
-		for _, rawEffect := range strings.Split(metadata, ",") {
-			effect := strings.TrimSpace(rawEffect)
-			if effect == "" {
-				return fmt.Errorf("%s: invalid effects metadata %q", path, metadata)
-			}
-			for _, r := range effect {
-				if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
-					return fmt.Errorf("%s: invalid effect name %q in metadata", path, effect)
-				}
-			}
+		declaredEffects, err := stableModuleDeclaredEffects(path, raw)
+		if err != nil {
+			return err
+		}
+		if !sameEffectSet(metadataEffects, declaredEffects) {
+			return fmt.Errorf("%s: effects metadata mismatch: got %s want %s", path, formatEffectSet(metadataEffects), formatEffectSet(declaredEffects))
 		}
 	}
 	return nil
 }
 
+func parseStableEffectsMetadata(path string, metadata string) ([]string, error) {
+	if strings.EqualFold(metadata, "none") {
+		return nil, nil
+	}
+	effects := map[string]struct{}{}
+	for _, rawEffect := range strings.Split(metadata, ",") {
+		effect := strings.TrimSpace(rawEffect)
+		if effect == "" {
+			return nil, fmt.Errorf("%s: invalid effects metadata %q", path, metadata)
+		}
+		expanded, err := expandStableEffect(effect)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %v", path, err)
+		}
+		for _, name := range expanded {
+			effects[name] = struct{}{}
+		}
+	}
+	return sortedEffectNames(effects), nil
+}
+
+func stableModuleDeclaredEffects(path string, raw []byte) ([]string, error) {
+	file, err := compiler.ParseFile(raw, path)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", path, err)
+	}
+	effects := map[string]struct{}{}
+	addUses := func(uses []string) error {
+		for _, rawEffect := range uses {
+			expanded, err := expandStableEffect(rawEffect)
+			if err != nil {
+				return err
+			}
+			for _, name := range expanded {
+				effects[name] = struct{}{}
+			}
+		}
+		return nil
+	}
+	for _, fn := range file.Funcs {
+		if err := addUses(fn.Uses); err != nil {
+			return nil, fmt.Errorf("%s: %v", path, err)
+		}
+	}
+	for _, proto := range file.Protocols {
+		for _, req := range proto.Requirements {
+			if err := addUses(req.Uses); err != nil {
+				return nil, fmt.Errorf("%s: %v", path, err)
+			}
+		}
+	}
+	for _, ext := range file.Extensions {
+		for _, method := range ext.Methods {
+			if err := addUses(method.Uses); err != nil {
+				return nil, fmt.Errorf("%s: %v", path, err)
+			}
+		}
+	}
+	return sortedEffectNames(effects), nil
+}
+
+func expandStableEffect(effect string) ([]string, error) {
+	canonical := map[string]string{
+		"actors":      "actors",
+		"alloc":       "alloc",
+		"budget":      "budget",
+		"cap.io":      "io",
+		"cap.mem":     "mem",
+		"capability":  "capability",
+		"capsule.io":  "capsule.io",
+		"capsule.mem": "capsule.mem",
+		"control":     "control",
+		"io":          "io",
+		"islands":     "islands",
+		"link":        "link",
+		"mem":         "mem",
+		"mmio":        "mmio",
+		"privacy":     "privacy",
+		"runtime":     "runtime",
+	}
+	if name, ok := canonical[effect]; ok {
+		return []string{name}, nil
+	}
+	groups := map[string][]string{
+		"effects.all":     {"actors", "alloc", "budget", "capability", "control", "io", "islands", "link", "mem", "mmio", "privacy", "runtime"},
+		"effects.cap.io":  {"capability", "io", "mmio"},
+		"effects.cap.mem": {"capability", "mem"},
+		"effects.memory":  {"alloc", "islands", "mem"},
+		"effects.policy":  {"budget", "privacy"},
+		"effects.runtime": {"actors", "control", "link", "runtime"},
+	}
+	if members, ok := groups[effect]; ok {
+		return members, nil
+	}
+	for _, r := range effect {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' && r != '.' {
+			return nil, fmt.Errorf("invalid effect name %q in metadata", effect)
+		}
+	}
+	return nil, fmt.Errorf("unknown stable effect %q in metadata", effect)
+}
+
+func sortedEffectNames(effects map[string]struct{}) []string {
+	out := make([]string, 0, len(effects))
+	for effect := range effects {
+		out = append(out, effect)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func formatEffectSet(effects []string) string {
+	if len(effects) == 0 {
+		return "none"
+	}
+	return strings.Join(effects, ", ")
+}
+
+func sameEffectSet(a []string, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func currentStableModulePaths() []string {
 	paths, err := filepath.Glob(filepath.FromSlash("lib/core/*.tetra"))
+	if err != nil {
+		return nil
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+func currentExperimentalModulePaths() []string {
+	paths, err := filepath.Glob(filepath.FromSlash("lib/experimental/*.tetra"))
 	if err != nil {
 		return nil
 	}

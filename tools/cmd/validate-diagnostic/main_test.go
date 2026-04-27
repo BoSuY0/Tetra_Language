@@ -22,6 +22,12 @@ func TestValidateDiagnosticRejectsMissingRequiredFields(t *testing.T) {
 	}
 }
 
+func TestValidateDiagnosticRejectsUnknownFields(t *testing.T) {
+	if _, err := parseDiagnostic([]byte(`{"code":"TETRA2001","message":"bad","severity":"error","extra":true}`)); err == nil {
+		t.Fatalf("expected unknown field failure")
+	}
+}
+
 func TestValidateDiagnosticRejectsWrongCodeSeverityAndMessage(t *testing.T) {
 	diag, err := parseDiagnostic([]byte(`{"code":"TETRA0001","message":"parse failed","severity":"warning"}`))
 	if err != nil {

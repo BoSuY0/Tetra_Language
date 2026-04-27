@@ -44,17 +44,17 @@ uses mem, io:
 	if got.Symbols[2].Kind != "const" || got.Symbols[3].Kind != "impl" {
 		t.Fatalf("symbols = %#v", got.Symbols)
 	}
-	if got.Symbols[4].Detail != "func add(v: borrow Vec2) -> Int uses io, mem" {
+	if got.Symbols[4].Detail != "func add(v: borrow Vec2) -> i32 uses io, mem" {
 		t.Fatalf("function detail = %q", got.Symbols[4].Detail)
 	}
-	if got.Symbols[5].Kind != "extension-method" || got.Symbols[5].Detail != "func Vec2.draw(self: Vec2) -> Int" {
+	if got.Symbols[5].Kind != "extension-method" || got.Symbols[5].Detail != "func Vec2.draw(self: Vec2) -> i32" {
 		t.Fatalf("extension method symbol = %#v", got.Symbols[5])
 	}
 	if len(got.Hovers) < 6 {
 		t.Fatalf("hovers = %#v", got.Hovers)
 	}
 	for _, hover := range got.Hovers {
-		if hover.Name == "answer" && hover.Contents == "const answer: Int" {
+		if hover.Name == "answer" && hover.Contents == "const answer: i32" {
 			return
 		}
 	}

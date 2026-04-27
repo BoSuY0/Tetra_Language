@@ -1,0 +1,7 @@
+manifest "tetra.capsule.v1"
+capsule DogfoodWASI:
+    id "tetra://examples/dogfood-wasi"
+    version "0.1.0"
+    target "wasm32-wasi"
+    permission "io"
+

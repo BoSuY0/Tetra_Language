@@ -1,9 +1,188 @@
 package frontend
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestParserFixtureCorpus(t *testing.T) {
+	root := filepath.Join("testdata", "parser")
+	families := []string{
+		"module",
+		"function",
+		"control_flow",
+		"match",
+		"optionals",
+		"enums",
+		"generics",
+		"protocols",
+		"extensions",
+		"async",
+		"tests",
+		"ui",
+	}
+
+	for _, family := range families {
+		t.Run(family+"/positive", func(t *testing.T) {
+			path := filepath.Join(root, "positive", family+".tetra")
+			src, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read fixture: %v", err)
+			}
+			if _, err := ParseFile(src, filepath.ToSlash(path)); err != nil {
+				t.Fatalf("ParseFile(%s): %v", path, err)
+			}
+		})
+		t.Run(family+"/negative", func(t *testing.T) {
+			path := filepath.Join(root, "negative", family+".tetra")
+			src, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read fixture: %v", err)
+			}
+			wantPath := filepath.Join(root, "negative", family+".diag")
+			wantRaw, err := os.ReadFile(wantPath)
+			if err != nil {
+				t.Fatalf("read diagnostic fixture: %v", err)
+			}
+			_, err = ParseFile(src, filepath.ToSlash(path))
+			if err == nil {
+				t.Fatalf("expected diagnostic from %s", path)
+			}
+			if got, want := strings.TrimSpace(err.Error()), strings.TrimSpace(string(wantRaw)); got != want {
+				t.Fatalf("diagnostic mismatch:\ngot:  %s\nwant: %s", got, want)
+			}
+		})
+	}
+}
+
+func TestParseFileDiagnosticsRecoversIndependentTopLevelErrors(t *testing.T) {
+	src := []byte(`actor Renderable:
+    func draw() -> Int
+
+capsule App:
+    name: "app"
+
+func main() -> Int:
+    return 0
+`)
+	file, diagnostics := ParseFileDiagnostics(src, "recovery.tetra")
+	if file == nil {
+		t.Fatalf("expected partial file")
+	}
+	if len(diagnostics) != 2 {
+		t.Fatalf("diagnostics = %#v, want 2", diagnostics)
+	}
+	want := []struct {
+		line    int
+		column  int
+		message string
+	}{
+		{1, 1, "planned feature 'actor' is not implemented in the Tetra v1.0 profile"},
+		{4, 1, "planned feature 'capsule' is not implemented in the Tetra v1.0 profile"},
+	}
+	for i, exp := range want {
+		got := diagnostics[i]
+		if got.Code != DiagnosticCodeParse || got.Severity != "error" || got.File != "recovery.tetra" || got.Line != exp.line || got.Column != exp.column || got.Message != exp.message {
+			t.Fatalf("diagnostic[%d] = %#v, want line %d col %d message %q", i, got, exp.line, exp.column, exp.message)
+		}
+	}
+	if len(file.Funcs) != 1 || file.Funcs[0].Name != "main" {
+		t.Fatalf("recovered funcs = %#v, want main", file.Funcs)
+	}
+}
+
+func TestParseFileDiagnosticsReturnsLexerError(t *testing.T) {
+	file, diagnostics := ParseFileDiagnostics([]byte{'f', 'n', ' ', 0xff, '\n'}, "bad.tetra")
+	if file != nil {
+		t.Fatalf("file = %#v, want nil", file)
+	}
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %#v, want 1", diagnostics)
+	}
+	if diagnostics[0].Message != "invalid UTF-8 encoding" || diagnostics[0].Line != 1 || diagnostics[0].Column != 4 {
+		t.Fatalf("diagnostic = %#v", diagnostics[0])
+	}
+}
+
+func TestParsePlannedFeatureMatrixFromFlowSyntaxV1(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{"actor declaration", "actor Renderable:\n", "planned feature 'actor' is not implemented in the Tetra v1.0 profile"},
+		{"capsule declaration", "capsule App:\n", "planned feature 'capsule' is not implemented in the Tetra v1.0 profile"},
+		{"closure declaration keyword", "closure draw:\n", "planned feature 'closures' is not implemented in the Tetra v1.0 profile"},
+		{"generic struct", "struct Box<T>:\n    value: T\n", "generic structs are planned for a later release"},
+		{"enum payload case", "enum Option:\n    case some(Int)\n", "enum payload cases are planned for a later release"},
+		{"payload match pattern", "func main() -> Int:\n    match value:\n    case Option.some(x):\n        return x\n", "payload match patterns are planned for a later release"},
+		{"generic closure", "func main() -> Int:\n    let f: ptr = fn<T>(x: T) -> T:\n        return x\n    return 0\n", "generic closures are not supported yet"},
+		{"function pointer type", "func main(cb: fn(Int) -> Int) -> Int:\n    return 0\n", "expected identifier, got fn"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), tt.name+".tetra")
+			if err == nil {
+				t.Fatalf("expected planned-feature diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %q, want %q", err.Error(), tt.want)
+			}
+			if strings.Contains(err.Error(), "MVP profile") {
+				t.Fatalf("stale MVP wording in diagnostic: %v", err)
+			}
+		})
+	}
+}
+
+func TestParserSourceSpanPrecision(t *testing.T) {
+	tests := []struct {
+		name   string
+		src    string
+		line   int
+		column int
+		msg    string
+	}{
+		{
+			name:   "nested block expression",
+			src:    "func main() -> Int:\n    if true:\n        return @\n    return 0\n",
+			line:   3,
+			column: 8,
+			msg:    "expected expression, got ?",
+		},
+		{
+			name:   "crlf eof block",
+			src:    "func main() -> Int:\r\n    if true:\r\n",
+			line:   3,
+			column: 1,
+			msg:    "expected indented block after ':'",
+		},
+		{
+			name:   "unicode string keeps following column",
+			src:    "func main() -> Int:\n    print(\"Привіт\")\n    return @\n",
+			line:   3,
+			column: 8,
+			msg:    "expected expression, got ?",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), tt.name+".tetra")
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			diag, ok := DiagnosticForError(err)
+			if !ok {
+				t.Fatalf("expected structured diagnostic: %T %v", err, err)
+			}
+			if diag.Line != tt.line || diag.Column != tt.column || diag.Message != tt.msg {
+				t.Fatalf("diagnostic = %#v, want %d:%d %q", diag, tt.line, tt.column, tt.msg)
+			}
+		})
+	}
+}
 
 func parseExpr(src string) (Expr, error) {
 	full := "fn main() -> i32 { return " + src + " }"

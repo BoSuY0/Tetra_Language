@@ -1,0 +1,7 @@
+manifest "tetra.capsule.v1"
+capsule EcoDogfood:
+    id "tetra://examples/eco-dogfood"
+    version "0.1.0"
+    target "linux-x64"
+    permission "io"
+    dependency "tetra://examples/eco-core" "0.1.0"

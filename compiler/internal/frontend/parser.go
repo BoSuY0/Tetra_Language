@@ -34,6 +34,25 @@ func ParseFile(src []byte, filename string) (*FileAST, error) {
 	return parsePreparedSource(src, parseSrc, filename)
 }
 
+// ParseFileDiagnostics performs limited top-level recovery for independent
+// release-boundary declarations, then parses the remaining source.
+func ParseFileDiagnostics(src []byte, filename string) (*FileAST, []Diagnostic) {
+	recovered, diagnostics := recoverTopLevelPlannedFeatures(src, filename)
+	if len(diagnostics) == 0 {
+		file, err := ParseFile(src, filename)
+		if err != nil {
+			return nil, []Diagnostic{diagnosticFromError(err)}
+		}
+		return file, nil
+	}
+	file, err := ParseFile(recovered, filename)
+	if err != nil {
+		diagnostics = append(diagnostics, diagnosticFromError(err))
+		return nil, diagnostics
+	}
+	return file, diagnostics
+}
+
 func ParseFileWithMigrationNormalization(src []byte, filename string) (*FileAST, error) {
 	parseSrc, err := normalizeFlowSyntax(src, filename)
 	if err != nil {
@@ -1674,7 +1693,69 @@ func plannedFeatureFromToken(tok token) (string, bool) {
 }
 
 func plannedFeatureError(pos Position, feature string) error {
-	return diagnosticErrorf(pos, "planned feature '%s' is not implemented in the Tetra MVP profile", feature)
+	return diagnosticErrorf(pos, "planned feature '%s' is not implemented in the Tetra v1.0 profile", feature)
+}
+
+func recoverTopLevelPlannedFeatures(src []byte, filename string) ([]byte, []Diagnostic) {
+	lines := strings.Split(string(src), "\n")
+	out := make([]string, len(lines))
+	var diagnostics []Diagnostic
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimRight(lines[i], "\r")
+		trimmed := strings.TrimSpace(line)
+		out[i] = line
+		if trimmed == "" || strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			continue
+		}
+		fields := strings.Fields(trimmed)
+		if len(fields) == 0 {
+			continue
+		}
+		featureTok := token{typ: TokenIdent, lit: strings.TrimSuffix(fields[0], ":")}
+		feature, ok := plannedFeatureFromToken(featureTok)
+		if !ok {
+			continue
+		}
+		msg := fmt.Sprintf("planned feature '%s' is not implemented in the Tetra v1.0 profile", feature)
+		diagnostics = append(diagnostics, Diagnostic{
+			Code:     DiagnosticCodeParse,
+			Message:  msg,
+			File:     filename,
+			Line:     i + 1,
+			Column:   1,
+			Severity: "error",
+			Hint:     hintForDiagnosticMessage(msg),
+		})
+		out[i] = ""
+		for i+1 < len(lines) {
+			next := strings.TrimRight(lines[i+1], "\r")
+			nextTrimmed := strings.TrimSpace(next)
+			if nextTrimmed == "" {
+				i++
+				out[i] = ""
+				continue
+			}
+			if strings.HasPrefix(next, " ") || strings.HasPrefix(next, "\t") {
+				i++
+				out[i] = ""
+				continue
+			}
+			break
+		}
+	}
+	return []byte(strings.Join(out, "\n")), diagnostics
+}
+
+func diagnosticFromError(err error) Diagnostic {
+	if diag, ok := DiagnosticForError(err); ok {
+		return diag
+	}
+	return Diagnostic{
+		Code:     DiagnosticCodeParse,
+		Message:  err.Error(),
+		Severity: "error",
+		Hint:     hintForDiagnosticMessage(err.Error()),
+	}
 }
 
 func (p *parser) parseIfLetValue() (Expr, error) {

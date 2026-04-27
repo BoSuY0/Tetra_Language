@@ -43,6 +43,11 @@ Required diff fields:
 - `baseline`: object with `api_hash`, `module_count`, `entry_count`.
 - `candidate`: object with `api_hash`, `module_count`, `entry_count`.
 - `summary`: object with integer `added`, `removed`, `changed`.
+- `review`: object with:
+  - `status`: `clean` when no changes are present, otherwise `needs_review`.
+  - `release_checklist`: path to the release checklist that consumes the report.
+  - `baseline_policy`: path to this policy.
+  - `checklist`: review actions that must be completed before a baseline update.
 - `changes`: sorted array by `id`, then `kind`.
 
 Change object fields:
@@ -56,6 +61,10 @@ Change object fields:
 - `before_hash`: previous `symbol_hash` or empty for `added`.
 - `after_hash`: new `symbol_hash` or empty for `removed`.
 - `severity`: `minor` for `added`; `major` for `removed` and `changed`.
+- `review_status`: machine-readable review class. `added` changes use
+  `addition_requires_scope_review`; `removed` and `changed` changes use
+  `breaking_requires_review`.
+- `review_note`: human-readable review instruction for the change.
 
 ## Gate Command Contract
 

@@ -1451,11 +1451,11 @@ func validateGenericTypeRef(ref frontend.TypeRef, params map[string]struct{}) er
 		return nil
 	case frontend.TypeRefSlice, frontend.TypeRefArray, frontend.TypeRefOptional:
 		if ref.Elem == nil {
-			return fmt.Errorf("missing element type")
+			return fmt.Errorf("%s: missing element type", frontend.FormatPos(ref.At))
 		}
 		return validateGenericTypeRef(*ref.Elem, params)
 	default:
-		return fmt.Errorf("unsupported type")
+		return fmt.Errorf("%s: unsupported generic type reference kind %d", frontend.FormatPos(ref.At), ref.Kind)
 	}
 }
 

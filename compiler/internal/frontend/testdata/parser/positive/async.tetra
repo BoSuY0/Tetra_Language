@@ -1,0 +1,5 @@
+async func worker() -> Int:
+    return 42
+
+func main() -> Int:
+    return 0

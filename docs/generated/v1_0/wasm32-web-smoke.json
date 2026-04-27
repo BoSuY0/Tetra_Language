@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-04-27T10:32:33Z",
+  "target": "wasm32-web",
+  "build_only": true,
+  "host": "linux-x64",
+  "version": "v0.1.1",
+  "git_head": "4c9a01d",
+  "islands_debug": false,
+  "total": 5,
+  "passed": 5,
+  "failed": 0,
+  "cases": [
+    {
+      "name": "flow_hello",
+      "src_path": "examples/flow_hello.tetra",
+      "out_path": "/tmp/tetra-smoke-1129348379/flow_hello.wasm",
+      "expected_exit": 0,
+      "ran": false,
+      "pass": true
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects_io_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1129348379/effects_io_smoke.wasm",
+      "expected_exit": 0,
+      "ran": false,
+      "pass": true
+    },
+    {
+      "name": "ui_web_smoke",
+      "src_path": "examples/ui_web_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1129348379/ui_web_smoke.wasm",
+      "expected_exit": 0,
+      "ran": false,
+      "pass": true
+    },
+    {
+      "name": "dogfood_wasi",
+      "src_path": "examples/projects/dogfood_wasi/src/main.tetra",
+      "out_path": "/tmp/tetra-smoke-1129348379/dogfood_wasi.wasm",
+      "expected_exit": 0,
+      "ran": false,
+      "pass": true
+    },
+    {
+      "name": "dogfood_web_ui",
+      "src_path": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "out_path": "/tmp/tetra-smoke-1129348379/dogfood_web_ui.wasm",
+      "expected_exit": 0,
+      "ran": false,
+      "pass": true
+    }
+  ]
+}

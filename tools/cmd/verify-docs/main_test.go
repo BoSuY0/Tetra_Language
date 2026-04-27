@@ -176,6 +176,32 @@ func TestVerifyStableModuleEffectsMetadataAcceptsDeclaredEffects(t *testing.T) {
 	}
 }
 
+func TestVerifyStableModuleEffectsMetadataRejectsMismatchedMetadata(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "module.tetra")
+	if err := os.WriteFile(doc, []byte(strings.Join([]string{
+		"// Stable docs.",
+		"// Effects: none",
+		"module lib.core.sample",
+		"",
+		"func len_i32(values: []i32) -> Int",
+		"uses mem:",
+		"    var count: Int = 0",
+		"    for value in values:",
+		"        count = count + 1",
+		"    return count",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := verifyStableModuleEffectsMetadata([]string{doc})
+	if err == nil {
+		t.Fatalf("expected mismatched effects metadata failure")
+	}
+	if !strings.Contains(err.Error(), "effects metadata mismatch") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestVerifyStableModuleExamplesRejectsMissingExampleFile(t *testing.T) {
 	dir := t.TempDir()
 	doc := filepath.Join(dir, "sample.tetra")
@@ -194,6 +220,82 @@ func TestVerifyStableModuleExamplesRejectsMissingExampleFile(t *testing.T) {
 		t.Fatalf("expected missing stable module example failure")
 	}
 	if !strings.Contains(err.Error(), "missing stable module example") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVerifyStdlibModulePathsRejectsMismatchedCoreModule(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "core", "math.tetra")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Join([]string{
+		"// Stable docs.",
+		"// Effects: none",
+		"module lib.experimental.math",
+		"",
+		"func add(a: Int, b: Int) -> Int:",
+		"    return a + b",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := verifyStdlibModulePaths([]string{path}, nil)
+	if err == nil {
+		t.Fatalf("expected mismatched core module failure")
+	}
+	if !strings.Contains(err.Error(), "expected module lib.core.math") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVerifyStdlibModulePathsRejectsStableVersionSuffix(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "core", "math_v2.tetra")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Join([]string{
+		"// Stable docs.",
+		"// Effects: none",
+		"module lib.core.math_v2",
+		"",
+		"func add(a: Int, b: Int) -> Int:",
+		"    return a + b",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := verifyStdlibModulePaths([]string{path}, nil)
+	if err == nil {
+		t.Fatalf("expected stable version suffix failure")
+	}
+	if !strings.Contains(err.Error(), "stable module name must not contain version suffix") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVerifyStableExamplesRejectExperimentalImports(t *testing.T) {
+	dir := t.TempDir()
+	example := filepath.Join(dir, "examples", "core_math_smoke.tetra")
+	if err := os.MkdirAll(filepath.Dir(example), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(example, []byte(strings.Join([]string{
+		"import lib.experimental.math as math",
+		"",
+		"func main() -> Int:",
+		"    return math.add(40, 2)",
+	}, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := verifyStableExamplesDoNotImportExperimental([]string{example})
+	if err == nil {
+		t.Fatalf("expected experimental import failure")
+	}
+	if !strings.Contains(err.Error(), "stable example imports experimental module") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

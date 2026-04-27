@@ -1,5 +1,9 @@
 # Tetra v0.5.0 Integrated Alpha Release Notes
 
+> Historical checkpoint. These notes record the v0.5.0 Integrated Alpha
+> milestone and do not describe the current release truth, which is
+> `docs/spec/v1_scope.md`.
+
 Tetra v0.5.0 is an Integrated Alpha release. It packages the staged compiler,
 runtime, language, tooling, docs, and local ecosystem work into one coherent
 local development profile. It is not the final Tetra platform or a v1.0

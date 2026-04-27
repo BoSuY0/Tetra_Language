@@ -1,6 +1,9 @@
 package frontend
 
-import "strconv"
+import (
+	"strconv"
+	"unicode/utf8"
+)
 
 type TokenType int
 
@@ -84,11 +87,12 @@ type token struct {
 }
 
 type lexer struct {
-	src  []byte
-	idx  int
-	line int
-	col  int
-	file string
+	src         []byte
+	idx         int
+	line        int
+	col         int
+	file        string
+	utf8Checked bool
 }
 
 func newLexer(src []byte, file string) *lexer {
@@ -96,6 +100,9 @@ func newLexer(src []byte, file string) *lexer {
 }
 
 func (l *lexer) nextToken() (token, error) {
+	if err := l.checkUTF8(); err != nil {
+		return token{}, err
+	}
 	if err := l.skipSpaceAndComments(); err != nil {
 		return token{}, err
 	}
@@ -321,6 +328,24 @@ func (l *lexer) nextToken() (token, error) {
 	}
 }
 
+func (l *lexer) checkUTF8() error {
+	if l.utf8Checked {
+		return nil
+	}
+	l.utf8Checked = true
+	if utf8.Valid(l.src) {
+		return nil
+	}
+	for idx := 0; idx < len(l.src); {
+		r, size := utf8.DecodeRune(l.src[idx:])
+		if r == utf8.RuneError && size == 1 {
+			return l.errorf(l.posForOffset(idx), "invalid UTF-8 encoding")
+		}
+		idx += size
+	}
+	return nil
+}
+
 func (l *lexer) readString() (token, error) {
 	pos := l.pos()
 	l.advance()
@@ -415,6 +440,20 @@ func (l *lexer) peekNext() byte {
 
 func (l *lexer) pos() Position {
 	return Position{File: l.file, Line: l.line, Col: l.col}
+}
+
+func (l *lexer) posForOffset(offset int) Position {
+	line := 1
+	col := 1
+	for i := 0; i < len(l.src) && i < offset; i++ {
+		if l.src[i] == '\n' {
+			line++
+			col = 1
+			continue
+		}
+		col++
+	}
+	return Position{File: l.file, Line: line, Col: col}
 }
 
 func (l *lexer) errorf(pos Position, format string, args ...interface{}) error {

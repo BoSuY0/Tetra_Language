@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -53,7 +54,9 @@ func main() {
 
 func parseDiagnostic(raw []byte) (diagnostic, error) {
 	var diag diagnostic
-	if err := json.Unmarshal(raw, &diag); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&diag); err != nil {
 		return diagnostic{}, fmt.Errorf("invalid diagnostic JSON: %w", err)
 	}
 	return diag, nil

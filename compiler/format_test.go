@@ -1,6 +1,8 @@
 package compiler
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -97,6 +99,41 @@ func main() -> Int:
 `
 	if string(got) != want {
 		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
+func TestFormatSourcePreservesDocAndUIComments(t *testing.T) {
+	src := []byte(`/// state model
+state CounterState:
+    // primary count
+    var count: Int = 0
+
+/// counter view
+view CounterView(state: CounterState):
+    // display binding
+    bind value: Int = state.count
+    event click -> increment
+    command increment:
+        // command body
+        state.count = state.count + 1
+    /* accessibility copy */
+    accessibility label: String = "Increment"
+`)
+	got, err := FormatSource(src, "ui.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	for _, want := range []string{
+		"/// state model",
+		"    // primary count",
+		"/// counter view",
+		"    // display binding",
+		"        // command body",
+		"    /* accessibility copy */",
+	} {
+		if !strings.Contains(string(got), want) {
+			t.Fatalf("formatted source missing %q:\n%s", want, string(got))
+		}
 	}
 }
 
@@ -707,5 +744,67 @@ test "math":
 		if !strings.Contains(string(once), expected) {
 			t.Fatalf("formatted source missing %q:\n%s", expected, string(once))
 		}
+	}
+}
+
+func TestFormatSourceExamplesAreIdempotent(t *testing.T) {
+	examplesDir := filepath.Join("..", "examples")
+	err := filepath.WalkDir(examplesDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".tetra" {
+			return nil
+		}
+		t.Run(filepath.ToSlash(path), func(t *testing.T) {
+			src, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("ReadFile: %v", err)
+			}
+			once, err := FormatSource(src, filepath.ToSlash(path))
+			if err != nil {
+				t.Fatalf("FormatSource once: %v", err)
+			}
+			twice, err := FormatSource(once, filepath.ToSlash(path))
+			if err != nil {
+				t.Fatalf("FormatSource twice: %v", err)
+			}
+			if string(twice) != string(once) {
+				t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+			}
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDir(%s): %v", examplesDir, err)
+	}
+}
+
+func TestFlowGrammarSurfaceExampleCoversCanonicalForms(t *testing.T) {
+	path := filepath.Join("..", "examples", "flow_grammar_surface_smoke.tetra")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	src := string(raw)
+	for _, want := range []string{
+		"module examples.flow_grammar_surface_smoke",
+		"state CounterState:",
+		"view CounterView(state: CounterState):",
+		"func id<T>(x: T) -> T:",
+		"borrow Int",
+		"inout Int",
+		"consume Int",
+		"let f: ptr = fn(x: Int) -> Int:",
+		"let value: Int = try read(flag)",
+		"let value: Int = await async_answer()",
+		"test \"grammar surface\":",
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("%s missing canonical form %q", filepath.ToSlash(path), want)
+		}
+	}
+	if _, err := FormatSource(raw, filepath.ToSlash(path)); err != nil {
+		t.Fatalf("FormatSource(%s): %v", filepath.ToSlash(path), err)
 	}
 }

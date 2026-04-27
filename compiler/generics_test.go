@@ -82,6 +82,27 @@ func main() -> Int:
 	}
 }
 
+func TestGenericFunctionRejectsAmbiguousReturnOnlyInference(t *testing.T) {
+	src := []byte(`
+func zero<T>() -> T:
+    return 0
+
+func main() -> Int:
+    return zero()
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected generic ambiguity diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot infer generic argument 'T'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestGenericFunctionCrossModuleMonomorphizedCall(t *testing.T) {
 	files := map[string]string{
 		"engine/util.tetra": `module engine.util

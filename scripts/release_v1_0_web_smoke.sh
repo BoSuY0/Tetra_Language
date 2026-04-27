@@ -4,13 +4,19 @@ set -euo pipefail
 report_path=""
 source_override=""
 
+: "${GOCACHE:=/tmp/tetra-go-cache}"
+mkdir -p "$GOCACHE"
+export GOCACHE
+
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/release_v1_0_web_smoke.sh --report PATH [--source examples/file.tetra]
+Usage: bash scripts/release_v1_0_web_smoke.sh [--report PATH] [--source examples/file.tetra]
 
 Runs wasm32-web smoke in headless Chromium.
-If no UI-specific smoke source exists, the script runs a fallback wasm web smoke
-for evidence and marks the report as blocked.
+Host/browser limits write a validated blocked report and fail the script. If no
+UI-specific smoke source exists, the script runs a fallback wasm web smoke for
+evidence and marks the report as blocked.
+Default report: docs/generated/v1_0/web-ui-smoke.json
 USAGE
 }
 
@@ -37,8 +43,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$report_path" ]]; then
-  echo "release_v1_0_web_smoke: --report is required" >&2
-  exit 2
+  report_path="docs/generated/v1_0/web-ui-smoke.json"
 fi
 
 mkdir -p "$(dirname "$report_path")"
@@ -56,12 +61,19 @@ if [[ -n "$source_override" ]]; then
   source_path="$source_override"
   scope_active="true"
 else
-  ui_candidate="$(
+  dogfood_candidate="examples/projects/dogfood_web_ui/src/main.tetra"
+  if [[ -f "$dogfood_candidate" ]]; then
+    ui_candidate="$dogfood_candidate"
+  else
+    ui_candidate="$(
     {
       git ls-files 'examples/*.tetra'
+      git ls-files 'examples/projects/*/src/*.tetra'
       find examples -maxdepth 1 -type f -name '*.tetra' 2>/dev/null
-    } | sort -u | grep -E '/[^/]*(ui.*smoke|view.*smoke|state.*smoke)[^/]*\.tetra$' | head -n 1 || true
-  )"
+      find examples/projects -path '*/src/*.tetra' -type f 2>/dev/null
+    } | sort -u | grep -E '(/|^)[^/]*(ui.*smoke|view.*smoke|state.*smoke|dogfood_web_ui)[^/]*\.tetra$|examples/projects/dogfood_web_ui/src/main\.tetra$' | head -n 1 || true
+    )"
+  fi
   if [[ -n "$ui_candidate" ]]; then
     source_path="$ui_candidate"
     scope_active="true"
@@ -130,7 +142,7 @@ HTML
           blocker="browser automation did not produce ok:* result"
         fi
       else
-        status="fail"
+        status="blocked"
         blocker="headless chromium command failed"
       fi
       kill "$server_pid" >/dev/null 2>&1 || true
@@ -178,6 +190,8 @@ const report = {
 };
 fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
 JS
+
+go run ./tools/cmd/validate-web-ui-smoke --report "$report_path"
 
 if [[ "$status" != "pass" ]]; then
   echo "release_v1_0_web_smoke: $blocker" >&2

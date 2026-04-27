@@ -126,7 +126,14 @@ func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {
 	if file.Module != "" {
 		title = file.Module
 	}
+	experimental := isExperimentalModuleTitle(title)
+	if experimental {
+		title += " (experimental)"
+	}
 	fmt.Fprintf(b, "## %s\n\n", title)
+	if experimental {
+		b.WriteString("Experimental module: compatibility is not guaranteed for v1.x.\n\n")
+	}
 	if len(file.Structs) > 0 {
 		b.WriteString("### Structs\n\n")
 		for _, st := range file.Structs {
@@ -166,6 +173,12 @@ func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {
 			for _, command := range view.Commands {
 				fmt.Fprintf(b, "  - `command %s`\n", command.Name)
 			}
+			for _, style := range view.Styles {
+				fmt.Fprintf(b, "  - `style %s: %s`\n", style.Name, formatLSPTypeRef(style.Type))
+			}
+			for _, entry := range view.Accessibility {
+				fmt.Fprintf(b, "  - `accessibility %s: %s`\n", entry.Name, formatLSPTypeRef(entry.Type))
+			}
 		}
 		b.WriteByte('\n')
 	}
@@ -187,7 +200,7 @@ func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {
 		for _, proto := range file.Protocols {
 			fmt.Fprintf(b, "- `protocol %s`\n", proto.Name)
 			for _, req := range proto.Requirements {
-				fmt.Fprintf(b, "  - `%s`\n", formatFuncSigDecl(req))
+				fmt.Fprintf(b, "  - `%s`\n", formatLSPFuncSigDecl(req))
 			}
 		}
 		b.WriteByte('\n')
@@ -233,4 +246,34 @@ func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {
 		}
 		b.WriteByte('\n')
 	}
+	doctestCount := countTetraDoctests(file.Src)
+	if doctestCount > 0 {
+		b.WriteString("### Doctests\n\n")
+		for i := 1; i <= doctestCount; i++ {
+			fmt.Fprintf(b, "- doctest %d\n", i)
+		}
+		b.WriteByte('\n')
+	}
+}
+
+func isExperimentalModuleTitle(title string) bool {
+	return title == "lib.experimental" || strings.HasPrefix(title, "lib.experimental.")
+}
+
+func countTetraDoctests(src []byte) int {
+	count := 0
+	for _, line := range strings.Split(string(src), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "```tetra doctest" {
+			count++
+			continue
+		}
+		if strings.HasPrefix(trimmed, "//") {
+			comment := strings.TrimSpace(strings.TrimPrefix(trimmed, "//"))
+			if comment == "```tetra doctest" {
+				count++
+			}
+		}
+	}
+	return count
 }

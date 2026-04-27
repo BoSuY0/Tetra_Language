@@ -3,14 +3,13 @@ set -euo pipefail
 
 report_path=""
 source_path="examples/flow_hello.tetra"
-native_target="linux-x64"
-wasm_target="wasm32-wasi"
+targets=("linux-x64" "macos-x64" "windows-x64" "wasm32-wasi" "wasm32-web")
 
 usage() {
   cat <<'USAGE'
 Usage: bash scripts/release_v1_0_repro.sh --report PATH [--source examples/flow_hello.tetra]
 
-Produces a reproducibility proof JSON for one native and one WASM target.
+Produces a reproducibility proof JSON for every v1 build-only/release target.
 USAGE
 }
 
@@ -49,54 +48,86 @@ fi
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-native_a="$tmp_dir/native-a"
-native_b="$tmp_dir/native-b"
-wasm_a="$tmp_dir/wasm-a.wasm"
-wasm_b="$tmp_dir/wasm-b.wasm"
+json_escape() {
+  local s="${1-}"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  printf '%s' "$s"
+}
 
-./tetra build --target "$native_target" -o "$native_a" "$source_path"
-./tetra build --target "$native_target" -o "$native_b" "$source_path"
-./tetra build --target "$wasm_target" -o "$wasm_a" "$source_path"
-./tetra build --target "$wasm_target" -o "$wasm_b" "$source_path"
+target_ext() {
+  case "$1" in
+    windows-x64)
+      printf '.exe'
+      ;;
+    wasm32-wasi|wasm32-web)
+      printf '.wasm'
+      ;;
+    *)
+      printf ''
+      ;;
+  esac
+}
 
-native_hash_a="sha256:$(sha256sum "$native_a" | awk '{print $1}')"
-native_hash_b="sha256:$(sha256sum "$native_b" | awk '{print $1}')"
-wasm_hash_a="sha256:$(sha256sum "$wasm_a" | awk '{print $1}')"
-wasm_hash_b="sha256:$(sha256sum "$wasm_b" | awk '{print $1}')"
+artifacts_json="$tmp_dir/artifacts.jsonl"
+: >"$artifacts_json"
+all_match="true"
+legacy_native_json=""
+legacy_wasm_json=""
 
-native_match="false"
-wasm_match="false"
-if cmp -s "$native_a" "$native_b"; then
-  native_match="true"
-fi
-if cmp -s "$wasm_a" "$wasm_b"; then
-  wasm_match="true"
-fi
+for target in "${targets[@]}"; do
+  ext="$(target_ext "$target")"
+  out_a="$tmp_dir/${target}-a${ext}"
+  out_b="$tmp_dir/${target}-b${ext}"
+
+  ./tetra build --target "$target" -o "$out_a" "$source_path"
+  ./tetra build --target "$target" -o "$out_b" "$source_path"
+
+  hash_a="sha256:$(sha256sum "$out_a" | awk '{print $1}')"
+  hash_b="sha256:$(sha256sum "$out_b" | awk '{print $1}')"
+  match="false"
+  if cmp -s "$out_a" "$out_b"; then
+    match="true"
+  else
+    all_match="false"
+  fi
+  size_a="$(wc -c <"$out_a" | tr -d '[:space:]')"
+  size_b="$(wc -c <"$out_b" | tr -d '[:space:]')"
+
+  artifact_json="$(printf '{"target":"%s","hash_a":"%s","hash_b":"%s","size_a":%s,"size_b":%s,"match":%s}' \
+    "$(json_escape "$target")" \
+    "$(json_escape "$hash_a")" \
+    "$(json_escape "$hash_b")" \
+    "$size_a" \
+    "$size_b" \
+    "$match")"
+  printf '%s\n' "$artifact_json" >>"$artifacts_json"
+  if [[ "$target" == "linux-x64" ]]; then
+    legacy_native_json="$artifact_json"
+  fi
+  if [[ "$target" == "wasm32-wasi" ]]; then
+    legacy_wasm_json="$artifact_json"
+  fi
+done
 
 mkdir -p "$(dirname "$report_path")"
-cat >"$report_path" <<JSON
 {
-  "schema": "tetra.reproducible-build-proof.v1alpha1",
-  "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "source": "$source_path",
-  "native": {
-    "target": "$native_target",
-    "hash_a": "$native_hash_a",
-    "hash_b": "$native_hash_b",
-    "match": $native_match
-  },
-  "wasm": {
-    "target": "$wasm_target",
-    "hash_a": "$wasm_hash_a",
-    "hash_b": "$wasm_hash_b",
-    "match": $wasm_match
-  },
-  "status": "$( [[ "$native_match" == "true" && "$wasm_match" == "true" ]] && echo pass || echo fail )"
-}
-JSON
+  echo "{"
+  echo '  "schema": "tetra.reproducible-build-proof.v1alpha1",'
+  echo '  "timestamp_policy": "no wall-clock timestamps; release gate summary records run time",'
+  printf '  "source": "%s",\n' "$(json_escape "$source_path")"
+  printf '  "native": %s,\n' "$legacy_native_json"
+  printf '  "wasm": %s,\n' "$legacy_wasm_json"
+  echo '  "artifacts": ['
+  awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$artifacts_json"
+  echo '  ],'
+  printf '  "status": "%s"\n' "$( [[ "$all_match" == "true" ]] && echo pass || echo fail )"
+  echo "}"
+} >"$report_path"
 
-if [[ "$native_match" != "true" || "$wasm_match" != "true" ]]; then
-  echo "release_v1_0_repro: reproducible build mismatch (native=$native_match wasm=$wasm_match)" >&2
+if [[ "$all_match" != "true" ]]; then
+  echo "release_v1_0_repro: reproducible build mismatch" >&2
   exit 1
 fi
 

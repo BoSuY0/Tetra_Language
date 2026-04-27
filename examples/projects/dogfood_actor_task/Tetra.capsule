@@ -1,0 +1,8 @@
+manifest "tetra.capsule.v1"
+capsule DogfoodActorTask:
+    id "tetra://examples/dogfood-actor-task"
+    version "0.1.0"
+    target "linux-x64"
+    permission "actors"
+    permission "runtime"
+

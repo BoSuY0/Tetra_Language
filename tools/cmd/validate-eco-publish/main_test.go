@@ -34,6 +34,66 @@ func TestValidateEcoPublishRejectsHashMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateEcoPublishRejectsUnknownMetadataField(t *testing.T) {
+	root, id, version, target := makePublishFixture(t)
+	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	raw, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.Replace(string(raw), "\n  \"package\":", "\n  \"unexpected\": true,\n  \"package\":", 1)
+	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runPublishValidator(t, root, id, version, target)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unknown field") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateEcoPublishRejectsUnsafePackagePath(t *testing.T) {
+	root, id, version, target := makePublishFixture(t)
+	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	raw, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.Replace(string(raw), `"file": "package.todex"`, `"file": "../linux-x64/package.todex"`, 1)
+	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runPublishValidator(t, root, id, version, target)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unsafe package file path") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateEcoPublishRejectsDownloadPathMismatch(t *testing.T) {
+	root, id, version, target := makePublishFixture(t)
+	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	raw, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.Replace(string(raw), `"path": "packages/tetra_demo/0.1.0/linux-x64/package.todex"`, `"path": "packages/tetra_demo/0.1.0/windows-x64/package.todex"`, 1)
+	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runPublishValidator(t, root, id, version, target)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "download path mismatch") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func makePublishFixture(t *testing.T) (root string, id string, version string, target string) {
 	t.Helper()
 	root = t.TempDir()
@@ -53,10 +113,14 @@ func makePublishFixture(t *testing.T) (root string, id string, version string, t
   "schema": "tetra.eco.publish.v1beta",
   "channel": "beta",
   "hub": "local-beta",
+  "published_at_unix": 0,
   "capsule": {
+    "name": "Demo",
     "id": %q,
     "version": %q,
-    "target": %q
+    "target": %q,
+    "targets": [%q],
+    "permissions": ["io"]
   },
   "package": {
     "file": "package.todex",
@@ -64,10 +128,15 @@ func makePublishFixture(t *testing.T) (root string, id string, version string, t
     "sha256": "sha256:%s"
   },
   "trust": {
-    "snapshot_sha256": "sha256:%s"
-  }
+    "snapshot_file": "trust.snapshot.json",
+    "snapshot_sha256": "sha256:%s",
+    "trust_tier": "high"
+  },
+  "downloads": [
+    {"target": %q, "path": "packages/tetra_demo/0.1.0/linux-x64/package.todex"}
+  ]
 }
-`, id, version, target, len(pkg), hex.EncodeToString(sum[:]), strings.Repeat("a", 64))
+`, id, version, target, target, len(pkg), hex.EncodeToString(sum[:]), strings.Repeat("a", 64), target)
 	if err := os.WriteFile(filepath.Join(dir, "metadata.json"), []byte(meta), 0o644); err != nil {
 		t.Fatal(err)
 	}

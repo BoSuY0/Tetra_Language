@@ -1,0 +1,10 @@
+{
+  "total": 4,
+  "islands_debug": false,
+  "cases": [
+    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","expected_exit":0},
+    {"name":"flow_struct_smoke","src_path":"examples/flow_struct_smoke.tetra","expected_exit":42},
+    {"name":"flow_islands_smoke","src_path":"examples/flow_islands_smoke.tetra","expected_exit":0},
+    {"name":"flow_unsafe_cap_mem_smoke","src_path":"examples/flow_unsafe_cap_mem_smoke.tetra","expected_exit":42}
+  ]
+}

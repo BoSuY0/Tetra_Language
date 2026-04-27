@@ -63,6 +63,26 @@ func TestValidateAPIDocsRejectsAPIMetadataHashMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateAPIDocsRejectsUnknownMetadataFields(t *testing.T) {
+	docs := `# Tetra API Docs
+
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:a5813045590b999abb9088185f7ee73c1d75b281dbbacfd2ea16fda06106dc36","module_count":1,"entry_count":1,"extra":true} -->
+
+## examples/flow_hello.tetra
+
+### Functions
+
+- ` + "`func main() -> Int uses io`" + `
+`
+	out, err := runAPIDocsValidator(t, docs)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unknown field") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func TestValidateAPIDocsRejectsEmptyDocument(t *testing.T) {
 	out, err := runAPIDocsValidator(t, "")
 	if err == nil {
@@ -161,6 +181,28 @@ func TestValidateAPIDocsRejectsEntryBeforeSection(t *testing.T) {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
 	if !strings.Contains(string(out), "API entry appears before module section") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateAPIDocsRejectsBrokenInternalLink(t *testing.T) {
+	docs := `# Tetra API Docs
+
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:a5813045590b999abb9088185f7ee73c1d75b281dbbacfd2ea16fda06106dc36","module_count":1,"entry_count":1} -->
+
+See [missing](#missing-section).
+
+## examples/flow_hello.tetra
+
+### Functions
+
+- ` + "`func main() -> Int uses io`" + `
+`
+	out, err := runAPIDocsValidator(t, docs)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "broken internal link") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }

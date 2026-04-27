@@ -1,6 +1,8 @@
 # Roadmap v0.6 -> v1.0 (Maximal Production Release)
 
-Status: active plan. The current repository baseline is v0.6 Usable Alpha.
+Status: historical roadmap. The current release truth is
+`docs/spec/v1_scope.md`; the active TODO is
+`docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
 
 Tetra 1.0 is the production line for the final platform profile: Flow-only
 syntax, stable compiler/tooling, Rust-grade ownership safety, no data races in
@@ -20,9 +22,11 @@ Eco/Todex, and beta network publishing.
 
 ## Wave 0: Release Tracking
 
-- Keep v0.6.x gates green while new 1.0 work lands behind focused tests.
-- Maintain this roadmap, `docs/checklists/v1_0_release_gate.md`, and the draft
-  release notes as the source of truth for 1.0 readiness.
+- Keep the current-version stabilization gate green while new 1.0 work lands
+  behind focused tests.
+- Maintain `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`,
+  `docs/checklists/v1_0_release_gate.md`, and the draft release notes as the
+  source of truth for 1.0 readiness.
 - Keep `scripts/release_v1_0_gate.sh` intentionally failing until the release
   version and all mandatory capability checks are implemented.
 

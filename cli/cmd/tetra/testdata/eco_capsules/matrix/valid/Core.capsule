@@ -1,0 +1,7 @@
+manifest "tetra.capsule.v1"
+capsule FixtureCore:
+    id "tetra://fixture/core"
+    version "0.1.0"
+    target "linux-x64"
+    permission "io"
+

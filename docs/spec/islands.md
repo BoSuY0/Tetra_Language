@@ -1,6 +1,6 @@
 # Islands Memory Model
 
-> **Version:** 0.1 (MVP)  
+> **Version:** v1 checked MVP
 > **Status:** Specification  
 > **Introduced:** Tetra v0.12
 
@@ -20,7 +20,7 @@
 ### Safety Guarantees (MVP)
 
 - Attempting to allocate more than the island's remaining capacity causes a controlled program exit (exit code 1)
-- **Double-free is undefined behavior** by default in v0.12 (the memory is already deallocated, so accessing the header is invalid)
+- **Double-free is undefined behavior** by default (the memory is already deallocated, so accessing the header is invalid)
 - With `--islands-debug`, double-free is detected and the data pages are protected to catch use-after-free
 
 ---
@@ -181,7 +181,7 @@ Manual `free` is only allowed inside `unsafe` blocks. Scoped islands inject an i
    - **Linux/macOS**: `munmap(base, total)`
    - **Windows**: `VirtualFree(base, 0, MEM_RELEASE)`
 
-> **Warning:** Double-free is **undefined behavior** by default in v0.12. After `free(isl)`, the island's memory is returned to the OS and any access (including another `free`) may crash or corrupt memory.
+> **Warning:** Double-free is **undefined behavior** by default. After `free(isl)`, the island's memory is returned to the OS and any access (including another `free`) may crash or corrupt memory.
 >
 > **Debug mode (`--islands-debug`):** The runtime keeps the mapping, sets `flags |= 1`, and protects data pages. A second `free` triggers a controlled exit (exit code 2), and use-after-free faults on protected pages.
 

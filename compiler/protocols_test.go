@@ -33,7 +33,7 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("GenerateAPIDocsFromSource: %v", err)
 	}
-	if !strings.Contains(string(docs), "`protocol Renderable`") || !strings.Contains(string(docs), "`func draw(self: Vec2) -> Int`") {
+	if !strings.Contains(string(docs), "`protocol Renderable`") || !strings.Contains(string(docs), "`func draw(self: Vec2) -> i32`") {
 		t.Fatalf("docs = %s", string(docs))
 	}
 }

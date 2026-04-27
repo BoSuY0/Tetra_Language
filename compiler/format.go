@@ -61,8 +61,8 @@ func collectLineComments(src []byte, filename string) (lineComments, error) {
 		if commentAt >= 0 {
 			if strings.TrimSpace(line[:commentAt]) != "" {
 				return lineComments{}, &frontend.DiagnosticError{Info: frontend.Diagnostic{
-					Code:     "TETRA_FMT001",
-					Message:  "inline comments are not supported by tetra fmt v0.18; move the comment to its own line or format manually",
+					Code:     DiagnosticCodeFormatter,
+					Message:  "inline comments are not supported by tetra fmt for the v1.0 profile; move the comment to its own line or format manually",
 					File:     filename,
 					Line:     i + 1,
 					Column:   commentAt + 1,
@@ -83,8 +83,8 @@ func collectLineComments(src []byte, filename string) (lineComments, error) {
 					if strings.TrimSpace(commentLine[end+2:]) != "" {
 						col := commentAt + end + 3
 						return lineComments{}, &frontend.DiagnosticError{Info: frontend.Diagnostic{
-							Code:     "TETRA_FMT001",
-							Message:  "inline comments are not supported by tetra fmt v0.18; move the comment to its own line or format manually",
+							Code:     DiagnosticCodeFormatter,
+							Message:  "inline comments are not supported by tetra fmt for the v1.0 profile; move the comment to its own line or format manually",
 							File:     filename,
 							Line:     i + 1,
 							Column:   col,
@@ -99,7 +99,7 @@ func collectLineComments(src []byte, filename string) (lineComments, error) {
 				i++
 				if i >= len(lines) {
 					return lineComments{}, &frontend.DiagnosticError{Info: frontend.Diagnostic{
-						Code:     "TETRA_FMT002",
+						Code:     DiagnosticCodeFormatterCheck,
 						Message:  "unterminated block comment",
 						File:     filename,
 						Line:     len(lines),
@@ -290,14 +290,6 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 		p.structDecl(st)
 		p.blank()
 	}
-	for _, st := range file.States {
-		p.stateDecl(st)
-		p.blank()
-	}
-	for _, view := range file.Views {
-		p.viewDecl(view)
-		p.blank()
-	}
 	for _, proto := range file.Protocols {
 		p.protocolDecl(proto)
 		p.blank()
@@ -308,6 +300,14 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 	}
 	for _, impl := range file.Impls {
 		p.implDecl(impl)
+		p.blank()
+	}
+	for _, st := range file.States {
+		p.stateDecl(st)
+		p.blank()
+	}
+	for _, view := range file.Views {
+		p.viewDecl(view)
 		p.blank()
 	}
 	for _, g := range file.Globals {

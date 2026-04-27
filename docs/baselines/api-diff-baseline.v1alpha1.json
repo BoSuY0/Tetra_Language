@@ -1,136 +1,374 @@
 {
   "schema": "tetra.api.diff-baseline.v1alpha1",
-  "created_at": "2026-04-26T19:54:11.334Z",
+  "created_at": "2026-04-27T10:40:44.505Z",
   "source_docs": "docs/generated/v1_0/api-diff/api-docs.md",
-  "source_docs_sha256": "sha256:a5b51502c3a232118bc88c987fdf74f0202377b370cd06d2d64ccadd38c6af69",
+  "source_docs_sha256": "sha256:4a0a64659af1261e55ebbc34785c76d67707a7a58f56fcad2d72254a930ec84a",
   "api_metadata": {
     "schema": "tetra.api.v1alpha1",
-    "api_hash": "sha256:b7cdf34de1eda56ca8ebf2f6795660d3081bf5ae40581c1e3e6eb8695e655007",
-    "module_count": 62,
-    "entry_count": 113
+    "api_hash": "sha256:40f6fcd0c427f7d88a52ef4e5cad9cb6afa266efda0b3905c7c0cd6f09a8fb8a",
+    "module_count": 72,
+    "entry_count": 199
   },
   "symbols": [
     {
-      "id": "examples.core_async_smoke::Functions::async func core_async_probe() -> Int",
+      "id": "examples.core_async_smoke::Functions::func core_async_probe",
       "module": "examples.core_async_smoke",
       "section": "Functions",
-      "entry": "async func core_async_probe() -> Int",
-      "symbol_hash": "sha256:362c4900222e4e74a09fea8a4d9096282d15d1cc9f3134540bfddf46a5efb280"
+      "entry": "async func core_async_probe() -> i32",
+      "symbol_hash": "sha256:0798369e652503fa05b7099f89ac68d710425d35e0ceb0a8adad886d95ac4484"
     },
     {
-      "id": "examples.core_async_smoke::Functions::func main() -> Int",
+      "id": "examples.core_async_smoke::Functions::func main",
       "module": "examples.core_async_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:dfe06a95378bae41b944aa54bf1d490b14b761b885bd8bdb9e45bdeb9439f2bf"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:c25f6bc7cbb51ffcee4046792f3ae01ee39f9237743092320e60508d1aad345d"
     },
     {
-      "id": "examples.core_collections_smoke::Functions::func main() -> Int uses alloc, mem",
+      "id": "examples.core_collections_smoke::Functions::func main",
       "module": "examples.core_collections_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, mem",
-      "symbol_hash": "sha256:4683e79a14820c4764f1bba424daf28002d31621096d4756e167c20d043cfaa2"
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e61707fe4baaccf0ff97e53d04bc7468d280b13e649466de13665b1e94177b77"
     },
     {
-      "id": "examples.core_crypto_smoke::Functions::func main() -> Int uses alloc, mem",
+      "id": "examples.core_crypto_smoke::Functions::func main",
       "module": "examples.core_crypto_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, mem",
-      "symbol_hash": "sha256:b80037a429506972351f81bb60b59b18635a439ef268caf26136a57104cf657b"
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6675ec7bf372892fb819288807600c79d8bdc688cd061a6061b9a515b0a96a1d"
     },
     {
-      "id": "examples.core_filesystem_smoke::Functions::func main() -> Int",
+      "id": "examples.core_filesystem_smoke::Functions::func main",
       "module": "examples.core_filesystem_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:70e565e48207d0324d5dd4e1878b87925f3c71d918e6cfac5d7ba04d16f220be"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:34a9ace43ac7d2e04fd0a195356c3d3e24d20ff37127126f4329ea8104b8aec4"
     },
     {
-      "id": "examples.core_io_smoke::Functions::func main() -> Int uses alloc, capability, io, mem, mmio",
+      "id": "examples.core_io_smoke::Functions::func main",
       "module": "examples.core_io_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, capability, io, mem, mmio",
-      "symbol_hash": "sha256:ab6473fb46513e8684c0f6a2db9714959b13e595de126f4d63eab64fc1be1199"
+      "entry": "func main() -> i32 uses alloc, capability, io, mem, mmio",
+      "symbol_hash": "sha256:8e12725cdd6a5ea9b1ff08dcf60c106093bc54eac928571dd3b1c2043d098dee"
     },
     {
-      "id": "examples.core_math_smoke::Functions::func main() -> Int",
+      "id": "examples.core_math_smoke::Functions::func main",
       "module": "examples.core_math_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:a81978146c8dba4536c81679f6e09f8edd634e6422578742183bf4223d3f4f31"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:064ccf41e202c7c8d833d69d0392fd061cda1dc94546eefb318e6e2981b501db"
     },
     {
-      "id": "examples.core_memory_smoke::Functions::func main() -> Int uses alloc, capability, mem",
+      "id": "examples.core_memory_smoke::Functions::func main",
       "module": "examples.core_memory_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, capability, mem",
-      "symbol_hash": "sha256:ffcf4e4a3a98cdee56e97392f299ad15bbc514e23799553b476faaaf58ff18b4"
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:7683110f1b760a5fc9d75a2e48150a8c7aff67b83f8f6fe4c5b62664969dc894"
     },
     {
-      "id": "examples.core_networking_smoke::Functions::func main() -> Int",
+      "id": "examples.core_networking_smoke::Functions::func main",
       "module": "examples.core_networking_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:4d2bc5fd4b2cfd36570200d7f93b31f81b225e0226a6789bfc4d692b311ceb7d"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:79ec1d6bec8ab57a93fa78b87c69d2d50a170695b4801b39aed7bbcd8538582d"
     },
     {
-      "id": "examples.core_serialization_smoke::Functions::func main() -> Int uses alloc, mem",
+      "id": "examples.core_serialization_smoke::Functions::func main",
       "module": "examples.core_serialization_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, mem",
-      "symbol_hash": "sha256:452d3654edc80a4c9bf2b7a55aea05f98cb31551be6b35bdfb43e4fd9f49a32f"
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:09db6814dd0c96629837fd44546f2c0b7b72fd46496115ec1089d873491cdaf5"
     },
     {
-      "id": "examples.core_slices_smoke::Functions::func main() -> Int uses alloc, islands, mem",
+      "id": "examples.core_slices_smoke::Functions::func main",
       "module": "examples.core_slices_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, islands, mem",
-      "symbol_hash": "sha256:cbf84971981093778b57a338cd1551afa8aa0c66e2f9dd99312ea56d085f3f11"
+      "entry": "func main() -> i32 uses alloc, islands, mem",
+      "symbol_hash": "sha256:6c5aa087cfe003d8577c716d2e0072a7020d8343f9f4b6db360d8f6645939e28"
     },
     {
-      "id": "examples.core_strings_smoke::Functions::func main() -> Int",
+      "id": "examples.core_strings_smoke::Functions::func main",
       "module": "examples.core_strings_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:6a9385e1a920cfd7d80ef403684bc5fc78688861c05c3b6d0e981e0c9f047452"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:9ece35a3da8c8a45a16d35cdcca994cdc392cf0d9709be0182e1901bb63f5973"
     },
     {
-      "id": "examples.core_sync_smoke::Functions::func main() -> Int",
+      "id": "examples.core_sync_smoke::Functions::func main",
       "module": "examples.core_sync_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:f26e087095359cf7c6c929c859b8a2a46dd034a69bdec711250f9ce4b9a502b2"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:704589627089e1577f5c9596bd40e9bb83da2a68e606148402140739a1ccce33"
     },
     {
-      "id": "examples.core_testing_smoke::Functions::func main() -> Int",
+      "id": "examples.core_testing_smoke::Functions::func main",
       "module": "examples.core_testing_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:c3cd2f7d4bdfd01c4b9e2a50797724c46af0c4443f78cd4edc2717745fd4be36"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:76aac8c45dbfac568ce2abab059d47a3ca58f3f0e5230fdb7abf426ea52d2789"
     },
     {
-      "id": "examples.core_time_smoke::Functions::func main() -> Int",
+      "id": "examples.core_time_smoke::Functions::func main",
       "module": "examples.core_time_smoke",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:ee8d0cf5bd51fbdb0898016997814f4a30474f28764d5682e6633d6de0a2b64e"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:a8b9c752572cad924e9c389a36f2ebb50279146b8c8186572decce446bc877da"
     },
     {
-      "id": "examples.experimental_math_smoke::Functions::func main() -> i32",
+      "id": "examples.experimental_math_smoke::Functions::func main",
       "module": "examples.experimental_math_smoke",
       "section": "Functions",
       "entry": "func main() -> i32",
       "symbol_hash": "sha256:b7d37c18d7182a65e4b6f1557c7069f7e310bfebcf76f3468aba8db4e879c95a"
     },
     {
-      "id": "examples.experimental_memcpy_smoke::Functions::func main() -> i32 uses alloc, capability, mem",
+      "id": "examples.experimental_memcpy_smoke::Functions::func main",
       "module": "examples.experimental_memcpy_smoke",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, mem",
       "symbol_hash": "sha256:4fe51ba37f08f5dc49fdf70fd9f9c4164fe0f71b0098025a18d3ebada14fd838"
     },
     {
-      "id": "examples.struct_ctor_smoke::Functions::func main() -> i32",
+      "id": "examples.flow_grammar_surface_smoke::Enums::`Mode`: fast, slow",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Enums",
+      "entry": "`Mode`: fast, slow",
+      "symbol_hash": "sha256:fc0a4c47509e06069f3109dc6825835825035089fcaa0cef86e9eb66affedbbc"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Enums::`ReadError`: eof",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Enums",
+      "entry": "`ReadError`: eof",
+      "symbol_hash": "sha256:b1b91b0734a07bdd9ab3050417c2067a0b38d73ad49f6d27bb7cdb6fa58c93cc"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Extensions::Box",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Extensions",
+      "entry": "Box",
+      "symbol_hash": "sha256:37dc111e4e9fe32f55803a1cefa2cd03ebf452c933819e24a24ad256d83d7916"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Extensions::func Box.run(self: Box) -> i32",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Extensions",
+      "entry": "func Box.run(self: Box) -> i32",
+      "symbol_hash": "sha256:de7d8a72f24e541731b6c1f392ca259e480852d02e5f9465362a63f7958f6305"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func async_answer",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "async func async_answer() -> i32",
+      "symbol_hash": "sha256:f58e4f338c0be23faec4b543f14b5438f8c323c392ecf409e02ea71066dc3458"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func async_caller",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "async func async_caller() -> i32",
+      "symbol_hash": "sha256:979d74efdb01426897351437443742fdbe928b86ae7ac52d956606e869471356"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func borrow_one",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func borrow_one(x: borrow i32) -> i32",
+      "symbol_hash": "sha256:17ffe0db7ec9aa5960a1740017318af61fcb3e2ac927109c5f6e9993dc65f7a8"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func bump",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func bump(x: inout i32) -> i32",
+      "symbol_hash": "sha256:644acbda2eb097deb9fa000af7b1ccd81e96e6d2282eb1f1eb7bd2471c39d905"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func id<T>(x: T) -> T",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func id<T>(x: T) -> T",
+      "symbol_hash": "sha256:05a8035ba2a2dee1bf52aa9c7ce43add04cbc642eda30ee71e78051ef79e7d2d"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func main",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, budget, capability, io, islands, mem, runtime",
+      "symbol_hash": "sha256:c95e0fc843df757af04a5186a1437ca9a4f3b9a45e705e56cc716bf843dcdb23"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func maybe",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func maybe(flag: bool) -> i32?",
+      "symbol_hash": "sha256:53bf8e2cf7ce4b0d49a405866c8c1224b07f42bf0686e988feb7cf061c17e67a"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func read",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func read(flag: bool) -> i32 throws ReadError",
+      "symbol_hash": "sha256:14a8d0fddcba284630f739d7c1cb16fd2afc9789db1e1639e9e0b47cb709f723"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func read_caller",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func read_caller(flag: bool) -> i32 throws ReadError",
+      "symbol_hash": "sha256:e8897d6a586a0d3bc9efc352bc6040dd820e10257a48376ee00cb9da0c4f9bcf"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func take",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func take(x: consume i32) -> i32",
+      "symbol_hash": "sha256:b5f2f203d9f0b64bd7a61fd1fda2693a3316a93db9ca0a33834e3e54fbdd92bf"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Globals::const answer",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Globals",
+      "entry": "const answer: i32",
+      "symbol_hash": "sha256:37abbe6a4ceec4f0a48ea704490fe5336854012f04577e893503869770f70ab6"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Implementations::impl Box",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Implementations",
+      "entry": "impl Box: Runner",
+      "symbol_hash": "sha256:c039f82902490dca0b5388aa95eb579229f9c217d006815af637b2b8b5e433b1"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Protocols::func run(self: Box) -> i32",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Protocols",
+      "entry": "func run(self: Box) -> i32",
+      "symbol_hash": "sha256:38771696b2f1bea84694355a62d48bbe830ceccedbdad85bbba38502ba6143fe"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Protocols::protocol Runner",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Protocols",
+      "entry": "protocol Runner",
+      "symbol_hash": "sha256:7c906ccfd484f61591ce6b6f1b7a0114982ebd73eddb34189e498be383a89903"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::States::state CounterState",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "States",
+      "entry": "state CounterState",
+      "symbol_hash": "sha256:59c382ef1cd45c155b303640f9f03780992827e1218588a95460959979770e98"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::States::val title",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "States",
+      "entry": "val title: str",
+      "symbol_hash": "sha256:89c4a56f069bc666679ac10c8e486b518d5e52e8cb92c15ff108b8ca1cd43acc"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::States::var count",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "States",
+      "entry": "var count: i32",
+      "symbol_hash": "sha256:8338c5be93e0c613d53b901ec0d8a27398ed4845779680ca8bcdd0409023deec"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Structs::Box",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Structs",
+      "entry": "Box",
+      "symbol_hash": "sha256:5981492e9913233ed9bd84d1ad2544dfb1f9d10fbfdb1c3f54db4ac69ff523c7"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Structs::value: i32",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Structs",
+      "entry": "value: i32",
+      "symbol_hash": "sha256:9b6782d8fe2c7bb817e7cbd3c4d171cd3396b3b93ee4f57f9c7e8dbe3f028665"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Tests::grammar surface",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Tests",
+      "entry": "grammar surface",
+      "symbol_hash": "sha256:444f836037eeec06b4bc5dabdc29b388cc02418949b50fd2fb5532998a6b9880"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Views::accessibility label: str",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Views",
+      "entry": "accessibility label: str",
+      "symbol_hash": "sha256:c7ec83474ea6bbb1aec1ef9f17ff5b2071dc0b97a8cc44958f36a77206a440e5"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Views::bind countValue: i32",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Views",
+      "entry": "bind countValue: i32",
+      "symbol_hash": "sha256:6f4b5cbd120c485ba72a4bec802da66e45a1477f95359cfd33d5eeea9c957058"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Views::bind titleText: str",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Views",
+      "entry": "bind titleText: str",
+      "symbol_hash": "sha256:846039893679589602a6d189dbd4e203f68db86948e7c9efe6e57d7be97f48f3"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Views::command increment",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Views",
+      "entry": "command increment",
+      "symbol_hash": "sha256:9b4f07f1823e8f9de2baf581dfdbce8e126c0ed19e260679820a0865ee2c105f"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Views::event click -> increment",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Views",
+      "entry": "event click -> increment",
+      "symbol_hash": "sha256:056f187f5157772860ec2cf8bb73055c0b2414933a7556be694da9eb2d795438"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Views::style width: i32",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Views",
+      "entry": "style width: i32",
+      "symbol_hash": "sha256:72124a208bfd828234cf53caa571fcf09fb226598f5d6f5a2b2a382032f98095"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Views::view CounterView",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Views",
+      "entry": "view CounterView(state: CounterState)",
+      "symbol_hash": "sha256:3e6758a0abf2b05dc21bd720bd90a7e5a4eedb1fa2d20dd8be7b1c45ba882240"
+    },
+    {
+      "id": "examples.projects.dogfood_cli.src.main::Functions::func main",
+      "module": "examples.projects.dogfood_cli.src.main",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses io",
+      "symbol_hash": "sha256:5c73c04b22c4c19c9b8676e0932df406c2f6ec4d0c58742f02be10a3744c73e8"
+    },
+    {
+      "id": "examples.projects.dogfood_cli.src.main::Functions::func status_code",
+      "module": "examples.projects.dogfood_cli.src.main",
+      "section": "Functions",
+      "entry": "func status_code() -> i32",
+      "symbol_hash": "sha256:d0a9c4435a1b98d20c16062f2b2ea0e501d42fc084a4853852c412e90f623465"
+    },
+    {
+      "id": "examples.projects.dogfood_cli.src.main::Tests::cli status code",
+      "module": "examples.projects.dogfood_cli.src.main",
+      "section": "Tests",
+      "entry": "cli status code",
+      "symbol_hash": "sha256:3b1145d7ea3a3ede2bf93b574e1af3f2579db883e494a768b0484ec0a74f3602"
+    },
+    {
+      "id": "examples.struct_ctor_smoke::Functions::func main",
       "module": "examples.struct_ctor_smoke",
       "section": "Functions",
       "entry": "func main() -> i32",
@@ -158,95 +396,116 @@
       "symbol_hash": "sha256:ea1a92b89a342ba3636d872e8dde2f60687e52687d2c6ef1bd268cbacfe8a649"
     },
     {
-      "id": "examples/actors_pingpong.tetra::Functions::func main() -> i32 uses actors",
+      "id": "examples/actors_pingpong.tetra::Functions::func main",
       "module": "examples/actors_pingpong.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses actors",
       "symbol_hash": "sha256:78393397335761080c9689c477690e0aadb17b7f9cdebfd4c96458abbe757c71"
     },
     {
-      "id": "examples/actors_pingpong.tetra::Functions::func pong() -> i32 uses actors",
+      "id": "examples/actors_pingpong.tetra::Functions::func pong",
       "module": "examples/actors_pingpong.tetra",
       "section": "Functions",
       "entry": "func pong() -> i32 uses actors",
       "symbol_hash": "sha256:0de4f66f75120f1f6bebfd727b717349007e5b6ef4514abf87d526d08d27bd0f"
     },
     {
-      "id": "examples/actors_tagged_stress.tetra::Functions::func main() -> Int uses actors",
+      "id": "examples/actors_tagged_stress.tetra::Functions::func main",
       "module": "examples/actors_tagged_stress.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses actors",
-      "symbol_hash": "sha256:be5dead8d15e6a33459604f16e642b4154dcb69b2a9c1eb3103ad69ee615559e"
+      "entry": "func main() -> i32 uses actors",
+      "symbol_hash": "sha256:9e84b347a4c2e75c6d6f918db6efc7109c1f78059f2994aa8104c9eb2f5bd55c"
     },
     {
-      "id": "examples/actors_tagged_stress.tetra::Functions::func worker() -> Int uses actors",
+      "id": "examples/actors_tagged_stress.tetra::Functions::func worker",
       "module": "examples/actors_tagged_stress.tetra",
       "section": "Functions",
-      "entry": "func worker() -> Int uses actors",
-      "symbol_hash": "sha256:0505a77ac609ca802ed11261e9ecf7af21d411260db75aec2993f974a68d1e12"
+      "entry": "func worker() -> i32 uses actors",
+      "symbol_hash": "sha256:b4d78342a2cdb163daf21e78cc6395b8e85cc7b41cc03723ce5e51d129ea92f3"
     },
     {
-      "id": "examples/actors_tagged_stress.tetra::Globals::val ITERATIONS: i32",
+      "id": "examples/actors_tagged_stress.tetra::Globals::val ITERATIONS",
       "module": "examples/actors_tagged_stress.tetra",
       "section": "Globals",
       "entry": "val ITERATIONS: i32",
       "symbol_hash": "sha256:fc9eeec91881906982252a3612bef2e5720cc44c92058f0d0a7d27ca51e5370e"
     },
     {
-      "id": "examples/async_smoke.tetra::Functions::async func answer() -> Int",
+      "id": "examples/async_smoke.tetra::Functions::func answer",
       "module": "examples/async_smoke.tetra",
       "section": "Functions",
-      "entry": "async func answer() -> Int",
-      "symbol_hash": "sha256:55c6e044fda338fe3a94d533e6432863b186b9c74caf730f9ac11693c06d6835"
+      "entry": "async func answer() -> i32",
+      "symbol_hash": "sha256:c3318871535fb119a01fc20c808fc15e43c247498a2ee251d63ec057a8fbdba1"
     },
     {
-      "id": "examples/async_smoke.tetra::Functions::async func caller() -> Int",
+      "id": "examples/async_smoke.tetra::Functions::func caller",
       "module": "examples/async_smoke.tetra",
       "section": "Functions",
-      "entry": "async func caller() -> Int",
-      "symbol_hash": "sha256:302768f85c6e4c863d55e585269916fa5d22a75ce01fb00df401059fffc50d6f"
+      "entry": "async func caller() -> i32",
+      "symbol_hash": "sha256:93b9bc6e5d00dd8081f39ade453b2c2cb8116a2a6b95c899bf5f28822a853976"
     },
     {
-      "id": "examples/async_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/async_smoke.tetra::Functions::func main",
       "module": "examples/async_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:86549fad4f45b2badc52bf9cf2ae1e69b586c45746aefd0c219e22277e53842b"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:448674b46d1619520355c77a3e3301d4eaa25a4f1ed409143ae4d669eab0d57a"
     },
     {
-      "id": "examples/bool_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/bool_smoke.tetra::Functions::func main",
       "module": "examples/bool_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:070271fb0e2cdf5a51281d19fcf6a7bf321c4b936b1f148a31a49af673daca51"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:5fdca7ddca4dda4b38734d15ba2393ec20130e5445689e9a1b482bf7953c80b1"
     },
     {
-      "id": "examples/cap_mem_ptr_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, mem",
+      "id": "examples/cap_mem_ptr_smoke.tetra::Functions::func main",
       "module": "examples/cap_mem_ptr_smoke.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, mem",
       "symbol_hash": "sha256:35958dca81a123216bb1a3a887cf4fe754bfd546b62ad36ed7eea1b69d3ce843"
     },
     {
-      "id": "examples/cap_mem_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, mem",
+      "id": "examples/cap_mem_smoke.tetra::Functions::func main",
       "module": "examples/cap_mem_smoke.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, mem",
       "symbol_hash": "sha256:bfd56a77d55bb8aa5cfca00e7c0a953a0ca6cbcbfdd648869e19337947cebc6a"
     },
     {
-      "id": "examples/compound_assignment_smoke.tetra::Functions::func main() -> Int",
-      "module": "examples/compound_assignment_smoke.tetra",
-      "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:7bf4fd09d689e5d44716d7647005c683d1711f40931040e1c3f2bb2ee2617808"
+      "id": "examples/complex_control_flow_smoke.tetra::Enums::`Mode`: fast, slow",
+      "module": "examples/complex_control_flow_smoke.tetra",
+      "section": "Enums",
+      "entry": "`Mode`: fast, slow",
+      "symbol_hash": "sha256:f81f18c0832aa49108cfd16e6ed8039e5647123debcd5b8ae6a57e8d580e2946"
     },
     {
-      "id": "examples/const_bool_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/complex_control_flow_smoke.tetra::Functions::func classify",
+      "module": "examples/complex_control_flow_smoke.tetra",
+      "section": "Functions",
+      "entry": "func classify(x: i32) -> i32",
+      "symbol_hash": "sha256:ad4f6888504437dec6a0f216c469830d4d0763bcd4b620aa5a26c3c3fb1d5f65"
+    },
+    {
+      "id": "examples/complex_control_flow_smoke.tetra::Functions::func main",
+      "module": "examples/complex_control_flow_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:bf809f2d6a99c882b8947655954b2e91f82e12e784aa940a6a8f85db1f4bdd08"
+    },
+    {
+      "id": "examples/compound_assignment_smoke.tetra::Functions::func main",
+      "module": "examples/compound_assignment_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:77e95cccf866d0f2056c590349e37d30fe8268a83a58088ae809e2299c41d705"
+    },
+    {
+      "id": "examples/const_bool_smoke.tetra::Functions::func main",
       "module": "examples/const_bool_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:e6cd53afebd25779c3b9fba7409f654d81538e295cbf66cb034f369bf6c8e612"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:5e55963a7b2ac62ac976be8425500f4862fa4cf038df92e5534774ead4a78c9f"
     },
     {
       "id": "examples/const_bool_smoke.tetra::Globals::const enabled",
@@ -256,14 +515,14 @@
       "symbol_hash": "sha256:a1fa9a068a2c443871ca36dca8128146678c6bbfb232809b39c4cd4edcba3975"
     },
     {
-      "id": "examples/const_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/const_smoke.tetra::Functions::func main",
       "module": "examples/const_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:6873c34b8110b06fa5238fe37af93bb669070ef0b3a0a723d7c3f1070e5fe54f"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:17e1e6a0562cca9b743d7ee74787ab41d97519ef1cdc87d3139f804bcbb748b8"
     },
     {
-      "id": "examples/const_smoke.tetra::Globals::const base: i32",
+      "id": "examples/const_smoke.tetra::Globals::const base",
       "module": "examples/const_smoke.tetra",
       "section": "Globals",
       "entry": "const base: i32",
@@ -277,88 +536,88 @@
       "symbol_hash": "sha256:1979232595c70ccc6c147d08bddf6debd7c2813c404406e44f0aa4ca13bcf268"
     },
     {
-      "id": "examples/ctx_switch_sysv_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, control, link, mem, runtime",
+      "id": "examples/ctx_switch_sysv_smoke.tetra::Functions::func main",
       "module": "examples/ctx_switch_sysv_smoke.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, control, link, mem, runtime",
       "symbol_hash": "sha256:ce737a19d709b4800443b10211da07321e746f8ed289c0c99a510267f9227744"
     },
     {
-      "id": "examples/ctx_switch_sysv_smoke.tetra::Functions::func trampoline() -> i32 uses capability, control, mem, runtime",
+      "id": "examples/ctx_switch_sysv_smoke.tetra::Functions::func trampoline",
       "module": "examples/ctx_switch_sysv_smoke.tetra",
       "section": "Functions",
       "entry": "func trampoline() -> i32 uses capability, control, mem, runtime",
       "symbol_hash": "sha256:6e41ec931d70241ab53aaedebb05dba25b75e36fcd7dfeaf36bc8d66687c0ff4"
     },
     {
-      "id": "examples/ctx_switch_sysv_smoke.tetra::Globals::var g_fiber_slot: ptr",
+      "id": "examples/ctx_switch_sysv_smoke.tetra::Globals::var g_fiber_slot",
       "module": "examples/ctx_switch_sysv_smoke.tetra",
       "section": "Globals",
       "entry": "var g_fiber_slot: ptr",
       "symbol_hash": "sha256:bd83973e9d8ab84a68e3a96d7b93236d77d3bb37ad74163545cf1686acad1550"
     },
     {
-      "id": "examples/ctx_switch_sysv_smoke.tetra::Globals::var g_main_slot: ptr",
+      "id": "examples/ctx_switch_sysv_smoke.tetra::Globals::var g_main_slot",
       "module": "examples/ctx_switch_sysv_smoke.tetra",
       "section": "Globals",
       "entry": "var g_main_slot: ptr",
       "symbol_hash": "sha256:bb922e041a024fe8b7d92c2706ee0f1e755e73ba0789c6bca3dd0805518da59f"
     },
     {
-      "id": "examples/ctx_switch_win64_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, control, link, mem, runtime",
+      "id": "examples/ctx_switch_win64_smoke.tetra::Functions::func main",
       "module": "examples/ctx_switch_win64_smoke.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, control, link, mem, runtime",
       "symbol_hash": "sha256:3eb70def95a868e83fa063dd64da9afd40536cc32365a166b928180b9e312896"
     },
     {
-      "id": "examples/ctx_switch_win64_smoke.tetra::Functions::func trampoline() -> i32 uses capability, control, mem, runtime",
+      "id": "examples/ctx_switch_win64_smoke.tetra::Functions::func trampoline",
       "module": "examples/ctx_switch_win64_smoke.tetra",
       "section": "Functions",
       "entry": "func trampoline() -> i32 uses capability, control, mem, runtime",
       "symbol_hash": "sha256:87d871a13df454e3aa57213e328ec460fe717c8785dd0321a5028451a5155ecb"
     },
     {
-      "id": "examples/ctx_switch_win64_smoke.tetra::Globals::var g_fiber_slot: ptr",
+      "id": "examples/ctx_switch_win64_smoke.tetra::Globals::var g_fiber_slot",
       "module": "examples/ctx_switch_win64_smoke.tetra",
       "section": "Globals",
       "entry": "var g_fiber_slot: ptr",
       "symbol_hash": "sha256:980f52065e9d258741a3f5cd02cf7c2d6ce5f387bae277b698fffea85720d066"
     },
     {
-      "id": "examples/ctx_switch_win64_smoke.tetra::Globals::var g_main_slot: ptr",
+      "id": "examples/ctx_switch_win64_smoke.tetra::Globals::var g_main_slot",
       "module": "examples/ctx_switch_win64_smoke.tetra",
       "section": "Globals",
       "entry": "var g_main_slot: ptr",
       "symbol_hash": "sha256:793d807303eb5d53684b3360405cd69de6397e2ca8e25fdf641b4da6a2999013"
     },
     {
-      "id": "examples/effects_actors_smoke.tetra::Functions::func main() -> Int uses actors",
+      "id": "examples/effects_actors_smoke.tetra::Functions::func main",
       "module": "examples/effects_actors_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses actors",
-      "symbol_hash": "sha256:0c97f65e844fe85b722c3184746c368b536af6e8899fc6ca033e3349feec056f"
+      "entry": "func main() -> i32 uses actors",
+      "symbol_hash": "sha256:170144ccefee240d490d8da9bc7b2e903540562d4f666d9cb44df380285dedd6"
     },
     {
-      "id": "examples/effects_io_smoke.tetra::Functions::func main() -> Int uses io",
+      "id": "examples/effects_io_smoke.tetra::Functions::func main",
       "module": "examples/effects_io_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses io",
-      "symbol_hash": "sha256:75daa2e4b345b4fa379478dd45579843a469915be5f7e45f4270e9ed105237cf"
+      "entry": "func main() -> i32 uses io",
+      "symbol_hash": "sha256:631ae1630a92e0fe64af4fba1080422f4eba2fb75ff106d5621a2cac2ce9e265"
     },
     {
-      "id": "examples/effects_mem_smoke.tetra::Functions::func main() -> Int uses alloc, capability, mem",
+      "id": "examples/effects_mem_smoke.tetra::Functions::func main",
       "module": "examples/effects_mem_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, capability, mem",
-      "symbol_hash": "sha256:e1810932617b71a0e4d199e80732f800911bb9908066e607e072180dd0e560d2"
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:2a2e82fa7235f18a25a17278701c295cc48702d03443f608f446fa47d776f35e"
     },
     {
-      "id": "examples/else_if_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/else_if_smoke.tetra::Functions::func main",
       "module": "examples/else_if_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:9e649e7051a82d6c51d14a8c4b35e49bb953386370a05371a93b9af9e3798ee6"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:dac27ffed41367b847ffecbd09a0a2a38825ac32a61ed1a19b18bd885bdacc0e"
     },
     {
       "id": "examples/enum_exhaustive_match_smoke.tetra::Enums::`Color`: red, green",
@@ -368,11 +627,11 @@
       "symbol_hash": "sha256:b2d62bc2f30184fa51c2ae18044c7505fb943708b97600f4e422b20331740830"
     },
     {
-      "id": "examples/enum_exhaustive_match_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/enum_exhaustive_match_smoke.tetra::Functions::func main",
       "module": "examples/enum_exhaustive_match_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:8f8039c68912e133a7a9dec5d6d866e863857fd7b33f07a2fcd9bfe23e306a15"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:555297f70a7229a204cb0f81cdae3ea90cb8aff7bb4b6f4cdf7ef14cfaf6594e"
     },
     {
       "id": "examples/enum_match_smoke.tetra::Enums::`Color`: red, green, blue",
@@ -382,18 +641,18 @@
       "symbol_hash": "sha256:91fef4dc36e568f2abe38f2dd3eca03a5fa5e50684b2e9768de4284298892890"
     },
     {
-      "id": "examples/enum_match_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/enum_match_smoke.tetra::Functions::func main",
       "module": "examples/enum_match_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:62864ff3f7bbf6e17f03f657b4e7caeb0ca9df59dfb000cddfbe9cb589e44374"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:a48f3ae2244e7d0c78f4164cdcba61f7848e9e52ed6ff14e0b972f0a51cba637"
     },
     {
-      "id": "examples/extension_smoke.tetra::Extensions::func Vec2.sum(self: Vec2) -> Int",
+      "id": "examples/extension_smoke.tetra::Extensions::func Vec2.sum(self: Vec2) -> i32",
       "module": "examples/extension_smoke.tetra",
       "section": "Extensions",
-      "entry": "func Vec2.sum(self: Vec2) -> Int",
-      "symbol_hash": "sha256:9c553e6438a8d604115f1976a331a64f3006dcb68802ab696537ae5e9f3349d8"
+      "entry": "func Vec2.sum(self: Vec2) -> i32",
+      "symbol_hash": "sha256:5c32322e739a48934171d466cc66530f723be78c12bb0910660f3e4cc351a689"
     },
     {
       "id": "examples/extension_smoke.tetra::Extensions::Vec2",
@@ -403,11 +662,11 @@
       "symbol_hash": "sha256:05144e9be0a2c0c9d612e970d9e316f46d97c312a319356b7ed9796901a38c04"
     },
     {
-      "id": "examples/extension_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/extension_smoke.tetra::Functions::func main",
       "module": "examples/extension_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:146301fec942596cd5583c82ec69a2cc6724e3950ce4cd9f158f18a6ec6d0f7e"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:f27985e4b90ea704ebf9c4011b49ba5a7a8b4f50a646ecef82721926d3a7432d"
     },
     {
       "id": "examples/extension_smoke.tetra::Structs::Vec2",
@@ -417,39 +676,39 @@
       "symbol_hash": "sha256:05e3c1468d8fac7db1efcfad99796246120d8c3385a884aae97817b94fbbc41f"
     },
     {
-      "id": "examples/extension_smoke.tetra::Structs::x: Int",
+      "id": "examples/extension_smoke.tetra::Structs::x: i32",
       "module": "examples/extension_smoke.tetra",
       "section": "Structs",
-      "entry": "x: Int",
-      "symbol_hash": "sha256:63e445ef89b9564f4d91e704f5ed29ca7148d4511fb208ebb86877e21fba5c2b"
+      "entry": "x: i32",
+      "symbol_hash": "sha256:0913e6c946e898dfcdf0739558a911d3b388e06d275a777e9ed3870e1866e3dc"
     },
     {
-      "id": "examples/extension_smoke.tetra::Structs::y: Int",
+      "id": "examples/extension_smoke.tetra::Structs::y: i32",
       "module": "examples/extension_smoke.tetra",
       "section": "Structs",
-      "entry": "y: Int",
-      "symbol_hash": "sha256:3d2475714e51fedb83363546fef0b089df962b2988b2e55df10a6ef4f956c37e"
+      "entry": "y: i32",
+      "symbol_hash": "sha256:368ee5c1cbd88c7ac64b00488600e24ca5f067b204f3dd9a2785e25c7a1e9a12"
     },
     {
-      "id": "examples/flow_hello.tetra::Functions::func main() -> Int uses io",
+      "id": "examples/flow_hello.tetra::Functions::func main",
       "module": "examples/flow_hello.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses io",
-      "symbol_hash": "sha256:6962c05fa998b0fd2d79c1cbdad4b400280aa71fddc2429e7e8952c659bb50ac"
+      "entry": "func main() -> i32 uses io",
+      "symbol_hash": "sha256:b51ac337192f8f0573179d22ee9b3259dd693cb4de223857eaa598a63b0681b8"
     },
     {
-      "id": "examples/flow_islands_smoke.tetra::Functions::func main() -> Int uses alloc, io, islands, mem",
+      "id": "examples/flow_islands_smoke.tetra::Functions::func main",
       "module": "examples/flow_islands_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, io, islands, mem",
-      "symbol_hash": "sha256:a1115079763fcf3146c7c5c5ceecdd75cfd953e1064277fe5030e0065ef95f4b"
+      "entry": "func main() -> i32 uses alloc, io, islands, mem",
+      "symbol_hash": "sha256:c6c4933e7205e375f1a3d93bbc614a7ea5afddae0ece6645aab357c775868472"
     },
     {
-      "id": "examples/flow_struct_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/flow_struct_smoke.tetra::Functions::func main",
       "module": "examples/flow_struct_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:ef43731a505ca8fa6a35e681c8f638bb21ff65c0dcb981c78abd7343ca63cab4"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:bdac004c027556ea304002f0ce57b7caef2f9a5d7f666b2315e50f81ccf99857"
     },
     {
       "id": "examples/flow_struct_smoke.tetra::Structs::Vec2",
@@ -459,46 +718,46 @@
       "symbol_hash": "sha256:dcb223c442babc7a962f55414e6198a62dbccfc2b376d005ecfc46ecaafa087a"
     },
     {
-      "id": "examples/flow_struct_smoke.tetra::Structs::x: Int",
+      "id": "examples/flow_struct_smoke.tetra::Structs::x: i32",
       "module": "examples/flow_struct_smoke.tetra",
       "section": "Structs",
-      "entry": "x: Int",
-      "symbol_hash": "sha256:c364b7e9ed103998ad8a68856b62ca16d69b648b79e5a5d248de5a5b820a534d"
+      "entry": "x: i32",
+      "symbol_hash": "sha256:d518dda84bbf87a97a68827921fb3e453eaa5ae1bb4e3790e5abdb70e72398a5"
     },
     {
-      "id": "examples/flow_struct_smoke.tetra::Structs::y: Int",
+      "id": "examples/flow_struct_smoke.tetra::Structs::y: i32",
       "module": "examples/flow_struct_smoke.tetra",
       "section": "Structs",
-      "entry": "y: Int",
-      "symbol_hash": "sha256:4dac7eb3a7634552361185b9c49b69cda2f817811b57cebd5e25ea166d3c9c77"
+      "entry": "y: i32",
+      "symbol_hash": "sha256:e32b5126e28c689ed873169118912d8429f93afb46dbaba00c7d74df3c16ba5b"
     },
     {
-      "id": "examples/flow_unsafe_cap_mem_smoke.tetra::Functions::func main() -> Int uses alloc, capability, mem",
+      "id": "examples/flow_unsafe_cap_mem_smoke.tetra::Functions::func main",
       "module": "examples/flow_unsafe_cap_mem_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, capability, mem",
-      "symbol_hash": "sha256:f7c6d46c861b28636a6ad00a270492ed1715c68210073705ddcdf0bdac25fd9a"
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:710c21d6f7111fbb8e193e5fd79835afaa49d775a07bee93cb0812fbbff8bddd"
     },
     {
-      "id": "examples/for_collection_smoke.tetra::Functions::func main() -> Int uses alloc, islands, mem",
+      "id": "examples/for_collection_smoke.tetra::Functions::func main",
       "module": "examples/for_collection_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, islands, mem",
-      "symbol_hash": "sha256:5d89116bc865c627b3d7c4568c3b107d4c56bf9edf5dfd838cb679aed1e6f89a"
+      "entry": "func main() -> i32 uses alloc, islands, mem",
+      "symbol_hash": "sha256:cf2ac0cdfa526a28e0dd227aac23ea11353860ed03c83fa4b4b846a55bc70a94"
     },
     {
-      "id": "examples/for_collection_u8_smoke.tetra::Functions::func main() -> Int uses alloc, islands, mem",
+      "id": "examples/for_collection_u8_smoke.tetra::Functions::func main",
       "module": "examples/for_collection_u8_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses alloc, islands, mem",
-      "symbol_hash": "sha256:d1e485fec56514f9cf62e5e8c58fa0db362c4f9aa25a20340b56e2096b0846ba"
+      "entry": "func main() -> i32 uses alloc, islands, mem",
+      "symbol_hash": "sha256:d366354b7445a1f2c12ae6472f276e42ba872452ddedce9ee5292fecc6fc2403"
     },
     {
-      "id": "examples/for_range_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/for_range_smoke.tetra::Functions::func main",
       "module": "examples/for_range_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:66fc9737d41e411dd19f57b65611c8f7bd73d26ef88b154744ce71676cd9a77c"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:48878a6de5448594a43da11184ce1a9c9b7f1b9e885c80ac626dd2325cac63f8"
     },
     {
       "id": "examples/generic_smoke.tetra::Functions::func id<T>(x: T) -> T",
@@ -508,193 +767,319 @@
       "symbol_hash": "sha256:5bc53205905ccefd50517691f24c9489eef75df99427ef7272cc667c8d486498"
     },
     {
-      "id": "examples/generic_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/generic_smoke.tetra::Functions::func main",
       "module": "examples/generic_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:9332544b5fd28ab56d13f413dd475c6375d80ee18264502ea536bc6c02a24373"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:36eaad03749f301cb6346e71ca220a941a7064520083fd7744bf22bbd9938414"
     },
     {
-      "id": "examples/globals_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, mem",
+      "id": "examples/globals_smoke.tetra::Functions::func main",
       "module": "examples/globals_smoke.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, mem",
       "symbol_hash": "sha256:a936e86fab185b8f620ad4ac12f188f7ed2bcc7195be714cf87da019404f6ec0"
     },
     {
-      "id": "examples/globals_smoke.tetra::Globals::val g_null: ptr",
+      "id": "examples/globals_smoke.tetra::Globals::val g_null",
       "module": "examples/globals_smoke.tetra",
       "section": "Globals",
       "entry": "val g_null: ptr",
       "symbol_hash": "sha256:2631629aa6d52fe180e4712e8e862f7406ab6ad4613a37de8a4c076d9c0d4bf1"
     },
     {
-      "id": "examples/globals_smoke.tetra::Globals::val g_y: i32",
+      "id": "examples/globals_smoke.tetra::Globals::val g_y",
       "module": "examples/globals_smoke.tetra",
       "section": "Globals",
       "entry": "val g_y: i32",
       "symbol_hash": "sha256:abc2c74248eaa966293d63f2ecd3fe8fcffc894da98386f34b2b739638330b1e"
     },
     {
-      "id": "examples/globals_smoke.tetra::Globals::var g_p: ptr",
+      "id": "examples/globals_smoke.tetra::Globals::var g_p",
       "module": "examples/globals_smoke.tetra",
       "section": "Globals",
       "entry": "var g_p: ptr",
       "symbol_hash": "sha256:08ed8040b9c404cb977cd5212780bde74a279e0454681d97c680b6ec265d0b7a"
     },
     {
-      "id": "examples/globals_smoke.tetra::Globals::var g_x: i32",
+      "id": "examples/globals_smoke.tetra::Globals::var g_x",
       "module": "examples/globals_smoke.tetra",
       "section": "Globals",
       "entry": "var g_x: i32",
       "symbol_hash": "sha256:ef97c21da8dccd01ff23ce4a3005be4cee3afc973f41039276d39d6151e33447"
     },
     {
-      "id": "examples/hello.tetra::Functions::func main() -> i32 uses io",
+      "id": "examples/hello.tetra::Functions::func main",
       "module": "examples/hello.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses io",
       "symbol_hash": "sha256:6d4ba98c54f65f80f4369c915b9e4a7de592459543ce078c5047d02ee36a13bd"
     },
     {
-      "id": "examples/islands_double_free.tetra::Functions::func main() -> i32 uses alloc, capability, islands, mem",
+      "id": "examples/islands_double_free.tetra::Functions::func main",
       "module": "examples/islands_double_free.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, islands, mem",
       "symbol_hash": "sha256:1d2a637028901a8ca0deb63d36f89a9ca1c43bc830ed9577dcc05ff64d44714b"
     },
     {
-      "id": "examples/islands_hello.tetra::Functions::func main() -> i32 uses alloc, io, islands, mem",
+      "id": "examples/islands_hello.tetra::Functions::func main",
       "module": "examples/islands_hello.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, io, islands, mem",
       "symbol_hash": "sha256:21f32b106047b2fb5c1588807385595a23aeffadff50e475fc6a2004c07eecbd"
     },
     {
-      "id": "examples/islands_i32.tetra::Functions::func main() -> i32 uses alloc, islands, mem",
+      "id": "examples/islands_i32.tetra::Functions::func main",
       "module": "examples/islands_i32.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, islands, mem",
       "symbol_hash": "sha256:23405c3163ae8068b2ca8fb60b5fbd9d77a4f2368cf6077cccc6dde2276e9e37"
     },
     {
-      "id": "examples/islands_overflow.tetra::Functions::func main() -> i32 uses alloc, islands, mem",
+      "id": "examples/islands_overflow.tetra::Functions::func main",
       "module": "examples/islands_overflow.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, islands, mem",
       "symbol_hash": "sha256:49b8682f5dca907c8f43a28c8942aefb3d624ae24fdbad3fb874e57947613d50"
     },
     {
-      "id": "examples/local_const_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/local_const_smoke.tetra::Functions::func main",
       "module": "examples/local_const_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:d920aa859d1b9a3aa989ae2fafd60d9167211986b402f2a71a01b04d74ae3fc3"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:f2c91ba0b36106d34d104430618df6a4d39ff82b80c867cd5eb76142eb65ef8c"
     },
     {
-      "id": "examples/loop_control_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/loop_control_smoke.tetra::Functions::func main",
       "module": "examples/loop_control_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:4f145edc9869ffbcd5bc7031323c81debcb1b64ed918e04b4c205647bd0d897d"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:b545cde9deecf68d7c647ffc1c42a79d360ff5e2638095890975bf9074f385cd"
     },
     {
-      "id": "examples/memset_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, mem",
+      "id": "examples/memset_smoke.tetra::Functions::func main",
       "module": "examples/memset_smoke.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, mem",
       "symbol_hash": "sha256:f34c9ab7ede2e81ee1443672843c6bbfea27483759043450a878c1f6204175b3"
     },
     {
-      "id": "examples/mmio_smoke.tetra::Functions::func main() -> i32 uses alloc, capability, io, mem, mmio",
+      "id": "examples/mmio_smoke.tetra::Functions::func main",
       "module": "examples/mmio_smoke.tetra",
       "section": "Functions",
       "entry": "func main() -> i32 uses alloc, capability, io, mem, mmio",
       "symbol_hash": "sha256:8420a479b0cb5935bf1c87f107dcd3145f0e608bb27c257b1f566868c6fc4b15"
     },
     {
-      "id": "examples/optional_match_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/optional_match_smoke.tetra::Functions::func main",
       "module": "examples/optional_match_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:2e3c0ca241a7eab7c16ca00b3c964feb24d2e1aa4f6eb460af14f9348c38c640"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:513e0a49916576517b21b2bde0dd15690e6b3c8eb90b099b00f95c803f523c68"
     },
     {
-      "id": "examples/optional_match_smoke.tetra::Functions::func maybe(flag: Bool) -> Int?",
+      "id": "examples/optional_match_smoke.tetra::Functions::func maybe",
       "module": "examples/optional_match_smoke.tetra",
       "section": "Functions",
-      "entry": "func maybe(flag: Bool) -> Int?",
-      "symbol_hash": "sha256:a6092ca121d41d45f8a369d8aad815a117001853d1f151830468958535d76703"
+      "entry": "func maybe(flag: bool) -> i32?",
+      "symbol_hash": "sha256:9c74b1bf6586b12d313fa76340364ba048ae59e9f143ec83774a57a2abcd77d2"
     },
     {
-      "id": "examples/optional_match_some_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/optional_match_some_smoke.tetra::Functions::func main",
       "module": "examples/optional_match_some_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:cdaef3c1be29fd9c6994ed7d976d3e02fb75839a87ab9c6f306a05bbb561b8f3"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:d505cfa691310157ea097c1a0e9f88f65f9210807bdd88c0cbc7ee911513a3c9"
     },
     {
-      "id": "examples/optional_match_some_smoke.tetra::Functions::func maybe(flag: Bool) -> Int?",
+      "id": "examples/optional_match_some_smoke.tetra::Functions::func maybe",
       "module": "examples/optional_match_some_smoke.tetra",
       "section": "Functions",
-      "entry": "func maybe(flag: Bool) -> Int?",
-      "symbol_hash": "sha256:165fbd9452d8aeac78a77dfe0bd04efdb718edd9e7f58291cc34f77f12a99896"
+      "entry": "func maybe(flag: bool) -> i32?",
+      "symbol_hash": "sha256:0c6111664bc536c414879c01c401fa29a728f71c4be04a99749cc4884c9934a2"
     },
     {
-      "id": "examples/optional_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/optional_smoke.tetra::Functions::func main",
       "module": "examples/optional_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:6df9dc4a67702838e6a3cb828aefd729931f46ad56757d8b27fffb4e205cd240"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:468601d635bba34831993babd3340d6d11158e95bb349f6e8bb231d2ce1b0c89"
     },
     {
-      "id": "examples/optional_smoke.tetra::Functions::func maybe(flag: Bool) -> Int?",
+      "id": "examples/optional_smoke.tetra::Functions::func maybe",
       "module": "examples/optional_smoke.tetra",
       "section": "Functions",
-      "entry": "func maybe(flag: Bool) -> Int?",
-      "symbol_hash": "sha256:ce28cafe4e693aa480989c98cbccacec7463a96ba129c767ac8ea11e462395cb"
+      "entry": "func maybe(flag: bool) -> i32?",
+      "symbol_hash": "sha256:081cec21f87bed63aca4064923e3ce325ebd51cbc78b3e5965896d32f358a147"
     },
     {
-      "id": "examples/optional_smoke.tetra::Functions::func unwrap(value: Int?) -> Int",
+      "id": "examples/optional_smoke.tetra::Functions::func unwrap",
       "module": "examples/optional_smoke.tetra",
       "section": "Functions",
-      "entry": "func unwrap(value: Int?) -> Int",
-      "symbol_hash": "sha256:02d8b7805db55f32678d2c3073c6a4eb0fadfb786b3092c892292f7bf3c45db8"
+      "entry": "func unwrap(value: i32?) -> i32",
+      "symbol_hash": "sha256:945b42954ba7d83ba358df94307449149e2e8c1dfadc781fe985519e78fc295d"
     },
     {
-      "id": "examples/ownership_smoke.tetra::Functions::func add_one(x: borrow Int) -> Int",
+      "id": "examples/ownership_smoke.tetra::Functions::func add_one",
       "module": "examples/ownership_smoke.tetra",
       "section": "Functions",
-      "entry": "func add_one(x: borrow Int) -> Int",
-      "symbol_hash": "sha256:608ab8c51b726bfe0f3b2a20892474405571f79782bede1d0afd3df1d8badcf0"
+      "entry": "func add_one(x: borrow i32) -> i32",
+      "symbol_hash": "sha256:bd9b9dd1e6b7dca7221d1316249fef4230205df8f0b2ce2de5b49762547af3f1"
     },
     {
-      "id": "examples/ownership_smoke.tetra::Functions::func bump(x: inout Int) -> Int",
+      "id": "examples/ownership_smoke.tetra::Functions::func bump",
       "module": "examples/ownership_smoke.tetra",
       "section": "Functions",
-      "entry": "func bump(x: inout Int) -> Int",
-      "symbol_hash": "sha256:119f59fbb0bad86938f46501c2c3aa0ef8be85e16b6de171b5949e4c51dc6161"
+      "entry": "func bump(x: inout i32) -> i32",
+      "symbol_hash": "sha256:45740ae24b8749f99f9c3b36b379aaf975db7c4525092ebd6d7b5e5fde31a25b"
     },
     {
-      "id": "examples/ownership_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/ownership_smoke.tetra::Functions::func main",
       "module": "examples/ownership_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:225bfc8bba1abfa878629da8639d6ff3558691f85544bed8f7d7eb7e7adeb7cc"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:47d568d8b29e3cfee9c3526ad86406af4db8b61bdd6f877af1c49c1c8d91fde0"
     },
     {
-      "id": "examples/ownership_smoke.tetra::Functions::func take(x: consume Int) -> Int",
+      "id": "examples/ownership_smoke.tetra::Functions::func take",
       "module": "examples/ownership_smoke.tetra",
       "section": "Functions",
-      "entry": "func take(x: consume Int) -> Int",
-      "symbol_hash": "sha256:1e5bf2614fa7abddf3ec17b27676e15d6f9cb30362bf925f7a9c690f9fbaa07f"
+      "entry": "func take(x: consume i32) -> i32",
+      "symbol_hash": "sha256:33e7d581459a0c3f2b746b5438685bf2f9ebbe281f79132cd965c6656f53e31f"
     },
     {
-      "id": "examples/protocol_impl_smoke.tetra::Extensions::func Vec2.draw(self: Vec2) -> Int",
+      "id": "examples/projects/dogfood_actor_task/src/main.tetra::Functions::func echo",
+      "module": "examples/projects/dogfood_actor_task/src/main.tetra",
+      "section": "Functions",
+      "entry": "func echo() -> i32 uses actors",
+      "symbol_hash": "sha256:8cef0c7a82b10ba173a9195d09e2a2cb85f8d02d8e1f41847b797e18c41cce47"
+    },
+    {
+      "id": "examples/projects/dogfood_actor_task/src/main.tetra::Functions::func main",
+      "module": "examples/projects/dogfood_actor_task/src/main.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses actors, runtime",
+      "symbol_hash": "sha256:617285d4fd828e1f5cf3bc1fd78b4378bde84e838e6be9c93af3180cfb68dc49"
+    },
+    {
+      "id": "examples/projects/dogfood_actor_task/src/main.tetra::Functions::func worker",
+      "module": "examples/projects/dogfood_actor_task/src/main.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> i32",
+      "symbol_hash": "sha256:0977652c9fb43c8228da585264c62f07900f1786dd4fba97c9dbbe13809f4bdd"
+    },
+    {
+      "id": "examples/projects/dogfood_wasi/src/main.tetra::Functions::func main",
+      "module": "examples/projects/dogfood_wasi/src/main.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses io",
+      "symbol_hash": "sha256:453fe72e1d04e226e2ddfab6e075f010a87ed8a2ca2a57f3e767cd6902597bc3"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Functions::func main",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:bb8023ce4202ed31b350e96e1cea52c353ff8d54a1b82a7ddf2571ba426fdcb1"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::States::state TodoState",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "States",
+      "entry": "state TodoState",
+      "symbol_hash": "sha256:3342bdead0fe168943185a70b3e65d7f0f1e88c8c46424a81842ebdd76878108"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::States::val title",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "States",
+      "entry": "val title: str",
+      "symbol_hash": "sha256:177b24169ebd4fc536f7ab98a64cc26441eeea4fd03d2eab9e931136407db352"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::States::var count",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "States",
+      "entry": "var count: i32",
+      "symbol_hash": "sha256:771d3aa2f76d3dfe53782c37983c5180b51a952a9cf7bfcf13987114c9821496"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::accessibility label: str",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "accessibility label: str",
+      "symbol_hash": "sha256:66832d817ba31d8da160d4b20bf3781cb928c8739bfc52b3ef5e67a6065e4721"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::accessibility role: str",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "accessibility role: str",
+      "symbol_hash": "sha256:fdc6e397c3d28b4e685f0df394813ff25745e2ae454a32b78caec90698dfb30d"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::bind countValue: i32",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "bind countValue: i32",
+      "symbol_hash": "sha256:40f16433b8f87515f6d06d24fccc14629ff3b33ee8080eb703194596268b13a5"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::bind titleText: str",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "bind titleText: str",
+      "symbol_hash": "sha256:4c650508b09d763ade0e76ecbe03cb1adacbcf7605e3efd49017ab13ad1ad605"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::command increment",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "command increment",
+      "symbol_hash": "sha256:24e2495509b418f86fa8694cf74e0735ced694ba9d8b243f9fefd3a2767b6d13"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::event click -> increment",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "event click -> increment",
+      "symbol_hash": "sha256:7627bf685ae7daab6ed6e624eaea661ba02720deffc5af014833f14b95586eb6"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::style theme: str",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "style theme: str",
+      "symbol_hash": "sha256:83e97d98aab081b2476b40670195edcb8e95676e2ef40f3b6aadbf6ba3529e9d"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::style width: i32",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "style width: i32",
+      "symbol_hash": "sha256:2cb7ea653ab625611e8a5b58e6e0d60f86b637107dc94cea2f53cf33e1c30175"
+    },
+    {
+      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::view TodoView",
+      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "section": "Views",
+      "entry": "view TodoView(state: TodoState)",
+      "symbol_hash": "sha256:009ffe3630c53c2c14e53b240ca1764eb435348d1b3b7a699b81981da5defbf3"
+    },
+    {
+      "id": "examples/projects/eco_dogfood/src/main.tetra::Functions::func main",
+      "module": "examples/projects/eco_dogfood/src/main.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses io",
+      "symbol_hash": "sha256:1d683ef0dd53bca858229b9f181bc9a1b3c106ef402dae3e62bb0a84768a3296"
+    },
+    {
+      "id": "examples/protocol_impl_smoke.tetra::Extensions::func Vec2.draw(self: Vec2) -> i32",
       "module": "examples/protocol_impl_smoke.tetra",
       "section": "Extensions",
-      "entry": "func Vec2.draw(self: Vec2) -> Int",
-      "symbol_hash": "sha256:7553826f3165e75eb00d8548b0140748e0434e6f90d7c9e2147b8804b4182f3f"
+      "entry": "func Vec2.draw(self: Vec2) -> i32",
+      "symbol_hash": "sha256:480dd966e37f369ed68c3d1ed0a6ef14202f000df797a4c79decb0681757f500"
     },
     {
       "id": "examples/protocol_impl_smoke.tetra::Extensions::Vec2",
@@ -704,25 +1089,25 @@
       "symbol_hash": "sha256:bb60d48b502fb5a9807c99ca1fc175d19ffb3986cdc047ae7c3ebe95606946cb"
     },
     {
-      "id": "examples/protocol_impl_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/protocol_impl_smoke.tetra::Functions::func main",
       "module": "examples/protocol_impl_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:c8e64f744cbbdb18f5588d0e56f8fa5883ed0e573261a8501f9482f249f629a6"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:8491b3e74412bab84268170de0914a266ea835cf6001a478cc244d69961008ce"
     },
     {
-      "id": "examples/protocol_impl_smoke.tetra::Implementations::impl Vec2: Renderable",
+      "id": "examples/protocol_impl_smoke.tetra::Implementations::impl Vec2",
       "module": "examples/protocol_impl_smoke.tetra",
       "section": "Implementations",
       "entry": "impl Vec2: Renderable",
       "symbol_hash": "sha256:d0aa6a5b26af1e914b8d1eca256e925f844dc340c5f69cd50648867591bfe190"
     },
     {
-      "id": "examples/protocol_impl_smoke.tetra::Protocols::func draw(self: Vec2) -> Int",
+      "id": "examples/protocol_impl_smoke.tetra::Protocols::func draw(self: Vec2) -> i32",
       "module": "examples/protocol_impl_smoke.tetra",
       "section": "Protocols",
-      "entry": "func draw(self: Vec2) -> Int",
-      "symbol_hash": "sha256:977b77f31fdf2ad4a5e9617913e9bf5b9ef1290fec034fa2c8f4eeecf6b25743"
+      "entry": "func draw(self: Vec2) -> i32",
+      "symbol_hash": "sha256:3e95fba87886d44dac955a8f2cbab4659aa2d2ea68ad03c6a197e480fbc82d38"
     },
     {
       "id": "examples/protocol_impl_smoke.tetra::Protocols::protocol Renderable",
@@ -739,25 +1124,60 @@
       "symbol_hash": "sha256:cb0fd54de04adf73e24a6707b5c8168f78e12011a5c91f372be75393692c0405"
     },
     {
-      "id": "examples/protocol_impl_smoke.tetra::Structs::x: Int",
+      "id": "examples/protocol_impl_smoke.tetra::Structs::x: i32",
       "module": "examples/protocol_impl_smoke.tetra",
       "section": "Structs",
-      "entry": "x: Int",
-      "symbol_hash": "sha256:125224d55fcef2e284d8659b1ab287c6ecf79a733a85e462fa401a94aaeb56e5"
+      "entry": "x: i32",
+      "symbol_hash": "sha256:f71cc318dcf9ee80642f1807886f1824c01cd6d5016decd0b9347691c3f2cb2b"
     },
     {
-      "id": "examples/task_smoke.tetra::Functions::func main() -> Int uses runtime",
-      "module": "examples/task_smoke.tetra",
+      "id": "examples/task_bounded_stress.tetra::Functions::func main",
+      "module": "examples/task_bounded_stress.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int uses runtime",
-      "symbol_hash": "sha256:ad8817fb9d73270b1b3a6ff2d719259156b0d3696cc9836edd93c696f959c099"
+      "entry": "func main() -> i32 uses runtime",
+      "symbol_hash": "sha256:47fa43c436078469adad2e925ef7b7a6392dfc7463657d42c51b1e0af226666e"
     },
     {
-      "id": "examples/task_smoke.tetra::Functions::func worker() -> Int",
+      "id": "examples/task_bounded_stress.tetra::Functions::func worker",
+      "module": "examples/task_bounded_stress.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> i32",
+      "symbol_hash": "sha256:119949a10e2a74c4b5dc84faa8b1ff4d9aee297301cddaa76613a6e4dc199d16"
+    },
+    {
+      "id": "examples/task_bounded_stress.tetra::Globals::val EXPECTED",
+      "module": "examples/task_bounded_stress.tetra",
+      "section": "Globals",
+      "entry": "val EXPECTED: i32",
+      "symbol_hash": "sha256:218f64de09c4c528b2d64f334a7a574ccc9e703f4365c201c6346a24482f14a7"
+    },
+    {
+      "id": "examples/task_bounded_stress.tetra::Globals::val ITERATIONS",
+      "module": "examples/task_bounded_stress.tetra",
+      "section": "Globals",
+      "entry": "val ITERATIONS: i32",
+      "symbol_hash": "sha256:1b564d0c7490f28e5022a909cb99681be3676fdd15f7c2245f13ce7d47bd1f24"
+    },
+    {
+      "id": "examples/task_bounded_stress.tetra::Globals::val SEED",
+      "module": "examples/task_bounded_stress.tetra",
+      "section": "Globals",
+      "entry": "val SEED: i32",
+      "symbol_hash": "sha256:ba824d41329672555d11ed8009c8edf79f295c6442c4fe2a2d884eb15c23c3d1"
+    },
+    {
+      "id": "examples/task_smoke.tetra::Functions::func main",
       "module": "examples/task_smoke.tetra",
       "section": "Functions",
-      "entry": "func worker() -> Int",
-      "symbol_hash": "sha256:c9edd96fbee20d3ff18efac30d1595a03dc5e64c39be68ffab39c06ed79e5c27"
+      "entry": "func main() -> i32 uses runtime",
+      "symbol_hash": "sha256:7c75da01b4012397b8a0b6fb48f385e4ca9a6f5252a05290b7f3dfd53ca6e04e"
+    },
+    {
+      "id": "examples/task_smoke.tetra::Functions::func worker",
+      "module": "examples/task_smoke.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> i32",
+      "symbol_hash": "sha256:050c58e25941c64ebfbed4786369df481f4cfdfbf7d5604caeac94f7a3757645"
     },
     {
       "id": "examples/tooling_tests.tetra::Tests::math",
@@ -774,32 +1194,214 @@
       "symbol_hash": "sha256:8d65a84544cba01ceb8847690fd973d87e33d4a43cc25e891f606a2f7a268543"
     },
     {
-      "id": "examples/typed_errors_smoke.tetra::Functions::func caller() -> Int throws ReadError",
+      "id": "examples/typed_errors_smoke.tetra::Functions::func caller",
       "module": "examples/typed_errors_smoke.tetra",
       "section": "Functions",
-      "entry": "func caller() -> Int throws ReadError",
-      "symbol_hash": "sha256:30ef9d8746bf4553f90a5fb9c88d6bea33c5aa3c2f4dd5285f243cbe4f559749"
+      "entry": "func caller() -> i32 throws ReadError",
+      "symbol_hash": "sha256:2e0faceeb7796e729a0e26231e8ab550d8166f9d8437b5f6cdf8ba3c6a2fecb3"
     },
     {
-      "id": "examples/typed_errors_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/typed_errors_smoke.tetra::Functions::func main",
       "module": "examples/typed_errors_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:9e64ac3a3a62bf8bef380ba43dbc72501fb2f4eace9e5e999054b72c3d4e810f"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:84ff969c32a3eb4fcc6bcce7021981bfd88a802967df469aabf4ef9e70a19078"
     },
     {
-      "id": "examples/typed_errors_smoke.tetra::Functions::func read(flag: Bool) -> Int throws ReadError",
+      "id": "examples/typed_errors_smoke.tetra::Functions::func read",
       "module": "examples/typed_errors_smoke.tetra",
       "section": "Functions",
-      "entry": "func read(flag: Bool) -> Int throws ReadError",
-      "symbol_hash": "sha256:9b96fd5211b71f0ee68bf8b41e4e1eecda4bf7c4df3453f613d988f758e82d10"
+      "entry": "func read(flag: bool) -> i32 throws ReadError",
+      "symbol_hash": "sha256:3f237b2ef2c172889a052304a44345075aad9b29ce95eb5a8f481c976c141bc0"
     },
     {
-      "id": "examples/unary_not_smoke.tetra::Functions::func main() -> Int",
+      "id": "examples/ui_native_shell_smoke.tetra::Functions::func main",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:24dff87140eed3543b59a35dbfa373140673074811a058abca77c460831760bd"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::States::state ShellState",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "States",
+      "entry": "state ShellState",
+      "symbol_hash": "sha256:5085973d64a0e3c6538f16cf49f7e064fc595ef006d57dd2e7da32f0db64f4c6"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::States::val label",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "States",
+      "entry": "val label: str",
+      "symbol_hash": "sha256:58f400437257b8663aef659e026dd7386bb68014aeaaee1e1cbc6c1b344bbc06"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::States::var toggles",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "States",
+      "entry": "var toggles: i32",
+      "symbol_hash": "sha256:b5863246a067aa632ed2f631692cef336192c724f4a6ffcc3f80f1e63eb67170"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::accessibility description: str",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "accessibility description: str",
+      "symbol_hash": "sha256:ddf7387b687032c664148339aee45cf207bb4b5d63c7c9cd33b64996469163c8"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::accessibility role: str",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "accessibility role: str",
+      "symbol_hash": "sha256:bb309ac946631857151b65eba22935af3c4f42ae659e19715652f67e010361d0"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::bind labelText: str",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "bind labelText: str",
+      "symbol_hash": "sha256:f8d8a1ed7690b92b2b5558adf655f8f31300df433e676c32dd813d3d1d192e0f"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::bind toggles: i32",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "bind toggles: i32",
+      "symbol_hash": "sha256:2181e95f24f89d799dcead308533f5a2a7183144f3e3089168baf673c3574fa6"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::command toggle",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "command toggle",
+      "symbol_hash": "sha256:3be04916c9af0978edef12ebfaa40a7cc558b41365532444777eaf02282c7377"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::event submit -> toggle",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "event submit -> toggle",
+      "symbol_hash": "sha256:5baeb83ffc33e187dbb42225b2ea38d24e5e4caaefebce2c8ad70ed6d80d607f"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::style accent: str",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "style accent: str",
+      "symbol_hash": "sha256:74bd646c8a019c13c3e70a06761843fbfc2effec3857f145a5a9d75a8112adae"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::style width: i32",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "style width: i32",
+      "symbol_hash": "sha256:4fa50d88da9fb366a76bea9ae85f6dca69b9e86bcb457bf9e5317a076eefd3f0"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::view ShellView",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "view ShellView(state: ShellState)",
+      "symbol_hash": "sha256:a40e8abe0b2ee1ae2d442dd57313b3c1c1159abbef9fec8cf2d3309011147516"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Functions::func main",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:c2dd1eaed648a942fd655cb5d893018f5e5c6ebeeb28d9375a939863e4aabcce"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::States::state CounterState",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "States",
+      "entry": "state CounterState",
+      "symbol_hash": "sha256:b65394bb7191c098ef384c516a0458390294bb81668158c2349eb7b6d60ded81"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::States::val title",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "States",
+      "entry": "val title: str",
+      "symbol_hash": "sha256:7b7cfa8820c3bf265aa7046ba6ad19236f66d8b5803413c0aaf18431aecbc2f5"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::States::var count",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "States",
+      "entry": "var count: i32",
+      "symbol_hash": "sha256:85bb5a161d5ebbd3a374cba03fab95ffcbf12e77cffeffd609ec0050beb77266"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::accessibility label: str",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "accessibility label: str",
+      "symbol_hash": "sha256:8fbe7900fc72e7780693d11f52091199e5caa65927d5df7c63fad3439ca0c4c3"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::accessibility role: str",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "accessibility role: str",
+      "symbol_hash": "sha256:4929926ca3036d5ced3607e501e56c4febe6b3f5b0bcf0d7f4614b8fa9efca11"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::bind countValue: i32",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "bind countValue: i32",
+      "symbol_hash": "sha256:cc526e7a6f6f248665a6c9ea4f1770725b7fc26dda65ac41c51b32bfe0497bb6"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::bind titleText: str",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "bind titleText: str",
+      "symbol_hash": "sha256:a980fa5955531f19226d0d7bf38e6dd88c57d1d33c11738d2f8f9fa47f090bb5"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::command increment",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "command increment",
+      "symbol_hash": "sha256:c1aa0cefff7ffad0d6e42e76aa2f229fc7ca208a6662fa43a9a65ad49173d7aa"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::event click -> increment",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "event click -> increment",
+      "symbol_hash": "sha256:8d059ddda262c53b7626a8c906dcfe928bd547fdda100b380e7296a1a94609a1"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::style theme: str",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "style theme: str",
+      "symbol_hash": "sha256:b38023aad84062d5873af5321b0e893e8ca21e1c1d7d0e1f0a035c3307d39a96"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::style width: i32",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "style width: i32",
+      "symbol_hash": "sha256:6efd5e3867f0481bef2c672dc22196969c76ca7e3cc47ad9c98d185a663fc897"
+    },
+    {
+      "id": "examples/ui_web_smoke.tetra::Views::view CounterView",
+      "module": "examples/ui_web_smoke.tetra",
+      "section": "Views",
+      "entry": "view CounterView(state: CounterState)",
+      "symbol_hash": "sha256:29e79d2efc32bea54e45c342c1b8aa6c3b54448e2a53114fa6e06e9e7b73f5a5"
+    },
+    {
+      "id": "examples/unary_not_smoke.tetra::Functions::func main",
       "module": "examples/unary_not_smoke.tetra",
       "section": "Functions",
-      "entry": "func main() -> Int",
-      "symbol_hash": "sha256:94cd6d62c4f36cbdd45a9853bd9f0b5fed2c9fa8f988dd0a10747e60130d5415"
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:5434c90d175c401217cae2bc881516a77b78403009cebd659fb41e3f6530a329"
     }
   ]
 }

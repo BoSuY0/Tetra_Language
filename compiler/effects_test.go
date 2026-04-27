@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -91,12 +92,73 @@ uses io:
 `)
 }
 
+func TestEffectsPropagateAcrossImportedWrapper(t *testing.T) {
+	files := map[string]string{
+		"lib/logger.tetra": `module lib.logger
+
+func write() -> Int
+uses io:
+  print("wrapped\n")
+  return 1
+`,
+		"app/main.tetra": `module app.main
+import lib.logger as logger
+
+func call_logger() -> Int:
+  return logger.write()
+
+func main() -> Int:
+  return call_logger()
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	world, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/main.tetra")))
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	_, err = CheckWorld(world)
+	if err == nil {
+		t.Fatalf("expected imported effect propagation error")
+	}
+	for _, want := range []string{"function 'app.main.call_logger'", "uses effect 'io'"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+}
+
 func TestEffectsRequireActorsUse(t *testing.T) {
 	requireCheckErrorContains(t, `
 func main() -> Int:
   let a: actor = core.spawn("main")
   return 0
 `, "uses effect 'actors'")
+}
+
+func TestEffectsRejectUICommandMissingUses(t *testing.T) {
+	requireCheckErrorContains(t, `
+state ConsoleState:
+  var count: Int = 0
+
+view ConsoleView(state: ConsoleState):
+  command log:
+    print("event\n")
+
+func main() -> Int:
+  return 0
+`, "command 'log'")
+	requireCheckErrorContains(t, `
+state ConsoleState:
+  var count: Int = 0
+
+view ConsoleView(state: ConsoleState):
+  command log:
+    print("event\n")
+
+func main() -> Int:
+  return 0
+`, "uses effect 'io'")
 }
 
 func TestEffectGroupsExpandUsesForMemory(t *testing.T) {

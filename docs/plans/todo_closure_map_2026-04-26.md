@@ -636,7 +636,7 @@
     },
     {
       "line": 632,
-      "text": "1. Freeze current green v0.6.0 baseline.",
+      "text": "1. Freeze historical green v0.6.0 baseline.",
       "closure_mode": "implemented-now",
       "rationale": "This sequencing checklist is superseded by the current wave status and can be closed now as planning bookkeeping.",
       "target_ref": "docs/plans/v1_scope_freeze_frontend_runtime.md",

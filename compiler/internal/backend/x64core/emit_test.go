@@ -3,6 +3,7 @@ package x64core
 import (
 	"bytes"
 	"encoding/binary"
+	"strings"
 	"testing"
 
 	"tetra_language/compiler/internal/backend/x64"
@@ -10,6 +11,10 @@ import (
 	"tetra_language/compiler/internal/backend/x64obj"
 	"tetra_language/compiler/internal/ir"
 )
+
+type unsupportedCtxSwitchABI struct {
+	*x64abi.SysVUnix
+}
 
 func emitOneFunc(t *testing.T, abi x64abi.ABI, fn ir.IRFunc) []byte {
 	t.Helper()
@@ -24,6 +29,34 @@ func emitOneFunc(t *testing.T, abi x64abi.ABI, fn ir.IRFunc) []byte {
 		t.Fatalf("emit: %v", err)
 	}
 	return e.Buf
+}
+
+func TestCtxSwitchUnsupportedABIDiagnostic(t *testing.T) {
+	emitFn := NewEmitFunc(&unsupportedCtxSwitchABI{SysVUnix: x64abi.LinuxSysV()})
+	e := &x64.Emitter{}
+	var dataBlobs [][]byte
+	var leaPatches []x64obj.LeaPatch
+	var callPatches []x64obj.CallPatch
+	var importPatches []x64obj.ImportPatch
+	err := emitFn(e, ir.IRFunc{
+		Name:        "__test_ctx_switch_unknown",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRConstI32, Imm: 3},
+			{Kind: ir.IRCtxSwitch},
+			{Kind: ir.IRReturn},
+		},
+	}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+	if err == nil {
+		t.Fatalf("expected unsupported ABI error")
+	}
+	if !strings.Contains(err.Error(), "ctx_switch: unsupported ABI") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func findCtxSwitchInternalTarget(t *testing.T, buf []byte) (callOp int, target int) {

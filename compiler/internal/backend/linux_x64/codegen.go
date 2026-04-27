@@ -18,7 +18,12 @@ func CodegenObjectLinuxX64WithOptions(funcs []ir.IRFunc, opt x64.CodegenOptions)
 }
 
 func CodegenObjectLinuxX64WithOptionsAndDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, opt x64.CodegenOptions) (*tobj.Object, error) {
-	return x64obj.BuildObjectWithDataPrefix(funcs, dataPrefix, x64core.NewEmitFunc(x64abi.LinuxSysV()), opt, x64obj.Options{
+	obj, err := x64obj.BuildObjectWithDataPrefix(funcs, dataPrefix, x64core.NewEmitFunc(x64abi.LinuxSysV()), opt, x64obj.Options{
 		CollectImports: false,
 	})
+	if err != nil {
+		return nil, err
+	}
+	obj.Target = "linux-x64"
+	return obj, nil
 }

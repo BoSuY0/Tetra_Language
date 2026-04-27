@@ -1,0 +1,4 @@
+struct Vec2:
+    x: Int
+
+extension Vec2:

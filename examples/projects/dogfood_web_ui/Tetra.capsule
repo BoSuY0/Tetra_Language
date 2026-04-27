@@ -1,0 +1,6 @@
+manifest "tetra.capsule.v1"
+capsule DogfoodWebUI:
+    id "tetra://examples/dogfood-web-ui"
+    version "0.1.0"
+    target "wasm32-web"
+

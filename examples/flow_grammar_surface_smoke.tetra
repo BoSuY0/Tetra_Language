@@ -1,0 +1,116 @@
+module examples.flow_grammar_surface_smoke
+
+enum Mode:
+    case fast
+    case slow
+
+enum ReadError:
+    case eof
+
+struct Box:
+    value: Int
+
+protocol Runner:
+    func run(self: Box) -> Int
+
+extension Box:
+    func run(self: Box) -> Int:
+        return self.value
+
+impl Box: Runner
+
+state CounterState:
+    var count: Int = 0
+    val title: String = "Grammar"
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+    bind titleText: String = state.title
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 320
+    accessibility label: String = "Increment"
+
+const answer: Int = 42
+
+func id<T>(x: T) -> T:
+    return x
+
+func borrow_one(x: borrow Int) -> Int:
+    return x + 1
+
+func bump(x: inout Int) -> Int:
+    x = x + 1
+    return x
+
+func take(x: consume Int) -> Int:
+    return x
+
+func maybe(flag: Bool) -> Int?:
+    if flag:
+        return answer
+    else:
+        return none
+
+func read(flag: Bool) -> Int throws ReadError:
+    if flag:
+        return answer
+    throw ReadError.eof
+
+async func async_answer() -> Int:
+    return answer
+
+func read_caller(flag: Bool) -> Int throws ReadError:
+    let value: Int = try read(flag)
+    return value
+
+async func async_caller() -> Int:
+    let value: Int = await async_answer()
+    return value
+
+func main() -> Int
+uses alloc, budget, capability, io, islands, mem, runtime
+budget(128):
+    let mode: Mode = Mode.fast
+    var total: Int = id(0)
+    const step: Int = 1
+    let f: ptr = fn(x: Int) -> Int:
+        return x + step
+    let maybe_value: Int? = maybe(true)
+    if let value = maybe_value:
+        total += value
+    else:
+        total += step
+    for i in 0..<3:
+        total += i
+    let text: String = "*"
+    for ch in text:
+        total += ch
+    while total < 90:
+        if total == 84:
+            break
+        else if total == 80:
+            total = total + 2
+            continue
+        else:
+            total += step
+    match mode:
+    case Mode.fast:
+        total += 1
+    case Mode.slow:
+        total += 2
+    case _:
+        total += 3
+    unsafe:
+        let mem_cap: cap.mem = core.cap_mem()
+        let raw: ptr = core.alloc_bytes(4)
+        core.store_i32(raw, total, mem_cap)
+        total += core.load_i32(raw, mem_cap)
+    island(64) as isl:
+        var buf: []UInt8 = core.island_make_u8(isl, 1)
+        buf[0] = 1
+    return total
+
+test "grammar surface":
+    expect 40 + 2 == 42

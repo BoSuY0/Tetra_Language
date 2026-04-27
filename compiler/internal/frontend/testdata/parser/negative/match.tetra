@@ -1,0 +1,4 @@
+func main() -> Int:
+    match value:
+    case Option.some(x):
+        return x

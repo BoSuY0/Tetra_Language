@@ -109,3 +109,50 @@ func main() -> Int:
 		t.Fatalf("exit code mismatch: got %d, want 42", code)
 	}
 }
+
+func TestBuildNestedControlFlowSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `enum Mode:
+    case fast
+    case slow
+
+func classify(x: Int) -> Int:
+    if x > 10:
+        return 10
+    return x
+
+func main() -> Int:
+    var total: Int = 0
+    for i in 0..<6:
+        var j: Int = 0
+        while j < 4:
+            j += 1
+            if i == 1:
+                continue
+            else if i == 4 && j == 2:
+                break
+            else:
+                total += classify(i + j)
+        if total > 35:
+            break
+
+    match Mode.fast:
+    case Mode.fast:
+        total += 1
+    case Mode.slow:
+        total += 2
+    case _:
+        total += 3
+
+    if total == 51:
+        return 42
+    return total
+`
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}

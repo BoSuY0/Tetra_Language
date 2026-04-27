@@ -14,6 +14,19 @@ func Render(bundle *lower.UILoweredBundle) []byte {
 		"Tetra Native UI Shell",
 		"schema: " + bundle.Schema,
 	}
+	for _, state := range bundle.States {
+		lines = append(lines, "")
+		lines = append(lines, "state "+state.Name)
+		for _, field := range state.Fields {
+			kind := "val"
+			if field.Mutable {
+				kind = "var"
+			} else if field.Const {
+				kind = "const"
+			}
+			lines = append(lines, "  "+kind+" "+field.Name+": "+field.Type+" = "+field.Init)
+		}
+	}
 	for _, view := range bundle.Views {
 		lines = append(lines, "")
 		lines = append(lines, "view "+view.Name+" (state: "+view.StateType+")")

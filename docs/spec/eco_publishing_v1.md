@@ -20,6 +20,18 @@ Supported fields:
 
 Backward compatibility rule: manifests without explicit `manifest` are interpreted as `tetra.capsule.v1`.
 
+Example:
+
+```tetra
+manifest "tetra.capsule.v1"
+capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    target "linux-x64"
+    permission "io"
+    dependency "tetra://core" "0.1.0"
+```
+
 ## 2) Permission Model v1
 
 Canonical permission model identifier: `tetra.eco.permissions.v1`.
@@ -84,6 +96,33 @@ Materializer unpacks and writes deterministic `tetra.materialization.json` metad
 
 Package metadata remains `tetra.eco.package.v1`.
 
+Minimal unpacked project bundle metadata example:
+
+```json
+{
+  "schema": "tetra.eco.package.v1",
+  "compression": "gzip",
+  "mtime_unix": 0,
+  "reproducible": true,
+  "build_inputs_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "manifest_schema": "tetra.capsule.v1",
+  "permissions_model": "tetra.eco.permissions.v1",
+  "file_count": 2,
+  "files": [
+    {
+      "path": "Tetra.capsule",
+      "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size": 128
+    },
+    {
+      "path": "src/main.tetra",
+      "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "size": 32
+    }
+  ]
+}
+```
+
 ## 8) Beta Package Publishing
 
 Publishing metadata schema: `tetra.eco.publish.v1beta`.
@@ -94,6 +133,43 @@ Command:
 Contract:
 - channel is beta-only in v1 (`channel = "beta"`)
 - published metadata records package hash/size and optional trust snapshot linkage
+- metadata is target-specific and must point at the package file for that target
+- validators reject unknown metadata fields, unsafe paths, size/hash mismatches, and mismatched download entries
+
+Stable local metadata fields:
+
+```json
+{
+  "schema": "tetra.eco.publish.v1beta",
+  "channel": "beta",
+  "hub": "local-beta",
+  "published_at_unix": 0,
+  "capsule": {
+    "id": "tetra://demo",
+    "name": "Demo",
+    "version": "0.1.0",
+    "target": "linux-x64",
+    "targets": ["linux-x64"],
+    "permissions": ["io"]
+  },
+  "package": {
+    "file": "package.todex",
+    "size": 4096,
+    "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "trust": {
+    "snapshot_file": "trust.snapshot.json",
+    "snapshot_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "trust_tier": "high"
+  },
+  "downloads": [
+    {
+      "target": "linux-x64",
+      "path": "packages/tetra_demo/0.1.0/linux-x64/package.todex"
+    }
+  ]
+}
+```
 
 ## 9) TetraHub Beta Path
 
@@ -119,6 +195,28 @@ Trust metadata is published and consumed via:
 - capsule trust tier and score from TrustSnapshot
 
 This is intentionally local/beta metadata and not a global trust network claim.
+
+Trust snapshot example:
+
+```json
+{
+  "schema": "tetra.eco.trust-snapshot.v1",
+  "generated_at_unix": 0,
+  "lock_sha256": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "vault_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "record_count": 1,
+  "capsules": [
+    {
+      "id": "tetra://demo",
+      "version": "0.1.0",
+      "permissions": ["io"],
+      "trust_tier": "high",
+      "trust_score": 95,
+      "trust_reasons": ["permissions=io"]
+    }
+  ]
+}
+```
 
 ## 12) v1 vs post-v1 boundaries
 

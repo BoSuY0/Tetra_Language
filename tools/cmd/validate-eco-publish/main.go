@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -13,19 +14,23 @@ import (
 )
 
 type publishMetadata struct {
-	Schema  string         `json:"schema"`
-	Channel string         `json:"channel"`
-	Hub     string         `json:"hub"`
-	Capsule publishCapsule `json:"capsule"`
-	Package publishPackage `json:"package"`
-	Trust   *publishTrust  `json:"trust,omitempty"`
+	Schema        string            `json:"schema"`
+	Channel       string            `json:"channel"`
+	Hub           string            `json:"hub"`
+	PublishedUnix int64             `json:"published_at_unix"`
+	Capsule       publishCapsule    `json:"capsule"`
+	Package       publishPackage    `json:"package"`
+	Trust         *publishTrust     `json:"trust,omitempty"`
+	Downloads     []publishDownload `json:"downloads,omitempty"`
 }
 
 type publishCapsule struct {
-	ID      string   `json:"id"`
-	Version string   `json:"version"`
-	Target  string   `json:"target"`
-	Targets []string `json:"targets,omitempty"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Version     string   `json:"version"`
+	Target      string   `json:"target"`
+	Targets     []string `json:"targets,omitempty"`
+	Permissions []string `json:"permissions,omitempty"`
 }
 
 type publishPackage struct {
@@ -35,7 +40,14 @@ type publishPackage struct {
 }
 
 type publishTrust struct {
+	SnapshotFile string `json:"snapshot_file"`
 	SnapshotHash string `json:"snapshot_sha256"`
+	TrustTier    string `json:"trust_tier"`
+}
+
+type publishDownload struct {
+	Target string `json:"target"`
+	Path   string `json:"path"`
 }
 
 func main() {
@@ -84,7 +96,9 @@ func validatePublishedPackage(registry string, id string, version string, target
 		return err
 	}
 	var meta publishMetadata
-	if err := json.Unmarshal(rawMeta, &meta); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(rawMeta))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&meta); err != nil {
 		return err
 	}
 	if meta.Schema != "tetra.eco.publish.v1beta" {
@@ -93,8 +107,17 @@ func validatePublishedPackage(registry string, id string, version string, target
 	if meta.Channel != "beta" {
 		return fmt.Errorf("unsupported channel %q", meta.Channel)
 	}
+	if meta.Hub == "" {
+		return fmt.Errorf("hub is required")
+	}
+	if meta.PublishedUnix < 0 {
+		return fmt.Errorf("published_at_unix must not be negative")
+	}
 	if meta.Capsule.ID != id {
 		return fmt.Errorf("capsule id mismatch: metadata has %s", meta.Capsule.ID)
+	}
+	if meta.Capsule.Name == "" {
+		return fmt.Errorf("capsule name is required")
 	}
 	if meta.Capsule.Version != version {
 		return fmt.Errorf("capsule version mismatch: metadata has %s", meta.Capsule.Version)
@@ -102,12 +125,39 @@ func validatePublishedPackage(registry string, id string, version string, target
 	if meta.Capsule.Target != target {
 		return fmt.Errorf("capsule target mismatch: metadata has %s", meta.Capsule.Target)
 	}
+	if len(meta.Capsule.Targets) > 0 && !containsString(meta.Capsule.Targets, target) {
+		return fmt.Errorf("capsule targets missing selected target %s", target)
+	}
 	if meta.Trust != nil {
 		if _, err := parseSHA256Hash(meta.Trust.SnapshotHash); err != nil {
 			return err
 		}
+		if meta.Trust.TrustTier == "" {
+			return fmt.Errorf("trust tier is required")
+		}
 	}
-	pkgPath := filepath.Join(targetDir, meta.Package.File)
+	if err := validateRelativeMetadataPath(meta.Package.File, "package file"); err != nil {
+		return err
+	}
+	if meta.Package.Size < 0 {
+		return fmt.Errorf("package size must not be negative")
+	}
+	expectedDownloadPath := filepath.ToSlash(filepath.Join("packages", capsuleIDDirectory(id), version, target, meta.Package.File))
+	if len(meta.Downloads) == 0 {
+		return fmt.Errorf("downloads must not be empty")
+	}
+	for _, download := range meta.Downloads {
+		if download.Target != target {
+			return fmt.Errorf("download target mismatch: metadata has %s", download.Target)
+		}
+		if err := validateRelativeMetadataPath(download.Path, "download path"); err != nil {
+			return err
+		}
+		if download.Path != expectedDownloadPath {
+			return fmt.Errorf("download path mismatch: metadata has %s, expected %s", download.Path, expectedDownloadPath)
+		}
+	}
+	pkgPath := filepath.Join(targetDir, filepath.FromSlash(meta.Package.File))
 	rawPkg, err := os.ReadFile(pkgPath)
 	if err != nil {
 		return err
@@ -122,6 +172,23 @@ func validatePublishedPackage(registry string, id string, version string, target
 	sum := sha256.Sum256(rawPkg)
 	if hex.EncodeToString(sum[:]) != hexHash {
 		return fmt.Errorf("package hash mismatch for %s", pkgPath)
+	}
+	return nil
+}
+
+func validateRelativeMetadataPath(path string, label string) error {
+	if path == "" {
+		return fmt.Errorf("%s is required", label)
+	}
+	if strings.Contains(path, "\\") {
+		return fmt.Errorf("unsafe %s path %s", label, path)
+	}
+	clean := filepath.Clean(path)
+	if clean == "." || strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
+		return fmt.Errorf("unsafe %s path %s", label, path)
+	}
+	if filepath.ToSlash(clean) != path {
+		return fmt.Errorf("%s path %s is not normalized", label, path)
 	}
 	return nil
 }
@@ -161,4 +228,13 @@ func capsuleIDDirectory(id string) string {
 		}
 	}
 	return b.String()
+}
+
+func containsString(values []string, value string) bool {
+	for _, candidate := range values {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
 }

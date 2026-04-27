@@ -1,0 +1,55 @@
+ok  	tetra_language/compiler	(cached)
+?   	tetra_language/compiler/internal/actorsrt	[no test files]
+?   	tetra_language/compiler/internal/backend/linux_x64	[no test files]
+?   	tetra_language/compiler/internal/backend/macos_x64	[no test files]
+ok  	tetra_language/compiler/internal/backend/native_shell	(cached)
+ok  	tetra_language/compiler/internal/backend/wasm32_wasi	(cached)
+ok  	tetra_language/compiler/internal/backend/wasm32_web	(cached)
+?   	tetra_language/compiler/internal/backend/windows_x64	[no test files]
+?   	tetra_language/compiler/internal/backend/x64	[no test files]
+ok  	tetra_language/compiler/internal/backend/x64abi	(cached)
+ok  	tetra_language/compiler/internal/backend/x64core	(cached)
+?   	tetra_language/compiler/internal/backend/x64obj	[no test files]
+ok  	tetra_language/compiler/internal/cache	(cached)
+?   	tetra_language/compiler/internal/deps	[no test files]
+?   	tetra_language/compiler/internal/format/elf	[no test files]
+?   	tetra_language/compiler/internal/format/macho	[no test files]
+?   	tetra_language/compiler/internal/format/pe	[no test files]
+?   	tetra_language/compiler/internal/format/tobj	[no test files]
+ok  	tetra_language/compiler/internal/frontend	(cached)
+?   	tetra_language/compiler/internal/ir	[no test files]
+?   	tetra_language/compiler/internal/linker	[no test files]
+ok  	tetra_language/compiler/internal/linker/linkcore	(cached)
+ok  	tetra_language/compiler/internal/lower	(cached)
+?   	tetra_language/compiler/internal/module	[no test files]
+ok  	tetra_language/compiler/internal/semantics	(cached)
+?   	tetra_language/compiler/internal/version	[no test files]
+ok  	tetra_language/compiler/target	(cached)
+ok  	tetra_language/cli/cmd/tetra	(cached)
+?   	tetra_language/tools/cmd/dump-project	[no test files]
+ok  	tetra_language/tools/cmd/flow-grammar-smoke	(cached)
+?   	tetra_language/tools/cmd/gen-docs	[no test files]
+?   	tetra_language/tools/cmd/gen-manifest	[no test files]
+ok  	tetra_language/tools/cmd/smoke-report-to-checklist	(cached)
+ok  	tetra_language/tools/cmd/validate-api-docs	(cached)
+ok  	tetra_language/tools/cmd/validate-artifact-hashes	(cached)
+ok  	tetra_language/tools/cmd/validate-diagnostic	(cached)
+ok  	tetra_language/tools/cmd/validate-doctor	(cached)
+ok  	tetra_language/tools/cmd/validate-eco-lock	(cached)
+ok  	tetra_language/tools/cmd/validate-eco-publish	(cached)
+ok  	tetra_language/tools/cmd/validate-eco-unpack	(cached)
+ok  	tetra_language/tools/cmd/validate-eco-vault	(cached)
+ok  	tetra_language/tools/cmd/validate-example-index	(cached)
+ok  	tetra_language/tools/cmd/validate-flow-only	(cached)
+ok  	tetra_language/tools/cmd/validate-lsp-smoke	(cached)
+ok  	tetra_language/tools/cmd/validate-lsp-stdio	(cached)
+ok  	tetra_language/tools/cmd/validate-manifest	(cached)
+ok  	tetra_language/tools/cmd/validate-performance-report	(cached)
+ok  	tetra_language/tools/cmd/validate-release-state	(cached)
+ok  	tetra_language/tools/cmd/validate-smoke-list	(cached)
+ok  	tetra_language/tools/cmd/validate-targets	(cached)
+ok  	tetra_language/tools/cmd/validate-test-all-summary	(cached)
+ok  	tetra_language/tools/cmd/validate-test-report	(cached)
+ok  	tetra_language/tools/cmd/validate-web-ui-smoke	(cached)
+ok  	tetra_language/tools/cmd/verify-docs	(cached)
+ok  	tetra_language/tools/scriptstest	(cached)

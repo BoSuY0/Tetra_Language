@@ -1,0 +1,1445 @@
+{
+  "schema": "tetra.release-state.v1alpha1",
+  "status": "pass",
+  "branch": "codex/tetra-language-todo-execution",
+  "version": "v0.1.1",
+  "report_dir": "/tmp/tetra-v0_1_1-final-release-gate-20260427",
+  "git": {
+    "entries": [
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": ".gitignore"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "README.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "cli/cmd/tetra/eco.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "cli/cmd/tetra/eco_wave10_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "cli/cmd/tetra/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "cli/cmd/tetra/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "cli/cmd/tetra/test_all_script_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/actor_task_ownership_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/actors_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/async_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/cache_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/compiler_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/diagnostics.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/diagnostics_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/docs.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/docs_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/effects_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/elf_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/extensions_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/format.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/format_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/generics_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/backend/linux_x64/codegen.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/backend/macos_x64/codegen.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/backend/native_shell/codegen.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/backend/wasm32_wasi/codegen_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/backend/wasm32_web/codegen_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/backend/windows_x64/codegen.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/backend/x64core/emit_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/frontend/diagnostics.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/frontend/lexer.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/frontend/lexer_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/frontend/parser.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/frontend/parser_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/lower/lower.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/module/loader.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/semantics/checker.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/semantics/exprs.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/semantics/resolution.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/semantics/ui.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/internal/version/version.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/loop_control_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/lsp.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/lsp_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/macho_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/optionals_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/pe_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/protocol_conformance_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/protocols_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/runtime_override_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/stabilization_negative_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/target/target.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/target/target_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/test_runner.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/test_runner_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/type_inference_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "compiler/typed_errors_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/baselines/api-diff-baseline.v1alpha1.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/checklists/v0_5_release_gate.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/checklists/v0_6_release_gate.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/checklists/v1_0_release_gate.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/manifest.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/README.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/api-diff/api-diff.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/api-diff/api-docs.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/release_gate_summary.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/release_gate_summary.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/reproducible-build.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/test_all_full_summary.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/test_all_full_summary.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/wasi-smoke.build-only.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/wasi-smoke.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/web-ui-smoke.chromium.err"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/generated/v1_0/web-ui-smoke.json"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/plans/2026-04-26-tetra-language-todo.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/plans/2026-04-26-v1_0-implementation-roadmap.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/plans/todo_closure_map_2026-04-26.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/plans/v1_scope_freeze_eco_release.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/release-notes/v1_0.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/release_notes_v0_5.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/release_notes_v0_6.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/release_notes_v1_0_draft.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/roadmap_0_18_to_0_5.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/roadmap_0_5_to_0_6.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/roadmap_0_6_to_1_0.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/roadmap_0_6_x_stabilization.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/actors.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/api_diff_policy.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/capabilities.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/eco_publishing_v1.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/flow_syntax_v1.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/islands.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/runtime_abi.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/stdlib.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/stdlib_naming_versioning.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/unsafe.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "docs/spec/v1_feature_status.md"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "scripts/release_v1_0_gate.sh"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "scripts/release_v1_0_repro.sh"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "scripts/release_v1_0_wasi_smoke.sh"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "scripts/release_v1_0_web_smoke.sh"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "scripts/test.sh"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "scripts/test_all.sh"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "scripts/tools/api_diff_report.mjs"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "scripts/tools/run_wasi_smoke_from_report.mjs"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/smoke-report-to-checklist/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/smoke-report-to-checklist/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-api-docs/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-api-docs/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-diagnostic/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-diagnostic/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-doctor/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-doctor/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-eco-lock/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-eco-lock/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-eco-publish/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-eco-publish/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-manifest/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-manifest/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-smoke-list/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-smoke-list/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-targets/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-targets/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-test-all-summary/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-test-all-summary/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-test-report/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/validate-test-report/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/verify-docs/main.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/cmd/verify-docs/main_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/scriptstest/release_v1_test.go"
+      },
+      {
+        "index": " ",
+        "worktree": "M",
+        "path": "tools/scriptstest/test_all_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "cli/cmd/tetra/eco_fuzz_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "cli/cmd/tetra/testdata/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/actor_task_stress_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/format_property_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/internal/backend/native_shell/codegen_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/internal/backend/x64abi/abi_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/internal/cache/cache_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/internal/frontend/testdata/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/internal/lower/unsupported_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/internal/lower/verify.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/internal/lower/verify_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/internal/semantics/resolution_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/performance_benchmark_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "compiler/x64_abi_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/checklists/security_review_gate.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/contributing/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/artifact-hashes.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/binary-size-thresholds.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/doctor.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/host-smoke.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/invalid-diagnostic.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/known_issues.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/linux-smoke.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/macos-smoke.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/manifest.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/missing-effect-diagnostic.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/performance-regression.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/performance-regression.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/planned-actor-diagnostic.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/release-state.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/release-state.txt"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/security-review.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/smoke-list.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/tabs-diagnostic.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/targets.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/test-all/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/tetra-docs.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/tetra-test-report.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/wasm32-wasi-smoke.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/wasm32-web-smoke.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/generated/v1_0/windows-smoke.json"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/performance/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/plans/2026-04-27-tetra-agent-execution-dashboard.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/plans/2026-04-27-tetra-real-stabilization-agent-backlog.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/plans/2026-04-27-tetra-stabilization-5000-todo.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/release/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/spec/cli_contracts.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/spec/effects_capabilities_privacy_v1.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/spec/ownership_v1.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/spec/ui_v1.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/spec/v1_scope.md"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/testing/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "docs/user/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "examples/complex_control_flow_smoke.tetra"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "examples/flow_grammar_surface_smoke.tetra"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "examples/projects/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "examples/task_bounded_stress.tetra"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "scripts/fuzz_nightly.sh"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "scripts/release_v1_0_binary_size.sh"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "scripts/release_v1_0_security_review.sh"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/cmd/flow-grammar-smoke/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/cmd/validate-artifact-hashes/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/cmd/validate-example-index/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/cmd/validate-manifest/fuzz_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/cmd/validate-performance-report/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/cmd/validate-release-state/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/cmd/validate-web-ui-smoke/"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/scriptstest/api_diff_report_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/scriptstest/fuzz_nightly_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/scriptstest/release_repro_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/scriptstest/security_review_test.go"
+      },
+      {
+        "index": "?",
+        "worktree": "?",
+        "path": "tools/scriptstest/shell_portability_test.go"
+      }
+    ],
+    "dirty_tracked": [
+      ".gitignore",
+      "README.md",
+      "cli/cmd/tetra/eco.go",
+      "cli/cmd/tetra/eco_wave10_test.go",
+      "cli/cmd/tetra/main.go",
+      "cli/cmd/tetra/main_test.go",
+      "cli/cmd/tetra/test_all_script_test.go",
+      "compiler/actor_task_ownership_test.go",
+      "compiler/actors_test.go",
+      "compiler/async_test.go",
+      "compiler/cache_test.go",
+      "compiler/compiler_test.go",
+      "compiler/diagnostics.go",
+      "compiler/diagnostics_test.go",
+      "compiler/docs.go",
+      "compiler/docs_test.go",
+      "compiler/effects_test.go",
+      "compiler/elf_test.go",
+      "compiler/extensions_test.go",
+      "compiler/format.go",
+      "compiler/format_test.go",
+      "compiler/generics_test.go",
+      "compiler/internal/backend/linux_x64/codegen.go",
+      "compiler/internal/backend/macos_x64/codegen.go",
+      "compiler/internal/backend/native_shell/codegen.go",
+      "compiler/internal/backend/wasm32_wasi/codegen_test.go",
+      "compiler/internal/backend/wasm32_web/codegen_test.go",
+      "compiler/internal/backend/windows_x64/codegen.go",
+      "compiler/internal/backend/x64core/emit_test.go",
+      "compiler/internal/frontend/diagnostics.go",
+      "compiler/internal/frontend/lexer.go",
+      "compiler/internal/frontend/lexer_test.go",
+      "compiler/internal/frontend/parser.go",
+      "compiler/internal/frontend/parser_test.go",
+      "compiler/internal/lower/lower.go",
+      "compiler/internal/module/loader.go",
+      "compiler/internal/semantics/checker.go",
+      "compiler/internal/semantics/exprs.go",
+      "compiler/internal/semantics/resolution.go",
+      "compiler/internal/semantics/ui.go",
+      "compiler/internal/version/version.go",
+      "compiler/loop_control_test.go",
+      "compiler/lsp.go",
+      "compiler/lsp_test.go",
+      "compiler/macho_test.go",
+      "compiler/optionals_test.go",
+      "compiler/pe_test.go",
+      "compiler/protocol_conformance_test.go",
+      "compiler/protocols_test.go",
+      "compiler/runtime_override_test.go",
+      "compiler/stabilization_negative_test.go",
+      "compiler/target/target.go",
+      "compiler/target/target_test.go",
+      "compiler/test_runner.go",
+      "compiler/test_runner_test.go",
+      "compiler/type_inference_test.go",
+      "compiler/typed_errors_test.go",
+      "docs/baselines/api-diff-baseline.v1alpha1.json",
+      "docs/checklists/v0_5_release_gate.md",
+      "docs/checklists/v0_6_release_gate.md",
+      "docs/checklists/v1_0_release_gate.md",
+      "docs/generated/manifest.json",
+      "docs/generated/v1_0/README.md",
+      "docs/generated/v1_0/api-diff/api-diff.json",
+      "docs/generated/v1_0/api-diff/api-docs.md",
+      "docs/generated/v1_0/release_gate_summary.json",
+      "docs/generated/v1_0/release_gate_summary.md",
+      "docs/generated/v1_0/reproducible-build.json",
+      "docs/generated/v1_0/test_all_full_summary.json",
+      "docs/generated/v1_0/test_all_full_summary.md",
+      "docs/generated/v1_0/wasi-smoke.build-only.json",
+      "docs/generated/v1_0/wasi-smoke.json",
+      "docs/generated/v1_0/web-ui-smoke.chromium.err",
+      "docs/generated/v1_0/web-ui-smoke.json",
+      "docs/plans/2026-04-26-tetra-language-todo.md",
+      "docs/plans/2026-04-26-v1_0-implementation-roadmap.md",
+      "docs/plans/todo_closure_map_2026-04-26.md",
+      "docs/plans/v1_scope_freeze_eco_release.md",
+      "docs/release-notes/v1_0.md",
+      "docs/release_notes_v0_5.md",
+      "docs/release_notes_v0_6.md",
+      "docs/release_notes_v1_0_draft.md",
+      "docs/roadmap_0_18_to_0_5.md",
+      "docs/roadmap_0_5_to_0_6.md",
+      "docs/roadmap_0_6_to_1_0.md",
+      "docs/roadmap_0_6_x_stabilization.md",
+      "docs/spec/actors.md",
+      "docs/spec/api_diff_policy.md",
+      "docs/spec/capabilities.md",
+      "docs/spec/eco_publishing_v1.md",
+      "docs/spec/flow_syntax_v1.md",
+      "docs/spec/islands.md",
+      "docs/spec/runtime_abi.md",
+      "docs/spec/stdlib.md",
+      "docs/spec/stdlib_naming_versioning.md",
+      "docs/spec/unsafe.md",
+      "docs/spec/v1_feature_status.md",
+      "scripts/release_v1_0_gate.sh",
+      "scripts/release_v1_0_repro.sh",
+      "scripts/release_v1_0_wasi_smoke.sh",
+      "scripts/release_v1_0_web_smoke.sh",
+      "scripts/test.sh",
+      "scripts/test_all.sh",
+      "scripts/tools/api_diff_report.mjs",
+      "scripts/tools/run_wasi_smoke_from_report.mjs",
+      "tools/cmd/smoke-report-to-checklist/main.go",
+      "tools/cmd/smoke-report-to-checklist/main_test.go",
+      "tools/cmd/validate-api-docs/main.go",
+      "tools/cmd/validate-api-docs/main_test.go",
+      "tools/cmd/validate-diagnostic/main.go",
+      "tools/cmd/validate-diagnostic/main_test.go",
+      "tools/cmd/validate-doctor/main.go",
+      "tools/cmd/validate-doctor/main_test.go",
+      "tools/cmd/validate-eco-lock/main.go",
+      "tools/cmd/validate-eco-lock/main_test.go",
+      "tools/cmd/validate-eco-publish/main.go",
+      "tools/cmd/validate-eco-publish/main_test.go",
+      "tools/cmd/validate-manifest/main.go",
+      "tools/cmd/validate-manifest/main_test.go",
+      "tools/cmd/validate-smoke-list/main.go",
+      "tools/cmd/validate-smoke-list/main_test.go",
+      "tools/cmd/validate-targets/main.go",
+      "tools/cmd/validate-targets/main_test.go",
+      "tools/cmd/validate-test-all-summary/main.go",
+      "tools/cmd/validate-test-all-summary/main_test.go",
+      "tools/cmd/validate-test-report/main.go",
+      "tools/cmd/validate-test-report/main_test.go",
+      "tools/cmd/verify-docs/main.go",
+      "tools/cmd/verify-docs/main_test.go",
+      "tools/scriptstest/release_v1_test.go",
+      "tools/scriptstest/test_all_test.go"
+    ],
+    "untracked_release_artifacts": [
+      "docs/generated/v1_0/artifact-hashes.json",
+      "docs/generated/v1_0/binary-size-thresholds.json",
+      "docs/generated/v1_0/doctor.json",
+      "docs/generated/v1_0/host-smoke.json",
+      "docs/generated/v1_0/invalid-diagnostic.json",
+      "docs/generated/v1_0/known_issues.md",
+      "docs/generated/v1_0/linux-smoke.json",
+      "docs/generated/v1_0/macos-smoke.json",
+      "docs/generated/v1_0/manifest.json",
+      "docs/generated/v1_0/missing-effect-diagnostic.json",
+      "docs/generated/v1_0/performance-regression.json",
+      "docs/generated/v1_0/performance-regression.md",
+      "docs/generated/v1_0/planned-actor-diagnostic.json",
+      "docs/generated/v1_0/release-state.json",
+      "docs/generated/v1_0/release-state.txt",
+      "docs/generated/v1_0/security-review.md",
+      "docs/generated/v1_0/smoke-list.json",
+      "docs/generated/v1_0/tabs-diagnostic.json",
+      "docs/generated/v1_0/targets.json",
+      "docs/generated/v1_0/test-all/",
+      "docs/generated/v1_0/tetra-docs.md",
+      "docs/generated/v1_0/tetra-test-report.json",
+      "docs/generated/v1_0/wasm32-wasi-smoke.json",
+      "docs/generated/v1_0/wasm32-web-smoke.json",
+      "docs/generated/v1_0/windows-smoke.json",
+      "docs/release/"
+    ],
+    "untracked_non_release_entries": [
+      "cli/cmd/tetra/eco_fuzz_test.go",
+      "cli/cmd/tetra/testdata/",
+      "compiler/actor_task_stress_test.go",
+      "compiler/format_property_test.go",
+      "compiler/internal/backend/native_shell/codegen_test.go",
+      "compiler/internal/backend/x64abi/abi_test.go",
+      "compiler/internal/cache/cache_test.go",
+      "compiler/internal/frontend/testdata/",
+      "compiler/internal/lower/unsupported_test.go",
+      "compiler/internal/lower/verify.go",
+      "compiler/internal/lower/verify_test.go",
+      "compiler/internal/semantics/resolution_test.go",
+      "compiler/performance_benchmark_test.go",
+      "compiler/x64_abi_test.go",
+      "docs/checklists/security_review_gate.md",
+      "docs/contributing/",
+      "docs/performance/",
+      "docs/plans/2026-04-27-tetra-agent-execution-dashboard.md",
+      "docs/plans/2026-04-27-tetra-real-stabilization-agent-backlog.md",
+      "docs/plans/2026-04-27-tetra-stabilization-5000-todo.md",
+      "docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md",
+      "docs/spec/cli_contracts.md",
+      "docs/spec/effects_capabilities_privacy_v1.md",
+      "docs/spec/ownership_v1.md",
+      "docs/spec/ui_v1.md",
+      "docs/spec/v1_scope.md",
+      "docs/testing/",
+      "docs/user/",
+      "examples/complex_control_flow_smoke.tetra",
+      "examples/flow_grammar_surface_smoke.tetra",
+      "examples/projects/",
+      "examples/task_bounded_stress.tetra",
+      "scripts/fuzz_nightly.sh",
+      "scripts/release_v1_0_binary_size.sh",
+      "scripts/release_v1_0_security_review.sh",
+      "tools/cmd/flow-grammar-smoke/",
+      "tools/cmd/validate-artifact-hashes/",
+      "tools/cmd/validate-example-index/",
+      "tools/cmd/validate-manifest/fuzz_test.go",
+      "tools/cmd/validate-performance-report/",
+      "tools/cmd/validate-release-state/",
+      "tools/cmd/validate-web-ui-smoke/",
+      "tools/scriptstest/api_diff_report_test.go",
+      "tools/scriptstest/fuzz_nightly_test.go",
+      "tools/scriptstest/release_repro_test.go",
+      "tools/scriptstest/security_review_test.go",
+      "tools/scriptstest/shell_portability_test.go"
+    ]
+  },
+  "generated_artifacts": {
+    "required": [
+      {
+        "path": "docs/generated/manifest.json",
+        "exists": true,
+        "size": 10387
+      },
+      {
+        "path": "docs/generated/v1_0/README.md",
+        "exists": true,
+        "size": 1564
+      },
+      {
+        "path": "docs/generated/v1_0/release_gate_summary.json",
+        "exists": true,
+        "size": 8090
+      },
+      {
+        "path": "docs/generated/v1_0/release_gate_summary.md",
+        "exists": true,
+        "size": 7860
+      },
+      {
+        "path": "docs/generated/v1_0/test_all_full_summary.json",
+        "exists": true,
+        "size": 4049
+      },
+      {
+        "path": "docs/generated/v1_0/test_all_full_summary.md",
+        "exists": true,
+        "size": 3812
+      },
+      {
+        "path": "docs/generated/v1_0/api-diff/api-diff.json",
+        "exists": true,
+        "size": 1200
+      },
+      {
+        "path": "docs/generated/v1_0/api-diff/api-docs.md",
+        "exists": true,
+        "size": 7950
+      },
+      {
+        "path": "docs/generated/v1_0/reproducible-build.json",
+        "exists": true,
+        "size": 1891
+      },
+      {
+        "path": "docs/generated/v1_0/security-review.md",
+        "exists": true,
+        "size": 1114
+      },
+      {
+        "path": "docs/generated/v1_0/binary-size-thresholds.json",
+        "exists": true,
+        "size": 973
+      },
+      {
+        "path": "docs/generated/v1_0/release-state.json",
+        "exists": true,
+        "size": 38124
+      },
+      {
+        "path": "docs/generated/v1_0/release-state.txt",
+        "exists": true,
+        "size": 382
+      },
+      {
+        "path": "docs/generated/v1_0/targets.json",
+        "exists": true,
+        "size": 1750
+      },
+      {
+        "path": "docs/generated/v1_0/doctor.json",
+        "exists": true,
+        "size": 1922
+      },
+      {
+        "path": "docs/generated/v1_0/tetra-test-report.json",
+        "exists": true,
+        "size": 1279
+      },
+      {
+        "path": "docs/generated/v1_0/smoke-list.json",
+        "exists": true,
+        "size": 10598
+      },
+      {
+        "path": "docs/generated/v1_0/host-smoke.json",
+        "exists": true,
+        "size": 11310
+      },
+      {
+        "path": "docs/generated/v1_0/linux-smoke.json",
+        "exists": true,
+        "size": 10287
+      },
+      {
+        "path": "docs/generated/v1_0/macos-smoke.json",
+        "exists": true,
+        "size": 10287
+      },
+      {
+        "path": "docs/generated/v1_0/windows-smoke.json",
+        "exists": true,
+        "size": 10418
+      },
+      {
+        "path": "docs/generated/v1_0/wasm32-wasi-smoke.json",
+        "exists": true,
+        "size": 1417
+      },
+      {
+        "path": "docs/generated/v1_0/wasm32-web-smoke.json",
+        "exists": true,
+        "size": 1416
+      },
+      {
+        "path": "docs/generated/v1_0/wasi-smoke.build-only.json",
+        "exists": true,
+        "size": 1417
+      },
+      {
+        "path": "docs/generated/v1_0/wasi-smoke.json",
+        "exists": true,
+        "size": 1591
+      },
+      {
+        "path": "docs/generated/v1_0/web-ui-smoke.json",
+        "exists": true,
+        "size": 553
+      },
+      {
+        "path": "docs/generated/v1_0/web-ui-smoke.dom.html",
+        "exists": true,
+        "size": 405
+      },
+      {
+        "path": "docs/generated/v1_0/invalid-diagnostic.json",
+        "exists": true,
+        "size": 158
+      },
+      {
+        "path": "docs/generated/v1_0/missing-effect-diagnostic.json",
+        "exists": true,
+        "size": 190
+      },
+      {
+        "path": "docs/generated/v1_0/tabs-diagnostic.json",
+        "exists": true,
+        "size": 166
+      },
+      {
+        "path": "docs/generated/v1_0/planned-actor-diagnostic.json",
+        "exists": true,
+        "size": 306
+      },
+      {
+        "path": "docs/generated/v1_0/known_issues.md",
+        "exists": true,
+        "size": 706
+      },
+      {
+        "path": "docs/generated/v1_0/artifact-hashes.json",
+        "exists": true,
+        "size": 11610
+      },
+      {
+        "path": "docs/generated/v1_0/test-all/summary.json",
+        "exists": true,
+        "size": 4049
+      },
+      {
+        "path": "docs/generated/v1_0/test-all/summary.md",
+        "exists": true,
+        "size": 3812
+      },
+      {
+        "path": "docs/generated/v1_0/test-all/lsp-smoke.json",
+        "exists": true,
+        "size": 359
+      },
+      {
+        "path": "docs/generated/v1_0/test-all/tetra-docs.md",
+        "exists": true,
+        "size": 10365
+      }
+    ]
+  },
+  "freshness": [
+    {
+      "name": "docs/generated/manifest.json",
+      "status": "pass"
+    },
+    {
+      "name": "docs/generated/v1_0/artifact-hashes.json",
+      "status": "pass"
+    }
+  ],
+  "last_gate_evidence": {
+    "summary_path": "docs/generated/v1_0/release_gate_summary.json",
+    "status": "pass",
+    "step_count": 33
+  }
+}

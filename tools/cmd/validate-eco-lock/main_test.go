@@ -13,7 +13,6 @@ func TestValidateEcoLockAcceptsDependencyGraph(t *testing.T) {
   "schema": "tetra.eco.lock.v1",
   "manifest_schema": "tetra.capsule.v1",
   "permissions_model": "tetra.eco.permissions.v1",
-  "graph_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "capsules": [
     {
       "id": "tetra://app",
@@ -37,6 +36,32 @@ func TestValidateEcoLockAcceptsDependencyGraph(t *testing.T) {
 	out, err := runEcoLockValidator(t, lock)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoLockRejectsGraphHashMismatch(t *testing.T) {
+	lock := `{
+  "schema": "tetra.eco.lock.v1",
+  "manifest_schema": "tetra.capsule.v1",
+  "permissions_model": "tetra.eco.permissions.v1",
+  "graph_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "capsules": [
+    {
+      "id": "tetra://app",
+      "name": "App",
+      "version": "0.1.0",
+      "path": "/tmp/project/Tetra.capsule",
+      "targets": ["linux-x64"],
+      "permissions": ["io"]
+    }
+  ]
+}`
+	out, err := runEcoLockValidator(t, lock)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "graph_sha256 mismatch") {
+		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
 

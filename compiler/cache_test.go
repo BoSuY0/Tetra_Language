@@ -321,6 +321,45 @@ func TestBuildCacheCorruptObjectFallsBackToRebuild(t *testing.T) {
 	}
 }
 
+func TestBuildCacheTargetChangeInvalidatesObjects(t *testing.T) {
+	tmp := t.TempDir()
+	files := map[string]string{
+		"engine/render.tetra": "module engine.render\nfun add_one(x: i32): i32 {\n  return x + 1\n}\n",
+		"app/game.tetra":      "module app.game\nimport engine.render as r\nfun main(): i32 {\n  return r.add_one(41)\n}\n",
+	}
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/game.tetra"))
+
+	linuxOut := filepath.Join(tmp, "out", "app-linux")
+	if err := os.MkdirAll(filepath.Dir(linuxOut), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	stats1, err := BuildFileWithStats(entry, linuxOut, "linux-x64")
+	if err != nil {
+		t.Fatalf("linux build1: %v", err)
+	}
+	assertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
+
+	macosOut := filepath.Join(tmp, "out", "app-macos")
+	stats2, err := BuildFileWithStats(entry, macosOut, "macos-x64")
+	if err != nil {
+		t.Fatalf("macos build: %v", err)
+	}
+	assertModules(t, stats2.CompiledModules, []string{"app.game", "engine.render"})
+	if len(stats2.CacheHits) != 0 {
+		t.Fatalf("unexpected macos cache hits after linux build: %v", stats2.CacheHits)
+	}
+
+	stats3, err := BuildFileWithStats(entry, linuxOut, "linux-x64")
+	if err != nil {
+		t.Fatalf("linux build2: %v", err)
+	}
+	if len(stats3.CompiledModules) != 0 {
+		t.Fatalf("expected linux cache hit after target round trip, compiled %v", stats3.CompiledModules)
+	}
+	assertModules(t, stats3.CacheHits, []string{"app.game", "engine.render"})
+}
+
 func assertModules(t *testing.T, got []string, want []string) {
 	t.Helper()
 	gotSorted := append([]string(nil), got...)

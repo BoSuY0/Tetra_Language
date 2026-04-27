@@ -62,6 +62,23 @@ function normalizeEntry(text) {
   return trimmed;
 }
 
+function entryIdentity(section, entry) {
+  const trimmed = entry.trim();
+  const functionMatch = /^(?:async\s+)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(trimmed);
+  if (functionMatch && (section === 'Functions' || section === 'Tests')) {
+    return `func ${functionMatch[1]}`;
+  }
+  const keywordMatch = /^(const|val|var|struct|enum|protocol|extension|impl|state|view)\s+([^(:\s]+)/.exec(trimmed);
+  if (keywordMatch) {
+    return `${keywordMatch[1]} ${keywordMatch[2]}`;
+  }
+  return trimmed;
+}
+
+function symbolID(symbol) {
+  return `${symbol.module}::${symbol.section}::${entryIdentity(symbol.section, symbol.entry)}`;
+}
+
 function parseAPIDocs(md) {
   const lines = md.split(/\r?\n/);
   if (lines.length === 0 || lines[0].trim() !== '# Tetra API Docs') {
@@ -114,7 +131,7 @@ function parseAPIDocs(md) {
         continue;
       }
       const entry = normalizeEntry(line.slice(2));
-      const id = `${moduleName}::${sectionName}::${entry}`;
+      const id = `${moduleName}::${sectionName}::${entryIdentity(sectionName, entry)}`;
       const symbolHash = `sha256:${sha256Hex(`${moduleName}\n${sectionName}\n${entry}`)}`;
       symbols.push({
         id,
@@ -153,15 +170,54 @@ function buildBaseline(parsed, docsPath) {
   };
 }
 
+function reviewMetadata(kind) {
+  switch (kind) {
+    case 'added':
+      return {
+        review_status: 'addition_requires_scope_review',
+        review_note: 'New API surface; confirm it is intentional v1 scope before updating the baseline.',
+      };
+    case 'removed':
+      return {
+        review_status: 'breaking_requires_review',
+        review_note: 'Previously baselined API surface was removed; restore it or approve a breaking baseline update.',
+      };
+    case 'changed':
+      return {
+        review_status: 'breaking_requires_review',
+        review_note: 'Baselined API signature or metadata changed; restore it or approve a deliberate compatibility decision.',
+      };
+    default:
+      return {
+        review_status: 'unknown_requires_review',
+        review_note: 'Unrecognized API diff kind; inspect before release.',
+      };
+  }
+}
+
+function buildReviewSummary(totalChanges) {
+  return {
+    status: totalChanges === 0 ? 'clean' : 'needs_review',
+    release_checklist: 'docs/checklists/v1_0_release_gate.md',
+    baseline_policy: 'docs/spec/api_diff_policy.md',
+    checklist: [
+      'Classify added entries as intentional v1 scope or remove them before baseline update.',
+      'Classify changed entries as deliberate compatibility decisions or restore the previous signature.',
+      'Classify removed entries as deliberate breaking decisions or restore the missing API surface.',
+      'Update docs/baselines/api-diff-baseline.v1alpha1.json only after review approval.',
+    ],
+  };
+}
+
 function buildDiff(baseline, parsed, baselinePath, candidatePath) {
   const baseSymbols = new Map();
   const candSymbols = new Map();
 
   for (const symbol of baseline.symbols || []) {
-    baseSymbols.set(symbol.id, symbol);
+    baseSymbols.set(symbolID(symbol), { ...symbol, id: symbolID(symbol) });
   }
   for (const symbol of parsed.symbols) {
-    candSymbols.set(symbol.id, symbol);
+    candSymbols.set(symbolID(symbol), { ...symbol, id: symbolID(symbol) });
   }
 
   const ids = [...new Set([...baseSymbols.keys(), ...candSymbols.keys()])].sort((a, b) => a.localeCompare(b));
@@ -187,6 +243,7 @@ function buildDiff(baseline, parsed, baselinePath, candidatePath) {
         before_hash: '',
         after_hash: after.symbol_hash,
         severity: 'minor',
+        ...reviewMetadata('added'),
       });
       continue;
     }
@@ -202,6 +259,7 @@ function buildDiff(baseline, parsed, baselinePath, candidatePath) {
         before_hash: before.symbol_hash,
         after_hash: '',
         severity: 'major',
+        ...reviewMetadata('removed'),
       });
       continue;
     }
@@ -220,11 +278,13 @@ function buildDiff(baseline, parsed, baselinePath, candidatePath) {
         before_hash: before.symbol_hash,
         after_hash: after.symbol_hash,
         severity: 'major',
+        ...reviewMetadata('changed'),
       });
     }
   }
 
   const baselineMeta = baseline.api_metadata || {};
+  const totalChanges = added + removed + changed;
 
   return {
     schema: 'tetra.api.diff.v1alpha1',
@@ -245,6 +305,7 @@ function buildDiff(baseline, parsed, baselinePath, candidatePath) {
       removed,
       changed,
     },
+    review: buildReviewSummary(totalChanges),
     changes,
   };
 }

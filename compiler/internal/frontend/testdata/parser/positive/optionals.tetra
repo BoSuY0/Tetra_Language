@@ -1,0 +1,5 @@
+func unwrap(value: Int?) -> Int:
+    if let x = value:
+        return x
+    else:
+        return 0

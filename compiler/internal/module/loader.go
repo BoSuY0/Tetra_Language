@@ -124,7 +124,21 @@ func parseFileFromPath(path string) (*frontend.FileAST, error) {
 		return nil, err
 	}
 	file.Path = path
+	if err := validateImportPaths(file); err != nil {
+		return nil, err
+	}
 	return file, nil
+}
+
+func validateImportPaths(file *frontend.FileAST) error {
+	seen := make(map[string]frontend.Position, len(file.Imports))
+	for _, imp := range file.Imports {
+		if first, ok := seen[imp.Path]; ok {
+			return fmt.Errorf("%s: duplicate import '%s' (first imported at %s)", frontend.FormatPos(imp.At), imp.Path, frontend.FormatPos(first))
+		}
+		seen[imp.Path] = imp.At
+	}
+	return nil
 }
 
 func moduleToRelPath(module string) string {

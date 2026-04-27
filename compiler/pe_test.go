@@ -40,6 +40,17 @@ func TestBuildWindowsPEHeaders(t *testing.T) {
 	if info.importRVA == 0 || info.importSize == 0 {
 		t.Fatalf("missing import directory")
 	}
+	for _, name := range []string{".text", ".rdata", ".idata", ".reloc"} {
+		findSection(t, info.sections, name)
+	}
+	idata := findSection(t, info.sections, ".idata")
+	if info.importRVA < idata.virtualAddress || info.importRVA >= idata.virtualAddress+idata.virtualSize {
+		t.Fatalf("import directory outside .idata section")
+	}
+	textSec := findSection(t, info.sections, ".text")
+	if info.entry < textSec.virtualAddress || info.entry >= textSec.virtualAddress+textSec.virtualSize {
+		t.Fatalf("entrypoint outside .text section")
+	}
 
 	imports := readPEImports(t, data, info)
 	dll, ok := imports["KERNEL32.dll"]
@@ -50,8 +61,8 @@ func TestBuildWindowsPEHeaders(t *testing.T) {
 	assertImportHas(t, dll, "GetStdHandle")
 	assertImportHas(t, dll, "WriteFile")
 
-	text := sectionData(t, data, info.sections, ".text")
-	if !bytes.Contains(text, []byte{0xFF, 0x15}) {
+	textBytes := sectionData(t, data, info.sections, ".text")
+	if !bytes.Contains(textBytes, []byte{0xFF, 0x15}) {
 		t.Fatalf("expected indirect call pattern in .text")
 	}
 }

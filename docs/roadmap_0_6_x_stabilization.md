@@ -1,6 +1,12 @@
 # Tetra 0.6.x Stabilization Roadmap
 
-Tetra 0.6.x is a stabilization line for the current Usable Alpha surface. The
+> Historical checkpoint. This roadmap belongs to the older v0.6 stabilization
+> line and is superseded by
+> `docs/spec/v1_scope.md` and
+> `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+> The current public release truth is the v1.0 scope contract.
+
+Tetra 0.6.x was a stabilization line for the then-current Usable Alpha surface. The
 goal is not to add another large language feature, but to make the existing
 compiler, runtime, tooling, docs, and local Eco flows repeatably testable.
 

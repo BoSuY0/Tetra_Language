@@ -200,6 +200,25 @@ func main() -> Int:
 	}
 }
 
+func TestStabilizationEnumPayloadsRemainExplicitlyPostV1(t *testing.T) {
+	_, err := Parse([]byte(`
+enum Option:
+    case some(Int)
+
+func main() -> Int:
+    return 0
+`))
+	if err == nil {
+		t.Fatalf("expected enum payload diagnostic")
+	}
+	if !strings.Contains(err.Error(), "enum payload cases are planned") {
+		t.Fatalf("error = %v", err)
+	}
+	if strings.Contains(err.Error(), "v0.") {
+		t.Fatalf("enum payload diagnostic should be versionless: %v", err)
+	}
+}
+
 func TestStabilizationForCollectionRejectsNonCollection(t *testing.T) {
 	requireCheckErrorContains(t, `
 func main() -> Int:

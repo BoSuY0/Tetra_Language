@@ -11,9 +11,8 @@ operations. They are meant to make low-level code explicit and auditable.
 ## Obtaining Capabilities
 
 Capabilities are not constructible in safe code. They can only be obtained in
-`unsafe` blocks via builtins. In v0.17 the containing function must also
-declare the corresponding effects; `uses` is an audit declaration, not a token
-grant.
+`unsafe` blocks via builtins. The containing function must also declare the
+corresponding effects; `uses` is an audit declaration, not a token grant.
 
 ```tetra
 fun main(): i32 uses capability, io, mem {
@@ -49,6 +48,25 @@ fun main(): i32 uses alloc, capability, io, mem, mmio {
 }
 ```
 
+## Safe Wrapper Pattern
+
+Stable wrappers keep unsafe regions tiny and make the public effect contract
+visible at the wrapper boundary. A wrapper may contain the `unsafe` block, but
+callers still need the wrapper's declared effects:
+
+```tetra
+module lib.core.memory
+
+func write_i32(dst: ptr, value: Int, mem: cap.mem) -> Int
+uses mem:
+  unsafe:
+    return core.store_i32(dst, value, mem)
+```
+
+Callers cannot manufacture `cap.mem` through `uses mem`; they must receive a
+capability from a reviewed unsafe boundary such as `lib.core.capability.mem()`
+or another explicitly audited wrapper.
+
 ## Status
 
 This is a compile-time gating mechanism with a minimal runtime implementation:
@@ -58,6 +76,10 @@ current backend.
 `uses mem` / `uses io` does not replace `unsafe` and does not create a
 capability. Unsafe builtins still require an `unsafe` block and the relevant
 `cap.mem` or `cap.io` argument.
+
+Privacy capabilities are separate: `consent.token` is obtained through the
+privacy surface and is documented in
+[effects_capabilities_privacy_v1.md](./effects_capabilities_privacy_v1.md).
 
 ## MMIO Semantics (Volatile Contract)
 

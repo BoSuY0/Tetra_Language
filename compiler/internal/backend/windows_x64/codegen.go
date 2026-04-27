@@ -18,7 +18,12 @@ func CodegenObjectWindowsX64WithOptions(funcs []ir.IRFunc, opt x64.CodegenOption
 }
 
 func CodegenObjectWindowsX64WithOptionsAndDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, opt x64.CodegenOptions) (*tobj.Object, error) {
-	return x64obj.BuildObjectWithDataPrefix(funcs, dataPrefix, x64core.NewEmitFunc(x64abi.NewWin64()), opt, x64obj.Options{
+	obj, err := x64obj.BuildObjectWithDataPrefix(funcs, dataPrefix, x64core.NewEmitFunc(x64abi.NewWin64()), opt, x64obj.Options{
 		CollectImports: true,
 	})
+	if err != nil {
+		return nil, err
+	}
+	obj.Target = "windows-x64"
+	return obj, nil
 }

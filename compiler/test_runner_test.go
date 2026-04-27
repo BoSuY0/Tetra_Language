@@ -31,11 +31,13 @@ func TestTestRunnerSourcesIncludeCaseMetadata(t *testing.T) {
 	}
 }
 
-func TestTestRunnerSourcesStripModuleAndTestDeclsForTempBuilds(t *testing.T) {
+func TestTestRunnerSourcesStripTestDeclsForTempBuilds(t *testing.T) {
 	src := []byte(`module app.tests
 
+import lib.core.math as math
+
 func fortyTwo() -> Int:
-    return 42
+    return math.add_i32(40, 2)
 
 test "module case":
     expect fortyTwo() == 42
@@ -48,11 +50,17 @@ test "module case":
 		t.Fatalf("cases = %d, want 1", len(cases))
 	}
 	generated := string(cases[0].Source)
-	if strings.Contains(generated, "module app.tests") || strings.Contains(generated, `test "module case"`) {
-		t.Fatalf("generated source should be temp-build friendly:\n%s", generated)
+	if strings.Contains(generated, `test "module case"`) {
+		t.Fatalf("generated source should not include test blocks:\n%s", generated)
+	}
+	if !strings.Contains(generated, "module app.tests") {
+		t.Fatalf("generated source should preserve module declaration for imports:\n%s", generated)
 	}
 	if !strings.Contains(generated, "func fortyTwo() -> Int:") {
 		t.Fatalf("generated source missing helper function:\n%s", generated)
+	}
+	if !strings.Contains(generated, "import lib.core.math as math") {
+		t.Fatalf("generated source missing required imports:\n%s", generated)
 	}
 }
 
@@ -70,7 +78,10 @@ test "module case":
 		t.Fatalf("TestRunnerSources: %v", err)
 	}
 	tmp := t.TempDir()
-	srcPath := filepath.Join(tmp, "test_1.tetra")
+	srcPath := filepath.Join(tmp, "app", "tests.tetra")
+	if err := os.MkdirAll(filepath.Dir(srcPath), 0o755); err != nil {
+		t.Fatalf("mkdir generated source dir: %v", err)
+	}
 	outPath := filepath.Join(tmp, "test_1")
 	if err := os.WriteFile(srcPath, cases[0].Source, 0o644); err != nil {
 		t.Fatalf("write generated source: %v", err)
@@ -95,6 +106,32 @@ func TestTestRunnerSourcesDeclareEffectsForSyntheticFunctions(t *testing.T) {
 	}
 	if !strings.Contains(generated, "func main() -> Int\nuses actors, alloc, capability, control, islands, io, link, mem, mmio, runtime:") {
 		t.Fatalf("generated main missing conservative uses:\n%s", generated)
+	}
+}
+
+func TestTestRunnerSourcesStripUserMainBeforeGeneratingRunnerMain(t *testing.T) {
+	src := []byte(`func helper() -> Int:
+    return 41
+
+func main() -> Int:
+    return helper()
+
+test "helper + 1":
+    expect helper() + 1 == 42
+`)
+	cases, err := TestRunnerSources(src, "main_with_test.tetra")
+	if err != nil {
+		t.Fatalf("TestRunnerSources: %v", err)
+	}
+	if len(cases) != 1 {
+		t.Fatalf("cases = %d, want 1", len(cases))
+	}
+	generated := string(cases[0].Source)
+	if strings.Count(generated, "func main() -> Int") != 1 {
+		t.Fatalf("generated source should contain exactly one main:\n%s", generated)
+	}
+	if !strings.Contains(generated, "func helper() -> Int:") {
+		t.Fatalf("generated source missing helper function:\n%s", generated)
 	}
 }
 

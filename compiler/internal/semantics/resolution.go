@@ -9,6 +9,7 @@ import (
 
 func collectImportAliases(file *frontend.FileAST) (map[string]string, error) {
 	aliases := make(map[string]string)
+	topLevel := topLevelDeclarationNames(file)
 	for _, imp := range file.Imports {
 		if imp.Alias == "" {
 			return nil, fmt.Errorf("%s: import alias required", frontend.FormatPos(imp.At))
@@ -16,9 +17,38 @@ func collectImportAliases(file *frontend.FileAST) (map[string]string, error) {
 		if _, exists := aliases[imp.Alias]; exists {
 			return nil, fmt.Errorf("%s: duplicate import alias '%s'", frontend.FormatPos(imp.At), imp.Alias)
 		}
+		if _, exists := topLevel[imp.Alias]; exists {
+			return nil, fmt.Errorf("%s: import alias '%s' conflicts with declaration '%s'", frontend.FormatPos(imp.At), imp.Alias, imp.Alias)
+		}
 		aliases[imp.Alias] = imp.Path
 	}
 	return aliases, nil
+}
+
+func topLevelDeclarationNames(file *frontend.FileAST) map[string]struct{} {
+	names := map[string]struct{}{}
+	for _, fn := range file.Funcs {
+		names[fn.Name] = struct{}{}
+	}
+	for _, glob := range file.Globals {
+		names[glob.Name] = struct{}{}
+	}
+	for _, st := range file.Structs {
+		names[st.Name] = struct{}{}
+	}
+	for _, en := range file.Enums {
+		names[en.Name] = struct{}{}
+	}
+	for _, state := range file.States {
+		names[state.Name] = struct{}{}
+	}
+	for _, view := range file.Views {
+		names[view.Name] = struct{}{}
+	}
+	for _, proto := range file.Protocols {
+		names[proto.Name] = struct{}{}
+	}
+	return names
 }
 
 func qualifyName(module, name string) string {
@@ -82,7 +112,7 @@ func resolveTypeName(ref *frontend.TypeRef, module string, imports map[string]st
 		}
 		return ref.Name, nil
 	default:
-		return "", fmt.Errorf("%s: unsupported type", frontend.FormatPos(ref.At))
+		return "", fmt.Errorf("%s: unsupported type reference kind %d", frontend.FormatPos(ref.At), ref.Kind)
 	}
 }
 

@@ -4,23 +4,29 @@
 safe by default. Unsafe code can violate memory safety if misused, so it should
 be small, explicit, and well-reviewed.
 
-## What Requires `unsafe`
+## Unsafe-Only Builtins Registry
 
-The following operations are gated behind `unsafe`:
+The following operations are gated behind `unsafe`. The generated manifest
+records the same policy in each builtin's `unsafe_policy` field, and
+`go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
+checks that this registry stays current.
 
-- `core.alloc_bytes`
-- `core.island_new`
-- `core.island_make_u8` / `core.island_make_i32` when the island is not a tracked
-  region (scoped island or region-carrying parameter)
-- `free(<island>)` when called explicitly
-- `core.cap_io` / `core.cap_mem`
-- `core.load_i32` / `core.store_i32`
-- `core.load_u8` / `core.store_u8`
-- `core.load_ptr` / `core.store_ptr`
-- `core.ptr_add`
-- `core.mmio_read_i32` / `core.mmio_write_i32`
-- `core.sym_addr`
-- `core.ctx_switch`
+| Builtin | Unsafe policy | Required effects | Capability argument |
+| --- | --- | --- | --- |
+| `core.alloc_bytes` | always | `alloc`, `mem` | none |
+| `core.island_new` | always | `alloc`, `islands`, `mem` | none |
+| `core.island_make_u8` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |
+| `core.island_make_i32` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |
+| explicit `free(<island>)` | always | `islands`, `mem` | island handle |
+| `core.cap_io` | always | `capability`, `io` | returns `cap.io` |
+| `core.cap_mem` | always | `capability`, `mem` | returns `cap.mem` |
+| `core.load_i32` / `core.store_i32` | always | `mem` | `cap.mem` |
+| `core.load_u8` / `core.store_u8` | always | `mem` | `cap.mem` |
+| `core.load_ptr` / `core.store_ptr` | always | `mem` | `cap.mem` |
+| `core.ptr_add` | always | `mem` | `cap.mem` |
+| `core.mmio_read_i32` / `core.mmio_write_i32` | always | `io`, `mmio` | `cap.io` |
+| `core.sym_addr` | always | `link` | none |
+| `core.ctx_switch` | always | `control`, `runtime` | `cap.mem` |
 
 Scoped islands remain safe: `island(size) as isl { ... }` injects `free` automatically.
 

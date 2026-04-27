@@ -52,6 +52,15 @@ struct constructors such as `Vec2(x: 40)`, so lowercase/function-like callees
 with labels currently produce an explicit planned-feature diagnostic instead of
 being treated as calls.
 
+Type inference is intentionally local and predictable. Integer literals default
+to `i32`, boolean literals to `bool`, string literals to `str`, and `none`
+requires an expected optional type from an annotation, return type, assignment,
+or call parameter. Expected types flow through annotated `let`/`var` bindings,
+assignments, returns, function arguments, `try`, `await`, and implicit optional
+packing. Generic calls are inferred only from value arguments; return-only type
+parameters and `none` without an expected optional type are diagnostics that ask
+for an explicit annotation.
+
 Closures are accepted in MVP as non-capturing function literals:
 
 ```tetra
@@ -75,6 +84,39 @@ test "math":
 `test` blocks are ignored by normal app builds and run through `tetra test`.
 `tetra fmt` formats supported MVP syntax in canonical Flow style with 4-space
 indentation and sorted `uses` clauses.
+
+## Blocks And Indentation
+
+Canonical Flow uses `:` to open indentation-sensitive blocks. A block header
+must be followed by at least one line with greater indentation, except `match`
+headers whose immediate `case` clauses stay aligned with the `match` line.
+Tabs are rejected in indentation. Blank lines and standalone comments do not
+start or end blocks.
+
+The supported block headers are:
+
+- top-level `struct`, `enum`, `protocol`, `extension`, `impl`, `state`, `view`,
+  `test`, and `func` declarations;
+- statement-level `if`, `else if`, `else`, `if let`, `else if let`, `while`,
+  `for`, `match`, `case`, `unsafe`, `island`, and UI `command` blocks;
+- non-capturing closure literals in expression positions.
+
+Legacy brace/semicolon syntax still parses as compatibility input, but it is a
+migration surface. Canonical formatting prints Flow indentation.
+
+## Comments
+
+Line comments begin with `//` and run to the end of the line. Standalone line
+comments may appear before declarations or statements and `tetra fmt` preserves
+them at the nearest formatted code position.
+
+Standalone block comments begin with `/*` and end with `*/`; formatter support
+is conservative and preserves standalone block comments. Inline comments after
+code are intentionally rejected by `tetra fmt` with a formatter diagnostic so
+the tool does not silently move or drop user text.
+
+Doc comments currently use the same standalone comment syntax. They are
+preserved by the formatter but are not yet a distinct AST node.
 
 Structs:
 
@@ -179,6 +221,13 @@ func main() -> Int:
 Loop bodies support `break` and `continue`. Both are diagnostics outside a
 `while`, range `for`, or collection `for`.
 
+The v1 frontend accepts statements that appear after `return`, `throw`,
+`break`, or `continue` in the same block. Those statements are treated as
+ordinary unreachable code: they may still be parsed, type-checked, formatted,
+and lowered, but no unreachable-code diagnostic is promised in v1. Lowering is
+required to keep verifier invariants such as stack balance and valid branch
+targets even when unreachable instructions are present.
+
 No-payload enums and statement-level `match`:
 
 ```tetra
@@ -221,10 +270,11 @@ func unwrap(value: Int?) -> Int:
         return 0
 ```
 
-The v0.5 optionals MVP supports one-slot payloads, `none`, implicit `some`
-packing for compatible values, equality/inequality with `none`, and Flow
-`if let` unwrapping. Multi-slot optional payloads such as `String?` are planned
-for a later layout pass.
+The v1 optional contract supports `none`, implicit `some` packing for
+compatible values, equality/inequality with `none`, Flow `if let` unwrapping,
+and statement `match` with `none`, `some(name)`, and `_`. Optional layout is a
+presence tag followed by the payload slots, so `Int?` uses two slots and
+`String?` uses three slots.
 
 Ownership markers:
 
@@ -240,10 +290,12 @@ func take(x: consume Int) -> Int:
     return x
 ```
 
-The v0.5 marker MVP records ownership in function signatures, keeps `borrow`
-parameters immutable, allows local mutation through `inout`, and reports a
-diagnostic when a local value is reused after being passed to a `consume`
-parameter. It is not a full lifetime solver.
+The v1 ownership marker contract records ownership in function signatures,
+keeps `borrow` parameters immutable, allows mutation only through `inout`
+arguments backed by mutable locals, and reports diagnostics for use after
+`consume`, consuming the same value twice in one call, and aliasing an `inout`
+argument with a borrow or consume argument. Region-backed values derived from a
+borrow cannot escape through returns, owned parameters, or `inout` assignment.
 
 Typed errors:
 
@@ -262,10 +314,12 @@ func caller() -> Int throws ReadError:
     return value
 ```
 
-The v0.5 typed-errors MVP supports one-slot success values and one-slot error
-values. `try` is only valid inside another throwing function, and `main` remains
-non-throwing. Catching/recovery syntax, typed error unions, multi-slot error
-payloads, and throwing `main` wrappers are planned for later releases.
+The v1 typed-errors contract supports one-slot and multi-slot success/error
+payloads. Throwing functions return a success tag plus success slots and error
+slots. `throw` must match the declared error type, `try` is only valid inside a
+throwing function with a compatible error type, and bare calls to throwing
+functions are rejected. Catching/recovery syntax and throwing `main` wrappers
+remain post-v1.
 
 Async syntax:
 
@@ -278,12 +332,14 @@ async func caller() -> Int:
     return value
 ```
 
-The v0.5 async MVP is syntax and semantic checking over the existing
-synchronous call path. Calls to async functions require `await`, and `await` is
-only valid inside another async function. The cooperative task MVP adds
-`core.task_spawn_i32("worker")` and `core.task_join_i32(task)` for zero-argument
-`i32` worker functions; these APIs require `uses runtime`. Cancellation and
-structured concurrency remain later runtime work.
+The v1 async MVP is a checked surface over the current synchronous lowering
+path. Calls to async functions require `await`, and `await` is only valid inside
+another async function. The cooperative task API adds
+`core.task_spawn_i32("worker")`, `core.task_spawn_group_i32(group, "worker")`,
+`core.task_join_i32(task)`, and `core.task_join_result_i32(task)` for
+zero-argument synchronous `i32` workers; these APIs require `uses runtime`.
+Task groups expose typed handles and cancellation state, while structured
+concurrency remains post-v1.
 
 Extensions:
 
@@ -297,10 +353,11 @@ extension Vec2:
         return self.x + self.y
 ```
 
-The v0.5 extensions MVP lowers methods to namespaced static functions. Call
-extension methods as `Vec2.sum(value)`. Extension protocol conformance clauses,
-implicit receiver-call syntax, and cross-module extension lookup are planned for
-later releases.
+The v1 extensions contract lowers methods to deterministic namespaced static
+functions. Call extension methods as `Vec2.sum(value)` or through an imported
+type namespace such as `core.Vec2.draw(value)`. Duplicate generated method names
+are rejected. Implicit receiver-call syntax and constrained extensions remain
+post-v1.
 
 Protocols:
 
@@ -311,11 +368,12 @@ protocol Renderable:
 impl Vec2: Renderable
 ```
 
-The v0.5 protocols MVP accepts declarations with typed required function
-signatures, validates referenced types, and exposes them to formatter, generated
-docs, and LSP symbols. `impl Type: Protocol` checks that matching
-extension/static methods exist with compatible signatures. Protocol-bound
-generics and dynamic dispatch are planned for later releases.
+The v1 protocols contract accepts declarations with typed required function
+signatures, validates referenced types, and exposes them to formatter,
+generated docs, and LSP symbols. `impl Type: Protocol` checks that matching
+extension/static methods exist with compatible signatures, including effects,
+async, throws, params, and return type. Duplicate impls are rejected.
+Protocol-bound generics and dynamic dispatch remain post-v1.
 
 Generic signatures:
 
@@ -324,10 +382,11 @@ func id<T>(x: T) -> T:
     return x
 ```
 
-The v0.5 generics MVP parses, validates, formats, documents, and monomorphizes
-simple same-module generic function calls with inferred type parameters.
-Higher-ranked generics, protocol-bound generics, and specialization optimization
-are planned for later releases.
+The v1 generics MVP parses, validates, formats, documents, and monomorphizes
+generic function calls with inferred value arguments across modules. Generated
+specialization names are deterministic and encode fully qualified type names to
+avoid collisions. Higher-ranked generics, explicit type arguments,
+protocol-bound generics, and specialization optimization remain post-v1.
 
 Unsafe and scoped islands:
 
@@ -350,21 +409,67 @@ func main() -> Int:
 - `Int` maps to `i32`
 - `String` maps to `str`
 - `UInt8` and `Byte` map to `u8`
-- `Bool` and `bool` are real boolean types in v0.15
-- `T?` stores a one-slot optional payload plus a presence tag in v0.5
-- `throws E` uses a one-slot success payload plus a one-slot error/tag result in v0.5
-- `async func` currently lowers through the normal synchronous ABI in v0.5
-- `core.task_spawn_i32` runs zero-argument `i32` workers through the current cooperative task MVP
-- Simple same-module generic functions are monomorphized at call sites in v0.5
+- `Bool` maps to `bool`
+- `ConsentToken` maps to `consent.token`
+- `SecretInt` maps to `secret.i32`
+- `T?` stores a presence tag plus the payload slots
+- `throws E` uses a success tag plus success and error payload slots
+- `async func` currently lowers through the normal synchronous ABI
+- `core.task_spawn_i32` runs zero-argument `i32` workers through the cooperative task MVP
+- Generic functions are monomorphized at call sites using deterministic specialization names
+
+## Expression Precedence
+
+From tightest to loosest:
+
+| Level | Forms | Associativity |
+| --- | --- | --- |
+| 1 | calls, field access, indexing, literals, identifiers, parenthesized expressions | left |
+| 2 | prefix `!`, prefix `-`, `try`, `await` | prefix |
+| 3 | `*`, `/`, `%` | left |
+| 4 | `+`, `-` | left |
+| 5 | `<`, `<=`, `>`, `>=` | non-chaining |
+| 6 | `==`, `!=` | non-chaining |
+| 7 | `&&` | left |
+| 8 | `||` | left |
+
+Relational and equality chains such as `a < b < c` and `a == b == c` are
+diagnostics rather than implicitly associated expressions.
+
+## Diagnostics And Formatting Contracts
+
+Frontend diagnostics are machine-readable. Parse/frontend diagnostics use
+`TETRA0001`; semantic/compiler diagnostics rendered from positioned errors use
+`TETRA2001`; formatter preservation diagnostics use `TETRA_FMT001`; formatter
+check mismatches use `TETRA_FMT002`. Diagnostics exposed by CLI JSON include
+`code`, `severity`, `message`, and, when available, `file`, `line`, and
+`column`. UTF-8 input must be valid; invalid byte sequences are reported before
+tokenization with an exact byte position.
+
+The v1 parser recovery contract is deliberately first-error based: malformed
+source returns one structured diagnostic at the earliest reliable location.
+Multi-error recovery and partial AST production after syntax errors are post-v1
+work, so v1 tools must not depend on multiple diagnostics from one parse.
+
+Formatter guarantees for the supported Flow surface:
+
+- formatting is idempotent;
+- indentation is four spaces per block level;
+- `uses` clauses are sorted deterministically;
+- standalone line comments and block comments are preserved;
+- inline comments after code are rejected with a formatter diagnostic instead
+  of being moved or discarded;
+- malformed files report diagnostics rather than partially formatted output.
 
 ## Not In Canonical v1 Surface
 
 The compiler intentionally reports planned-feature diagnostics for `actor`,
-`view`, `state`, `property`, and `capsule` language declarations.
+`property`, and `capsule` language declarations. The actor runtime is available
+through `core.spawn`, `core.send`, `core.recv`, `core.self`, and `core.sender`;
+the declaration syntax is post-v1.
 
 Enum payloads, richer payload match patterns, exhaustive integer match checking,
 collection `for` exhaustiveness improvements, closure captures/function-pointer
-invocation, catch/recovery syntax, effect polymorphism/inference, full
-ownership/lifetime solving, protocol-bound generics, extension conformance
-clauses, task cancellation, and structured concurrency are planned for later
-releases.
+invocation, catch/recovery syntax, effect polymorphism/inference,
+protocol-bound generics, implicit receiver-call syntax, distributed actors, and
+structured concurrency are planned for later releases.

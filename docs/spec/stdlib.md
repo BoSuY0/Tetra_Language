@@ -43,7 +43,28 @@ Wave 7 promotions in this repository include:
 - `lib.experimental.crypto` -> `lib.core.crypto`
 
 `lib.experimental.*` entries remain available as compatibility shims, but stable
-code should import `lib.core.*` directly.
+code should import `lib.core.*` directly. Generated API docs label
+`lib.experimental.*` modules as experimental so they are not confused with v1
+compatibility promises.
+
+## Stable Type Display
+
+Public compiler output and generated API docs use canonical builtin names:
+
+| Source aliases | Canonical name | Notes |
+| --- | --- | --- |
+| `Int`, `i32` | `i32` | Default integer literal type. |
+| `UInt8`, `Byte`, `u8` | `u8` | Slice element supported by `[]u8` and string storage. |
+| `Bool`, `bool` | `bool` | Boolean literal and condition type. |
+| `String`, `str` | `str` | Two-slot UTF-8 string/slice shape. |
+| `ConsentToken` | `consent.token` | Privacy/consent capability token. |
+| `SecretInt` | `secret.i32` | Privacy-protected integer wrapper. |
+
+Structural types use deterministic field order and slot counts. `str`, `[]u8`,
+and `[]i32` are two-slot values (`ptr`, `len`). `T?` adds one presence tag slot
+to the payload slots. Opaque handles such as `ptr`, `island`, `actor`,
+`cap.io`, `cap.mem`, and `task.*` are not interchangeable even when they occupy
+one slot.
 
 ## Stable Module Quality Gates
 
@@ -55,3 +76,6 @@ Stable `lib.core.*` modules are required to include:
 - a checked smoke example under `examples/core_*_smoke.tetra`
 
 `tools/cmd/verify-docs` enforces these requirements.
+
+Stable examples used as release evidence must import `lib.core.*` directly and
+must not import `lib.experimental.*`.

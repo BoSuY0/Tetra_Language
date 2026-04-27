@@ -1,0 +1,2 @@
+test "math":
+    expect 40 + 2 == 42

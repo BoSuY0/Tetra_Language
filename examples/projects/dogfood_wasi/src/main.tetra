@@ -1,0 +1,4 @@
+func main() -> Int
+uses io:
+    print("wasi dogfood: ok\n")
+    return 0

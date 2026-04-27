@@ -141,6 +141,7 @@ function main() {
   const report = {
     timestamp: new Date().toISOString(),
     target: buildReport.target || 'wasm32-wasi',
+    build_only: Boolean(buildReport.build_only),
     host: buildReport.host || '',
     version: buildReport.version || '',
     git_head: buildReport.git_head || '',

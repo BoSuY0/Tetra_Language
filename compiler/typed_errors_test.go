@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -186,5 +187,75 @@ func main() -> Int:
 	}
 	if _, err := Lower(checked); err != nil {
 		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTypedErrorsRejectWrongThrowType(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case eof
+
+func read(flag: Bool) -> Int throws ReadError:
+    if flag:
+        return 1
+    throw 7
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected throw type mismatch")
+	}
+	if !strings.Contains(err.Error(), "throw type mismatch: expected 'ReadError', got 'i32'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsImportedThrowingFunctionCheckAndLower(t *testing.T) {
+	files := map[string]string{
+		"engine/errors.tetra": `module engine.errors
+enum ReadError:
+    case eof
+
+func read(flag: Bool) -> Int throws ReadError:
+    if flag:
+        return 42
+    throw ReadError.eof
+`,
+		"app/main.tetra": `module app.main
+import engine.errors as errors
+
+func caller(flag: Bool) -> Int throws errors.ReadError:
+    return try errors.read(flag)
+
+func main() -> Int:
+    return 0
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.tetra"))
+
+	world, err := LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	if got := checked.FuncSigs["engine.errors.read"].ThrowsType; got != "engine.errors.ReadError" {
+		t.Fatalf("imported read throws type = %q, want engine.errors.ReadError", got)
+	}
+	if got := checked.FuncSigs["app.main.caller"].ThrowsType; got != "engine.errors.ReadError" {
+		t.Fatalf("caller throws type = %q, want engine.errors.ReadError", got)
+	}
+	if _, err := LowerModules(checked); err != nil {
+		t.Fatalf("LowerModules: %v", err)
 	}
 }

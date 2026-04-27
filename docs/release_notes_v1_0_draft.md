@@ -1,7 +1,14 @@
 # Tetra v1.0 Production Release Notes Draft
 
-This draft tracks the target shape for Tetra v1.0. It is not a claim that the
-current v0.6 compiler already implements the 1.0 surface.
+This draft tracks the release-note shape for Tetra v1.0. The authoritative
+current release scope is `docs/spec/v1_scope.md`.
+
+Canonical scope and release process:
+
+- `docs/spec/v1_scope.md`
+- `docs/checklists/v1_0_release_gate.md`
+- `docs/release/artifact_policy.md`
+- `docs/release/rc_process.md`
 
 ## Target Profile
 

@@ -1,6 +1,10 @@
 package frontend
 
 import (
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -36,10 +40,27 @@ func TestLexTokenTypes(t *testing.T) {
 		{"module", []TokenType{TokenModule, TokenEOF}},
 		{"import", []TokenType{TokenImport, TokenEOF}},
 		{"as", []TokenType{TokenAs, TokenEOF}},
+		{"uses", []TokenType{TokenUses, TokenEOF}},
 		{"struct", []TokenType{TokenStruct, TokenEOF}},
+		{"const", []TokenType{TokenConst, TokenEOF}},
 		{"if", []TokenType{TokenIf, TokenEOF}},
 		{"else", []TokenType{TokenElse, TokenEOF}},
 		{"while", []TokenType{TokenWhile, TokenEOF}},
+		{"for", []TokenType{TokenFor, TokenEOF}},
+		{"in", []TokenType{TokenIn, TokenEOF}},
+		{"enum", []TokenType{TokenEnum, TokenEOF}},
+		{"case", []TokenType{TokenCase, TokenEOF}},
+		{"match", []TokenType{TokenMatch, TokenEOF}},
+		{"true", []TokenType{TokenTrue, TokenEOF}},
+		{"false", []TokenType{TokenFalse, TokenEOF}},
+		{"none", []TokenType{TokenNone, TokenEOF}},
+		{"throws", []TokenType{TokenThrows, TokenEOF}},
+		{"try", []TokenType{TokenTry, TokenEOF}},
+		{"throw", []TokenType{TokenThrow, TokenEOF}},
+		{"async", []TokenType{TokenAsync, TokenEOF}},
+		{"await", []TokenType{TokenAwait, TokenEOF}},
+		{"break", []TokenType{TokenBreak, TokenEOF}},
+		{"continue", []TokenType{TokenContinue, TokenEOF}},
 		{"return", []TokenType{TokenReturn, TokenEOF}},
 		{"print", []TokenType{TokenPrint, TokenEOF}},
 		{"free", []TokenType{TokenFree, TokenEOF}},
@@ -71,6 +92,8 @@ func TestLexTokenTypes(t *testing.T) {
 		{"}", []TokenType{TokenRBrace, TokenEOF}},
 		{"[", []TokenType{TokenLBracket, TokenEOF}},
 		{"]", []TokenType{TokenRBracket, TokenEOF}},
+		{"?", []TokenType{TokenQuestion, TokenEOF}},
+		{"..<", []TokenType{TokenRangeUntil, TokenEOF}},
 		{`"hello"`, []TokenType{TokenString, TokenEOF}},
 		{"1 + 2 * 3", []TokenType{TokenNumber, TokenPlus, TokenNumber, TokenStar, TokenNumber, TokenEOF}},
 		{"a >= b && c <= d", []TokenType{TokenIdent, TokenGreaterEq, TokenIdent, TokenAmpAmp, TokenIdent, TokenLessEq, TokenIdent, TokenEOF}},
@@ -186,6 +209,145 @@ func TestLexComments(t *testing.T) {
 				t.Errorf("collectTokens(%q): token[%d].typ = %s, want %s", tt.src, i, TokenName(tok.typ), TokenName(tt.want[i]))
 			}
 		}
+	}
+}
+
+func TestLexCRLFAndLFPositionTracking(t *testing.T) {
+	tokens, err := collectTokens("a\r\nb\nc")
+	if err != nil {
+		t.Fatalf("collectTokens: %v", err)
+	}
+	expected := []struct {
+		line int
+		col  int
+	}{
+		{1, 1},
+		{2, 1},
+		{3, 1},
+	}
+	for i, exp := range expected {
+		if tokens[i].pos.Line != exp.line || tokens[i].pos.Col != exp.col {
+			t.Fatalf("token[%d] pos = %d:%d, want %d:%d", i, tokens[i].pos.Line, tokens[i].pos.Col, exp.line, exp.col)
+		}
+	}
+}
+
+func TestLexUnicodeInStringsAndComments(t *testing.T) {
+	tokens, err := collectTokens("// привіт 🌊\n\"Привіт 🌊\"")
+	if err != nil {
+		t.Fatalf("collectTokens: %v", err)
+	}
+	if len(tokens) != 2 || tokens[0].typ != TokenString || tokens[1].typ != TokenEOF {
+		t.Fatalf("tokens = %#v, want string/eof", tokens)
+	}
+	if tokens[0].lit != "Привіт 🌊" {
+		t.Fatalf("string literal = %q", tokens[0].lit)
+	}
+}
+
+func TestLexInvalidUTF8Diagnostic(t *testing.T) {
+	_, err := collectTokens(string([]byte{'f', 'n', ' ', 0xff, '\n'}))
+	if err == nil {
+		t.Fatalf("expected invalid UTF-8 diagnostic")
+	}
+	if !strings.Contains(err.Error(), "invalid UTF-8") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLexLineCommentsDoNotNest(t *testing.T) {
+	tokens, err := collectTokens("// looks like /* nested */ comment\n42")
+	if err != nil {
+		t.Fatalf("collectTokens: %v", err)
+	}
+	if len(tokens) != 2 || tokens[0].typ != TokenNumber || tokens[1].typ != TokenEOF {
+		t.Fatalf("tokens = %#v, want number/eof", tokens)
+	}
+}
+
+func TestLexFuzzRegressionCorpus(t *testing.T) {
+	tests := []struct {
+		name    string
+		src     []byte
+		wantErr string
+	}{
+		{name: "invalid utf8 after keyword", src: []byte{'f', 'n', ' ', 0xff, '\n'}, wantErr: "invalid UTF-8 encoding"},
+		{name: "nul byte", src: []byte{0x00}, wantErr: "unexpected character"},
+		{name: "lone ampersand", src: []byte("&"), wantErr: "did you mean '&&'?"},
+		{name: "lone pipe", src: []byte("|"), wantErr: "did you mean '||'?"},
+		{name: "unterminated escape", src: []byte(`"trailing\`), wantErr: "unterminated escape sequence"},
+		{name: "unicode comment then string", src: []byte("// Привіт 🌊\n\"ok\"")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := collectTokens(string(tt.src))
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("collectTokens: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected %q", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestLexArchivedFuzzCrashers(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("testdata", "lexer", "crashers", "*.tetra"))
+	if err != nil {
+		t.Fatalf("glob crashers: %v", err)
+	}
+	sort.Strings(files)
+	if len(files) == 0 {
+		t.Fatalf("expected archived lexer crashers")
+	}
+	for _, path := range files {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read crasher: %v", err)
+			}
+			_, _ = collectTokens(string(raw))
+		})
+	}
+}
+
+func TestLexLongLineAndLargeFileSmoke(t *testing.T) {
+	longIdent := strings.Repeat("a", 32*1024)
+	tokens, err := collectTokens(longIdent)
+	if err != nil {
+		t.Fatalf("collect long identifier: %v", err)
+	}
+	if len(tokens) != 2 || tokens[0].typ != TokenIdent || tokens[1].typ != TokenEOF {
+		t.Fatalf("tokens = %#v, want ident/eof", tokens)
+	}
+	if tokens[0].lit != longIdent {
+		t.Fatalf("long identifier length = %d, want %d", len(tokens[0].lit), len(longIdent))
+	}
+	if tokens[1].pos.Line != 1 || tokens[1].pos.Col != len(longIdent)+1 {
+		t.Fatalf("EOF position = %d:%d, want 1:%d", tokens[1].pos.Line, tokens[1].pos.Col, len(longIdent)+1)
+	}
+
+	var large strings.Builder
+	for i := 0; i < 4096; i++ {
+		large.WriteString("let value")
+		large.WriteString("0")
+		large.WriteString(": i32 = 42\n")
+	}
+	tokens, err = collectTokens(large.String())
+	if err != nil {
+		t.Fatalf("collect large file: %v", err)
+	}
+	if tokens[len(tokens)-1].typ != TokenEOF {
+		t.Fatalf("last token = %s, want EOF", TokenName(tokens[len(tokens)-1].typ))
+	}
+	if tokens[len(tokens)-1].pos.Line != 4097 || tokens[len(tokens)-1].pos.Col != 1 {
+		t.Fatalf("large-file EOF position = %d:%d, want 4097:1", tokens[len(tokens)-1].pos.Line, tokens[len(tokens)-1].pos.Col)
 	}
 }
 

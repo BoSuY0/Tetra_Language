@@ -20,6 +20,10 @@ reports/
 /app.exe
 /tetra
 /t
+/.codex
+/app.ui.json
+/app.ui.shell.txt
+/docs/generated/v1_0/security-review.md
 *.exe
 *.dll
 *.so

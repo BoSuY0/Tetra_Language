@@ -1,0 +1,21 @@
+{
+  "uri": "examples/flow_hello.tetra",
+  "diagnostics": [],
+  "symbols": [
+    {
+      "name": "main",
+      "kind": "function",
+      "line": 1,
+      "column": 6,
+      "detail": "func main() -> i32 uses io"
+    }
+  ],
+  "hovers": [
+    {
+      "name": "main",
+      "line": 1,
+      "column": 6,
+      "contents": "func main() -> i32 uses io"
+    }
+  ]
+}

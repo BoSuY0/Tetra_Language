@@ -48,6 +48,27 @@ func TestValidateTestAllSummaryRejectsCountMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateTestAllSummaryRejectsUnknownFields(t *testing.T) {
+	dir := makeSummaryReport(t, `{
+  "mode": "full",
+  "status": "pass",
+  "started_at": "2026-04-25T13:00:00Z",
+  "ended_at": "2026-04-25T13:00:01Z",
+  "step_count": 1,
+  "failed_count": 0,
+  "steps": [
+    {"name":"one","status":"pass","duration_seconds":0,"exit_code":0,"command":"true","log":"logs/01-one.log","extra":true}
+  ]
+}`)
+	out, err := runSummaryValidator(t, dir)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unknown field") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func TestValidateTestAllSummaryRejectsPassWithNonZeroExit(t *testing.T) {
 	dir := makeSummaryReport(t, `{
   "mode": "quick",

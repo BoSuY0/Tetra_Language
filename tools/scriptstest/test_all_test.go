@@ -589,6 +589,22 @@ func TestTestAllValidatesDocsManifests(t *testing.T) {
 	}
 }
 
+func TestTestAllFullRunsDocsManifestDiffStep(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--full", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all full failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	for _, step := range summary.Steps {
+		if step.Name == "docs manifest diff" && step.Status == "pass" {
+			return
+		}
+	}
+	t.Fatalf("full test_all summary missing passing docs manifest diff step: %#v", summary.Steps)
+}
+
 func TestTestAllValidatesLSPSmokeJSONReport(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
 	if err != nil {
@@ -758,7 +774,7 @@ cmd="${1:-}"
 shift || true
 case "$cmd" in
   version)
-    echo "v1.0.0"
+    echo "v0.1.1"
     ;;
   fmt)
     if [[ "${TETRA_FAIL_FMT:-}" == "1" ]]; then

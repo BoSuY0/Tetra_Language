@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"tetra_language/compiler"
+	ctarget "tetra_language/compiler/target"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -21,6 +23,59 @@ func TestVersionCommand(t *testing.T) {
 	if !strings.Contains(stdout.String(), compiler.Version()) {
 		t.Fatalf("version output = %q, want compiler version", stdout.String())
 	}
+}
+
+func TestCLIContractDocumentedCommandsHaveHelpAndInvalidArgBehavior(t *testing.T) {
+	commands := documentedCLICommands(t)
+	if len(commands) == 0 {
+		t.Fatal("no documented CLI commands found")
+	}
+	for _, command := range commands {
+		t.Run(command+"_help", func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runCLI([]string{command, "--help"}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("%s --help exit code = %d, stdout=%q stderr=%q", command, code, stdout.String(), stderr.String())
+			}
+			combined := stdout.String() + stderr.String()
+			if !strings.Contains(strings.ToLower(combined), command) && !strings.Contains(strings.ToLower(combined), "usage") {
+				t.Fatalf("%s --help output does not describe the command: stdout=%q stderr=%q", command, stdout.String(), stderr.String())
+			}
+		})
+		t.Run(command+"_invalid_arg", func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runCLI([]string{command, "--definitely-invalid"}, &stdout, &stderr)
+			if code != 2 {
+				t.Fatalf("%s invalid arg exit code = %d, stdout=%q stderr=%q", command, code, stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
+func documentedCLICommands(t *testing.T) []string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "spec", "cli_contracts.md"))
+	if err != nil {
+		t.Fatalf("read cli contracts: %v", err)
+	}
+	seen := map[string]bool{}
+	var commands []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "| `") {
+			continue
+		}
+		rest := strings.TrimPrefix(line, "| `")
+		command, _, ok := strings.Cut(rest, "`")
+		if !ok || command == "tetra" || strings.Contains(command, " ") || command == "" || command[0] < 'a' || command[0] > 'z' {
+			continue
+		}
+		if !seen[command] {
+			seen[command] = true
+			commands = append(commands, command)
+		}
+	}
+	return commands
 }
 
 func TestTargetsCommandText(t *testing.T) {
@@ -43,10 +98,24 @@ func TestTargetsCommandJSON(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("targets exit code = %d, stdout=%q", code, stdout.String())
 	}
+	type targetMeta struct {
+		Triple                  string `json:"triple"`
+		Status                  string `json:"status"`
+		OS                      string `json:"os"`
+		Arch                    string `json:"arch"`
+		ABI                     string `json:"abi"`
+		Format                  string `json:"format"`
+		ExeExt                  string `json:"exe_ext"`
+		BuildOnly               bool   `json:"build_only"`
+		RunSupported            bool   `json:"run_supported"`
+		SupportsDebugInfo       bool   `json:"supports_debug_info"`
+		SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
+	}
 	var report struct {
-		Supported []string `json:"supported"`
-		BuildOnly []string `json:"build_only"`
-		Planned   []string `json:"planned"`
+		Supported []string     `json:"supported"`
+		BuildOnly []string     `json:"build_only"`
+		Planned   []string     `json:"planned"`
+		Targets   []targetMeta `json:"targets"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("targets JSON: %v\n%s", err, stdout.String())
@@ -59,6 +128,22 @@ func TestTargetsCommandJSON(t *testing.T) {
 	}
 	if len(report.Planned) != 0 {
 		t.Fatalf("planned targets = %#v", report.Planned)
+	}
+	if len(report.Targets) != 5 {
+		t.Fatalf("targets metadata count = %d, want 5: %#v", len(report.Targets), report.Targets)
+	}
+	byTriple := map[string]targetMeta{}
+	for _, tgt := range report.Targets {
+		byTriple[tgt.Triple] = tgt
+	}
+	if got := byTriple["linux-x64"]; got.Status != "supported" || got.OS != "linux" || got.Arch != "x64" || got.ABI != "sysv" || got.Format != "elf" || got.BuildOnly {
+		t.Fatalf("linux-x64 metadata = %#v", got)
+	}
+	if got := byTriple["windows-x64"]; got.Status != "supported" || got.OS != "windows" || got.ABI != "win64" || got.Format != "pe" || got.ExeExt != ".exe" {
+		t.Fatalf("windows-x64 metadata = %#v", got)
+	}
+	if got := byTriple["wasm32-wasi"]; got.Status != "build_only" || got.OS != "wasi" || got.Arch != "wasm32" || got.ABI != "wasi" || got.Format != "wasm" || !got.BuildOnly || got.RunSupported {
+		t.Fatalf("wasm32-wasi metadata = %#v", got)
 	}
 }
 
@@ -94,6 +179,7 @@ func TestDoctorCommandJSON(t *testing.T) {
 		t.Fatalf("doctor status = %q, report=%s", report.Status, stdout.String())
 	}
 	var sawVersion, sawRuntime, sawManifest, sawManifestVersion, sawManifestSurface, sawSmokeSources, sawRuntimeExports bool
+	var sawTargetMetadata, sawToolingCommands bool
 	var sawBuildOnlyTargets bool
 	for _, check := range report.Checks {
 		if check.Name == "version" && check.Status == "pass" {
@@ -120,8 +206,14 @@ func TestDoctorCommandJSON(t *testing.T) {
 		if check.Name == "runtime exports" && check.Status == "pass" && strings.Contains(check.Detail, "symbols") {
 			sawRuntimeExports = true
 		}
+		if check.Name == "target metadata" && check.Status == "pass" && strings.Contains(check.Detail, "5 targets") && strings.Contains(check.Detail, "2 build-only") {
+			sawTargetMetadata = true
+		}
+		if check.Name == "tooling commands" && check.Status == "pass" && strings.Contains(check.Detail, "fmt") && strings.Contains(check.Detail, "test") {
+			sawToolingCommands = true
+		}
 	}
-	if !sawVersion || !sawBuildOnlyTargets || !sawRuntime || !sawManifest || !sawManifestVersion || !sawManifestSurface || !sawSmokeSources || !sawRuntimeExports {
+	if !sawVersion || !sawBuildOnlyTargets || !sawRuntime || !sawManifest || !sawManifestVersion || !sawManifestSurface || !sawSmokeSources || !sawRuntimeExports || !sawTargetMetadata || !sawToolingCommands {
 		t.Fatalf("doctor missing expected checks: %#v", report.Checks)
 	}
 }
@@ -134,6 +226,33 @@ func TestDoctorCommandRejectsUnsupportedFormat(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "unsupported --format") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestDoctorReportFilesystemProbesFailInIncompleteRepo(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "examples"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	report := buildDoctorReportForRoot(root)
+	if report.Status != "fail" {
+		t.Fatalf("doctor status = %q, checks=%#v", report.Status, report.Checks)
+	}
+	requiredFailures := map[string]bool{
+		"__rt/actors_sysv.tetra":                false,
+		"compiler/selfhostrt/actors_sysv.tetra": false,
+		"examples/flow_hello.tetra":             false,
+		"docs/generated/manifest.json":          false,
+	}
+	for _, check := range report.Checks {
+		if _, ok := requiredFailures[check.Name]; ok && check.Status == "fail" {
+			requiredFailures[check.Name] = true
+		}
+	}
+	for name, saw := range requiredFailures {
+		if !saw {
+			t.Fatalf("doctor did not fail missing filesystem probe %s: %#v", name, report.Checks)
+		}
 	}
 }
 
@@ -165,6 +284,30 @@ func TestBuildCommandUsesDefaultInput(t *testing.T) {
 	}
 	if _, err := os.Stat(out); err != nil {
 		t.Fatalf("expected build output %s: %v", out, err)
+	}
+}
+
+func TestDefaultOutputUsesTargetExtensionAndEmitMode(t *testing.T) {
+	tests := []struct {
+		target string
+		emit   string
+		want   string
+	}{
+		{target: "linux-x64", emit: "exe", want: "app"},
+		{target: "windows-x64", emit: "exe", want: "app.exe"},
+		{target: "wasm32-wasi", emit: "exe", want: "app.wasm"},
+		{target: "wasm32-web", emit: "exe", want: "app.wasm"},
+		{target: "linux-x64", emit: "object", want: "app.tobj"},
+		{target: "windows-x64", emit: "library", want: "app.tobj"},
+	}
+	for _, tt := range tests {
+		tgt, err := ctarget.Parse(tt.target)
+		if err != nil {
+			t.Fatalf("parse target %s: %v", tt.target, err)
+		}
+		if got := defaultOutput(tgt, tt.emit); got != tt.want {
+			t.Fatalf("defaultOutput(%s, %s) = %q, want %q", tt.target, tt.emit, got, tt.want)
+		}
 	}
 }
 
@@ -200,7 +343,7 @@ func TestSmokeCommandWritesReport(t *testing.T) {
 	if err := json.Unmarshal(raw, &smokeReport); err != nil {
 		t.Fatalf("decode smoke report: %v\n%s", err, string(raw))
 	}
-	if smokeReport.Target != target || !strings.HasPrefix(smokeReport.Version, "v1.0.") || len(smokeReport.Cases) == 0 {
+	if smokeReport.Target != target || smokeReport.Version != compiler.Version() || len(smokeReport.Cases) == 0 {
 		t.Fatalf("smoke report shape = %#v", smokeReport)
 	}
 	if smokeReport.Total != len(smokeReport.Cases) || smokeReport.Passed != len(smokeReport.Cases) || smokeReport.Failed != 0 {
@@ -223,6 +366,7 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 		Cases        []struct {
 			Name         string `json:"name"`
 			SrcPath      string `json:"src_path"`
+			TargetGroup  string `json:"target_group"`
 			ExpectedExit int    `json:"expected_exit"`
 			DebugOnly    bool   `json:"debug_only"`
 		} `json:"cases"`
@@ -241,12 +385,16 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	}
 	var sawFlowHello bool
 	var sawUINative bool
+	var sawComplexControl bool
 	for _, c := range report.Cases {
-		if c.Name == "flow_hello" && c.SrcPath == "examples/flow_hello.tetra" && c.ExpectedExit == 0 {
+		if c.Name == "flow_hello" && c.SrcPath == "examples/flow_hello.tetra" && c.TargetGroup == "native" && c.ExpectedExit == 0 {
 			sawFlowHello = true
 		}
-		if c.Name == "ui_native_shell_smoke" && c.SrcPath == "examples/ui_native_shell_smoke.tetra" && c.ExpectedExit == 0 {
+		if c.Name == "ui_native_shell_smoke" && c.SrcPath == "examples/ui_native_shell_smoke.tetra" && c.TargetGroup == "native" && c.ExpectedExit == 0 {
 			sawUINative = true
+		}
+		if c.Name == "complex_control_flow_smoke" && c.SrcPath == "examples/complex_control_flow_smoke.tetra" && c.TargetGroup == "native" && c.ExpectedExit == 42 {
+			sawComplexControl = true
 		}
 	}
 	if !sawFlowHello {
@@ -254,6 +402,9 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	}
 	if !sawUINative {
 		t.Fatalf("smoke list missing ui_native_shell_smoke: %#v", report.Cases)
+	}
+	if !sawComplexControl {
+		t.Fatalf("smoke list missing complex_control_flow_smoke: %#v", report.Cases)
 	}
 }
 
@@ -293,8 +444,9 @@ func TestSmokeCommandListsWASMBuildOnlyTarget(t *testing.T) {
 			BuildOnly    bool   `json:"build_only"`
 			RunSupported bool   `json:"run_supported"`
 			Cases        []struct {
-				Name    string `json:"name"`
-				SrcPath string `json:"src_path"`
+				Name        string `json:"name"`
+				SrcPath     string `json:"src_path"`
+				TargetGroup string `json:"target_group"`
 			} `json:"cases"`
 		}
 		if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
@@ -305,7 +457,7 @@ func TestSmokeCommandListsWASMBuildOnlyTarget(t *testing.T) {
 		}
 		var sawUIWeb bool
 		for _, c := range report.Cases {
-			if c.Name == "ui_web_smoke" && c.SrcPath == "examples/ui_web_smoke.tetra" {
+			if c.Name == "ui_web_smoke" && c.SrcPath == "examples/ui_web_smoke.tetra" && c.TargetGroup == "wasm" {
 				sawUIWeb = true
 			}
 		}
@@ -348,6 +500,33 @@ func TestSmokeCommandBuildsWASMTargetWithoutRun(t *testing.T) {
 	}
 }
 
+func TestSmokeCommandWASMTargetGroupsIncludeDogfoodWebUI(t *testing.T) {
+	var stdout bytes.Buffer
+	code := runCLI([]string{"smoke", "--list", "--target", "wasm32-web", "--format=json"}, &stdout, &bytes.Buffer{})
+	if code != 0 {
+		t.Fatalf("smoke --list exit code = %d, stdout=%q", code, stdout.String())
+	}
+	var report smokeListReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("smoke list JSON: %v\n%s", err, stdout.String())
+	}
+	required := map[string]string{
+		"ui_web_smoke":   "examples/ui_web_smoke.tetra",
+		"dogfood_web_ui": "examples/projects/dogfood_web_ui/src/main.tetra",
+	}
+	for _, c := range report.Cases {
+		if wantPath, ok := required[c.Name]; ok {
+			if c.SrcPath != wantPath || c.TargetGroup != "wasm" {
+				t.Fatalf("case %s = %#v, want src %s in wasm group", c.Name, c, wantPath)
+			}
+			delete(required, c.Name)
+		}
+	}
+	if len(required) != 0 {
+		t.Fatalf("wasm smoke list missing required cases: %#v", required)
+	}
+}
+
 func TestSmokeCommandRejectsFormatWithoutList(t *testing.T) {
 	var stderr bytes.Buffer
 	code := runCLI([]string{"smoke", "--format=json"}, &bytes.Buffer{}, &stderr)
@@ -356,6 +535,88 @@ func TestSmokeCommandRejectsFormatWithoutList(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "--format is only supported with --list") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestCleanCommandRemovesCacheDirectories(t *testing.T) {
+	dir := t.TempDir()
+	for _, path := range []string{".tetra_cache", "tetra_cache"} {
+		if err := os.MkdirAll(filepath.Join(dir, path, "nested"), 0o755); err != nil {
+			t.Fatalf("mkdir cache dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, path, "nested", "entry"), []byte("cache"), 0o644); err != nil {
+			t.Fatalf("write cache entry: %v", err)
+		}
+	}
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout bytes.Buffer
+	code := runCLI([]string{"clean"}, &stdout, &bytes.Buffer{})
+	if code != 0 {
+		t.Fatalf("clean exit code = %d, stdout=%q", code, stdout.String())
+	}
+	for _, path := range []string{".tetra_cache", "tetra_cache"} {
+		if _, err := os.Stat(filepath.Join(dir, path)); !os.IsNotExist(err) {
+			t.Fatalf("cache dir %s still exists or stat failed with non-missing error: %v", path, err)
+		}
+	}
+	if !strings.Contains(stdout.String(), "Cleaned Tetra cache") {
+		t.Fatalf("clean stdout = %q", stdout.String())
+	}
+}
+
+func TestCleanCommandTargetRemovesOnlyRequestedTargetCache(t *testing.T) {
+	dir := t.TempDir()
+	for _, path := range []string{
+		filepath.Join(".tetra_cache", "linux-x64", "entry"),
+		filepath.Join(".tetra_cache", "windows-x64", "entry"),
+		filepath.Join("tetra_cache", "linux-x64", "entry"),
+		filepath.Join("tetra_cache", "windows-x64", "entry"),
+	} {
+		if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(path)), 0o755); err != nil {
+			t.Fatalf("mkdir cache dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, path), []byte("cache"), 0o644); err != nil {
+			t.Fatalf("write cache entry: %v", err)
+		}
+	}
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"clean", "--target", "linux-x64"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("clean --target exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, path := range []string{filepath.Join(".tetra_cache", "linux-x64"), filepath.Join("tetra_cache", "linux-x64")} {
+		if _, err := os.Stat(filepath.Join(dir, path)); !os.IsNotExist(err) {
+			t.Fatalf("target cache dir %s still exists or stat failed with non-missing error: %v", path, err)
+		}
+	}
+	for _, path := range []string{filepath.Join(".tetra_cache", "windows-x64", "entry"), filepath.Join("tetra_cache", "windows-x64", "entry")} {
+		if _, err := os.Stat(filepath.Join(dir, path)); err != nil {
+			t.Fatalf("non-target cache entry %s should remain: %v", path, err)
+		}
+	}
+	if !strings.Contains(stdout.String(), "linux-x64") {
+		t.Fatalf("clean stdout should name target: %q", stdout.String())
 	}
 }
 
@@ -766,7 +1027,7 @@ func TestDocCommandWritesAPIDocsToStdout(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("doc exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "# Tetra API Docs") || !strings.Contains(stdout.String(), "`func answer() -> Int`") {
+	if !strings.Contains(stdout.String(), "# Tetra API Docs") || !strings.Contains(stdout.String(), "`func answer() -> i32`") {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
@@ -787,8 +1048,36 @@ func TestDocCommandWritesAPIDocsToFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read docs: %v", err)
 	}
-	if !strings.Contains(string(raw), "`func answer() -> Int`") {
+	if !strings.Contains(string(raw), "`func answer() -> i32`") {
 		t.Fatalf("docs = %s", raw)
+	}
+}
+
+func TestDocCommandGeneratedOutputPassesAPIValidator(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "api.tetra")
+	outPath := filepath.Join(dir, "api.md")
+	src := `module docs.api
+
+func answer() -> Int:
+    return 42
+
+test "answer":
+    expect answer() == 42
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"doc", "-o", outPath, srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doc exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	cmd := exec.Command("go", "run", "./tools/cmd/validate-api-docs", "--docs", outPath)
+	cmd.Dir = filepath.Join("..", "..", "..")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("validate-api-docs failed: %v\n%s", err, out)
 	}
 }
 
@@ -924,6 +1213,64 @@ func main() -> Int:
 	}
 }
 
+func TestBuildCommandWASMWebPackageOutputIsDeterministic(t *testing.T) {
+	src := `state CounterState:
+    var count: Int = 0
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    style width: Int = 320
+    accessibility label: String = "Increment"
+
+func main() -> Int:
+    return 0
+`
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "ui.tetra")
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	buildDir := func(name string) string {
+		outDir := filepath.Join(dir, name)
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		outPath := filepath.Join(outDir, "app.wasm")
+		var stderr bytes.Buffer
+		if code := runCLI([]string{"build", "--target", "wasm32-web", "-o", outPath, srcPath}, &bytes.Buffer{}, &stderr); code != 0 {
+			t.Fatalf("build %s exit code = %d stderr=%q", name, code, stderr.String())
+		}
+		return outDir
+	}
+
+	first := buildDir("first")
+	second := buildDir("second")
+	for _, name := range []string{
+		"app.wasm",
+		"app.mjs",
+		"app.ui.json",
+		"app.ui.web.mjs",
+		"app.ui.html",
+	} {
+		a, err := os.ReadFile(filepath.Join(first, name))
+		if err != nil {
+			t.Fatalf("read first %s: %v", name, err)
+		}
+		b, err := os.ReadFile(filepath.Join(second, name))
+		if err != nil {
+			t.Fatalf("read second %s: %v", name, err)
+		}
+		if !bytes.Equal(a, b) {
+			t.Fatalf("wasm32-web package file %s is not deterministic", name)
+		}
+	}
+}
+
 func TestBuildCommandRejectsUnsupportedDiagnosticsMode(t *testing.T) {
 	if _, ok := hostTarget(); !ok {
 		t.Skip("host target unsupported")
@@ -939,6 +1286,95 @@ func TestBuildCommandRejectsUnsupportedDiagnosticsMode(t *testing.T) {
 		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "unsupported --diagnostics format") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestBuildCommandRejectsInvalidTarget(t *testing.T) {
+	var stderr bytes.Buffer
+	code := runCLI([]string{"build", "--target", "not-a-target", "examples/flow_hello.tetra"}, &bytes.Buffer{}, &stderr)
+	if code != 2 {
+		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "unsupported target") || !strings.Contains(stderr.String(), "supported targets: linux-x64, windows-x64, macos-x64") || !strings.Contains(stderr.String(), "build-only targets: wasm32-wasi, wasm32-web") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestBuildCommandJSONDiagnosticsForInvalidTarget(t *testing.T) {
+	var stderr bytes.Buffer
+	code := runCLI([]string{"build", "--diagnostics=json", "--target", "not-a-target", "examples/flow_hello.tetra"}, &bytes.Buffer{}, &stderr)
+	if code != 2 {
+		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+	}
+	var diag struct {
+		Code     string `json:"code"`
+		Message  string `json:"message"`
+		Severity string `json:"severity"`
+		Hint     string `json:"hint"`
+	}
+	if err := json.Unmarshal(stderr.Bytes(), &diag); err != nil {
+		t.Fatalf("json diagnostic: %v\n%s", err, stderr.String())
+	}
+	if diag.Code != "TETRA0001" || diag.Severity != "error" {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+	for _, want := range []string{"unsupported target: not-a-target", "supported targets: linux-x64, windows-x64, macos-x64", "build-only targets: wasm32-wasi, wasm32-web"} {
+		if !strings.Contains(diag.Message, want) {
+			t.Fatalf("diagnostic missing %q: %#v", want, diag)
+		}
+	}
+	if !strings.Contains(diag.Hint, "tetra targets") {
+		t.Fatalf("diagnostic hint = %q", diag.Hint)
+	}
+}
+
+func TestTargetAwareCommandsRejectInvalidTargetConsistently(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "build", args: []string{"build", "--target", "not-a-target", "examples/flow_hello.tetra"}},
+		{name: "run", args: []string{"run", "--target", "not-a-target", "examples/flow_hello.tetra"}},
+		{name: "test", args: []string{"test", "--target", "not-a-target", "examples/tooling_tests.tetra"}},
+		{name: "smoke", args: []string{"smoke", "--target", "not-a-target", "--run=false"}},
+		{name: "smoke list", args: []string{"smoke", "--list", "--target", "not-a-target"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stderr bytes.Buffer
+			code := runCLI(tt.args, &bytes.Buffer{}, &stderr)
+			if code != 2 {
+				t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+			}
+			for _, want := range []string{"unsupported target: not-a-target", "supported targets: linux-x64, windows-x64, macos-x64", "build-only targets: wasm32-wasi, wasm32-web"} {
+				if !strings.Contains(stderr.String(), want) {
+					t.Fatalf("stderr missing %q: %q", want, stderr.String())
+				}
+			}
+		})
+	}
+}
+
+func TestCheckCommandReportsMissingDefaultMain(t *testing.T) {
+	dir := t.TempDir()
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stderr bytes.Buffer
+	code := runCLI([]string{"check"}, &bytes.Buffer{}, &stderr)
+	if code != 1 {
+		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "main.tetra") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
@@ -960,6 +1396,57 @@ func TestRunCommandJSONDiagnosticsForHostTargetMismatch(t *testing.T) {
 	}
 	if diag.Code != "TETRA0001" || diag.Severity != "error" || !strings.Contains(diag.Message, "cannot run target "+target) {
 		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestRunCommandPropagatesProgramExitCode(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	if err := os.WriteFile(srcPath, []byte("func main() -> Int:\n    return 7\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"run", "--target", mustHostTarget(t), srcPath}, &stdout, &stderr)
+	if code != 7 {
+		t.Fatalf("run exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestRunCommandWithoutOutputDoesNotLeaveDefaultBinary(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	if err := os.WriteFile(srcPath, []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"run", "--target", mustHostTarget(t), srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	tgt, err := ctarget.Parse(mustHostTarget(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaultPath := filepath.Join(dir, defaultOutput(tgt, "exe"))
+	if _, err := os.Stat(defaultPath); !os.IsNotExist(err) {
+		t.Fatalf("run without -o should not leave %s, stat err=%v", defaultPath, err)
 	}
 }
 
@@ -1133,6 +1620,24 @@ func TestTestCommandRunsTetraTests(t *testing.T) {
 	}
 }
 
+func TestTestCommandRunsModuleFileWithImportsAndMain(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	srcPath := filepath.Join("..", "..", "..", "examples", "projects", "dogfood_cli", "src", "main.tetra")
+	if _, err := os.Stat(srcPath); err != nil {
+		t.Fatalf("missing dogfood source %s: %v", srcPath, err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"test", "--target", mustHostTarget(t), srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "PASS cli status code") {
+		t.Fatalf("test stdout = %q", stdout.String())
+	}
+}
+
 func TestTestCommandJSONReport(t *testing.T) {
 	if _, ok := hostTarget(); !ok {
 		t.Skip("host target unsupported")
@@ -1180,6 +1685,51 @@ func TestTestCommandJSONReport(t *testing.T) {
 	}
 	if report.Files[0].DurationMS != report.Results[0].DurationMS || report.DurationMS != report.Results[0].DurationMS {
 		t.Fatalf("duration aggregation mismatch: %#v", report)
+	}
+}
+
+func TestTestCommandJSONReportMultipleBlocks(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "sample.tetra")
+	src := `test "first":
+    expect 1 + 1 == 2
+
+test "second":
+    expect 2 + 2 == 4
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"test", "--target", mustHostTarget(t), "--report=json", srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	var report struct {
+		Total   int `json:"total"`
+		Passed  int `json:"passed"`
+		Failed  int `json:"failed"`
+		Results []struct {
+			Name         string `json:"name"`
+			Index        int    `json:"index"`
+			FunctionName string `json:"function_name"`
+			Passed       bool   `json:"passed"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("json report: %v\n%s", err, stdout.String())
+	}
+	if report.Total != 2 || report.Passed != 2 || report.Failed != 0 || len(report.Results) != 2 {
+		t.Fatalf("report = %#v", report)
+	}
+	if report.Results[0].Name != "first" || report.Results[0].Index != 0 || report.Results[0].FunctionName != "__tetra_test_0_first" || !report.Results[0].Passed {
+		t.Fatalf("first result = %#v", report.Results[0])
+	}
+	if report.Results[1].Name != "second" || report.Results[1].Index != 1 || report.Results[1].FunctionName != "__tetra_test_1_second" || !report.Results[1].Passed {
+		t.Fatalf("second result = %#v", report.Results[1])
 	}
 }
 
@@ -1363,6 +1913,41 @@ func TestLSPStdioInitializeAndDidOpen(t *testing.T) {
 	}
 }
 
+func TestLSPStdioTranscriptFixtureCoversEditingRequests(t *testing.T) {
+	var input bytes.Buffer
+	for _, body := range loadLSPTranscriptFixture(t, "full_session.jsonl") {
+		writeLSPTestMessage(t, &input, body)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runLSPStdio(&input, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("lsp stdio fixture exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		`"id":1`,
+		`"id":2`,
+		`"contents":{"kind":"markdown","value":"const answer: i32"}`,
+		`"id":3`,
+		`"label":"answer"`,
+		`"id":4`,
+		`"uri":"file:///fixture.tetra"`,
+		`"id":5`,
+		`"newText":"value"`,
+		`"id":6`,
+		`"newText":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer\n"`,
+		`function 'main' uses effect 'io' but does not declare it`,
+		`"id":7`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("fixture transcript output missing %q:\n%s", want, out)
+		}
+	}
+	if got := strings.Count(out, `"method":"textDocument/publishDiagnostics"`); got != 2 {
+		t.Fatalf("publish diagnostics count = %d, stdout=%q", got, out)
+	}
+}
+
 func TestLSPStdioCodeActionReturnsMissingUsesQuickFix(t *testing.T) {
 	var input bytes.Buffer
 	writeLSPTestMessage(t, &input, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
@@ -1411,7 +1996,7 @@ func TestLSPStdioCompletionReturnsOpenDocumentSymbols(t *testing.T) {
 	if !strings.Contains(out, `"id":2`) || !strings.Contains(out, `"label":"answer"`) || !strings.Contains(out, `"label":"main"`) {
 		t.Fatalf("completion response missing expected symbols: %q", out)
 	}
-	if !strings.Contains(out, `"detail":"const answer: Int"`) {
+	if !strings.Contains(out, `"detail":"const answer: i32"`) {
 		t.Fatalf("completion response missing detail: %q", out)
 	}
 }
@@ -1569,6 +2154,26 @@ func TestLSPStdioDidCloseClearsDiagnostics(t *testing.T) {
 func writeLSPTestMessage(t *testing.T, w *bytes.Buffer, body string) {
 	t.Helper()
 	fmt.Fprintf(w, "Content-Length: %d\r\n\r\n%s", len(body), body)
+}
+
+func loadLSPTranscriptFixture(t *testing.T, name string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "lsp", name))
+	if err != nil {
+		t.Fatalf("read LSP fixture: %v", err)
+	}
+	var bodies []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		bodies = append(bodies, line)
+	}
+	if len(bodies) == 0 {
+		t.Fatalf("LSP fixture %s is empty", name)
+	}
+	return bodies
 }
 
 func mustHostTarget(t *testing.T) string {

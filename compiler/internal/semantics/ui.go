@@ -291,7 +291,7 @@ func checkUIDecls(world *module.World, checked *CheckedProgram, types map[string
 					return fmt.Errorf("%s: command '%s': %v", frontend.FormatPos(cmd.At), cmd.Name, err)
 				}
 				cmdState := newRegionState(scopes)
-				cmdEffects := newEffectContext(fullName+".command."+cmd.Name, nil, nil, true)
+				cmdEffects := newEffectContext(fullName+".command."+cmd.Name, nil, nil, false)
 				if err := checkStmts(
 					cmd.Body,
 					cmdLocals,

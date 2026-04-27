@@ -274,3 +274,53 @@ uses runtime:
 		})
 	}
 }
+
+func TestActorAndTaskTransfersCannotBeReusedAfterConsume(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "task",
+			src: `
+func worker() -> Int:
+    return 7
+
+func take_task(task: consume task.i32) -> Int
+uses runtime:
+    return core.task_join_i32(task)
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let value: Int = take_task(task)
+    return value + core.task_join_i32(task)
+`,
+			want: "cannot use consumed value 'task'",
+		},
+		{
+			name: "actor",
+			src: `
+func worker() -> Int:
+    return 0
+
+func take_actor(peer: consume actor) -> Int:
+    return 0
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("worker")
+    let _: Int = take_actor(peer)
+    return core.send(peer, 1)
+`,
+			want: "cannot use consumed value 'peer'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requireCheckFileErrorContains(t, tt.src, tt.want)
+		})
+	}
+}

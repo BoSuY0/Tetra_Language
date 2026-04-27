@@ -39,8 +39,14 @@ func TestBuildMachOHeaders(t *testing.T) {
 	if info.entryOff == 0 {
 		t.Fatalf("missing entry offset")
 	}
+	if info.ncmds != 3 {
+		t.Fatalf("load command count = %d, want 3", info.ncmds)
+	}
 	findMachOSection(t, info.sections, "__TEXT", "__text")
 	findMachOSection(t, info.sections, "__DATA", "__cstring")
+	if len(info.sections) != 2 {
+		t.Fatalf("section count = %d, want 2", len(info.sections))
+	}
 }
 
 func TestMachOCStringInSection(t *testing.T) {

@@ -32,6 +32,31 @@ func TestTargetListsAreStable(t *testing.T) {
 	}
 }
 
+func TestTargetStatusValues(t *testing.T) {
+	cases := []struct {
+		triple string
+		status Status
+	}{
+		{"linux-x64", StatusSupported},
+		{"windows-x64", StatusSupported},
+		{"macos-x64", StatusSupported},
+		{"wasm32-wasi", StatusBuildOnly},
+		{"wasm32-web", StatusBuildOnly},
+	}
+	for _, tc := range cases {
+		tgt, err := Parse(tc.triple)
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", tc.triple, err)
+		}
+		if tgt.Status != tc.status {
+			t.Fatalf("Parse(%q).Status = %q, want %q", tc.triple, tgt.Status, tc.status)
+		}
+	}
+	if StatusSupported.String() != "supported" || StatusBuildOnly.String() != "build_only" || StatusPlanned.String() != "planned" {
+		t.Fatalf("unexpected status strings: %q %q %q", StatusSupported, StatusBuildOnly, StatusPlanned)
+	}
+}
+
 func TestParseRejectsUnknown(t *testing.T) {
 	if _, err := Parse("plan9-x64"); err == nil {
 		t.Fatalf("expected error, got nil")

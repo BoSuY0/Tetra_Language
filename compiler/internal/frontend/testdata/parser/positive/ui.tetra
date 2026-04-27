@@ -1,0 +1,9 @@
+state CounterState:
+    var count: Int = 0
+
+view CounterView(state: CounterState):
+    bind value: Int = state.count
+    event click -> increment
+    command increment:
+        state.count = state.count + 1
+    accessibility label: String = "Increment"

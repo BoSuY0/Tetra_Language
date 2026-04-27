@@ -1,4 +1,4 @@
-# Tetra Language (v0.6 Usable Alpha)
+# Tetra Language (v0.1.1)
 
 A systems programming language with region-based memory management (Islands).
 
@@ -6,17 +6,18 @@ This repository is the working Tetra compiler/toolchain. It is not yet the full
 future Tetra platform described by the final language concept; instead it is a
 staged profile that grows through small, verifiable slices.
 
-The current profile is **v0.6 Usable Alpha**: the v0.5 Integrated Alpha surface
-with additional hardening for formatter coverage, LSP stdio, local Eco project
-bundles, release gates, and docs. See `docs/roadmap_0_5_to_0_6.md`,
-`docs/roadmap_0_6_x_stabilization.md`, `docs/release_notes_v0_6.md`, and
-`docs/checklists/v0_6_release_gate.md` for the supported surface and gates.
+The current public profile is **v0.1.1**. It keeps the verified local
+compiler/tooling implementation, while treating older v0.5/v0.6 labels as
+historical checkpoints rather than the current release truth.
 
-The active long-range production plan is `docs/roadmap_0_6_to_1_0.md`.
-`docs/checklists/v1_0_release_gate.md` and `scripts/release_v1_0_gate.sh`
-track the eventual v1.0 release bar. The v1.0 gate intentionally fails on the
-current v0.6 compiler until the Flow-only, ownership-safe, x64+WASM, UI, and
-Eco requirements are implemented.
+The active long-range production TODO is `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+The canonical v1.0 scope contract is `docs/spec/v1_scope.md`.
+`docs/checklists/v1_0_release_gate.md` and `scripts/release_v1_0_gate.sh` track
+the current release bar. The gate is the source of truth for final release
+evidence across Flow syntax, ownership safety, x64+WASM targets, UI smoke, and
+local Eco workflows.
+Release maintainers cut candidates with `docs/release/v1_0_release_cut_guide.md`;
+artifact retention and integrity rules live in `docs/release/artifact_policy.md`.
 
 ## Build
 
@@ -36,7 +37,7 @@ bash scripts/test_all.sh --full --keep-going
 bash scripts/test_all.sh --full --json-only
 ```
 
-`scripts/test_all.sh` is the v0.6.x stabilization wrapper. It runs the quick or
+`scripts/test_all.sh` is the v0.1.x stabilization wrapper. It runs the quick or
 full gate, writes per-step logs, and emits both `summary.md` and `summary.json`
 under `reports/` by default. Each JSON step records its command, exit code,
 status, duration, and log path. `--keep-going` records all selected failures
@@ -155,8 +156,14 @@ go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
 go run ./tools/cmd/gen-docs examples
 ```
 
+The stable command, exit-code, diagnostics, and JSON report contract is tracked
+in `docs/spec/cli_contracts.md`.
+Common command failures and fixes are collected in
+`docs/user/troubleshooting.md`.
+Release-covered examples are indexed in `docs/user/examples_index.md`.
+
 `tetra fmt` emits canonical Flow-style formatting for the supported profile.
-In v0.6, all `examples`, `lib`, `__rt`, and `compiler/selfhostrt` sources are
+In the v0.1.1 profile, all `examples`, `lib`, `__rt`, and `compiler/selfhostrt` sources are
 part of formatter release coverage, and the stabilization gates also scan those
 trees for accidental legacy syntax drift. `tetra test` discovers top-level
 `test "name":` blocks and runs them on the matching host target.
@@ -171,17 +178,21 @@ use `TETRA0001`; positioned semantic/compiler diagnostics use `TETRA2001`;
 formatter check mismatches use `TETRA_FMT002`. Text diagnostics keep the
 traditional `file:line:column: message` shape.
 
-`tetra targets` prints the current target surface. In v0.6 the supported build
+`tetra targets` prints the current target surface. In v0.1.1, the supported build
 targets are `linux-x64`, `windows-x64`, and `macos-x64`; `wasm32-wasi` and
-`wasm32-web` are reported as planned targets with clear diagnostics until the
-real v1.0 WASM backend lands.
+`wasm32-web` are build-only targets with release smoke coverage, while
+cross-host execution remains disabled unless a dedicated runner supports it.
 `tetra smoke --list --format=json` emits the canonical smoke matrix without
 building, so CI can validate smoke coverage before the slower build/run stage.
+`tetra doctor --format=json` reports version, target metadata, manifest
+consistency, smoke source coverage, runtime exports, and the stable tooling
+command surface; `tools/cmd/validate-doctor` enforces that schema for gates.
 
 `tetra lsp --stdio-smoke <file>` emits a one-shot LSP-basic analysis.
-`tetra lsp --stdio` runs the v0.6 minimal JSON-RPC loop for initialize,
-didOpen/didChange/didClose diagnostics, document symbols, hover, shutdown, and
-exit. LSP diagnostics include parser/frontend errors and single-file semantic
+`tetra lsp --stdio` runs the current JSON-RPC loop for initialize,
+didOpen/didChange/didClose diagnostics, document symbols, hover, completion,
+definition, references, rename, formatting, code actions, shutdown, and exit.
+LSP diagnostics include parser/frontend errors and single-file semantic
 diagnostics; library-style files are checked without requiring `main`. Unsaved
 stdio documents with imports currently keep parser/symbol/hover coverage but
 skip semantic checks to avoid false unresolved-import noise. On-disk
@@ -357,7 +368,7 @@ See `docs/spec/islands.md` for the full specification.
 - Targets supported: `linux-x64`, `windows-x64`, `macos-x64`.
 - Unsafe/capability model: see `docs/spec/unsafe.md` and `docs/spec/capabilities.md`.
 - Actors alpha uses `i32` messages and a single-thread cooperative scheduler; the default CLI runtime mode is `--runtime=auto`, which selects the embedded self-host runtime when actors are used.
-- v0.6 Usable Alpha is a coherent local compiler/tooling profile. It does not imply the full future language, package ecosystem, UI stack, or distributed runtime is complete.
+- v0.1.1 is a coherent local compiler/tooling profile. It does not imply the full future language, package ecosystem, UI stack, or distributed runtime is complete.
 - Build flag: `--islands-debug` (double-free detection and UAF traps for islands).
 - Linux output is a native ELF file without a custom extension.
   - Default output name is `app` (use `-o` to override).
