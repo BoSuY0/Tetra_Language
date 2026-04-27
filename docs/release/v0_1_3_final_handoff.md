@@ -12,10 +12,11 @@ Version: `v0.1.3`
   `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
 - Release checklist: no open checkboxes in
   `docs/checklists/v0_1_3_release_gate.md`.
-- Canonical tracked evidence snapshot: `docs/generated/v1_0`, mirrored from
+- Canonical release archive for the prep branch:
   `reports/codex-v0_1_3-post-bump-release-gate-2`.
-- Final verification release gate:
-  `reports/codex-v0_1_3-post-bump-release-gate-2`.
+- Tracked compatibility evidence snapshot: `docs/generated/v1_0`. The
+  directory name is retained for validator compatibility; exact-commit
+  signoff artifacts remain in the release archive.
 
 ## Fresh Verification
 
@@ -38,18 +39,22 @@ Version: `v0.1.3`
 
 ## Integration Notes
 
-- `scripts/release_v0_1_3_gate.sh` now archives the external
-  `security-review.md` signoff into the release evidence artifacts before
-  hashing the archive.
+- `scripts/release_v0_1_3_gate.sh` archives the external `security-review.md`
+  signoff into the release evidence artifacts before hashing the archive.
+- `scripts/release_v1_0_security_review.sh` validates the signoff against the
+  current repository version and exact commit under review.
 - `tools/cmd/validate-release-state` now rejects stale release summaries with
   fewer than `33` steps and validates the tracked artifact hash manifest.
-- `docs/generated/v1_0` now mirrors the release evidence artifact set, not only
-  a small subset of summary files.
+- `docs/generated/v1_0` is a tracked compatibility snapshot of reviewed
+  release evidence. The exact final signoff and release-state audit must be
+  preserved from the report directory produced for the tagged commit.
 - `.gitignore` excludes root-level native UI smoke sidecars and local Codex
   scratch files from release commits.
 
 ## Remaining Release Action
 
-The code and evidence are release-gate clean for the release-prep branch
-state. Final tagging still requires rerunning `scripts/release_v0_1_3_gate.sh`
-on the exact tagged commit and preserving its artifact archive.
+The code is release-gate clean except for the intentionally external security
+review signoff when no `TETRA_SECURITY_REVIEW_SIGNOFF` is supplied. Final
+tagging requires a fresh signoff for the exact commit, rerunning
+`scripts/release_v0_1_3_gate.sh` with that signoff, and preserving the report
+archive.

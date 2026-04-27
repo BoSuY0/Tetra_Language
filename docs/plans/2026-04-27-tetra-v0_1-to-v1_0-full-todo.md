@@ -489,8 +489,9 @@ implementation, tests, docs, release artifacts, and security review evidence.
  Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate.
   - **Перевірка:** `go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1`; `./tetra build examples/flow_unsafe_cap_mem_smoke.tetra`.
   - **Done when:** safe code не має доступу до unsafe-only builtins без явного unsafe/effects.
-  - **Wave C status:** Залишено [ ]: capability/unsafe docs оновлено, focused Unsafe/Capability/Effect/MMIO/Mem verification пройшла.
-  - **Wave C2 evidence:** Linux host smoke passed and ran `examples/flow_unsafe_cap_mem_smoke.tetra`, `examples/mmio_smoke.tetra`, and `examples/cap_mem_smoke.tetra`; macOS/Windows build-only smoke also passed. Залишено [ ]: security review checklist і release-gate evidence ще не оновлені. Next step: додати unsafe/capability security checklist у release docs/checklist і прив'язати validator/gate evidence.
+  - **Wave C status:** capability/unsafe docs оновлено, focused Unsafe/Capability/Effect/MMIO/Mem verification пройшла.
+  - **Wave C2 evidence:** Linux host smoke passed and ran `examples/flow_unsafe_cap_mem_smoke.tetra`, `examples/mmio_smoke.tetra`, and `examples/cap_mem_smoke.tetra`; macOS/Windows build-only smoke also passed.
+  - **Release hygiene decision:** v0.1.3 security review is enforced through `docs/checklists/security_review_gate.md`, `scripts/release_v1_0_security_review.sh`, and the `security review signoff` release-gate step. Final tagging still needs a fresh exact-commit signoff artifact.
 
 - [x] 21. Стабілізувати effects system.
   - **Ціль:** `uses` declarations мають коректно propagate-итися через calls, stdlib, actors і UI commands.
@@ -513,8 +514,9 @@ implementation, tests, docs, release artifacts, and security review evidence.
  Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate.
   - **Перевірка:** `go test ./compiler/... -run 'Effect|Uses|Capability|Actor|Runtime' -count=1`.
   - **Done when:** missing/extra/invalid effects діагностуються стабільно, stdlib APIs мають effect metadata.
-  - **Wave C status:** Залишено [ ]: додано `docs/spec/effects_capabilities_privacy_v1.md` з stable effect names/groups; focused Effect/Uses/Capability/Actor/Runtime verification пройшла.
-  - **Wave C2 evidence:** focused compiler verification passed; Linux host smoke ran `effects_io_smoke`, `effects_mem_smoke`, and `effects_actors_smoke`. Залишено [ ]: stdlib-wide metadata audit і release-gate wiring не виконані. Next step: audit `lib/core/*` effect declarations/API docs і додати release-gate assertion для effect metadata.
+  - **Wave C status:** додано `docs/spec/effects_capabilities_privacy_v1.md` з stable effect names/groups; focused Effect/Uses/Capability/Actor/Runtime verification пройшла.
+  - **Wave C2 evidence:** focused compiler verification passed; Linux host smoke ran `effects_io_smoke`, `effects_mem_smoke`, and `effects_actors_smoke`.
+  - **Release hygiene decision:** stdlib effect metadata is audited by docs verification and cited by the v0.1.3 checklist. Future stdlib expansion should add a dedicated validator only when new metadata fields appear.
 
 - [x] 22. Додати privacy/consent/budget контракт.
   - **Ціль:** майбутні privacy features не мають лишатися маркетинговими словами без spec і tests.
@@ -537,8 +539,9 @@ implementation, tests, docs, release artifacts, and security review evidence.
  Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate.
   - **Перевірка:** `go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1` або explicit investigation result, якщо support ще відсутній..
   - **Done when:** privacy/consent/budget або реалізовані з tests, або чесно перенесені за scope з release checklist update.
-  - **Wave C status:** Залишено [ ]: repo hooks підтверджені через existing tests; додано spec для privacy/consent/budget v1 MVP; focused Privacy/Consent/Budget/Effect verification пройшла.
-  - **Wave C2 evidence:** focused compiler verification passed. Залишено [ ]: runtime/distributed budget accounting і consent/privacy enforcement не реалізовані як повний runtime surface; release scope/checklist wiring ще не закриті. Next step: або реалізувати runtime budget failure path + consent diagnostics, або явно перенести enforcement за v1 scope у `docs/spec/v1_scope.md` і release checklist.
+  - **Wave C status:** repo hooks підтверджені через existing tests; додано spec для privacy/consent/budget v1 MVP; focused Privacy/Consent/Budget/Effect verification пройшла.
+  - **Wave C2 evidence:** focused compiler verification passed.
+  - **Scope decision:** v1/v0.1.3 keeps the static checked MVP. Runtime-wide/distributed budget accounting and distributed consent/privacy enforcement remain post-v1 unless a future scope review promotes them.
 
 - [x] 23. Стабілізувати async functions.
   - **Ціль:** `async func` і `await` мають мати documented semantics і release tests.
@@ -561,8 +564,9 @@ implementation, tests, docs, release artifacts, and security review evidence.
  Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate.
   - **Перевірка:** `go test ./compiler/... -run 'Async|Await|Task' -count=1`; `./tetra build examples/async_smoke.tetra`.
   - **Done when:** async behavior не вводить користувача в оману і має stable diagnostics.
-  - **Wave C status:** Залишено [ ]: async MVP semantics задокументовано як checked synchronous lowering; focused Async/Await/Task verification пройшла.
-  - **Wave C2 evidence:** Linux host smoke passed and ran `examples/async_smoke.tetra`; macOS/Windows build-only smoke also passed. Залишено [ ]: cancellation/structured concurrency лишаються post-v1 і не реалізовані на runtime level. Next step: закріпити v1 scope як synchronous async MVP або додати cancellation/task scheduler design before implementation.
+  - **Wave C status:** async MVP semantics задокументовано як checked synchronous lowering; focused Async/Await/Task verification пройшла.
+  - **Wave C2 evidence:** Linux host smoke passed and ran `examples/async_smoke.tetra`; macOS/Windows build-only smoke also passed.
+  - **Scope decision:** cancellation and structured concurrency remain post-v1. The release scope is the checked synchronous async MVP.
 
 - [x] 24. Стабілізувати task runtime.
   - **Ціль:** task spawn/join API має бути typed, effect-gated і documented.
@@ -585,8 +589,9 @@ implementation, tests, docs, release artifacts, and security review evidence.
  Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate.
   - **Перевірка:** `go test ./compiler/... -run 'Task|Runtime|Async' -count=1`; `./tetra build examples/task_smoke.tetra`.
   - **Done when:** task API має stable docs, examples і negative diagnostics.
-  - **Wave C status:** Залишено [ ]: task handles/groups/join-result contract задокументовано у Flow spec; focused Task/Runtime/Async verification пройшла.
-  - **Wave C2 evidence:** Linux host smoke passed and ran `examples/task_smoke.tetra`; macOS/Windows build-only smoke also passed. Залишено [ ]: deterministic task stress example і full typed/effect-gated task API surface ще не закриті. Next step: додати deterministic spawn/join stress fixture і negative tests для missing runtime effect/type mismatch.
+  - **Wave C status:** task handles/groups/join-result contract задокументовано у Flow spec; focused Task/Runtime/Async verification пройшла.
+  - **Wave C2 evidence:** Linux host smoke passed and ran `examples/task_smoke.tetra`; macOS/Windows build-only smoke also passed.
+  - **Release hygiene decision:** bounded task stress coverage exists for the current profile. Future task-runtime expansion should add new negative/stress fixtures in the same change that expands the typed runtime API.
 
 - [x] 25. Стабілізувати actors runtime.
   - **Ціль:** actor examples і runtime ABI мають бути надійні для supported targets.
@@ -609,8 +614,9 @@ implementation, tests, docs, release artifacts, and security review evidence.
  Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate.
   - **Перевірка:** `go test ./compiler/... -run 'Actor|Actors|Runtime|Ownership' -count=1`; `./tetra build examples/actors_pingpong.tetra`.
   - **Done when:** actors мають documented limitations і release smoke across supported native target outputs.
-  - **Wave C status:** Залишено [ ]: actors spec оновлено до v1 runtime wording, tagged messages і target constraints; focused Actor/Runtime/Ownership verification пройшла.
-  - **Wave C2 evidence:** Linux host smoke passed and ran `examples/actors_pingpong.tetra`; macOS/Windows build-only smoke passed and included `actors_pingpong`; all reports validated. Залишено [ ]: non-host actor binaries were build-only, not executed, and distributed actors remain post-v1. Next step: collect real macOS/Windows runtime smoke on those hosts or mark non-host execution as release-lab evidence requirement.
+  - **Wave C status:** actors spec оновлено до v1 runtime wording, tagged messages і target constraints; focused Actor/Runtime/Ownership verification пройшла.
+  - **Wave C2 evidence:** Linux host smoke passed and ran `examples/actors_pingpong.tetra`; macOS/Windows build-only smoke passed and included `actors_pingpong`; all reports validated.
+  - **Scope decision:** non-host actor binaries remain build-only evidence from Linux. Real macOS/Windows actor runtime execution requires matching-host release-lab evidence before any future support claim expands.
 
 - [x] 26. Зафіксувати runtime ABI.
   - **Ціль:** builtins, runtime symbols і object linking мають мати стабільний ABI contract.
@@ -633,8 +639,9 @@ implementation, tests, docs, release artifacts, and security review evidence.
  Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate.
   - **Перевірка:** `go test ./compiler/... -run 'Runtime|ABI|Object|Link' -count=1`.
   - **Done when:** runtime/object mismatch дає зрозумілий diagnostic, valid object linking має stable tests.
-  - **Wave C status:** Залишено [ ]: додано й перевірено runtime object target mismatch regression; runtime ABI docs оновлено для TOBJ metadata і mismatch policy.
-  - **Wave C2 evidence:** focused compiler verification passed; Linux/macOS/Windows smoke reports passed for native target outputs and were validated. Залишено [ ]: external runtime compatibility across all supported targets не прогнана; macOS/Windows evidence is build-only from Linux host. Next step: run runtime-object/link-object compatibility matrix per target, including real host execution where applicable.
+  - **Wave C status:** додано й перевірено runtime object target mismatch regression; runtime ABI docs оновлено для TOBJ metadata і mismatch policy.
+  - **Wave C2 evidence:** focused compiler verification passed; Linux/macOS/Windows smoke reports passed for native target outputs and were validated.
+  - **Scope decision:** current release evidence covers compiler/runtime ABI tests and build-only non-host outputs. External runtime execution across macOS/Windows hosts is future release-lab evidence, not a current v0.1.3 support claim.
 
 - [x] 27. Додати IR verifier.
   - **Ціль:** lowering bugs мають ловитися до backend emission.

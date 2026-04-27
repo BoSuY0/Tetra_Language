@@ -4,6 +4,25 @@ set -euo pipefail
 signoff_path=""
 template_path=""
 
+current_release_version() {
+  local version=""
+  if [[ -x ./tetra ]]; then
+    version="$(./tetra version 2>/dev/null || true)"
+  fi
+  if [[ -z "$version" && -f compiler/internal/version/version.go ]]; then
+    version="$(sed -nE 's/^const CompilerVersion = "([^"]+)"/\1/p' compiler/internal/version/version.go | head -n 1)"
+  fi
+  if [[ -z "$version" ]]; then
+    echo "security_review: cannot determine current release version" >&2
+    exit 2
+  fi
+  printf '%s\n' "$version"
+}
+
+regex_escape() {
+  printf '%s' "$1" | sed -E 's/[][\\.^$*+?(){}|]/\\&/g'
+}
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -43,14 +62,16 @@ if [[ -n "$template_path" && -n "$signoff_path" ]]; then
 fi
 
 if [[ -n "$template_path" ]]; then
+  release_version="$(current_release_version)"
   mkdir -p "$(dirname "$template_path")"
-  cat >"$template_path" <<'TEMPLATE'
-# v0.1.2 Security Review Signoff
+  template_tmp="$(mktemp)"
+  cat >"$template_tmp" <<'TEMPLATE'
+# @RELEASE_VERSION@ Security Review Signoff
 
 Reviewer: <name and contact>
 Reviewed commit: <git commit sha>
 Report directory: <release report directory>
-Decision: <approved for v0.1.2 release | blocked>
+Decision: <approved for @RELEASE_VERSION@ release | blocked>
 
 ## Evidence Commands
 
@@ -69,6 +90,8 @@ Decision: <approved for v0.1.2 release | blocked>
 
 - <accepted residual risk or "None">
 TEMPLATE
+  sed "s/@RELEASE_VERSION@/$release_version/g" "$template_tmp" >"$template_path"
+  rm -f "$template_tmp"
   echo "security review signoff template: $template_path"
   exit 0
 fi
@@ -85,6 +108,8 @@ if [[ ! -f "$signoff_path" ]]; then
 fi
 
 current_head="$(git rev-parse HEAD)"
+release_version="$(current_release_version)"
+release_version_re="$(regex_escape "$release_version")"
 text="$(cat "$signoff_path")"
 
 require_line() {
@@ -96,7 +121,7 @@ require_line() {
   fi
 }
 
-if grep -Eq '<(name and contact|git commit sha|release report directory|approved for v0\.1\.2 release \| blocked|pass/fail, date, log path|artifact file name|64 lowercase hex chars|accepted residual risk or "None")>|TODO|TBD' "$signoff_path"; then
+if grep -Eq "<(name and contact|git commit sha|release report directory|approved for ${release_version_re} release \| blocked|pass/fail, date, log path|artifact file name|64 lowercase hex chars|accepted residual risk or \"None\")>|TODO|TBD" "$signoff_path"; then
   echo "security_review: signoff contains template placeholder text" >&2
   exit 1
 fi
@@ -104,7 +129,7 @@ fi
 require_line '^Reviewer: .+' 'Reviewer'
 require_line "^Reviewed commit: $current_head$" 'Reviewed commit'
 require_line '^Report directory: .+' 'Report directory'
-require_line '^Decision: approved for v0\.1\.2 release$' 'Decision'
+require_line "^Decision: approved for ${release_version_re} release$" 'Decision'
 require_line '^## Evidence Commands$' 'Evidence Commands section'
 require_line '^## Artifact Hashes$' 'Artifact Hashes section'
 require_line '^## Residual Risks$' 'Residual Risks section'

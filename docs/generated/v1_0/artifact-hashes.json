@@ -4,8 +4,8 @@
   "artifacts": [
     {
       "path": "README.md",
-      "sha256": "sha256:ab0e36aa413ad1ee6f7eb50ae91bb158bd855ebaadded1311221d7835bb6e35a",
-      "size": 1670
+      "sha256": "sha256:c156fc29d0645dad2c0f8329ba6684de5998ab015053e5c5088ab6f034c60868",
+      "size": 1932
     },
     {
       "path": "api-diff/api-diff.json",

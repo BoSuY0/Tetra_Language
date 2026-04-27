@@ -217,7 +217,7 @@ On the `v0.1.3` release branch:
 
 - `bash scripts/bootstrap.sh && ./tetra version && ./t version` reports
   `v0.1.3`.
-- `bash scripts/release_v0_1_3_gate.sh --report-dir <dir>/release-gate` must pass
-  before the release label is attached.
+- `TETRA_SECURITY_REVIEW_SIGNOFF=<current-signoff> bash scripts/release_v0_1_3_gate.sh --report-dir <dir>/release-gate`
+  must pass before the release label is attached.
 - Required checkboxes above must stay linked to evidence produced in the same
   branch state and archived with the release report.
