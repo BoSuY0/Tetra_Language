@@ -50,6 +50,38 @@ bash scripts/test_all.sh --full --keep-going
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 ```
 
+## Multi-Module Layout
+
+Use module paths that mirror file paths under your project root.
+
+Example layout:
+
+```text
+app/main.tetra
+engine/render.tetra
+```
+
+```tetra
+// app/main.tetra
+module app.main
+import engine.render as render
+
+func main() -> Int:
+    return render.add_one(41)
+```
+
+```tetra
+// engine/render.tetra
+module engine.render
+
+func add_one(x: Int) -> Int:
+    return x + 1
+```
+
+The path-to-module rule is strict: `app.main` maps to `app/main.tetra`. Missing
+imports, duplicate module declarations, and import cycles are rejected during
+`./tetra check` / `./tetra build`.
+
 ## Examples In Documentation
 
 Examples in user docs are either real repository paths or are marked as

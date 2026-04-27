@@ -1043,20 +1043,20 @@ implementation, tests, docs, release artifacts, and security review evidence.
   - **Файли/артефакти:** `compiler/internal/module/loader.go`, `compiler/internal/deps/deps.go`, `compiler/cache_test.go`, `compiler/internal/semantics/resolution.go`
   - **Підхід:** покрити module paths, aliases, cycles, duplicates, missing imports, cache invalidation.
   - **Підзадачі:**
-  - [ ] Описати module path rules.
-  - [ ] Додати tests для missing import.
-  - [ ] Додати tests для cyclic import.
-  - [ ] Додати tests для duplicate module.
+  - [x] Описати module path rules. Evidence: `docs/spec/cli_contracts.md` Module imports section defines `app.main -> app/main.tetra`, unique import path rules, alias-shadowing rule, and import error classes.
+  - [x] Додати tests для missing import. Evidence: `TestLoadWorldReportsMissingImportPath`; `go test ./compiler -run 'LoadWorldReportsMissingImportPath' -count=1`.
+  - [x] Додати tests для cyclic import. Evidence: `TestLoadWorldReportsImportCycle`; `go test ./compiler -run 'LoadWorldReportsImportCycle' -count=1`.
+  - [x] Додати tests для duplicate module. Evidence: `TestLoadWorldReportsDuplicateModuleDeclaration`; `go test ./compiler -run 'LoadWorldReportsDuplicateModuleDeclaration' -count=1`.
   - [x] Додати tests для alias shadowing. Evidence: `TestCheckWorldRejectsImportAliasShadowingTopLevelName`; `go test ./compiler -run 'DuplicateImportPath|AliasShadowing|CacheTargetChange' -count=1`.
   - [x] Додати cache invalidation tests. Evidence: existing source/dependency cache tests plus `TestBuildCacheTargetChangeInvalidatesObjects`; `go test ./compiler/... -run 'Module|Import|Deps|Cache|Resolution' -count=1`.
-  - [ ] Додати multi-module docs example.
+  - [x] Додати multi-module docs example. Evidence: `docs/user/getting_started.md` now includes a two-file `app/main.tetra` + `engine/render.tetra` module/import layout example.
   - [x] Перевірити, чи всі згадані файли реально існують або додати investigation task перед змінами. Evidence: inspected `compiler/internal/module/loader.go`, `compiler/internal/deps/deps.go`, `compiler/cache_test.go`, `compiler/internal/semantics/resolution.go`.
   - [x] Не закривати чекбокс без test/evidence output у відповідному PR/agent report. Evidence recorded inline in this Agent F update.
   - [x] Після зміни коду запускати focused tests перед broad gate. Evidence: `go test ./compiler -run 'DuplicateImportPath|AliasShadowing|CacheTargetChange' -count=1`; `go test ./compiler/... -run 'Module|Import|Deps|Cache|Resolution' -count=1`.
-  - [ ] Після зміни docs запускати `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`.
+  - [x] Після зміни docs запускати `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`. Evidence: command passed on 2026-04-27 after the new multi-module docs section landed.
   - [x] Після зміни generated artifacts перевірити `git diff --check` і regenerate consistency. Evidence: `git diff --check`.
   - [x] Оновити цей TODO-file, якщо scope змінюється або task розбивається.
-  - [ ] Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate.
+  - [x] Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate. N/A: import/module loader behavior is mandatory in `docs/spec/v1_scope.md` under stable module contracts.
   - **Перевірка:** `go test ./compiler/... -run 'Module|Import|Deps|Cache|Resolution' -count=1`.
   - **Done when:** multi-module examples/tests стабільні і мають clear diagnostics.
 
