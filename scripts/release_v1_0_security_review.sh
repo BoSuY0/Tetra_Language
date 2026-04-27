@@ -45,12 +45,12 @@ fi
 if [[ -n "$template_path" ]]; then
   mkdir -p "$(dirname "$template_path")"
   cat >"$template_path" <<'TEMPLATE'
-# v0.1.1 Security Review Signoff
+# v0.1.2 Security Review Signoff
 
 Reviewer: <name and contact>
 Reviewed commit: <git commit sha>
 Report directory: <release report directory>
-Decision: <approved for v0.1.1 release | blocked>
+Decision: <approved for v0.1.2 release | blocked>
 
 ## Evidence Commands
 
@@ -96,7 +96,7 @@ require_line() {
   fi
 }
 
-if grep -Eq '<(name and contact|git commit sha|release report directory|approved for v0\.1\.1 release \| blocked|pass/fail, date, log path|artifact file name|64 lowercase hex chars|accepted residual risk or "None")>|TODO|TBD' "$signoff_path"; then
+if grep -Eq '<(name and contact|git commit sha|release report directory|approved for v0\.1\.2 release \| blocked|pass/fail, date, log path|artifact file name|64 lowercase hex chars|accepted residual risk or "None")>|TODO|TBD' "$signoff_path"; then
   echo "security_review: signoff contains template placeholder text" >&2
   exit 1
 fi
@@ -104,7 +104,7 @@ fi
 require_line '^Reviewer: .+' 'Reviewer'
 require_line "^Reviewed commit: $current_head$" 'Reviewed commit'
 require_line '^Report directory: .+' 'Report directory'
-require_line '^Decision: approved for v0\.1\.1 release$' 'Decision'
+require_line '^Decision: approved for v0\.1\.2 release$' 'Decision'
 require_line '^## Evidence Commands$' 'Evidence Commands section'
 require_line '^## Artifact Hashes$' 'Artifact Hashes section'
 require_line '^## Residual Risks$' 'Residual Risks section'

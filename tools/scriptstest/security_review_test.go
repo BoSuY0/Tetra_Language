@@ -12,12 +12,12 @@ func TestSecurityReviewSignoffValidatorAcceptsAuditableSignoff(t *testing.T) {
 	dir := t.TempDir()
 	signoff := filepath.Join(dir, "security-review.md")
 	head := currentGitHead(t)
-	raw := `# v0.1.1 Security Review Signoff
+	raw := `# v0.1.2 Security Review Signoff
 
 Reviewer: Release Reviewer <security@example.invalid>
 Reviewed commit: ` + head + `
 Report directory: /tmp/tetra-v1-rc-security
-Decision: approved for v0.1.1 release
+Decision: approved for v0.1.2 release
 
 ## Evidence Commands
 
@@ -74,12 +74,12 @@ func TestSecurityReviewSignoffValidatorRequiresPrivacyAndWASMEvidence(t *testing
 	dir := t.TempDir()
 	signoff := filepath.Join(dir, "security-review.md")
 	head := currentGitHead(t)
-	raw := `# v0.1.1 Security Review Signoff
+	raw := `# v0.1.2 Security Review Signoff
 
 Reviewer: Release Reviewer <security@example.invalid>
 Reviewed commit: ` + head + `
 Report directory: /tmp/tetra-v1-rc-security
-Decision: approved for v0.1.1 release
+Decision: approved for v0.1.2 release
 
 ## Evidence Commands
 
@@ -118,12 +118,12 @@ func TestSecurityReviewSignoffValidatorRequiresArtifactHashes(t *testing.T) {
 	dir := t.TempDir()
 	signoff := filepath.Join(dir, "security-review.md")
 	head := currentGitHead(t)
-	raw := `# v0.1.1 Security Review Signoff
+	raw := `# v0.1.2 Security Review Signoff
 
 Reviewer: Release Reviewer <security@example.invalid>
 Reviewed commit: ` + head + `
 Report directory: /tmp/tetra-v1-rc-security
-Decision: approved for v0.1.1 release
+Decision: approved for v0.1.2 release
 
 ## Evidence Commands
 

@@ -646,14 +646,14 @@ func TestTestAllValidatesGeneratedAPIDocs(t *testing.T) {
 	}
 }
 
-func TestReleaseV011GateFormatterCoversRuntimeSources(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
+func TestReleaseV012GateFormatterCoversRuntimeSources(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_2_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v0.1.1 release gate: %v", err)
+		t.Fatalf("read v0.1.2 release gate: %v", err)
 	}
 	want := `./tetra fmt --check examples lib __rt compiler/selfhostrt`
 	if !strings.Contains(string(raw), want) {
-		t.Fatalf("v0.1.1 release gate missing runtime formatter coverage %q", want)
+		t.Fatalf("v0.1.2 release gate missing runtime formatter coverage %q", want)
 	}
 }
 
@@ -774,7 +774,7 @@ cmd="${1:-}"
 shift || true
 case "$cmd" in
   version)
-    echo "v0.1.1"
+    echo "v0.1.2"
     ;;
   fmt)
     if [[ "${TETRA_FAIL_FMT:-}" == "1" ]]; then

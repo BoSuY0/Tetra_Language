@@ -1,7 +1,7 @@
 # v1.0 Release Gate Placeholder
 
-Status: compatibility document. The current public release is `v0.1.1`, and
-its authoritative checklist is `docs/checklists/v0_1_1_release_gate.md`.
+Status: compatibility document. The current public release is `v0.1.2`, and
+its authoritative checklist is `docs/checklists/v0_1_2_release_gate.md`.
 
 This filename is retained because older planning documents and helper scripts
 still refer to the future `v1.0` release gate. Do not use this file as proof
@@ -14,6 +14,6 @@ review, and end-to-end gate evidence.
 
 Current release references:
 
-- Current release checklist: `docs/checklists/v0_1_1_release_gate.md`
-- Current release gate: `scripts/release_v0_1_1_gate.sh`
+- Current release checklist: `docs/checklists/v0_1_2_release_gate.md`
+- Current release gate: `scripts/release_v0_1_2_gate.sh`
 - Future v1.0 scope contract: `docs/spec/v1_scope.md`

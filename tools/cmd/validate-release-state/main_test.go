@@ -35,8 +35,8 @@ func TestAuditRequiredArtifactsFailsWhenReleaseEvidenceMissing(t *testing.T) {
 		return nil, errNotExist(path)
 	}
 	report := buildReleaseStateReport(releaseStateInputs{
-		Branch:    "release/v0.1.1",
-		Version:   "v0.1.1",
+		Branch:    "release/v0.1.2",
+		Version:   "v0.1.2",
 		GitStatus: nil,
 		ReadFile:  readFile,
 		StatFile:  statFile,
@@ -71,7 +71,7 @@ func TestReleaseStateJSONAndTextReportEvidence(t *testing.T) {
 	}
 	report := buildReleaseStateReport(releaseStateInputs{
 		Branch:    "main",
-		Version:   "v0.1.1",
+		Version:   "v0.1.2",
 		GitStatus: parseGitStatus(" M README.md\n"),
 		ReadFile:  readFile,
 		StatFile:  statFile,
@@ -87,7 +87,7 @@ func TestReleaseStateJSONAndTextReportEvidence(t *testing.T) {
 		t.Fatalf("json missing dirty tracked: %s", raw)
 	}
 	text := formatTextReport(report)
-	for _, want := range []string{"status: pass", "branch: main", "version: v0.1.1", "dirty tracked files: 1"} {
+	for _, want := range []string{"status: pass", "branch: main", "version: v0.1.2", "dirty tracked files: 1"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("text report missing %q:\n%s", want, text)
 		}
@@ -116,7 +116,7 @@ func TestReleaseStateRejectsStaleGateStepCount(t *testing.T) {
 	}
 	report := buildReleaseStateReport(releaseStateInputs{
 		Branch:    "main",
-		Version:   "v0.1.1",
+		Version:   "v0.1.2",
 		GitStatus: nil,
 		ReadFile:  readFile,
 		StatFile:  statFile,

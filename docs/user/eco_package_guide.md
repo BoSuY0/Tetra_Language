@@ -19,6 +19,6 @@ Release-covered local flows should include:
 ## Verification
 
 Use the validators and smoke steps wired into `bash scripts/test_all.sh --full
---keep-going` and the current `bash scripts/release_v0_1_1_gate.sh` release
+--keep-going` and the current `bash scripts/release_v0_1_2_gate.sh` release
 gate. The future v1.0 gate must not be recreated until these flows produce
 current artifacts for the promoted branch state.

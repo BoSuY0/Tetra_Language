@@ -2,7 +2,7 @@
 
 > Historical checkpoint. This roadmap was produced against an older v0.6 baseline
 > and is superseded by `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
-> The current public version is `v0.1.1`.
+> The current public version is `v0.1.2`.
 
 **Date:** 2026-04-26  
 **Historical starting version:** `v0.6.0`

@@ -2,9 +2,9 @@
 
 Status: pre-release scope contract. This document defines what must be true
 before a build can be labeled `v1.0.0`; it is not a claim that the current
-`v0.1.1` baseline already satisfies the scope.
+`v0.1.2` baseline already satisfies the scope.
 
-The current public release gate is `scripts/release_v0_1_1_gate.sh`. A true
+The current public release gate is `scripts/release_v0_1_2_gate.sh`. A true
 `v1.0.0` gate must be reintroduced from this contract when the version is
 promoted to `v1.0.x` and every mandatory artifact below has fresh evidence.
 
@@ -28,7 +28,7 @@ promoted to `v1.0.x` and every mandatory artifact below has fresh evidence.
 
 | Feature | v1.0 decision | Required evidence | Blocking gate | Owner / agent slot |
 | --- | --- | --- | --- | --- |
-| CLI commands: `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`, `clean`, `version` | Required | CLI package tests and release gate command coverage | `go test ./cli/... -count=1`; current gate: `bash scripts/release_v0_1_1_gate.sh`; future v1 gate: blocked until promotion | CLI agent |
+| CLI commands: `check`, `build`, `run`, `fmt`, `test`, `doc`, `lsp`, `eco`, `clean`, `version` | Required | CLI package tests and release gate command coverage | `go test ./cli/... -count=1`; current gate: `bash scripts/release_v0_1_2_gate.sh`; future v1 gate: blocked until promotion | CLI agent |
 | Formatter contract | Required | Idempotence and comment-preservation coverage for release sources | `go test ./compiler/... -run 'Format|Formatter|Comment' -count=1`; `./tetra fmt --check examples lib __rt compiler/selfhostrt` | tooling agent |
 | Docs manifest, doctests, and generated API docs | Required | Manifest validation, docs verification, API docs validation | `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go run ./tools/cmd/validate-api-docs --docs <generated-docs>` | docs agent |
 | JSON diagnostics, test reports, target reports, doctor reports, smoke reports | Required | Schema validator tests and release gate validator steps | `go test ./tools/... -count=1`; `bash scripts/test_all.sh --full --keep-going` | tools agent |

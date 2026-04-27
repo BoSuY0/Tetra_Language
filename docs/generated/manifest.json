@@ -1,5 +1,5 @@
 {
-  "compiler_version": "v0.1.1",
+  "compiler_version": "v0.1.2",
   "targets": [
     {
       "triple": "linux-x64",

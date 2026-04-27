@@ -2,7 +2,7 @@
 
 Status: future maintainer runbook for non-interactive v1.0 release candidates
 and v1.0.x patch releases. This guide is not executable for the current
-`v0.1.1` line until a real v1 gate replaces the compatibility placeholder.
+`v0.1.2` line until a real v1 gate replaces the compatibility placeholder.
 
 Canonical scope: `docs/spec/v1_scope.md`.
 Release gate: future replacement for `docs/checklists/v1_0_release_gate.md`.

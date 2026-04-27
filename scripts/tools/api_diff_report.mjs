@@ -198,7 +198,7 @@ function reviewMetadata(kind) {
 function buildReviewSummary(totalChanges) {
   return {
     status: totalChanges === 0 ? 'clean' : 'needs_review',
-    release_checklist: 'docs/checklists/v0_1_1_release_gate.md',
+    release_checklist: 'docs/checklists/v0_1_2_release_gate.md',
     baseline_policy: 'docs/spec/api_diff_policy.md',
     checklist: [
       'Classify added entries as intentional v1 scope or remove them before baseline update.',

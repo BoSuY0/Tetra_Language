@@ -207,8 +207,8 @@ func buildReleaseStateReport(input releaseStateInputs) releaseStateReport {
 	issues := []string{}
 	if input.Version == "" {
 		issues = append(issues, "version is missing")
-	} else if input.Version != "v0.1.1" {
-		issues = append(issues, fmt.Sprintf("version %q is not v0.1.1", input.Version))
+	} else if input.Version != "v0.1.2" {
+		issues = append(issues, fmt.Sprintf("version %q is not v0.1.2", input.Version))
 	}
 	for _, missing := range generated.Missing {
 		issues = append(issues, "missing required release artifact: "+missing)

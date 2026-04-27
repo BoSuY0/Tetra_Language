@@ -1,4 +1,4 @@
-# Tetra Language (v0.1.1)
+# Tetra Language (v0.1.2)
 
 A systems programming language with region-based memory management (Islands).
 
@@ -6,14 +6,15 @@ This repository is the working Tetra compiler/toolchain. It is not yet the full
 future Tetra platform described by the final language concept; instead it is a
 staged profile that grows through small, verifiable slices.
 
-The current public profile is **v0.1.1**. It keeps the verified local
+The current public profile is **v0.1.2**. It keeps the verified local
 compiler/tooling implementation, while treating older v0.5/v0.6 labels as
 historical checkpoints rather than the current release truth.
 
+The current supported surface is `docs/spec/current_supported_surface.md`.
 The active long-range production TODO is `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
 The canonical future v1.0 scope contract is `docs/spec/v1_scope.md`.
-`docs/checklists/v0_1_1_release_gate.md` and `scripts/release_v0_1_1_gate.sh`
-track the current `v0.1.1` release bar. The gate is the source of truth for
+`docs/checklists/v0_1_2_release_gate.md` and `scripts/release_v0_1_2_gate.sh`
+track the current `v0.1.2` release bar. The gate is the source of truth for
 final release evidence across Flow syntax, ownership safety, x64+WASM targets,
 UI smoke, and local Eco workflows. The older `v1_0` gate/checklist filenames
 are compatibility aliases and placeholders, not a claim that Tetra is ready for
@@ -165,7 +166,7 @@ Common command failures and fixes are collected in
 Release-covered examples are indexed in `docs/user/examples_index.md`.
 
 `tetra fmt` emits canonical Flow-style formatting for the supported profile.
-In the v0.1.1 profile, all `examples`, `lib`, `__rt`, and `compiler/selfhostrt` sources are
+In the v0.1.2 profile, all `examples`, `lib`, `__rt`, and `compiler/selfhostrt` sources are
 part of formatter release coverage, and the stabilization gates also scan those
 trees for accidental legacy syntax drift. `tetra test` discovers top-level
 `test "name":` blocks and runs them on the matching host target.
@@ -180,7 +181,7 @@ use `TETRA0001`; positioned semantic/compiler diagnostics use `TETRA2001`;
 formatter check mismatches use `TETRA_FMT002`. Text diagnostics keep the
 traditional `file:line:column: message` shape.
 
-`tetra targets` prints the current target surface. In v0.1.1, the supported build
+`tetra targets` prints the current target surface. In v0.1.2, the supported build
 targets are `linux-x64`, `windows-x64`, and `macos-x64`; `wasm32-wasi` and
 `wasm32-web` are build-only targets with release smoke coverage, while
 cross-host execution remains disabled unless a dedicated runner supports it.
@@ -370,7 +371,7 @@ See `docs/spec/islands.md` for the full specification.
 - Targets supported: `linux-x64`, `windows-x64`, `macos-x64`.
 - Unsafe/capability model: see `docs/spec/unsafe.md` and `docs/spec/capabilities.md`.
 - Actors alpha uses `i32` messages and a single-thread cooperative scheduler; the default CLI runtime mode is `--runtime=auto`, which selects the embedded self-host runtime when actors are used.
-- v0.1.1 is a coherent local compiler/tooling profile. It does not imply the full future language, package ecosystem, UI stack, or distributed runtime is complete.
+- v0.1.2 is a coherent local compiler/tooling profile. It does not imply the full future language, package ecosystem, UI stack, or distributed runtime is complete.
 - Build flag: `--islands-debug` (double-free detection and UAF traps for islands).
 - Linux output is a native ELF file without a custom extension.
   - Default output name is `app` (use `-o` to override).
