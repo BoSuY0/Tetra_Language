@@ -1,6 +1,6 @@
 # Tetra Current Supported Surface
 
-Status: current for `v0.1.2`.
+Status: current for `v0.1.3`.
 
 This document is the short release-truth layer for the current public Tetra
 profile. It records what the repository may describe as supported now, and what
@@ -8,14 +8,14 @@ must still be described as future or planned.
 
 `v1.0.0` is a future label. The future scope contract remains
 `docs/spec/v1_scope.md`, but the current user-facing and release-facing truth is
-the `v0.1.2` local compiler/tooling profile.
+the `v0.1.3` local compiler/tooling profile.
 
 ## Current Release Gate
 
-- Current gate: `scripts/release_v0_1_2_gate.sh`.
-- Current checklist: `docs/checklists/v0_1_2_release_gate.md`.
+- Current gate: `scripts/release_v0_1_3_gate.sh`.
+- Current checklist: `docs/checklists/v0_1_3_release_gate.md`.
 - Compatibility alias: `scripts/release_v1_0_gate.sh` delegates to the current
-  `v0.1.2` gate and must not be treated as proof of `v1.0.0` readiness.
+  `v0.1.3` gate and must not be treated as proof of `v1.0.0` readiness.
 - Historical gate: `scripts/release_v0_1_1_gate.sh` remains for the immutable
   `v0.1.1` tag.
 
@@ -41,7 +41,7 @@ the `v0.1.2` local compiler/tooling profile.
   proof-carrying capsules remain post-v1 unless explicitly promoted.
 - Distributed actors, full async cancellation/structured concurrency, full UI
   runtime event dispatch, and native widget rendering remain outside the
-  current `v0.1.2` support claim.
+  current `v0.1.3` support claim.
 - Any feature labeled `planned`, `beta`, `deferred-post-v1`, or
   `blocked-by-prerequisite` in release docs must not be marketed as stable.
 

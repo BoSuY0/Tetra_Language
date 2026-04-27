@@ -1,7 +1,7 @@
 # v0.5 Integrated Alpha Release Gate
 
 > Historical checkpoint. This gate documented the v0.5 release branch only.
-> The current public baseline is `v0.1.2`; use
+> The current public baseline is `v0.1.3`; use
 > `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md` for active work.
 
 Use this checklist before labeling a build or branch as v0.5 Integrated Alpha.

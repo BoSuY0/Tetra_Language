@@ -1,6 +1,6 @@
 # v1.0 Release Candidate Process
 
-Status: future release process policy. The current public release is `v0.1.2`;
+Status: future release process policy. The current public release is `v0.1.3`;
 no `v1.0.0` release candidate may be created while mandatory scope remains
 blocked.
 
