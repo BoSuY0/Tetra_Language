@@ -83,7 +83,7 @@ Release target: `v0.1.1`
 - Do not add new release features after this audit.
 - Only bug fixes, evidence synchronization, release checklist updates, and
   review fixes are allowed before `v0.1.1`.
-- Every checked item in `docs/checklists/v1_0_release_gate.md` must map to a
+- Every checked item in `docs/checklists/v0_1_1_release_gate.md` must map to a
   command, log, or artifact from the canonical release evidence archive.
 - If a release gate run changes tracked generated artifacts, synchronize the
   tracked files first and rerun the gate until generated-artifact churn is zero.

@@ -1,6 +1,6 @@
 # v1.0.x Maintenance Policy
 
-Status: post-release policy for patch releases after `v1.0.0`.
+Status: future post-release policy for patch releases after `v1.0.0`.
 
 ## Semver Policy
 
@@ -43,7 +43,8 @@ bash scripts/test_all.sh --full --keep-going
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 ```
 
-Patch release candidates also run `bash scripts/release_v1_0_gate.sh`.
+Patch release candidates will run the future v1.0 gate after
+`docs/checklists/v1_0_release_gate.md` is replaced with a real v1.0 checklist.
 
 ## Known Issues
 

@@ -7,23 +7,40 @@ import (
 	"testing"
 )
 
-func TestReleaseV10GateDocumentsMandatoryTargets(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+func TestReleaseV011GateDocumentsMandatoryTargets(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v1.0 release gate: %v", err)
+		t.Fatalf("read v0.1.1 release gate: %v", err)
 	}
 	text := string(raw)
 	for _, target := range []string{"linux-x64", "macos-x64", "windows-x64", "wasm32-wasi", "wasm32-web"} {
 		if !strings.Contains(text, "--target "+target) {
-			t.Fatalf("v1.0 release gate missing target %s", target)
+			t.Fatalf("v0.1.1 release gate missing target %s", target)
 		}
 	}
 }
 
-func TestReleaseV10GateKeepsCurrentValidators(t *testing.T) {
+func TestReleaseV10GateIsCompatibilityAlias(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v1.0 release gate: %v", err)
+		t.Fatalf("read v1.0 compatibility gate: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"compatibility alias",
+		"scripts/release_v0_1_1_gate.sh",
+		`exec bash "$script_dir/release_v0_1_1_gate.sh" "$@"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("v1.0 compatibility gate missing %q", want)
+		}
+	}
+}
+
+func TestReleaseV011GateKeepsCurrentValidators(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
+	if err != nil {
+		t.Fatalf("read v0.1.1 release gate: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
@@ -48,24 +65,24 @@ func TestReleaseV10GateKeepsCurrentValidators(t *testing.T) {
 		"bash scripts/release_v1_0_binary_size.sh",
 	} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("v1.0 release gate missing %q", want)
+			t.Fatalf("v0.1.1 release gate missing %q", want)
 		}
 	}
 }
 
-func TestReleaseV10GateRecordsBinarySizeEvidenceBeforeRepro(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+func TestReleaseV011GateRecordsBinarySizeEvidenceBeforeRepro(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v1.0 release gate: %v", err)
+		t.Fatalf("read v0.1.1 release gate: %v", err)
 	}
 	text := string(raw)
 	sizeIdx := strings.Index(text, `run_step "binary size thresholds" check_binary_size_thresholds`)
 	if sizeIdx < 0 {
-		t.Fatalf("v1.0 release gate missing binary size threshold step")
+		t.Fatalf("v0.1.1 release gate missing binary size threshold step")
 	}
 	reproIdx := strings.Index(text, `run_step "reproducible build proof" check_repro_build`)
 	if reproIdx < 0 {
-		t.Fatalf("v1.0 release gate missing repro proof step")
+		t.Fatalf("v0.1.1 release gate missing repro proof step")
 	}
 	if sizeIdx > reproIdx {
 		t.Fatalf("binary size evidence should be recorded before reproducibility proof")
@@ -89,10 +106,10 @@ func TestReleaseV10WebSmokeScriptValidatesReportBeforeExit(t *testing.T) {
 	}
 }
 
-func TestReleaseV10GateValidatesJSONDiagnostics(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+func TestReleaseV011GateValidatesJSONDiagnostics(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v1.0 release gate: %v", err)
+		t.Fatalf("read v0.1.1 release gate: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
@@ -104,15 +121,15 @@ func TestReleaseV10GateValidatesJSONDiagnostics(t *testing.T) {
 		`go run ./tools/cmd/validate-diagnostic --diagnostic "$diagnostic" --severity error --contains "$contains" --require-position`,
 	} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("v1.0 release gate missing JSON diagnostic validation %q", want)
+			t.Fatalf("v0.1.1 release gate missing JSON diagnostic validation %q", want)
 		}
 	}
 }
 
-func TestReleaseV10GateRequiresSecurityReviewSignoff(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+func TestReleaseV011GateRequiresSecurityReviewSignoff(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v1.0 release gate: %v", err)
+		t.Fatalf("read v0.1.1 release gate: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
@@ -122,15 +139,15 @@ func TestReleaseV10GateRequiresSecurityReviewSignoff(t *testing.T) {
 		`run_step "security review signoff" check_security_review_signoff`,
 	} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("v1.0 release gate missing security review wiring %q", want)
+			t.Fatalf("v0.1.1 release gate missing security review wiring %q", want)
 		}
 	}
 }
 
-func TestReleaseV10GateArchivesReleaseStateKnownIssuesAndHashes(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+func TestReleaseV011GateArchivesReleaseStateKnownIssuesAndHashes(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v1.0 release gate: %v", err)
+		t.Fatalf("read v0.1.1 release gate: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
@@ -146,15 +163,15 @@ func TestReleaseV10GateArchivesReleaseStateKnownIssuesAndHashes(t *testing.T) {
 		`run_step "artifact hash manifest" check_artifact_hash_manifest`,
 	} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("v1.0 release gate missing release evidence step %q", want)
+			t.Fatalf("v0.1.1 release gate missing release evidence step %q", want)
 		}
 	}
 }
 
-func TestReleaseV10GateChecksGeneratedArtifactChurn(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+func TestReleaseV011GateChecksGeneratedArtifactChurn(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v1.0 release gate: %v", err)
+		t.Fatalf("read v0.1.1 release gate: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
@@ -165,27 +182,27 @@ func TestReleaseV10GateChecksGeneratedArtifactChurn(t *testing.T) {
 		`run_step "generated artifact churn check" check_generated_artifact_churn`,
 	} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("v1.0 release gate missing generated churn guard %q", want)
+			t.Fatalf("v0.1.1 release gate missing generated churn guard %q", want)
 		}
 	}
 }
 
-func TestReleaseV10GateRunsVersionPreflightBeforePackageTests(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_gate.sh"))
+func TestReleaseV011GateRunsVersionPreflightBeforePackageTests(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_1_gate.sh"))
 	if err != nil {
-		t.Fatalf("read v1.0 release gate: %v", err)
+		t.Fatalf("read v0.1.1 release gate: %v", err)
 	}
 	text := string(raw)
 	versionIdx := strings.Index(text, `run_step "version preflight (v0.1.1 required)"`)
 	if versionIdx < 0 {
-		t.Fatalf("v1.0 release gate missing version preflight step")
+		t.Fatalf("v0.1.1 release gate missing version preflight step")
 	}
 	goTestIdx := strings.Index(text, `run_step "go test packages"`)
 	if goTestIdx < 0 {
-		t.Fatalf("v1.0 release gate missing go test packages step")
+		t.Fatalf("v0.1.1 release gate missing go test packages step")
 	}
 	if versionIdx > goTestIdx {
-		t.Fatalf("v1.0 release gate must hard-block on version before package tests")
+		t.Fatalf("v0.1.1 release gate must hard-block on version before package tests")
 	}
 }
 

@@ -6,7 +6,7 @@ for the current v1 planning baseline.
 Companion freeze decisions for unresolved TODO 12/13/15 implementation items:
 `../plans/v1_scope_freeze_backend_stdlib_ui.md`.
 
-Canonical release scope for the current v0.1.0-to-v1.0.0 plan:
+Canonical release scope for the current v0.1.1-to-v1.0.0 plan:
 `./v1_scope.md`.
 
 Decision labels used here:

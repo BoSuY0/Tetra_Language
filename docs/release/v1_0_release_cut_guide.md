@@ -1,10 +1,11 @@
 # Tetra v1.0 Release Cut Guide
 
-Status: maintainer runbook for non-interactive v1.0 release candidates and
-v1.0.x patch releases.
+Status: future maintainer runbook for non-interactive v1.0 release candidates
+and v1.0.x patch releases. This guide is not executable for the current
+`v0.1.1` line until a real v1 gate replaces the compatibility placeholder.
 
 Canonical scope: `docs/spec/v1_scope.md`.
-Release gate: `docs/checklists/v1_0_release_gate.md`.
+Release gate: future replacement for `docs/checklists/v1_0_release_gate.md`.
 Artifact policy: `docs/release/artifact_policy.md`.
 
 ## Prepare Branch
@@ -32,7 +33,7 @@ report_dir=/tmp/tetra-v1.0.0-rc1-gate
 rm -rf "$report_dir"
 GOCACHE=/tmp/tetra-go-build \
   TETRA_SECURITY_REVIEW_SIGNOFF=docs/generated/v1_0/security-review.md \
-  bash scripts/release_v1_0_gate.sh --report-dir "$report_dir"
+  bash <future-v1-release-gate> --report-dir "$report_dir"
 ```
 
 Required archive entry points:

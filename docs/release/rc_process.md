@@ -1,16 +1,17 @@
 # v1.0 Release Candidate Process
 
-Status: release process policy. No release candidate may be created while
-mandatory scope remains blocked.
+Status: future release process policy. The current public release is `v0.1.1`;
+no `v1.0.0` release candidate may be created while mandatory scope remains
+blocked.
 
 ## RC Entry Criteria
 
 - `docs/spec/v1_scope.md` has no mandatory open blockers.
-- `docs/checklists/v1_0_release_gate.md` required items have current evidence.
+- `docs/checklists/v1_0_release_gate.md` has been replaced with a real v1.0
+  checklist instead of the current placeholder.
 - `./tetra version` and `./t version` report the intended `v1.0.0-rcN` or
   release-candidate branch version policy.
-- `bash scripts/release_v1_0_gate.sh --report-dir <archive-dir>` reaches all
-  mandatory steps and records the result.
+- The future v1.0 gate reaches all mandatory steps and records the result.
 
 ## Feature Freeze
 

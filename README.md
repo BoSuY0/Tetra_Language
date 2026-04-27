@@ -11,11 +11,13 @@ compiler/tooling implementation, while treating older v0.5/v0.6 labels as
 historical checkpoints rather than the current release truth.
 
 The active long-range production TODO is `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
-The canonical v1.0 scope contract is `docs/spec/v1_scope.md`.
-`docs/checklists/v1_0_release_gate.md` and `scripts/release_v1_0_gate.sh` track
-the current release bar. The gate is the source of truth for final release
-evidence across Flow syntax, ownership safety, x64+WASM targets, UI smoke, and
-local Eco workflows.
+The canonical future v1.0 scope contract is `docs/spec/v1_scope.md`.
+`docs/checklists/v0_1_1_release_gate.md` and `scripts/release_v0_1_1_gate.sh`
+track the current `v0.1.1` release bar. The gate is the source of truth for
+final release evidence across Flow syntax, ownership safety, x64+WASM targets,
+UI smoke, and local Eco workflows. The older `v1_0` gate/checklist filenames
+are compatibility aliases and placeholders, not a claim that Tetra is ready for
+the `v1.0.0` label.
 Release maintainers cut candidates with `docs/release/v1_0_release_cut_guide.md`;
 artifact retention and integrity rules live in `docs/release/artifact_policy.md`.
 

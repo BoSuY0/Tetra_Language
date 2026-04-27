@@ -1,6 +1,11 @@
-# Tetra v0.1.0 -> v1.0.0: повний TODO-list
+# Tetra v0.1.1 -> v1.0.0: повний TODO-list
 
-**Поточна публічна версія:** `v0.1.0`
+**Status:** historical long-range backlog. The current public release is
+`v0.1.1`; this file is not proof that the language is ready for `v1.0.0`.
+Future v1 work must be re-opened from `docs/spec/v1_scope.md` with fresh
+implementation, tests, docs, release artifacts, and security review evidence.
+
+**Поточна публічна версія:** `v0.1.1`
 **Ціль релізу:** `v1.0.0`
 **Масштаб:** розширений master backlog з 68 релізних епіків, сотнями підзадач і конкретними командами перевірки.
 **Формат:** одна група задач, щоб усі агенти працювали з одним канонічним списком.
@@ -13,9 +18,10 @@
 - Кожен агент має повернути: змінені файли, команди перевірки, результат, відкриті ризики.
 - Не оновлювати API baseline, release checklist або version number без окремого review.
 - `scripts/test_all.sh --full` є поточним `v0.1.x` stabilization gate.
-- `scripts/release_v1_0_gate.sh` є майбутнім `v1.0.0` gate і має падати, доки version не `v1.0.x` і всі mandatory artifacts не готові.
+- `scripts/release_v0_1_1_gate.sh` є поточним `v0.1.1` gate.
+- `scripts/release_v1_0_gate.sh` лишається compatibility alias/placeholder до моменту, коли буде створений справжній `v1.0.0` gate.
 
-## Єдина група: довести Tetra від v0.1.0 до справжнього v1.0.0
+## Єдина група: довести Tetra від v0.1.1 до справжнього v1.0.0
 
 - [x] 1. Зафіксувати `v0.1.0` як єдину поточну публічну версію.
   - **Ціль:** прибрати двозначність після попередніх v0.5/v0.6/v1.0 маркерів і зробити `v0.1.0` чесним baseline.

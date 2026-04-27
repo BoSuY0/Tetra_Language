@@ -2,7 +2,7 @@
 
 > Historical checkpoint. This TODO list belongs to the older v0.6 stabilization
 > work and is superseded by `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
-> The current public version is `v0.1.0`.
+> The current public version is `v0.1.1`.
 
 **Date:** 2026-04-26
 **Historical baseline:** Tetra `v0.6.0` Usable Alpha
