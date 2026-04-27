@@ -1407,8 +1407,8 @@ implementation, tests, docs, release artifacts, and security review evidence.
   - [x] Додати state mutation scenario.
   - [x] Додати event handler scenario.
   - [x] Додати accessibility metadata якщо supported.
-  - [ ] Додати browser assertion.
-  - [ ] Додати screenshot/report artifact якщо harness підтримує.
+  - [x] Додати browser assertion. Evidence: `bash scripts/release_v1_0_web_smoke.sh --report reports/codex-current-web-smoke-2.json` passed on 2026-04-27 with report result `ok:0`; release gate step `Web UI browser smoke` also passed in `reports/codex-current-release-gate-pass/summary.md`.
+  - [x] Додати screenshot/report artifact якщо harness підтримує. Evidence: harness archives DOM/report artifacts, not screenshots; current artifacts are `reports/codex-current-release-gate-pass/artifacts/web-ui-smoke.json`, `.dom.html`, and `.chromium.err`.
   - [x] Оновити release notes.
   - [x] Перевірити, чи всі згадані файли реально існують або додати investigation task перед змінами.
   - [x] Не закривати чекбокс без test/evidence output у відповідному PR/agent report.
@@ -1417,7 +1417,7 @@ implementation, tests, docs, release artifacts, and security review evidence.
   - [x] Після зміни generated artifacts перевірити `git diff --check` і regenerate consistency.
   - [x] Оновити цей TODO-file, якщо scope змінюється або task розбивається.
   - [x] Якщо задача виявилась post-v1, записати explicit decision і прибрати її з mandatory gate. N/A: web UI dogfood remains in v1 scope.
-  - [ ] Блокер/залишок: `bash scripts/release_v1_0_web_smoke.sh` still fails on this host (`chromium --headless` crash), so browser assertion/screenshot evidence is not yet attachable.
+  - [x] Блокер/залишок resolved for this host on 2026-04-27: `bash scripts/release_v1_0_web_smoke.sh --report reports/codex-current-web-smoke-2.json` passed, `go run ./tools/cmd/validate-web-ui-smoke --report reports/codex-current-web-smoke.json` passed, and `TETRA_SECURITY_REVIEW_SIGNOFF=reports/codex-current-security-review.md bash scripts/release_v0_1_2_gate.sh --report-dir reports/codex-current-release-gate-pass` passed with web UI browser smoke `pass`.
   - **Перевірка:** `bash scripts/release_v1_0_web_smoke.sh`; `./tetra smoke --target wasm32-web --run=false`.
   - **Done when:** browser smoke перевіряє реальний UI artifact.
 

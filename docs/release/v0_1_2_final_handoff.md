@@ -8,8 +8,10 @@ Version: `v0.1.2`
 
 - Stabilization backlog: no open checkboxes in
   `docs/plans/2026-04-27-tetra-real-stabilization-agent-backlog.md`.
-- v1.0 TODO plan: no open checkboxes in
-  `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+- v1.0 TODO plan: all top-level epics are marked complete in
+  `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`; the long-range
+  file still contains historical/internal unchecked subtasks that must not be
+  treated as closed without fresh per-item evidence.
 - Release checklist: no open checkboxes in
   `docs/checklists/v0_1_2_release_gate.md`.
 - Canonical tracked evidence snapshot: `docs/generated/v1_0`, mirrored from
