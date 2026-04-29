@@ -44,6 +44,10 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 		"language.callable-level1":            FeatureStatusExperimental,
 		"stdlib.experimental-mirrors":         FeatureStatusExperimental,
 		"language.enum-payload-match":         FeatureStatusExperimental,
+		"language.ownership-markers-mvp":      FeatureStatusCurrent,
+		"language.resource-lifetime-mvp":      FeatureStatusCurrent,
+		"actors.task-transfer-safety":         FeatureStatusCurrent,
+		"language.lifetime-ssa":               FeatureStatusPlanned,
 		"language.callable-level2":            FeatureStatusPlanned,
 		"wasm.runtime-execution":              FeatureStatusPlanned,
 		"eco.distributed-network":             FeatureStatusPostV1,
@@ -78,6 +82,33 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	for _, want := range []string{"experimental", "not part of the v0.2.0 stable baseline", "not a full first-class function-value claim"} {
 		if !strings.Contains(callableLevel1.Scope+" "+callableLevel1.Stability, want) {
 			t.Fatalf("callable Level 1 feature missing %q boundary: %#v", want, callableLevel1)
+		}
+	}
+	ownershipMVP := seenFeature["language.ownership-markers-mvp"]
+	for _, want := range []string{"conservative borrow/inout/consume marker checks", "use-after-consume", "borrow escape diagnostics", "not a full SSA lifetime solver"} {
+		if !strings.Contains(ownershipMVP.Scope+" "+ownershipMVP.Stability, want) {
+			t.Fatalf("ownership markers MVP feature missing %q boundary: %#v", want, ownershipMVP)
+		}
+	}
+	resourceMVP := seenFeature["language.resource-lifetime-mvp"]
+	for _, want := range []string{"conservative resource finalization checks", "task handles", "island handles", "double-use", "ambiguous provenance", "not a full SSA lifetime solver"} {
+		if !strings.Contains(resourceMVP.Scope+" "+resourceMVP.Stability, want) {
+			t.Fatalf("resource lifetime MVP feature missing %q boundary: %#v", want, resourceMVP)
+		}
+	}
+	transferMVP := seenFeature["actors.task-transfer-safety"]
+	for _, want := range []string{"conservative actor/task ownership transfer checks", "worker entrypoints", "use-after-transfer diagnostics", "conservative local MVP", "distributed actors"} {
+		if !strings.Contains(transferMVP.Scope+" "+transferMVP.Stability, want) {
+			t.Fatalf("actor/task transfer feature missing %q boundary: %#v", want, transferMVP)
+		}
+	}
+	lifetimeSSA := seenFeature["language.lifetime-ssa"]
+	if lifetimeSSA.Since != "" {
+		t.Fatalf("lifetime SSA should not claim v0.2.0 since marker: %#v", lifetimeSSA)
+	}
+	for _, want := range []string{"planned full SSA lifetime analysis", "precise merge reasoning", "no current v0.2.0 support guarantee", "conservative ownership/resource MVP"} {
+		if !strings.Contains(lifetimeSSA.Scope+" "+lifetimeSSA.Stability, want) {
+			t.Fatalf("lifetime SSA feature missing %q boundary: %#v", want, lifetimeSSA)
 		}
 	}
 	callableLevel2 := seenFeature["language.callable-level2"]

@@ -259,6 +259,46 @@ func TestFeaturesCommandJSON(t *testing.T) {
 				}
 			}
 		}
+		if feature.ID == "language.ownership-markers-mvp" {
+			if feature.Status != "current" || feature.Since != "v0.2.0" {
+				t.Fatalf("ownership markers MVP lifecycle = status %q since %q, want current since v0.2.0", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"conservative borrow/inout/consume marker checks", "use-after-consume", "borrow escape diagnostics", "not a full SSA lifetime solver"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("ownership markers MVP feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
+		if feature.ID == "language.resource-lifetime-mvp" {
+			if feature.Status != "current" || feature.Since != "v0.2.0" {
+				t.Fatalf("resource lifetime MVP lifecycle = status %q since %q, want current since v0.2.0", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"conservative resource finalization checks", "task handles", "island handles", "double-use", "ambiguous provenance", "not a full SSA lifetime solver"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("resource lifetime MVP feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
+		if feature.ID == "actors.task-transfer-safety" {
+			if feature.Status != "current" || feature.Since != "v0.2.0" {
+				t.Fatalf("actor/task transfer safety lifecycle = status %q since %q, want current since v0.2.0", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"conservative actor/task ownership transfer checks", "worker entrypoints", "use-after-transfer diagnostics", "conservative local MVP", "distributed actors"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("actor/task transfer feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
+		if feature.ID == "language.lifetime-ssa" {
+			if feature.Status != "planned" || feature.Since != "" {
+				t.Fatalf("lifetime SSA lifecycle = status %q since %q, want planned without v0.2.0 since marker", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"planned full SSA lifetime analysis", "precise merge reasoning", "no current v0.2.0 support guarantee", "conservative ownership/resource MVP"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("lifetime SSA feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
 		if feature.ID == "language.callable-level2" {
 			if feature.Status != "planned" || feature.Since != "" {
 				t.Fatalf("callable Level 2 lifecycle = status %q since %q, want planned without v0.2.0 since marker", feature.Status, feature.Since)
@@ -284,6 +324,10 @@ func TestFeaturesCommandJSON(t *testing.T) {
 		"stdlib.experimental-mirrors":         "experimental",
 		"language.callable-level1":            "experimental",
 		"language.enum-payload-match":         "experimental",
+		"language.ownership-markers-mvp":      "current",
+		"language.resource-lifetime-mvp":      "current",
+		"actors.task-transfer-safety":         "current",
+		"language.lifetime-ssa":               "planned",
 		"language.callable-level2":            "planned",
 		"wasm.runtime-execution":              "planned",
 		"eco.distributed-network":             "post-v1",

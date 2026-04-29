@@ -23,23 +23,23 @@ func worker() -> Int:
 func main() -> Int
 uses runtime:
     let task: task.i32 = core.task_spawn_i32("worker")
-    let result: task.result_i32 = core.task_join_result_i32(task)
-    return result.value + core.task_join_i32(task)
-`, "cannot use joined resource 'task'")
+    let alias: task.i32 = task
+    let first: Int = core.task_join_i32(task)
+    return first + core.task_join_i32(alias)
+`, "cannot use joined resource 'alias'")
 }
 
-func TestTaskHandleFinalizationRejectsAliasJoin(t *testing.T) {
-	requireCheckFileErrorContains(t, `
+func TestTaskHandleFinalizationJoinUntilDoesNotConsumeHandle(t *testing.T) {
+	requireCheckFileOK(t, `
 func worker() -> Int:
     return 7
 
 func main() -> Int
 uses runtime:
     let task: task.i32 = core.task_spawn_i32("worker")
-    let alias: task.i32 = task
-    let first: Int = core.task_join_i32(task)
-    return first + core.task_join_i32(alias)
-`, "cannot use joined resource 'alias'")
+    let first: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(5))
+    return first.value + core.task_join_i32(task)
+`)
 }
 
 func TestTaskGroupCloseStillAllowsStatus(t *testing.T) {

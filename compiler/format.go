@@ -541,7 +541,11 @@ func (p *sourcePrinter) funcDeclWithNameAt(fn *frontend.FuncDecl, name string, i
 	if len(fn.TypeParams) > 0 {
 		typeParams = "<" + strings.Join(fn.TypeParams, ", ") + ">"
 	}
-	header := p.functionHeader("func", fn.Async, name+typeParams, fn.Params, fn.ReturnType, fn.HasThrows, fn.Throws)
+	keyword := "func"
+	if fn.Closure && !fn.Synthetic {
+		keyword = "closure"
+	}
+	header := p.functionHeader(keyword, fn.Async, name+typeParams, fn.Params, fn.ReturnType, fn.HasThrows, fn.Throws)
 	p.emitHeaderWithModifiers(indent, header, fn.Uses, fn.SemanticClauses)
 	p.stmts(fn.Body, indent+1)
 }
@@ -787,6 +791,20 @@ func formatTypeRef(ref frontend.TypeRef) string {
 		return "[" + strconv.Itoa(ref.Len) + "]" + formatTypeRef(*ref.Elem)
 	case frontend.TypeRefOptional:
 		return formatTypeRef(*ref.Elem) + "?"
+	case frontend.TypeRefFunction:
+		params := make([]string, 0, len(ref.Params))
+		for _, param := range ref.Params {
+			params = append(params, formatTypeRef(param))
+		}
+		ret := "?"
+		if ref.Return != nil {
+			ret = formatTypeRef(*ref.Return)
+		}
+		out := "fn(" + strings.Join(params, ", ") + ") -> " + ret
+		if len(ref.Uses) > 0 {
+			out += " uses " + strings.Join(ref.Uses, ", ")
+		}
+		return out
 	default:
 		if len(ref.TypeArgs) == 0 {
 			return ref.Name

@@ -311,6 +311,10 @@ func validateFeatures(features []featureManifest) error {
 		"targets.wasm-build-only":             "current",
 		"stdlib.experimental-mirrors":         "experimental",
 		"language.enum-payload-match":         "experimental",
+		"language.ownership-markers-mvp":      "current",
+		"language.resource-lifetime-mvp":      "current",
+		"actors.task-transfer-safety":         "current",
+		"language.lifetime-ssa":               "planned",
 		"language.callable-level2":            "planned",
 		"wasm.runtime-execution":              "planned",
 		"language.full-v1-guarantees":         "planned",
@@ -383,6 +387,41 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"no witness tables",
 			"dynamic dispatch remain post-v1",
 		},
+		"language.ownership-markers-mvp": {
+			"conservative borrow/inout/consume marker checks",
+			"use-after-consume",
+			"borrow escape diagnostics",
+			"not a full SSA lifetime solver",
+		},
+		"language.resource-lifetime-mvp": {
+			"conservative resource finalization checks",
+			"task handles",
+			"island handles",
+			"double-use",
+			"ambiguous provenance",
+			"not a full SSA lifetime solver",
+		},
+		"actors.task-transfer-safety": {
+			"conservative actor/task ownership transfer checks",
+			"worker entrypoints",
+			"use-after-transfer diagnostics",
+			"conservative local MVP",
+			"distributed actors",
+		},
+		"language.lifetime-ssa": {
+			"planned full SSA lifetime analysis",
+			"precise merge reasoning",
+			"no current v0.2.0 support guarantee",
+			"conservative ownership/resource MVP",
+		},
+	}
+	docChecks := map[string][]string{
+		"language.generics-mvp":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
+		"language.protocol-conformance-mvp": {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
+		"language.ownership-markers-mvp":    {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.resource-lifetime-mvp":    {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"actors.task-transfer-safety":       {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.lifetime-ssa":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
 	}
 	for id, required := range checks {
 		feature, ok := features[id]
@@ -395,7 +434,7 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 				return fmt.Errorf("feature %s missing truth-boundary phrase %q", id, want)
 			}
 		}
-		for _, doc := range []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"} {
+		for _, doc := range docChecks[id] {
 			if !containsString(feature.Docs, doc) {
 				return fmt.Errorf("feature %s missing doc reference %s", id, doc)
 			}

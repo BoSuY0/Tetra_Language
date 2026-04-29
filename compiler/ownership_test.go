@@ -7,23 +7,31 @@ import (
 
 func TestOwnershipMarkersParseAndFormat(t *testing.T) {
 	src := []byte(`
-func mix(a: borrow Int, b: inout Int, c: consume Int) -> Int:
-    return a + b + c
+func mix(a: borrow Int, b: inout Int, c: consume Int, cb: borrow fn(Int) -> Int) -> Int:
+    return cb(a) + b + c
 `)
 	prog, err := Parse(src)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
 	params := prog.Funcs[0].Params
-	if params[0].Ownership != "borrow" || params[1].Ownership != "inout" || params[2].Ownership != "consume" {
-		t.Fatalf("ownership markers = %q/%q/%q", params[0].Ownership, params[1].Ownership, params[2].Ownership)
+	if params[0].Ownership != "borrow" || params[1].Ownership != "inout" || params[2].Ownership != "consume" || params[3].Ownership != "borrow" {
+		t.Fatalf("ownership markers = %q/%q/%q/%q", params[0].Ownership, params[1].Ownership, params[2].Ownership, params[3].Ownership)
 	}
 	formatted, err := FormatSource(src, "ownership.tetra")
 	if err != nil {
 		t.Fatalf("FormatSource: %v", err)
 	}
-	if !strings.Contains(string(formatted), "a: borrow Int, b: inout Int, c: consume Int") {
+	wantParams := "a: borrow Int, b: inout Int, c: consume Int, cb: borrow fn(Int) -> Int"
+	if !strings.Contains(string(formatted), wantParams) {
 		t.Fatalf("formatted source missing markers:\n%s", string(formatted))
+	}
+	twice, err := FormatSource(formatted, "ownership.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource twice: %v", err)
+	}
+	if string(twice) != string(formatted) {
+		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(formatted), string(twice))
 	}
 }
 

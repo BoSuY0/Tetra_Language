@@ -220,6 +220,21 @@ func (s *regionState) markResourceFinalized(name string, state string, pos front
 	s.finalizedResources[id] = resourceFinalization{state: state, pos: pos}
 }
 
+func (s *regionState) markResourceFinalizedAliases(name string, state string, pos frontend.Position) {
+	if s == nil || name == "" || state == "" {
+		return
+	}
+	id, ok := s.resourceID(name)
+	if !ok {
+		id = s.ensureResource(name)
+	}
+	for _, aliasID := range s.resourceVars {
+		if aliasID == id {
+			s.finalizedResources[aliasID] = resourceFinalization{state: state, pos: pos}
+		}
+	}
+}
+
 func (s *regionState) clearResourceFinalized(name string) {
 	if s == nil || name == "" {
 		return

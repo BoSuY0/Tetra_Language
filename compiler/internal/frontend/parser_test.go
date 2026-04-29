@@ -383,6 +383,80 @@ func TestParsePlannedFeatureMatrixFromFlowSyntaxV1(t *testing.T) {
 	}
 }
 
+func TestParseOwnershipParamSyntaxMatrix(t *testing.T) {
+	src := `
+protocol BufferOps:
+    func update(src: borrow []u8, dst: inout []u8, tmp: consume []u8) -> Int
+
+closure local(read: borrow Int, write: inout Int, taken: consume Int) -> Int:
+    write = write + read + taken
+    return write
+
+func mix(a: borrow Int, b: inout Int, c: consume Int, cb: borrow fn(Int) -> Int) -> Int:
+    return cb(a) + b + c
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Protocols) != 1 || len(prog.Protocols[0].Requirements) != 1 {
+		t.Fatalf("protocol requirements = %#v", prog.Protocols)
+	}
+	reqParams := prog.Protocols[0].Requirements[0].Params
+	if got := reqParams[0].Ownership + "," + reqParams[1].Ownership + "," + reqParams[2].Ownership; got != "borrow,inout,consume" {
+		t.Fatalf("protocol ownership = %q", got)
+	}
+	if len(prog.Funcs) != 2 {
+		t.Fatalf("func count = %d, want closure plus func", len(prog.Funcs))
+	}
+	closureParams := prog.Funcs[0].Params
+	if prog.Funcs[0].Name != "local" || closureParams[0].Ownership != "borrow" || closureParams[1].Ownership != "inout" || closureParams[2].Ownership != "consume" {
+		t.Fatalf("closure ownership params = %#v", prog.Funcs[0])
+	}
+	fnParams := prog.Funcs[1].Params
+	if got := fnParams[0].Ownership + "," + fnParams[1].Ownership + "," + fnParams[2].Ownership + "," + fnParams[3].Ownership; got != "borrow,inout,consume,borrow" {
+		t.Fatalf("func ownership = %q", got)
+	}
+	if fnParams[3].Type.Kind != TypeRefFunction {
+		t.Fatalf("borrowed callback type = %#v, want function type", fnParams[3].Type)
+	}
+}
+
+func TestParseOwnershipMarkerSyntaxDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "missing type",
+			src:  "func bad(x: borrow) -> Int:\n    return 0\n",
+			want: "ownership marker 'borrow' must be followed by a parameter type",
+		},
+		{
+			name: "stacked markers",
+			src:  "func bad(x: borrow inout Int) -> Int:\n    return 0\n",
+			want: "ownership marker 'inout' cannot follow ownership marker 'borrow'",
+		},
+		{
+			name: "trailing comma after marker",
+			src:  "func bad(x: consume, y: Int) -> Int:\n    return 0\n",
+			want: "ownership marker 'consume' must be followed by a parameter type",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse([]byte(tt.src))
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseFunctionTypeRef(t *testing.T) {
 	src := `
 func apply(cb: fn(Int, Bool) -> UInt8, value: Int, flag: Bool) -> UInt8:

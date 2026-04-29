@@ -580,6 +580,39 @@ budget(10):
 	}
 }
 
+func TestFormatSourceOwnershipMarkersAreCanonicalAndIdempotent(t *testing.T) {
+	src := []byte(`protocol BufferOps:
+    func update(src: borrow []u8, dst: inout []u8, tmp: consume []u8) -> Int
+
+closure local(read: borrow Int, write: inout Int, taken: consume Int) -> Int:
+    write = write + read + taken
+    return write
+
+func mix(a: borrow Int, b: inout Int, c: consume Int, cb: borrow fn(Int) -> Int) -> Int:
+    return cb(a) + b + c
+`)
+	once, err := FormatSource(src, "ownership.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource once: %v", err)
+	}
+	twice, err := FormatSource(once, "ownership.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource twice: %v", err)
+	}
+	if string(twice) != string(once) {
+		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+	}
+	for _, want := range []string{
+		"func update(src: borrow []u8, dst: inout []u8, tmp: consume []u8) -> Int",
+		"closure local(read: borrow Int, write: inout Int, taken: consume Int) -> Int:",
+		"func mix(a: borrow Int, b: inout Int, c: consume Int, cb: borrow fn(Int) -> Int) -> Int:",
+	} {
+		if !strings.Contains(string(once), want) {
+			t.Fatalf("formatted source missing %q:\n%s", want, string(once))
+		}
+	}
+}
+
 func TestFormatSourceClosureLiteralIsIdempotent(t *testing.T) {
 	src := []byte(`func main() -> Int:
     let f: ptr = fn(x: Int) -> Int:

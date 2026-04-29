@@ -1525,7 +1525,7 @@ func checkResourceCallArg(
 	imports map[string]string,
 	state *regionState,
 ) error {
-	if paramType != "task.group" {
+	if !isResourceHandleType(paramType) {
 		return nil
 	}
 	source, err := resourceSourceForExpr(arg, funcs, module, imports, state)
@@ -1545,7 +1545,7 @@ func checkResourceCallArg(
 	if !source.known {
 		return nil
 	}
-	if resolved == "core.task_group_status" {
+	if paramType == "task.group" && resolved == "core.task_group_status" {
 		return state.checkResourceFinalizationAllowed(source.name, arg.Pos(), "closed")
 	}
 	return state.checkResourceFinalizationAllowed(source.name, arg.Pos())
@@ -1567,7 +1567,7 @@ func markCallFinalizedResources(
 		markTaskHandleJoined(call.Args[0], funcs, module, imports, state)
 	case "core.task_group_close":
 		if source, err := resourceSourceForExpr(call.Args[0], funcs, module, imports, state); err == nil && source.known {
-			state.markResourceFinalized(source.name, "closed", call.Args[0].Pos())
+			state.markResourceFinalizedAliases(source.name, "closed", call.Args[0].Pos())
 		}
 	}
 }
@@ -1577,7 +1577,7 @@ func markTaskHandleJoined(arg frontend.Expr, funcs map[string]FuncSig, module st
 		return
 	}
 	if source, err := resourceSourceForExpr(arg, funcs, module, imports, state); err == nil && source.known {
-		state.markResourceFinalized(source.name, "joined", arg.Pos())
+		state.markResourceFinalizedAliases(source.name, "joined", arg.Pos())
 	}
 }
 

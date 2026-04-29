@@ -514,19 +514,29 @@ func isSupportedActorStateScalarType(name string) bool {
 }
 
 func funcSigActorTaskTransferSafe(sig FuncSig, types map[string]*TypeInfo) bool {
+	return funcSigActorTaskTransferUnsafeReason(sig, types) == ""
+}
+
+func funcSigActorTaskTransferUnsafeReason(sig FuncSig, types map[string]*TypeInfo) string {
 	for i, typeName := range sig.ParamTypes {
 		ownership := ""
 		if i < len(sig.ParamOwnership) {
 			ownership = sig.ParamOwnership[i]
 		}
 		if ownership == "borrow" || ownership == "inout" {
-			return false
+			return fmt.Sprintf("parameter %d uses %s ownership", i+1, ownership)
 		}
 		if !typeActorTaskSendable(typeName, types, map[string]bool{}) {
-			return false
+			return fmt.Sprintf("parameter %d type '%s' is not sendable", i+1, typeName)
 		}
 	}
-	return typeActorTaskSendable(sig.ReturnType, types, map[string]bool{})
+	if sig.ReturnType == "" {
+		return ""
+	}
+	if !typeActorTaskSendable(sig.ReturnType, types, map[string]bool{}) {
+		return fmt.Sprintf("return type '%s' is not sendable", sig.ReturnType)
+	}
+	return ""
 }
 
 func typeActorTaskSendable(typeName string, types map[string]*TypeInfo, seen map[string]bool) bool {
@@ -539,7 +549,16 @@ func typeActorTaskSendable(typeName string, types map[string]*TypeInfo, seen map
 		return false
 	}
 	switch info.Kind {
-	case TypeI32, TypeU8, TypeBool, TypeActor, TypeEnum:
+	case TypeI32, TypeU8, TypeBool, TypeActor:
+		return true
+	case TypeEnum:
+		for _, c := range info.EnumCases {
+			for _, payload := range c.PayloadTypes {
+				if !typeActorTaskSendable(payload, types, seen) {
+					return false
+				}
+			}
+		}
 		return true
 	case TypeOptional:
 		return typeActorTaskSendable(info.ElemType, types, seen)

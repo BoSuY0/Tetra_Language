@@ -85,6 +85,7 @@ type FuncDecl struct {
 	ExportName      string
 	Public          bool
 	Synthetic       bool
+	Closure         bool
 	Async           bool
 	ExtensionOf     string
 	TypeParams      []string

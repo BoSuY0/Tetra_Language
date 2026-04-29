@@ -1327,6 +1327,7 @@ func (p *parser) parseClosureDecl(public bool) (*FuncDecl, error) {
 		Pos:             nameTok.pos,
 		Name:            nameTok.lit,
 		Public:          public,
+		Closure:         true,
 		TypeParams:      typeParams,
 		TypeParamBounds: typeParamBounds,
 		ReturnType:      retType,
@@ -1681,9 +1682,16 @@ func (p *parser) parseParams() ([]ParamDecl, error) {
 		}
 		ownership := ""
 		if p.cur.typ == TokenIdent && isOwnershipMarker(p.cur.lit) {
-			ownership = p.cur.lit
+			ownershipTok := p.cur
+			ownership = ownershipTok.lit
 			if err := p.next(); err != nil {
 				return nil, err
+			}
+			if p.cur.typ == TokenIdent && isOwnershipMarker(p.cur.lit) {
+				return nil, diagnosticErrorf(p.cur.pos, "ownership marker '%s' cannot follow ownership marker '%s'; use exactly one of borrow, inout, or consume before the parameter type", p.cur.lit, ownershipTok.lit)
+			}
+			if !p.startsTypeRef() {
+				return nil, diagnosticErrorf(ownershipTok.pos, "ownership marker '%s' must be followed by a parameter type", ownershipTok.lit)
 			}
 		}
 		typeRef, err := p.parseTypeRef()
@@ -1703,6 +1711,10 @@ func (p *parser) parseParams() ([]ParamDecl, error) {
 
 func isOwnershipMarker(name string) bool {
 	return name == "borrow" || name == "inout" || name == "consume"
+}
+
+func (p *parser) startsTypeRef() bool {
+	return p.cur.typ == TokenIdent || p.cur.typ == TokenFn || p.cur.typ == TokenLBracket
 }
 
 func isFunctionLikeCallee(parts []string) bool {
@@ -3315,6 +3327,7 @@ func (p *parser) parseClosureExpr() (Expr, error) {
 		Pos:             pos,
 		Name:            name,
 		Synthetic:       true,
+		Closure:         true,
 		TypeParams:      typeParams,
 		TypeParamBounds: typeParamBounds,
 		ReturnType:      retType,

@@ -100,6 +100,20 @@ green `scripts/release_v0_2_0_gate.sh` report and matching handoff evidence.
   runtime scope); build-only WASM targets provide compile-compatible island IR
   fallback (`island_new` handle token, `island_make_*` mapped to linear heap
   slice allocation by element width, `island_free` no-op).
+- Ownership markers MVP for `borrow`, `inout`, and `consume` call-site
+  contracts. The current checker is conservative: it covers local-call marker
+  validation, same-call alias rejection, use-after-`consume`, and borrow escape
+  diagnostics, but it is not a full SSA lifetime solver.
+- Resource lifetime MVP for task handles, task groups, island handles,
+  region-backed slices, and structs containing those resources. Common local
+  scopes and control-flow merges are checked conservatively; double-use,
+  ambiguous provenance, and ambiguous lifetime merges are diagnostics rather
+  than proof obligations solved by a full SSA analysis.
+- Actor/task transfer safety MVP for local worker entrypoints, sendable scalar
+  and supported structural results, handle transfer, and use-after-transfer
+  diagnostics. This is a conservative local MVP; it does not claim distributed
+  actor safety, full race-safety proofs, full cancellation semantics, or
+  structured concurrency.
 - Typed task handle wrappers support slot counts `2..8` in the current runtime
   path (`2..4` direct, `5..8` staged). Layouts above `8` are rejected.
 
@@ -129,6 +143,8 @@ green `scripts/release_v0_2_0_gate.sh` report and matching handoff evidence.
   baseline claim. Advanced ADT constructors, nested destructuring patterns,
   richer payload algebra, and guard expansion remain future/post-v1 unless
   separately promoted.
+- Lifetime SSA solving is planned future work: the current ownership/resource
+  safety implementation is a conservative MVP, not a full SSA lifetime solver.
 - Distributed actors, full async cancellation/structured concurrency, full UI
   runtime event dispatch, and native widget rendering remain outside the
   current `v0.2.0` support claim.
