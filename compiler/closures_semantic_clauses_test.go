@@ -298,6 +298,30 @@ func TestFunctionTypedClosureValueUnsupportedDiagnostics(t *testing.T) {
 		want string
 	}{
 		{
+			name: "literal declared effects must cover closure effects",
+			src: `
+func main() -> Int:
+    let f: fn(Int) -> Int = fn(x: Int) -> Int
+    uses io:
+        print("x\n")
+        return x
+    return f(41)
+`,
+			want: "function-typed local 'f' requires effects io but function type does not declare them",
+		},
+		{
+			name: "literal declared effects propagate to local callback call",
+			src: `
+func main() -> Int:
+    let f: fn(Int) -> Int uses io = fn(x: Int) -> Int
+    uses io:
+        print("x\n")
+        return x
+    return f(41)
+`,
+			want: "function 'main' uses effect 'io' but does not declare it",
+		},
+		{
 			name: "return generic named symbol unsupported",
 			src: `
 func id<T>(x: T) -> T:
@@ -358,7 +382,7 @@ func main() -> Int:
         return x + base
     return f(41)
 `,
-			want: "requires a non-capturing closure literal",
+			want: "captures 'base'; captures are not supported for function-typed values in this MVP",
 		},
 		{
 			name: "escape unsupported",
@@ -749,7 +773,8 @@ func hasInstrKind(fn *IRFunc, kind ir.IRInstrKind) bool {
 func TestBudgetRuntimeChecksAreLowered(t *testing.T) {
 	src := []byte(`
 func tick() -> Int
-uses budget:
+uses budget
+budget(1):
     return 1
 
 func work() -> Int
@@ -758,7 +783,8 @@ budget(2):
     return tick()
 
 func main() -> Int
-uses budget:
+uses budget
+budget(4):
     return work()
 `)
 	prog, err := Parse(src)

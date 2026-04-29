@@ -190,6 +190,42 @@ func TestVerifyWASMBackendPlanRequiresConcreteGateCommands(t *testing.T) {
 	}
 }
 
+func TestVerifyFeatureRegistryAcceptsRequiredStatuses(t *testing.T) {
+	features := []featureManifest{
+		{ID: "cli.core", Name: "CLI", Status: "current", Since: "v0.2.0", Scope: "core CLI", Stability: "supported", Docs: []string{"docs/spec/current_supported_surface.md"}},
+		{ID: "language.flow", Name: "Flow", Status: "current", Since: "v0.2.0", Scope: "flow syntax", Stability: "supported", Docs: []string{"docs/spec/flow_syntax_v1.md"}},
+		{ID: "targets.wasm-build-only", Name: "WASM build-only", Status: "current", Since: "v0.2.0", Scope: "build-only smoke", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "stdlib.experimental-mirrors", Name: "Experimental mirrors", Status: "experimental", Since: "v0.2.0", Scope: "stdlib mirrors", Stability: "experimental", Docs: []string{"docs/user/standard_library_guide.md"}},
+		{ID: "wasm.runtime-execution", Name: "WASM runtime", Status: "planned", Scope: "runner", Stability: "planned", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "language.full-v1-guarantees", Name: "v1", Status: "planned", Scope: "v1", Stability: "planned", Docs: []string{"docs/spec/v1_scope.md"}},
+		{ID: "eco.distributed-network", Name: "EcoNet", Status: "post-v1", Scope: "network", Stability: "deferred", Docs: []string{"docs/release/post_v1_promotion_checklist.md"}},
+		{ID: "language.full-first-class-callables", Name: "Callables", Status: "post-v1", Scope: "callables", Stability: "deferred", Docs: []string{"docs/spec/v1_feature_status.md"}},
+	}
+	if err := verifyFeatureRegistry(features); err != nil {
+		t.Fatalf("verifyFeatureRegistry: %v", err)
+	}
+}
+
+func TestVerifyFeatureRegistryRejectsFutureMismatch(t *testing.T) {
+	features := []featureManifest{
+		{ID: "cli.core", Name: "CLI", Status: "current", Since: "v0.2.0", Scope: "core CLI", Stability: "supported", Docs: []string{"docs/spec/current_supported_surface.md"}},
+		{ID: "language.flow", Name: "Flow", Status: "current", Since: "v0.2.0", Scope: "flow syntax", Stability: "supported", Docs: []string{"docs/spec/flow_syntax_v1.md"}},
+		{ID: "targets.wasm-build-only", Name: "WASM build-only", Status: "current", Since: "v0.2.0", Scope: "build-only smoke", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "stdlib.experimental-mirrors", Name: "Experimental mirrors", Status: "experimental", Since: "v0.2.0", Scope: "stdlib mirrors", Stability: "experimental", Docs: []string{"docs/user/standard_library_guide.md"}},
+		{ID: "wasm.runtime-execution", Name: "WASM runtime", Status: "current", Since: "v0.2.0", Scope: "runner", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "language.full-v1-guarantees", Name: "v1", Status: "planned", Scope: "v1", Stability: "planned", Docs: []string{"docs/spec/v1_scope.md"}},
+		{ID: "eco.distributed-network", Name: "EcoNet", Status: "post-v1", Scope: "network", Stability: "deferred", Docs: []string{"docs/release/post_v1_promotion_checklist.md"}},
+		{ID: "language.full-first-class-callables", Name: "Callables", Status: "post-v1", Scope: "callables", Stability: "deferred", Docs: []string{"docs/spec/v1_feature_status.md"}},
+	}
+	err := verifyFeatureRegistry(features)
+	if err == nil {
+		t.Fatalf("expected future mismatch failure")
+	}
+	if !strings.Contains(err.Error(), "wasm.runtime-execution") || !strings.Contains(err.Error(), "want planned") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestVerifyReleaseTruthDocsRejectsMisleadingCurrentReleaseLanguage(t *testing.T) {
 	dir := t.TempDir()
 	doc := filepath.Join(dir, "current_supported_surface.md")

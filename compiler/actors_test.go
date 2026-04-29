@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/target"
@@ -898,6 +899,40 @@ uses actors, runtime:
 	}
 }
 
+func TestActorSpawnsTaskAndReceivesCompletionBuildAndRun(t *testing.T) {
+	src := `
+func task_worker() -> Int:
+    return 5
+
+func actor_worker() -> Int
+uses actors, runtime:
+    let task: task.i32 = core.task_spawn_i32("task_worker")
+    let taskResult: task.result_i32 = core.task_join_result_i32(task)
+    if taskResult.error != 0:
+        return 40 + taskResult.error
+    let _sent: Int = core.send(core.sender(), taskResult.value + 1)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let _actor: actor = core.spawn("actor_worker")
+    let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+    if reply.error != 0:
+        return 60 + reply.error
+    return reply.value
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; actor-spawned task should wake actor receive")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 6 {
+		t.Fatalf("exit code = %d, want actor/task interaction result 6", exitCode)
+	}
+}
+
 func TestActorsPingPongRuntimeModeParity(t *testing.T) {
 	tgt, ok := target.Host()
 	if !ok {
@@ -1041,6 +1076,7 @@ func TestRequiredActorRuntimeSymbolsIncludeTaggedMessageABI(t *testing.T) {
 		"__tetra_actor_send_msg",
 		"__tetra_actor_recv_msg",
 		"__tetra_actor_recv_poll",
+		"__tetra_actor_recv_until",
 		"__tetra_actor_send_begin",
 		"__tetra_actor_send_slot",
 		"__tetra_actor_send_commit",

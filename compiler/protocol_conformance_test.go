@@ -73,6 +73,39 @@ func main() -> Int:
 	}
 }
 
+func TestProtocolConformanceRejectsThrowingRequirementMismatch(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+enum DrawError:
+    case failed
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int throws DrawError
+
+extension Vec2:
+    func draw(self: Vec2) -> Int:
+        return self.x
+
+impl Vec2: Renderable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected throws conformance error")
+	}
+	if !strings.Contains(err.Error(), "throws type differs") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestProtocolConformanceReportsMissingMethod(t *testing.T) {
 	src := []byte(`
 struct Vec2:

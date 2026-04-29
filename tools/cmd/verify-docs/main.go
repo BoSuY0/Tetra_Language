@@ -28,6 +28,17 @@ type manifest struct {
 		TimeRequiredSymbols      []string `json:"time_required_symbols"`
 		ActorsProgramGlueSymbols []string `json:"actors_program_glue_symbols"`
 	} `json:"runtime_abi"`
+	Features []featureManifest `json:"features"`
+}
+
+type featureManifest struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Status    string   `json:"status"`
+	Since     string   `json:"since,omitempty"`
+	Scope     string   `json:"scope"`
+	Stability string   `json:"stability"`
+	Docs      []string `json:"docs"`
 }
 
 func main() {
@@ -126,6 +137,9 @@ func main() {
 	if err := verifyReleaseTruthDocs(currentReleaseTruthDocPaths()); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifyFeatureRegistry(m.Features); err != nil {
+		errs = append(errs, err.Error())
+	}
 	if err := verifyWASMBackendPlan("docs/backend/wasm_backend_plan.md", ctarget.WASMTriples()); err != nil {
 		errs = append(errs, err.Error())
 	}
@@ -163,6 +177,85 @@ func verifyWASMBackendPlan(path string, plannedTargets []string) error {
 	for _, want := range required {
 		if !strings.Contains(text, want) {
 			return fmt.Errorf("%s: missing %q", path, want)
+		}
+	}
+	return nil
+}
+
+func verifyFeatureRegistry(features []featureManifest) error {
+	if len(features) == 0 {
+		return fmt.Errorf("feature registry is required in generated manifest")
+	}
+	allowedStatus := map[string]bool{
+		"current":      true,
+		"experimental": true,
+		"planned":      true,
+		"post-v1":      true,
+	}
+	requiredStatus := map[string]bool{
+		"current":      false,
+		"experimental": false,
+		"planned":      false,
+		"post-v1":      false,
+	}
+	requiredIDs := map[string]string{
+		"cli.core":                            "current",
+		"language.flow":                       "current",
+		"targets.wasm-build-only":             "current",
+		"stdlib.experimental-mirrors":         "experimental",
+		"wasm.runtime-execution":              "planned",
+		"language.full-v1-guarantees":         "planned",
+		"eco.distributed-network":             "post-v1",
+		"language.full-first-class-callables": "post-v1",
+	}
+	seen := map[string]string{}
+	var currentCount int
+	for _, feature := range features {
+		if feature.ID == "" {
+			return fmt.Errorf("feature registry entry missing id")
+		}
+		if feature.Name == "" || feature.Scope == "" || feature.Stability == "" {
+			return fmt.Errorf("feature %s missing name, scope, or stability", feature.ID)
+		}
+		if !allowedStatus[feature.Status] {
+			return fmt.Errorf("feature %s has invalid status %q", feature.ID, feature.Status)
+		}
+		if seenStatus, ok := seen[feature.ID]; ok {
+			return fmt.Errorf("feature %s is duplicated with statuses %s and %s", feature.ID, seenStatus, feature.Status)
+		}
+		seen[feature.ID] = feature.Status
+		requiredStatus[feature.Status] = true
+		if feature.Status == "current" {
+			currentCount++
+			if feature.Since == "" {
+				return fmt.Errorf("current feature %s missing since", feature.ID)
+			}
+		}
+		if len(feature.Docs) == 0 {
+			return fmt.Errorf("feature %s must cite docs", feature.ID)
+		}
+		for _, doc := range feature.Docs {
+			if doc == "" {
+				return fmt.Errorf("feature %s has empty doc reference", feature.ID)
+			}
+			if filepath.IsAbs(doc) || strings.Contains(filepath.ToSlash(doc), "..") {
+				return fmt.Errorf("feature %s has unsafe doc reference %q", feature.ID, doc)
+			}
+		}
+	}
+	if currentCount == 0 {
+		return fmt.Errorf("feature registry must include current features")
+	}
+	for status, present := range requiredStatus {
+		if !present {
+			return fmt.Errorf("feature registry missing %s feature", status)
+		}
+	}
+	for id, wantStatus := range requiredIDs {
+		if gotStatus, ok := seen[id]; !ok {
+			return fmt.Errorf("feature registry missing %s", id)
+		} else if gotStatus != wantStatus {
+			return fmt.Errorf("feature registry %s status = %s, want %s", id, gotStatus, wantStatus)
 		}
 	}
 	return nil

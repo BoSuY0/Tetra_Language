@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -18,9 +19,11 @@ type manifestEnvelope struct {
 	TargetsRaw      json.RawMessage    `json:"targets"`
 	BuiltinsRaw     json.RawMessage    `json:"builtins"`
 	RuntimeABI      runtimeABIManifest `json:"runtime_abi"`
+	FeaturesRaw     json.RawMessage    `json:"features"`
 	Formats         []formatManifest
 	Targets         []targetManifest
 	Builtins        []builtinManifest
+	Features        []featureManifest
 }
 
 type formatManifest struct {
@@ -59,6 +62,16 @@ type runtimeABIManifest struct {
 	ActorsRequiredSymbols    []string `json:"actors_required_symbols"`
 	TimeRequiredSymbols      []string `json:"time_required_symbols,omitempty"`
 	ActorsProgramGlueSymbols []string `json:"actors_program_glue_symbols"`
+}
+
+type featureManifest struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Status    string   `json:"status"`
+	Since     string   `json:"since,omitempty"`
+	Scope     string   `json:"scope"`
+	Stability string   `json:"stability"`
+	Docs      []string `json:"docs"`
 }
 
 const manifestArtifact = "tetra.release.v0_2_0.manifest-json.v1"
@@ -142,7 +155,13 @@ func validateManifest(raw []byte) error {
 		}
 		builtins[builtin.Name] = true
 	}
-	return validateRuntimeABI(manifest.RuntimeABI, targets)
+	if err := validateRuntimeABI(manifest.RuntimeABI, targets); err != nil {
+		return err
+	}
+	if err := unmarshalArray(manifest.FeaturesRaw, "features", &manifest.Features); err != nil {
+		return err
+	}
+	return validateFeatures(manifest.Features)
 }
 
 func validateFormats(formats []formatManifest) error {
@@ -271,6 +290,65 @@ func validateBuiltin(builtin builtinManifest) error {
 	for _, effect := range builtin.Effects {
 		if effect == "" {
 			return fmt.Errorf("builtin %s has empty effect", builtin.Name)
+		}
+	}
+	return nil
+}
+
+func validateFeatures(features []featureManifest) error {
+	if len(features) == 0 {
+		return fmt.Errorf("features must not be empty")
+	}
+	allowedStatus := map[string]bool{"current": true, "experimental": true, "planned": true, "post-v1": true}
+	requiredStatus := map[string]bool{"current": false, "experimental": false, "planned": false, "post-v1": false}
+	requiredIDs := map[string]string{
+		"cli.core":                            "current",
+		"language.flow":                       "current",
+		"targets.wasm-build-only":             "current",
+		"stdlib.experimental-mirrors":         "experimental",
+		"wasm.runtime-execution":              "planned",
+		"language.full-v1-guarantees":         "planned",
+		"eco.distributed-network":             "post-v1",
+		"language.full-first-class-callables": "post-v1",
+	}
+	seen := map[string]string{}
+	for _, feature := range features {
+		if feature.ID == "" {
+			return fmt.Errorf("feature missing id")
+		}
+		if feature.Name == "" || feature.Scope == "" || feature.Stability == "" {
+			return fmt.Errorf("feature %s missing name, scope, or stability", feature.ID)
+		}
+		if !allowedStatus[feature.Status] {
+			return fmt.Errorf("feature %s invalid status %q", feature.ID, feature.Status)
+		}
+		if seenStatus, ok := seen[feature.ID]; ok {
+			return fmt.Errorf("duplicate feature %s (%s and %s)", feature.ID, seenStatus, feature.Status)
+		}
+		seen[feature.ID] = feature.Status
+		requiredStatus[feature.Status] = true
+		if feature.Status == "current" && feature.Since == "" {
+			return fmt.Errorf("current feature %s missing since", feature.ID)
+		}
+		if len(feature.Docs) == 0 {
+			return fmt.Errorf("feature %s missing docs", feature.ID)
+		}
+		for _, doc := range feature.Docs {
+			if doc == "" || filepath.IsAbs(doc) || strings.Contains(filepath.ToSlash(doc), "..") {
+				return fmt.Errorf("feature %s invalid doc reference %q", feature.ID, doc)
+			}
+		}
+	}
+	for status, present := range requiredStatus {
+		if !present {
+			return fmt.Errorf("features missing %s status", status)
+		}
+	}
+	for id, wantStatus := range requiredIDs {
+		if gotStatus, ok := seen[id]; !ok {
+			return fmt.Errorf("features missing %s", id)
+		} else if gotStatus != wantStatus {
+			return fmt.Errorf("feature %s status = %s, want %s", id, gotStatus, wantStatus)
 		}
 	}
 	return nil

@@ -14,6 +14,7 @@ type Manifest struct {
 	Targets         []TargetManifest  `json:"targets"`
 	Builtins        []BuiltinManifest `json:"builtins"`
 	RuntimeABI      RuntimeManifest   `json:"runtime_abi"`
+	Features        []FeatureInfo     `json:"features"`
 }
 
 type FormatManifest = formats.Info
@@ -93,5 +94,6 @@ func GetManifest() (Manifest, error) {
 				"__tetra_actor_main_entry_id",
 			},
 		},
+		Features: FeatureRegistry(),
 	}, nil
 }

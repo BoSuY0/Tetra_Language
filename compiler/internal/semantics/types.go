@@ -61,6 +61,7 @@ type LocalInfo struct {
 	FunctionTypeValue    bool
 	FunctionParamTypes   []string
 	FunctionReturnType   string
+	FunctionEffects      []string
 }
 
 type GlobalInfo struct {
@@ -83,12 +84,14 @@ type FuncSig struct {
 	ParamFunctionTypes    []bool
 	ParamFunctionParams   [][]string
 	ParamFunctionReturns  []string
+	ParamFunctionEffects  [][]string
 	ParamOwnership        []string
 	ParamSlots            int
 	ReturnType            string
 	ReturnFunctionType    bool
 	ReturnFunctionParams  []string
 	ReturnFunctionReturn  string
+	ReturnFunctionEffects []string
 	ReturnFunctionSymbol  string
 	ThrowsType            string
 	Async                 bool

@@ -208,6 +208,57 @@ func TestValidateTypedTaskRuntimeObjectRejectsMissingStagedSymbols(t *testing.T)
 	}
 }
 
+func TestRequiredTaskRuntimeSymbolsIncludeDeadlineAndCancellationABI(t *testing.T) {
+	got := map[string]struct{}{}
+	for _, name := range requiredTaskRuntimeSymbols() {
+		got[name] = struct{}{}
+	}
+	for _, name := range []string{
+		"__tetra_task_join_until_i32",
+		"__tetra_task_poll_i32",
+		"__tetra_task_is_canceled",
+		"__tetra_task_checkpoint",
+	} {
+		if _, ok := got[name]; !ok {
+			t.Fatalf("required task runtime symbols missing deadline/cancellation ABI symbol %q", name)
+		}
+	}
+}
+
+func TestRequiredTaskGroupRuntimeSymbolsIncludeCancellationABI(t *testing.T) {
+	got := map[string]struct{}{}
+	for _, name := range requiredTaskGroupRuntimeSymbols() {
+		got[name] = struct{}{}
+	}
+	for _, name := range []string{
+		"__tetra_task_group_open",
+		"__tetra_task_group_close",
+		"__tetra_task_group_cancel",
+		"__tetra_task_group_current",
+		"__tetra_task_group_status",
+		"__tetra_task_spawn_group_i32",
+	} {
+		if _, ok := got[name]; !ok {
+			t.Fatalf("required task group runtime symbols missing ABI symbol %q", name)
+		}
+	}
+}
+
+func TestValidateTaskGroupRuntimeObjectRejectsMissingCancellationSymbols(t *testing.T) {
+	obj := &Object{}
+	for _, name := range requiredTaskGroupRuntimeSymbols() {
+		if name == "__tetra_task_group_cancel" {
+			continue
+		}
+		obj.Symbols = append(obj.Symbols, Symbol{Name: name})
+	}
+	if err := validateTaskGroupRuntimeObject(obj); err == nil {
+		t.Fatalf("expected missing task group cancellation symbol failure")
+	} else if !strings.Contains(err.Error(), "__tetra_task_group_cancel") {
+		t.Fatalf("unexpected task group runtime validation error: %v", err)
+	}
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
@@ -588,6 +639,82 @@ uses runtime:
 	}
 	if exitCode != 1 {
 		t.Fatalf("exit code = %d, want canceled status 1", exitCode)
+	}
+}
+
+func TestTaskGroupCancelWakesJoinUntilBeforeDeadlineBuildAndRun(t *testing.T) {
+	src := `
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(10)
+    return 99
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let _delay: Int = core.sleep_ms(2)
+    group = core.task_group_cancel(group)
+    let result: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(20))
+    let _closed: Int = core.task_group_close(group)
+    if result.value != 0:
+        return result.value
+    if result.error != 1:
+        return 30 + result.error
+    let now: Int = core.time_now_ms()
+    if now != 2:
+        return 50 + now
+    return result.error
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; canceled grouped task should wake join_until before deadline")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 1 {
+		t.Fatalf("exit code = %d, want canceled task error 1 at logical time 2", exitCode)
+	}
+}
+
+func TestTaskGroupJoinUntilTimeoutThenCancelFinalJoinBuildAndRun(t *testing.T) {
+	src := `
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(10)
+    return 99
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let early: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(3))
+    if early.error != 2:
+        return 20 + early.error
+    if early.value != 0:
+        return 40 + early.value
+    let atTimeout: Int = core.time_now_ms()
+    if atTimeout != 3:
+        return 60 + atTimeout
+    group = core.task_group_cancel(group)
+    let final: task.result_i32 = core.task_join_result_i32(task)
+    let _closed: Int = core.task_group_close(group)
+    if final.value != 0:
+        return final.value
+    if final.error != 1:
+        return 80 + final.error
+    return final.error
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; final join should observe cancellation after prior timeout")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 1 {
+		t.Fatalf("exit code = %d, want canceled final join after timeout", exitCode)
 	}
 }
 
@@ -1143,6 +1270,56 @@ uses runtime:
 	}
 }
 
+func TestTaskDeadlineBuiltinSelfHostParityBuildAndRun(t *testing.T) {
+	src := `
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let result: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(5))
+    if result.error != 0:
+        return 20 + result.error
+    return result.value
+`
+	var want *struct {
+		stdout string
+		exit   int
+	}
+	for _, tc := range []struct {
+		name string
+		rt   RuntimeMode
+	}{
+		{name: "builtin", rt: RuntimeBuiltin},
+		{name: "selfhost", rt: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{Runtime: tc.rt}, 250*time.Millisecond)
+			if timedOut {
+				t.Fatalf("program timed out; deadline join should complete under runtime %d", tc.rt)
+			}
+			got := struct {
+				stdout string
+				exit   int
+			}{stdout: stdout, exit: exitCode}
+			if want == nil {
+				want = &got
+			} else if got != *want {
+				t.Fatalf("runtime parity mismatch: got=%#v want=%#v", got, *want)
+			}
+			if stdout != "" {
+				t.Fatalf("stdout mismatch: %q", stdout)
+			}
+			if exitCode != 2 {
+				t.Fatalf("exit code = %d, want deadline join value 2", exitCode)
+			}
+		})
+	}
+}
+
 func TestTaskJoinResultWaitStateAllowsSleepingTaskDeadlineBuildAndRun(t *testing.T) {
 	src := `
 func worker() -> Int
@@ -1367,6 +1544,41 @@ uses runtime:
 	}
 	if exitCode != 11 {
 		t.Fatalf("exit code = %d, want nested canceled checkpoint result 11", exitCode)
+	}
+}
+
+func TestTaskSpawnsActorAndReceivesMailboxReplyBuildAndRun(t *testing.T) {
+	src := `
+func actor_worker() -> Int
+uses actors:
+    let _sent: Int = core.send(core.sender(), 6)
+    return 0
+
+func worker() -> Int
+uses actors:
+    let _actor: actor = core.spawn("actor_worker")
+    return 1
+
+func main() -> Int
+uses actors, runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(3))
+    if reply.error != 0:
+        return 40 + reply.error
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    if result.error != 0:
+        return 80 + result.error
+    return result.value + reply.value
+`
+	stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, src, BuildOptions{}, 250*time.Millisecond)
+	if timedOut {
+		t.Fatalf("program timed out; task-spawned actor should reply to parent mailbox")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 7 {
+		t.Fatalf("exit code = %d, want task/actor mailbox reply result 7", exitCode)
 	}
 }
 

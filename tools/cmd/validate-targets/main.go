@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type targetsReport struct {
@@ -25,6 +26,7 @@ type targetReportEntry struct {
 	ExeExt                  string `json:"exe_ext"`
 	BuildOnly               bool   `json:"build_only"`
 	RunSupported            bool   `json:"run_supported"`
+	RunUnsupportedReason    string `json:"run_unsupported_reason,omitempty"`
 	SupportsDebugInfo       bool   `json:"supports_debug_info"`
 	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 }
@@ -126,6 +128,13 @@ func validateTargetMetadata(got []targetReportEntry) error {
 		}
 		if got[i].BuildOnly && got[i].RunSupported {
 			return fmt.Errorf("target metadata[%s].run_supported must be false for build-only targets", got[i].Triple)
+		}
+		if got[i].BuildOnly {
+			if !strings.Contains(got[i].RunUnsupportedReason, "build-only") || !strings.Contains(got[i].RunUnsupportedReason, "does not provide a production runtime runner") {
+				return fmt.Errorf("target metadata[%s].run_unsupported_reason must explain build-only artifact-only runtime status", got[i].Triple)
+			}
+		} else if !got[i].RunSupported && got[i].RunUnsupportedReason == "" {
+			return fmt.Errorf("target metadata[%s].run_unsupported_reason is required when run_supported is false", got[i].Triple)
 		}
 		if got[i].SupportsDebugInfo != want[i].SupportsDebugInfo {
 			return fmt.Errorf("target metadata[%s].supports_debug_info = %v, want %v", got[i].Triple, got[i].SupportsDebugInfo, want[i].SupportsDebugInfo)

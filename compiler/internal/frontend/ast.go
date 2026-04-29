@@ -156,6 +156,7 @@ type TypeRef struct {
 	Len      int
 	Params   []TypeRef
 	Return   *TypeRef
+	Uses     []string
 }
 
 type StructDecl struct {
@@ -431,11 +432,13 @@ func (s *MatchStmt) Pos() Position {
 }
 
 type MatchCase struct {
-	At      Position
-	Pattern Expr
-	Guard   Expr
-	Default bool
-	Body    []Stmt
+	At              Position
+	Pattern         Expr
+	Guard           Expr
+	Default         bool
+	Body            []Stmt
+	RequiresPayload bool
+	PayloadArity    int
 }
 
 func (c *MatchCase) Pos() Position {
@@ -457,11 +460,13 @@ func (e *MatchExpr) Pos() Position {
 }
 
 type MatchExprCase struct {
-	At      Position
-	Pattern Expr
-	Guard   Expr
-	Default bool
-	Value   Expr
+	At              Position
+	Pattern         Expr
+	Guard           Expr
+	Default         bool
+	Value           Expr
+	RequiresPayload bool
+	PayloadArity    int
 }
 
 type CatchExpr struct {
@@ -480,11 +485,13 @@ func (e *CatchExpr) Pos() Position {
 }
 
 type CatchExprCase struct {
-	At      Position
-	Pattern Expr
-	Guard   Expr
-	Default bool
-	Value   Expr
+	At              Position
+	Pattern         Expr
+	Guard           Expr
+	Default         bool
+	Value           Expr
+	RequiresPayload bool
+	PayloadArity    int
 }
 
 type FreeStmt struct {
@@ -580,12 +587,14 @@ func (e *SomePatternExpr) Pos() Position {
 }
 
 type EnumCasePatternExpr struct {
-	At          Position
-	TypeName    string
-	CaseName    string
-	Bindings    []string
-	EnumType    string
-	EnumOrdinal int32
+	At           Position
+	TypeName     string
+	CaseName     string
+	Bindings     []string
+	HasPayload   bool
+	EnumType     string
+	EnumOrdinal  int32
+	PayloadSlots []int
 }
 
 func (e *EnumCasePatternExpr) exprNode() {}
@@ -647,11 +656,12 @@ func (e *AwaitExpr) Pos() Position {
 }
 
 type CallExpr struct {
-	At        Position
-	Name      string
-	TypeArgs  []TypeRef
-	Args      []Expr
-	ArgLabels []string
+	At           Position
+	Name         string
+	TypeArgs     []TypeRef
+	Args         []Expr
+	ArgLabels    []string
+	ResolvedType string
 }
 
 func (e *CallExpr) exprNode() {}

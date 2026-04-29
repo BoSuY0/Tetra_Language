@@ -502,6 +502,18 @@ func TestBuildIfLetEnumPayloadSmoke(t *testing.T) {
 	}
 }
 
+func TestBuildIfLetEnumNoPayloadSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Result:\n  case ok(Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.empty\n  if let Result.empty = result:\n    return 42\n  else:\n    return 0\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
 func TestBuildMatchGuardEnumPayloadSmoke(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -554,6 +566,71 @@ func TestEnumPayloadBindingScopeDiagnostic(t *testing.T) {
 		t.Fatalf("expected enum payload binding scope diagnostic")
 	} else if !strings.Contains(err.Error(), "out of scope") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumNoPayloadConstructorCallDiagnostic(t *testing.T) {
+	src := "enum Color:\n  case red\n\nfunc main() -> Int:\n  let color: Color = Color.red()\n  return 0\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected no-payload enum constructor diagnostic")
+	} else if !strings.Contains(err.Error(), "has no payload; use 'Color.red'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumPayloadPatternArityDiagnostic(t *testing.T) {
+	src := "enum Result:\n  case ok(Int, Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(1, 2)\n  match result:\n  case Result.ok(value):\n    return value\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected enum payload pattern arity diagnostic")
+	} else if !strings.Contains(err.Error(), "pattern expects 2 binding(s), got 1") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumPayloadPatternRequiresPayloadSyntaxDiagnostic(t *testing.T) {
+	src := "enum Result:\n  case ok(Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.ok(1)\n  let score: Int = match result:\n  case Result.ok:\n    1\n  case Result.empty:\n    0\n  return score\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected enum payload syntax diagnostic")
+	} else if !strings.Contains(err.Error(), "carries 1 payload value(s); use 'Result.ok(value1)'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumNoPayloadPatternRejectsPayloadSyntaxDiagnostic(t *testing.T) {
+	src := "enum Result:\n  case ok(Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.empty\n  match result:\n  case Result.ok(value):\n    return value\n  case Result.empty():\n    return 0\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected no-payload enum pattern diagnostic")
+	} else if !strings.Contains(err.Error(), "has no payload; use 'Result.empty'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumPayloadPatternDuplicateBindingParseDiagnostic(t *testing.T) {
+	src := "enum Result:\n  case ok(Int, Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(1, 2)\n  match result:\n  case Result.ok(value, value):\n    return value\n"
+	if _, err := Parse([]byte(src)); err == nil {
+		t.Fatalf("expected duplicate payload binding parse diagnostic")
+	} else if !strings.Contains(err.Error(), "duplicate enum payload binding 'value'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestCrossModuleEnumPayloadConstructorAndMatchCheckLower(t *testing.T) {
+	files := map[string]string{
+		"lib/result.tetra": "module lib.result\n\npub enum Result:\n  case ok(Int)\n  case err(Int)\n",
+		"app/main.tetra":   "module app.main\nimport lib.result as res\n\nfunc main() -> Int:\n  let result: res.Result = res.Result.ok(42)\n  let score: Int = match result:\n  case res.Result.ok(value):\n    value\n  case res.Result.err(code):\n    code\n  return score\n",
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	world, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/main.tetra")))
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	if _, err := LowerModules(checked); err != nil {
+		t.Fatalf("LowerModules: %v", err)
 	}
 }
 
@@ -986,7 +1063,8 @@ func TestBuildBudgetRuntimeGuardAllowsAndFailsDeterministically(t *testing.T) {
 	}
 
 	okSrc := `func tick() -> Int
-uses budget:
+uses budget
+budget(1):
     return 9
 
 func main() -> Int
@@ -1003,7 +1081,8 @@ budget(4):
 	}
 
 	failSrc := `func tick() -> Int
-uses budget:
+uses budget
+budget(1):
     return 9
 
 func main() -> Int

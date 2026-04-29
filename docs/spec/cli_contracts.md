@@ -8,6 +8,7 @@ The `tetra` CLI command surface is:
 | --- | --- | --- |
 | `version` | Print the compiler version. | Text only. |
 | `targets` | Print supported, build-only, and planned targets. | `--format=json`. |
+| `features` | Print the machine-readable current, experimental, planned, and post-v1 feature registry. | `--format=json`. |
 | `doctor` | Check local release-critical metadata and source files, or project structure when given a project path. | `--format=json`. |
 | `project` | Inspect, sync, or edit local dependencies for a discovered `Capsule.t4` project. | `project info --format=json`; `project deps list/check --format=json`; sync/deps text output. |
 | `workspace` | Manage a local `Tetra.workspace` member list and run multi-capsule check/sync/build/test/run workflows. | `workspace list/check/graph/build/test --format=json`; sync/run text output. |
@@ -50,6 +51,9 @@ JSON reports:
 
 - `targets --format=json` emits target metadata including `triple`, `os`,
   `arch`, `abi`, `format`, `exe_ext`, `build_only`, and `run_supported`.
+- `features --format=json` emits `schema`, `version`, and `features` entries
+  with `id`, `name`, `status`, `scope`, `stability`, and `docs`. Status is one
+  of `current`, `experimental`, `planned`, or `post-v1`.
 - `doctor --format=json` emits top-level `status` plus named checks.
 - `test --report=json` emits `total`, `passed`, `failed`, `duration_ms`,
   `files`, and `results`; validate it with `tools/cmd/validate-test-report`.

@@ -106,6 +106,9 @@ func validateLSPTranscript(raw []byte) error {
 			if !jsonObjectHasKey(msg.Params, "uri") {
 				return fmt.Errorf("publishDiagnostics missing uri")
 			}
+			if err := validateDiagnosticsNotification(msg.Params); err != nil {
+				return err
+			}
 			sawDiagnostics = true
 		}
 		if msg.ID != nil && *msg.ID == 10 {
@@ -177,10 +180,22 @@ func validateEditorResponse(id int, raw json.RawMessage) error {
 		if !jsonArrayHasObjectField(raw, "name") {
 			return fmt.Errorf("documentSymbol response missing symbol name")
 		}
+		if !jsonArrayHasObjectField(raw, "kind") {
+			return fmt.Errorf("documentSymbol response missing symbol kind")
+		}
+		if !jsonArrayHasObjectField(raw, "range") {
+			return fmt.Errorf("documentSymbol response missing symbol range")
+		}
 	case 3:
 		contents, ok := jsonObjectField(raw, "contents")
 		if !ok || !jsonObjectHasKey(contents, "value") {
 			return fmt.Errorf("hover response missing markdown contents")
+		}
+		if !jsonObjectStringFieldContains(contents, "kind", "markdown") {
+			return fmt.Errorf("hover response contents must be markdown")
+		}
+		if !jsonObjectStringFieldNonEmpty(contents, "value") {
+			return fmt.Errorf("hover response markdown value must not be empty")
 		}
 	case 4:
 		if !jsonArrayHasObjectField(raw, "label") {
@@ -206,6 +221,32 @@ func validateEditorResponse(id int, raw json.RawMessage) error {
 	case 9:
 		if !jsonArrayHasObjectField(raw, "title") {
 			return fmt.Errorf("codeAction response missing action title")
+		}
+	}
+	return nil
+}
+
+func validateDiagnosticsNotification(raw json.RawMessage) error {
+	diagnostics, ok := jsonObjectField(raw, "diagnostics")
+	if !ok {
+		return fmt.Errorf("publishDiagnostics missing diagnostics")
+	}
+	var values []map[string]json.RawMessage
+	if err := json.Unmarshal(diagnostics, &values); err != nil {
+		return fmt.Errorf("publishDiagnostics diagnostics must be an array")
+	}
+	for i, diag := range values {
+		if _, ok := diag["range"]; !ok {
+			return fmt.Errorf("publishDiagnostics diagnostic[%d] missing range", i)
+		}
+		if _, ok := diag["message"]; !ok {
+			return fmt.Errorf("publishDiagnostics diagnostic[%d] missing message", i)
+		}
+		if _, ok := diag["severity"]; !ok {
+			return fmt.Errorf("publishDiagnostics diagnostic[%d] missing severity", i)
+		}
+		if _, ok := diag["code"]; !ok {
+			return fmt.Errorf("publishDiagnostics diagnostic[%d] missing code", i)
 		}
 	}
 	return nil
@@ -289,6 +330,24 @@ func jsonObjectField(raw json.RawMessage, key string) (json.RawMessage, bool) {
 	}
 	value, ok := obj[key]
 	return value, ok
+}
+
+func jsonObjectStringFieldContains(raw json.RawMessage, key string, want string) bool {
+	var value string
+	field, ok := jsonObjectField(raw, key)
+	if !ok || json.Unmarshal(field, &value) != nil {
+		return false
+	}
+	return strings.Contains(value, want)
+}
+
+func jsonObjectStringFieldNonEmpty(raw json.RawMessage, key string) bool {
+	var value string
+	field, ok := jsonObjectField(raw, key)
+	if !ok || json.Unmarshal(field, &value) != nil {
+		return false
+	}
+	return strings.TrimSpace(value) != ""
 }
 
 func jsonArrayHasObjectField(raw json.RawMessage, key string) bool {

@@ -996,5 +996,215 @@
       "__tetra_actor_dispatch",
       "__tetra_actor_main_entry_id"
     ]
-  }
+  },
+  "features": [
+    {
+      "id": "cli.core",
+      "name": "Core CLI workflows",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "check/build/run/fmt/test/doc/doctor/targets/smoke/eco/clean/version local workflows",
+      "stability": "supported in the current v0.2.0 local profile",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/cli_contracts.md"
+      ]
+    },
+    {
+      "id": "targets.native",
+      "name": "Native target builds",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "linux-x64 build/run plus macos-x64 and windows-x64 build-only release coverage",
+      "stability": "supported target metadata is validated by release checks",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/targets.md"
+      ]
+    },
+    {
+      "id": "targets.wasm-build-only",
+      "name": "WASM build-only targets",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "wasm32-wasi and wasm32-web build-only smoke/report validation; no runtime execution guarantee",
+      "stability": "build-only in the current v0.2.0 local profile",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/backend/wasm_backend_plan.md"
+      ]
+    },
+    {
+      "id": "language.flow",
+      "name": "Flow syntax profile",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "release-covered indentation syntax in examples, stdlib, runtime, and self-host snippets",
+      "stability": "supported source syntax for the current release gate",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/flow_syntax_v1.md"
+      ]
+    },
+    {
+      "id": "language.callable-mvp",
+      "name": "Callable/function type MVP",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "function type references and narrow symbol-backed non-capturing callable paths",
+      "stability": "limited MVP; full first-class function values remain out of scope",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/v1_feature_status.md"
+      ]
+    },
+    {
+      "id": "language.semantic-clauses-mvp",
+      "name": "Semantic clause checker MVP",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "phase-1 noalloc/noblock/realtime checks on resolved direct and supported callable paths",
+      "stability": "static checker MVP; proof-level guarantees remain future work",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/v1_feature_status.md"
+      ]
+    },
+    {
+      "id": "language.globals-properties-capsule-mvp",
+      "name": "Top-level globals, properties, and capsule metadata MVP",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "constant global initializers, property declarations, and compile-time capsule metadata validation",
+      "stability": "supported MVP with explicit initializer/runtime limitations",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/capsule_metadata_v1.md"
+      ]
+    },
+    {
+      "id": "language.slice-mvp",
+      "name": "Native-first slice MVP",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "[]u16 and []bool helpers including make_* and island compile-compatible fallback paths",
+      "stability": "supported MVP with documented layout/runtime constraints",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/stdlib.md"
+      ]
+    },
+    {
+      "id": "language.task-handles-mvp",
+      "name": "Typed task handle wrappers MVP",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "typed task handle wrappers for slot counts 2..8 in the current runtime path",
+      "stability": "supported MVP; layouts above 8 are rejected",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/user/async_actors_guide.md"
+      ]
+    },
+    {
+      "id": "eco.local-package-lifecycle",
+      "name": "Local Eco package lifecycle",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "local verify, lock generation/validation, pack/unpack, vault, and publish metadata fixtures",
+      "stability": "local tooling support only; network ecosystem is not implied",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/user/eco_package_guide.md"
+      ]
+    },
+    {
+      "id": "stdlib.experimental-mirrors",
+      "name": "Experimental standard-library mirrors",
+      "status": "experimental",
+      "since": "v0.2.0",
+      "scope": "lib.experimental mirrors for selected lib.core modules",
+      "stability": "experimental mirrors with no stability guarantees",
+      "docs": [
+        "docs/user/standard_library_guide.md"
+      ]
+    },
+    {
+      "id": "ui.metadata-v1",
+      "name": "UI metadata v1 surface",
+      "status": "planned",
+      "scope": "checked view/state metadata, deterministic UI JSON, preview artifacts, and shell sidecars",
+      "stability": "planned release behavior pending gate evidence",
+      "docs": [
+        "docs/spec/v1_feature_status.md",
+        "docs/user/wasm_ui_guide.md"
+      ]
+    },
+    {
+      "id": "wasm.runtime-execution",
+      "name": "WASM runtime execution",
+      "status": "planned",
+      "scope": "WASI runner and browser smoke execution beyond build-only validation",
+      "stability": "planned until runner/browser automation evidence is present",
+      "docs": [
+        "docs/backend/wasm_backend_plan.md",
+        "docs/user/wasm_ui_guide.md"
+      ]
+    },
+    {
+      "id": "language.full-v1-guarantees",
+      "name": "Full v1.0 language guarantees",
+      "status": "planned",
+      "scope": "complete v1.0 release contract after mandatory release-gate evidence",
+      "stability": "future label while repository remains on the v0.2.0 profile",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/v1_scope.md"
+      ]
+    },
+    {
+      "id": "language.full-first-class-callables",
+      "name": "Full first-class callable/function-value semantics",
+      "status": "post-v1",
+      "scope": "arbitrary escape, passing, storing, full capture matrix, and ABI redesign",
+      "stability": "deferred post-v1",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/v1_feature_status.md"
+      ]
+    },
+    {
+      "id": "eco.distributed-network",
+      "name": "Distributed EcoNet and production publishing",
+      "status": "post-v1",
+      "scope": "distributed EcoNet, production TetraHub publishing, global trust scoring, proof-carrying capsules",
+      "stability": "deferred post-v1 unless explicitly promoted",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/release/post_v1_promotion_checklist.md"
+      ]
+    },
+    {
+      "id": "actors.distributed-runtime",
+      "name": "Distributed actors and full structured concurrency",
+      "status": "post-v1",
+      "scope": "distributed actors plus full async cancellation and structured concurrency guarantees",
+      "stability": "outside the current v0.2.0 support claim",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/user/async_actors_guide.md"
+      ]
+    },
+    {
+      "id": "ui.native-runtime",
+      "name": "Native UI runtime widgets and event dispatch",
+      "status": "post-v1",
+      "scope": "native widget rendering and runtime UI event dispatch",
+      "stability": "outside the current v0.2.0 support claim",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/user/wasm_ui_guide.md"
+      ]
+    }
+  ]
 }

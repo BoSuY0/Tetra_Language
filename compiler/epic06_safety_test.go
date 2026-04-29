@@ -139,12 +139,40 @@ uses alloc, islands, mem:
 			wantErr: "escape",
 		},
 		{
-			name: "Privacy and Budget positive via policy group",
+			name: "Budget clause negative missing budget contract",
+			src: `
+func audit() -> Int
+uses budget:
+    return 1
+
+func main() -> Int
+uses budget:
+    return audit()
+`,
+			wantErr: "uses effect 'budget' requires semantic clause 'budget'",
+		},
+		{
+			name: "Budget clause negative policy group missing budget contract",
 			src: `
 func audit(token: consent.token) -> secret.i32
 uses effects.policy
 privacy
 consent(token):
+    return core.secret_seal_i32(1, token)
+
+func main() -> Int:
+    return 0
+`,
+			wantErr: "uses effect 'budget' requires semantic clause 'budget'",
+		},
+		{
+			name: "Privacy and Budget positive via policy group",
+			src: `
+func audit(token: consent.token) -> secret.i32
+uses effects.policy
+privacy
+consent(token)
+budget(8):
     return core.secret_seal_i32(1, token)
 
 func main() -> Int:
@@ -368,18 +396,27 @@ func main() -> Int:
 			want: "borrowed value derived from 'buf' cannot be passed as inout to 'mutate'",
 		},
 		{
-			name: "borrowed island slice cannot be consumed",
+			name: "borrowed island slice cannot escape via return",
 			src: `
-func take(buf: consume []u8) -> Int:
-    return 0
-
-func forward(buf: borrow []u8) -> Int:
-    return take(buf)
+func forward(buf: borrow []u8) -> []u8:
+    return buf
 
 func main() -> Int:
     return 0
 `,
-			want: "borrowed value derived from 'buf' cannot be consumed by 'take'",
+			want: "borrowed local 'buf' cannot escape via return",
+		},
+		{
+			name: "borrowed island slice cannot escape through inout assignment",
+			src: `
+func forward(buf: borrow []u8, out: inout []u8) -> Int:
+    out = buf
+    return 0
+
+func main() -> Int:
+    return 0
+`,
+			want: "borrowed local 'buf' cannot escape via inout assignment to 'out'",
 		},
 	}
 

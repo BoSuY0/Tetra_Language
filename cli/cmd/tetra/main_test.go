@@ -108,6 +108,7 @@ func TestTargetsCommandJSON(t *testing.T) {
 		ExeExt                  string `json:"exe_ext"`
 		BuildOnly               bool   `json:"build_only"`
 		RunSupported            bool   `json:"run_supported"`
+		RunUnsupportedReason    string `json:"run_unsupported_reason"`
 		SupportsDebugInfo       bool   `json:"supports_debug_info"`
 		SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 	}
@@ -155,6 +156,9 @@ func TestTargetsCommandJSON(t *testing.T) {
 		if got.Status != "build_only" || got.Arch != "wasm32" || got.Format != "wasm" || got.ExeExt != ".wasm" || !got.BuildOnly || got.RunSupported || got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 			t.Fatalf("%s metadata = %#v", triple, got)
 		}
+		if !strings.Contains(got.RunUnsupportedReason, "build-only") || !strings.Contains(got.RunUnsupportedReason, "does not provide a production runtime runner") {
+			t.Fatalf("%s run_unsupported_reason = %q", triple, got.RunUnsupportedReason)
+		}
 	}
 }
 
@@ -163,6 +167,73 @@ func TestTargetsCommandRejectsUnsupportedFormat(t *testing.T) {
 	code := runCLI([]string{"targets", "--format=yaml"}, &bytes.Buffer{}, &stderr)
 	if code != 2 {
 		t.Fatalf("targets exit code = %d, stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "unsupported --format") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestFeaturesCommandJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	code := runCLI([]string{"features", "--format=json"}, &stdout, &bytes.Buffer{})
+	if code != 0 {
+		t.Fatalf("features exit code = %d, stdout=%q", code, stdout.String())
+	}
+	var report struct {
+		Schema   string `json:"schema"`
+		Version  string `json:"version"`
+		Features []struct {
+			ID        string   `json:"id"`
+			Name      string   `json:"name"`
+			Status    string   `json:"status"`
+			Since     string   `json:"since"`
+			Scope     string   `json:"scope"`
+			Stability string   `json:"stability"`
+			Docs      []string `json:"docs"`
+		} `json:"features"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("features JSON: %v\n%s", err, stdout.String())
+	}
+	if report.Schema != "tetra.features.v1" {
+		t.Fatalf("features schema = %q", report.Schema)
+	}
+	if report.Version != compiler.Version() {
+		t.Fatalf("features version = %q, want %q", report.Version, compiler.Version())
+	}
+	statusByID := map[string]string{}
+	statusSeen := map[string]bool{}
+	for _, feature := range report.Features {
+		if feature.ID == "" || feature.Name == "" || feature.Scope == "" || feature.Stability == "" || len(feature.Docs) == 0 {
+			t.Fatalf("feature missing required metadata: %#v", feature)
+		}
+		statusByID[feature.ID] = feature.Status
+		statusSeen[feature.Status] = true
+	}
+	for _, status := range []string{"current", "experimental", "planned", "post-v1"} {
+		if !statusSeen[status] {
+			t.Fatalf("features output missing %s status: %#v", status, report.Features)
+		}
+	}
+	for id, wantStatus := range map[string]string{
+		"cli.core":                            "current",
+		"targets.wasm-build-only":             "current",
+		"stdlib.experimental-mirrors":         "experimental",
+		"wasm.runtime-execution":              "planned",
+		"eco.distributed-network":             "post-v1",
+		"language.full-first-class-callables": "post-v1",
+	} {
+		if gotStatus := statusByID[id]; gotStatus != wantStatus {
+			t.Fatalf("feature %s status = %q, want %q", id, gotStatus, wantStatus)
+		}
+	}
+}
+
+func TestFeaturesCommandRejectsUnsupportedFormat(t *testing.T) {
+	var stderr bytes.Buffer
+	code := runCLI([]string{"features", "--format=yaml"}, &bytes.Buffer{}, &stderr)
+	if code != 2 {
+		t.Fatalf("features exit code = %d, stderr=%q", code, stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "unsupported --format") {
 		t.Fatalf("stderr = %q", stderr.String())
@@ -3400,6 +3471,48 @@ func TestRunCommandJSONDiagnosticsForHostTargetMismatch(t *testing.T) {
 	}
 	if diag.Code != "TETRA0001" || diag.Severity != "error" || !strings.Contains(diag.Message, "cannot run target "+target) {
 		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestRunCommandJSONDiagnosticsForWASMBuildOnlyRuntimeUnsupported(t *testing.T) {
+	var stderr bytes.Buffer
+	code := runCLI([]string{"run", "--diagnostics=json", "--target", "wasm32-web"}, &bytes.Buffer{}, &stderr)
+	if code != 2 {
+		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+	}
+	var diag struct {
+		Code     string `json:"code"`
+		Message  string `json:"message"`
+		Severity string `json:"severity"`
+	}
+	if err := json.Unmarshal(stderr.Bytes(), &diag); err != nil {
+		t.Fatalf("json diagnostic: %v\n%s", err, stderr.String())
+	}
+	for _, want := range []string{"cannot run target wasm32-web", "build-only target emits artifacts only", "unsupported runtime execution", "does not provide a production runtime runner"} {
+		if !strings.Contains(diag.Message, want) {
+			t.Fatalf("diagnostic missing %q: %#v", want, diag)
+		}
+	}
+}
+
+func TestTestCommandJSONDiagnosticsForWASMBuildOnlyRuntimeUnsupported(t *testing.T) {
+	var stderr bytes.Buffer
+	code := runCLI([]string{"test", "--diagnostics=json", "--target", "wasm32-web"}, &bytes.Buffer{}, &stderr)
+	if code != 2 {
+		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+	}
+	var diag struct {
+		Code     string `json:"code"`
+		Message  string `json:"message"`
+		Severity string `json:"severity"`
+	}
+	if err := json.Unmarshal(stderr.Bytes(), &diag); err != nil {
+		t.Fatalf("json diagnostic: %v\n%s", err, stderr.String())
+	}
+	for _, want := range []string{"cannot run tests for target wasm32-web", "build-only target emits artifacts only", "unsupported runtime execution", "does not provide a production test runner"} {
+		if !strings.Contains(diag.Message, want) {
+			t.Fatalf("diagnostic missing %q: %#v", want, diag)
+		}
 	}
 }
 

@@ -600,7 +600,38 @@ func main() -> Int:
 	if !ok {
 		t.Fatalf("pattern = %T, want EnumCasePatternExpr", match.Cases[0].Pattern)
 	}
-	if pat.TypeName != "Result" || pat.CaseName != "ok" || strings.Join(pat.Bindings, ",") != "value" {
+	if pat.TypeName != "Result" || pat.CaseName != "ok" || strings.Join(pat.Bindings, ",") != "value" || !pat.HasPayload {
+		t.Fatalf("pattern = %#v", pat)
+	}
+}
+
+func TestParseMatchNoPayloadEnumCasePattern(t *testing.T) {
+	src := `
+enum Result:
+    case ok(Int)
+    case empty
+
+func main() -> Int:
+    match result:
+    case Result.empty:
+        return 0
+    case Result.ok(value):
+        return value
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	match, ok := prog.Funcs[0].Body[0].(*MatchStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want MatchStmt", prog.Funcs[0].Body[0])
+	}
+	pat, ok := match.Cases[0].Pattern.(*FieldAccessExpr)
+	if !ok {
+		t.Fatalf("pattern = %T, want FieldAccessExpr", match.Cases[0].Pattern)
+	}
+	base, ok := pat.Base.(*IdentExpr)
+	if !ok || base.Name != "Result" || pat.Field != "empty" {
 		t.Fatalf("pattern = %#v", pat)
 	}
 }

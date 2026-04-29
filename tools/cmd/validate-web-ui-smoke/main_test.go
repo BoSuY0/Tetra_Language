@@ -30,6 +30,37 @@ func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
 	}
 }
 
+func TestValidateWebUISmokeReportAcceptsRootModuleUIBundle(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
+	raw, err := os.ReadFile(uiBundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.ReplaceAll(string(raw), `"module":"main"`, `"module":""`))
+	if err := os.WriteFile(uiBundlePath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report := webUISmokeReport{
+		Schema:             "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:        "2026-04-27T12:00:00Z",
+		Target:             "wasm32-web",
+		UIScopeActive:      true,
+		Source:             "examples/projects/dogfood_web_ui/src/main.tetra",
+		UsedFallbackSource: false,
+		Automation:         "chromium --headless --dump-dom",
+		Status:             "pass",
+		Result:             "ok:0:ui=1",
+		DOMSnapshot:        domSnapshotPath,
+		UISchema:           "tetra.ui.v1",
+		UIBundlePath:       uiBundlePath,
+		UIModulePath:       uiModulePath,
+	}
+	if err := validateWebUISmokeReport(report); err != nil {
+		t.Fatalf("root-module UI bundle should be valid evidence shape: %v", err)
+	}
+}
+
 func TestValidateWebUISmokeReportAcceptsHostBlockedReport(t *testing.T) {
 	report := webUISmokeReport{
 		Schema:        "tetra.web-ui-smoke.v1alpha1",
@@ -174,12 +205,87 @@ func TestValidateWebUISmokeReportRejectsPassWithMissingDOMSnapshot(t *testing.T)
 	}
 }
 
+func TestValidateWebUISmokeReportRejectsPassWithMissingUIAccessibilityRole(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
+	raw, err := os.ReadFile(uiBundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), `{"name":"role","type":"String","value":"\"button\""},`, "", 1))
+	if err := os.WriteFile(uiBundlePath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report := webUISmokeReport{
+		Schema:        "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:   "2026-04-27T12:00:00Z",
+		Target:        "wasm32-web",
+		UIScopeActive: true,
+		Source:        "examples/projects/dogfood_web_ui/src/main.tetra",
+		Automation:    "chromium --headless --dump-dom",
+		Status:        "pass",
+		Result:        "ok:0",
+		DOMSnapshot:   domSnapshotPath,
+		UISchema:      "tetra.ui.v1",
+		UIBundlePath:  uiBundlePath,
+		UIModulePath:  uiModulePath,
+	}
+	err = validateWebUISmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "accessibility role") {
+		t.Fatalf("expected missing accessibility role rejection, got %v", err)
+	}
+}
+
+func TestValidateWebUISmokeReportRejectsPassWithUnknownUIBundleFields(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
+	raw, err := os.ReadFile(uiBundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), `"states":`, `"extra": true, "states":`, 1))
+	if err := os.WriteFile(uiBundlePath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	report := webUISmokeReport{
+		Schema:        "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:   "2026-04-27T12:00:00Z",
+		Target:        "wasm32-web",
+		UIScopeActive: true,
+		Source:        "examples/projects/dogfood_web_ui/src/main.tetra",
+		Automation:    "chromium --headless --dump-dom",
+		Status:        "pass",
+		Result:        "ok:0",
+		DOMSnapshot:   domSnapshotPath,
+		UISchema:      "tetra.ui.v1",
+		UIBundlePath:  uiBundlePath,
+		UIModulePath:  uiModulePath,
+	}
+	err = validateWebUISmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("expected strict ui bundle rejection, got %v", err)
+	}
+}
+
 func writeWebUISidecarArtifacts(t *testing.T) (string, string) {
 	t.Helper()
 	dir := t.TempDir()
 	uiBundlePath := filepath.Join(dir, "app.ui.json")
 	uiModulePath := filepath.Join(dir, "app.ui.web.mjs")
-	if err := os.WriteFile(uiBundlePath, []byte(`{"schema":"tetra.ui.v1"}`+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(uiBundlePath, []byte(`{
+  "schema":"tetra.ui.v1",
+  "states":[{"name":"CounterState","module":"main","fields":[]}],
+  "views":[{
+    "name":"CounterView",
+    "module":"main",
+    "state_type":"CounterState",
+    "bindings":[],
+    "events":[],
+    "commands":[],
+    "styles":[],
+    "accessibility":[{"name":"role","type":"String","value":"\"button\""},{"name":"label","type":"String","value":"\"Increment counter\""}]
+  }]
+}`+"\n"), 0o644); err != nil {
 		t.Fatalf("write ui bundle artifact: %v", err)
 	}
 	if err := os.WriteFile(uiModulePath, []byte("export function mountTetraUI() {}\n"), 0o644); err != nil {

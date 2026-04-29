@@ -1944,7 +1944,11 @@ func (p *parser) parseFunctionTypeRef() (TypeRef, error) {
 	if err != nil {
 		return TypeRef{}, err
 	}
-	return TypeRef{At: at, Kind: TypeRefFunction, Params: params, Return: &ret}, nil
+	uses, _, err := p.parseFunctionModifiers()
+	if err != nil {
+		return TypeRef{}, err
+	}
+	return TypeRef{At: at, Kind: TypeRefFunction, Params: params, Return: &ret, Uses: uses}, nil
 }
 
 func (p *parser) parseOptionalNamedTypeArgs() ([]TypeRef, error) {
@@ -2869,6 +2873,9 @@ func (p *parser) parseMatchPattern() (Expr, error) {
 				if err != nil {
 					return nil, err
 				}
+				if nameTok.lit == "_" {
+					return nil, diagnosticErrorf(nameTok.pos, "some pattern binding must be an identifier")
+				}
 				if p.cur.typ == TokenComma {
 					return nil, diagnosticErrorf(p.cur.pos, "some pattern expects one binding")
 				}
@@ -2882,15 +2889,26 @@ func (p *parser) parseMatchPattern() (Expr, error) {
 					return nil, err
 				}
 				var bindings []string
+				seenBindings := map[string]struct{}{}
 				for p.cur.typ != TokenRParen && p.cur.typ != TokenEOF {
 					nameTok, err := p.expect(TokenIdent)
 					if err != nil {
 						return nil, err
 					}
+					if nameTok.lit == "_" {
+						return nil, diagnosticErrorf(nameTok.pos, "enum payload pattern binding must be an identifier")
+					}
+					if _, exists := seenBindings[nameTok.lit]; exists {
+						return nil, diagnosticErrorf(nameTok.pos, "duplicate enum payload binding '%s'", nameTok.lit)
+					}
+					seenBindings[nameTok.lit] = struct{}{}
 					bindings = append(bindings, nameTok.lit)
 					if p.cur.typ == TokenComma {
 						if err := p.next(); err != nil {
 							return nil, err
+						}
+						if p.cur.typ == TokenRParen {
+							return nil, diagnosticErrorf(p.cur.pos, "enum payload pattern does not allow a trailing comma")
 						}
 						continue
 					}
@@ -2899,7 +2917,7 @@ func (p *parser) parseMatchPattern() (Expr, error) {
 				if _, err := p.expect(TokenRParen); err != nil {
 					return nil, err
 				}
-				return &EnumCasePatternExpr{At: pos, TypeName: strings.Join(parts[:len(parts)-1], "."), CaseName: parts[len(parts)-1], Bindings: bindings}, nil
+				return &EnumCasePatternExpr{At: pos, TypeName: strings.Join(parts[:len(parts)-1], "."), CaseName: parts[len(parts)-1], Bindings: bindings, HasPayload: true}, nil
 			}
 			return nil, diagnosticErrorf(pos, "payload match patterns require qualified enum case syntax")
 		}
@@ -3417,7 +3435,7 @@ func cloneCompoundTarget(expr Expr) Expr {
 		}
 		labels := append([]string(nil), e.ArgLabels...)
 		typeArgs := append([]TypeRef(nil), e.TypeArgs...)
-		return &CallExpr{At: e.At, Name: e.Name, TypeArgs: typeArgs, Args: args, ArgLabels: labels}
+		return &CallExpr{At: e.At, Name: e.Name, TypeArgs: typeArgs, Args: args, ArgLabels: labels, ResolvedType: e.ResolvedType}
 	default:
 		return expr
 	}

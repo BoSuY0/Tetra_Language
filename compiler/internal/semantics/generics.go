@@ -1082,12 +1082,14 @@ func cloneExpr(expr frontend.Expr, subst map[string]string) frontend.Expr {
 		return &frontend.SomePatternExpr{At: e.At, Name: e.Name}
 	case *frontend.EnumCasePatternExpr:
 		return &frontend.EnumCasePatternExpr{
-			At:          e.At,
-			TypeName:    e.TypeName,
-			CaseName:    e.CaseName,
-			Bindings:    append([]string(nil), e.Bindings...),
-			EnumType:    e.EnumType,
-			EnumOrdinal: e.EnumOrdinal,
+			At:           e.At,
+			TypeName:     e.TypeName,
+			CaseName:     e.CaseName,
+			Bindings:     append([]string(nil), e.Bindings...),
+			HasPayload:   e.HasPayload,
+			EnumType:     e.EnumType,
+			EnumOrdinal:  e.EnumOrdinal,
+			PayloadSlots: append([]int(nil), e.PayloadSlots...),
 		}
 	case *frontend.StringLitExpr:
 		return &frontend.StringLitExpr{At: e.At, Value: append([]byte(nil), e.Value...)}
@@ -1121,7 +1123,7 @@ func cloneExpr(expr frontend.Expr, subst map[string]string) frontend.Expr {
 		for i := range e.TypeArgs {
 			typeArgs[i] = substituteTypeRef(e.TypeArgs[i], subst)
 		}
-		return &frontend.CallExpr{At: e.At, Name: e.Name, TypeArgs: typeArgs, Args: args, ArgLabels: labels}
+		return &frontend.CallExpr{At: e.At, Name: e.Name, TypeArgs: typeArgs, Args: args, ArgLabels: labels, ResolvedType: e.ResolvedType}
 	case *frontend.StructLitExpr:
 		fields := make([]frontend.StructFieldInit, 0, len(e.Fields))
 		for _, field := range e.Fields {
@@ -1240,7 +1242,11 @@ func genericTypeName(ref frontend.TypeRef) string {
 		if ref.Return != nil {
 			ret = genericTypeName(*ref.Return)
 		}
-		return "fn(" + strings.Join(params, ",") + ")->" + ret
+		out := "fn(" + strings.Join(params, ",") + ")->" + ret
+		if len(ref.Uses) > 0 {
+			out += " uses " + strings.Join(ref.Uses, ",")
+		}
+		return out
 	default:
 		if canonical, ok := canonicalBuiltinType(ref.Name); ok {
 			return canonical

@@ -278,11 +278,13 @@ func main() -> Int:
 	requireCheckOK(t, `
 func audit() -> Int
 uses budget, privacy
+budget(1)
 privacy:
   return 1
 
 func main() -> Int
 uses effects.policy
+budget(1)
 privacy:
   return audit()
 `)
@@ -517,7 +519,7 @@ func apply(cb: fn(Int) -> Int, x: Int) -> Int:
 
 func main() -> Int:
   return apply(allocer, 41)
-`, "uses effect 'alloc'")
+`, "callback function symbol 'allocer' requires effects alloc, mem but function type does not declare them")
 }
 
 func TestCallbackWrapperRequiresLocalSymbolBackedTargetEffects(t *testing.T) {
@@ -534,7 +536,7 @@ func apply(cb: fn(Int) -> Int, x: Int) -> Int:
 func main() -> Int:
   let f: fn(Int) -> Int = allocer
   return apply(f, 41)
-`, "uses effect 'alloc'")
+`, "function-typed local 'f' requires effects alloc, mem but function type does not declare them")
 }
 
 func TestCallbackWrapperRequiresImportedTargetEffects(t *testing.T) {
@@ -567,7 +569,7 @@ func main() -> Int:
 	if err == nil {
 		t.Fatalf("expected imported callback target effect propagation error")
 	}
-	for _, want := range []string{"function 'app.main.main'", "uses effect 'alloc'"} {
+	for _, want := range []string{"callback function symbol 'allocer' requires effects alloc, mem but function type does not declare them"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error = %v, want substring %q", err, want)
 		}

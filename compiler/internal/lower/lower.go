@@ -2006,21 +2006,8 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 				}
 			}
 			if enumPat, ok := c.Pattern.(*frontend.EnumCasePatternExpr); ok {
-				payloadOffset := 1
-				for i, binding := range enumPat.Bindings {
-					bindInfo, ok := l.locals[binding]
-					if !ok {
-						return fmt.Errorf("%s: unknown enum payload binding '%s'", frontend.FormatPos(enumPat.At), binding)
-					}
-					for slot := 0; slot < bindInfo.SlotCount; slot++ {
-						l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: info.Base + payloadOffset + slot, Pos: enumPat.At})
-					}
-					for slot := bindInfo.SlotCount - 1; slot >= 0; slot-- {
-						l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: bindInfo.Base + slot, Pos: enumPat.At})
-					}
-					if i < len(enumPat.Bindings) {
-						payloadOffset += bindInfo.SlotCount
-					}
+				if err := l.emitIfLetPatternBindings(enumPat, info); err != nil {
+					return err
 				}
 			}
 			if c.Guard != nil {
@@ -2174,21 +2161,8 @@ func (l *lowerer) lowerMatchExpr(e *frontend.MatchExpr) (int, error) {
 			}
 		}
 		if enumPat, ok := c.Pattern.(*frontend.EnumCasePatternExpr); ok {
-			payloadOffset := 1
-			for i, binding := range enumPat.Bindings {
-				bindInfo, ok := l.locals[binding]
-				if !ok {
-					return 0, fmt.Errorf("%s: unknown enum payload binding '%s'", frontend.FormatPos(enumPat.At), binding)
-				}
-				for slot := 0; slot < bindInfo.SlotCount; slot++ {
-					l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: info.Base + payloadOffset + slot, Pos: enumPat.At})
-				}
-				for slot := bindInfo.SlotCount - 1; slot >= 0; slot-- {
-					l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: bindInfo.Base + slot, Pos: enumPat.At})
-				}
-				if i < len(enumPat.Bindings) {
-					payloadOffset += bindInfo.SlotCount
-				}
+			if err := l.emitIfLetPatternBindings(enumPat, info); err != nil {
+				return 0, err
 			}
 		}
 		if c.Guard != nil {
@@ -2481,15 +2455,20 @@ func (l *lowerer) emitIfLetPatternBindings(pattern frontend.Expr, valueInfo sema
 			if !ok {
 				return fmt.Errorf("%s: unknown enum payload binding '%s'", frontend.FormatPos(enumPat.At), binding)
 			}
+			wantSlots := bindInfo.SlotCount
+			if i < len(enumPat.PayloadSlots) {
+				wantSlots = enumPat.PayloadSlots[i]
+			}
+			if bindInfo.SlotCount != wantSlots {
+				return fmt.Errorf("%s: enum payload binding '%s' slot mismatch", frontend.FormatPos(enumPat.At), binding)
+			}
 			for slot := 0; slot < bindInfo.SlotCount; slot++ {
 				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: valueInfo.Base + payloadOffset + slot, Pos: enumPat.At})
 			}
 			for slot := bindInfo.SlotCount - 1; slot >= 0; slot-- {
 				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: bindInfo.Base + slot, Pos: enumPat.At})
 			}
-			if i < len(enumPat.Bindings) {
-				payloadOffset += bindInfo.SlotCount
-			}
+			payloadOffset += wantSlots
 		}
 	}
 	return nil
@@ -4034,6 +4013,17 @@ func (l *lowerer) lowerFunctionTypedParamCall(e *frontend.CallExpr, local semant
 }
 
 func (l *lowerer) resolveEnumCaseConstructor(e *frontend.CallExpr) (string, semantics.EnumCaseInfo, bool) {
+	if e.ResolvedType != "" {
+		parts := strings.Split(e.Name, ".")
+		if len(parts) >= 2 {
+			caseName := parts[len(parts)-1]
+			if info, ok := l.types[e.ResolvedType]; ok && info.Kind == semantics.TypeEnum {
+				if caseInfo, ok := info.CaseMap[caseName]; ok {
+					return e.ResolvedType, caseInfo, true
+				}
+			}
+		}
+	}
 	parts := strings.Split(e.Name, ".")
 	if len(parts) < 2 {
 		return "", semantics.EnumCaseInfo{}, false
@@ -4042,13 +4032,37 @@ func (l *lowerer) resolveEnumCaseConstructor(e *frontend.CallExpr) (string, sema
 	caseName := parts[len(parts)-1]
 	info, ok := l.types[typeName]
 	if !ok || info.Kind != semantics.TypeEnum {
-		return "", semantics.EnumCaseInfo{}, false
+		if altName, altInfo, found := findUniqueEnumByShortNameInLower(typeName, l.types); found {
+			typeName = altName
+			info = altInfo
+		} else {
+			return "", semantics.EnumCaseInfo{}, false
+		}
 	}
 	caseInfo, ok := info.CaseMap[caseName]
 	if !ok {
 		return "", semantics.EnumCaseInfo{}, false
 	}
 	return typeName, caseInfo, true
+}
+
+func findUniqueEnumByShortNameInLower(shortName string, types map[string]*semantics.TypeInfo) (string, *semantics.TypeInfo, bool) {
+	var foundName string
+	var foundInfo *semantics.TypeInfo
+	for name, info := range types {
+		if info == nil || info.Kind != semantics.TypeEnum {
+			continue
+		}
+		if name != shortName && !strings.HasSuffix(name, "."+shortName) {
+			continue
+		}
+		if foundInfo != nil && foundName != name {
+			return "", nil, false
+		}
+		foundName = name
+		foundInfo = info
+	}
+	return foundName, foundInfo, foundInfo != nil
 }
 
 func (l *lowerer) inferStructConstructorCallType(e *frontend.CallExpr) (string, bool, error) {

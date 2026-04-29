@@ -125,6 +125,41 @@ func main() -> Int:
 	}
 }
 
+func TestGenericFunctionProtocolBoundRejectsMismatchedImplSignature(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Echoable:
+    func echo(self: Vec2) -> Vec2
+
+extension Vec2:
+    func echo(self: Vec2) -> Int:
+        return self.x
+
+impl Vec2: Echoable
+
+func id<T: Echoable>(x: T) -> T:
+    return x
+
+func main() -> Int:
+    let v: Vec2 = Vec2(x: 42)
+    let out: Vec2 = id(v)
+    return out.x
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected protocol-bound conformance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "return type differs") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestGenericStructSameModuleMonomorphizedHappyPath(t *testing.T) {
 	src := []byte(`
 struct Box<T>:

@@ -360,6 +360,64 @@ func main() -> Int:
 	}
 }
 
+func TestTypedErrorsCatchPayloadCaseRequiresDestructuringDiagnostic(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case eof
+    case denied(Int)
+
+func read() -> Int throws ReadError:
+    throw ReadError.denied(7)
+
+func main() -> Int:
+    return catch read():
+    case ReadError.eof:
+        0
+    case ReadError.denied:
+        1
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected catch payload destructuring diagnostic")
+	}
+	if !strings.Contains(err.Error(), "carries 1 payload value(s); use 'ReadError.denied(value1)'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsCatchNoPayloadCaseRejectsPayloadSyntaxDiagnostic(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case eof
+    case denied(Int)
+
+func read() -> Int throws ReadError:
+    throw ReadError.eof
+
+func main() -> Int:
+    return catch read():
+    case ReadError.eof():
+        0
+    case ReadError.denied(code):
+        code
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected catch no-payload pattern diagnostic")
+	}
+	if !strings.Contains(err.Error(), "has no payload; use 'ReadError.eof'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestTypedErrorsCatchRejectsNonThrowingCall(t *testing.T) {
 	src := []byte(`
 func read() -> Int:

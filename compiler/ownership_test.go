@@ -407,3 +407,57 @@ func main() -> Int:
     return 0
 `, "cannot be passed as inout")
 }
+
+func TestOwnershipRejectsBorrowEscapeViaStructLiteralReturn(t *testing.T) {
+	requireCheckErrorContains(t, `
+struct BufBox:
+    buf: []u8
+
+func leak(x: borrow []u8) -> BufBox:
+    return BufBox(buf: x)
+
+func main() -> Int:
+    return 0
+`, "borrowed local 'x' cannot escape via return")
+}
+
+func TestOwnershipRejectsBorrowEscapeViaStructAliasReturn(t *testing.T) {
+	requireCheckErrorContains(t, `
+struct BufBox:
+    buf: []u8
+
+func leak(x: borrow []u8) -> BufBox:
+    let box: BufBox = BufBox(buf: x)
+    return box
+
+func main() -> Int:
+    return 0
+`, "borrowed local 'x' cannot escape via return")
+}
+
+func TestOwnershipRejectsBorrowEscapeViaStructInoutAssignment(t *testing.T) {
+	requireCheckErrorContains(t, `
+struct BufBox:
+    buf: []u8
+
+func leak(read: borrow []u8, out: inout BufBox) -> Int:
+    out = BufBox(buf: read)
+    return 0
+
+func main() -> Int:
+    return 0
+`, "borrowed local 'read' cannot escape via inout assignment to 'out'")
+}
+
+func TestOwnershipRejectsBorrowEscapeViaEnumReturn(t *testing.T) {
+	requireCheckErrorContains(t, `
+enum BufMsg:
+    case send([]u8)
+
+func leak(x: borrow []u8) -> BufMsg:
+    return BufMsg.send(x)
+
+func main() -> Int:
+    return 0
+`, "borrowed local 'x' cannot escape via return")
+}

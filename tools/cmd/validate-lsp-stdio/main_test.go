@@ -30,7 +30,7 @@ func TestValidateLSPStdioAcceptsExpectedTranscript(t *testing.T) {
 func TestValidateLSPStdioRejectsMissingHoverResponse(t *testing.T) {
 	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
 		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
-		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14,"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}},"selectionRange":{"start":{"line":0,"character":6},"end":{"line":0,"character":12}}}]}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`) +
 		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra"}]}`) +

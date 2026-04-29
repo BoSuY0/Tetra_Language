@@ -200,11 +200,15 @@ func checkExprWithEffects(
 					}
 				}
 			}
+			if len(caseInfo.PayloadTypes) == 0 {
+				return "", regionNone, fmt.Errorf("%s: enum case '%s.%s' has no payload; use '%s.%s'", frontend.FormatPos(e.At), displayTypeName(enumType, module), caseInfo.Name, displayTypeName(enumType, module), caseInfo.Name)
+			}
 			if len(e.Args) != len(caseInfo.PayloadTypes) {
 				return "", regionNone, fmt.Errorf("%s: enum case '%s.%s' expects %d payload argument(s), got %d", frontend.FormatPos(e.At), displayTypeName(enumType, module), caseInfo.Name, len(caseInfo.PayloadTypes), len(e.Args))
 			}
+			payloadRegion := regionNone
 			for i, arg := range e.Args {
-				argType, _, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
+				argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
 					return "", regionNone, err
 				}
@@ -212,8 +216,13 @@ func checkExprWithEffects(
 					return "", regionNone, fmt.Errorf("%s: enum case '%s.%s' payload %d expects '%s', got '%s'", frontend.FormatPos(arg.Pos()), displayTypeName(enumType, module), caseInfo.Name, i+1, caseInfo.PayloadTypes[i], argType)
 				}
 				consumeIslandSourceLocals(arg, caseInfo.PayloadTypes[i], locals, types, module, imports, state)
+				payloadRegion = joinRegion(payloadRegion, argRegion)
+				if payloadRegion == regionUnknown {
+					return "", regionNone, fmt.Errorf("%s: enum case '%s.%s' mixes values from different regions", frontend.FormatPos(arg.Pos()), displayTypeName(enumType, module), caseInfo.Name)
+				}
 			}
-			return enumType, regionNone, nil
+			e.ResolvedType = enumType
+			return enumType, payloadRegion, nil
 		}
 		return checkCallExprWithEffects(e, locals, globals, funcs, types, module, imports, state, effects, analysis)
 	case *frontend.ClosureExpr:
@@ -410,6 +419,9 @@ func checkMatchExpr(
 		}
 		e.ResultType = resultType
 	}
+	if err := reportBarePayloadMatchExprPatterns(e, scrutType, locals, globals, funcs, types, module, imports); err != nil {
+		return "", err
+	}
 	if !matchExprHasCompleteOptionalPatterns(e) && !matchExprHasCompleteEnumPatterns(e, locals, globals, funcs, types, module, imports) {
 		hasDefault := false
 		for _, c := range e.Cases {
@@ -461,8 +473,8 @@ func checkMatchExpr(
 				if !found {
 					return "", fmt.Errorf("%s: unknown enum pattern '%s.%s'", frontend.FormatPos(enumPat.At), enumPat.TypeName, enumPat.CaseName)
 				}
-				if len(enumPat.Bindings) != len(caseInfo.PayloadTypes) {
-					return "", fmt.Errorf("%s: enum case '%s.%s' pattern expects %d binding(s), got %d", frontend.FormatPos(enumPat.At), displayTypeName(caseType, module), enumPat.CaseName, len(caseInfo.PayloadTypes), len(enumPat.Bindings))
+				if err := validateEnumCasePatternPayload(enumPat, caseType, caseInfo, module); err != nil {
+					return "", err
 				}
 				patType = caseType
 			} else {
@@ -579,6 +591,9 @@ func checkCatchExpr(
 	}
 	if e.ResultType == "" {
 		e.ResultType = successType
+	}
+	if err := reportBarePayloadCatchExprPatterns(e, locals, globals, funcs, types, module, imports); err != nil {
+		return "", err
 	}
 	if !catchExprHasCompleteOptionalPatterns(e, e.ErrorType, types) && !catchExprHasCompleteEnumPatterns(e, e.ErrorType, locals, globals, funcs, types, module, imports) {
 		hasDefault := false
@@ -699,6 +714,9 @@ func checkCallExprWithEffects(
 				if !typesCompatibleWithNullPtr(local.FunctionParamTypes[i], argType, arg) {
 					return "", regionNone, fmt.Errorf("%s: type mismatch for callback '%s' arg %d", frontend.FormatPos(arg.Pos()), e.Name, i+1)
 				}
+			}
+			if err := effects.requireAll(e.At, local.FunctionEffects); err != nil {
+				return "", regionNone, err
 			}
 			if hasCallerSig && hasStrictSemanticCallClauses(callerSig) {
 				return "", regionNone, fmt.Errorf(
@@ -826,7 +844,7 @@ func checkCallExprWithEffects(
 			if !ok {
 				return "", regionNone, fmt.Errorf("%s: callback argument for '%s' must be a symbol-backed local function value or direct named function/closure symbol in this MVP", frontend.FormatPos(arg.Pos()), resolved)
 			}
-			callbackType, callbackSymbol, err := resolveCallbackArgumentType(id, resolved, sig, i, locals, funcs, module, imports)
+			callbackType, callbackSymbol, err := resolveCallbackArgumentType(id, resolved, sig, i, locals, funcs, module, imports, hasCallerSig && hasStrictSemanticCallClauses(callerSig))
 			if err != nil {
 				return "", regionNone, err
 			}
@@ -1197,6 +1215,7 @@ func resolveCallbackArgumentType(
 	funcs map[string]FuncSig,
 	module string,
 	imports map[string]string,
+	deferEffectValidation bool,
 ) (string, string, error) {
 	if localInfo, ok := locals[arg.Name]; ok {
 		if !localInfo.FunctionTypeValue || localInfo.FunctionValue == "" {
@@ -1205,11 +1224,14 @@ func resolveCallbackArgumentType(
 		if localInfo.GenericFunctionValue {
 			return "", "", fmt.Errorf("%s: generic function symbol '%s' is not supported for callback argument in this MVP", frontend.FormatPos(arg.Pos()), arg.Name)
 		}
+		if len(localInfo.FunctionCaptures) > 0 {
+			return "", "", unsupportedCallbackCaptureError(arg.Pos(), arg.Name)
+		}
 		localSig, ok := funcs[localInfo.FunctionValue]
 		if !ok {
 			return "", "", fmt.Errorf("%s: unknown callback function symbol '%s'", frontend.FormatPos(arg.Pos()), localInfo.FunctionValue)
 		}
-		if err := validateCallbackSignature(localSig, calleeSig, paramIndex, arg.At, arg.Name); err != nil {
+		if err := validateCallbackSignature(localSig, calleeSig, paramIndex, arg.At, arg.Name, deferEffectValidation); err != nil {
 			return "", "", err
 		}
 		if err := validateCallbackClauseCompatibility(localSig, calleeSig, calleeName, arg.At, arg.Name); err != nil {
@@ -1235,7 +1257,7 @@ func resolveCallbackArgumentType(
 	if sig.ThrowsType != "" {
 		return "", "", fmt.Errorf("%s: throwing function symbol '%s' is not supported for callback argument in this MVP", frontend.FormatPos(arg.Pos()), arg.Name)
 	}
-	if err := validateCallbackSignature(sig, calleeSig, paramIndex, arg.At, arg.Name); err != nil {
+	if err := validateCallbackSignature(sig, calleeSig, paramIndex, arg.At, arg.Name, deferEffectValidation); err != nil {
 		return "", "", err
 	}
 	if err := validateCallbackClauseCompatibility(sig, calleeSig, calleeName, arg.At, arg.Name); err != nil {
@@ -1244,18 +1266,27 @@ func resolveCallbackArgumentType(
 	return "ptr", resolved, nil
 }
 
+func unsupportedCallbackCaptureError(pos frontend.Position, rawName string) error {
+	return fmt.Errorf("%s: callback argument '%s' captures local values; captured function values cannot be passed as callback arguments in this MVP", frontend.FormatPos(pos), rawName)
+}
+
 func validateCallbackSignature(
 	callbackSig FuncSig,
 	calleeSig FuncSig,
 	paramIndex int,
 	pos frontend.Position,
 	rawName string,
+	deferEffectValidation bool,
 ) error {
 	if paramIndex >= len(calleeSig.ParamFunctionParams) || paramIndex >= len(calleeSig.ParamFunctionReturns) {
 		return nil
 	}
 	wantParams := calleeSig.ParamFunctionParams[paramIndex]
 	wantReturn := calleeSig.ParamFunctionReturns[paramIndex]
+	wantEffects := []string(nil)
+	if paramIndex < len(calleeSig.ParamFunctionEffects) {
+		wantEffects = calleeSig.ParamFunctionEffects[paramIndex]
+	}
 	if len(wantParams) != len(callbackSig.ParamTypes) {
 		return fmt.Errorf("%s: callback function symbol '%s' has incompatible parameter count: expected %d, got %d", frontend.FormatPos(pos), rawName, len(wantParams), len(callbackSig.ParamTypes))
 	}
@@ -1266,6 +1297,11 @@ func validateCallbackSignature(
 	}
 	if wantReturn != "" && wantReturn != callbackSig.ReturnType {
 		return fmt.Errorf("%s: callback function symbol '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), rawName, wantReturn, callbackSig.ReturnType)
+	}
+	if !deferEffectValidation {
+		if err := validateFunctionTypeCallableEffects(wantEffects, callbackSig.Effects, pos, "callback function symbol", rawName); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1537,6 +1573,50 @@ func markTaskHandleJoined(arg frontend.Expr, funcs map[string]FuncSig, module st
 	if source, err := resourceSourceForExpr(arg, funcs, module, imports, state); err == nil && source.known {
 		state.markResourceFinalized(source.name, "joined", arg.Pos())
 	}
+}
+
+func borrowedOwnerForRegion(regionID int, state *regionState) (string, bool) {
+	if state == nil || regionID == regionNone || regionID == regionUnknown {
+		return "", false
+	}
+	if borrowedName, borrowed := state.borrowedParamOwner(regionID); borrowed {
+		return borrowedName, true
+	}
+	return "", false
+}
+
+func borrowedOwnerFromExpr(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState) (string, bool, error) {
+	_, regionID, err := checkExprWithEffects(expr, locals, globals, funcs, types, module, imports, state, effects, analysis)
+	if err != nil {
+		return "", false, err
+	}
+	borrowedName, borrowed := borrowedOwnerForRegion(regionID, state)
+	return borrowedName, borrowed, nil
+}
+
+func checkBorrowedEscape(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState, format func(string) error) error {
+	if expr == nil {
+		return nil
+	}
+	if borrowedName, borrowed, err := borrowedOwnerFromExpr(expr, locals, globals, funcs, types, module, imports, state, effects, analysis); err != nil {
+		return err
+	} else if borrowed {
+		return format(borrowedName)
+	}
+	if lit, ok := expr.(*frontend.StructLitExpr); ok {
+		for _, field := range lit.Fields {
+			if err := checkBorrowedEscape(field.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func checkBorrowedInoutEscape(expr frontend.Expr, targetName string, pos frontend.Position, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState) error {
+	return checkBorrowedEscape(expr, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+		return fmt.Errorf("%s: borrowed local '%s' cannot escape via inout assignment to '%s'", frontend.FormatPos(pos), borrowedName, targetName)
+	})
 }
 
 func markConsumedResourceValue(name string, typeName string, types map[string]*TypeInfo, state *regionState, pos frontend.Position) {
@@ -1960,6 +2040,103 @@ func checkStructConstructorCallWithEffects(
 	e.Args = orderedArgs
 	e.ArgLabels = orderedLabels
 	return resolvedType, structRegion, true, nil
+}
+
+func reportBarePayloadMatchExprPatterns(
+	e *frontend.MatchExpr,
+	scrutType string,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) error {
+	if e == nil {
+		return nil
+	}
+	info, ok := types[scrutType]
+	if !ok || info.Kind != TypeEnum {
+		return nil
+	}
+	for i := range e.Cases {
+		c := &e.Cases[i]
+		if c.Default || c.Guard != nil {
+			continue
+		}
+		caseName, ok := bareEnumPatternCaseName(c.Pattern, scrutType, module, imports)
+		if !ok {
+			continue
+		}
+		caseInfo, ok := info.CaseMap[caseName]
+		if !ok || len(caseInfo.PayloadTypes) == 0 {
+			continue
+		}
+		return barePayloadRequiredDiagnostic(c.At, scrutType, caseName, len(caseInfo.PayloadTypes), module)
+	}
+	return nil
+}
+
+func reportBarePayloadCatchExprPatterns(
+	e *frontend.CatchExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) error {
+	if e == nil {
+		return nil
+	}
+	info, ok := types[e.ErrorType]
+	if !ok || info.Kind != TypeEnum {
+		return nil
+	}
+	for i := range e.Cases {
+		c := &e.Cases[i]
+		if c.Default || c.Guard != nil {
+			continue
+		}
+		caseName, ok := bareEnumPatternCaseName(c.Pattern, e.ErrorType, module, imports)
+		if !ok {
+			continue
+		}
+		caseInfo, ok := info.CaseMap[caseName]
+		if !ok || len(caseInfo.PayloadTypes) == 0 {
+			continue
+		}
+		return barePayloadRequiredDiagnostic(c.At, e.ErrorType, caseName, len(caseInfo.PayloadTypes), module)
+	}
+	return nil
+}
+
+func barePayloadRequiredDiagnostic(pos frontend.Position, typeName string, caseName string, arity int, module string) error {
+	if arity <= 0 {
+		arity = 1
+	}
+	return fmt.Errorf("%s: enum case '%s.%s' carries %d payload value(s); use '%s.%s(%s)'", frontend.FormatPos(pos), displayTypeName(typeName, module), caseName, arity, displayTypeName(typeName, module), caseName, placeholderBindingList(arity))
+}
+
+func bareEnumPatternCaseName(pattern frontend.Expr, expectedType string, module string, imports map[string]string) (string, bool) {
+	field, ok := pattern.(*frontend.FieldAccessExpr)
+	if !ok {
+		return "", false
+	}
+	baseName, fields, pos, ok := splitFieldPath(field.Base)
+	if !ok {
+		return "", false
+	}
+	parts := append([]string{baseName}, fields...)
+	if len(parts) == 0 {
+		return "", false
+	}
+	ref := frontend.TypeRef{At: pos, Kind: frontend.TypeRefNamed, Name: strings.Join(parts, ".")}
+	typeName, err := resolveTypeName(&ref, module, imports)
+	if err != nil || typeName != expectedType {
+		return "", false
+	}
+	return field.Field, true
 }
 
 func comparableTypes(left, right string, types map[string]*TypeInfo) bool {

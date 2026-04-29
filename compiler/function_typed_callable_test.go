@@ -276,7 +276,7 @@ func TestBuildFunctionTypedCallableMVPRejectsUnsupportedForms(t *testing.T) {
         return x + base
     return f(41)
 `,
-			want: "requires a non-capturing closure literal",
+			want: "captures 'base'; captures are not supported for function-typed values in this MVP",
 		},
 		{
 			name: "generic literal binding",

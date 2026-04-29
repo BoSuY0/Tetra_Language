@@ -116,6 +116,8 @@ func runCLI(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 0
 	case "targets":
 		return runTargets(args[1:], stdout, stderr)
+	case "features":
+		return runFeatures(args[1:], stdout, stderr)
 	case "formats":
 		return runFormats(args[1:], stdout, stderr)
 	case "new":
@@ -176,12 +178,19 @@ type targetReportEntry struct {
 	ExeExt                  string `json:"exe_ext"`
 	BuildOnly               bool   `json:"build_only"`
 	RunSupported            bool   `json:"run_supported"`
+	RunUnsupportedReason    string `json:"run_unsupported_reason,omitempty"`
 	SupportsDebugInfo       bool   `json:"supports_debug_info"`
 	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 }
 
 type formatsReport struct {
 	Formats []compiler.FormatInfo `json:"formats"`
+}
+
+type featuresReport struct {
+	Schema   string                 `json:"schema"`
+	Version  string                 `json:"version"`
+	Features []compiler.FeatureInfo `json:"features"`
 }
 
 type doctorReport struct {
@@ -228,6 +237,46 @@ func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Planned targets:")
 		for _, triple := range report.Planned {
 			fmt.Fprintf(stdout, "  %s\n", triple)
+		}
+		return 0
+	case "json":
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintln(stderr, "unsupported --format")
+		return 2
+	}
+}
+
+func runFeatures(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("features", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	format := fs.String("format", "text", "output format: text or json")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintln(stderr, "features does not accept positional arguments")
+		return 2
+	}
+	report := featuresReport{
+		Schema:   "tetra.features.v1",
+		Version:  compiler.Version(),
+		Features: compiler.FeatureRegistry(),
+	}
+	switch *format {
+	case "text", "":
+		fmt.Fprintf(stdout, "Tetra features (%s):\n", report.Version)
+		for _, feature := range report.Features {
+			fmt.Fprintf(stdout, "  %s [%s] - %s\n", feature.ID, feature.Status, feature.Name)
 		}
 		return 0
 	case "json":
@@ -1394,6 +1443,13 @@ func buildTargetReportEntries() []targetReportEntry {
 			continue
 		}
 		buildOnly := ctarget.IsBuildOnlyTarget(tgt.Triple)
+		runSupported := hostOK && host == tgt.Triple && !buildOnly
+		runUnsupportedReason := ""
+		if buildOnly {
+			runUnsupportedReason = fmt.Sprintf("%s is build-only: compiler emits .wasm artifacts but the CLI does not provide a production runtime runner", tgt.Triple)
+		} else if !runSupported {
+			runUnsupportedReason = fmt.Sprintf("%s cannot run on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH)
+		}
 		out = append(out, targetReportEntry{
 			Triple:                  tgt.Triple,
 			Status:                  tgt.Status.String(),
@@ -1403,7 +1459,8 @@ func buildTargetReportEntries() []targetReportEntry {
 			Format:                  tgt.Format.String(),
 			ExeExt:                  tgt.ExeExt,
 			BuildOnly:               buildOnly,
-			RunSupported:            hostOK && host == tgt.Triple && !buildOnly,
+			RunSupported:            runSupported,
+			RunUnsupportedReason:    runUnsupportedReason,
 			SupportsDebugInfo:       tgt.SupportsDebugInfo,
 			SupportsReleaseOptimize: tgt.SupportsReleaseOptimize,
 		})
@@ -3002,6 +3059,10 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 	isWASI := tgt.Triple == "wasm32-wasi"
+	if ctarget.IsBuildOnlyTarget(tgt.Triple) && !isWASI {
+		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run target %s: build-only target emits artifacts only; unsupported runtime execution because the CLI does not provide a production runtime runner", tgt.Triple))
+		return 2
+	}
 	if !isWASI {
 		host, ok := hostTarget()
 		if !ok || host != tgt.Triple {
@@ -3213,6 +3274,10 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	tgt, ok := parseBuildTargetOrReport(*target, *diagnostics, stderr)
 	if !ok {
+		return 2
+	}
+	if ctarget.IsBuildOnlyTarget(tgt.Triple) {
+		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run tests for target %s: build-only target emits artifacts only; unsupported runtime execution because the CLI does not provide a production test runner", tgt.Triple))
 		return 2
 	}
 	host, ok := hostTarget()
@@ -4069,5 +4134,5 @@ func writeDiagnosticObject(w io.Writer, diag compiler.Diagnostic) {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: tetra <version|targets|formats|doctor|project|workspace|new|check|build|run|smoke|fmt|test|doc|interface|clean|eco|lsp> [options]")
+	fmt.Fprintln(w, "usage: tetra <version|targets|features|formats|doctor|project|workspace|new|check|build|run|smoke|fmt|test|doc|interface|clean|eco|lsp> [options]")
 }

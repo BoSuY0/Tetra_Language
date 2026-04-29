@@ -872,6 +872,15 @@ func typeMayContainRegion(typeName string, types map[string]*TypeInfo) bool {
 			}
 		}
 		return false
+	case TypeEnum:
+		for _, c := range info.EnumCases {
+			for _, payload := range c.PayloadTypes {
+				if typeMayContainRegion(payload, types) {
+					return true
+				}
+			}
+		}
+		return false
 	case TypeArray:
 		return typeMayContainRegion(info.ElemType, types)
 	default:

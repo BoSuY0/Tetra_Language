@@ -168,6 +168,9 @@ func resolveTypeName(ref *frontend.TypeRef, module string, imports map[string]st
 			return "", err
 		}
 		ref.Return.Name = retName
+		if _, err := normalizeEffects(ref.Uses, ref.At); err != nil {
+			return "", err
+		}
 		// MVP: function-typed values lower through the existing ptr-sized value path.
 		return "ptr", nil
 	default:
@@ -234,6 +237,9 @@ func resolveEnumCaseExpr(expr frontend.Expr, locals map[string]LocalInfo, global
 	if len(caseInfo.PayloadTypes) > 0 {
 		return "", EnumCaseInfo{}, true, fmt.Errorf("%s: enum case '%s.%s' requires payload arguments", frontend.FormatPos(field.At), displayTypeName(typeName, module), field.Field)
 	}
+	if len(caseInfo.PayloadTypes) == 0 && field.Field == "" {
+		return "", EnumCaseInfo{}, true, fmt.Errorf("%s: malformed enum case reference", frontend.FormatPos(field.At))
+	}
 	field.EnumType = typeName
 	field.EnumOrdinal = caseInfo.Ordinal
 	return typeName, caseInfo, true, nil
@@ -260,6 +266,7 @@ func resolveEnumCasePattern(pattern *frontend.EnumCasePatternExpr, types map[str
 	}
 	pattern.EnumType = typeName
 	pattern.EnumOrdinal = caseInfo.Ordinal
+	pattern.PayloadSlots = append(pattern.PayloadSlots[:0], caseInfo.PayloadSlots...)
 	return typeName, caseInfo, true, nil
 }
 

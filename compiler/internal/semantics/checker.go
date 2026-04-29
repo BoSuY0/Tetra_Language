@@ -39,6 +39,253 @@ type CheckOptions struct {
 	RequireMain bool
 }
 
+func clearMatchPayloadExhaustivenessMarkers(world *module.World) {
+	if world == nil {
+		return
+	}
+	for _, file := range world.Files {
+		if file == nil {
+			continue
+		}
+		for _, fn := range file.Funcs {
+			clearStmtListMatchPayloadMarkers(fn.Body)
+		}
+		for _, test := range file.Tests {
+			clearStmtListMatchPayloadMarkers(test.Body)
+		}
+	}
+}
+
+func clearStmtListMatchPayloadMarkers(stmts []frontend.Stmt) {
+	for _, stmt := range stmts {
+		switch s := stmt.(type) {
+		case *frontend.IfStmt:
+			clearStmtListMatchPayloadMarkers(s.Then)
+			clearStmtListMatchPayloadMarkers(s.Else)
+		case *frontend.IfLetStmt:
+			clearStmtListMatchPayloadMarkers(s.Then)
+			clearStmtListMatchPayloadMarkers(s.Else)
+		case *frontend.WhileStmt:
+			clearStmtListMatchPayloadMarkers(s.Body)
+		case *frontend.ForRangeStmt:
+			clearStmtListMatchPayloadMarkers(s.Body)
+		case *frontend.MatchStmt:
+			for i := range s.Cases {
+				s.Cases[i].RequiresPayload = false
+				s.Cases[i].PayloadArity = 0
+				clearStmtListMatchPayloadMarkers(s.Cases[i].Body)
+			}
+		case *frontend.UnsafeStmt:
+			clearStmtListMatchPayloadMarkers(s.Body)
+		case *frontend.DeferStmt:
+			clearStmtListMatchPayloadMarkers(s.Body)
+		}
+		clearExprMatchPayloadMarkers(stmtExpr(stmt))
+	}
+}
+
+func stmtExpr(stmt frontend.Stmt) frontend.Expr {
+	switch s := stmt.(type) {
+	case *frontend.LetStmt:
+		return s.Value
+	case *frontend.AssignStmt:
+		return s.Value
+	case *frontend.ExprStmt:
+		return s.Expr
+	case *frontend.ReturnStmt:
+		return s.Value
+	case *frontend.ThrowStmt:
+		return s.Value
+	case *frontend.PrintStmt:
+		return s.Value
+	case *frontend.FreeStmt:
+		return s.Value
+	}
+	return nil
+}
+
+func reportStmtListMatchPayloadDiagnostics(stmts []frontend.Stmt, module string) error {
+	for _, stmt := range stmts {
+		switch s := stmt.(type) {
+		case *frontend.IfStmt:
+			if err := reportStmtListMatchPayloadDiagnostics(s.Then, module); err != nil {
+				return err
+			}
+			if err := reportStmtListMatchPayloadDiagnostics(s.Else, module); err != nil {
+				return err
+			}
+		case *frontend.IfLetStmt:
+			if err := reportStmtListMatchPayloadDiagnostics(s.Then, module); err != nil {
+				return err
+			}
+			if err := reportStmtListMatchPayloadDiagnostics(s.Else, module); err != nil {
+				return err
+			}
+		case *frontend.WhileStmt:
+			if err := reportStmtListMatchPayloadDiagnostics(s.Body, module); err != nil {
+				return err
+			}
+		case *frontend.ForRangeStmt:
+			if err := reportStmtListMatchPayloadDiagnostics(s.Body, module); err != nil {
+				return err
+			}
+		case *frontend.MatchStmt:
+			for i := range s.Cases {
+				c := &s.Cases[i]
+				if c.RequiresPayload {
+					return payloadRequiredDiagnostic(c.At, c.Pattern, c.PayloadArity, module)
+				}
+				if err := reportStmtListMatchPayloadDiagnostics(c.Body, module); err != nil {
+					return err
+				}
+			}
+		case *frontend.UnsafeStmt:
+			if err := reportStmtListMatchPayloadDiagnostics(s.Body, module); err != nil {
+				return err
+			}
+		case *frontend.DeferStmt:
+			if err := reportStmtListMatchPayloadDiagnostics(s.Body, module); err != nil {
+				return err
+			}
+		}
+		if err := reportExprMatchPayloadDiagnostics(stmtExpr(stmt), module); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func reportExprMatchPayloadDiagnostics(expr frontend.Expr, module string) error {
+	if expr == nil {
+		return nil
+	}
+	switch e := expr.(type) {
+	case *frontend.MatchExpr:
+		for i := range e.Cases {
+			c := &e.Cases[i]
+			if c.RequiresPayload {
+				return payloadRequiredDiagnostic(c.At, c.Pattern, c.PayloadArity, module)
+			}
+			if err := reportExprMatchPayloadDiagnostics(c.Guard, module); err != nil {
+				return err
+			}
+			if err := reportExprMatchPayloadDiagnostics(c.Value, module); err != nil {
+				return err
+			}
+		}
+		return reportExprMatchPayloadDiagnostics(e.Value, module)
+	case *frontend.CatchExpr:
+		for i := range e.Cases {
+			c := &e.Cases[i]
+			if c.RequiresPayload {
+				return payloadRequiredDiagnostic(c.At, c.Pattern, c.PayloadArity, module)
+			}
+			if err := reportExprMatchPayloadDiagnostics(c.Guard, module); err != nil {
+				return err
+			}
+			if err := reportExprMatchPayloadDiagnostics(c.Value, module); err != nil {
+				return err
+			}
+		}
+		return reportExprMatchPayloadDiagnostics(e.Call, module)
+	case *frontend.CallExpr:
+		for _, arg := range e.Args {
+			if err := reportExprMatchPayloadDiagnostics(arg, module); err != nil {
+				return err
+			}
+		}
+	case *frontend.UnaryExpr:
+		return reportExprMatchPayloadDiagnostics(e.X, module)
+	case *frontend.BinaryExpr:
+		if err := reportExprMatchPayloadDiagnostics(e.Left, module); err != nil {
+			return err
+		}
+		return reportExprMatchPayloadDiagnostics(e.Right, module)
+	case *frontend.FieldAccessExpr:
+		return reportExprMatchPayloadDiagnostics(e.Base, module)
+	case *frontend.IndexExpr:
+		if err := reportExprMatchPayloadDiagnostics(e.Base, module); err != nil {
+			return err
+		}
+		return reportExprMatchPayloadDiagnostics(e.Index, module)
+	case *frontend.TryExpr:
+		return reportExprMatchPayloadDiagnostics(e.X, module)
+	case *frontend.AwaitExpr:
+		return reportExprMatchPayloadDiagnostics(e.X, module)
+	case *frontend.StructLitExpr:
+		for _, field := range e.Fields {
+			if err := reportExprMatchPayloadDiagnostics(field.Value, module); err != nil {
+				return err
+			}
+		}
+	case *frontend.ClosureExpr:
+		if e.Decl != nil {
+			return reportStmtListMatchPayloadDiagnostics(e.Decl.Body, module)
+		}
+	}
+	return nil
+}
+
+func payloadRequiredDiagnostic(pos frontend.Position, pattern frontend.Expr, arity int, module string) error {
+	if field, ok := pattern.(*frontend.FieldAccessExpr); ok {
+		if arity <= 0 {
+			arity = 1
+		}
+		return fmt.Errorf("%s: enum case '%s.%s' carries %d payload value(s); use '%s.%s(%s)'", frontend.FormatPos(pos), displayTypeName(field.EnumType, module), field.Field, arity, displayTypeName(field.EnumType, module), field.Field, placeholderBindingList(arity))
+	}
+	return fmt.Errorf("%s: enum payload pattern requires destructuring", frontend.FormatPos(pos))
+}
+
+func clearExprMatchPayloadMarkers(expr frontend.Expr) {
+	if expr == nil {
+		return
+	}
+	switch e := expr.(type) {
+	case *frontend.MatchExpr:
+		for i := range e.Cases {
+			e.Cases[i].RequiresPayload = false
+			e.Cases[i].PayloadArity = 0
+			clearExprMatchPayloadMarkers(e.Cases[i].Guard)
+			clearExprMatchPayloadMarkers(e.Cases[i].Value)
+		}
+		clearExprMatchPayloadMarkers(e.Value)
+	case *frontend.CatchExpr:
+		for i := range e.Cases {
+			e.Cases[i].RequiresPayload = false
+			e.Cases[i].PayloadArity = 0
+			clearExprMatchPayloadMarkers(e.Cases[i].Guard)
+			clearExprMatchPayloadMarkers(e.Cases[i].Value)
+		}
+		clearExprMatchPayloadMarkers(e.Call)
+	case *frontend.CallExpr:
+		for _, arg := range e.Args {
+			clearExprMatchPayloadMarkers(arg)
+		}
+	case *frontend.UnaryExpr:
+		clearExprMatchPayloadMarkers(e.X)
+	case *frontend.BinaryExpr:
+		clearExprMatchPayloadMarkers(e.Left)
+		clearExprMatchPayloadMarkers(e.Right)
+	case *frontend.FieldAccessExpr:
+		clearExprMatchPayloadMarkers(e.Base)
+	case *frontend.IndexExpr:
+		clearExprMatchPayloadMarkers(e.Base)
+		clearExprMatchPayloadMarkers(e.Index)
+	case *frontend.TryExpr:
+		clearExprMatchPayloadMarkers(e.X)
+	case *frontend.AwaitExpr:
+		clearExprMatchPayloadMarkers(e.X)
+	case *frontend.StructLitExpr:
+		for _, field := range e.Fields {
+			clearExprMatchPayloadMarkers(field.Value)
+		}
+	case *frontend.ClosureExpr:
+		if e.Decl != nil {
+			clearStmtListMatchPayloadMarkers(e.Decl.Body)
+		}
+	}
+}
+
 func fileUsesExplicitPublic(file *frontend.FileAST) bool {
 	if file == nil {
 		return false
@@ -335,6 +582,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 	if err := monomorphizeGenerics(world); err != nil {
 		return nil, err
 	}
+	clearMatchPayloadExhaustivenessMarkers(world)
 	if err := normalizeExtensionMethodNames(world); err != nil {
 		return nil, err
 	}
@@ -1034,6 +1282,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					ParamFunctionTypes:   genericParamFunctionKinds(fn.Params),
 					ParamFunctionParams:  genericParamFunctionParamTypes(fn.Params),
 					ParamFunctionReturns: genericParamFunctionReturnTypes(fn.Params),
+					ParamFunctionEffects: genericParamFunctionEffectTypes(fn.Params),
 					ParamOwnership:       genericParamOwnership(fn.Params),
 					ParamSlots:           0,
 					ReturnType:           fn.ReturnType.Name,
@@ -1054,8 +1303,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			returnFunctionType := fn.ReturnType.Kind == frontend.TypeRefFunction
 			returnFunctionParams := []string(nil)
 			returnFunctionReturn := ""
+			returnFunctionEffects := []string(nil)
 			if returnFunctionType {
-				returnFunctionParams, returnFunctionReturn, err = functionTypeRefSignature(fn.ReturnType, module, imports)
+				returnFunctionParams, returnFunctionReturn, returnFunctionEffects, err = functionTypeRefSignatureAndEffects(fn.ReturnType, module, imports)
 				if err != nil {
 					return nil, err
 				}
@@ -1125,28 +1375,30 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				return nil, err
 			}
 			checked.FuncSigs[fullName] = FuncSig{
-				Public:               declarationIsPublic(file, fn.Public),
-				HasNoAlloc:           policy.hasNoAlloc,
-				HasNoBlock:           policy.hasNoBlock,
-				HasRealtime:          policy.hasRealtime,
-				ParamNames:           paramNames,
-				ParamTypes:           paramTypes,
-				ParamFunctionTypes:   paramFunctionKinds(fn.Params),
-				ParamFunctionParams:  paramFunctionParamTypes(fn.Params),
-				ParamFunctionReturns: paramFunctionReturnTypes(fn.Params),
-				ParamOwnership:       paramOwnership,
-				ParamSlots:           paramSlots,
-				ReturnType:           retName,
-				ReturnFunctionType:   returnFunctionType,
-				ReturnFunctionParams: returnFunctionParams,
-				ReturnFunctionReturn: returnFunctionReturn,
-				ThrowsType:           throwsType,
-				Async:                fn.Async,
-				ReturnSlots:          returnSlots,
-				ReturnRegionParam:    regionNone,
-				ReturnResourceParam:  initialReturnResourceParam(retName, types),
-				ReturnResourcePath:   "",
-				Effects:              effects,
+				Public:                declarationIsPublic(file, fn.Public),
+				HasNoAlloc:            policy.hasNoAlloc,
+				HasNoBlock:            policy.hasNoBlock,
+				HasRealtime:           policy.hasRealtime,
+				ParamNames:            paramNames,
+				ParamTypes:            paramTypes,
+				ParamFunctionTypes:    paramFunctionKinds(fn.Params),
+				ParamFunctionParams:   paramFunctionParamTypes(fn.Params),
+				ParamFunctionReturns:  paramFunctionReturnTypes(fn.Params),
+				ParamFunctionEffects:  paramFunctionEffectTypes(fn.Params),
+				ParamOwnership:        paramOwnership,
+				ParamSlots:            paramSlots,
+				ReturnType:            retName,
+				ReturnFunctionType:    returnFunctionType,
+				ReturnFunctionParams:  returnFunctionParams,
+				ReturnFunctionReturn:  returnFunctionReturn,
+				ReturnFunctionEffects: returnFunctionEffects,
+				ThrowsType:            throwsType,
+				Async:                 fn.Async,
+				ReturnSlots:           returnSlots,
+				ReturnRegionParam:     regionNone,
+				ReturnResourceParam:   initialReturnResourceParam(retName, types),
+				ReturnResourcePath:    "",
+				Effects:               effects,
 			}
 		}
 	}
@@ -1250,8 +1502,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					functionTypeValue := param.Type.Kind == frontend.TypeRefFunction
 					functionParamTypes := []string(nil)
 					functionReturnType := ""
+					functionEffects := []string(nil)
 					if functionTypeValue {
-						functionParamTypes, functionReturnType, err = functionTypeRefSignature(param.Type, module, imports)
+						functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(param.Type, module, imports)
 						if err != nil {
 							return nil, err
 						}
@@ -1264,6 +1517,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 						FunctionTypeValue:  functionTypeValue,
 						FunctionParamTypes: functionParamTypes,
 						FunctionReturnType: functionReturnType,
+						FunctionEffects:    functionEffects,
 					}
 					scopeInfo.localScopes[param.Name] = regionNone
 					slotIndex += info.SlotCount
@@ -1277,7 +1531,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					return nil, err
 				}
 				if !stmtListEndsWithReturnTyped(fn.Body, locals, globals, checked.FuncSigs, types, module, imports) {
+					if err := reportStmtListMatchPayloadDiagnostics(fn.Body, module); err != nil {
+						return nil, err
+					}
 					return nil, fmt.Errorf("function '%s' must end with return", fullName)
+				}
+				if err := reportStmtListMatchPayloadDiagnostics(fn.Body, module); err != nil {
+					return nil, err
 				}
 				state := newRegionState(scopeInfo)
 				if fields, ok := actorStateFieldsByMethod[fullName]; ok {
@@ -1402,8 +1662,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				functionTypeValue := param.Type.Kind == frontend.TypeRefFunction
 				functionParamTypes := []string(nil)
 				functionReturnType := ""
+				functionEffects := []string(nil)
 				if functionTypeValue {
-					functionParamTypes, functionReturnType, err = functionTypeRefSignature(param.Type, module, imports)
+					functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(param.Type, module, imports)
 					if err != nil {
 						return nil, err
 					}
@@ -1416,6 +1677,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					FunctionTypeValue:  functionTypeValue,
 					FunctionParamTypes: functionParamTypes,
 					FunctionReturnType: functionReturnType,
+					FunctionEffects:    functionEffects,
 				}
 				scopeInfo.localScopes[param.Name] = regionNone
 				slotIndex += info.SlotCount
@@ -1739,7 +2001,8 @@ func matchHasCompleteEnumPatterns(
 		return false
 	}
 	seen := make(map[string]struct{}, len(info.EnumCases))
-	for _, c := range s.Cases {
+	for i := range s.Cases {
+		c := &s.Cases[i]
 		if c.Guard != nil {
 			continue
 		}
@@ -1751,6 +2014,16 @@ func matchHasCompleteEnumPatterns(
 			patType, err := inferExprTypeForDecl(c.Pattern, locals, globals, funcs, types, module, imports)
 			if err != nil || patType != scrutType || pat.EnumType != scrutType {
 				return false
+			}
+			caseInfo, ok := info.CaseMap[pat.Field]
+			if !ok {
+				return false
+			}
+			if len(caseInfo.PayloadTypes) != 0 {
+				c.RequiresPayload = true
+				c.PayloadArity = len(caseInfo.PayloadTypes)
+				seen[pat.Field] = struct{}{}
+				continue
 			}
 			seen[pat.Field] = struct{}{}
 		case *frontend.EnumCasePatternExpr:
@@ -1809,7 +2082,8 @@ func matchExprHasCompleteEnumPatterns(
 		return false
 	}
 	seen := make(map[string]struct{}, len(info.EnumCases))
-	for _, c := range e.Cases {
+	for i := range e.Cases {
+		c := &e.Cases[i]
 		if c.Guard != nil {
 			continue
 		}
@@ -1821,6 +2095,16 @@ func matchExprHasCompleteEnumPatterns(
 			patType, err := inferExprTypeForDecl(c.Pattern, locals, globals, funcs, types, module, imports)
 			if err != nil || patType != scrutType || pat.EnumType != scrutType {
 				return false
+			}
+			caseInfo, ok := info.CaseMap[pat.Field]
+			if !ok {
+				return false
+			}
+			if len(caseInfo.PayloadTypes) != 0 {
+				c.RequiresPayload = true
+				c.PayloadArity = len(caseInfo.PayloadTypes)
+				seen[pat.Field] = struct{}{}
+				continue
 			}
 			seen[pat.Field] = struct{}{}
 		case *frontend.EnumCasePatternExpr:
@@ -2006,8 +2290,8 @@ func catchPatternType(
 		if !found {
 			return "", fmt.Errorf("%s: unknown enum pattern '%s.%s'", frontend.FormatPos(pat.At), pat.TypeName, pat.CaseName)
 		}
-		if len(pat.Bindings) != len(caseInfo.PayloadTypes) {
-			return "", fmt.Errorf("%s: enum case '%s.%s' pattern expects %d binding(s), got %d", frontend.FormatPos(pat.At), displayTypeName(caseType, module), pat.CaseName, len(caseInfo.PayloadTypes), len(pat.Bindings))
+		if err := validateEnumCasePatternPayload(pat, caseType, caseInfo, module); err != nil {
+			return "", err
 		}
 		return caseType, nil
 	default:
@@ -2058,7 +2342,8 @@ func catchExprHasCompleteEnumPatterns(
 		return false
 	}
 	seen := make(map[string]struct{}, len(info.EnumCases))
-	for _, c := range e.Cases {
+	for i := range e.Cases {
+		c := &e.Cases[i]
 		if c.Guard != nil {
 			continue
 		}
@@ -2070,6 +2355,16 @@ func catchExprHasCompleteEnumPatterns(
 			patType, err := inferExprTypeForDecl(c.Pattern, locals, globals, funcs, types, module, imports)
 			if err != nil || patType != errorType || pat.EnumType != errorType {
 				return false
+			}
+			caseInfo, ok := info.CaseMap[pat.Field]
+			if !ok {
+				return false
+			}
+			if len(caseInfo.PayloadTypes) != 0 {
+				c.RequiresPayload = true
+				c.PayloadArity = len(caseInfo.PayloadTypes)
+				seen[pat.Field] = struct{}{}
+				continue
 			}
 			seen[pat.Field] = struct{}{}
 		case *frontend.EnumCasePatternExpr:
@@ -2128,14 +2423,49 @@ func bindMatchPatternLocalsForInference(
 		if !found || caseType != scrutType {
 			return fmt.Errorf("%s: enum pattern type mismatch", frontend.FormatPos(pat.At))
 		}
-		if len(pat.Bindings) != len(caseInfo.PayloadTypes) {
-			return fmt.Errorf("%s: enum case '%s.%s' pattern expects %d binding(s), got %d", frontend.FormatPos(pat.At), displayTypeName(caseType, module), pat.CaseName, len(caseInfo.PayloadTypes), len(pat.Bindings))
+		if err := validateEnumCasePatternPayload(pat, caseType, caseInfo, module); err != nil {
+			return err
 		}
 		for i, binding := range pat.Bindings {
 			locals[binding] = LocalInfo{SlotCount: caseInfo.PayloadSlots[i], TypeName: caseInfo.PayloadTypes[i]}
 		}
 	}
 	return nil
+}
+
+func validateEnumCasePatternPayload(pattern *frontend.EnumCasePatternExpr, caseType string, caseInfo EnumCaseInfo, module string) error {
+	want := len(caseInfo.PayloadTypes)
+	got := len(pattern.Bindings)
+	if got > 0 && !pattern.HasPayload {
+		pattern.HasPayload = true
+	}
+	if want == 0 {
+		if pattern.HasPayload {
+			return fmt.Errorf("%s: enum case '%s.%s' has no payload; use '%s.%s'", frontend.FormatPos(pattern.At), displayTypeName(caseType, module), pattern.CaseName, displayTypeName(caseType, module), pattern.CaseName)
+		}
+		if got != 0 {
+			return fmt.Errorf("%s: enum case '%s.%s' pattern expects 0 binding(s), got %d", frontend.FormatPos(pattern.At), displayTypeName(caseType, module), pattern.CaseName, got)
+		}
+		return nil
+	}
+	if !pattern.HasPayload {
+		return fmt.Errorf("%s: enum case '%s.%s' carries %d payload value(s); use '%s.%s(%s)'", frontend.FormatPos(pattern.At), displayTypeName(caseType, module), pattern.CaseName, want, displayTypeName(caseType, module), pattern.CaseName, placeholderBindingList(want))
+	}
+	if got != want {
+		return fmt.Errorf("%s: enum case '%s.%s' pattern expects %d binding(s), got %d", frontend.FormatPos(pattern.At), displayTypeName(caseType, module), pattern.CaseName, want, got)
+	}
+	return nil
+}
+
+func placeholderBindingList(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	bindings := make([]string, n)
+	for i := range bindings {
+		bindings[i] = fmt.Sprintf("value%d", i+1)
+	}
+	return strings.Join(bindings, ", ")
 }
 
 func stmtEndsWithReturn(stmt frontend.Stmt) bool {
@@ -2299,6 +2629,9 @@ func validateFunctionPolicyClauses(
 		return ok
 	}
 
+	if hasEffect("budget") && !policy.hasBudget {
+		return fmt.Errorf("%s: uses effect 'budget' requires semantic clause 'budget'", frontend.FormatPos(fn.Pos))
+	}
 	if policy.hasBudget && !hasEffect("budget") {
 		return fmt.Errorf("%s: semantic clause 'budget' requires function '%s' to declare uses effect 'budget'", frontend.FormatPos(fn.Pos), fn.Name)
 	}
@@ -2514,6 +2847,9 @@ func resolveProtocolRequirementTypeRef(ref *frontend.TypeRef, module string, imp
 			return "", false, err
 		}
 		ref.Return.Name = retName
+		if _, err := normalizeEffects(ref.Uses, ref.At); err != nil {
+			return "", false, err
+		}
 		anyGeneric = anyGeneric || retGeneric
 		if anyGeneric {
 			return genericTypeName(*ref), true, nil
@@ -2553,6 +2889,9 @@ func validateGenericTypeRef(ref frontend.TypeRef, params map[string]struct{}) er
 		}
 		if ref.Return == nil {
 			return fmt.Errorf("%s: missing function return type", frontend.FormatPos(ref.At))
+		}
+		if _, err := normalizeEffects(ref.Uses, ref.At); err != nil {
+			return err
 		}
 		return validateGenericTypeRef(*ref.Return, params)
 	default:
@@ -2620,6 +2959,23 @@ func genericParamFunctionReturnTypes(params []frontend.ParamDecl) []string {
 	return out
 }
 
+func genericParamFunctionEffectTypes(params []frontend.ParamDecl) [][]string {
+	out := make([][]string, 0, len(params))
+	for _, param := range params {
+		if param.Type.Kind != frontend.TypeRefFunction {
+			out = append(out, nil)
+			continue
+		}
+		effects, err := normalizeEffects(param.Type.Uses, param.Type.At)
+		if err != nil {
+			out = append(out, nil)
+			continue
+		}
+		out = append(out, effects)
+	}
+	return out
+}
+
 func paramFunctionKinds(params []frontend.ParamDecl) []bool {
 	out := make([]bool, 0, len(params))
 	for _, param := range params {
@@ -2652,6 +3008,23 @@ func paramFunctionReturnTypes(params []frontend.ParamDecl) []string {
 			continue
 		}
 		out = append(out, param.Type.Return.Name)
+	}
+	return out
+}
+
+func paramFunctionEffectTypes(params []frontend.ParamDecl) [][]string {
+	out := make([][]string, 0, len(params))
+	for _, param := range params {
+		if param.Type.Kind != frontend.TypeRefFunction {
+			out = append(out, nil)
+			continue
+		}
+		effects, err := normalizeEffects(param.Type.Uses, param.Type.At)
+		if err != nil {
+			out = append(out, nil)
+			continue
+		}
+		out = append(out, effects)
 	}
 	return out
 }
@@ -2697,7 +3070,11 @@ func formatGenericTypeRef(ref frontend.TypeRef) string {
 		if ref.Return != nil {
 			ret = formatGenericTypeRef(*ref.Return)
 		}
-		return "fn(" + strings.Join(parts, ", ") + ") -> " + ret
+		out := "fn(" + strings.Join(parts, ", ") + ") -> " + ret
+		if len(ref.Uses) > 0 {
+			out += " uses " + strings.Join(ref.Uses, ", ")
+		}
+		return out
 	default:
 		if len(ref.TypeArgs) > 0 {
 			args := make([]string, 0, len(ref.TypeArgs))
@@ -3577,8 +3954,19 @@ func validateFunctionTypeLiteralBinding(
 	if closure.Decl.HasThrows {
 		return fmt.Errorf("%s: throwing closure literals are not supported for function-typed local '%s' in this MVP", frontend.FormatPos(closure.At), name)
 	}
+	declaredEffects, err := functionTypeRefEffects(declared, declared.At)
+	if err != nil {
+		return err
+	}
+	closureEffects, err := normalizeEffects(closure.Decl.Uses, closure.Decl.Pos)
+	if err != nil {
+		return err
+	}
+	if err := validateFunctionTypeCallableEffects(declaredEffects, closureEffects, closure.At, "function-typed local", name); err != nil {
+		return err
+	}
 	if captured, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, locals)); ok {
-		return fmt.Errorf("%s: function-typed local '%s' requires a non-capturing closure literal in this MVP (captured '%s')", frontend.FormatPos(pos), name, captured)
+		return unsupportedFunctionTypedCaptureError(pos, name, captured)
 	}
 	if len(declared.Params) != len(closure.Decl.Params) {
 		return fmt.Errorf("%s: function-typed local '%s' parameter count mismatch: expected %d, got %d", frontend.FormatPos(closure.At), name, len(declared.Params), len(closure.Decl.Params))
@@ -3611,6 +3999,15 @@ func validateFunctionTypeLiteralBinding(
 		return fmt.Errorf("%s: function-typed local '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(closure.At), name, wantRet, gotRet)
 	}
 	return nil
+}
+
+func unsupportedFunctionTypedCaptureError(pos frontend.Position, localName, captured string) error {
+	return fmt.Errorf(
+		"%s: function-typed local '%s' captures '%s'; captures are not supported for function-typed values in this MVP (use a let-bound ptr closure and call it directly, or pass a non-capturing named function/closure symbol)",
+		frontend.FormatPos(pos),
+		localName,
+		captured,
+	)
 }
 
 func validateFunctionTypeNamedSymbolBinding(
@@ -3674,6 +4071,14 @@ func validateFunctionTypeNamedSymbolBinding(
 	return resolved, nil
 }
 
+func validateFunctionTypeCallableEffects(declaredEffects []string, targetEffects []string, pos frontend.Position, context, rawName string) error {
+	missing := missingRequiredEffects(targetEffects, declaredEffects)
+	if len(missing) > 0 {
+		return fmt.Errorf("%s: %s '%s' requires effects %s but function type does not declare them", frontend.FormatPos(pos), context, rawName, strings.Join(missing, ", "))
+	}
+	return nil
+}
+
 func validateFunctionTypeSymbolSignature(
 	localName string,
 	declared frontend.TypeRef,
@@ -3704,6 +4109,13 @@ func validateFunctionTypeSymbolSignature(
 	}
 	if wantRet != sig.ReturnType {
 		return fmt.Errorf("%s: function-typed local '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), localName, wantRet, sig.ReturnType)
+	}
+	declaredEffects, err := functionTypeRefEffects(declared, declared.At)
+	if err != nil {
+		return err
+	}
+	if err := validateFunctionTypeCallableEffects(declaredEffects, sig.Effects, pos, "function-typed local", localName); err != nil {
+		return err
 	}
 	return nil
 }
@@ -3741,6 +4153,9 @@ func validateReturnedFunctionSignature(
 			returnedSig.ReturnType,
 		)
 	}
+	if err := validateFunctionTypeCallableEffects(callerSig.ReturnFunctionEffects, returnedSig.Effects, pos, "returned function symbol", rawName); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -3764,6 +4179,25 @@ func functionTypeRefSignature(ref frontend.TypeRef, module string, imports map[s
 		return nil, "", err
 	}
 	return paramTypes, retType, nil
+}
+
+func functionTypeRefEffects(ref frontend.TypeRef, pos frontend.Position) ([]string, error) {
+	if ref.Kind != frontend.TypeRefFunction {
+		return nil, nil
+	}
+	return normalizeEffects(ref.Uses, pos)
+}
+
+func functionTypeRefSignatureAndEffects(ref frontend.TypeRef, module string, imports map[string]string) ([]string, string, []string, error) {
+	params, ret, err := functionTypeRefSignature(ref, module, imports)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	effects, err := functionTypeRefEffects(ref, ref.At)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	return params, ret, effects, nil
 }
 
 func configureClosureCaptures(
@@ -4131,6 +4565,9 @@ func checkStmts(
 					if targetSig.ThrowsType != "" {
 						return fmt.Errorf("%s: throwing function symbol '%s' is not supported for function return in this MVP", frontend.FormatPos(s.At), id.Name)
 					}
+					if len(localInfo.FunctionCaptures) > 0 {
+						return fmt.Errorf("%s: returning function-typed value '%s' captures local values; captured function values cannot be returned in this MVP", frontend.FormatPos(s.At), id.Name)
+					}
 					if err := validateReturnedFunctionSignature(callerSig, targetSig, s.At, id.Name); err != nil {
 						return err
 					}
@@ -4156,8 +4593,10 @@ func checkStmts(
 				return fmt.Errorf("%s: returning function-typed value requires a symbol-backed non-generic non-throwing function value in this MVP", frontend.FormatPos(s.At))
 			}
 			if typeMayContainRegion(tname, types) {
-				if borrowedName, borrowed := state.borrowedParamOwner(regionID); borrowed {
+				if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
 					return fmt.Errorf("%s: borrowed local '%s' cannot escape via return", frontend.FormatPos(s.At), borrowedName)
+				}); err != nil {
+					return err
 				}
 				if id, ok := s.Value.(*frontend.IdentExpr); ok {
 					if _, borrowed := borrowedParams[id.Name]; borrowed {
@@ -4355,8 +4794,8 @@ func checkStmts(
 			}
 			if valRegion < regionNone {
 				if _, outParam := inoutParams[targetInfo.Name]; outParam {
-					if borrowedName, borrowed := state.borrowedParamOwner(valRegion); borrowed {
-						return fmt.Errorf("%s: borrowed local '%s' cannot escape via inout assignment to '%s'", frontend.FormatPos(s.At), borrowedName, targetInfo.Name)
+					if err := checkBorrowedInoutEscape(s.Value, targetInfo.Name, s.At, locals, globals, funcs, types, module, imports, state, effects, analysis); err != nil {
+						return err
 					}
 				}
 			}
@@ -4622,8 +5061,8 @@ func checkStmts(
 						if !found {
 							return fmt.Errorf("%s: unknown enum pattern '%s.%s'", frontend.FormatPos(enumPat.At), enumPat.TypeName, enumPat.CaseName)
 						}
-						if len(enumPat.Bindings) != len(caseInfo.PayloadTypes) {
-							return fmt.Errorf("%s: enum case '%s.%s' pattern expects %d binding(s), got %d", frontend.FormatPos(enumPat.At), displayTypeName(caseType, module), enumPat.CaseName, len(caseInfo.PayloadTypes), len(enumPat.Bindings))
+						if err := validateEnumCasePatternPayload(enumPat, caseType, caseInfo, module); err != nil {
+							return err
 						}
 						patType = caseType
 					} else {
@@ -4773,8 +5212,8 @@ func validateIfLetPattern(
 		if !found {
 			return fmt.Errorf("%s: unknown enum pattern '%s.%s'", frontend.FormatPos(enumPat.At), enumPat.TypeName, enumPat.CaseName)
 		}
-		if len(enumPat.Bindings) != len(caseInfo.PayloadTypes) {
-			return fmt.Errorf("%s: enum case '%s.%s' pattern expects %d binding(s), got %d", frontend.FormatPos(enumPat.At), displayTypeName(caseType, module), enumPat.CaseName, len(caseInfo.PayloadTypes), len(enumPat.Bindings))
+		if err := validateEnumCasePatternPayload(enumPat, caseType, caseInfo, module); err != nil {
+			return err
 		}
 		patType = caseType
 	} else {
@@ -5056,8 +5495,8 @@ func collectPatternLocals(
 		if !found || caseType != scrutType {
 			return fmt.Errorf("%s: enum pattern type mismatch", frontend.FormatPos(pat.At))
 		}
-		if len(pat.Bindings) != len(caseInfo.PayloadTypes) {
-			return fmt.Errorf("%s: enum case '%s.%s' pattern expects %d binding(s), got %d", frontend.FormatPos(pat.At), displayTypeName(caseType, module), pat.CaseName, len(caseInfo.PayloadTypes), len(pat.Bindings))
+		if err := validateEnumCasePatternPayload(pat, caseType, caseInfo, module); err != nil {
+			return err
 		}
 		for i, binding := range pat.Bindings {
 			if _, exists := globals[binding]; exists {
@@ -5122,8 +5561,9 @@ func collectLocals(
 			functionTypeValue := s.Type.Kind == frontend.TypeRefFunction
 			functionParamTypes := []string(nil)
 			functionReturnType := ""
+			functionEffects := []string(nil)
 			if functionTypeValue {
-				functionParamTypes, functionReturnType, err = functionTypeRefSignature(s.Type, module, imports)
+				functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(s.Type, module, imports)
 				if err != nil {
 					return err
 				}
@@ -5186,6 +5626,7 @@ func collectLocals(
 				FunctionTypeValue:    functionTypeValue,
 				FunctionParamTypes:   functionParamTypes,
 				FunctionReturnType:   functionReturnType,
+				FunctionEffects:      functionEffects,
 			}
 			if scopes != nil {
 				scopes.localScopes[s.Name] = scopes.currentScopeID()
@@ -5511,8 +5952,8 @@ func collectLocals(
 					if !found || caseType != scrutType {
 						return fmt.Errorf("%s: enum pattern type mismatch", frontend.FormatPos(enumPat.At))
 					}
-					if len(enumPat.Bindings) != len(caseInfo.PayloadTypes) {
-						return fmt.Errorf("%s: enum case '%s.%s' pattern expects %d binding(s), got %d", frontend.FormatPos(enumPat.At), displayTypeName(caseType, module), enumPat.CaseName, len(caseInfo.PayloadTypes), len(enumPat.Bindings))
+					if err := validateEnumCasePatternPayload(enumPat, caseType, caseInfo, module); err != nil {
+						return err
 					}
 					for j, binding := range enumPat.Bindings {
 						if _, exists := globals[binding]; exists {

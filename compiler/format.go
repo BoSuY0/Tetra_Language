@@ -918,6 +918,9 @@ func (p *sourcePrinter) formatExprPrec(expr frontend.Expr, parent int) string {
 	case *frontend.SomePatternExpr:
 		return "some(" + e.Name + ")"
 	case *frontend.EnumCasePatternExpr:
+		if !e.HasPayload {
+			return e.TypeName + "." + e.CaseName
+		}
 		return e.TypeName + "." + e.CaseName + "(" + strings.Join(e.Bindings, ", ") + ")"
 	case *frontend.MatchExpr:
 		var b strings.Builder

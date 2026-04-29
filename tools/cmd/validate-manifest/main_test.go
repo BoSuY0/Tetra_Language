@@ -38,11 +38,57 @@ func TestValidateManifestAcceptsGeneratedShape(t *testing.T) {
     "actors_required_symbols": ["__tetra_entry","__tetra_actor_spawn","__tetra_actor_send","__tetra_actor_send_msg","__tetra_actor_send_begin","__tetra_actor_send_slot","__tetra_actor_send_commit","__tetra_actor_recv","__tetra_actor_recv_msg","__tetra_actor_recv_poll","__tetra_actor_recv_until","__tetra_actor_recv_msg_until","__tetra_actor_recv_begin","__tetra_actor_recv_slot","__tetra_actor_recv_count","__tetra_actor_self","__tetra_actor_sender","__tetra_actor_yield_now"],
     "time_required_symbols": ["__tetra_time_now_ms","__tetra_sleep_ms","__tetra_sleep_until_ms","__tetra_deadline_ms","__tetra_timer_ready_ms"],
     "actors_program_glue_symbols": ["__tetra_actor_dispatch","__tetra_actor_main_entry_id"]
-  }
+  },
+  "features": [
+    {"id":"cli.core","name":"CLI","status":"current","since":"v0.2.0","scope":"core CLI","stability":"supported","docs":["docs/spec/current_supported_surface.md"]},
+    {"id":"language.flow","name":"Flow","status":"current","since":"v0.2.0","scope":"flow syntax","stability":"supported","docs":["docs/spec/flow_syntax_v1.md"]},
+    {"id":"targets.wasm-build-only","name":"WASM build-only","status":"current","since":"v0.2.0","scope":"build-only smoke","stability":"supported","docs":["docs/backend/wasm_backend_plan.md"]},
+    {"id":"stdlib.experimental-mirrors","name":"Experimental mirrors","status":"experimental","since":"v0.2.0","scope":"stdlib mirrors","stability":"experimental","docs":["docs/user/standard_library_guide.md"]},
+    {"id":"wasm.runtime-execution","name":"WASM runtime","status":"planned","scope":"runner","stability":"planned","docs":["docs/backend/wasm_backend_plan.md"]},
+    {"id":"language.full-v1-guarantees","name":"v1","status":"planned","scope":"v1","stability":"planned","docs":["docs/spec/v1_scope.md"]},
+    {"id":"eco.distributed-network","name":"EcoNet","status":"post-v1","scope":"network","stability":"deferred","docs":["docs/release/post_v1_promotion_checklist.md"]},
+    {"id":"language.full-first-class-callables","name":"Callables","status":"post-v1","scope":"callables","stability":"deferred","docs":["docs/spec/v1_feature_status.md"]}
+  ]
 }`
 	out, err := runManifestValidator(t, manifest)
 	if err != nil {
 		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateFeaturesAcceptsMachineReadableCurrentFutureClaims(t *testing.T) {
+	features := []featureManifest{
+		{ID: "cli.core", Name: "CLI", Status: "current", Since: "v0.2.0", Scope: "core CLI", Stability: "supported", Docs: []string{"docs/spec/current_supported_surface.md"}},
+		{ID: "language.flow", Name: "Flow", Status: "current", Since: "v0.2.0", Scope: "flow syntax", Stability: "supported", Docs: []string{"docs/spec/flow_syntax_v1.md"}},
+		{ID: "targets.wasm-build-only", Name: "WASM build-only", Status: "current", Since: "v0.2.0", Scope: "build-only smoke", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "stdlib.experimental-mirrors", Name: "Experimental mirrors", Status: "experimental", Since: "v0.2.0", Scope: "stdlib mirrors", Stability: "experimental", Docs: []string{"docs/user/standard_library_guide.md"}},
+		{ID: "wasm.runtime-execution", Name: "WASM runtime", Status: "planned", Scope: "runner", Stability: "planned", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "language.full-v1-guarantees", Name: "v1", Status: "planned", Scope: "v1", Stability: "planned", Docs: []string{"docs/spec/v1_scope.md"}},
+		{ID: "eco.distributed-network", Name: "EcoNet", Status: "post-v1", Scope: "network", Stability: "deferred", Docs: []string{"docs/release/post_v1_promotion_checklist.md"}},
+		{ID: "language.full-first-class-callables", Name: "Callables", Status: "post-v1", Scope: "callables", Stability: "deferred", Docs: []string{"docs/spec/v1_feature_status.md"}},
+	}
+	if err := validateFeatures(features); err != nil {
+		t.Fatalf("validateFeatures: %v", err)
+	}
+}
+
+func TestValidateFeaturesRejectsFutureStatusPromotionWithoutRegistryUpdate(t *testing.T) {
+	features := []featureManifest{
+		{ID: "cli.core", Name: "CLI", Status: "current", Since: "v0.2.0", Scope: "core CLI", Stability: "supported", Docs: []string{"docs/spec/current_supported_surface.md"}},
+		{ID: "language.flow", Name: "Flow", Status: "current", Since: "v0.2.0", Scope: "flow syntax", Stability: "supported", Docs: []string{"docs/spec/flow_syntax_v1.md"}},
+		{ID: "targets.wasm-build-only", Name: "WASM build-only", Status: "current", Since: "v0.2.0", Scope: "build-only smoke", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "stdlib.experimental-mirrors", Name: "Experimental mirrors", Status: "experimental", Since: "v0.2.0", Scope: "stdlib mirrors", Stability: "experimental", Docs: []string{"docs/user/standard_library_guide.md"}},
+		{ID: "wasm.runtime-execution", Name: "WASM runtime", Status: "current", Since: "v0.2.0", Scope: "runner", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "language.full-v1-guarantees", Name: "v1", Status: "planned", Scope: "v1", Stability: "planned", Docs: []string{"docs/spec/v1_scope.md"}},
+		{ID: "eco.distributed-network", Name: "EcoNet", Status: "post-v1", Scope: "network", Stability: "deferred", Docs: []string{"docs/release/post_v1_promotion_checklist.md"}},
+		{ID: "language.full-first-class-callables", Name: "Callables", Status: "post-v1", Scope: "callables", Stability: "deferred", Docs: []string{"docs/spec/v1_feature_status.md"}},
+	}
+	err := validateFeatures(features)
+	if err == nil {
+		t.Fatalf("expected future status promotion failure")
+	}
+	if !strings.Contains(err.Error(), "wasm.runtime-execution") || !strings.Contains(err.Error(), "want planned") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
