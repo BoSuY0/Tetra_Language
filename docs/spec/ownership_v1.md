@@ -32,3 +32,16 @@ The checker is intentionally conservative. It tracks region-backed slices,
 island handles, and structs containing them across local scopes and common
 control-flow merges, but it is not an SSA lifetime solver. Ambiguous region
 merges are reported as diagnostics and must be resolved by rewriting the code.
+
+## Epic 06 coverage
+
+Ownership coverage is release-blocking in the focused safety slice:
+
+```sh
+go test ./compiler/... -run "Effect|Uses|Capability|Unsafe|Ownership|Borrow|Consume|Inout|Island|Region|Privacy|Budget" -count=1
+```
+
+The slice checks allowed borrow forwarding and distinct `borrow`/`inout`
+locals, rejects reuse after `consume`, rejects borrowed values escaping through
+returns, owned parameters, or `inout`, and verifies actor/task handles cannot be
+used after ownership transfer.

@@ -93,6 +93,33 @@ func main() -> Int:
 	}
 }
 
+func TestEnumExhaustiveMatchNoDefaultCheckAndLower(t *testing.T) {
+	src := []byte(`
+enum Color:
+    case red
+    case green
+
+func main() -> Int:
+    let color: Color = Color.green
+    match color:
+    case Color.red:
+        return 1
+    case Color.green:
+        return 42
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
 func TestBuildOptionalMatchNoneSmoke(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")

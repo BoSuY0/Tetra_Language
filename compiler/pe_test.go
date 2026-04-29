@@ -285,6 +285,50 @@ func TestPEMultiDLLImports(t *testing.T) {
 	assertImportHas(t, user, "MessageBoxA")
 }
 
+func TestPEBuildsHighArityCallSurface(t *testing.T) {
+	tmp := t.TempDir()
+	src := `
+fun f10(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32, h: i32, i: i32, j: i32): i32 {
+  return a + b + c + d + e + f + g + h + i + j
+}
+fun main(): i32 {
+  return f10(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+}
+`
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "app.exe")
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := BuildFile(srcPath, outPath, "windows-x64"); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read exe: %v", err)
+	}
+	info := parsePEInfo(t, data)
+	textSec := findSection(t, info.sections, ".text")
+	if info.entry < textSec.virtualAddress || info.entry >= textSec.virtualAddress+textSec.virtualSize {
+		t.Fatalf("entrypoint outside .text for high-arity sample")
+	}
+}
+
+func TestPELinkRejectsNonWindowsObjectTarget(t *testing.T) {
+	_, err := LinkWindowsX64([]*Object{{
+		Target:  "linux-x64",
+		Module:  "wrong",
+		Code:    []byte{0xC3},
+		Symbols: []Symbol{{Name: "main", Offset: 0}},
+	}}, "main")
+	if err == nil {
+		t.Fatalf("expected mismatch error")
+	}
+	if !strings.Contains(err.Error(), "linker target mismatch") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 type peSection struct {
 	name           string
 	virtualSize    uint32

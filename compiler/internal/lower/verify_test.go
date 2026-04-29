@@ -66,6 +66,83 @@ func TestVerifyFuncRejectsUnbalancedReturnStack(t *testing.T) {
 	}
 }
 
+func TestVerifyProgramRejectsInvalidMainMetadata(t *testing.T) {
+	prog := &ir.IRProgram{
+		MainIndex: 1,
+		MainName:  "main",
+		Funcs: []ir.IRFunc{
+			{Name: "main", Instrs: []ir.IRInstr{{Kind: ir.IRReturn}}},
+		},
+	}
+	err := VerifyProgram(prog)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), "main index 1 out of bounds") {
+		t.Fatalf("error = %v", err)
+	}
+	diag, ok := frontend.DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Code != DiagnosticCodeIRVerifier || diag.Severity != "error" {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestVerifyProgramRejectsDuplicateFunctionNames(t *testing.T) {
+	prog := &ir.IRProgram{
+		MainIndex: 0,
+		MainName:  "main",
+		Funcs: []ir.IRFunc{
+			{Name: "main", Instrs: []ir.IRInstr{{Kind: ir.IRReturn}}},
+			{Name: "main", Instrs: []ir.IRInstr{{Kind: ir.IRReturn}}},
+		},
+	}
+	err := VerifyProgram(prog)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), `duplicate function name "main"`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyFuncRejectsInvalidSlotMetadata(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   ir.IRFunc
+		want string
+	}{
+		{
+			name: "negative_param_slots",
+			fn:   ir.IRFunc{Name: "bad_param", ParamSlots: -1},
+			want: "negative slot metadata",
+		},
+		{
+			name: "negative_return_slots",
+			fn:   ir.IRFunc{Name: "bad_return_slots", ReturnSlots: -1},
+			want: "negative slot metadata",
+		},
+		{
+			name: "params_exceed_locals",
+			fn:   ir.IRFunc{Name: "bad_locals", ParamSlots: 2, LocalSlots: 1},
+			want: "param slots 2 exceed locals 1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyFunc(tt.fn)
+			if err == nil {
+				t.Fatalf("expected verifier error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestVerifyFuncRejectsUnknownBranchLabel(t *testing.T) {
 	fn := ir.IRFunc{
 		Name: "bad_label",
@@ -83,11 +160,12 @@ func TestVerifyFuncRejectsUnknownBranchLabel(t *testing.T) {
 }
 
 func TestVerifyFuncRejectsLocalSlotOutOfBounds(t *testing.T) {
+	pos := frontend.Position{File: "bad_lower.t4", Line: 7, Col: 5}
 	fn := ir.IRFunc{
 		Name:       "bad_local",
 		LocalSlots: 1,
 		Instrs: []ir.IRInstr{
-			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 1, Pos: pos},
 			{Kind: ir.IRReturn},
 		},
 	}
@@ -97,6 +175,40 @@ func TestVerifyFuncRejectsLocalSlotOutOfBounds(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "local slot 1 out of bounds") {
 		t.Fatalf("error = %v", err)
+	}
+	diag, ok := frontend.DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Code != DiagnosticCodeIRVerifier || diag.File != "bad_lower.t4" || diag.Line != 7 || diag.Column != 5 {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestLowerRunsProgramLevelVerifier(t *testing.T) {
+	prog, err := frontend.Parse([]byte("func main() -> Int:\n    return 0\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := semantics.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	checked.MainIndex = len(checked.Funcs) + 1
+
+	_, err = Lower(checked)
+	if err == nil {
+		t.Fatalf("expected program verifier error")
+	}
+	diag, ok := frontend.DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Code != DiagnosticCodeIRVerifier {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+	if !strings.Contains(diag.Message, "main index") {
+		t.Fatalf("message = %q", diag.Message)
 	}
 }
 

@@ -1,1 +1,1 @@
-testdata/parser/negative/generics.tetra:1:8: generic structs are planned for a later release
+testdata/parser/negative/generics.tetra:1:15: duplicate type parameter 'T'

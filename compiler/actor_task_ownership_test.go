@@ -324,3 +324,79 @@ uses actors:
 		})
 	}
 }
+
+func TestReleaseTraceabilityLifetimeAndRaceSafetyNegativeActorTaskOwnership(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "LifetimeRejectsTaskUseAfterJoin",
+			src: `
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let first: Int = core.task_join_i32(task)
+    return first + core.task_join_i32(task)
+`,
+			want: "cannot use joined resource 'task'",
+		},
+		{
+			name: "LifetimeRejectsTaskGroupSpawnAfterClose",
+			src: `
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let _: Int = core.task_group_close(group)
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    return core.task_join_i32(task)
+`,
+			want: "cannot use closed resource 'group'",
+		},
+		{
+			name: "RaceSafetyRejectsActorTargetMutableGlobal",
+			src: `
+var g: Int
+
+func worker() -> Int:
+    g = g + 1
+    return g
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("worker")
+    return core.send(peer, 1)
+`,
+			want: "touches mutable global state",
+		},
+		{
+			name: "RaceSafetyRejectsTaskTargetMutableGlobal",
+			src: `
+var g: Int
+
+func worker() -> Int:
+    g = g + 1
+    return g
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    return core.task_join_i32(task)
+`,
+			want: "touches mutable global state",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requireCheckFileErrorContains(t, tt.src, tt.want)
+		})
+	}
+}

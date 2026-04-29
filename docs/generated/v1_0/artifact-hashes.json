@@ -4,8 +4,8 @@
   "artifacts": [
     {
       "path": "README.md",
-      "sha256": "sha256:c156fc29d0645dad2c0f8329ba6684de5998ab015053e5c5088ab6f034c60868",
-      "size": 1932
+      "sha256": "sha256:3a607cf2d5d081e807698e585b5920cb5b29a1cc4325d149d03373e69594c216",
+      "size": 2151
     },
     {
       "path": "api-diff/api-diff.json",
@@ -20,8 +20,8 @@
     },
     {
       "path": "binary-size-thresholds.json",
-      "sha256": "sha256:c33a98422b4cebb2e74de56bb3855d4a9fa85d0a6de6ff3a89c9fb1c0069b8e7",
-      "size": 973,
+      "sha256": "sha256:df3fbd54da8a36667d5c5cd5444688445167a27f2db05ac286021bc6639be34b",
+      "size": 1436,
       "schema": "tetra.binary-size-thresholds.v1alpha1"
     },
     {
@@ -56,8 +56,8 @@
     },
     {
       "path": "manifest.json",
-      "sha256": "sha256:114c9bfc2c47ae4721d32e906545394a0e0f26393a193ecbdd2a08834829c0c7",
-      "size": 10387
+      "sha256": "sha256:7538be30022854dceace78d4a1010e1c1d05ed08374d79a6e29a1083e6ff99d0",
+      "size": 10451
     },
     {
       "path": "missing-effect-diagnostic.json",
@@ -66,14 +66,14 @@
     },
     {
       "path": "performance-regression.json",
-      "sha256": "sha256:417d79c21fe954ae5c29298c7c86f30c03e8d7ea11bb9e8e2ee20e048c2407fa",
-      "size": 3236,
+      "sha256": "sha256:5572e380031526fd7056b4ae8f9c495af70767cf4d3b4287f5f5738548aa6d91",
+      "size": 3972,
       "schema": "tetra.performance-regression.v1"
     },
     {
       "path": "performance-regression.md",
-      "sha256": "sha256:90eb7411ea3f64eb455fee78d5b67f80eb64b682ab5cd6b0e95a8a2e7a21eca8",
-      "size": 1917
+      "sha256": "sha256:ef4f3413d902977c386452bb5ad7181bf8ea4c03a4d3973c5e212d5817da321e",
+      "size": 2117
     },
     {
       "path": "planned-actor-diagnostic.json",
@@ -103,8 +103,8 @@
     },
     {
       "path": "reproducible-build.json",
-      "sha256": "sha256:520bf5883cbb952a6934e08e608934edf1712f1b707655f3bab0b68e74a6ecd4",
-      "size": 1891,
+      "sha256": "sha256:e4775527f39ba461aa8ed2a2a0596a06200cc8fe4709a65b0d498343a3f4cc6f",
+      "size": 2199,
       "schema": "tetra.reproducible-build-proof.v1alpha1"
     },
     {

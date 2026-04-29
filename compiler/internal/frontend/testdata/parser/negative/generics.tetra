@@ -1,2 +1,2 @@
-struct Box<T>:
+struct Box<T, T>:
     value: T

@@ -124,6 +124,43 @@ func main() -> Int:
 	}
 }
 
+func TestTypedErrorsAllowEnumPayloadError(t *testing.T) {
+	src := []byte(`
+enum ParseError:
+    case unexpected(Int)
+    case eof
+
+func fail(flag: Bool) -> Int throws ParseError:
+    if flag:
+        return 7
+    else:
+        throw ParseError.unexpected(9)
+
+func caller(flag: Bool) -> Int throws ParseError:
+    return try fail(flag)
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if got := checked.FuncSigs["fail"].ThrowsType; got != "ParseError" {
+		t.Fatalf("fail throws = %q, want ParseError", got)
+	}
+	if got := checked.FuncSigs["fail"].ReturnSlots; got != 4 {
+		t.Fatalf("fail return slots = %d, want 4", got)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
 func TestTypedErrorsTryPropagatesIntoOptionalThrows(t *testing.T) {
 	src := []byte(`
 func fail(flag: Bool) -> Int throws Int:
@@ -184,6 +221,37 @@ func main() -> Int:
 	}
 	if got := checked.FuncSigs["caller"].ReturnSlots; got != 5 {
 		t.Fatalf("caller return slots = %d, want 5", got)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTypedErrorsGenericEnumThrowMonomorphizes(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case eof
+
+func fail<T>(err: T) -> Int throws T:
+    throw err
+
+func caller() -> Int throws ReadError:
+    let err: ReadError = ReadError.eof
+    return try fail(err)
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if got := checked.FuncSigs["fail__T_ReadError"].ThrowsType; got != "ReadError" {
+		t.Fatalf("monomorphized fail throws = %q, want ReadError", got)
 	}
 	if _, err := Lower(checked); err != nil {
 		t.Fatalf("Lower: %v", err)
@@ -257,5 +325,195 @@ func main() -> Int:
 	}
 	if _, err := LowerModules(checked); err != nil {
 		t.Fatalf("LowerModules: %v", err)
+	}
+}
+
+func TestTypedErrorsCatchExpressionEnumPayloadSmoke(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case eof
+    case denied(Int)
+
+func read(flag: Bool) -> Int throws ReadError:
+    if flag:
+        return 42
+    throw ReadError.denied(7)
+
+func main() -> Int:
+    let value: Int = catch read(false):
+    case ReadError.eof:
+        0
+    case ReadError.denied(code):
+        code
+    return value
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTypedErrorsCatchRejectsNonThrowingCall(t *testing.T) {
+	src := []byte(`
+func read() -> Int:
+    return 42
+
+func main() -> Int:
+    return catch read():
+    case _:
+        0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected catch non-throwing call error")
+	}
+	if !strings.Contains(err.Error(), "catch expects a throwing function call") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsCatchBindingScopeDiagnostic(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case denied(Int)
+
+func read() -> Int throws ReadError:
+    throw ReadError.denied(7)
+
+func main() -> Int:
+    let value: Int = catch read():
+    case ReadError.denied(code):
+        code
+    return code
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected catch binding scope error")
+	}
+	if !strings.Contains(err.Error(), "identifier 'code' is out of scope") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsCatchRequiresExhaustiveCases(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case eof
+    case denied(Int)
+
+func read() -> Int throws ReadError:
+    throw ReadError.eof
+
+func main() -> Int:
+    return catch read():
+    case ReadError.eof:
+        0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected catch exhaustiveness error")
+	}
+	if !strings.Contains(err.Error(), "catch expression must be exhaustive") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsCatchRejectsHandlerTypeMismatch(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case eof
+
+func read() -> Int throws ReadError:
+    throw ReadError.eof
+
+func main() -> Int:
+    return catch read():
+    case ReadError.eof:
+        "bad"
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected catch handler type mismatch")
+	}
+	if !strings.Contains(err.Error(), "catch expression case type mismatch") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsCatchGuardEnumPayloadSmoke(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case denied(Int)
+
+func read() -> Int throws ReadError:
+    throw ReadError.denied(7)
+
+func main() -> Int:
+    return catch read():
+    case ReadError.denied(code) if code > 0:
+        code
+    case _:
+        0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTypedErrorsCatchRuntimeErrorAndSuccessPaths(t *testing.T) {
+	src := `
+enum ReadError:
+    case eof
+
+func read(flag: Bool) -> Int throws ReadError:
+    if flag:
+        return 35
+    throw ReadError.eof
+
+func recover(flag: Bool) -> Int:
+    return catch read(flag):
+    case ReadError.eof:
+        7
+
+func main() -> Int:
+    return recover(false) + recover(true)
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code = %d, want 42", exitCode)
 	}
 }

@@ -3,16 +3,20 @@ package compiler
 import (
 	"fmt"
 
+	"tetra_language/compiler/internal/formats"
 	"tetra_language/compiler/internal/semantics"
 	ctarget "tetra_language/compiler/target"
 )
 
 type Manifest struct {
 	CompilerVersion string            `json:"compiler_version"`
+	Formats         []FormatManifest  `json:"formats"`
 	Targets         []TargetManifest  `json:"targets"`
 	Builtins        []BuiltinManifest `json:"builtins"`
 	RuntimeABI      RuntimeManifest   `json:"runtime_abi"`
 }
+
+type FormatManifest = formats.Info
 
 type TargetManifest struct {
 	Triple         string `json:"triple"`
@@ -38,6 +42,7 @@ type RuntimeManifest struct {
 	ReservedPrefix           string   `json:"reserved_prefix"`
 	ActorsSupportedTargets   []string `json:"actors_supported_targets"`
 	ActorsRequiredSymbols    []string `json:"actors_required_symbols"`
+	TimeRequiredSymbols      []string `json:"time_required_symbols,omitempty"`
 	ActorsProgramGlueSymbols []string `json:"actors_program_glue_symbols"`
 }
 
@@ -75,19 +80,14 @@ func GetManifest() (Manifest, error) {
 
 	return Manifest{
 		CompilerVersion: Version(),
+		Formats:         formats.All(),
 		Targets:         targetOut,
 		Builtins:        builtinOut,
 		RuntimeABI: RuntimeManifest{
 			ReservedPrefix:         "__tetra_",
 			ActorsSupportedTargets: []string{"linux-x64", "macos-x64", "windows-x64"},
-			ActorsRequiredSymbols: []string{
-				"__tetra_entry",
-				"__tetra_actor_spawn",
-				"__tetra_actor_send",
-				"__tetra_actor_recv",
-				"__tetra_actor_self",
-				"__tetra_actor_sender",
-			},
+			ActorsRequiredSymbols:  requiredActorRuntimeSymbols(),
+			TimeRequiredSymbols:    requiredTimeRuntimeSymbols(),
 			ActorsProgramGlueSymbols: []string{
 				"__tetra_actor_dispatch",
 				"__tetra_actor_main_entry_id",

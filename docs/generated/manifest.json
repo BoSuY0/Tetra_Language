@@ -1,5 +1,69 @@
 {
-  "compiler_version": "v0.1.3",
+  "compiler_version": "v0.2.0",
+  "formats": [
+    {
+      "name": "T4 Source Format",
+      "extension": ".t4",
+      "role": "source",
+      "description": "Tetra source file for capsules, apps, kernels, drivers, UI, games, and tests.",
+      "primary": true
+    },
+    {
+      "name": "Legacy Tetra Source Format",
+      "extension": ".tetra",
+      "role": "source",
+      "description": "Legacy Tetra source file kept for backward compatibility.",
+      "legacy": true
+    },
+    {
+      "name": "Todex Fragment",
+      "extension": ".tdx",
+      "role": "todex-fragment",
+      "description": "Todex encrypted semantic fragment."
+    },
+    {
+      "name": "T4 Seed",
+      "extension": ".t4s",
+      "role": "offline-seed",
+      "description": "Tetra Seed offline bundle."
+    },
+    {
+      "name": "T4 Interface",
+      "extension": ".t4i",
+      "role": "interface",
+      "description": "T4 interface file for fast type-checking without full source."
+    },
+    {
+      "name": "T4 Proof",
+      "extension": ".t4p",
+      "role": "proof",
+      "description": "T4 proof and verification file."
+    },
+    {
+      "name": "T4 Replay",
+      "extension": ".t4r",
+      "role": "replay",
+      "description": "T4 replay file for reproducible bugs and desync reports."
+    },
+    {
+      "name": "T4 Quest",
+      "extension": ".t4q",
+      "role": "quest",
+      "description": "T4 executable quest file."
+    },
+    {
+      "name": "Tetra NeedMap",
+      "extension": ".tneed",
+      "role": "needmap",
+      "description": "NeedMap file describing missing Todex fragments for offline builds."
+    },
+    {
+      "name": "Tetra Semantic Lock",
+      "file_name": "Tetra.lock",
+      "role": "semantic-lock",
+      "description": "Tetra semantic lockfile for versions, policies, and reproducibility guarantees."
+    }
+  ],
   "targets": [
     {
       "triple": "linux-x64",
@@ -117,6 +181,38 @@
       "unsafe_policy": "always"
     },
     {
+      "name": "core.deadline_ms",
+      "aliases": [
+        "deadline_ms"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.island_make_bool",
+      "aliases": [
+        "island_make_bool"
+      ],
+      "param_types": [
+        "island",
+        "i32"
+      ],
+      "return_type": "[]bool",
+      "effects": [
+        "alloc",
+        "islands",
+        "mem"
+      ],
+      "unsafe_policy": "conditional",
+      "unsafe_details": "requires unsafe when the island argument is not a scoped island variable"
+    },
+    {
       "name": "core.island_make_i32",
       "aliases": [
         "island_make_i32"
@@ -126,6 +222,24 @@
         "i32"
       ],
       "return_type": "[]i32",
+      "effects": [
+        "alloc",
+        "islands",
+        "mem"
+      ],
+      "unsafe_policy": "conditional",
+      "unsafe_details": "requires unsafe when the island argument is not a scoped island variable"
+    },
+    {
+      "name": "core.island_make_u16",
+      "aliases": [
+        "island_make_u16"
+      ],
+      "param_types": [
+        "island",
+        "i32"
+      ],
+      "return_type": "[]u16",
       "effects": [
         "alloc",
         "islands",
@@ -208,6 +322,21 @@
       "unsafe_policy": "always"
     },
     {
+      "name": "core.make_bool",
+      "aliases": [
+        "make_bool"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "[]bool",
+      "effects": [
+        "alloc",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.make_i32",
       "aliases": [
         "make_i32"
@@ -216,6 +345,21 @@
         "i32"
       ],
       "return_type": "[]i32",
+      "effects": [
+        "alloc",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.make_u16",
+      "aliases": [
+        "make_u16"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "[]u16",
       "effects": [
         "alloc",
         "mem"
@@ -297,6 +441,58 @@
       "unsafe_policy": "never"
     },
     {
+      "name": "core.recv_msg_until",
+      "aliases": [
+        "recv_msg_until"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "actor.recv_msg_result",
+      "effects": [
+        "actors",
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.recv_poll",
+      "aliases": [
+        "recv_poll"
+      ],
+      "return_type": "actor.recv_result_i32",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.recv_typed",
+      "aliases": [
+        "recv_typed"
+      ],
+      "return_type": "enum",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.recv_until",
+      "aliases": [
+        "recv_until"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "actor.recv_result_i32",
+      "effects": [
+        "actors",
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.secret_seal_i32",
       "aliases": [
         "secret_seal_i32"
@@ -323,6 +519,21 @@
       "return_type": "i32",
       "effects": [
         "privacy"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.select2_i32",
+      "aliases": [
+        "select2_i32"
+      ],
+      "param_types": [
+        "task.i32",
+        "i32"
+      ],
+      "return_type": "task.result_i32",
+      "effects": [
+        "runtime"
       ],
       "unsafe_policy": "never"
     },
@@ -363,10 +574,53 @@
       "unsafe_policy": "never"
     },
     {
+      "name": "core.send_typed",
+      "aliases": [
+        "send_typed"
+      ],
+      "param_types": [
+        "actor",
+        "enum"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.sender",
       "return_type": "actor",
       "effects": [
         "actors"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.sleep_ms",
+      "aliases": [
+        "sleep_ms"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.sleep_until",
+      "aliases": [
+        "sleep_until"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
       ],
       "unsafe_policy": "never"
     },
@@ -438,6 +692,17 @@
       "unsafe_policy": "always"
     },
     {
+      "name": "core.task_checkpoint",
+      "aliases": [
+        "task_checkpoint"
+      ],
+      "return_type": "task.error",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.task_group_cancel",
       "aliases": [
         "task_group_cancel"
@@ -466,11 +731,61 @@
       "unsafe_policy": "never"
     },
     {
+      "name": "core.task_group_current",
+      "aliases": [
+        "task_group_current"
+      ],
+      "return_type": "task.group",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.task_group_open",
       "aliases": [
         "task_group_open"
       ],
       "return_type": "task.group",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_group_status",
+      "aliases": [
+        "task_group_status"
+      ],
+      "param_types": [
+        "task.group"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_is_canceled",
+      "aliases": [
+        "task_is_canceled"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_join_group_i32_typed",
+      "aliases": [
+        "task_join_group_i32_typed"
+      ],
+      "param_types": [
+        "task.i32"
+      ],
+      "return_type": "i32",
       "effects": [
         "runtime"
       ],
@@ -491,9 +806,52 @@
       "unsafe_policy": "never"
     },
     {
+      "name": "core.task_join_i32_typed",
+      "aliases": [
+        "task_join_i32_typed"
+      ],
+      "param_types": [
+        "task.i32"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.task_join_result_i32",
       "aliases": [
         "task_join_result_i32"
+      ],
+      "param_types": [
+        "task.i32"
+      ],
+      "return_type": "task.result_i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_join_until_i32",
+      "aliases": [
+        "task_join_until_i32"
+      ],
+      "param_types": [
+        "task.i32",
+        "i32"
+      ],
+      "return_type": "task.result_i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_poll_i32",
+      "aliases": [
+        "task_poll_i32"
       ],
       "param_types": [
         "task.i32"
@@ -520,6 +878,21 @@
       "unsafe_policy": "never"
     },
     {
+      "name": "core.task_spawn_group_i32_typed",
+      "aliases": [
+        "task_spawn_group_i32_typed"
+      ],
+      "param_types": [
+        "task.group",
+        "str"
+      ],
+      "return_type": "task.i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.task_spawn_i32",
       "aliases": [
         "task_spawn_i32"
@@ -529,6 +902,57 @@
       ],
       "return_type": "task.i32",
       "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.task_spawn_i32_typed",
+      "aliases": [
+        "task_spawn_i32_typed"
+      ],
+      "param_types": [
+        "str"
+      ],
+      "return_type": "task.i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.time_now_ms",
+      "aliases": [
+        "time_now_ms"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.timer_ready",
+      "aliases": [
+        "timer_ready"
+      ],
+      "param_types": [
+        "i32"
+      ],
+      "return_type": "bool",
+      "effects": [
+        "runtime"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.yield",
+      "aliases": [
+        "yield"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "actors",
         "runtime"
       ],
       "unsafe_policy": "never"
@@ -545,9 +969,28 @@
       "__tetra_entry",
       "__tetra_actor_spawn",
       "__tetra_actor_send",
+      "__tetra_actor_send_msg",
+      "__tetra_actor_send_begin",
+      "__tetra_actor_send_slot",
+      "__tetra_actor_send_commit",
       "__tetra_actor_recv",
+      "__tetra_actor_recv_msg",
+      "__tetra_actor_recv_poll",
+      "__tetra_actor_recv_until",
+      "__tetra_actor_recv_msg_until",
+      "__tetra_actor_recv_begin",
+      "__tetra_actor_recv_slot",
+      "__tetra_actor_recv_count",
       "__tetra_actor_self",
-      "__tetra_actor_sender"
+      "__tetra_actor_sender",
+      "__tetra_actor_yield_now"
+    ],
+    "time_required_symbols": [
+      "__tetra_time_now_ms",
+      "__tetra_sleep_ms",
+      "__tetra_sleep_until_ms",
+      "__tetra_deadline_ms",
+      "__tetra_timer_ready_ms"
     ],
     "actors_program_glue_symbols": [
       "__tetra_actor_dispatch",

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 report_dir=""
+release_version="${TETRA_RELEASE_GATE_VERSION:-v0.1.1}"
 
 usage() {
   cat <<'USAGE'
@@ -152,8 +153,8 @@ write_summary() {
 check_release_version() {
   local version
   version="$(./tetra version 2>/dev/null || true)"
-  if [[ "$version" != v0.1.1 ]]; then
-    echo "expected v0.1.1 version, got '${version:-<missing>}'" >&2
+  if [[ "$version" != "$release_version" ]]; then
+    echo "expected $release_version version, got '${version:-<missing>}'" >&2
     return 1
   fi
 }
@@ -211,8 +212,8 @@ check_generated_artifact_churn() {
 }
 
 check_release_state() {
-  go run ./tools/cmd/validate-release-state --format=json --report-dir "$report_dir" >"$artifacts_dir/release-state.json"
-  go run ./tools/cmd/validate-release-state --format=text --report-dir "$report_dir" >"$artifacts_dir/release-state.txt"
+  go run ./tools/cmd/validate-release-state --expected-version "$release_version" --format=json --report-dir "$report_dir" >"$artifacts_dir/release-state.json"
+  go run ./tools/cmd/validate-release-state --expected-version "$release_version" --format=text --report-dir "$report_dir" >"$artifacts_dir/release-state.txt"
 }
 
 write_known_issues_artifact() {

@@ -211,6 +211,27 @@ func TestValidateTestReportRejectsNonSequentialIndex(t *testing.T) {
 	}
 }
 
+func TestValidateTestReportRejectsUnsortedResultOrder(t *testing.T) {
+	report := `{
+  "total": 2,
+  "passed": 2,
+  "failed": 0,
+  "duration_ms": 2,
+  "files": [{"filename": "a.tetra", "total": 2, "passed": 2, "failed": 0, "duration_ms": 2}],
+  "results": [
+    {"name": "b", "filename": "a.tetra", "index": 1, "function_name": "__tetra_test_1_b", "exit_code": 0, "passed": true, "duration_ms": 1},
+    {"name": "a", "filename": "a.tetra", "index": 0, "function_name": "__tetra_test_0_a", "exit_code": 0, "passed": true, "duration_ms": 1}
+  ]
+}`
+	out, err := runValidator(t, report)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "sorted by filename then index") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func runValidator(t *testing.T, report string) ([]byte, error) {
 	t.Helper()
 	dir := t.TempDir()

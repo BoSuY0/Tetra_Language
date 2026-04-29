@@ -74,7 +74,7 @@ func TestTestAllScriptKeepGoingJSONOnly(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "tetra"), []byte(`#!/usr/bin/env bash
 case "$1" in
-  version) echo "v0.1.1"; exit 0 ;;
+  version) echo "v0.2.0"; exit 0 ;;
   fmt|test|smoke) exit 0 ;;
   check)
     for arg in "$@"; do
@@ -82,7 +82,7 @@ case "$1" in
         case "$*" in
           *missing-effect-diagnostic.tetra*) echo '{"code":"TETRA2001","message":"function main uses effect '\''io'\'' but does not declare it","severity":"error"}' >&2 ;;
           *tabs-diagnostic.tetra*) echo '{"code":"TETRA0001","message":"tabs are not supported in Flow indentation","severity":"error"}' >&2 ;;
-          *planned-actor-diagnostic.tetra*) echo '{"code":"TETRA0001","message":"planned feature '\''actor'\'' is not implemented","severity":"error"}' >&2 ;;
+          *planned-actor-diagnostic.tetra*) echo '{"code":"TETRA0001","message":"actor declarations currently support state fields and func methods only","severity":"error"}' >&2 ;;
           *) echo '{"code":"TETRA2001","message":"unknown function missing_call","severity":"error"}' >&2 ;;
         esac
         exit 1

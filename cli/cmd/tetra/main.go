@@ -116,6 +116,16 @@ func runCLI(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 0
 	case "targets":
 		return runTargets(args[1:], stdout, stderr)
+	case "formats":
+		return runFormats(args[1:], stdout, stderr)
+	case "new":
+		return runNew(args[1:], stdout, stderr)
+	case "project":
+		return runProject(args[1:], stdout, stderr)
+	case "workspace":
+		return runWorkspace(args[1:], stdout, stderr)
+	case "interface":
+		return runInterface(args[1:], stdout, stderr)
 	case "doctor":
 		return runDoctor(args[1:], stdout, stderr)
 	case "check":
@@ -168,6 +178,10 @@ type targetReportEntry struct {
 	RunSupported            bool   `json:"run_supported"`
 	SupportsDebugInfo       bool   `json:"supports_debug_info"`
 	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
+}
+
+type formatsReport struct {
+	Formats []compiler.FormatInfo `json:"formats"`
 }
 
 type doctorReport struct {
@@ -230,6 +244,1144 @@ func runTargets(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 }
 
+func runFormats(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("formats", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	format := fs.String("format", "text", "output format: text or json")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintln(stderr, "formats does not accept positional arguments")
+		return 2
+	}
+	report := formatsReport{Formats: compiler.T4Formats()}
+	switch *format {
+	case "text", "":
+		fmt.Fprintln(stdout, "T4 formats:")
+		for _, item := range report.Formats {
+			suffix := item.Extension
+			if suffix == "" {
+				suffix = item.FileName
+			}
+			markers := []string{item.Role}
+			if item.Primary {
+				markers = append(markers, "primary")
+			}
+			if item.Legacy {
+				markers = append(markers, "legacy")
+			}
+			fmt.Fprintf(stdout, "  %s - %s (%s)\n", suffix, item.Name, strings.Join(markers, ", "))
+		}
+		return 0
+	case "json":
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintln(stderr, "unsupported --format")
+		return 2
+	}
+}
+
+func runNew(args []string, stdout io.Writer, stderr io.Writer) int {
+	if isHelpArgs(args) {
+		fmt.Fprintln(stdout, "usage: tetra new app [--lock] <NameOrPath>")
+		return 0
+	}
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "new requires a template")
+		return 2
+	}
+	switch args[0] {
+	case "app":
+		return runNewAppArgs(args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown new template %q\n", args[0])
+		return 2
+	}
+}
+
+type newAppOptions struct {
+	WriteLock bool
+}
+
+func runNewAppArgs(args []string, stdout io.Writer, stderr io.Writer) int {
+	if isHelpArgs(args) {
+		fmt.Fprintln(stdout, "usage: tetra new app [--lock] <NameOrPath>")
+		return 0
+	}
+	var path string
+	var opt newAppOptions
+	for _, arg := range args {
+		switch arg {
+		case "--lock":
+			opt.WriteLock = true
+		default:
+			if strings.HasPrefix(arg, "-") {
+				fmt.Fprintf(stderr, "unknown new app option %q\n", arg)
+				return 2
+			}
+			if path != "" {
+				fmt.Fprintln(stderr, "usage: tetra new app [--lock] <NameOrPath>")
+				return 2
+			}
+			path = arg
+		}
+	}
+	if path == "" {
+		fmt.Fprintln(stderr, "usage: tetra new app [--lock] <NameOrPath>")
+		return 2
+	}
+	return runNewApp(path, opt, stdout, stderr)
+}
+
+func runNewApp(path string, opt newAppOptions, stdout io.Writer, stderr io.Writer) int {
+	if strings.TrimSpace(path) == "" {
+		fmt.Fprintln(stderr, "new app requires a name or path")
+		return 2
+	}
+	targetDir := filepath.Clean(filepath.FromSlash(path))
+	if _, err := os.Stat(targetDir); err == nil {
+		fmt.Fprintf(stderr, "%s already exists\n", targetDir)
+		return 2
+	} else if !os.IsNotExist(err) {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	name := capsuleNameFromPath(targetDir)
+	if name == "" {
+		fmt.Fprintln(stderr, "new app requires a valid app name")
+		return 2
+	}
+	target := defaultTarget()
+	files := map[string]string{
+		"Capsule.t4": fmt.Sprintf(`manifest "tetra.capsule.v1"
+capsule %s:
+    id "tetra://apps/%s"
+    version "0.1.0"
+    entry "src/main.t4"
+    source "src"
+    source "tests"
+    target "%s"
+    permission "io"
+`, name, capsuleSlug(name), target),
+		"src/main.t4": `func main() -> Int:
+    return 0
+`,
+		"tests/main_test.t4": `test "main returns success":
+    expect 40 + 2 == 42
+`,
+		"README.md": fmt.Sprintf(`# %s
+
+Run:
+
+`+"```bash"+`
+tetra check .
+tetra build .
+tetra run .
+tetra test .
+`+"```"+`
+`, name),
+	}
+	for rel, content := range files {
+		full := filepath.Join(targetDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+	}
+	fmt.Fprintf(stdout, "Created app: %s\n", targetDir)
+	if opt.WriteLock {
+		lockPath := filepath.Join(targetDir, compiler.SemanticLockFileName)
+		if err := buildCapsuleArtifacts(filepath.Join(targetDir, compiler.CapsuleFileName), capsuleArtifactBuildOptions{
+			LockPath: lockPath,
+			Jobs:     1,
+		}); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Created lock: %s\n", lockPath)
+	}
+	return 0
+}
+
+func runProject(args []string, stdout io.Writer, stderr io.Writer) int {
+	if isHelpArgs(args) {
+		fmt.Fprintln(stdout, "usage: tetra project <info|sync|deps> [options]")
+		return 0
+	}
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "project requires a subcommand")
+		return 2
+	}
+	switch args[0] {
+	case "info":
+		return runProjectInfo(args[1:], stdout, stderr)
+	case "sync":
+		return runProjectSync(args[1:], stdout, stderr)
+	case "deps":
+		return runProjectDeps(args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown project subcommand %q\n", args[0])
+		return 2
+	}
+}
+
+type projectDepsContext struct {
+	Root        string
+	CapsulePath string
+	Manifest    capsuleManifest
+}
+
+type projectDepsReport struct {
+	Status       string                    `json:"status,omitempty"`
+	Root         string                    `json:"root,omitempty"`
+	CapsulePath  string                    `json:"capsule_path,omitempty"`
+	Dependencies []projectDependencyReport `json:"dependencies"`
+}
+
+type projectDependencyReport struct {
+	ID           string `json:"id"`
+	Version      string `json:"version"`
+	Path         string `json:"path,omitempty"`
+	ResolvedPath string `json:"resolved_path,omitempty"`
+	Status       string `json:"status"`
+	Detail       string `json:"detail,omitempty"`
+}
+
+func runProjectDeps(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "usage: tetra project deps <list|add|remove|check> [options]")
+		return 2
+	}
+	if isHelpArgs(args) {
+		fmt.Fprintln(stdout, "usage: tetra project deps <list|add|remove|check> [options]")
+		return 0
+	}
+	switch args[0] {
+	case "list":
+		return runProjectDepsList(args[1:], stdout, stderr)
+	case "add":
+		return runProjectDepsAdd(args[1:], stdout, stderr)
+	case "remove":
+		return runProjectDepsRemove(args[1:], stdout, stderr)
+	case "check":
+		return runProjectDepsCheck(args[1:], stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "unknown project deps command %q\n", args[0])
+		return 2
+	}
+}
+
+func runProjectDepsList(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("project deps list", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	format := fs.String("format", "text", "output format: text or json")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintln(stderr, "project deps list accepts at most one path")
+		return 2
+	}
+	start := "."
+	if fs.NArg() == 1 {
+		start = fs.Arg(0)
+	}
+	ctx, err := discoverProjectDepsContext(start)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	report := buildProjectDepsReport(ctx)
+	switch *format {
+	case "text", "":
+		writeProjectDepsText(stdout, report)
+		return 0
+	case "json":
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintln(stderr, "unsupported --format")
+		return 2
+	}
+}
+
+func runProjectDepsAdd(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("project deps add", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	pathFlag := fs.String("path", "", "local dependency project path")
+	idFlag := fs.String("id", "", "dependency id; defaults to dependency Capsule.t4 id")
+	versionFlag := fs.String("version", "", "dependency version; defaults to dependency Capsule.t4 version")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintln(stderr, "project deps add accepts at most one project path")
+		return 2
+	}
+	start := "."
+	if fs.NArg() == 1 {
+		start = fs.Arg(0)
+	}
+	ctx, err := discoverProjectDepsContext(start)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	depRoot, depManifest, relPath, err := resolveProjectDependencyAddPath(ctx.Root, *pathFlag)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	_ = depRoot
+	id := strings.TrimSpace(*idFlag)
+	if id == "" {
+		id = depManifest.ID
+	}
+	id, err = normalizeProjectDependencyID(id)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	version := strings.TrimSpace(*versionFlag)
+	if version == "" {
+		version = depManifest.Version
+	}
+	if !isCapsuleSemver(version) {
+		fmt.Fprintln(stderr, "project deps add --version must use semver x.y.z")
+		return 2
+	}
+	for _, dep := range ctx.Manifest.Dependencies {
+		if dep.ID == id && dep.Version == version {
+			fmt.Fprintf(stderr, "duplicate dependency %s %s\n", id, version)
+			return 1
+		}
+	}
+	dep := capsuleDependency{ID: id, Version: version, Path: relPath}
+	if err := appendDependencyToCapsule(ctx.CapsulePath, dep); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Added dependency: %s %s %s\n", dep.ID, dep.Version, dep.Path)
+	fmt.Fprintf(stdout, "run: %s\n", projectSyncRepairCommand(ctx.Root, "", false))
+	return 0
+}
+
+func runProjectDepsRemove(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("project deps remove", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	idFlag := fs.String("id", "", "dependency id")
+	versionFlag := fs.String("version", "", "dependency version")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintln(stderr, "project deps remove accepts at most one project path")
+		return 2
+	}
+	id, err := normalizeProjectDependencyID(*idFlag)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	version := strings.TrimSpace(*versionFlag)
+	if version != "" && !isCapsuleSemver(version) {
+		fmt.Fprintln(stderr, "project deps remove --version must use semver x.y.z")
+		return 2
+	}
+	start := "."
+	if fs.NArg() == 1 {
+		start = fs.Arg(0)
+	}
+	ctx, err := discoverProjectDepsContext(start)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	var matches []capsuleDependency
+	for _, dep := range ctx.Manifest.Dependencies {
+		if dep.ID == id && (version == "" || dep.Version == version) {
+			matches = append(matches, dep)
+		}
+	}
+	if len(matches) == 0 {
+		fmt.Fprintf(stderr, "dependency not found: %s\n", id)
+		return 1
+	}
+	if version == "" && len(matches) > 1 {
+		fmt.Fprintf(stderr, "dependency %s has multiple versions; remove requires --version\n", id)
+		return 2
+	}
+	removed, err := removeDependencyFromCapsule(ctx.CapsulePath, id, version)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	if removed == 0 {
+		fmt.Fprintf(stderr, "dependency not found: %s\n", id)
+		return 1
+	}
+	if version == "" {
+		version = matches[0].Version
+	}
+	fmt.Fprintf(stdout, "Removed dependency: %s %s\n", id, version)
+	fmt.Fprintf(stdout, "run: %s\n", projectSyncRepairCommand(ctx.Root, "", false))
+	return 0
+}
+
+func runProjectDepsCheck(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("project deps check", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	format := fs.String("format", "text", "output format: text or json")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintln(stderr, "project deps check accepts at most one path")
+		return 2
+	}
+	start := "."
+	if fs.NArg() == 1 {
+		start = fs.Arg(0)
+	}
+	ctx, err := discoverProjectDepsContext(start)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	report := buildProjectDepsReport(ctx)
+	status := "pass"
+	var issues []projectDependencyReport
+	for _, dep := range report.Dependencies {
+		if dep.Status != "ok" {
+			status = "fail"
+			issues = append(issues, dep)
+		}
+	}
+	if status == "pass" {
+		depRoots, depManifests, err := projectDependencyGraph(ctx.Root, ctx.Manifest, map[string]int{ctx.Root: projectDependencyVisiting}, []string{ctx.Root})
+		if err != nil {
+			status = "fail"
+			issues = append(issues, projectDependencyReport{Status: "fail", Detail: err.Error()})
+		} else {
+			_ = depRoots
+			manifests := append([]capsuleManifest{ctx.Manifest}, depManifests...)
+			if err := validateCapsuleGraph(manifests, ""); err != nil {
+				status = "fail"
+				issues = append(issues, projectDependencyReport{Status: "fail", Detail: err.Error()})
+			}
+		}
+	}
+	report.Status = status
+	switch *format {
+	case "text", "":
+		if status == "pass" {
+			fmt.Fprintf(stdout, "Dependencies OK: %d\n", len(report.Dependencies))
+			return 0
+		}
+		writeProjectDependencyIssues(stderr, issues)
+		return 1
+	case "json":
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if status != "pass" {
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintln(stderr, "unsupported --format")
+		return 2
+	}
+}
+
+type projectInfoReport struct {
+	Found              bool           `json:"found"`
+	Root               string         `json:"root,omitempty"`
+	CapsulePath        string         `json:"capsule_path,omitempty"`
+	LockPath           string         `json:"lock_path,omitempty"`
+	EntryPath          string         `json:"entry_path,omitempty"`
+	SourceRoots        []string       `json:"source_roots,omitempty"`
+	Targets            []string       `json:"targets,omitempty"`
+	DependencyRoots    []string       `json:"dependency_roots,omitempty"`
+	ArtifactCounts     map[string]int `json:"artifact_counts,omitempty"`
+	DependencyCapsules []string       `json:"dependency_capsules,omitempty"`
+}
+
+func runProjectInfo(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("project info", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	format := fs.String("format", "text", "output format: text or json")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintln(stderr, "project info accepts at most one path")
+		return 2
+	}
+	start := "."
+	if fs.NArg() == 1 {
+		start = fs.Arg(0)
+	}
+	report, err := buildProjectInfoReport(start)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	switch *format {
+	case "text", "":
+		if !report.Found {
+			fmt.Fprintln(stdout, "Project: not found")
+			return 1
+		}
+		fmt.Fprintf(stdout, "Project root: %s\n", report.Root)
+		fmt.Fprintf(stdout, "Capsule: %s\n", report.CapsulePath)
+		if report.LockPath != "" {
+			fmt.Fprintf(stdout, "Lock: %s\n", report.LockPath)
+		}
+		fmt.Fprintf(stdout, "Entry: %s\n", report.EntryPath)
+		fmt.Fprintf(stdout, "Source roots: %s\n", strings.Join(report.SourceRoots, ", "))
+		fmt.Fprintf(stdout, "Targets: %s\n", strings.Join(report.Targets, ", "))
+		return 0
+	case "json":
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if !report.Found {
+			return 1
+		}
+		return 0
+	default:
+		fmt.Fprintln(stderr, "unsupported --format")
+		return 2
+	}
+}
+
+func runProjectSync(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("project sync", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	targetFlag := fs.String("target", "", "native target triple for generated .tobj artifacts")
+	checkOnly := fs.Bool("check", false, "dry-run and report pending project lock/artifact changes without writing files")
+	allTargets := fs.Bool("all-targets", false, "sync artifacts for every native target listed in Capsule.t4")
+	jobs := fs.Int("jobs", 1, "parallel module build jobs")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if *targetFlag != "" && *allTargets {
+		fmt.Fprintln(stderr, "project sync accepts either --target or --all-targets, not both")
+		return 2
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintln(stderr, "project sync accepts at most one path")
+		return 2
+	}
+	start := "."
+	if fs.NArg() == 1 {
+		start = fs.Arg(0)
+	}
+	ctx, err := discoverCLIProject(start)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	if ctx == nil || !ctx.Found {
+		fmt.Fprintln(stderr, "project capsule not found")
+		return 1
+	}
+	lockPath := filepath.Join(ctx.Root, compiler.SemanticLockFileName)
+	if *checkOnly {
+		issues, err := checkProjectSync(ctx, *targetFlag, lockPath, *allTargets)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		for i := range issues {
+			issues[i].Repair = projectSyncRepairCommand(ctx.Root, *targetFlag, *allTargets)
+		}
+		if len(issues) > 0 {
+			writeArtifactIssues(stdout, issues, true)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Project current: %s\n", ctx.Root)
+		return 0
+	}
+	useArtifactBuilder, err := projectSyncUsesArtifactBuilder(ctx.Manifest, *targetFlag, *allTargets)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	if useArtifactBuilder {
+		if err := buildCapsuleArtifacts(ctx.CapsulePath, capsuleArtifactBuildOptions{
+			Target:     *targetFlag,
+			LockPath:   lockPath,
+			Jobs:       *jobs,
+			AllTargets: *allTargets,
+		}); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+	} else {
+		manifests, err := parseCapsuleGraphArgs([]string{ctx.CapsulePath})
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if err := validateCapsuleGraph(manifests, *targetFlag); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if err := writeEcoLock(lockPath, manifests); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+	}
+	fmt.Fprintf(stdout, "Project synced: %s\n", ctx.Root)
+	return 0
+}
+
+func checkProjectSync(ctx *cliProjectContext, targetFlag string, lockPath string, allTargets bool) ([]artifactIssue, error) {
+	useArtifactBuilder, err := projectSyncUsesArtifactBuilder(ctx.Manifest, targetFlag, allTargets)
+	if err != nil {
+		return nil, err
+	}
+	if useArtifactBuilder {
+		return checkCapsuleArtifacts(ctx.CapsulePath, targetFlag, lockPath, allTargets)
+	}
+	manifests, err := parseCapsuleGraphArgs([]string{ctx.CapsulePath})
+	if err != nil {
+		return nil, err
+	}
+	if err := validateCapsuleGraph(manifests, targetFlag); err != nil {
+		return nil, err
+	}
+	return checkProjectLockOnly(lockPath, manifests)
+}
+
+func projectSyncUsesArtifactBuilder(manifest capsuleManifest, targetFlag string, allTargets bool) (bool, error) {
+	targets, err := projectSyncNativeArtifactTargets(manifest, targetFlag, allTargets)
+	if err != nil {
+		return false, err
+	}
+	return len(targets) > 0, nil
+}
+
+func projectSyncNativeArtifactTargets(manifest capsuleManifest, targetFlag string, allTargets bool) ([]string, error) {
+	if targetFlag != "" {
+		target, err := normalizeCapsuleTarget(targetFlag)
+		if err != nil {
+			return nil, err
+		}
+		if ctarget.IsBuildOnlyTarget(target) {
+			return nil, nil
+		}
+		return []string{target}, nil
+	}
+	if allTargets {
+		seen := map[string]struct{}{}
+		var targets []string
+		for _, raw := range manifest.Targets {
+			target, err := normalizeCapsuleTarget(raw)
+			if err != nil {
+				return nil, err
+			}
+			if ctarget.IsBuildOnlyTarget(target) {
+				continue
+			}
+			if _, ok := seen[target]; ok {
+				continue
+			}
+			seen[target] = struct{}{}
+			targets = append(targets, target)
+		}
+		sort.Strings(targets)
+		return targets, nil
+	}
+	if len(manifest.Targets) > 0 {
+		target, err := normalizeCapsuleTarget(manifest.Targets[0])
+		if err != nil {
+			return nil, err
+		}
+		if ctarget.IsBuildOnlyTarget(target) {
+			return nil, nil
+		}
+		return []string{target}, nil
+	}
+	host, ok := hostTarget()
+	if !ok {
+		return nil, nil
+	}
+	return []string{host}, nil
+}
+
+func checkProjectLockOnly(lockPath string, manifests []capsuleManifest) ([]artifactIssue, error) {
+	if _, err := os.Stat(lockPath); err != nil {
+		if os.IsNotExist(err) {
+			return []artifactIssue{{
+				Kind:   "missing lock",
+				Path:   filepath.ToSlash(lockPath),
+				Detail: "Tetra.lock is required for locked project builds",
+			}}, nil
+		}
+		return nil, err
+	}
+	raw, err := os.ReadFile(lockPath)
+	if err != nil {
+		return nil, err
+	}
+	lock, err := decodeEcoLock(raw)
+	if err != nil {
+		return []artifactIssue{{Kind: "invalid lock", Path: filepath.ToSlash(lockPath), Detail: err.Error()}}, nil
+	}
+	current, err := buildEcoLockWithArtifactHashes(manifests)
+	if err != nil {
+		return nil, err
+	}
+	if lock.GraphSHA256 != current.GraphSHA256 {
+		return []artifactIssue{{
+			Kind:   "stale lock",
+			Path:   filepath.ToSlash(lockPath),
+			Detail: fmt.Sprintf("expected graph %s, lock has %s", current.GraphSHA256, lock.GraphSHA256),
+		}}, nil
+	}
+	return nil, nil
+}
+
+func discoverProjectDepsContext(start string) (projectDepsContext, error) {
+	startDir, err := cliProjectStartDir(start)
+	if err != nil {
+		return projectDepsContext{}, err
+	}
+	capsulePath, root, ok, err := findProjectCapsule(startDir)
+	if err != nil {
+		return projectDepsContext{}, err
+	}
+	if !ok {
+		return projectDepsContext{}, fmt.Errorf("project capsule not found")
+	}
+	manifest, err := parseCapsule(capsulePath)
+	if err != nil {
+		return projectDepsContext{}, err
+	}
+	return projectDepsContext{Root: root, CapsulePath: capsulePath, Manifest: manifest}, nil
+}
+
+func buildProjectDepsReport(ctx projectDepsContext) projectDepsReport {
+	report := projectDepsReport{
+		Root:         ctx.Root,
+		CapsulePath:  ctx.CapsulePath,
+		Dependencies: []projectDependencyReport{},
+	}
+	for _, dep := range ctx.Manifest.Dependencies {
+		report.Dependencies = append(report.Dependencies, describeProjectDependency(ctx.Root, dep))
+	}
+	return report
+}
+
+func describeProjectDependency(root string, dep capsuleDependency) projectDependencyReport {
+	item := projectDependencyReport{
+		ID:      dep.ID,
+		Version: dep.Version,
+		Path:    dep.Path,
+		Status:  "ok",
+	}
+	if dep.Path == "" {
+		item.Status = "missing"
+		item.Detail = "dependency has no local path"
+		return item
+	}
+	depRoot, err := resolveDependencyProjectRoot(root, dep.Path)
+	if err != nil {
+		item.Status = "missing"
+		item.Detail = err.Error()
+		return item
+	}
+	item.ResolvedPath = depRoot
+	capsulePath, err := findCapsulePath(depRoot)
+	if err != nil {
+		item.Status = "missing"
+		item.Detail = err.Error()
+		return item
+	}
+	manifest, err := parseCapsule(capsulePath)
+	if err != nil {
+		item.Status = "invalid"
+		item.Detail = err.Error()
+		return item
+	}
+	if manifest.ID != dep.ID {
+		item.Status = "mismatch"
+		item.Detail = fmt.Sprintf("id mismatch: want %s, got %s", dep.ID, manifest.ID)
+		return item
+	}
+	if manifest.Version != dep.Version {
+		item.Status = "mismatch"
+		item.Detail = fmt.Sprintf("version mismatch: want %s, got %s", dep.Version, manifest.Version)
+		return item
+	}
+	return item
+}
+
+func writeProjectDepsText(w io.Writer, report projectDepsReport) {
+	if len(report.Dependencies) == 0 {
+		fmt.Fprintln(w, "Dependencies: none")
+		return
+	}
+	fmt.Fprintln(w, "Dependencies:")
+	for _, dep := range report.Dependencies {
+		path := dep.Path
+		if path == "" {
+			path = "-"
+		}
+		fmt.Fprintf(w, "  %s %s %s %s\n", dep.ID, dep.Version, path, dep.Status)
+		if dep.Detail != "" {
+			fmt.Fprintf(w, "    detail: %s\n", dep.Detail)
+		}
+	}
+}
+
+func writeProjectDependencyIssues(w io.Writer, issues []projectDependencyReport) {
+	for _, issue := range issues {
+		if issue.ID == "" {
+			fmt.Fprintln(w, issue.Detail)
+			continue
+		}
+		path := issue.Path
+		if path == "" {
+			path = "-"
+		}
+		if issue.Detail != "" {
+			fmt.Fprintf(w, "%s %s %s: %s\n", issue.ID, issue.Version, path, issue.Detail)
+		} else {
+			fmt.Fprintf(w, "%s %s %s: %s\n", issue.ID, issue.Version, path, issue.Status)
+		}
+	}
+}
+
+func resolveProjectDependencyAddPath(root string, depPath string) (string, capsuleManifest, string, error) {
+	depPath = strings.TrimSpace(depPath)
+	if depPath == "" {
+		return "", capsuleManifest{}, "", fmt.Errorf("project deps add requires --path")
+	}
+	path := filepath.FromSlash(depPath)
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(root, path)
+	}
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", capsuleManifest{}, "", err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", capsuleManifest{}, "", err
+	}
+	if !info.IsDir() {
+		path = filepath.Dir(path)
+	}
+	capsulePath, err := findCapsulePath(path)
+	if err != nil {
+		return "", capsuleManifest{}, "", err
+	}
+	depRoot := filepath.Dir(capsulePath)
+	if filepath.Clean(depRoot) == filepath.Clean(root) {
+		return "", capsuleManifest{}, "", fmt.Errorf("project cannot depend on itself")
+	}
+	manifest, err := parseCapsule(capsulePath)
+	if err != nil {
+		return "", capsuleManifest{}, "", err
+	}
+	rel, err := filepath.Rel(root, depRoot)
+	if err != nil {
+		return "", capsuleManifest{}, "", err
+	}
+	rel = filepath.ToSlash(filepath.Clean(rel))
+	if rel == "." || rel == "" {
+		return "", capsuleManifest{}, "", fmt.Errorf("project cannot depend on itself")
+	}
+	if strings.ContainsAny(rel, " \t\r\n") {
+		return "", capsuleManifest{}, "", fmt.Errorf("dependency path %q contains whitespace, which Capsule.t4 deps do not support yet", rel)
+	}
+	return depRoot, manifest, rel, nil
+}
+
+func normalizeProjectDependencyID(id string) (string, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return "", fmt.Errorf("dependency id is required")
+	}
+	if strings.ContainsAny(id, " \t\r\n") {
+		return "", fmt.Errorf("dependency id must not contain whitespace")
+	}
+	if !strings.HasPrefix(id, "tetra://") {
+		id = "tetra://" + id
+	}
+	return id, nil
+}
+
+func appendDependencyToCapsule(path string, dep capsuleDependency) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines, finalNewline := splitCapsuleText(raw)
+	line := formatCapsuleDependencyLine(dep)
+	if _, end, indent, ok := findCapsuleDepsSection(lines); ok {
+		depIndent := indent + "    "
+		lines = append(lines[:end], append([]string{depIndent + line}, lines[end:]...)...)
+		return writeCapsuleText(path, lines, finalNewline)
+	}
+	if len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) != "" {
+		lines = append(lines, "")
+	}
+	lines = append(lines, "    deps:", "        "+line)
+	return writeCapsuleText(path, lines, true)
+}
+
+func removeDependencyFromCapsule(path string, id string, version string) (int, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	lines, finalNewline := splitCapsuleText(raw)
+	section := ""
+	var out []string
+	removed := 0
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
+			out = append(out, line)
+			continue
+		}
+		if nextSection, ok := capsuleSectionHeader(trimmed); ok {
+			section = nextSection
+			out = append(out, line)
+			continue
+		}
+		dep, depLine, err := parseDependencyLineForEdit(path, i+1, section, trimmed)
+		if err != nil {
+			return 0, err
+		}
+		if depLine && dep.ID == id && (version == "" || dep.Version == version) {
+			removed++
+			continue
+		}
+		out = append(out, line)
+	}
+	if removed == 0 {
+		return 0, nil
+	}
+	return removed, writeCapsuleText(path, out, finalNewline)
+}
+
+func parseDependencyLineForEdit(path string, line int, section string, trimmed string) (capsuleDependency, bool, error) {
+	if strings.HasPrefix(trimmed, "dependency ") {
+		dep, err := parseCapsuleDependency(path, line, strings.TrimSpace(strings.TrimPrefix(trimmed, "dependency ")))
+		return dep, true, err
+	}
+	if section == "deps" {
+		dep, err := parseCapsuleDependencyFields(path, line, strings.Fields(trimmed))
+		return dep, true, err
+	}
+	return capsuleDependency{}, false, nil
+}
+
+func splitCapsuleText(raw []byte) ([]string, bool) {
+	text := string(raw)
+	finalNewline := strings.HasSuffix(text, "\n")
+	text = strings.TrimRight(text, "\n")
+	if text == "" {
+		return nil, finalNewline
+	}
+	return strings.Split(text, "\n"), finalNewline
+}
+
+func writeCapsuleText(path string, lines []string, finalNewline bool) error {
+	text := strings.Join(lines, "\n")
+	if finalNewline {
+		text += "\n"
+	}
+	return os.WriteFile(path, []byte(text), 0o644)
+}
+
+func findCapsuleDepsSection(lines []string) (int, int, string, bool) {
+	section := ""
+	start := -1
+	indent := ""
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if nextSection, ok := capsuleSectionHeader(trimmed); ok {
+			if section == "deps" {
+				return start, i, indent, true
+			}
+			section = nextSection
+			if nextSection == "deps" {
+				start = i
+				indent = leadingWhitespace(line)
+			}
+			continue
+		}
+	}
+	if section == "deps" {
+		return start, len(lines), indent, true
+	}
+	return -1, -1, "", false
+}
+
+func leadingWhitespace(s string) string {
+	i := 0
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	return s[:i]
+}
+
+func formatCapsuleDependencyLine(dep capsuleDependency) string {
+	if dep.Path != "" {
+		return dep.ID + " " + dep.Version + " " + dep.Path
+	}
+	return dep.ID + " " + dep.Version
+}
+
+func buildProjectInfoReport(start string) (projectInfoReport, error) {
+	ctx, err := discoverCLIProject(start)
+	if err != nil {
+		return projectInfoReport{}, err
+	}
+	if ctx == nil || !ctx.Found {
+		return projectInfoReport{Found: false}, nil
+	}
+	report := projectInfoReport{
+		Found:              true,
+		Root:               ctx.Root,
+		CapsulePath:        ctx.CapsulePath,
+		LockPath:           ctx.LockPath,
+		EntryPath:          ctx.EntryPath,
+		SourceRoots:        append([]string(nil), ctx.SourceRoots...),
+		Targets:            append([]string(nil), ctx.Manifest.Targets...),
+		ArtifactCounts:     map[string]int{},
+		DependencyCapsules: []string{},
+	}
+	for _, root := range ctx.DependencyRoots {
+		report.DependencyRoots = append(report.DependencyRoots, root.Root)
+	}
+	for _, manifest := range ctx.Manifests[1:] {
+		report.DependencyCapsules = append(report.DependencyCapsules, manifest.Path)
+	}
+	for _, artifact := range ctx.Manifest.Artifacts {
+		report.ArtifactCounts[artifact.Kind]++
+	}
+	sort.Strings(report.DependencyRoots)
+	sort.Strings(report.DependencyCapsules)
+	return report, nil
+}
+
+func runInterface(args []string, stdout io.Writer, stderr io.Writer) int {
+	fs := flag.NewFlagSet("interface", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	outPath := fs.String("o", "", "output .t4i path; stdout when empty")
+	checkMode := fs.Bool("check", false, "check that the .t4i public API hash matches the source")
+	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
+		return 2
+	}
+	if !validateDiagnosticsMode(stderr, *diagnostics) {
+		return 2
+	}
+	if fs.NArg() != 1 {
+		writeValidationDiagnostic(stderr, *diagnostics, "interface requires exactly one input path")
+		return 2
+	}
+	inputPath := fs.Arg(0)
+	if *checkMode {
+		path := *outPath
+		if path == "" {
+			path = compiler.InterfaceOutputPath(inputPath)
+		}
+		src, err := os.ReadFile(inputPath)
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		iface, err := os.ReadFile(path)
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		if err := compiler.ValidateInterfaceAgainstSource(src, iface, inputPath); err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Interface current: %s\n", path)
+		return 0
+	}
+	docs, err := compiler.GenerateInterfaceFile(inputPath)
+	if err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	if *outPath == "" {
+		fmt.Fprint(stdout, string(docs))
+		return 0
+	}
+	if err := os.MkdirAll(filepath.Dir(*outPath), 0o755); err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	if err := os.WriteFile(*outPath, docs, 0o644); err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Wrote interface: %s\n", *outPath)
+	return 0
+}
+
 func buildTargetReportEntries() []targetReportEntry {
 	host, hostOK := hostTarget()
 	triples := append([]string{}, ctarget.SupportedTriples()...)
@@ -290,11 +1442,18 @@ func runDoctor(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		return 2
 	}
-	if fs.NArg() != 0 {
-		fmt.Fprintln(stderr, "doctor does not accept positional arguments")
+	if fs.NArg() > 1 {
+		fmt.Fprintln(stderr, "doctor accepts at most one path")
 		return 2
 	}
-	report := buildDoctorReport()
+	report := doctorReport{}
+	if fs.NArg() == 1 {
+		report = buildProjectDoctorReport(fs.Arg(0))
+	} else if ctx, err := discoverCLIProject("."); err == nil && ctx != nil && ctx.Found {
+		report = buildProjectDoctorReport(ctx.Root)
+	} else {
+		report = buildDoctorReport()
+	}
 	switch *format {
 	case "text", "":
 		fmt.Fprintf(stdout, "Tetra doctor: %s\n", report.Status)
@@ -320,6 +1479,50 @@ func runDoctor(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func buildProjectDoctorReport(start string) doctorReport {
+	ctx, err := discoverCLIProject(start)
+	if err != nil {
+		return doctorReport{Status: "fail", Checks: []doctorCheck{failCheck("project capsule", err.Error())}}
+	}
+	if ctx == nil || !ctx.Found {
+		return doctorReport{Status: "fail", Checks: []doctorCheck{failCheck("project capsule", "not found")}}
+	}
+	checks := []doctorCheck{
+		passCheck("version", compiler.Version()),
+		passCheck("project root", ctx.Root),
+		passCheck("project capsule", ctx.CapsulePath),
+		passCheck("project entry", ctx.EntryPath),
+	}
+	sourcePaths := existingProjectSourcePaths(ctx)
+	if len(sourcePaths) == 0 {
+		checks = append(checks, failCheck("project source roots", "no existing source roots"))
+	} else {
+		var rels []string
+		for _, path := range sourcePaths {
+			rel, err := filepath.Rel(ctx.Root, path)
+			if err != nil {
+				rels = append(rels, filepath.ToSlash(path))
+				continue
+			}
+			rels = append(rels, filepath.ToSlash(rel))
+		}
+		checks = append(checks, passCheck("project source roots", strings.Join(rels, ", ")))
+	}
+	if len(ctx.DependencyRoots) == 0 {
+		checks = append(checks, passCheck("project dependencies", "none"))
+	} else {
+		checks = append(checks, passCheck("project dependencies", fmt.Sprintf("%d root(s)", len(ctx.DependencyRoots))))
+	}
+	if ctx.LockPath == "" {
+		checks = append(checks, passCheck("project lock", "not present; run "+projectSyncRepairCommand(ctx.Root, "", false)))
+	} else if err := validateDiscoveredProjectLock(ctx, ""); err != nil {
+		checks = append(checks, failCheck("project lock", err.Error()))
+	} else {
+		checks = append(checks, passCheck("project lock", ctx.LockPath))
+	}
+	return doctorReport{Status: doctorStatus(checks), Checks: checks}
 }
 
 func buildDoctorReport() doctorReport {
@@ -391,16 +1594,58 @@ func manifestSurfaceCheck(root string) doctorCheck {
 		return failCheck("docs manifest surface", err.Error())
 	}
 	var manifest struct {
+		Formats []struct {
+			Extension string `json:"extension,omitempty"`
+			FileName  string `json:"file_name,omitempty"`
+			Role      string `json:"role"`
+			Primary   bool   `json:"primary,omitempty"`
+			Legacy    bool   `json:"legacy,omitempty"`
+		} `json:"formats"`
 		Targets []struct {
 			Triple string `json:"triple"`
 		} `json:"targets"`
 		RuntimeABI struct {
 			ActorsSupportedTargets []string `json:"actors_supported_targets"`
 			ActorsRequiredSymbols  []string `json:"actors_required_symbols"`
+			TimeRequiredSymbols    []string `json:"time_required_symbols"`
 		} `json:"runtime_abi"`
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return failCheck("docs manifest surface", err.Error())
+	}
+	formatKeys := map[string]bool{}
+	var sourcePrimary, sourceLegacy bool
+	for _, format := range manifest.Formats {
+		key := format.Extension
+		if key == "" {
+			key = format.FileName
+		}
+		formatKeys[key] = true
+		if key == compiler.T4SourceExtension && format.Role == "source" && format.Primary {
+			sourcePrimary = true
+		}
+		if key == compiler.LegacyTetraSourceExtension && format.Role == "source" && format.Legacy {
+			sourceLegacy = true
+		}
+	}
+	requiredFormats := []string{
+		compiler.T4SourceExtension,
+		compiler.TodexFragmentExtension,
+		compiler.T4SeedExtension,
+		compiler.T4InterfaceExtension,
+		compiler.T4ProofExtension,
+		compiler.T4ReplayExtension,
+		compiler.T4QuestExtension,
+		compiler.NeedMapExtension,
+		compiler.SemanticLockFileName,
+	}
+	for _, key := range requiredFormats {
+		if !formatKeys[key] {
+			return failCheck("docs manifest surface", "missing format "+key)
+		}
+	}
+	if !sourcePrimary || !sourceLegacy {
+		return failCheck("docs manifest surface", "missing source format primary/legacy markers")
 	}
 	var targetTriples []string
 	for _, target := range manifest.Targets {
@@ -415,7 +1660,10 @@ func manifestSurfaceCheck(root string) doctorCheck {
 	if !sameStringSet(manifest.RuntimeABI.ActorsRequiredSymbols, actorRuntimeSymbols()) {
 		return failCheck("docs manifest surface", fmt.Sprintf("runtime symbols got %s want %s", strings.Join(sortedDoctorStrings(manifest.RuntimeABI.ActorsRequiredSymbols), ", "), strings.Join(sortedDoctorStrings(actorRuntimeSymbols()), ", ")))
 	}
-	return passCheck("docs manifest surface", fmt.Sprintf("%d targets, %d runtime symbols", len(targetTriples), len(actorRuntimeSymbols())))
+	if !sameStringSet(manifest.RuntimeABI.TimeRequiredSymbols, timeRuntimeSymbols()) {
+		return failCheck("docs manifest surface", fmt.Sprintf("time runtime symbols got %s want %s", strings.Join(sortedDoctorStrings(manifest.RuntimeABI.TimeRequiredSymbols), ", "), strings.Join(sortedDoctorStrings(timeRuntimeSymbols()), ", ")))
+	}
+	return passCheck("docs manifest surface", fmt.Sprintf("%d formats, %d targets, %d runtime symbols", len(manifest.Formats), len(targetTriples), len(actorRuntimeSymbols())+len(timeRuntimeSymbols())))
 }
 
 func smokeSourcesCheck(root string) doctorCheck {
@@ -459,7 +1707,7 @@ func runtimeExportsCheck(root string) doctorCheck {
 		"compiler/selfhostrt/actors_sysv.tetra",
 		"compiler/selfhostrt/actors_win64.tetra",
 	}
-	required := actorRuntimeSymbols()
+	required := append(actorRuntimeSymbols(), timeRuntimeSymbols()...)
 	var missing []string
 	for _, rel := range paths {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
@@ -519,7 +1767,7 @@ func targetMetadataCheck() doctorCheck {
 }
 
 func toolingCommandsCheck() doctorCheck {
-	commands := []string{"check", "build", "run", "fmt", "test", "doc", "smoke", "targets", "doctor", "lsp", "eco", "clean", "version"}
+	commands := []string{"check", "build", "run", "fmt", "test", "doc", "interface", "smoke", "targets", "formats", "doctor", "project", "new", "lsp", "eco", "clean", "version"}
 	if len(commands) == 0 {
 		return failCheck("tooling commands", "no commands registered")
 	}
@@ -531,9 +1779,31 @@ func actorRuntimeSymbols() []string {
 		"__tetra_entry",
 		"__tetra_actor_spawn",
 		"__tetra_actor_send",
+		"__tetra_actor_send_msg",
+		"__tetra_actor_send_begin",
+		"__tetra_actor_send_slot",
+		"__tetra_actor_send_commit",
 		"__tetra_actor_recv",
+		"__tetra_actor_recv_msg",
+		"__tetra_actor_recv_poll",
+		"__tetra_actor_recv_until",
+		"__tetra_actor_recv_msg_until",
+		"__tetra_actor_recv_begin",
+		"__tetra_actor_recv_slot",
+		"__tetra_actor_recv_count",
 		"__tetra_actor_self",
 		"__tetra_actor_sender",
+		"__tetra_actor_yield_now",
+	}
+}
+
+func timeRuntimeSymbols() []string {
+	return []string{
+		"__tetra_time_now_ms",
+		"__tetra_sleep_ms",
+		"__tetra_sleep_until_ms",
+		"__tetra_deadline_ms",
+		"__tetra_timer_ready_ms",
 	}
 }
 
@@ -603,7 +1873,18 @@ func runDoc(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
 		return 2
 	}
-	docs, err := compiler.GenerateAPIDocs(fs.Args())
+	paths := fs.Args()
+	if len(paths) == 0 {
+		ctx, err := discoverCLIProject(".")
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		if ctx != nil && ctx.Found {
+			paths = existingProjectSourcePaths(ctx)
+		}
+	}
+	docs, err := compiler.GenerateAPIDocs(paths)
 	if err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 1
@@ -627,6 +1908,7 @@ func runDoc(args []string, stdout io.Writer, stderr io.Writer) int {
 func runCheck(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	interfaceOnly := fs.Bool("interface-only", false, "check interface/API surface without requiring executable output")
 	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -637,7 +1919,7 @@ func runCheck(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
 		return 2
 	}
-	input := "main.tetra"
+	input := ""
 	if fs.NArg() > 0 {
 		input = fs.Arg(0)
 	}
@@ -645,12 +1927,25 @@ func runCheck(args []string, stdout io.Writer, stderr io.Writer) int {
 		writeValidationDiagnostic(stderr, *diagnostics, "check accepts at most one input path")
 		return 2
 	}
-	world, err := compiler.LoadWorld(input)
+	input, worldOpt, projectCtx, err := resolveCLIInput(input)
 	if err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 1
 	}
-	if _, err := compiler.CheckWorld(world); err != nil {
+	if err := validateDiscoveredProjectLock(projectCtx, ""); err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	world, err := compiler.LoadWorldOpt(input, worldOpt)
+	if err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	checkOpt := compiler.CheckOptions{RequireMain: true}
+	if *interfaceOnly {
+		checkOpt.RequireMain = false
+	}
+	if _, err := compiler.CheckWorldOpt(world, checkOpt); err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 1
 	}
@@ -661,7 +1956,7 @@ func runCheck(args []string, stdout io.Writer, stderr io.Writer) int {
 func runLSP(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("lsp", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	smokePath := fs.String("stdio-smoke", "", "analyze one .tetra file and print LSP-basic JSON")
+	smokePath := fs.String("stdio-smoke", "", "analyze one .t4/.tetra file and print LSP-basic JSON")
 	stdio := fs.Bool("stdio", false, "run LSP-basic JSON-RPC over stdio")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -1512,13 +2807,16 @@ func maxInt(a int, b int) int {
 func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	target := fs.String("target", defaultTarget(), "target triple ("+supportedTargetsHelp+")")
+	target := fs.String("target", "", "target triple ("+supportedTargetsHelp+"); defaults to Capsule.t4 first target, then host")
 	out := fs.String("o", "", "output path")
+	allTargets := fs.Bool("all-targets", false, "build every target listed in Capsule.t4")
+	interfaceOnly := fs.Bool("interface-only", false, "type-check interface/API graph without emitting executable code")
 	islandsDebug := fs.Bool("islands-debug", false, "enable islands debug runtime checks")
 	emit := fs.String("emit", "exe", "emit mode: exe, object, or library")
 	runtimeMode := fs.String("runtime", "auto", "actors runtime: auto, selfhost, or builtin")
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
+	artifactsMode := fs.String("artifacts", "strict", "artifact handling: strict or auto")
 	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
 	var linkObjects multiFlag
 	fs.Var(&linkObjects, "link-object", "extra TOBJ object to link")
@@ -1531,8 +2829,12 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
 		return 2
 	}
+	if *artifactsMode != "strict" && *artifactsMode != "auto" {
+		writeValidationDiagnostic(stderr, *diagnostics, "build --artifacts must be strict or auto")
+		return 2
+	}
 
-	input := "main.tetra"
+	input := ""
 	if fs.NArg() > 0 {
 		input = fs.Arg(0)
 	}
@@ -1541,7 +2843,83 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 
-	tgt, ok := parseBuildTargetOrReport(*target, *diagnostics, stderr)
+	input, worldOpt, projectCtx, err := resolveCLIInput(input)
+	if err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	if *artifactsMode == "auto" && projectCtx != nil && projectCtx.Found {
+		if err := buildCapsuleArtifacts(projectCtx.CapsulePath, capsuleArtifactBuildOptions{
+			Target:     *target,
+			LockPath:   projectCtx.LockPath,
+			Jobs:       *jobs,
+			AllTargets: *allTargets,
+		}); err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Artifacts repaired: %s\n", projectCtx.CapsulePath)
+		input, worldOpt, projectCtx, err = resolveCLIInput(input)
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+	}
+
+	if *allTargets {
+		targets := projectBuildTargets(projectCtx)
+		if len(targets) == 0 {
+			writeValidationDiagnostic(stderr, *diagnostics, "build --all-targets requires targets in Capsule.t4")
+			return 2
+		}
+		targetLinkObjects, err := projectLinkObjects(projectCtx, "", []string(linkObjects))
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		opt, err := buildOptions(*emit, *runtimeMode, *islandsDebug, *runtimeObject, targetLinkObjects, *jobs)
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 2
+		}
+		opt.ProjectRoot = worldOpt.Root
+		opt.SourceRoots = worldOpt.SourceRoots
+		opt.DependencyRoots = worldOpt.DependencyRoots
+		opt.InterfaceOnly = *interfaceOnly
+		for _, rawTarget := range targets {
+			tgt, ok := parseBuildTargetOrReport(rawTarget, *diagnostics, stderr)
+			if !ok {
+				return 2
+			}
+			if err := validateDiscoveredProjectLock(projectCtx, tgt.Triple); err != nil {
+				writeDiagnostic(stderr, *diagnostics, err)
+				return 1
+			}
+			targetLinkObjects, err := projectLinkObjects(projectCtx, tgt.Triple, []string(linkObjects))
+			if err != nil {
+				writeDiagnostic(stderr, *diagnostics, err)
+				return 1
+			}
+			opt.LinkObjectPaths = targetLinkObjects
+			output := allTargetsOutput(*out, tgt, *emit)
+			if _, err := compiler.BuildFileWithStatsOpt(input, output, tgt.Triple, opt); err != nil {
+				writeDiagnostic(stderr, *diagnostics, err)
+				return 1
+			}
+			if *interfaceOnly {
+				fmt.Fprintf(stdout, "Interface-only build checked: %s (%s)\n", input, tgt.Triple)
+			} else {
+				fmt.Fprintf(stdout, "Built: %s\n", output)
+			}
+		}
+		return 0
+	}
+
+	rawTarget := *target
+	if rawTarget == "" {
+		rawTarget = projectDefaultTarget(projectCtx)
+	}
+	tgt, ok := parseBuildTargetOrReport(rawTarget, *diagnostics, stderr)
 	if !ok {
 		return 2
 	}
@@ -1550,23 +2928,41 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 		output = defaultOutput(tgt, *emit)
 	}
 
-	opt, err := buildOptions(*emit, *runtimeMode, *islandsDebug, *runtimeObject, []string(linkObjects), *jobs)
+	if err := validateDiscoveredProjectLock(projectCtx, tgt.Triple); err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+
+	targetLinkObjects, err := projectLinkObjects(projectCtx, tgt.Triple, []string(linkObjects))
+	if err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	opt, err := buildOptions(*emit, *runtimeMode, *islandsDebug, *runtimeObject, targetLinkObjects, *jobs)
 	if err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 2
 	}
+	opt.ProjectRoot = worldOpt.Root
+	opt.SourceRoots = worldOpt.SourceRoots
+	opt.DependencyRoots = worldOpt.DependencyRoots
+	opt.InterfaceOnly = *interfaceOnly
 	if _, err := compiler.BuildFileWithStatsOpt(input, output, tgt.Triple, opt); err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "Built: %s\n", output)
+	if *interfaceOnly {
+		fmt.Fprintf(stdout, "Interface-only build checked: %s\n", input)
+	} else {
+		fmt.Fprintf(stdout, "Built: %s\n", output)
+	}
 	return 0
 }
 
 func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	target := fs.String("target", defaultTarget(), "target triple ("+supportedTargetsHelp+")")
+	target := fs.String("target", "", "target triple ("+supportedTargetsHelp+"); defaults to Capsule.t4 first target, then host")
 	out := fs.String("o", "", "output path")
 	islandsDebug := fs.Bool("islands-debug", false, "enable islands debug runtime checks")
 	runtimeMode := fs.String("runtime", "auto", "actors runtime: auto, selfhost, or builtin")
@@ -1584,7 +2980,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
 		return 2
 	}
-	input := "main.tetra"
+	input := ""
 	if fs.NArg() > 0 {
 		input = fs.Arg(0)
 	}
@@ -1592,7 +2988,16 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 		writeValidationDiagnostic(stderr, *diagnostics, "run accepts at most one input path")
 		return 2
 	}
-	tgt, ok := parseBuildTargetOrReport(*target, *diagnostics, stderr)
+	input, worldOpt, projectCtx, err := resolveCLIInput(input)
+	if err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	rawTarget := *target
+	if rawTarget == "" {
+		rawTarget = projectDefaultTarget(projectCtx)
+	}
+	tgt, ok := parseBuildTargetOrReport(rawTarget, *diagnostics, stderr)
 	if !ok {
 		return 2
 	}
@@ -1616,11 +3021,23 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 		defer os.RemoveAll(tmpDir)
 		output = filepath.Join(tmpDir, defaultOutput(tgt, "exe"))
 	}
-	opt, err := buildOptions("exe", *runtimeMode, *islandsDebug, *runtimeObject, []string(linkObjects), *jobs)
+	if err := validateDiscoveredProjectLock(projectCtx, tgt.Triple); err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	targetLinkObjects, err := projectLinkObjects(projectCtx, tgt.Triple, []string(linkObjects))
+	if err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	opt, err := buildOptions("exe", *runtimeMode, *islandsDebug, *runtimeObject, targetLinkObjects, *jobs)
 	if err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 2
 	}
+	opt.ProjectRoot = worldOpt.Root
+	opt.SourceRoots = worldOpt.SourceRoots
+	opt.DependencyRoots = worldOpt.DependencyRoots
 	if _, err := compiler.BuildFileWithStatsOpt(input, output, tgt.Triple, opt); err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 1
@@ -1685,10 +3102,13 @@ func runFmt(args []string, stdout io.Writer, stderr io.Writer) int {
 			if string(raw) != string(formatted) {
 				dirty = true
 				if *diagnostics == "json" {
+					line, column := firstFormatterDiffPosition(raw, formatted)
 					writeDiagnosticObject(stderr, compiler.Diagnostic{
 						Code:     compiler.DiagnosticCodeFormatterCheck,
 						Message:  "not formatted",
 						File:     path,
+						Line:     line,
+						Column:   column,
 						Severity: "error",
 						Hint:     "Run tetra fmt --write to update the file.",
 					})
@@ -1715,6 +3135,27 @@ func runFmt(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
+func firstFormatterDiffPosition(raw []byte, formatted []byte) (int, int) {
+	line := 1
+	column := 1
+	limit := len(raw)
+	if len(formatted) < limit {
+		limit = len(formatted)
+	}
+	for i := 0; i < limit; i++ {
+		if raw[i] != formatted[i] {
+			return line, column
+		}
+		if raw[i] == '\n' {
+			line++
+			column = 1
+			continue
+		}
+		column++
+	}
+	return line, column
+}
+
 func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -1735,8 +3176,40 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 	paths := fs.Args()
+	var projectCtx *cliProjectContext
+	var worldOpt compiler.WorldOptions
 	if len(paths) == 0 {
-		paths = []string{"."}
+		ctx, err := discoverCLIProject(".")
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		if ctx != nil && ctx.Found {
+			projectCtx = ctx
+			worldOpt = compiler.WorldOptions{
+				Root:            ctx.Root,
+				SourceRoots:     append([]string(nil), ctx.SourceRoots...),
+				DependencyRoots: append([]compiler.ModuleRoot(nil), ctx.DependencyRoots...),
+			}
+			paths = existingProjectSourcePaths(ctx)
+		}
+		if len(paths) == 0 {
+			paths = []string{"."}
+		}
+	} else if len(paths) == 1 {
+		resolved, resolvedWorldOpt, ctx, err := resolveCLIInput(paths[0])
+		if err != nil {
+			writeDiagnostic(stderr, *diagnostics, err)
+			return 1
+		}
+		if ctx != nil && ctx.Found && isProjectReference(paths[0], ctx) {
+			projectCtx = ctx
+			worldOpt = resolvedWorldOpt
+			paths = existingProjectSourcePaths(ctx)
+			if len(paths) == 0 {
+				paths = []string{resolved}
+			}
+		}
 	}
 	tgt, ok := parseBuildTargetOrReport(*target, *diagnostics, stderr)
 	if !ok {
@@ -1746,6 +3219,15 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !ok || host != tgt.Triple {
 		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run tests for target %s on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH))
 		return 2
+	}
+	if err := validateDiscoveredProjectLock(projectCtx, tgt.Triple); err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
+	}
+	targetLinkObjects, err := projectLinkObjects(projectCtx, tgt.Triple, nil)
+	if err != nil {
+		writeDiagnostic(stderr, *diagnostics, err)
+		return 1
 	}
 	files, err := collectTetraFiles(paths)
 	if err != nil {
@@ -1775,7 +3257,7 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 		for i, runner := range runners {
 			total++
 			start := time.Now()
-			srcPath := filepath.Join(tmpDir, fmt.Sprintf("test_%d.tetra", total))
+			srcPath := filepath.Join(tmpDir, fmt.Sprintf("test_%d.t4", total))
 			runnerSource := runner.Source
 			if modulePath := modulePathFromSource(runner.Source); modulePath != "" {
 				var err error
@@ -1795,9 +3277,23 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 				writeDiagnostic(stderr, *diagnostics, err)
 				return 1
 			}
-			if err := compiler.BuildFile(srcPath, outPath, tgt.Triple); err != nil {
-				writeDiagnostic(stderr, *diagnostics, err)
-				return 1
+			if modulePathFromSource(runnerSource) != "" && projectCtx != nil && projectCtx.Found {
+				opt := compiler.BuildOptions{
+					Jobs:            1,
+					ProjectRoot:     worldOpt.Root,
+					SourceRoots:     append([]string(nil), worldOpt.SourceRoots...),
+					DependencyRoots: append([]compiler.ModuleRoot(nil), worldOpt.DependencyRoots...),
+					LinkObjectPaths: append([]string(nil), targetLinkObjects...),
+				}
+				if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, opt); err != nil {
+					writeDiagnostic(stderr, *diagnostics, err)
+					return 1
+				}
+			} else {
+				if err := compiler.BuildFile(srcPath, outPath, tgt.Triple); err != nil {
+					writeDiagnostic(stderr, *diagnostics, err)
+					return 1
+				}
 			}
 			code := execProgram(outPath, io.Discard, io.Discard)
 			name := runner.Name
@@ -2141,6 +3637,7 @@ func smokeCases(islandsDebug bool) []smokeCase {
 		{name: "cap_mem_smoke", srcPath: "examples/cap_mem_smoke.tetra", expectedExit: 77},
 		{name: "memset_smoke", srcPath: "examples/memset_smoke.tetra", expectedExit: 88},
 		{name: "actors_pingpong", srcPath: "examples/actors_pingpong.tetra", expectedExit: 0},
+		{name: "actor_sleep_pingpong", srcPath: "examples/actor_sleep_pingpong.tetra", expectedExit: 0},
 		{name: "flow_hello", srcPath: "examples/flow_hello.tetra", expectedExit: 0},
 		{name: "flow_struct_smoke", srcPath: "examples/flow_struct_smoke.tetra", expectedExit: 42},
 		{name: "flow_islands_smoke", srcPath: "examples/flow_islands_smoke.tetra", expectedExit: 0},
@@ -2170,6 +3667,11 @@ func smokeCases(islandsDebug bool) []smokeCase {
 		{name: "typed_errors_smoke", srcPath: "examples/typed_errors_smoke.tetra", expectedExit: 42},
 		{name: "async_smoke", srcPath: "examples/async_smoke.tetra", expectedExit: 42},
 		{name: "task_smoke", srcPath: "examples/task_smoke.tetra", expectedExit: 42},
+		{name: "time_sleep_smoke", srcPath: "examples/time_sleep_smoke.tetra", expectedExit: 0},
+		{name: "task_sleep_deadline_smoke", srcPath: "examples/task_sleep_deadline_smoke.tetra", expectedExit: 0},
+		{name: "task_join_wait_smoke", srcPath: "examples/task_join_wait_smoke.tetra", expectedExit: 5},
+		{name: "deadline_aware_waits_smoke", srcPath: "examples/deadline_aware_waits_smoke.tetra", expectedExit: 0},
+		{name: "wait_composition_smoke", srcPath: "examples/wait_composition_smoke.tetra", expectedExit: 0},
 		{name: "core_math_smoke", srcPath: "examples/core_math_smoke.tetra", expectedExit: 42},
 		{name: "core_memory_smoke", srcPath: "examples/core_memory_smoke.tetra", expectedExit: 42},
 		{name: "extension_smoke", srcPath: "examples/extension_smoke.tetra", expectedExit: 42},
@@ -2178,16 +3680,13 @@ func smokeCases(islandsDebug bool) []smokeCase {
 		{name: "dogfood_cli", srcPath: "examples/projects/dogfood_cli/src/main.tetra", expectedExit: 0},
 		{name: "dogfood_actor_task", srcPath: "examples/projects/dogfood_actor_task/src/main.tetra", expectedExit: 0},
 	}
-	if islandsDebug {
-		cases = append(cases, smokeCase{name: "islands_double_free", srcPath: "examples/islands_double_free.tetra", expectedExit: 2, debugOnly: true})
-	}
 	return cases
 }
 
 func smokeCasesForTarget(islandsDebug bool, tgt ctarget.Target) []smokeCase {
 	if tgt.Triple == "wasm32-wasi" || tgt.Triple == "wasm32-web" {
 		return []smokeCase{
-			{name: "flow_hello", srcPath: "examples/flow_hello.tetra", expectedExit: 0},
+			{name: "legacy_hello", srcPath: "examples/hello.tetra", expectedExit: 0},
 			{name: "effects_io_smoke", srcPath: "examples/effects_io_smoke.tetra", expectedExit: 0},
 			{name: "ui_web_smoke", srcPath: "examples/ui_web_smoke.tetra", expectedExit: 0},
 			{name: "dogfood_wasi", srcPath: "examples/projects/dogfood_wasi/src/main.tetra", expectedExit: 0},
@@ -2211,6 +3710,48 @@ func defaultTarget() string {
 	return "linux-x64"
 }
 
+func capsuleNameFromPath(path string) string {
+	name := filepath.Base(filepath.Clean(path))
+	var b strings.Builder
+	capitalizeNext := true
+	for _, r := range name {
+		if r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			if b.Len() == 0 && r >= '0' && r <= '9' {
+				b.WriteByte('T')
+			}
+			if capitalizeNext && r >= 'a' && r <= 'z' {
+				r = r - 'a' + 'A'
+			}
+			b.WriteRune(r)
+			capitalizeNext = false
+			continue
+		}
+		capitalizeNext = true
+	}
+	return b.String()
+}
+
+func capsuleSlug(name string) string {
+	var b strings.Builder
+	lastDash := false
+	for _, r := range name {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r - 'A' + 'a')
+			lastDash = false
+		case r >= 'a' && r <= 'z' || r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		default:
+			if b.Len() > 0 && !lastDash {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
 func hostTarget() (string, bool) {
 	tgt, ok := ctarget.Host()
 	if !ok {
@@ -2226,6 +3767,40 @@ func defaultOutput(tgt ctarget.Target, emit string) string {
 	default:
 		return "app" + tgt.ExeExt
 	}
+}
+
+func projectDefaultTarget(ctx *cliProjectContext) string {
+	targets := projectBuildTargets(ctx)
+	if len(targets) > 0 {
+		return targets[0]
+	}
+	return defaultTarget()
+}
+
+func projectBuildTargets(ctx *cliProjectContext) []string {
+	if ctx == nil || !ctx.Found || len(ctx.Manifest.Targets) == 0 {
+		return nil
+	}
+	return append([]string(nil), ctx.Manifest.Targets...)
+}
+
+func allTargetsOutput(out string, tgt ctarget.Target, emit string) string {
+	name := "app-" + tgt.Triple
+	if emit == "object" || emit == "library" {
+		name += ".tobj"
+	} else {
+		name += tgt.ExeExt
+	}
+	if out == "" {
+		return name
+	}
+	if strings.HasSuffix(out, string(os.PathSeparator)) {
+		return filepath.Join(out, name)
+	}
+	if info, err := os.Stat(out); err == nil && info.IsDir() {
+		return filepath.Join(out, name)
+	}
+	return filepath.Join(out, name)
 }
 
 func execProgram(path string, stdout io.Writer, stderr io.Writer) int {
@@ -2315,7 +3890,7 @@ func collectTetraFiles(paths []string) ([]string, error) {
 			return nil, err
 		}
 		if !info.IsDir() {
-			if strings.HasSuffix(path, ".tetra") {
+			if isCLIManagedSourceFile(path) {
 				if _, ok := seen[path]; !ok {
 					seen[path] = struct{}{}
 					files = append(files, path)
@@ -2333,7 +3908,7 @@ func collectTetraFiles(paths []string) ([]string, error) {
 				}
 				return nil
 			}
-			if strings.HasSuffix(p, ".tetra") {
+			if isCLIManagedSourceFile(p) {
 				if _, ok := seen[p]; !ok {
 					seen[p] = struct{}{}
 					files = append(files, p)
@@ -2349,6 +3924,14 @@ func collectTetraFiles(paths []string) ([]string, error) {
 	return files, nil
 }
 
+func isCLIManagedSourceFile(path string) bool {
+	if !compiler.IsSourceFile(path) {
+		return false
+	}
+	base := filepath.Base(path)
+	return base != compiler.CapsuleFileName && base != compiler.LegacyCapsuleFileName
+}
+
 var moduleDeclRE = regexp.MustCompile(`(?m)^\s*module\s+([A-Za-z0-9_.]+)\s*$`)
 
 func modulePathFromSource(src []byte) string {
@@ -2360,7 +3943,7 @@ func modulePathFromSource(src []byte) string {
 }
 
 func moduleRelPath(module string) string {
-	return filepath.FromSlash(strings.ReplaceAll(module, ".", "/") + ".tetra")
+	return moduleRelPathWithExtension(module, compiler.T4SourceExtension)
 }
 
 func moduleRootFromEntry(entryPath string, module string) (string, error) {
@@ -2376,11 +3959,34 @@ func moduleRootFromEntry(entryPath string, module string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve module root: %w", err)
 	}
-	wantRel := moduleRelPath(module)
-	if rel != wantRel {
-		return "", fmt.Errorf("%s: module '%s' must be in %s", absEntry, module, wantRel)
+	if !cliModuleRelPathMatches(module, rel) {
+		return "", fmt.Errorf("%s: module '%s' must be in %s (or legacy %s)", absEntry, module, moduleRelPathWithExtension(module, compiler.T4SourceExtension), moduleRelPathWithExtension(module, compiler.LegacyTetraSourceExtension))
 	}
 	return root, nil
+}
+
+func defaultInputPath() string {
+	if fileExists(compiler.DefaultSourceFileName) {
+		return compiler.DefaultSourceFileName
+	}
+	if fileExists(compiler.LegacySourceFileName) {
+		return compiler.LegacySourceFileName
+	}
+	return compiler.DefaultSourceFileName
+}
+
+func moduleRelPathWithExtension(module string, extension string) string {
+	return filepath.FromSlash(strings.ReplaceAll(module, ".", "/") + extension)
+}
+
+func cliModuleRelPathMatches(module, rel string) bool {
+	cleanRel := filepath.Clean(rel)
+	for _, ext := range compiler.SourceExtensions() {
+		if cleanRel == filepath.Clean(moduleRelPathWithExtension(module, ext)) {
+			return true
+		}
+	}
+	return false
 }
 
 func rewriteModuleDecl(src []byte, module string) []byte {
@@ -2463,5 +4069,5 @@ func writeDiagnosticObject(w io.Writer, diag compiler.Diagnostic) {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: tetra <version|targets|doctor|check|build|run|smoke|fmt|test|doc|clean|eco|lsp> [options]")
+	fmt.Fprintln(w, "usage: tetra <version|targets|formats|doctor|project|workspace|new|check|build|run|smoke|fmt|test|doc|interface|clean|eco|lsp> [options]")
 }

@@ -181,3 +181,46 @@ func TestAPIDiffReportClassifiesAdditionsAndRemovalsForReview(t *testing.T) {
 		t.Fatalf("removed review status = %q\n%s", statusByKind["removed"], string(raw))
 	}
 }
+
+func TestAPIDiffBaselineWriteIsDeterministicWithoutWallClockTimestamp(t *testing.T) {
+	dir := t.TempDir()
+	docsPath := filepath.Join(dir, "api-docs.md")
+	baselinePath := filepath.Join(dir, "baseline.json")
+	docs := `# Tetra API Docs
+
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:3df89cec58b30743f96d0339ac6acdfb6ab628dd1269b353290f4a6c04da29c2","module_count":1,"entry_count":1} -->
+
+## examples/flow_hello.tetra
+
+### Functions
+
+- ` + "`func main() -> i32 uses io`" + `
+`
+	if err := os.WriteFile(docsPath, []byte(docs), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	run := func() []byte {
+		t.Helper()
+		cmd := exec.Command("node", filepath.Join(repoRoot(t), "scripts", "tools", "api_diff_report.mjs"), "--docs", docsPath, "--baseline", baselinePath, "--write-baseline")
+		cmd.Dir = repoRoot(t)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("api diff baseline write failed: %v\n%s", err, out)
+		}
+		raw, err := os.ReadFile(baselinePath)
+		if err != nil {
+			t.Fatalf("read baseline: %v", err)
+		}
+		return raw
+	}
+
+	first := run()
+	second := run()
+	if string(first) != string(second) {
+		t.Fatalf("baseline should be byte-stable across identical writes\nfirst:\n%s\nsecond:\n%s", string(first), string(second))
+	}
+	if !strings.Contains(string(first), `"created_at": "1970-01-01T00:00:00Z"`) {
+		t.Fatalf("baseline should use deterministic created_at:\n%s", string(first))
+	}
+}

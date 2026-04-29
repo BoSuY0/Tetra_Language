@@ -1,5 +1,5 @@
 {
-  "compiler_version": "v0.1.1",
+  "compiler_version": "v0.1.3",
   "targets": [
     {
       "triple": "linux-x64",
@@ -545,7 +545,9 @@
       "__tetra_entry",
       "__tetra_actor_spawn",
       "__tetra_actor_send",
+      "__tetra_actor_send_msg",
       "__tetra_actor_recv",
+      "__tetra_actor_recv_msg",
       "__tetra_actor_self",
       "__tetra_actor_sender"
     ],

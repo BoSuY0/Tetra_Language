@@ -6,15 +6,32 @@ import (
 	"path/filepath"
 	"strings"
 
+	"tetra_language/compiler/internal/formats"
 	"tetra_language/compiler/internal/frontend"
+	"tetra_language/compiler/internal/t4iface"
 )
 
 type World struct {
-	EntryPath   string
-	EntryModule string
+	EntryPath        string
+	EntryModule      string
+	Root             string
+	SourceRoots      []string
+	DependencyRoots  []ModuleRoot
+	InterfaceModules map[string]bool
+	InterfaceHashes  map[string]string
+	Files            []*frontend.FileAST
+	ByModule         map[string]*frontend.FileAST
+}
+
+type LoadOptions struct {
+	Root            string
+	SourceRoots     []string
+	DependencyRoots []ModuleRoot
+}
+
+type ModuleRoot struct {
 	Root        string
-	Files       []*frontend.FileAST
-	ByModule    map[string]*frontend.FileAST
+	SourceRoots []string
 }
 
 const (
@@ -24,6 +41,10 @@ const (
 )
 
 func LoadWorld(entryPath string) (*World, error) {
+	return LoadWorldOpt(entryPath, LoadOptions{})
+}
+
+func LoadWorldOpt(entryPath string, opt LoadOptions) (*World, error) {
 	absEntry, err := filepath.Abs(entryPath)
 	if err != nil {
 		return nil, fmt.Errorf("resolve entry path: %w", err)
@@ -39,8 +60,28 @@ func LoadWorld(entryPath string) (*World, error) {
 		return nil, fmt.Errorf("%s: module declaration required for imports", absEntry)
 	}
 
+	sourceRoots := cleanSourceRoots(opt.SourceRoots)
+	dependencyRoots, err := cleanModuleRoots(opt.DependencyRoots)
+	if err != nil {
+		return nil, err
+	}
 	root := filepath.Dir(absEntry)
-	if entryFile.Module != "" {
+	if opt.Root != "" {
+		root, err = filepath.Abs(opt.Root)
+		if err != nil {
+			return nil, fmt.Errorf("resolve project root: %w", err)
+		}
+		rel, err := filepath.Rel(root, absEntry)
+		if err != nil {
+			return nil, fmt.Errorf("resolve project entry: %w", err)
+		}
+		if rel == "." || strings.HasPrefix(filepath.Clean(rel), "..") || filepath.IsAbs(rel) {
+			return nil, fmt.Errorf("%s: entry is outside project root %s", absEntry, root)
+		}
+		if entryFile.Module != "" && !moduleRelPathMatchesInSourceRoots(entryFile.Module, rel, sourceRoots) {
+			return nil, fmt.Errorf("%s: module '%s' must be in %s", absEntry, entryFile.Module, describeModuleSourceRootPaths(entryFile.Module, sourceRoots))
+		}
+	} else if entryFile.Module != "" {
 		root, err = rootFromEntry(absEntry, entryFile.Module)
 		if err != nil {
 			return nil, err
@@ -48,20 +89,28 @@ func LoadWorld(entryPath string) (*World, error) {
 	}
 
 	world := &World{
-		EntryPath:   absEntry,
-		EntryModule: entryFile.Module,
-		Root:        root,
-		Files:       []*frontend.FileAST{entryFile},
-		ByModule:    map[string]*frontend.FileAST{},
+		EntryPath:        absEntry,
+		EntryModule:      entryFile.Module,
+		Root:             root,
+		SourceRoots:      append([]string(nil), sourceRoots...),
+		DependencyRoots:  append([]ModuleRoot(nil), dependencyRoots...),
+		InterfaceModules: map[string]bool{},
+		InterfaceHashes:  map[string]string{},
+		Files:            []*frontend.FileAST{entryFile},
+		ByModule:         map[string]*frontend.FileAST{},
 	}
 	world.ByModule[entryFile.Module] = entryFile
 
 	state := map[string]int{}
 	if entryFile.Module != "" {
 		state[entryFile.Module] = loadStateVisiting
+		if entryFile.InterfaceHash != "" {
+			world.InterfaceModules[entryFile.Module] = true
+			world.InterfaceHashes[entryFile.Module] = entryFile.InterfaceHash
+		}
 	}
 	for _, imp := range entryFile.Imports {
-		if err := world.loadModule(root, imp.Path, state); err != nil {
+		if err := world.loadModule(root, imp.Path, state, sourceRoots, dependencyRoots); err != nil {
 			return nil, err
 		}
 	}
@@ -72,7 +121,7 @@ func LoadWorld(entryPath string) (*World, error) {
 	return world, nil
 }
 
-func (w *World) loadModule(root, module string, state map[string]int) error {
+func (w *World) loadModule(root, module string, state map[string]int, sourceRoots []string, dependencyRoots []ModuleRoot) error {
 	switch state[module] {
 	case loadStateVisiting:
 		return fmt.Errorf("import cycle detected at '%s'", module)
@@ -81,7 +130,10 @@ func (w *World) loadModule(root, module string, state map[string]int) error {
 	}
 	state[module] = loadStateVisiting
 
-	path := filepath.Join(root, moduleToRelPath(module))
+	path, isInterface, err := resolveModulePath(root, module, sourceRoots, dependencyRoots)
+	if err != nil {
+		return fmt.Errorf("load module '%s': %w", module, err)
+	}
 	file, err := parseFileFromPath(path)
 	if err != nil {
 		return fmt.Errorf("load module '%s': %w", module, err)
@@ -103,10 +155,16 @@ func (w *World) loadModule(root, module string, state map[string]int) error {
 	}
 
 	w.ByModule[file.Module] = file
+	if isInterface {
+		w.InterfaceModules[file.Module] = true
+		if file.InterfaceHash != "" {
+			w.InterfaceHashes[file.Module] = file.InterfaceHash
+		}
+	}
 	w.Files = append(w.Files, file)
 
 	for _, imp := range file.Imports {
-		if err := w.loadModule(root, imp.Path, state); err != nil {
+		if err := w.loadModule(root, imp.Path, state, sourceRoots, dependencyRoots); err != nil {
 			return err
 		}
 	}
@@ -119,11 +177,20 @@ func parseFileFromPath(path string) (*frontend.FileAST, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read source: %w", err)
 	}
+	interfaceHash := ""
+	if filepath.Ext(path) == formats.T4InterfaceExtension {
+		hash, err := t4iface.ValidateHash(src)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		interfaceHash = hash
+	}
 	file, err := frontend.ParseFile(src, path)
 	if err != nil {
 		return nil, err
 	}
 	file.Path = path
+	file.InterfaceHash = interfaceHash
 	if err := validateImportPaths(file); err != nil {
 		return nil, err
 	}
@@ -142,7 +209,90 @@ func validateImportPaths(file *frontend.FileAST) error {
 }
 
 func moduleToRelPath(module string) string {
-	return filepath.FromSlash(strings.ReplaceAll(module, ".", "/") + ".tetra")
+	return formats.ModuleRelPath(module, formats.T4SourceExtension)
+}
+
+func resolveModulePath(root, module string, sourceRoots []string, dependencyRoots []ModuleRoot) (string, bool, error) {
+	matches, err := resolveModuleMatchesInRoot(root, module, sourceRoots)
+	if err != nil {
+		return "", false, err
+	}
+	for _, depRoot := range dependencyRoots {
+		depMatches, err := resolveModuleMatchesInRoot(depRoot.Root, module, depRoot.SourceRoots)
+		if err != nil {
+			return "", false, err
+		}
+		matches = append(matches, depMatches...)
+	}
+	if len(matches) > 1 {
+		paths := make([]string, 0, len(matches))
+		for _, match := range matches {
+			paths = append(paths, match.Path)
+		}
+		return "", false, fmt.Errorf("duplicate module '%s' (%s)", module, strings.Join(paths, ", "))
+	}
+	if len(matches) == 1 {
+		return matches[0].Path, matches[0].IsInterface, nil
+	}
+	sourceCandidates := cleanSourceRoots(sourceRoots)
+	if len(sourceCandidates) == 0 {
+		sourceCandidates = []string{""}
+	}
+	return filepath.Join(root, sourceCandidates[0], moduleLoadCandidateRelPaths(module)[0]), false, nil
+}
+
+type modulePathMatch struct {
+	Path        string
+	IsInterface bool
+}
+
+func resolveModuleMatchesInRoot(root, module string, sourceRoots []string) ([]modulePathMatch, error) {
+	moduleCandidates := moduleLoadCandidateRelPaths(module)
+	sourceCandidates := cleanSourceRoots(sourceRoots)
+	if len(sourceCandidates) == 0 {
+		sourceCandidates = []string{""}
+	}
+	var matches []modulePathMatch
+	for _, sourceRoot := range sourceCandidates {
+		for _, rel := range moduleCandidates {
+			path := filepath.Join(root, sourceRoot, rel)
+			if _, err := os.Stat(path); err == nil {
+				matches = append(matches, modulePathMatch{
+					Path:        path,
+					IsInterface: filepath.Ext(path) == formats.T4InterfaceExtension,
+				})
+				break
+			} else if !os.IsNotExist(err) {
+				return nil, err
+			}
+		}
+	}
+	return matches, nil
+}
+
+func resolveModulePathInRoot(root, module string, sourceRoots []string) (string, bool, bool, error) {
+	moduleCandidates := moduleLoadCandidateRelPaths(module)
+	sourceCandidates := cleanSourceRoots(sourceRoots)
+	if len(sourceCandidates) == 0 {
+		sourceCandidates = []string{""}
+	}
+	for _, sourceRoot := range sourceCandidates {
+		for _, rel := range moduleCandidates {
+			path := filepath.Join(root, sourceRoot, rel)
+			if _, err := os.Stat(path); err == nil {
+				return path, filepath.Ext(path) == formats.T4InterfaceExtension, true, nil
+			} else if !os.IsNotExist(err) {
+				return "", false, false, err
+			}
+		}
+	}
+	return "", false, false, nil
+}
+
+func moduleLoadCandidateRelPaths(module string) []string {
+	candidates := formats.ModuleCandidateRelPaths(module)
+	candidates = append(candidates, formats.ModuleRelPath(module, formats.T4InterfaceExtension))
+	return candidates
 }
 
 func rootFromEntry(entryPath, module string) (string, error) {
@@ -151,13 +301,93 @@ func rootFromEntry(entryPath, module string) (string, error) {
 	for range parts {
 		root = filepath.Dir(root)
 	}
-	expectedRel := moduleToRelPath(module)
 	rel, err := filepath.Rel(root, entryPath)
 	if err != nil {
 		return "", fmt.Errorf("resolve module root: %w", err)
 	}
-	if rel != expectedRel {
-		return "", fmt.Errorf("%s: module '%s' must be in %s", entryPath, module, expectedRel)
+	if !moduleRelPathMatches(module, rel) {
+		return "", fmt.Errorf("%s: module '%s' must be in %s (or legacy %s)", entryPath, module, formats.ModuleRelPath(module, formats.T4SourceExtension), formats.ModuleRelPath(module, formats.LegacyTetraSourceExtension))
 	}
 	return root, nil
+}
+
+func moduleRelPathMatches(module, rel string) bool {
+	cleanRel := filepath.Clean(rel)
+	for _, candidate := range formats.ModuleCandidateRelPaths(module) {
+		if cleanRel == filepath.Clean(candidate) {
+			return true
+		}
+	}
+	return false
+}
+
+func moduleRelPathMatchesInSourceRoots(module, rel string, sourceRoots []string) bool {
+	cleanRel := filepath.Clean(rel)
+	roots := cleanSourceRoots(sourceRoots)
+	if len(roots) == 0 {
+		roots = []string{""}
+	}
+	for _, root := range roots {
+		for _, candidate := range formats.ModuleCandidateRelPaths(module) {
+			if cleanRel == filepath.Clean(filepath.Join(root, candidate)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func describeModuleSourceRootPaths(module string, sourceRoots []string) string {
+	roots := cleanSourceRoots(sourceRoots)
+	if len(roots) == 0 {
+		roots = []string{""}
+	}
+	var paths []string
+	for _, root := range roots {
+		paths = append(paths, filepath.ToSlash(filepath.Join(root, formats.ModuleRelPath(module, formats.T4SourceExtension))))
+	}
+	return strings.Join(paths, " or ")
+}
+
+func cleanSourceRoots(in []string) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	for _, root := range in {
+		root = filepath.Clean(root)
+		if root == "." {
+			root = ""
+		}
+		if strings.HasPrefix(root, "..") || filepath.IsAbs(root) {
+			continue
+		}
+		if _, ok := seen[root]; ok {
+			continue
+		}
+		seen[root] = struct{}{}
+		out = append(out, root)
+	}
+	return out
+}
+
+func cleanModuleRoots(in []ModuleRoot) ([]ModuleRoot, error) {
+	seen := map[string]struct{}{}
+	var out []ModuleRoot
+	for _, item := range in {
+		if item.Root == "" {
+			continue
+		}
+		root, err := filepath.Abs(item.Root)
+		if err != nil {
+			return nil, fmt.Errorf("resolve dependency root: %w", err)
+		}
+		if _, ok := seen[root]; ok {
+			continue
+		}
+		seen[root] = struct{}{}
+		out = append(out, ModuleRoot{
+			Root:        root,
+			SourceRoots: cleanSourceRoots(item.SourceRoots),
+		})
+	}
+	return out, nil
 }

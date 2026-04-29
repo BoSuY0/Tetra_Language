@@ -10,13 +10,18 @@ The following operations are gated behind `unsafe`. The generated manifest
 records the same policy in each builtin's `unsafe_policy` field, and
 `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 checks that this registry stays current.
+This registry describes safety policy only; target/backend support can still
+vary (for example, build-only WASM targets use a compile-compatible fallback
+for island IR paths rather than native island runtime semantics).
 
 | Builtin | Unsafe policy | Required effects | Capability argument |
 | --- | --- | --- | --- |
 | `core.alloc_bytes` | always | `alloc`, `mem` | none |
 | `core.island_new` | always | `alloc`, `islands`, `mem` | none |
 | `core.island_make_u8` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |
+| `core.island_make_u16` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |
 | `core.island_make_i32` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |
+| `core.island_make_bool` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |
 | explicit `free(<island>)` | always | `islands`, `mem` | island handle |
 | `core.cap_io` | always | `capability`, `io` | returns `cap.io` |
 | `core.cap_mem` | always | `capability`, `mem` | returns `cap.mem` |
@@ -52,3 +57,17 @@ uses alloc, capability, mem:
 The build flag `--islands-debug` enables runtime checks for islands:
 - double-free detection (exit code 2)
 - data page protection to catch use-after-free
+
+## Epic 06 coverage
+
+Unsafe policy is covered by the release-blocking safety slice:
+
+```sh
+go test ./compiler/... -run "Effect|Uses|Capability|Unsafe|Ownership|Borrow|Consume|Inout|Island|Region|Privacy|Budget" -count=1
+```
+
+The slice checks both sides of the boundary: safe scoped islands remain
+available without `unsafe`, while raw allocation, direct island creation,
+manual `free`, capability construction, raw memory access, MMIO, symbol lookup,
+and context switching stay rejected unless they appear inside an `unsafe` block
+with the required `uses` effects.

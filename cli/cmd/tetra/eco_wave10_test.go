@@ -262,6 +262,40 @@ capsule App:
 	}
 }
 
+func TestEcoSeedImportRejectsUnsupportedPermissionsModel(t *testing.T) {
+	dir := t.TempDir()
+	seedPath := filepath.Join(dir, "seed.json")
+	lockPath := filepath.Join(dir, "lock.json")
+	if err := os.WriteFile(seedPath, []byte(`{
+  "schema": "tetra.eco.seed.v1",
+  "generated_at_unix": 0,
+  "lock": {
+    "schema": "tetra.eco.lock.v1",
+    "manifest_schema": "tetra.capsule.v1",
+    "permissions_model": "tetra.eco.permissions.v2",
+    "capsules": [
+      {
+        "id": "tetra://app",
+        "name": "App",
+        "version": "0.1.0",
+        "path": "Tetra.capsule",
+        "targets": ["linux-x64"],
+        "permissions": ["io"]
+      }
+    ]
+  }
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "seed", "import", "--seed", seedPath, "--lock", lockPath}, &bytes.Buffer{}, &stderr); code == 0 {
+		t.Fatalf("expected eco seed import failure")
+	}
+	if !strings.Contains(stderr.String(), "unsupported lock permissions model") {
+		t.Fatalf("unexpected stderr: %q", stderr.String())
+	}
+}
+
 func TestEcoPackProjectBundleIsDeterministic(t *testing.T) {
 	dir := t.TempDir()
 	project := filepath.Join(dir, "project")
@@ -388,6 +422,77 @@ capsule Demo:
 	}
 }
 
+func TestEcoNeedMapRejectsUnsupportedLockSchema(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, "tetra.lock.json")
+	if err := os.WriteFile(lockPath, []byte(`{
+  "schema": "tetra.eco.lock.v2",
+  "manifest_schema": "tetra.capsule.v1",
+  "permissions_model": "tetra.eco.permissions.v1",
+  "capsules": [
+    {
+      "id": "tetra://app",
+      "name": "App",
+      "version": "0.1.0",
+      "path": "Tetra.capsule",
+      "targets": ["linux-x64"],
+      "permissions": ["io"]
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "needmap", "--lock", lockPath, "-o", filepath.Join(dir, "needmap.json")}, &bytes.Buffer{}, &stderr); code == 0 {
+		t.Fatalf("expected eco needmap failure")
+	}
+	if !strings.Contains(stderr.String(), "unsupported lock schema") {
+		t.Fatalf("unexpected stderr: %q", stderr.String())
+	}
+}
+
+func TestEcoTrustSnapshotRejectsLockGraphHashMismatch(t *testing.T) {
+	dir := t.TempDir()
+	capsule := filepath.Join(dir, "Tetra.capsule")
+	writeCapsuleFile(t, capsule, `manifest "tetra.capsule.v1"
+capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    target "linux-x64"
+    permission "io"
+`)
+	lockPath := filepath.Join(dir, "tetra.lock.json")
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lockPath, capsule}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lock map[string]any
+	if err := json.Unmarshal(raw, &lock); err != nil {
+		t.Fatal(err)
+	}
+	lock["graph_sha256"] = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+	raw, err = json.MarshalIndent(lock, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if err := os.WriteFile(lockPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "trust", "snapshot", "--lock", lockPath, "--store", filepath.Join(dir, "vault"), "-o", filepath.Join(dir, "trust.json")}, &stdout, &stderr); code == 0 {
+		t.Fatalf("expected eco trust snapshot failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "lock graph_sha256 mismatch") {
+		t.Fatalf("unexpected stderr: %q", stderr.String())
+	}
+}
+
 func TestEcoBetaPublishDownloadAndTetraHubPath(t *testing.T) {
 	dir := t.TempDir()
 	project := filepath.Join(dir, "project")
@@ -443,6 +548,10 @@ capsule Demo:
 	}
 	if !strings.Contains(stdout.String(), "Published (beta)") {
 		t.Fatalf("publish stdout = %q", stdout.String())
+	}
+	cmd := testCommand(t, "go", "run", "./tools/cmd/validate-eco-publish", "--registry", registry, "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("validate-eco-publish failed: %v\n%s", err, out)
 	}
 
 	stdout.Reset()
@@ -639,6 +748,9 @@ func TestEcoDogfoodFixtureLocalLifecycle(t *testing.T) {
 	if code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lockPath, app, core}, &stdout, &stderr); code != 0 {
 		t.Fatalf("eco verify dogfood exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
+	if out, err := testCommand(t, "go", "run", "./tools/cmd/validate-eco-lock", "--lock", lockPath).CombinedOutput(); err != nil {
+		t.Fatalf("validate-eco-lock failed: %v\n%s", err, out)
+	}
 	stdout.Reset()
 	stderr.Reset()
 	if code := runCLI([]string{"eco", "pack", "--project", app, "-o", pkgPath}, &stdout, &stderr); code != 0 {
@@ -648,6 +760,9 @@ func TestEcoDogfoodFixtureLocalLifecycle(t *testing.T) {
 	stderr.Reset()
 	if code := runCLI([]string{"eco", "unpack", pkgPath, "-C", unpackDir}, &stdout, &stderr); code != 0 {
 		t.Fatalf("eco unpack dogfood exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if out, err := testCommand(t, "go", "run", "./tools/cmd/validate-eco-unpack", "--dir", unpackDir).CombinedOutput(); err != nil {
+		t.Fatalf("validate-eco-unpack failed: %v\n%s", err, out)
 	}
 	if _, err := os.Stat(filepath.Join(unpackDir, "Tetra.capsule")); err != nil {
 		t.Fatalf("unpacked dogfood capsule missing: %v", err)
@@ -662,6 +777,9 @@ func TestEcoDogfoodFixtureLocalLifecycle(t *testing.T) {
 	if code := runCLI([]string{"eco", "vault", "verify", "--store", store}, &stdout, &stderr); code != 0 {
 		t.Fatalf("eco vault verify dogfood exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
+	if out, err := testCommand(t, "go", "run", "./tools/cmd/validate-eco-vault", "--store", store).CombinedOutput(); err != nil {
+		t.Fatalf("validate-eco-vault failed: %v\n%s", err, out)
+	}
 	stdout.Reset()
 	stderr.Reset()
 	if code := runCLI([]string{"eco", "trust", "snapshot", "--lock", lockPath, "--store", store, "-o", trustPath}, &stdout, &stderr); code != 0 {
@@ -672,9 +790,37 @@ func TestEcoDogfoodFixtureLocalLifecycle(t *testing.T) {
 	if code := runCLI([]string{"eco", "publish", "--package", pkgPath, "--registry", registry, "--target", "linux-x64", "--trust", trustPath}, &stdout, &stderr); code != 0 {
 		t.Fatalf("eco publish dogfood exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
+	if out, err := testCommand(t, "go", "run", "./tools/cmd/validate-eco-publish", "--registry", registry, "--id", "tetra://examples/eco-dogfood", "--version", "0.1.0", "--target", "linux-x64").CombinedOutput(); err != nil {
+		t.Fatalf("validate-eco-publish failed: %v\n%s", err, out)
+	}
 	metaPath := filepath.Join(registry, "packages", "tetra_examples_eco_dogfood", "0.1.0", "linux-x64", "metadata.json")
 	if _, err := os.Stat(metaPath); err != nil {
 		t.Fatalf("dogfood publish metadata missing: %v", err)
+	}
+}
+
+func TestEcoDocsDeclareLocalOnlyBetaScope(t *testing.T) {
+	root, err := findRepoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	specPath := filepath.Join(root, "docs", "spec", "eco_publishing_v1.md")
+	userPath := filepath.Join(root, "docs", "user", "eco_package_guide.md")
+	for _, path := range []string{specPath, userPath} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(raw)
+		if !strings.Contains(text, "local") {
+			t.Fatalf("%s should declare local scope", path)
+		}
+		if !strings.Contains(text, "beta") {
+			t.Fatalf("%s should declare beta boundary", path)
+		}
+		if !strings.Contains(text, "TetraHub") {
+			t.Fatalf("%s should mention TetraHub boundary", path)
+		}
 	}
 }
 

@@ -1,6 +1,8 @@
 package compiler
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -69,6 +71,78 @@ func TestX64CodegenObjectsCarryTargetMetadata(t *testing.T) {
 			}
 			if obj.Target != tc.target {
 				t.Fatalf("object target = %q, want %q", obj.Target, tc.target)
+			}
+		})
+	}
+}
+
+func TestX64CodegenObjectRelocKindsByPlatformABI(t *testing.T) {
+	funcs := []IRFunc{{
+		Name:        "main",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRStrLit, Str: []byte("hi")},
+			{Kind: ir.IRWrite},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}
+
+	linuxObj, err := CodegenObjectLinuxX64(funcs)
+	if err != nil {
+		t.Fatalf("linux codegen: %v", err)
+	}
+	macosObj, err := CodegenObjectMacOSX64(funcs)
+	if err != nil {
+		t.Fatalf("macos codegen: %v", err)
+	}
+	windowsObj, err := CodegenObjectWindowsX64(funcs)
+	if err != nil {
+		t.Fatalf("windows codegen: %v", err)
+	}
+
+	hasKind := func(obj *Object, kind RelocKind) bool {
+		for _, reloc := range obj.Relocs {
+			if reloc.Kind == kind {
+				return true
+			}
+		}
+		return false
+	}
+
+	if hasKind(linuxObj, RelocIATDisp32) || hasKind(macosObj, RelocIATDisp32) {
+		t.Fatalf("SysV objects must not carry IAT relocations")
+	}
+	if !hasKind(windowsObj, RelocIATDisp32) {
+		t.Fatalf("Win64 object should carry IAT relocations")
+	}
+	if !hasKind(linuxObj, RelocDataDisp32) || !hasKind(macosObj, RelocDataDisp32) || !hasKind(windowsObj, RelocDataDisp32) {
+		t.Fatalf("all native x64 objects should carry data relocations for string literal")
+	}
+}
+
+func TestX64BuildOnlySmokeAcrossNativeTargets(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join("..", "examples", "hello.tetra")
+	targets := []struct {
+		target string
+		suffix string
+	}{
+		{target: "linux-x64", suffix: ""},
+		{target: "macos-x64", suffix: ""},
+		{target: "windows-x64", suffix: ".exe"},
+	}
+
+	for _, tc := range targets {
+		t.Run(tc.target, func(t *testing.T) {
+			outPath := filepath.Join(tmp, tc.target+tc.suffix)
+			if err := BuildFile(srcPath, outPath, tc.target); err != nil {
+				t.Fatalf("build %s: %v", tc.target, err)
+			}
+			if _, err := os.Stat(outPath); err != nil {
+				t.Fatalf("missing output for %s: %v", tc.target, err)
 			}
 		})
 	}

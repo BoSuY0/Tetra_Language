@@ -19,6 +19,16 @@ func TestLowerUnsupportedStatementNamesFeature(t *testing.T) {
 			t.Fatalf("error = %v, want substring %q", err, want)
 		}
 	}
+	diag, ok := frontend.DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Code != DiagnosticCodeLowerUnsupported || diag.File != "lower.tetra" || diag.Line != 4 || diag.Column != 3 {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+	if !strings.Contains(diag.Hint, "lowering") {
+		t.Fatalf("hint = %q", diag.Hint)
+	}
 }
 
 func TestLowerUnsupportedExpressionNamesFeature(t *testing.T) {
@@ -31,6 +41,13 @@ func TestLowerUnsupportedExpressionNamesFeature(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error = %v, want substring %q", err, want)
 		}
+	}
+	diag, ok := frontend.DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Code != DiagnosticCodeLowerUnsupported || diag.File != "lower.tetra" || diag.Line != 5 || diag.Column != 9 {
+		t.Fatalf("diagnostic = %#v", diag)
 	}
 }
 

@@ -10,6 +10,16 @@ import (
 )
 
 func LinkLinuxX64(objects []*tobj.Object, mainName string) (*elf.Image, error) {
+	const expectedTarget = "linux-x64"
+	for _, obj := range objects {
+		if obj == nil {
+			return nil, fmt.Errorf("nil object")
+		}
+		if obj.Target != expectedTarget {
+			return nil, fmt.Errorf("linker target mismatch: linux-x64 expects '%s' object, got '%s' (module '%s')", expectedTarget, obj.Target, obj.Module)
+		}
+	}
+
 	stub, stubCallAt := emitEntryStubSysVUnixX64(60)
 	res, err := linkcore.LinkX64Objects(objects, mainName, stub, stubCallAt, 0)
 	if err != nil {

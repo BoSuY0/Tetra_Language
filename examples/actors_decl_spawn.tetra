@@ -1,0 +1,18 @@
+// Actor declaration smoke: actor methods desugar to runtime spawn targets.
+actor Ponger:
+    func run() -> Int
+    uses actors:
+        let value: Int = core.recv()
+        if value == 41:
+            let _sent: Int = core.send(core.sender(), 42)
+            return 0
+        return 1
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("Ponger.run")
+    let _sent: Int = core.send(peer, 41)
+    let reply: Int = core.recv()
+    if reply == 42:
+        return 0
+    return 1

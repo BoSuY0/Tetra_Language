@@ -1,1 +1,1 @@
-testdata/parser/negative/async.tetra:2:1: expected statement, got await
+testdata/parser/negative/async.tetra:2:5: expected statement, got await

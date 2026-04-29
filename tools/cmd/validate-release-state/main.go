@@ -16,6 +16,8 @@ import (
 
 const releaseStateSchema = "tetra.release-state.v1alpha1"
 const minimumReleaseGateSteps = 33
+const defaultExpectedVersion = "v0.2.0"
+const promotedMinorVersion = "v0.2.0"
 
 var requiredReleaseArtifacts = []string{
 	"docs/generated/manifest.json",
@@ -82,11 +84,15 @@ type generatedArtifactsReport struct {
 }
 
 type gateEvidenceReport struct {
-	SummaryPath string `json:"summary_path"`
-	Status      string `json:"status,omitempty"`
-	StepCount   int    `json:"step_count,omitempty"`
-	FailedCount int    `json:"failed_count,omitempty"`
-	Error       string `json:"error,omitempty"`
+	SummaryPath        string `json:"summary_path"`
+	Status             string `json:"status,omitempty"`
+	ReleaseVersion     string `json:"release_version,omitempty"`
+	ReleaseArtifact    string `json:"release_artifact,omitempty"`
+	ReleaseGateCommand string `json:"release_gate_command,omitempty"`
+	ReportDir          string `json:"report_dir,omitempty"`
+	StepCount          int    `json:"step_count,omitempty"`
+	FailedCount        int    `json:"failed_count,omitempty"`
+	Error              string `json:"error,omitempty"`
 }
 
 type freshnessCheck struct {
@@ -100,6 +106,7 @@ type releaseStateReport struct {
 	Status             string                   `json:"status"`
 	Branch             string                   `json:"branch"`
 	Version            string                   `json:"version"`
+	ExpectedVersion    string                   `json:"expected_version"`
 	ReportDir          string                   `json:"report_dir,omitempty"`
 	Git                gitStatusClassification  `json:"git"`
 	GeneratedArtifacts generatedArtifactsReport `json:"generated_artifacts"`
@@ -109,13 +116,14 @@ type releaseStateReport struct {
 }
 
 type releaseStateInputs struct {
-	Branch    string
-	Version   string
-	ReportDir string
-	GitStatus []gitStatusEntry
-	ReadFile  func(string) ([]byte, error)
-	StatFile  func(string) (fileInfo, error)
-	Freshness []freshnessCheck
+	Branch          string
+	Version         string
+	ExpectedVersion string
+	ReportDir       string
+	GitStatus       []gitStatusEntry
+	ReadFile        func(string) ([]byte, error)
+	StatFile        func(string) (fileInfo, error)
+	Freshness       []freshnessCheck
 }
 
 type fileInfo interface {
@@ -136,14 +144,20 @@ func main() {
 	var format string
 	var repoRoot string
 	var reportDir string
+	var expectedVersion string
 	flag.StringVar(&format, "format", "text", "output format: text or json")
 	flag.StringVar(&repoRoot, "repo", ".", "repository root")
 	flag.StringVar(&reportDir, "report-dir", "", "current release gate report directory")
+	flag.StringVar(&expectedVersion, "expected-version", defaultExpectedVersion, "expected version boundary for release-state validation")
 	flag.Parse()
 
 	repoRoot = filepath.Clean(repoRoot)
 	readFile := func(path string) ([]byte, error) {
-		return os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(path)))
+		localPath := filepath.FromSlash(path)
+		if filepath.IsAbs(localPath) {
+			return os.ReadFile(localPath)
+		}
+		return os.ReadFile(filepath.Join(repoRoot, localPath))
 	}
 	statFile := func(path string) (fileInfo, error) {
 		return os.Stat(filepath.Join(repoRoot, filepath.FromSlash(path)))
@@ -153,12 +167,13 @@ func main() {
 	statusRaw, statusErr := commandOutput(repoRoot, "git", "status", "--porcelain")
 
 	inputs := releaseStateInputs{
-		Branch:    strings.TrimSpace(branch),
-		Version:   strings.TrimSpace(version),
-		ReportDir: reportDir,
-		GitStatus: parseGitStatus(statusRaw),
-		ReadFile:  readFile,
-		StatFile:  statFile,
+		Branch:          strings.TrimSpace(branch),
+		Version:         strings.TrimSpace(version),
+		ExpectedVersion: strings.TrimSpace(expectedVersion),
+		ReportDir:       reportDir,
+		GitStatus:       parseGitStatus(statusRaw),
+		ReadFile:        readFile,
+		StatFile:        statFile,
 		Freshness: []freshnessCheck{
 			checkGeneratedManifestFreshness(repoRoot),
 			checkArtifactHashManifest(repoRoot),
@@ -203,12 +218,25 @@ func main() {
 func buildReleaseStateReport(input releaseStateInputs) releaseStateReport {
 	classified := classifyGitStatus(input.GitStatus)
 	generated := inspectRequiredArtifacts(input.StatFile)
-	gate := inspectLastGateEvidence(input.ReadFile)
 	issues := []string{}
+	expectedVersion := strings.TrimSpace(input.ExpectedVersion)
+	if expectedVersion == "" {
+		expectedVersion = defaultExpectedVersion
+	}
+	gate := inspectLastGateEvidence(input.ReadFile, expectedVersion, input.ReportDir)
 	if input.Version == "" {
 		issues = append(issues, "version is missing")
-	} else if input.Version != "v0.1.3" {
-		issues = append(issues, fmt.Sprintf("version %q is not v0.1.3", input.Version))
+	} else if input.Version != expectedVersion {
+		issues = append(issues, fmt.Sprintf("version %q is not %q", input.Version, expectedVersion))
+	}
+	if expectedVersion == promotedMinorVersion && strings.TrimSpace(input.ReportDir) == "" {
+		issues = append(issues, "report-dir is required for v0.2.0 release validation")
+	}
+	if len(classified.DirtyTracked) > 0 {
+		issues = append(issues, fmt.Sprintf("dirty tracked files detected: %d", len(classified.DirtyTracked)))
+	}
+	if len(classified.UntrackedNonReleaseEntries) > 0 {
+		issues = append(issues, fmt.Sprintf("untracked non-release entries detected: %d", len(classified.UntrackedNonReleaseEntries)))
 	}
 	for _, missing := range generated.Missing {
 		issues = append(issues, "missing required release artifact: "+missing)
@@ -222,11 +250,30 @@ func buildReleaseStateReport(input releaseStateInputs) releaseStateReport {
 	} else if gate.StepCount < minimumReleaseGateSteps {
 		issues = append(issues, fmt.Sprintf("last gate evidence has %d step(s), want at least %d", gate.StepCount, minimumReleaseGateSteps))
 	}
+	if expectedVersion == promotedMinorVersion {
+		expectedArtifact := expectedReleaseArtifact(expectedVersion)
+		expectedGateScript := expectedReleaseGateScript(expectedVersion)
+		if gate.ReleaseVersion != expectedVersion {
+			issues = append(issues, fmt.Sprintf("last gate evidence release_version is %q, want %q", gate.ReleaseVersion, expectedVersion))
+		}
+		if gate.ReleaseArtifact != expectedArtifact {
+			issues = append(issues, fmt.Sprintf("last gate evidence release_artifact is %q, want %q", gate.ReleaseArtifact, expectedArtifact))
+		}
+		if !strings.Contains(gate.ReleaseGateCommand, expectedGateScript) {
+			issues = append(issues, fmt.Sprintf("last gate evidence release_gate_command %q does not reference %q", gate.ReleaseGateCommand, expectedGateScript))
+		}
+		if strings.TrimSpace(gate.ReportDir) == "" {
+			issues = append(issues, "last gate evidence report_dir is missing")
+		} else if strings.TrimSpace(input.ReportDir) != "" && filepath.Clean(gate.ReportDir) != filepath.Clean(input.ReportDir) {
+			issues = append(issues, fmt.Sprintf("last gate evidence report_dir is %q, want %q", gate.ReportDir, input.ReportDir))
+		}
+	}
 	return releaseStateReport{
 		Schema:             releaseStateSchema,
 		Status:             statusFromIssues(issues),
 		Branch:             input.Branch,
 		Version:            input.Version,
+		ExpectedVersion:    expectedVersion,
 		ReportDir:          input.ReportDir,
 		Git:                classified,
 		GeneratedArtifacts: generated,
@@ -311,8 +358,8 @@ func inspectRequiredArtifacts(statFile func(string) (fileInfo, error)) generated
 	return report
 }
 
-func inspectLastGateEvidence(readFile func(string) ([]byte, error)) gateEvidenceReport {
-	const path = "docs/generated/v1_0/release_gate_summary.json"
+func inspectLastGateEvidence(readFile func(string) ([]byte, error), expectedVersion string, reportDir string) gateEvidenceReport {
+	path := releaseGateSummaryPath(expectedVersion, reportDir)
 	report := gateEvidenceReport{SummaryPath: path}
 	raw, err := readFile(path)
 	if err != nil {
@@ -320,18 +367,41 @@ func inspectLastGateEvidence(readFile func(string) ([]byte, error)) gateEvidence
 		return report
 	}
 	var summary struct {
-		Status      string `json:"status"`
-		StepCount   int    `json:"step_count"`
-		FailedCount int    `json:"failed_count"`
+		Status             string `json:"status"`
+		ReleaseVersion     string `json:"release_version"`
+		ReleaseArtifact    string `json:"release_artifact"`
+		ReleaseGateCommand string `json:"release_gate_command"`
+		ReportDir          string `json:"report_dir"`
+		StepCount          int    `json:"step_count"`
+		FailedCount        int    `json:"failed_count"`
 	}
 	if err := json.Unmarshal(raw, &summary); err != nil {
 		report.Error = err.Error()
 		return report
 	}
 	report.Status = summary.Status
+	report.ReleaseVersion = summary.ReleaseVersion
+	report.ReleaseArtifact = summary.ReleaseArtifact
+	report.ReleaseGateCommand = summary.ReleaseGateCommand
+	report.ReportDir = summary.ReportDir
 	report.StepCount = summary.StepCount
 	report.FailedCount = summary.FailedCount
 	return report
+}
+
+func releaseGateSummaryPath(expectedVersion string, reportDir string) string {
+	if expectedVersion == promotedMinorVersion && strings.TrimSpace(reportDir) != "" {
+		return filepath.ToSlash(filepath.Join(reportDir, "summary.json"))
+	}
+	return "docs/generated/v1_0/release_gate_summary.json"
+}
+
+func expectedReleaseArtifact(version string) string {
+	return "tetra.release." + strings.ReplaceAll(version, ".", "_") + ".gate-report.v1"
+}
+
+func expectedReleaseGateScript(version string) string {
+	return "scripts/release_" + strings.ReplaceAll(version, ".", "_") + "_gate.sh"
 }
 
 func checkGeneratedManifestFreshness(repoRoot string) freshnessCheck {
@@ -388,6 +458,7 @@ func formatTextReport(report releaseStateReport) string {
 	fmt.Fprintf(&b, "status: %s\n", report.Status)
 	fmt.Fprintf(&b, "branch: %s\n", valueOrUnknown(report.Branch))
 	fmt.Fprintf(&b, "version: %s\n", valueOrUnknown(report.Version))
+	fmt.Fprintf(&b, "expected_version: %s\n", valueOrUnknown(report.ExpectedVersion))
 	if report.ReportDir != "" {
 		fmt.Fprintf(&b, "report_dir: %s\n", report.ReportDir)
 	}
@@ -395,7 +466,10 @@ func formatTextReport(report releaseStateReport) string {
 	fmt.Fprintf(&b, "untracked release artifacts: %d\n", len(report.Git.UntrackedReleaseArtifacts))
 	fmt.Fprintf(&b, "required artifacts: %d\n", len(report.GeneratedArtifacts.Required))
 	fmt.Fprintf(&b, "missing artifacts: %d\n", len(report.GeneratedArtifacts.Missing))
-	fmt.Fprintf(&b, "last gate evidence: %s (%d failed of %d steps)\n", valueOrUnknown(report.LastGateEvidence.Status), report.LastGateEvidence.FailedCount, report.LastGateEvidence.StepCount)
+	fmt.Fprintf(&b, "last gate evidence: %s (%d failed of %d steps, %s)\n", valueOrUnknown(report.LastGateEvidence.Status), report.LastGateEvidence.FailedCount, report.LastGateEvidence.StepCount, valueOrUnknown(report.LastGateEvidence.SummaryPath))
+	if report.LastGateEvidence.ReleaseVersion != "" {
+		fmt.Fprintf(&b, "last gate release_version: %s\n", report.LastGateEvidence.ReleaseVersion)
+	}
 	for _, fresh := range report.Freshness {
 		if fresh.Detail == "" {
 			fmt.Fprintf(&b, "freshness %s: %s\n", fresh.Name, fresh.Status)

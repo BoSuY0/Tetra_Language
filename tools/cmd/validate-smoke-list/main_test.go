@@ -66,7 +66,7 @@ func TestValidateSmokeListAcceptsWASMBuildOnlyProfile(t *testing.T) {
   "total": 5,
   "islands_debug": false,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
     {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
@@ -86,7 +86,7 @@ func TestValidateSmokeListRejectsUnknownFields(t *testing.T) {
   "total": 5,
   "islands_debug": false,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
     {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
@@ -104,7 +104,7 @@ func TestValidateSmokeListRejectsUnknownFields(t *testing.T) {
   "total": 5,
   "islands_debug": false,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","target_group":"wasm","expected_exit":0,"extra":true},
+    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0,"extra":true},
     {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
@@ -348,7 +348,7 @@ func TestValidateSmokeListRejectsUnassignedExampleWhenRootProvided(t *testing.T)
   "total": 5,
   "islands_debug": false,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
     {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
@@ -376,7 +376,7 @@ func TestValidateSmokeListAcceptsDocumentedExampleExclusion(t *testing.T) {
   "total": 5,
   "islands_debug": false,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
     {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},

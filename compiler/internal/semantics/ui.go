@@ -190,6 +190,9 @@ func checkUIDecls(world *module.World, checked *CheckedProgram, types map[string
 				}
 				commandNames[cmd.Name] = struct{}{}
 			}
+			if len(view.Commands) == 0 {
+				return fmt.Errorf("%s: view '%s' must declare at least one command", frontend.FormatPos(view.At), fullName)
+			}
 			for j := range view.Events {
 				event := &view.Events[j]
 				if _, exists := eventNames[event.Name]; exists {
@@ -346,6 +349,10 @@ func validateViewCommandStmts(stmts []frontend.Stmt, stateConstFields map[string
 			return fmt.Errorf("%s: return is not allowed inside view commands", frontend.FormatPos(s.At))
 		case *frontend.ThrowStmt:
 			return fmt.Errorf("%s: throw is not allowed inside view commands", frontend.FormatPos(s.At))
+		case *frontend.DeferStmt:
+			if err := validateViewCommandStmts(s.Body, stateConstFields); err != nil {
+				return err
+			}
 		case *frontend.AssignStmt:
 			if field, ok := assignedStateField(s.Target); ok {
 				if field == "" {

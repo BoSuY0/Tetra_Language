@@ -70,6 +70,31 @@ test "math":
 	}
 }
 
+func TestGenerateAPIDocsSkipsCapsuleManifestInProjectDirectory(t *testing.T) {
+	dir := t.TempDir()
+	capsule := `manifest "tetra.capsule.v1"
+capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+`
+	if err := os.WriteFile(filepath.Join(dir, "Capsule.t4"), []byte(capsule), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "src", "main.t4"), []byte("func answer() -> Int:\n    return 42\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := GenerateAPIDocs([]string{dir})
+	if err != nil {
+		t.Fatalf("GenerateAPIDocs: %v", err)
+	}
+	if !strings.Contains(string(docs), "`func answer() -> i32`") {
+		t.Fatalf("docs missing source entry:\n%s", docs)
+	}
+}
+
 func TestGenerateAPIDocsLabelsExperimentalModules(t *testing.T) {
 	src := []byte(`module lib.experimental.math
 

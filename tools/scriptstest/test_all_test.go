@@ -12,10 +12,11 @@ import (
 )
 
 type testAllSummary struct {
-	Status      string `json:"status"`
-	StepCount   int    `json:"step_count"`
-	FailedCount int    `json:"failed_count"`
-	Steps       []struct {
+	Status          string `json:"status"`
+	StepCount       int    `json:"step_count"`
+	FailedCount     int    `json:"failed_count"`
+	ReleaseArtifact string `json:"release_artifact"`
+	Steps           []struct {
 		Name     string `json:"name"`
 		Status   string `json:"status"`
 		ExitCode *int   `json:"exit_code"`
@@ -39,6 +40,9 @@ func TestTestAllQuickJSONIncludesStepExitCodes(t *testing.T) {
 	if summary.StepCount != len(summary.Steps) || summary.FailedCount != 0 {
 		t.Fatalf("summary counts = steps:%d failed:%d len:%d", summary.StepCount, summary.FailedCount, len(summary.Steps))
 	}
+	if summary.ReleaseArtifact != "tetra.release.v0_2_0.test-all-summary.v1" {
+		t.Fatalf("release_artifact = %q", summary.ReleaseArtifact)
+	}
 	for _, step := range summary.Steps {
 		if step.Status != "pass" || step.ExitCode == nil || *step.ExitCode != 0 {
 			t.Fatalf("step missing pass exit code: %#v", step)
@@ -46,6 +50,33 @@ func TestTestAllQuickJSONIncludesStepExitCodes(t *testing.T) {
 		if step.Command == "" {
 			t.Fatalf("step missing command: %#v", step)
 		}
+	}
+}
+
+func TestTestAllRejectsMalformedReportDirFlag(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	out, err := runTestAll(t, root, nil, "--report-dir")
+	if err == nil {
+		t.Fatalf("expected malformed --report-dir failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "--report-dir requires a directory") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestTestAllRunsFromNestedWorkingDirectory(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	nested := filepath.Join(root, "sub", "dir")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTestAllFromWorkingDir(t, root, nested, nil, "--quick", "--json-only", "--report-dir", filepath.Join(root, "report"))
+	if err != nil {
+		t.Fatalf("test_all run from nested dir failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "pass" {
+		t.Fatalf("summary status = %q", summary.Status)
 	}
 }
 
@@ -345,7 +376,7 @@ func TestReleaseV06GateValidatesJSONDiagnosticShape(t *testing.T) {
 		`check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported"`,
 		`check_json_diagnostic_case "planned-actor-diagnostic" "planned feature 'actor'"`,
 		`--require-position`,
-		`./tetra build --target wasm32-wasi -o "$wasm_out" examples/flow_hello.tetra`,
+		`./tetra build --target wasm32-wasi -o "$wasm_out" examples/hello.tetra`,
 		`test "$(od -An -tx1 -N4 "$wasm_out" | tr -d ' \n')" = "0061736d"`,
 	} {
 		if !strings.Contains(text, want) {
@@ -545,9 +576,9 @@ func TestTestAllValidatesJSONDiagnosticShape(t *testing.T) {
 		`check_json_diagnostic_case "invalid-diagnostic" "unknown function"`,
 		`check_json_diagnostic_case "missing-effect-diagnostic" "uses effect 'io'"`,
 		`check_json_diagnostic_case "tabs-diagnostic" "tabs are not supported"`,
-		`check_json_diagnostic_case "planned-actor-diagnostic" "planned feature 'actor'"`,
+		`check_json_diagnostic_case "planned-actor-diagnostic" "actor declarations currently support state fields and func methods only"`,
 		`--require-position`,
-		`./tetra build --target wasm32-wasi -o "$wasm_out" examples/flow_hello.tetra`,
+		`./tetra build --target wasm32-wasi -o "$wasm_out" examples/hello.tetra`,
 		`test "$(od -An -tx1 -N4 "$wasm_out" | tr -d ' \n')" = "0061736d"`,
 	} {
 		if !strings.Contains(text, want) {
@@ -585,6 +616,23 @@ func TestTestAllValidatesDocsManifests(t *testing.T) {
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("test_all missing manifest validation %q", want)
+		}
+	}
+}
+
+func TestTestAllFullValidatesPerformanceReportWhenPresent(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	if err != nil {
+		t.Fatalf("read test_all: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`check_performance_report()`,
+		`go run ./tools/cmd/validate-performance-report --report "$report"`,
+		`run_step "performance report schema" check_performance_report`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("test_all missing performance report wiring %q", want)
 		}
 	}
 }
@@ -774,7 +822,7 @@ cmd="${1:-}"
 shift || true
 case "$cmd" in
   version)
-    echo "v0.1.2"
+    echo "v0.2.0"
     ;;
   fmt)
     if [[ "${TETRA_FAIL_FMT:-}" == "1" ]]; then
@@ -796,7 +844,7 @@ case "$cmd" in
         case "$*" in
           *missing-effect-diagnostic.tetra*) echo '{"code":"TETRA2001","message":"function main uses effect '\''io'\'' but does not declare it","severity":"error"}' >&2 ;;
           *tabs-diagnostic.tetra*) echo '{"code":"TETRA0001","message":"tabs are not supported in Flow indentation","severity":"error"}' >&2 ;;
-          *planned-actor-diagnostic.tetra*) echo '{"code":"TETRA0001","message":"planned feature '\''actor'\'' is not implemented","severity":"error"}' >&2 ;;
+          *planned-actor-diagnostic.tetra*) echo '{"code":"TETRA0001","message":"actor declarations currently support state fields and func methods only","severity":"error"}' >&2 ;;
           *) echo '{"code":"TETRA2001","message":"unknown function missing_call","severity":"error"}' >&2 ;;
         esac
         exit 1
@@ -859,24 +907,278 @@ case "$cmd" in
   eco)
     sub="${1:-}"
     shift || true
-    if [[ "$sub" == "unpack" ]]; then
-      out=""
-      while [[ $# -gt 0 ]]; do
-        case "$1" in
-          -C)
-            out="$2"
-            shift 2
+    case "$sub" in
+      verify)
+        lock=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --lock)
+              lock="$2"
+              shift 2
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        if [[ -n "$lock" ]]; then
+          mkdir -p "$(dirname "$lock")"
+          cat >"$lock" <<'JSON'
+{
+  "schema": "tetra.eco.lock.v1",
+  "manifest_schema": "tetra.capsule.v1",
+  "permissions_model": "tetra.eco.permissions.v1",
+  "graph_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "capsules": [
+    {
+      "id": "tetra://app",
+      "name": "App",
+      "version": "0.1.0",
+      "path": "Tetra.capsule",
+      "targets": ["linux-x64"],
+      "permissions": ["io"]
+    }
+  ]
+}
+JSON
+        fi
+        ;;
+      seed)
+        action="${1:-}"
+        shift || true
+        case "$action" in
+          export)
+            out="tetra.seed.json"
+            while [[ $# -gt 0 ]]; do
+              case "$1" in
+                --out)
+                  out="$2"
+                  shift 2
+                  ;;
+                *)
+                  shift
+                  ;;
+              esac
+            done
+            mkdir -p "$(dirname "$out")"
+            printf '{}\n' >"$out"
             ;;
-          *)
-            shift
+          import)
+            lock=""
+            capsules_dir=""
+            while [[ $# -gt 0 ]]; do
+              case "$1" in
+                --lock)
+                  lock="$2"
+                  shift 2
+                  ;;
+                --capsules-dir)
+                  capsules_dir="$2"
+                  shift 2
+                  ;;
+                *)
+                  shift
+                  ;;
+              esac
+            done
+            if [[ -n "$lock" ]]; then
+              mkdir -p "$(dirname "$lock")"
+              printf '{}\n' >"$lock"
+            fi
+            if [[ -n "$capsules_dir" ]]; then
+              mkdir -p "$capsules_dir"
+              printf 'capsule App:\n  id "tetra://app"\n  version "0.1.0"\n' >"$capsules_dir/App.capsule"
+            fi
             ;;
         esac
-      done
-      if [[ -n "$out" ]]; then
-        mkdir -p "$out/src"
-        printf 'func main() -> Int:\n    return 0\n' >"$out/src/main.tetra"
-      fi
-    fi
+        ;;
+      needmap)
+        out="tetra.needmap.json"
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            -o)
+              out="$2"
+              shift 2
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        mkdir -p "$(dirname "$out")"
+        printf '{}\n' >"$out"
+        ;;
+      pack)
+        out=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            -o|--out)
+              out="$2"
+              shift 2
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        if [[ -n "$out" ]]; then
+          mkdir -p "$(dirname "$out")"
+          printf 'todex\n' >"$out"
+        fi
+        ;;
+      unpack)
+        out=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            -C|--dir)
+              out="$2"
+              shift 2
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        if [[ -n "$out" ]]; then
+          mkdir -p "$out/src"
+          printf 'capsule App:\n  id "tetra://app"\n  version "0.1.0"\n  target "linux-x64"\n' >"$out/Tetra.capsule"
+          printf 'func main() -> Int:\n    return 0\n' >"$out/src/main.tetra"
+          printf '{"schema":"tetra.eco.package.v1","compression":"gzip","mtime_unix":0,"file_count":2,"files":[{"path":"Tetra.capsule","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":68},{"path":"src/main.tetra","sha256":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":32}]}\n' >"$out/tetra.package.json"
+        fi
+        ;;
+      vault)
+        action="${1:-}"
+        shift || true
+        store=".tetra/todex-vault"
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --store)
+              store="$2"
+              shift 2
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        mkdir -p "$store/objects/sha256"
+        printf '{}' >"$store/records.json"
+        if [[ "$action" == "add" ]]; then
+          echo "Vault added: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa source fixture"
+        fi
+        if [[ "$action" == "verify" ]]; then
+          echo "Vault OK: 1 records"
+        fi
+        ;;
+      trust)
+        action="${1:-}"
+        shift || true
+        if [[ "$action" == "snapshot" ]]; then
+          out="tetra.trust-snapshot.json"
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              -o)
+                out="$2"
+                shift 2
+                ;;
+              *)
+                shift
+                ;;
+            esac
+          done
+          mkdir -p "$(dirname "$out")"
+          printf '{}\n' >"$out"
+        fi
+        ;;
+      materialize)
+        out="."
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            -C|--dir)
+              out="$2"
+              shift 2
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        mkdir -p "$out"
+        printf '{}\n' >"$out/tetra.materialization.json"
+        ;;
+      publish)
+        registry=".tetra/registry-beta"
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --registry)
+              registry="$2"
+              shift 2
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        mkdir -p "$registry/packages/tetra_app/0.1.0/linux-x64"
+        printf 'todex\n' >"$registry/packages/tetra_app/0.1.0/linux-x64/package.todex"
+        printf '{"schema":"tetra.eco.publish.v1beta","channel":"beta","hub":"local-beta","published_at_unix":0,"capsule":{"id":"tetra://app","name":"App","version":"0.1.0","target":"linux-x64","targets":["linux-x64"],"permissions":["io"]},"package":{"file":"package.todex","size":6,"sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"downloads":[{"target":"linux-x64","path":"packages/tetra_app/0.1.0/linux-x64/package.todex"}]}\n' >"$registry/packages/tetra_app/0.1.0/linux-x64/metadata.json"
+        ;;
+      download)
+        out=""
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            -o)
+              out="$2"
+              shift 2
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+        if [[ -n "$out" ]]; then
+          mkdir -p "$(dirname "$out")"
+          printf 'todex\n' >"$out"
+        fi
+        ;;
+      tetrahub)
+        action="${1:-}"
+        shift || true
+        if [[ "$action" == "publish" ]]; then
+          store=".tetra/tetrahub-beta"
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              --store)
+                store="$2"
+                shift 2
+                ;;
+              *)
+                shift
+                ;;
+            esac
+          done
+          mkdir -p "$store/packages/tetra_app/0.1.0/linux-x64"
+          printf 'todex\n' >"$store/packages/tetra_app/0.1.0/linux-x64/package.todex"
+        elif [[ "$action" == "download" ]]; then
+          out=""
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              -o)
+                out="$2"
+                shift 2
+                ;;
+              *)
+                shift
+                ;;
+            esac
+          done
+          if [[ -n "$out" ]]; then
+            mkdir -p "$(dirname "$out")"
+            printf 'todex\n' >"$out"
+          fi
+        fi
+        ;;
+    esac
     ;;
   *)
     ;;
@@ -912,6 +1214,16 @@ func runTestAllSplit(t *testing.T, root string, env []string, args ...string) ([
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	return stdout.Bytes(), stderr.Bytes(), err
+}
+
+func runTestAllFromWorkingDir(t *testing.T, root string, workingDir string, env []string, args ...string) ([]byte, error) {
+	t.Helper()
+	script := filepath.Join(root, "scripts", "test_all.sh")
+	cmd := exec.Command("bash", append([]string{script}, args...)...)
+	cmd.Dir = workingDir
+	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append(cmd.Env, "PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return cmd.CombinedOutput()
 }
 
 func decodeTestAllSummary(t *testing.T, raw []byte) testAllSummary {

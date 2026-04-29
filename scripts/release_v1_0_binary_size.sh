@@ -2,12 +2,12 @@
 set -euo pipefail
 
 report_path=""
-source_path="examples/flow_hello.tetra"
+source_path="examples/flow_struct_smoke.tetra"
 targets=("linux-x64" "macos-x64" "windows-x64" "wasm32-wasi" "wasm32-web")
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/release_v1_0_binary_size.sh --report PATH [--source examples/flow_hello.tetra]
+Usage: bash scripts/release_v1_0_binary_size.sh --report PATH [--source examples/flow_struct_smoke.tetra]
 
 Builds the v1 release target matrix and records soft/hard binary-size threshold evidence.
 USAGE
@@ -55,6 +55,24 @@ json_escape() {
   printf '%s' "$s"
 }
 
+sha256_file() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{print $1}'
+    return 0
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{print $1}'
+    return 0
+  fi
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$file" | awk '{print $NF}'
+    return 0
+  fi
+  echo "release_v1_0_binary_size: no sha256 tool found (expected sha256sum, shasum, or openssl)" >&2
+  exit 1
+}
+
 target_ext() {
   case "$1" in
     windows-x64)
@@ -94,6 +112,13 @@ hard_limit() {
 artifacts_json="$tmp_dir/artifacts.jsonl"
 : >"$artifacts_json"
 status="pass"
+pass_count=0
+warn_count=0
+fail_count=0
+total_size_bytes=0
+max_size_bytes=0
+compiler_version="$(./tetra version)"
+source_sha256="sha256:$(sha256_file "$source_path")"
 
 for target in "${targets[@]}"; do
   ext="$(target_ext "$target")"
@@ -106,11 +131,19 @@ for target in "${targets[@]}"; do
   if (( size > hard )); then
     result="fail"
     status="fail"
+    fail_count=$((fail_count + 1))
   elif (( size > soft )); then
     result="warn"
     if [[ "$status" == "pass" ]]; then
       status="warn"
     fi
+    warn_count=$((warn_count + 1))
+  else
+    pass_count=$((pass_count + 1))
+  fi
+  total_size_bytes=$((total_size_bytes + size))
+  if (( size > max_size_bytes )); then
+    max_size_bytes="$size"
   fi
   printf '{"target":"%s","artifact_name":"%s","size_bytes":%s,"soft_limit_bytes":%s,"hard_limit_bytes":%s,"status":"%s"}\n' \
     "$(json_escape "$target")" \
@@ -125,7 +158,25 @@ mkdir -p "$(dirname "$report_path")"
 {
   echo "{"
   echo '  "schema": "tetra.binary-size-thresholds.v1alpha1",'
+  echo '  "timestamp_policy": "no wall-clock timestamps; release gate summary records run time",'
+  printf '  "compiler_version": "%s",\n' "$(json_escape "$compiler_version")"
   printf '  "source": "%s",\n' "$(json_escape "$source_path")"
+  printf '  "source_sha256": "%s",\n' "$(json_escape "$source_sha256")"
+  printf '  "target_count": %s,\n' "${#targets[@]}"
+  printf '  "pass_count": %s,\n' "$pass_count"
+  printf '  "warn_count": %s,\n' "$warn_count"
+  printf '  "fail_count": %s,\n' "$fail_count"
+  printf '  "total_size_bytes": %s,\n' "$total_size_bytes"
+  printf '  "max_size_bytes": %s,\n' "$max_size_bytes"
+  echo '  "targets": ['
+  for i in "${!targets[@]}"; do
+    sep=","
+    if [[ "$i" -eq $((${#targets[@]} - 1)) ]]; then
+      sep=""
+    fi
+    printf '    "%s"%s\n' "$(json_escape "${targets[$i]}")" "$sep"
+  done
+  echo '  ],'
   echo '  "threshold_policy": "soft limits require release-owner review; hard limits block the gate",'
   echo '  "artifacts": ['
   awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$artifacts_json"

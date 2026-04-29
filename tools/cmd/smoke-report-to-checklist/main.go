@@ -39,6 +39,8 @@ type smokeReport struct {
 	Cases        []smokeCaseReport `json:"cases"`
 }
 
+const smokeReportArtifact = "tetra.release.v0_2_0.smoke-report.v1"
+
 func sectionHeadingForTarget(target string) (string, error) {
 	switch target {
 	case "windows-x64":
@@ -281,7 +283,7 @@ func validateRequiredSmokeCases(target string, seen map[string]bool) error {
 			}
 		}
 	case "wasm32-wasi", "wasm32-web":
-		required := []string{"flow_hello", "effects_io_smoke", "ui_web_smoke", "dogfood_wasi", "dogfood_web_ui"}
+		required := []string{"legacy_hello", "effects_io_smoke", "ui_web_smoke", "dogfood_wasi", "dogfood_web_ui"}
 		for _, name := range required {
 			if !seen[name] {
 				return fmt.Errorf("smoke report missing required smoke profile for target %s", target)

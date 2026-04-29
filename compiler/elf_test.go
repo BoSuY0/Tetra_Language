@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"tetra_language/compiler/internal/format/elf"
@@ -230,6 +231,49 @@ func TestELFDataRelocPointsToDataMarker(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("missing lea relocation to data marker")
+	}
+}
+
+func TestELFBuildsHighArityCallSurface(t *testing.T) {
+	tmp := t.TempDir()
+	src := `
+fun f7(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32): i32 {
+  return a + b + c + d + e + f + g
+}
+fun main(): i32 {
+  return f7(1, 2, 3, 4, 5, 6, 7)
+}
+`
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "app")
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := BuildFile(srcPath, outPath, "linux-x64"); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read elf: %v", err)
+	}
+	phdrs := parseELF64ProgramHeaders(t, data)
+	if len(phdrs) != 2 {
+		t.Fatalf("program header count = %d, want 2", len(phdrs))
+	}
+}
+
+func TestELFLinkRejectsNonLinuxObjectTarget(t *testing.T) {
+	_, err := LinkLinuxX64([]*Object{{
+		Target:  "windows-x64",
+		Module:  "wrong",
+		Code:    []byte{0xC3},
+		Symbols: []Symbol{{Name: "main", Offset: 0}},
+	}}, "main")
+	if err == nil {
+		t.Fatalf("expected mismatch error")
+	}
+	if !strings.Contains(err.Error(), "linker target mismatch") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

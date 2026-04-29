@@ -2,12 +2,12 @@
 set -euo pipefail
 
 report_path=""
-source_path="examples/flow_hello.tetra"
+source_path="examples/flow_struct_smoke.tetra"
 targets=("linux-x64" "macos-x64" "windows-x64" "wasm32-wasi" "wasm32-web")
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/release_v1_0_repro.sh --report PATH [--source examples/flow_hello.tetra]
+Usage: bash scripts/release_v1_0_repro.sh --report PATH [--source examples/flow_struct_smoke.tetra]
 
 Produces a reproducibility proof JSON for every v1 build-only/release target.
 USAGE
@@ -56,6 +56,24 @@ json_escape() {
   printf '%s' "$s"
 }
 
+sha256_file() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{print $1}'
+    return 0
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{print $1}'
+    return 0
+  fi
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$file" | awk '{print $NF}'
+    return 0
+  fi
+  echo "release_v1_0_repro: no sha256 tool found (expected sha256sum, shasum, or openssl)" >&2
+  exit 1
+}
+
 target_ext() {
   case "$1" in
     windows-x64)
@@ -75,6 +93,10 @@ artifacts_json="$tmp_dir/artifacts.jsonl"
 all_match="true"
 legacy_native_json=""
 legacy_wasm_json=""
+matched_count=0
+mismatched_count=0
+source_sha256="sha256:$(sha256_file "$source_path")"
+compiler_version="$(./tetra version)"
 
 for target in "${targets[@]}"; do
   ext="$(target_ext "$target")"
@@ -84,13 +106,15 @@ for target in "${targets[@]}"; do
   ./tetra build --target "$target" -o "$out_a" "$source_path"
   ./tetra build --target "$target" -o "$out_b" "$source_path"
 
-  hash_a="sha256:$(sha256sum "$out_a" | awk '{print $1}')"
-  hash_b="sha256:$(sha256sum "$out_b" | awk '{print $1}')"
+  hash_a="sha256:$(sha256_file "$out_a")"
+  hash_b="sha256:$(sha256_file "$out_b")"
   match="false"
   if cmp -s "$out_a" "$out_b"; then
     match="true"
+    matched_count=$((matched_count + 1))
   else
     all_match="false"
+    mismatched_count=$((mismatched_count + 1))
   fi
   size_a="$(wc -c <"$out_a" | tr -d '[:space:]')"
   size_b="$(wc -c <"$out_b" | tr -d '[:space:]')"
@@ -116,7 +140,21 @@ mkdir -p "$(dirname "$report_path")"
   echo "{"
   echo '  "schema": "tetra.reproducible-build-proof.v1alpha1",'
   echo '  "timestamp_policy": "no wall-clock timestamps; release gate summary records run time",'
+  printf '  "compiler_version": "%s",\n' "$(json_escape "$compiler_version")"
   printf '  "source": "%s",\n' "$(json_escape "$source_path")"
+  printf '  "source_sha256": "%s",\n' "$(json_escape "$source_sha256")"
+  printf '  "target_count": %s,\n' "${#targets[@]}"
+  printf '  "matched_count": %s,\n' "$matched_count"
+  printf '  "mismatched_count": %s,\n' "$mismatched_count"
+  echo '  "targets": ['
+  for i in "${!targets[@]}"; do
+    sep=","
+    if [[ "$i" -eq $((${#targets[@]} - 1)) ]]; then
+      sep=""
+    fi
+    printf '    "%s"%s\n' "$(json_escape "${targets[$i]}")" "$sep"
+  done
+  echo '  ],'
   printf '  "native": %s,\n' "$legacy_native_json"
   printf '  "wasm": %s,\n' "$legacy_wasm_json"
   echo '  "artifacts": ['

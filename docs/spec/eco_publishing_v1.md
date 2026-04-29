@@ -1,6 +1,7 @@
 # Eco Publishing Model v1
 
-Status: Accepted for Wave 10 completion on 2026-04-26.
+Status: Accepted for Wave 10 completion on 2026-04-26. Used as the local Eco/Todex
+contract baseline for v0.2.0 release gating.
 
 This document stabilizes local Eco/Todex v1 contracts and defines which network/distributed capabilities are beta vs post-v1.
 
@@ -13,23 +14,96 @@ Supported fields:
 - `capsule <Name>:`
 - `id "tetra://..."`
 - `version "x.y.z"`
+- `entry "<relative .t4/.tetra path>"`
+- `source "<relative source root>"` or a `sources:` block
 - `target "<triple>"` (repeatable)
+- `targets:` block with bare aliases or triples (`linux`, `windows`, `macOS`,
+  `web`, `wasi`, `linux-x64`, `wasm32-web`, ...)
 - `effect "<effect>"` (legacy-compatible, normalized)
 - `permission "<permission>"` (repeatable)
-- `dependency "<id>" "<version>"`
+- `allow:` block for permissions such as `ui` or `fs.readWrite.userData`
+- `dependency "<id>" "<version>" ["<local capsule path>"]`
+- `deps:` block with `<id> <version> [local capsule path]` entries
+- `artifact "<kind>" "<relative path>"` or an `artifacts:` block with
+  `<kind> <relative path>` entries. Supported kinds are `interface` (`.t4i`),
+  `object` (`.tobj`), and `seed` (`.t4s`). Object artifacts may be target-aware:
+  `object linux-x64 artifacts/math/core.linux-x64.tobj`.
+- `policy:` block with semantic project policy keys:
+  `unsafe deny|allow` and `reproducible required|preferred|off`
 
 Backward compatibility rule: manifests without explicit `manifest` are interpreted as `tetra.capsule.v1`.
 
+CLI project discovery rule: `tetra check`, `tetra build`, `tetra run`,
+`tetra test`, and `tetra doc` walk upward from the current/input path, prefer
+`Capsule.t4`, and fall back to legacy `Tetra.capsule`. When a project is found,
+`entry` selects the default program and `sources` become module lookup roots. If
+`sources` is omitted, the CLI uses the conventional roots `src`, `ui`, `tests`,
+`drivers`, `kernel`, `game`, and project root. Dependencies with local paths add
+that capsule's own source roots to module lookup, so `import other.module` can
+resolve across local workspace capsules without copying source files. Interface
+artifacts add `.t4i` module roots, object artifacts matching the active target
+are passed to native linking, and seed artifacts are lock-tracked offline inputs.
+
+If a discovered project contains `Tetra.lock`, `tetra check`, `tetra build`, and
+`tetra run` validate the current capsule graph and artifact hashes against the
+lock before compiler work begins. `tetra project sync` is the project-first
+command that expands local path dependencies, refreshes `Tetra.lock`, and
+generates local dependency artifacts when native object targets are available.
+`tetra project sync --check` reports pending lock/artifact writes without
+modifying project files. Build-only targets such as WASM use lock-only sync and
+skip native `.tobj` generation. The lower-level `tetra eco verify --lock
+Tetra.lock Capsule.t4` remains available when only the lock graph should be
+refreshed.
+
+`tetra eco artifacts build --target <native-triple> --lock Tetra.lock Capsule.t4`
+builds local path dependencies into project artifacts, appends missing
+`artifacts:` entries to `Capsule.t4`, writes `.t4i` interfaces under
+`interfaces/`, `.tobj` implementation objects under `artifacts/`, a dependency
+seed under `seeds/`, and then refreshes `Tetra.lock`.
+
+`tetra eco artifacts check` validates the same expected artifact set without
+writing files. It reports missing/stale generated interfaces, wrong-target or
+stale object files, stale dependency seeds, and stale semantic locks with a
+repair command. `tetra eco artifacts build --check` is the dry-run form of the
+builder and reports pending writes as `would generate ...`. `tetra eco artifacts
+build --all-targets` emits native object artifacts for every native target in
+`Capsule.t4` and skips build-only targets such as WASM object outputs.
+`tetra build --artifacts=auto` runs the repair step before compiling; the
+default strict build mode only validates declared artifacts and reports
+diagnostics.
+
 Example:
 
-```tetra
+```t4 unsupported
 manifest "tetra.capsule.v1"
 capsule Demo:
     id "tetra://demo"
     version "0.1.0"
-    target "linux-x64"
-    permission "io"
-    dependency "tetra://core" "0.1.0"
+    entry "src/main.t4"
+
+    sources:
+        src
+        ui
+
+    targets:
+        linux
+        web
+
+    allow:
+        io
+        ui
+
+    policy:
+        unsafe deny
+        reproducible required
+
+    deps:
+        tetra://core 0.1.0 ../tetra-core
+
+    artifacts:
+        interface interfaces/core/api.t4i
+        object linux-x64 artifacts/core-linux-x64.tobj
+        seed seeds/tetra-core.t4s
 ```
 
 ## 2) Permission Model v1
@@ -41,6 +115,13 @@ Rules:
 - `effect` entries are normalized and added to permissions for compatibility.
 - Dependency checks enforce no permission escalation: a depender must include every permission required by each dependency.
 - Existing effect-based checks remain in place.
+
+`Tetra.lock` also records each capsule `policy` map and artifact list when
+present. Artifact lock entries include SHA-256 and, when available, target,
+module, and public API hash metadata. The lock graph hash includes policy keys,
+dependency edges, artifact paths, targets, modules, public API hashes, and
+artifact SHA-256 values, so changing `unsafe`, `reproducible`, a dependency, or
+a tracked `.t4i`/`.tobj`/`.t4s` artifact changes the semantic lock.
 
 ## 3) Seed Import/Export v1
 
@@ -232,3 +313,17 @@ Post-v1 (explicitly out of v1 contract):
 - proof-carrying capsule mesh enforcement and live-evolution protocol
 
 Promotion rule: any post-v1 capability needs an explicit schema/version and release-gate command before being treated as v1-stable.
+
+## 13) v0.2.0 release evidence
+
+v0.2.0 treats Eco/Todex as local-only workflows with validator-backed metadata.
+
+Focused verification command:
+
+`go test ./cli/... ./tools/cmd/validate-eco-lock ./tools/cmd/validate-eco-unpack ./tools/cmd/validate-eco-vault ./tools/cmd/validate-eco-publish -count=1`
+
+Gate workflow command:
+
+`bash scripts/test_all.sh --full --keep-going`
+
+Both commands must pass before claiming Eco publish metadata health.

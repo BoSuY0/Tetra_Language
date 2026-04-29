@@ -1,8 +1,8 @@
 # v0.6 Usable Alpha Release Gate
 
 > Historical checkpoint. This gate documented the v0.6 release branch only.
-> The current public baseline is `v0.1.3`; use
-> `docs/checklists/v0_1_3_release_gate.md` for current release work.
+> The current public baseline is `v0.2.0`; use
+> `docs/checklists/v0_2_0_release_gate.md` for current release work.
 
 Use this checklist before labeling a build or branch as v0.6 Usable Alpha.
 

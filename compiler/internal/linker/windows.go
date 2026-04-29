@@ -1,6 +1,8 @@
 package linker
 
 import (
+	"fmt"
+
 	"tetra_language/compiler/internal/format/pe"
 	"tetra_language/compiler/internal/format/tobj"
 	"tetra_language/compiler/internal/linker/linkcore"
@@ -9,6 +11,16 @@ import (
 const winImportExitProcess = "kernel32.ExitProcess"
 
 func LinkWindowsX64(objects []*tobj.Object, mainName string) (*pe.PEImage, error) {
+	const expectedTarget = "windows-x64"
+	for _, obj := range objects {
+		if obj == nil {
+			return nil, fmt.Errorf("nil object")
+		}
+		if obj.Target != expectedTarget {
+			return nil, fmt.Errorf("linker target mismatch: windows-x64 expects '%s' object, got '%s' (module '%s')", expectedTarget, obj.Target, obj.Module)
+		}
+	}
+
 	stub, stubCallAt, stubExitAt := emitEntryStubWin64X64()
 	res, err := linkcore.LinkX64Objects(objects, mainName, stub, stubCallAt, 0)
 	if err != nil {

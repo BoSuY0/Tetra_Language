@@ -7,17 +7,94 @@
   "baseline_artifact": "docs/performance/v1_0_thresholds.md",
   "threshold_decision": "accepted as current branch baseline capture; compare future RCs with benchstat before release promotion",
   "metrics": [
-    {"name":"BenchmarkCompileRepresentativeExamples/core_math-32","iterations":9121,"ns_per_op":151356,"threshold":"compile <= 15 percent slower than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkCompileRepresentativeExamples/dogfood_cli-32","iterations":5614,"ns_per_op":220157,"threshold":"compile <= 15 percent slower than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkCompileRepresentativeExamples/flow_hello-32","iterations":12846,"ns_per_op":96690,"threshold":"compile <= 15 percent slower than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkFormatRepresentativeSources/flow_hello-32","iterations":218643,"ns_per_op":8025,"threshold":"format <= 10 percent slower than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkFormatRepresentativeSources/web_ui-32","iterations":40100,"ns_per_op":27446,"threshold":"format <= 10 percent slower than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkGenerateAPIDocsDogfoodProjects-32","iterations":16438,"ns_per_op":81948,"threshold":"docs <= 15 percent slower than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkBinarySizeBaselines/linux_flow_hello-32","iterations":15618,"ns_per_op":102192,"artifact_bytes":4113,"threshold":"binary size <= 10 percent larger than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkBinarySizeBaselines/macos_flow_hello-32","iterations":11173,"ns_per_op":120743,"artifact_bytes":12288,"threshold":"binary size <= 10 percent larger than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkBinarySizeBaselines/windows_flow_hello-32","iterations":11812,"ns_per_op":89155,"artifact_bytes":3072,"threshold":"binary size <= 10 percent larger than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkBinarySizeBaselines/wasi_dogfood-32","iterations":21150,"ns_per_op":71206,"artifact_bytes":222,"threshold":"WASM binary size <= 10 percent larger than accepted RC baseline","decision":"accepted baseline capture"},
-    {"name":"BenchmarkBinarySizeBaselines/web_dogfood-32","iterations":7647,"ns_per_op":143250,"artifact_bytes":120,"threshold":"WASM binary size <= 10 percent larger than accepted RC baseline","decision":"accepted baseline capture"}
+    {
+      "name": "BenchmarkBinarySizeBaselines/linux_flow_hello-32",
+      "iterations": 15618,
+      "ns_per_op": 102192,
+      "artifact_bytes": 4113,
+      "threshold": "binary size <= 10 percent larger than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkBinarySizeBaselines/macos_flow_hello-32",
+      "iterations": 11173,
+      "ns_per_op": 120743,
+      "artifact_bytes": 12288,
+      "threshold": "binary size <= 10 percent larger than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkBinarySizeBaselines/wasi_dogfood-32",
+      "iterations": 21150,
+      "ns_per_op": 71206,
+      "artifact_bytes": 222,
+      "threshold": "WASM binary size <= 10 percent larger than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkBinarySizeBaselines/web_dogfood-32",
+      "iterations": 7647,
+      "ns_per_op": 143250,
+      "artifact_bytes": 120,
+      "threshold": "WASM binary size <= 10 percent larger than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkBinarySizeBaselines/windows_flow_hello-32",
+      "iterations": 11812,
+      "ns_per_op": 89155,
+      "artifact_bytes": 3072,
+      "threshold": "binary size <= 10 percent larger than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkCompileRepresentativeExamples/core_math-32",
+      "iterations": 9121,
+      "ns_per_op": 151356,
+      "threshold": "compile <= 15 percent slower than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkCompileRepresentativeExamples/dogfood_cli-32",
+      "iterations": 5614,
+      "ns_per_op": 220157,
+      "threshold": "compile <= 15 percent slower than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkCompileRepresentativeExamples/flow_hello-32",
+      "iterations": 12846,
+      "ns_per_op": 96690,
+      "threshold": "compile <= 15 percent slower than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkFormatRepresentativeSources/flow_hello-32",
+      "iterations": 218643,
+      "ns_per_op": 8025,
+      "threshold": "format <= 10 percent slower than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkFormatRepresentativeSources/web_ui-32",
+      "iterations": 40100,
+      "ns_per_op": 27446,
+      "threshold": "format <= 10 percent slower than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    },
+    {
+      "name": "BenchmarkGenerateAPIDocsDogfoodProjects-32",
+      "iterations": 16438,
+      "ns_per_op": 81948,
+      "threshold": "docs <= 15 percent slower than accepted RC baseline",
+      "decision": "accepted baseline capture"
+    }
   ],
-  "residual_risk": "single-host count=1 benchmark evidence; release candidates should rerun count=5 and compare with benchstat when a prior baseline exists"
+  "residual_risk": "single-host count=1 benchmark evidence; release candidates should rerun count=5 and compare with benchstat when a prior baseline exists",
+  "summary": {
+    "metric_count": 11,
+    "total_iterations": 370162,
+    "max_ns_per_op": 220157,
+    "metrics_sha256": "sha256:8be60f159e4324422a8a0b02a735611dc748a12190742670a98b459d7c72cfa0"
+  }
 }

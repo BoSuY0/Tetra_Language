@@ -40,6 +40,8 @@ type testReportEnvelope struct {
 	Results    []testResult
 }
 
+const testReportArtifact = "tetra.release.v0_2_0.test-report.v1"
+
 func main() {
 	var reportPath string
 	flag.StringVar(&reportPath, "report", "", "path to tetra test JSON report")
@@ -105,10 +107,16 @@ func validateTestReportCounts(report testReportEnvelope) error {
 	indicesByFile := map[string]map[int]bool{}
 	seenResults := map[string]bool{}
 	seenFunctions := map[string]bool{}
+	prevOrderKey := ""
 	for _, result := range report.Results {
 		if err := validateTestResult(result); err != nil {
 			return err
 		}
+		orderKey := fmt.Sprintf("%s\x00%08d", result.Filename, result.Index)
+		if prevOrderKey != "" && orderKey < prevOrderKey {
+			return fmt.Errorf("results must be sorted by filename then index for deterministic evidence output")
+		}
+		prevOrderKey = orderKey
 		resultKey := result.Filename + "\x00" + result.Name
 		if seenResults[resultKey] {
 			return fmt.Errorf("duplicate test result %q in %s", result.Name, result.Filename)

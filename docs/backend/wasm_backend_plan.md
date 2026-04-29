@@ -2,7 +2,19 @@
 
 Status: planned
 
-This document turns the v1.0 WASM blocker into an implementation contract. It does not mark WASM as supported. The current compiler still reports `wasm32-wasi` and `wasm32-web` as planned targets until the phases below are complete and the release gate runs the real smoke checks.
+This document turns the v1.0 WASM blocker into an implementation contract. It does not mark full WASM runtime parity as complete. The current compiler exposes `wasm32-wasi` and `wasm32-web` as build-only targets until the phases below are complete and the release gate runs the real smoke checks end-to-end.
+
+v0.2.0 checkpoint (current behavior in this repository):
+
+- `wasm32-wasi` and `wasm32-web` are build-only targets with deterministic module/linker checks.
+- Phase 1 minimal backend parity is in place for control-flow IR (`IRLabel`,
+  `IRJmp`, `IRJmpIfZero`) and array/slice IR used by the Array MVP
+  (`IRMakeSliceI32/U8/U16`, `IRIndexLoadI32/U8/U16`, `IRIndexStoreI32/U8/U16`).
+- Unsupported IR remains explicit and fails with stable backend diagnostics
+  instead of silent behavior changes.
+- UI output is metadata-first (`tetra.ui.v1`) with preview artifacts.
+- Web preview validates and mounts metadata; it does not imply runtime UI event dispatch support.
+- WASI dogfood remains non-UI for this wave and must not emit web/native UI sidecars.
 
 Exact object/runtime/package/host-binding decisions are fixed in [WASM Object and Runtime Architecture](wasm_architecture.md) and should be treated as the prerequisite contract for target metadata and backend implementation changes.
 
@@ -128,10 +140,13 @@ bash scripts/release_v1_0_gate.sh
 
 The v1.0 release gate must not be changed to skip WASM. Until all commands above are real and green, the correct state is a failing `scripts/release_v1_0_gate.sh`.
 
-## Blockers To Resolve Before Implementation
+## Remaining Blockers For Full Runtime Parity
 
-- The target model currently has x64-specific arch, ABI, and executable-format enums.
-- The existing linker surface is native object oriented; WASM needs a module writer instead of TOBJ linking.
-- The runtime ABI document only describes native x64 actors and process entry.
-- `wasm32-web` depends on the UI MVP surface and browser smoke harness.
-- API diff and reproducible-build checks need a baseline format before they can certify WASM artifacts for v1.0.
+- `wasm32-wasi` still needs mandatory `--run=true` runner integration in the
+  main release gate.
+- `wasm32-web` still needs browser-runtime smoke automation for execute-path
+  evidence, not only build-only module checks.
+- Runtime parity beyond current build-only scope (for example full task/actor
+  execution behavior on wasm targets) is still out of this phase.
+- API diff and reproducible-build checks still need stable WASM artifact
+  baselines before they can certify final v1.0 parity.

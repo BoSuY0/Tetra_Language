@@ -263,6 +263,12 @@ type sourcePrinter struct {
 	emitSynthetic map[string]struct{}
 }
 
+type actorMethodGroup struct {
+	Name    string
+	Fields  []frontend.StateFieldDecl
+	Methods []*frontend.FuncDecl
+}
+
 func (p *sourcePrinter) file(file *frontend.FileAST) {
 	p.closures = make(map[string]*frontend.FuncDecl, len(file.Funcs))
 	p.emitSynthetic = make(map[string]struct{})
@@ -316,8 +322,16 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 	if len(file.Globals) > 0 {
 		p.blank()
 	}
+	actorGroups, actorMethodNames := collectActorMethodGroups(file)
+	for _, group := range actorGroups {
+		p.actorDecl(group)
+		p.blank()
+	}
 	for _, fn := range file.Funcs {
 		if fn.ExtensionOf != "" || fn.Synthetic {
+			continue
+		}
+		if _, ok := actorMethodNames[fn.Name]; ok {
 			continue
 		}
 		p.funcDecl(fn)
@@ -343,6 +357,80 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 	p.b.WriteByte('\n')
 }
 
+func collectActorMethodGroups(file *frontend.FileAST) ([]actorMethodGroup, map[string]struct{}) {
+	methodNames := make(map[string]struct{})
+	groupIndex := map[string]int{}
+	var groups []actorMethodGroup
+	if file != nil {
+		for _, actor := range file.Actors {
+			if actor == nil {
+				continue
+			}
+			idx := len(groups)
+			groupIndex[actor.Name] = idx
+			groups = append(groups, actorMethodGroup{
+				Name:   actor.Name,
+				Fields: append([]frontend.StateFieldDecl(nil), actor.Fields...),
+			})
+			for _, fn := range actor.Methods {
+				if fn == nil {
+					continue
+				}
+				groups[idx].Methods = append(groups[idx].Methods, fn)
+				methodNames[fn.Name] = struct{}{}
+			}
+		}
+	}
+	for _, fn := range file.Funcs {
+		actorName, _, ok := actorMethodName(fn)
+		if !ok {
+			continue
+		}
+		if _, exists := methodNames[fn.Name]; exists {
+			continue
+		}
+		idx, exists := groupIndex[actorName]
+		if !exists {
+			idx = len(groups)
+			groupIndex[actorName] = idx
+			groups = append(groups, actorMethodGroup{Name: actorName})
+		}
+		groups[idx].Methods = append(groups[idx].Methods, fn)
+		methodNames[fn.Name] = struct{}{}
+	}
+	return groups, methodNames
+}
+
+func actorMethodName(fn *frontend.FuncDecl) (string, string, bool) {
+	if fn.ExtensionOf != "" || fn.Synthetic {
+		return "", "", false
+	}
+	parts := strings.Split(fn.Name, ".")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
+}
+
+func (p *sourcePrinter) actorDecl(group actorMethodGroup) {
+	p.line(0, "actor "+group.Name+":")
+	for _, field := range group.Fields {
+		kw := "val"
+		if field.Const {
+			kw = "const"
+		}
+		line := kw + " " + field.Name + ": " + formatTypeRef(field.Type)
+		if field.Init != nil {
+			line += " = " + p.formatExpr(field.Init)
+		}
+		p.line(1, line)
+	}
+	for _, fn := range group.Methods {
+		_, methodName, _ := actorMethodName(fn)
+		p.funcDeclWithNameAt(fn, methodName, 1)
+	}
+}
+
 func (p *sourcePrinter) protocolDecl(proto *frontend.ProtocolDecl) {
 	p.line(0, "protocol "+proto.Name+":")
 	for _, req := range proto.Requirements {
@@ -353,12 +441,24 @@ func (p *sourcePrinter) protocolDecl(proto *frontend.ProtocolDecl) {
 func (p *sourcePrinter) enumDecl(en *frontend.EnumDecl) {
 	p.line(0, "enum "+en.Name+":")
 	for _, c := range en.Cases {
-		p.line(1, "case "+c.Name)
+		line := "case " + c.Name
+		if len(c.Payload) > 0 {
+			types := make([]string, 0, len(c.Payload))
+			for _, typ := range c.Payload {
+				types = append(types, formatTypeRef(typ))
+			}
+			line += "(" + strings.Join(types, ", ") + ")"
+		}
+		p.line(1, line)
 	}
 }
 
 func (p *sourcePrinter) structDecl(st *frontend.StructDecl) {
-	p.line(0, "struct "+st.Name+":")
+	typeParams := ""
+	if len(st.TypeParams) > 0 {
+		typeParams = "<" + strings.Join(st.TypeParams, ", ") + ">"
+	}
+	p.line(0, "struct "+st.Name+typeParams+":")
 	for _, f := range st.Fields {
 		p.line(1, f.Name+": "+formatTypeRef(f.Type))
 	}
@@ -489,7 +589,11 @@ func (p *sourcePrinter) ifStmt(s *frontend.IfStmt, indent int, prefix string) {
 }
 
 func (p *sourcePrinter) ifLetStmt(s *frontend.IfLetStmt, indent int, prefix string) {
-	p.line(indent, prefix+" let "+s.Name+" = "+p.formatExpr(s.Value)+":")
+	binding := s.Name
+	if s.Pattern != nil {
+		binding = p.formatExpr(s.Pattern)
+	}
+	p.line(indent, prefix+" let "+binding+" = "+p.formatExpr(s.Value)+":")
 	p.stmts(s.Then, indent+1)
 	p.elseStmts(s.Else, indent)
 }
@@ -512,6 +616,48 @@ func (p *sourcePrinter) elseStmts(stmts []frontend.Stmt, indent int) {
 	p.stmts(stmts, indent+1)
 }
 
+func (p *sourcePrinter) emitMatchExprStatement(indent int, prefix string, expr frontend.Expr) bool {
+	match, ok := expr.(*frontend.MatchExpr)
+	if !ok {
+		return false
+	}
+	p.line(indent, prefix+"match "+p.formatExpr(match.Value)+":")
+	for _, c := range match.Cases {
+		guard := ""
+		if c.Guard != nil {
+			guard = " if " + p.formatExpr(c.Guard)
+		}
+		if c.Default {
+			p.line(indent, "case _"+guard+":")
+		} else {
+			p.line(indent, "case "+p.formatExpr(c.Pattern)+guard+":")
+		}
+		p.line(indent+1, p.formatExpr(c.Value))
+	}
+	return true
+}
+
+func (p *sourcePrinter) emitCatchExprStatement(indent int, prefix string, expr frontend.Expr) bool {
+	catch, ok := expr.(*frontend.CatchExpr)
+	if !ok {
+		return false
+	}
+	p.line(indent, prefix+"catch "+p.formatExpr(catch.Call)+":")
+	for _, c := range catch.Cases {
+		guard := ""
+		if c.Guard != nil {
+			guard = " if " + p.formatExpr(c.Guard)
+		}
+		if c.Default {
+			p.line(indent, "case _"+guard+":")
+		} else {
+			p.line(indent, "case "+p.formatExpr(c.Pattern)+guard+":")
+		}
+		p.line(indent+1, p.formatExpr(c.Value))
+	}
+	return true
+}
+
 func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 	switch s := stmt.(type) {
 	case *frontend.PrintStmt:
@@ -522,12 +668,21 @@ func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 		if p.emitClosureValueStatement(indent, "return ", s.Value) {
 			return
 		}
+		if p.emitMatchExprStatement(indent, "return ", s.Value) {
+			return
+		}
+		if p.emitCatchExprStatement(indent, "return ", s.Value) {
+			return
+		}
 		p.line(indent, "return "+p.formatExpr(s.Value))
 	case *frontend.ThrowStmt:
 		if p.emitClosureValueStatement(indent, "throw ", s.Value) {
 			return
 		}
 		p.line(indent, "throw "+p.formatExpr(s.Value))
+	case *frontend.DeferStmt:
+		p.line(indent, "defer:")
+		p.stmts(s.Body, indent+1)
 	case *frontend.BreakStmt:
 		p.line(indent, "break")
 	case *frontend.ContinueStmt:
@@ -547,6 +702,12 @@ func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 		if p.emitClosureValueStatement(indent, line, s.Value) {
 			return
 		}
+		if p.emitMatchExprStatement(indent, line, s.Value) {
+			return
+		}
+		if p.emitCatchExprStatement(indent, line, s.Value) {
+			return
+		}
 		p.line(indent, line+p.formatExpr(s.Value))
 	case *frontend.AssignStmt:
 		if s.Op != 0 && s.CompoundValue != nil {
@@ -555,6 +716,12 @@ func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 		}
 		target := p.formatExpr(s.Target) + " = "
 		if p.emitClosureValueStatement(indent, target, s.Value) {
+			return
+		}
+		if p.emitMatchExprStatement(indent, target, s.Value) {
+			return
+		}
+		if p.emitCatchExprStatement(indent, target, s.Value) {
 			return
 		}
 		p.line(indent, target+p.formatExpr(s.Value))
@@ -575,10 +742,14 @@ func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 	case *frontend.MatchStmt:
 		p.line(indent, "match "+p.formatExpr(s.Value)+":")
 		for _, c := range s.Cases {
+			guard := ""
+			if c.Guard != nil {
+				guard = " if " + p.formatExpr(c.Guard)
+			}
 			if c.Default {
-				p.line(indent, "case _:")
+				p.line(indent, "case _"+guard+":")
 			} else {
-				p.line(indent, "case "+p.formatExpr(c.Pattern)+":")
+				p.line(indent, "case "+p.formatExpr(c.Pattern)+guard+":")
 			}
 			p.stmts(c.Body, indent+1)
 		}
@@ -617,7 +788,14 @@ func formatTypeRef(ref frontend.TypeRef) string {
 	case frontend.TypeRefOptional:
 		return formatTypeRef(*ref.Elem) + "?"
 	default:
-		return ref.Name
+		if len(ref.TypeArgs) == 0 {
+			return ref.Name
+		}
+		args := make([]string, 0, len(ref.TypeArgs))
+		for _, arg := range ref.TypeArgs {
+			args = append(args, formatTypeRef(arg))
+		}
+		return ref.Name + "<" + strings.Join(args, ", ") + ">"
 	}
 }
 
@@ -739,6 +917,60 @@ func (p *sourcePrinter) formatExprPrec(expr frontend.Expr, parent int) string {
 		return "none"
 	case *frontend.SomePatternExpr:
 		return "some(" + e.Name + ")"
+	case *frontend.EnumCasePatternExpr:
+		return e.TypeName + "." + e.CaseName + "(" + strings.Join(e.Bindings, ", ") + ")"
+	case *frontend.MatchExpr:
+		var b strings.Builder
+		b.WriteString("match ")
+		b.WriteString(p.formatExpr(e.Value))
+		b.WriteString(":")
+		for _, c := range e.Cases {
+			b.WriteByte('\n')
+			guard := ""
+			if c.Guard != nil {
+				guard = " if " + p.formatExpr(c.Guard)
+			}
+			if c.Default {
+				b.WriteString("case _")
+				b.WriteString(guard)
+				b.WriteString(":")
+			} else {
+				b.WriteString("case ")
+				b.WriteString(p.formatExpr(c.Pattern))
+				b.WriteString(guard)
+				b.WriteString(":")
+			}
+			b.WriteByte('\n')
+			b.WriteString("    ")
+			b.WriteString(p.formatExpr(c.Value))
+		}
+		return b.String()
+	case *frontend.CatchExpr:
+		var b strings.Builder
+		b.WriteString("catch ")
+		b.WriteString(p.formatExpr(e.Call))
+		b.WriteString(":")
+		for _, c := range e.Cases {
+			b.WriteByte('\n')
+			guard := ""
+			if c.Guard != nil {
+				guard = " if " + p.formatExpr(c.Guard)
+			}
+			if c.Default {
+				b.WriteString("case _")
+				b.WriteString(guard)
+				b.WriteString(":")
+			} else {
+				b.WriteString("case ")
+				b.WriteString(p.formatExpr(c.Pattern))
+				b.WriteString(guard)
+				b.WriteString(":")
+			}
+			b.WriteByte('\n')
+			b.WriteString("    ")
+			b.WriteString(p.formatExpr(c.Value))
+		}
+		return b.String()
 	case *frontend.StringLitExpr:
 		return strconv.Quote(string(e.Value))
 	case *frontend.IdentExpr:
@@ -770,7 +1002,15 @@ func (p *sourcePrinter) formatExprPrec(expr frontend.Expr, parent int) string {
 			}
 			args = append(args, p.formatExpr(arg))
 		}
-		return e.Name + "(" + strings.Join(args, ", ") + ")"
+		typeArgs := ""
+		if len(e.TypeArgs) > 0 {
+			parts := make([]string, 0, len(e.TypeArgs))
+			for _, arg := range e.TypeArgs {
+				parts = append(parts, formatTypeRef(arg))
+			}
+			typeArgs = "<" + strings.Join(parts, ", ") + ">"
+		}
+		return e.Name + typeArgs + "(" + strings.Join(args, ", ") + ")"
 	case *frontend.StructLitExpr:
 		fields := make([]string, 0, len(e.Fields))
 		for _, f := range e.Fields {

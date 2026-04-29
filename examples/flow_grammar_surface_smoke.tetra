@@ -53,6 +53,13 @@ func maybe(flag: Bool) -> Int?:
     else:
         return none
 
+func unwrap_match(value: Int?) -> Int:
+    match value:
+    case some(x):
+        return x
+    case none:
+        return 0
+
 func read(flag: Bool) -> Int throws ReadError:
     if flag:
         return answer
@@ -78,6 +85,7 @@ budget(128):
     let f: ptr = fn(x: Int) -> Int:
         return x + step
     let maybe_value: Int? = maybe(true)
+    total += unwrap_match(maybe_value)
     if let value = maybe_value:
         total += value
     else:

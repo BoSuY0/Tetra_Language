@@ -102,6 +102,14 @@ func (a *Win64) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, call
 		e.PushRdx()
 		*stackDepth++
 	}
+	if instr.RetSlots > 2 {
+		e.PushR8()
+		*stackDepth++
+	}
+	if instr.RetSlots > 3 {
+		e.PushR9()
+		*stackDepth++
+	}
 	return nil
 }
 
@@ -206,6 +214,8 @@ func (a *Win64) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *i
 	*stackDepth++
 	if kind == ir.IRMakeSliceI32 {
 		e.ShlRaxImm8(2)
+	} else if kind == ir.IRMakeSliceU16 {
+		e.ShlRaxImm8(1)
 	}
 	e.MovRdxRax()
 	frameBytes := int32(32)
@@ -288,6 +298,8 @@ func (a *Win64) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDe
 	e.MovRsiRcx()
 	if kind == ir.IRIslandMakeSliceI32 {
 		e.ShlRsiImm8(2)
+	} else if kind == ir.IRIslandMakeSliceU16 {
+		e.ShlRsiImm8(1)
 	}
 	e.MovEdxFromRaxPtrDisp0()
 	e.MovR8dFromRaxPtrDisp4()

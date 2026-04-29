@@ -33,6 +33,8 @@ type dumpOptions struct {
 	writeSummary    bool
 }
 
+const dumpArtifact = "tetra.release.v0_2_0.project-dump.v1"
+
 type multiValue []string
 
 func (m *multiValue) String() string {
@@ -394,7 +396,8 @@ func buildDump(opts dumpOptions) (int, int, int, error) {
 	if opts.writeSummary {
 		summaryPath := summaryPathFor(opts.outputPath)
 		summaryText := fmt.Sprintf(
-			"Included files: %d\nSkipped (binary): %d\nSkipped (too large): %d\n",
+			"Artifact: %s\nIncluded files: %d\nSkipped (binary): %d\nSkipped (too large): %d\n",
+			dumpArtifact,
 			included,
 			skippedBinary,
 			skippedLarge,
@@ -718,6 +721,7 @@ func writeDumpHeader(w *bufio.Writer, opts dumpOptions, now, gitHead string, rel
 		w.WriteString(fmt.Sprintf("Git HEAD: %s\n", gitHead))
 	}
 	w.WriteString(fmt.Sprintf("Root: %s\n", opts.root))
+	w.WriteString(fmt.Sprintf("Artifact schema: %s\n", dumpArtifact))
 	w.WriteString(fmt.Sprintf("Max file bytes: %d\n", opts.maxFileBytes))
 	w.WriteString(fmt.Sprintf("Files listed: %d\n", len(relPaths)))
 	w.WriteString(fmt.Sprintf("Include dumps/: %v\n", boolToYesNo(opts.includeDumps)))

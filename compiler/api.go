@@ -29,6 +29,9 @@ type Reloc = tobj.Reloc
 type RelocKind = tobj.RelocKind
 
 type World = module.World
+type WorldOptions = module.LoadOptions
+type ModuleRoot = module.ModuleRoot
+type CheckOptions = semantics.CheckOptions
 
 const (
 	RelocCallRel32  = tobj.RelocCallRel32
@@ -52,12 +55,24 @@ func LoadWorld(entryPath string) (*World, error) {
 	return module.LoadWorld(entryPath)
 }
 
+func LoadWorldOpt(entryPath string, opt WorldOptions) (*World, error) {
+	return module.LoadWorldOpt(entryPath, opt)
+}
+
+// Check validates a single already-parsed source program.
+// Boundary: this API does not resolve filesystem modules/import graphs; use
+// LoadWorld + CheckWorld for cross-module checking.
 func Check(prog *Program) (*CheckedProgram, error) {
 	return semantics.Check(prog)
 }
 
+// CheckWorld validates a module graph loaded from filesystem sources.
 func CheckWorld(world *World) (*CheckedProgram, error) {
 	return semantics.CheckWorld(world)
+}
+
+func CheckWorldOpt(world *World, opt CheckOptions) (*CheckedProgram, error) {
+	return semantics.CheckWorldOpt(world, opt)
 }
 
 func Lower(checked *CheckedProgram) (*IRProgram, error) {
@@ -76,16 +91,42 @@ func LowerUI(checked *CheckedProgram) (*UILoweredBundle, error) {
 	return lower.LowerUI(checked)
 }
 
+func VerifyIRProgram(prog *IRProgram) error {
+	return lower.VerifyProgram(prog)
+}
+
+func VerifyIRFunc(fn IRFunc) error {
+	return lower.VerifyFunc(fn)
+}
+
 func CodegenObjectLinuxX64(funcs []IRFunc) (*Object, error) {
+	if err := verifyIRFuncs(funcs); err != nil {
+		return nil, err
+	}
 	return linux_x64.CodegenObjectLinuxX64(funcs)
 }
 
 func CodegenObjectWindowsX64(funcs []IRFunc) (*Object, error) {
+	if err := verifyIRFuncs(funcs); err != nil {
+		return nil, err
+	}
 	return windows_x64.CodegenObjectWindowsX64(funcs)
 }
 
 func CodegenObjectMacOSX64(funcs []IRFunc) (*Object, error) {
+	if err := verifyIRFuncs(funcs); err != nil {
+		return nil, err
+	}
 	return macos_x64.CodegenObjectMacOSX64(funcs)
+}
+
+func verifyIRFuncs(funcs []IRFunc) error {
+	for _, fn := range funcs {
+		if err := lower.VerifyFunc(fn); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func LinkLinuxX64(objects []*Object, mainName string) (*elf.Image, error) {

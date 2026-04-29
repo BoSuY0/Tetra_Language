@@ -1,1 +1,1 @@
-testdata/parser/negative/enums.tetra:2:6: enum payload cases are planned for a later release
+testdata/parser/negative/enums.tetra:2:1: expected indented block after ':'

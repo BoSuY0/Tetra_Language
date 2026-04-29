@@ -1,0 +1,14 @@
+// Logical runtime timer smoke: sleep parks the current task until its deadline.
+func main() -> Int
+uses runtime:
+    let start: Int = core.time_now_ms()
+    let _sleep: Int = core.sleep_ms(4)
+    let after: Int = core.time_now_ms()
+    let deadline: Int = core.deadline_ms(3)
+    if start != 0:
+        return 10 + start
+    if after != 4:
+        return 20 + after
+    if deadline != 7:
+        return 30 + deadline
+    return 0

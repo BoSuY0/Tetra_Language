@@ -10,9 +10,13 @@ func Render(bundle *lower.UILoweredBundle) []byte {
 	if bundle == nil {
 		return []byte("Tetra Native UI Shell\n(no UI metadata)\n")
 	}
+	if bundle.Schema != "tetra.ui.v1" {
+		return []byte("Tetra Native UI Shell\nunsupported UI schema: " + bundle.Schema + "\nruntime: metadata-only preview (no event dispatch)\n")
+	}
 	lines := []string{
 		"Tetra Native UI Shell",
 		"schema: " + bundle.Schema,
+		"runtime: metadata-only preview (no event dispatch)",
 	}
 	for _, state := range bundle.States {
 		lines = append(lines, "")

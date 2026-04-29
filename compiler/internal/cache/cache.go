@@ -220,7 +220,7 @@ func BuildTypeSigMap(types map[string]*semantics.TypeInfo) (map[string]string, e
 		case semantics.TypeEnum:
 			parts := make([]string, 0, len(info.EnumCases))
 			for _, c := range info.EnumCases {
-				parts = append(parts, c.Name)
+				parts = append(parts, c.Name+"("+strings.Join(c.PayloadTypes, ",")+")")
 			}
 			sig = "enum{" + strings.Join(parts, ",") + "}"
 		case semantics.TypeOptional:
@@ -250,13 +250,27 @@ func DepSigHashFromDeps(
 	sigMap map[string]semantics.FuncSig,
 	typeSigMap map[string]string,
 ) ([32]byte, error) {
+	return DepSigHashFromDepsWithInterfaceHashes(callees, typeDeps, sigMap, typeSigMap, nil)
+}
+
+func DepSigHashFromDepsWithInterfaceHashes(
+	callees []string,
+	typeDeps []string,
+	sigMap map[string]semantics.FuncSig,
+	typeSigMap map[string]string,
+	interfaceHashes map[string]string,
+) ([32]byte, error) {
 	entries := make([]string, 0, len(callees)+len(typeDeps))
+	interfaceModules := map[string]struct{}{}
 	for _, name := range callees {
 		sig, ok := sigMap[name]
 		if !ok {
 			return [32]byte{}, fmt.Errorf("missing signature for '%s'", name)
 		}
 		entries = append(entries, formatFuncSig(name, sig))
+		if mod := ModuleOf(name); mod != "" {
+			interfaceModules[mod] = struct{}{}
+		}
 	}
 	for _, name := range typeDeps {
 		sig, ok := typeSigMap[name]
@@ -264,6 +278,14 @@ func DepSigHashFromDeps(
 			return [32]byte{}, fmt.Errorf("missing type signature for '%s'", name)
 		}
 		entries = append(entries, formatTypeSig(name, sig))
+		if mod := ModuleOf(name); mod != "" {
+			interfaceModules[mod] = struct{}{}
+		}
+	}
+	for module := range interfaceModules {
+		if hash := interfaceHashes[module]; hash != "" {
+			entries = append(entries, "interface:"+module+"="+hash)
+		}
 	}
 	sort.Strings(entries)
 

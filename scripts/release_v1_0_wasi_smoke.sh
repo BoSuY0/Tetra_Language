@@ -49,6 +49,21 @@ go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$build_re
 mkdir -p "$(dirname "$report_path")"
 cp "$build_report" "${report_path%.json}.build-only.json"
 
+wasi_dogfood_src="examples/projects/dogfood_wasi/src/main.tetra"
+wasi_ui_probe="$tmp_dir/dogfood_wasi_probe"
+if ./tetra build --target wasm32-wasi -o "$wasi_ui_probe" "$wasi_dogfood_src" >"$tmp_dir/dogfood_wasi_build.out" 2>"$tmp_dir/dogfood_wasi_build.err"; then
+  for sidecar in "$wasi_ui_probe.ui.json" "$wasi_ui_probe.ui.web.mjs" "$wasi_ui_probe.ui.html" "$wasi_ui_probe.ui.shell.txt"; do
+    if [[ -f "$sidecar" ]]; then
+      echo "release_v1_0_wasi_smoke: unexpected UI sidecar for WASI dogfood: $sidecar" >&2
+      exit 1
+    fi
+  done
+else
+  echo "release_v1_0_wasi_smoke: failed to build WASI dogfood source $wasi_dogfood_src" >&2
+  cat "$tmp_dir/dogfood_wasi_build.err" >&2 || true
+  exit 1
+fi
+
 runner=""
 if command -v wasmtime >/dev/null 2>&1; then
   runner="wasmtime"

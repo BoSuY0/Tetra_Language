@@ -32,6 +32,7 @@ func TestRenderIncludesStateAndViewMetadata(t *testing.T) {
 
 	out := string(Render(bundle))
 	for _, want := range []string{
+		"runtime: metadata-only preview (no event dispatch)",
 		"state ShellState",
 		"  var toggles: i32 = 0",
 		"  const label: str = \"Native\"",
@@ -41,5 +42,24 @@ func TestRenderIncludesStateAndViewMetadata(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("render output missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestRenderRejectsUnsupportedSchema(t *testing.T) {
+	out := string(Render(&lower.UILoweredBundle{Schema: "tetra.ui.v0"}))
+	for _, want := range []string{
+		"unsupported UI schema: tetra.ui.v0",
+		"runtime: metadata-only preview (no event dispatch)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("render output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderNilBundleIncludesNoMetadataMarker(t *testing.T) {
+	out := string(Render(nil))
+	if !strings.Contains(out, "(no UI metadata)") {
+		t.Fatalf("nil bundle output = %q", out)
 	}
 }

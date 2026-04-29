@@ -66,3 +66,52 @@ func TestArtifactHashManifestRejectsModifiedArtifact(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestArtifactHashManifestRejectsUnsortedPaths(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "a.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "z.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(root, "artifact-hashes.json")
+	raw := []byte(`{
+  "schema":"tetra.release-artifact-hashes.v1alpha1",
+  "root":".",
+  "artifacts":[
+    {"path":"z.json","sha256":"sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356","size":3},
+    {"path":"a.json","sha256":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":3}
+  ]
+}`)
+	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := validateHashManifest(manifestPath)
+	if err == nil || !strings.Contains(err.Error(), "sorted by path") {
+		t.Fatalf("expected sorted-path failure, got %v", err)
+	}
+}
+
+func TestArtifactHashManifestRejectsInvalidHashFormat(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "known_issues.md")
+	if err := os.WriteFile(path, []byte("# Known Issues\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(root, "artifact-hashes.json")
+	raw := []byte(`{
+  "schema":"tetra.release-artifact-hashes.v1alpha1",
+  "root":".",
+  "artifacts":[
+    {"path":"known_issues.md","sha256":"not-a-hash","size":13}
+  ]
+}`)
+	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := validateHashManifest(manifestPath)
+	if err == nil || !strings.Contains(err.Error(), "invalid sha256 format") {
+		t.Fatalf("expected hash format failure, got %v", err)
+	}
+}

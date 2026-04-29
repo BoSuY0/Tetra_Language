@@ -75,6 +75,18 @@ Native shell UI is a v1 metadata preview backend. It renders the same validated
 state/view metadata into a deterministic text sidecar. It is release-supported
 as an artifact contract and smoke target, not as a full native widget toolkit.
 
+`wasm32-wasi` in this wave remains non-UI runtime: it may compile UI metadata
+for artifact inspection, but it does not ship web/native UI preview sidecars
+and does not provide UI event dispatch behavior.
+
+Current smoke/dogfood expectation:
+
+- `examples/projects/dogfood_web_ui/src/main.tetra` exercises web metadata UI.
+- `examples/ui_web_smoke.tetra` and `examples/ui_native_shell_smoke.tetra` stay
+  as metadata-oriented UI source fixtures.
+- `examples/projects/dogfood_wasi/src/main.tetra` stays intentionally non-UI for
+  WASI runner/build-only evidence.
+
 ## Post-v1
 
 Native widgets, layout engines, command dispatch at runtime, richer event

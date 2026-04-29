@@ -2,8 +2,9 @@
 
 > Historical checkpoint. This roadmap describes the completed v0.6 hardening
 > cycle and is not the current release truth. The current public baseline is
-> `v0.1.2`; future v1.0 scope is tracked in `docs/spec/v1_scope.md`; the active plan is
-> `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+> `v0.2.0`; the current supported surface is
+> `docs/spec/current_supported_surface.md`; future v1.0 scope is tracked in
+> `docs/spec/v1_scope.md`.
 
 Status: completed as the v0.6.0 hardening profile.
 

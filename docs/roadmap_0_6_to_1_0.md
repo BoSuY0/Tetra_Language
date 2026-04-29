@@ -1,6 +1,7 @@
 # Roadmap v0.6 -> v1.0 (Maximal Production Release)
 
 Status: historical roadmap. The current release truth is
+`docs/spec/current_supported_surface.md`; the future v1 scope is
 `docs/spec/v1_scope.md`; the active TODO is
 `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
 

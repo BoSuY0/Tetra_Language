@@ -1,12 +1,10 @@
 package lower
 
-import (
-	"fmt"
-
-	"tetra_language/compiler/internal/ir"
-)
+import "tetra_language/compiler/internal/ir"
 
 // IR verifier invariants:
+//   - program main metadata names an existing function and function names are unique;
+//   - function slot metadata is non-negative and parameters fit inside locals;
 //   - every branch target names a label in the same function;
 //   - all control-flow paths entering an instruction agree on stack height;
 //   - each instruction has enough input stack slots and leaves a non-negative stack;
@@ -15,9 +13,28 @@ import (
 //   - calls declare non-negative argument and return slot counts.
 func VerifyProgram(prog *ir.IRProgram) error {
 	if prog == nil {
-		return fmt.Errorf("ir verifier: missing program")
+		return irVerifierError("ir verifier: missing program")
 	}
+	if len(prog.Funcs) > 0 {
+		if prog.MainIndex < 0 || prog.MainIndex >= len(prog.Funcs) {
+			return irVerifierError("ir verifier: main index %d out of bounds (funcs=%d)", prog.MainIndex, len(prog.Funcs))
+		}
+		if prog.MainName == "" {
+			return irVerifierError("ir verifier: missing main name")
+		}
+		if got := prog.Funcs[prog.MainIndex].Name; got != prog.MainName {
+			return irVerifierError("ir verifier: main metadata mismatch: index %d names %q, want %q", prog.MainIndex, got, prog.MainName)
+		}
+	}
+	names := make(map[string]struct{}, len(prog.Funcs))
 	for _, fn := range prog.Funcs {
+		if fn.Name == "" {
+			return irVerifierError("ir verifier: function with empty name")
+		}
+		if _, exists := names[fn.Name]; exists {
+			return irVerifierError("ir verifier: duplicate function name %q", fn.Name)
+		}
+		names[fn.Name] = struct{}{}
 		if err := VerifyFunc(fn); err != nil {
 			return err
 		}
@@ -26,6 +43,12 @@ func VerifyProgram(prog *ir.IRProgram) error {
 }
 
 func VerifyFunc(fn ir.IRFunc) error {
+	if fn.ParamSlots < 0 || fn.LocalSlots < 0 || fn.ReturnSlots < 0 {
+		return irVerifierError("ir verifier: %s has negative slot metadata params=%d locals=%d returns=%d", fn.Name, fn.ParamSlots, fn.LocalSlots, fn.ReturnSlots)
+	}
+	if fn.ParamSlots > fn.LocalSlots {
+		return irVerifierError("ir verifier: %s param slots %d exceed locals %d", fn.Name, fn.ParamSlots, fn.LocalSlots)
+	}
 	labels := make(map[int]int)
 	for i, instr := range fn.Instrs {
 		if instr.Kind != ir.IRLabel {
@@ -65,7 +88,7 @@ func VerifyFunc(fn ir.IRFunc) error {
 		work = work[:len(work)-1]
 		if cur.idx < 0 || cur.idx >= len(fn.Instrs) {
 			if cur.height != 0 {
-				return fmt.Errorf("ir verifier: %s falls off end with stack height %d", fn.Name, cur.height)
+				return irVerifierError("ir verifier: %s falls off end with stack height %d", fn.Name, cur.height)
 			}
 			continue
 		}
@@ -115,7 +138,9 @@ type stackState struct {
 }
 
 func verifyError(fn ir.IRFunc, idx int, format string, args ...interface{}) error {
-	return fmt.Errorf("ir verifier: %s instr %d: %s", fn.Name, idx, fmt.Sprintf(format, args...))
+	pos := fn.Instrs[idx].Pos
+	fullArgs := append([]interface{}{fn.Name, idx}, args...)
+	return irVerifierErrorAt(pos, "ir verifier: %s instr %d: "+format, fullArgs...)
 }
 
 func stackEffect(instr ir.IRInstr) (pop int, push int, known bool) {
@@ -144,13 +169,13 @@ func stackEffect(instr ir.IRInstr) (pop int, push int, known bool) {
 		return 0, 0, true
 	case ir.IRAllocBytes, ir.IRIslandNew:
 		return 1, 1, true
-	case ir.IRMakeSliceU8, ir.IRMakeSliceI32:
+	case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
 		return 1, 2, true
-	case ir.IRIndexLoadI32, ir.IRIndexLoadU8:
+	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
 		return 3, 1, true
-	case ir.IRIndexStoreI32, ir.IRIndexStoreU8:
+	case ir.IRIndexStoreI32, ir.IRIndexStoreU8, ir.IRIndexStoreU16:
 		return 4, 0, true
-	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceI32:
+	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
 		return 2, 2, true
 	case ir.IRIslandFree:
 		return 1, 0, true

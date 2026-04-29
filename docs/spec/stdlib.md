@@ -55,16 +55,29 @@ Public compiler output and generated API docs use canonical builtin names:
 | --- | --- | --- |
 | `Int`, `i32` | `i32` | Default integer literal type. |
 | `UInt8`, `Byte`, `u8` | `u8` | Slice element supported by `[]u8` and string storage. |
+| `UInt16`, `u16` | `u16` | Native-first slice element supported by `[]u16`. |
 | `Bool`, `bool` | `bool` | Boolean literal and condition type. |
 | `String`, `str` | `str` | Two-slot UTF-8 string/slice shape. |
 | `ConsentToken` | `consent.token` | Privacy/consent capability token. |
 | `SecretInt` | `secret.i32` | Privacy-protected integer wrapper. |
 
 Structural types use deterministic field order and slot counts. `str`, `[]u8`,
-and `[]i32` are two-slot values (`ptr`, `len`). `T?` adds one presence tag slot
+`[]u16`, `[]i32`, and `[]bool` are two-slot values (`ptr`, `len`). `T?` adds one presence tag slot
 to the payload slots. Opaque handles such as `ptr`, `island`, `actor`,
 `cap.io`, `cap.mem`, and `task.*` are not interchangeable even when they occupy
 one slot.
+
+## Semantic Type Model Boundaries (v0.2 profile)
+
+The current semantic checker intentionally enforces these boundaries:
+
+- Arrays (`[N]T`) are not part of the checked type model yet.
+- Slice element support is currently limited to `[]u8`, `[]u16`, `[]i32`, and `[]bool`.
+- Local inference does not infer a type from bare `none`; optional payload type
+  must be explicit (for example `let v: i32? = none`).
+- Global type inference is limited to constant numeric/bool expressions used by
+  immutable globals (`val`/`const`), and top-level `var` initializers are
+  limited to explicit `i32`/`bool` constant expressions.
 
 ## Stable Module Quality Gates
 

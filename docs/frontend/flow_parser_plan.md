@@ -50,6 +50,9 @@ Done when:
 - Migration compatibility behavior is covered without redefining canonical parse
   behavior.
 - Flow-only source scanning remains green for release-profile source trees.
+- Frontend regression coverage includes `test`/`expect` tokenization, test
+  declaration diagnostics, CRLF/tab/Unicode span checks, and migration
+  normalization boundary diagnostics.
 
 Verification:
 

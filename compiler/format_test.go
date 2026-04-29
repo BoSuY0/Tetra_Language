@@ -27,6 +27,28 @@ uses io, mem:
 	}
 }
 
+func TestFormatSourceDeferBlock(t *testing.T) {
+	src := []byte(`func main() -> Int
+uses io:
+    defer:
+        print("cleanup\n")
+    return 0
+`)
+	got, err := FormatSource(src, "defer.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `func main() -> Int
+uses io:
+    defer:
+        print("cleanup\n")
+    return 0
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
 func TestFormatSourceStateAndView(t *testing.T) {
 	src := []byte(`state CounterState:
     var count: Int = 0
@@ -49,6 +71,46 @@ view CounterView(state: CounterState):
 	}
 	if !strings.Contains(string(got), "accessibility label: String = \"Increment\"") {
 		t.Fatalf("formatted source missing accessibility entry:\n%s", string(got))
+	}
+}
+
+func TestFormatSourceGenericStructDeclarationRoundTrip(t *testing.T) {
+	src := []byte(`struct Box<T>:
+    value: T
+`)
+	got, err := FormatSource(src, "generic_struct.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `struct Box<T>:
+    value: T
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
+func TestFormatSourceGenericStructConstructorAndTypeRef(t *testing.T) {
+	src := []byte(`struct Box<T>:
+    value: T
+
+func main() -> Int:
+    let b: Box<Int> = Box<Int>{value: 42}
+    return b.value
+`)
+	got, err := FormatSource(src, "generic_struct_constructor.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `struct Box<T>:
+    value: T
+
+func main() -> Int:
+    let b: Box<Int> = Box<Int>(value: 42)
+    return b.value
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
 	}
 }
 
@@ -156,6 +218,30 @@ func tetra_entry() -> i32:
 	}
 }
 
+func TestFormatSourceLegacyMigrationSurfaceIsCanonicalAndIdempotent(t *testing.T) {
+	src := []byte(`fun main(): i32 {
+    return 0
+}
+`)
+	once, err := FormatSource(src, "legacy.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource once: %v", err)
+	}
+	want := `func main() -> i32:
+    return 0
+`
+	if string(once) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(once), want)
+	}
+	twice, err := FormatSource(once, "legacy.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource twice: %v", err)
+	}
+	if string(twice) != string(once) {
+		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+	}
+}
+
 func TestFormatSourceCommentPreservationIsIdempotent(t *testing.T) {
 	src := []byte(`// suite
 test "math":
@@ -193,6 +279,20 @@ func TestFormatSourceInlineCommentDiagnosticHasLocation(t *testing.T) {
 	diag := DiagnosticFromError(err)
 	if diag.Code != "TETRA_FMT001" || diag.File != "main.tetra" || diag.Line != 2 || diag.Column != 14 {
 		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestFormatSourceMalformedInputDiagnosticHasStableLocation(t *testing.T) {
+	_, err := FormatSource([]byte("func main() -> Int:\n\treturn 0\n"), "tabbed.tetra")
+	if err == nil {
+		t.Fatalf("expected malformed-input diagnostic")
+	}
+	diag := DiagnosticFromError(err)
+	if diag.Code != "TETRA0001" || diag.File != "tabbed.tetra" || diag.Line != 2 || diag.Column != 1 || diag.Severity != "error" {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+	if !strings.Contains(diag.Message, "tabs are not supported") {
+		t.Fatalf("diagnostic message = %q", diag.Message)
 	}
 }
 
@@ -427,6 +527,35 @@ func main() -> Int:
 `
 	if string(got) != want {
 		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+}
+
+func TestFormatSourcePreservesActorDeclarations(t *testing.T) {
+	src := []byte(`actor Worker:
+    val id: Int = 7
+    func run() -> Int
+    uses actors:
+        let me: actor = core.self()
+        return 0
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("Worker.run")
+    return 0
+`)
+	once, err := FormatSource(src, "actor.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource once: %v", err)
+	}
+	twice, err := FormatSource(once, "actor.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource twice: %v\nonce:\n%s", err, string(once))
+	}
+	if string(twice) != string(once) {
+		t.Fatalf("format not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+	}
+	if !strings.Contains(string(once), "actor Worker:\n    val id: Int = 7\n    func run() -> Int\n    uses actors:") {
+		t.Fatalf("formatted actor declaration missing:\n%s", string(once))
 	}
 }
 

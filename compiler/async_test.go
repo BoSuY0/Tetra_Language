@@ -1,6 +1,8 @@
 package compiler
 
 import (
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -72,6 +74,20 @@ func main() -> Int:
 	}
 }
 
+func TestAsyncSmokeExampleBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	stdout, exitCode := buildAndRunFile(t, filepath.Join("..", "examples", "async_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code = %d, want 42", exitCode)
+	}
+}
+
 func TestAsyncRejectAwaitOutsideAsync(t *testing.T) {
 	src := []byte(`
 async func answer() -> Int:
@@ -117,20 +133,31 @@ func main() -> Int:
 	}
 }
 
-func TestAsyncTypedErrorPropagationIsPostV1Diagnostic(t *testing.T) {
-	requireCheckFileErrorContains(t, `
+func TestAsyncTypedErrorPropagationTryAwaitCheckAndLower(t *testing.T) {
+	src := []byte(`
 enum AsyncErr:
     case failed
 
 async func worker() -> Int throws AsyncErr:
-    throw AsyncErr.failed
+    return 42
 
 async func caller() -> Int throws AsyncErr:
     return try await worker()
 
 func main() -> Int:
     return 0
-`, "async typed-error propagation is not supported")
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
 }
 
 func TestAsyncTypedErrorBoundaryRejectsAwaitTryForm(t *testing.T) {
@@ -146,7 +173,7 @@ async func caller() -> Int throws AsyncErr:
 
 func main() -> Int:
     return 0
-`, "async typed-error propagation is not supported")
+`, "use 'try await worker()'")
 }
 
 func TestTaskSpawnJoinCheckAndLower(t *testing.T) {
@@ -169,6 +196,20 @@ uses runtime:
 	}
 	if _, err := Lower(checked); err != nil {
 		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTaskSmokeExampleBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	stdout, exitCode := buildAndRunFile(t, filepath.Join("..", "examples", "task_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code = %d, want 42", exitCode)
 	}
 }
 
@@ -278,6 +319,148 @@ uses runtime:
 `, "task_spawn_i32 target must not throw")
 }
 
+func TestTaskSpawnJoinTypedErrorCheckAndLower(t *testing.T) {
+	src := []byte(`
+enum TaskErr:
+    case boom
+
+func worker() -> Int throws TaskErr:
+    return 42
+
+func caller() -> Int throws TaskErr
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32_typed<TaskErr>("worker")
+    return try core.task_join_i32_typed<TaskErr>(task)
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTaskJoinTypedErrorRequiresTry(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+enum TaskErr:
+    case boom
+
+func worker() -> Int throws TaskErr:
+    return 42
+
+func caller() -> Int throws TaskErr
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32_typed<TaskErr>("worker")
+    return core.task_join_i32_typed<TaskErr>(task)
+
+func main() -> Int:
+    return 0
+`, "requires try")
+}
+
+func TestTaskJoinTypedErrorCatchCheckAndLower(t *testing.T) {
+	src := []byte(`
+enum TaskErr:
+    case boom
+    case stopped
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom
+
+func caller() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom:
+        7
+    case TaskErr.stopped:
+        8
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTaskSpawnJoinTypedPayloadErrorTryCheckAndLower(t *testing.T) {
+	src := []byte(`
+enum TaskErr:
+    case boom(Int)
+    case stopped
+
+func worker() -> Int throws TaskErr:
+    return 42
+
+func caller() -> Int throws TaskErr
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return try core.task_join_i32_typed<TaskErr>(task)
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTaskSpawnJoinTypedPayloadErrorCatchBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum TaskErr:
+    case boom(Int)
+    case stopped
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom(7)
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(code):
+        code
+    case TaskErr.stopped:
+        9
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 7 {
+		t.Fatalf("exit code = %d, want 7", exitCode)
+	}
+}
+
 func TestTaskSpawnGroupRejectsThrowingTarget(t *testing.T) {
 	requireCheckFileErrorContains(t, `
 enum SpawnErr:
@@ -377,10 +560,128 @@ uses runtime:
     let task: task.i32 = core.task_spawn_group_i32(group, "worker")
     let result: task.result_i32 = core.task_join_result_i32(task)
     let err: task.error = result.error
-    if core.task_join_i32(task) != 0:
-        return 1
     if err == err:
         return 0
     return 1
 `)
+}
+
+func TestTaskSpawnGroupTypedPayloadErrorSuccessBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum GroupErr:
+    case stopped
+    case boom(Int)
+
+func worker() -> Int throws GroupErr:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task = core.task_spawn_group_i32_typed<GroupErr>(group, "worker")
+    let value: Int = catch core.task_join_group_i32_typed<GroupErr>(task):
+    case GroupErr.stopped:
+        5
+    case GroupErr.boom(code):
+        code
+    let _closed: Int = core.task_group_close(group)
+    return value
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code = %d, want 42", exitCode)
+	}
+}
+
+func TestTaskSpawnGroupTypedPayloadErrorCatchBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum GroupErr:
+    case stopped
+    case boom(Int)
+
+func worker() -> Int throws GroupErr:
+    throw GroupErr.boom(7)
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task = core.task_spawn_group_i32_typed<GroupErr>(group, "worker")
+    return catch core.task_join_group_i32_typed<GroupErr>(task):
+    case GroupErr.stopped:
+        5
+    case GroupErr.boom(code):
+        code
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 7 {
+		t.Fatalf("exit code = %d, want 7", exitCode)
+	}
+}
+
+func TestTaskSpawnGroupTypedPayloadCancelBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum GroupErr:
+    case stopped
+    case boom(Int)
+
+func worker() -> Int throws GroupErr:
+    return 99
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    group = core.task_group_cancel(group)
+    let task = core.task_spawn_group_i32_typed<GroupErr>(group, "worker")
+    return catch core.task_join_group_i32_typed<GroupErr>(task):
+    case GroupErr.stopped:
+        5
+    case GroupErr.boom(code):
+        code
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 5 {
+		t.Fatalf("exit code = %d, want 5", exitCode)
+	}
+}
+
+func TestTaskSpawnGroupTypedRejectsMutableGlobalTarget(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+enum GroupErr:
+    case stopped
+
+var g: Int
+
+func worker() -> Int throws GroupErr:
+    g = g + 1
+    return g
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task = core.task_spawn_group_i32_typed<GroupErr>(group, "worker")
+    return catch core.task_join_group_i32_typed<GroupErr>(task):
+    case GroupErr.stopped:
+        0
+`, "task_spawn_group_i32_typed target")
 }

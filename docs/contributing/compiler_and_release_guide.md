@@ -52,7 +52,7 @@ directory. The detailed policy is `docs/release/artifact_policy.md`.
 ## Release Process
 
 The release process is documented in `docs/release/rc_process.md`.
-For the current release line, use `scripts/release_v0_1_3_gate.sh`; do not
+For the current release line, use `scripts/release_v0_2_0_gate.sh`; do not
 bypass the version preflight or mark checklist items complete without evidence.
 `scripts/release_v1_0_gate.sh` is retained only as a compatibility alias until
 a real `v1.0.0` gate is rebuilt from `docs/spec/v1_scope.md`.

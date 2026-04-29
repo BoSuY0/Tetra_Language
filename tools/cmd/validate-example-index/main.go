@@ -1,15 +1,23 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 type smokeList struct {
-	Cases []smokeCase `json:"cases"`
+	Target           string          `json:"target"`
+	BuildOnly        bool            `json:"build_only"`
+	RunSupported     bool            `json:"run_supported"`
+	IslandsDebug     bool            `json:"islands_debug"`
+	Total            int             `json:"total"`
+	Cases            []smokeCase     `json:"cases"`
+	ExcludedExamples []smokeExcluded `json:"excluded_examples,omitempty"`
 }
 
 type smokeCase struct {
@@ -19,11 +27,18 @@ type smokeCase struct {
 	ExpectedExit int    `json:"expected_exit"`
 }
 
+type smokeExcluded struct {
+	SrcPath string `json:"src_path"`
+	Reason  string `json:"reason"`
+}
+
 type exampleIndexEntry struct {
 	Purpose  string
 	Target   string
 	Expected string
 }
+
+const exampleIndexArtifact = "tetra.release.v0_2_0.examples-index.v1"
 
 func main() {
 	smokeListPath := flag.String("smoke-list", "", "path to tetra smoke --list --format=json output")
@@ -52,8 +67,13 @@ func main() {
 
 func validateExampleIndex(rawSmoke []byte, markdown string) error {
 	var list smokeList
-	if err := json.Unmarshal(rawSmoke, &list); err != nil {
-		return err
+	dec := json.NewDecoder(bytes.NewReader(rawSmoke))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&list); err != nil {
+		return fmt.Errorf("invalid smoke list JSON: %w", err)
+	}
+	if list.Total != 0 && list.Total != len(list.Cases) {
+		return fmt.Errorf("smoke list total = %d, want %d", list.Total, len(list.Cases))
 	}
 	entries, err := parseExampleIndex(markdown)
 	if err != nil {
@@ -62,14 +82,27 @@ func validateExampleIndex(rawSmoke []byte, markdown string) error {
 	if len(list.Cases) == 0 {
 		return fmt.Errorf("smoke list has no cases")
 	}
+	coveredPaths := map[string]bool{}
 	for _, c := range list.Cases {
 		if c.Name == "" || c.SrcPath == "" {
 			return fmt.Errorf("smoke case missing name or src_path")
+		}
+		if err := validateExamplePath(c.SrcPath); err != nil {
+			return fmt.Errorf("smoke case %s: %w", c.Name, err)
+		}
+		switch c.TargetGroup {
+		case "native", "wasm":
+		default:
+			return fmt.Errorf("smoke case %s has invalid target_group %q", c.Name, c.TargetGroup)
+		}
+		if c.ExpectedExit < 0 || c.ExpectedExit > 255 {
+			return fmt.Errorf("smoke case %s expected_exit = %d, want 0..255", c.Name, c.ExpectedExit)
 		}
 		entry, ok := entries[c.SrcPath]
 		if !ok {
 			return fmt.Errorf("example index missing %s", c.SrcPath)
 		}
+		coveredPaths[c.SrcPath] = true
 		if entry.Purpose == "" {
 			return fmt.Errorf("example index %s missing purpose", c.SrcPath)
 		}
@@ -81,6 +114,20 @@ func validateExampleIndex(rawSmoke []byte, markdown string) error {
 		expected := strings.ToLower(entry.Expected)
 		if !strings.Contains(expected, wantExit) && !strings.Contains(expected, wantExits) && !strings.Contains(expected, "build-only") {
 			return fmt.Errorf("example index %s expected behavior must mention %s or build-only", c.SrcPath, wantExit)
+		}
+	}
+	for _, exclusion := range list.ExcludedExamples {
+		if err := validateExamplePath(exclusion.SrcPath); err != nil {
+			return fmt.Errorf("excluded example: %w", err)
+		}
+		if strings.TrimSpace(exclusion.Reason) == "" {
+			return fmt.Errorf("excluded example %s missing reason", exclusion.SrcPath)
+		}
+		coveredPaths[exclusion.SrcPath] = true
+	}
+	for path := range entries {
+		if !coveredPaths[path] {
+			return fmt.Errorf("example index includes %s but smoke list does not cover or exclude it", path)
 		}
 	}
 	return nil
@@ -107,6 +154,9 @@ func parseExampleIndex(markdown string) (map[string]exampleIndexEntry, error) {
 		if _, exists := entries[path]; exists {
 			return nil, fmt.Errorf("example index has duplicate entry %s", path)
 		}
+		if err := validateExamplePath(path); err != nil {
+			return nil, fmt.Errorf("example index entry %q: %w", path, err)
+		}
 		entries[path] = exampleIndexEntry{
 			Purpose:  strings.TrimSpace(cols[1]),
 			Target:   strings.TrimSpace(cols[2]),
@@ -117,6 +167,28 @@ func parseExampleIndex(markdown string) (map[string]exampleIndexEntry, error) {
 		return nil, fmt.Errorf("example index has no table entries")
 	}
 	return entries, nil
+}
+
+func validateExamplePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("missing src_path")
+	}
+	if strings.Contains(path, "\\") {
+		return fmt.Errorf("src_path %q must use forward slashes", path)
+	}
+	if filepath.IsAbs(path) {
+		return fmt.Errorf("src_path %q must be relative", path)
+	}
+	if !strings.HasPrefix(path, "examples/") {
+		return fmt.Errorf("src_path %q must start with examples/", path)
+	}
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("src_path %q must not contain ..", path)
+	}
+	if !strings.HasSuffix(path, ".tetra") {
+		return fmt.Errorf("src_path %q must point to a .tetra file", path)
+	}
+	return nil
 }
 
 func splitMarkdownTableRow(line string) []string {

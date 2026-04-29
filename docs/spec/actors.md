@@ -42,6 +42,32 @@ Actors are supported on x64 targets:
 
 - `actor` — an opaque handle identifying an actor (MVP: small integer handle).
 
+## Actor Declarations (Current Subset)
+
+Actor declarations are supported in the current language surface:
+
+```tetra
+actor Counter {
+    var count: Int = 0
+    val step: UInt8 = 1
+    const boost: UInt16 = 2
+    var err: task.error = 0
+
+    func run() -> Int {
+        count = count + step
+        return count + boost + err
+    }
+}
+```
+
+Current actor-state field constraints:
+
+- field declarations may use `var`, `val`, or `const`;
+- supported scalar field types are `Int`, `Bool`, `UInt8`, `UInt16`, and
+  `task.error`;
+- field initializers are required and must be compile-time constants;
+- pointer/resource/aggregate actor-state field types are rejected in this MVP.
+
 ## Core builtins (MVP)
 
 All actor builtins are **safe** (do not require `unsafe`), but functions that
@@ -84,22 +110,37 @@ Returns the handle of the current actor.
 
 - Single OS thread.
 - Cooperative: actors yield only when:
-  - blocked in `core.recv()`,
+  - explicitly calling `core.yield()`,
+  - blocked in `core.recv()`, `core.recv_until(deadline)`, or `core.recv_msg_until(deadline)`,
+  - waiting in `core.task_join_i32()`, `core.task_join_result_i32()`, `core.task_join_until_i32(task, deadline)`, or `core.select2_i32(task, deadline)`,
+  - sleeping in `core.sleep_ms()` or `core.sleep_until(deadline)`,
   - finished execution.
 - Scheduler policy: round-robin over runnable actors (MVP).
+- If no actor is ready but one or more actors have timed sleep, receive, or
+  join deadlines, the runtime advances the logical clock to the nearest deadline
+  and wakes due actors.
+- `core.send()` wakes actors blocked in `core.recv()`; sleeping actors wake only
+  through their deadline or task-group cancellation.
 
 ## Message Model
 
 MVP messages are `i32` values plus an implicit sender handle. Tagged messages
-are available through `core.send_msg(to, tag, value)` and `core.recv_msg()`,
+are available through `core.send_msg(to, value, tag)` and `core.recv_msg()`,
 which returns `actor.msg { value, tag }`.
+Timed receive is available through `core.recv_until(deadline)`, which returns
+`actor.recv_result_i32 { value, error }` and uses error `2` for timeout.
+Nonblocking receive is available through `core.recv_poll()` with the same
+result shape and timeout code. Tagged timed receive is available through
+`core.recv_msg_until(deadline)`, which returns
+`actor.recv_msg_result { value, tag, error }`.
 
 ## Runtime sources
 
 The canonical self-host runtime sources live under `__rt/actors_sysv.tetra` and
 `__rt/actors_win64.tetra`. The compiler embeds matching copies from
 `compiler/selfhostrt/actors_sysv.tetra` and `compiler/selfhostrt/actors_win64.tetra`
-when `--runtime=auto` or `--runtime=selfhost` is used with actor builtins.
+when `--runtime=selfhost` is used, or when `--runtime=auto` can use the
+self-host mailbox-only actor surface (no actor-state/task/time builtins).
 
 The canonical modules are `__rt.actors_sysv` for `linux-x64`/`macos-x64` and
 `__rt.actors_win64` for `windows-x64`.
@@ -111,8 +152,13 @@ Future extensions (post-MVP):
 - Copy-based passing of `[]u8` into a receiver-owned island.
 - Ownership transfer of message islands (move/consume semantics).
 - Distributed actors and network mailboxes.
+- Cancellation or structured-concurrency guarantees beyond the current
+  cooperative task group handles.
 
 ## Runtime ABI surface (internal)
 
-Actors are implemented by linking a runtime object that exports a small set of reserved symbols (e.g. `__tetra_entry`,
-`__tetra_actor_*`). The exact symbol list and calling conventions are documented in `docs/spec/runtime_abi.md`.
+Actors are implemented by linking a runtime object that exports a small set of
+reserved symbols (e.g. `__tetra_entry`, `__tetra_actor_*`). Tagged message
+builtins are part of that ABI through `__tetra_actor_send_msg` and
+`__tetra_actor_recv_msg`. The exact symbol list and calling conventions are
+documented in `docs/spec/runtime_abi.md`.

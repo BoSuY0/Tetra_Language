@@ -1,16 +1,27 @@
 // Self-hosted actors runtime (Win64 ABI: windows-x64)
 //
-// Same high-level logic as the SysV PoC, but the bootstrap stack layout matches
-// the registers saved/restored by `core.ctx_switch` on Win64.
+// NOTE: This copy is embedded into the compiler binary so that self-host runtime
+// can be used regardless of the current working directory.
 //
-// This canonical MVP runtime is intentionally minimal: it supports exactly two actors:
-// - actor 0: the program main entry
-// - actor 1: the first spawned actor (e.g. "pong" in examples/actors_pingpong.tetra)
+// For the “human-editable” version, see the repository root `__rt/` folder.
 module __rt.actors_win64
+
+struct task_join_typed_3:
+    r0: i32
+    r1: i32
+    r2: i32
+
+struct task_join_typed_4:
+    r0: i32
+    r1: i32
+    r2: i32
+    r3: i32
 
 val STATUS_READY: i32 = 0
 val STATUS_BLOCKED: i32 = 1
 val STATUS_DONE: i32 = 2
+val STATUS_SLEEPING: i32 = 3
+val STATUS_WAITING_TASK: i32 = 4
 var g_sched_slot: ptr
 var g_main_slot: ptr
 var g_pong_slot: ptr
@@ -22,26 +33,152 @@ var g_pong_entry_id: i32
 var g_main_has: i32
 var g_main_val: i32
 var g_main_tag: i32
+var g_main_count: i32
+var g_main_s0: i32
+var g_main_s1: i32
+var g_main_s2: i32
+var g_main_s3: i32
+var g_main_s4: i32
+var g_main_s5: i32
+var g_main_s6: i32
+var g_main_s7: i32
 var g_main_msg_sender: i32
 var g_main_last_sender: i32
 var g_pong_has: i32
 var g_pong_val: i32
 var g_pong_tag: i32
+var g_pong_count: i32
+var g_pong_s0: i32
+var g_pong_s1: i32
+var g_pong_s2: i32
+var g_pong_s3: i32
+var g_pong_s4: i32
+var g_pong_s5: i32
+var g_pong_s6: i32
+var g_pong_s7: i32
 var g_pong_msg_sender: i32
 var g_pong_last_sender: i32
+var g_pending_send: i32
+var g_pending_recv: i32
 var g_main_exit: i32
 var g_pong_exit: i32
+var g_time_ms: i32
+var g_main_wake_ms: i32
+var g_pong_wake_ms: i32
+var g_main_waiting_task: i32
+var g_pong_waiting_task: i32
+var g_main_state_ptr: ptr
+var g_pong_state_ptr: ptr
+var g_task_result_count: i32
+var g_task_result_s0: i32
+var g_task_result_s1: i32
+var g_task_result_s2: i32
+var g_task_result_s3: i32
+var g_task_result_s4: i32
+var g_task_result_s5: i32
+var g_task_result_s6: i32
+var g_task_result_s7: i32
 
 func actor_slot(idx: i32) -> ptr:
     if idx == 0:
         return g_main_slot
     return g_pong_slot
 
+func actor_status(idx: i32) -> i32:
+    if idx == 0:
+        return g_main_status
+    return g_pong_status
+
 func set_actor_status(idx: i32, st: i32) -> i32:
     if idx == 0:
         g_main_status = st
         return 0
     g_pong_status = st
+    return 0
+
+func set_actor_wake_ms(idx: i32, wake: i32) -> i32:
+    if idx == 0:
+        g_main_wake_ms = wake
+        return 0
+    g_pong_wake_ms = wake
+    return 0
+
+func actor_wake_ms(idx: i32) -> i32:
+    if idx == 0:
+        return g_main_wake_ms
+    return g_pong_wake_ms
+
+func actor_status_uses_wake_deadline(st: i32) -> i32:
+    if st == STATUS_SLEEPING:
+        return 1
+    if st == STATUS_BLOCKED:
+        return 1
+    if st == STATUS_WAITING_TASK:
+        return 1
+    return 0
+
+func set_actor_waiting_task(idx: i32, task: i32) -> i32:
+    if idx == 0:
+        g_main_waiting_task = task
+        return 0
+    g_pong_waiting_task = task
+    return 0
+
+func wake_task_waiters() -> i32:
+    var woke: i32 = 0
+    if g_main_status == STATUS_WAITING_TASK:
+        if actor_status(g_main_waiting_task) == STATUS_DONE:
+            g_main_status = STATUS_READY
+            woke = 1
+    if g_pong_spawned == 1:
+        if g_pong_status == STATUS_WAITING_TASK:
+            if actor_status(g_pong_waiting_task) == STATUS_DONE:
+                g_pong_status = STATUS_READY
+                woke = 1
+    return woke
+
+func wake_due_sleepers() -> i32:
+    var woke: i32 = 0
+    if actor_status_uses_wake_deadline(g_main_status) == 1:
+        if g_main_wake_ms != 0:
+            if g_main_wake_ms <= g_time_ms:
+                g_main_status = STATUS_READY
+                woke = 1
+    if g_pong_spawned == 1:
+        if actor_status_uses_wake_deadline(g_pong_status) == 1:
+            if g_pong_wake_ms != 0:
+                if g_pong_wake_ms <= g_time_ms:
+                    g_pong_status = STATUS_READY
+                    woke = 1
+    return woke
+
+func next_wake_candidate(next: i32, status: i32, wake: i32) -> i32:
+    if actor_status_uses_wake_deadline(status) == 1:
+        if wake != 0:
+            if next == 0:
+                return wake
+            if wake < next:
+                return wake
+    return next
+
+func next_sleep_wake_ms() -> i32:
+    var next: i32 = 0
+    next = next_wake_candidate(next, g_main_status, g_main_wake_ms)
+    if g_pong_spawned == 1:
+        next = next_wake_candidate(next, g_pong_status, g_pong_wake_ms)
+    return next
+
+func scheduler_advance_sleepers() -> i32:
+    if wake_task_waiters() == 1:
+        return 1
+    if wake_due_sleepers() == 1:
+        return 1
+    var next: i32 = next_sleep_wake_ms()
+    if next != 0:
+        g_time_ms = next
+        if wake_due_sleepers() == 1:
+            return 1
+        return wake_task_waiters()
     return 0
 
 func mailbox_has(idx: i32) -> i32:
@@ -62,6 +199,8 @@ func mailbox_put(idx: i32, v: i32, tag: i32, sender: i32) -> i32:
     if idx == 0:
         g_main_val = v
         g_main_tag = tag
+        g_main_count = 1
+        g_main_s0 = v
         g_main_msg_sender = sender
         g_main_has = 1
         if g_main_status == STATUS_BLOCKED:
@@ -69,6 +208,8 @@ func mailbox_put(idx: i32, v: i32, tag: i32, sender: i32) -> i32:
         return 0
     g_pong_val = v
     g_pong_tag = tag
+    g_pong_count = 1
+    g_pong_s0 = v
     g_pong_msg_sender = sender
     g_pong_has = 1
     if g_pong_status == STATUS_BLOCKED:
@@ -80,10 +221,160 @@ func mailbox_take_tag(idx: i32) -> i32:
         return g_main_tag
     return g_pong_tag
 
+func mailbox_begin_typed(idx: i32, tag: i32, count: i32, sender: i32) -> i32:
+    g_pending_send = idx
+    if idx == 0:
+        g_main_val = 0
+        g_main_tag = tag
+        g_main_count = count
+        g_main_msg_sender = sender
+        g_main_has = 1
+        if g_main_status == STATUS_BLOCKED:
+            g_main_status = STATUS_READY
+        return 0
+    g_pong_val = 0
+    g_pong_tag = tag
+    g_pong_count = count
+    g_pong_msg_sender = sender
+    g_pong_has = 1
+    if g_pong_status == STATUS_BLOCKED:
+        g_pong_status = STATUS_READY
+    return 0
+
+func mailbox_put_slot(idx: i32, slot: i32, value: i32) -> i32:
+    if idx == 0:
+        if slot == 0:
+            g_main_s0 = value
+            g_main_val = value
+        else if slot == 1:
+            g_main_s1 = value
+        else if slot == 2:
+            g_main_s2 = value
+        else if slot == 3:
+            g_main_s3 = value
+        else if slot == 4:
+            g_main_s4 = value
+        else if slot == 5:
+            g_main_s5 = value
+        else if slot == 6:
+            g_main_s6 = value
+        else:
+            g_main_s7 = value
+        return 0
+    if slot == 0:
+        g_pong_s0 = value
+        g_pong_val = value
+    else if slot == 1:
+        g_pong_s1 = value
+    else if slot == 2:
+        g_pong_s2 = value
+    else if slot == 3:
+        g_pong_s3 = value
+    else if slot == 4:
+        g_pong_s4 = value
+    else if slot == 5:
+        g_pong_s5 = value
+    else if slot == 6:
+        g_pong_s6 = value
+    else:
+        g_pong_s7 = value
+    return 0
+
+func mailbox_take_begin(idx: i32) -> i32:
+    g_pending_recv = idx
+    if idx == 0:
+        g_main_has = 0
+        g_main_last_sender = g_main_msg_sender
+        return g_main_tag
+    g_pong_has = 0
+    g_pong_last_sender = g_pong_msg_sender
+    return g_pong_tag
+
+func mailbox_take_slot(idx: i32, slot: i32) -> i32:
+    if idx == 0:
+        if slot == 0:
+            return g_main_s0
+        else if slot == 1:
+            return g_main_s1
+        else if slot == 2:
+            return g_main_s2
+        else if slot == 3:
+            return g_main_s3
+        else if slot == 4:
+            return g_main_s4
+        else if slot == 5:
+            return g_main_s5
+        else if slot == 6:
+            return g_main_s6
+        return g_main_s7
+    if slot == 0:
+        return g_pong_s0
+    else if slot == 1:
+        return g_pong_s1
+    else if slot == 2:
+        return g_pong_s2
+    else if slot == 3:
+        return g_pong_s3
+    else if slot == 4:
+        return g_pong_s4
+    else if slot == 5:
+        return g_pong_s5
+    else if slot == 6:
+        return g_pong_s6
+    return g_pong_s7
+
+func mailbox_take_count(idx: i32) -> i32:
+    if idx == 0:
+        return g_main_count
+    return g_pong_count
+
 func mailbox_last_sender(idx: i32) -> i32:
     if idx == 0:
         return g_main_last_sender
     return g_pong_last_sender
+
+func actor_state_ptr(idx: i32) -> ptr:
+    if idx == 0:
+        return g_main_state_ptr
+    return g_pong_state_ptr
+
+func task_result_slot_value(index: i32) -> i32:
+    if index == 0:
+        return g_task_result_s0
+    else if index == 1:
+        return g_task_result_s1
+    else if index == 2:
+        return g_task_result_s2
+    else if index == 3:
+        return g_task_result_s3
+    else if index == 4:
+        return g_task_result_s4
+    else if index == 5:
+        return g_task_result_s5
+    else if index == 6:
+        return g_task_result_s6
+    else if index == 7:
+        return g_task_result_s7
+    return 0
+
+func set_task_result_slot(index: i32, value: i32) -> i32:
+    if index == 0:
+        g_task_result_s0 = value
+    else if index == 1:
+        g_task_result_s1 = value
+    else if index == 2:
+        g_task_result_s2 = value
+    else if index == 3:
+        g_task_result_s3 = value
+    else if index == 4:
+        g_task_result_s4 = value
+    else if index == 5:
+        g_task_result_s5 = value
+    else if index == 6:
+        g_task_result_s6 = value
+    else if index == 7:
+        g_task_result_s7 = value
+    return value
 
 func build_actor_stack(slot: ptr) -> ptr:
     unsafe:
@@ -124,11 +415,13 @@ func actor_trampoline() -> i32:
             exit = core.actor_dispatch(entry)
             g_main_exit = exit
             g_main_status = STATUS_DONE
+            var _wake_main: i32 = wake_task_waiters()
             exit = core.ctx_switch(g_main_slot, g_sched_slot, mem)
             return 0
         exit = core.actor_dispatch(g_pong_entry_id)
         g_pong_exit = exit
         g_pong_status = STATUS_DONE
+        var _wake_pong: i32 = wake_task_waiters()
         exit = core.ctx_switch(g_pong_slot, g_sched_slot, mem)
         return 0
     return 0
@@ -146,6 +439,13 @@ func tetra_entry() -> i32:
         g_pong_spawned = 0
         g_main_has = 0
         g_pong_has = 0
+        g_time_ms = 0
+        g_main_wake_ms = 0
+        g_pong_wake_ms = 0
+        g_main_waiting_task = -1
+        g_pong_waiting_task = -1
+        g_main_state_ptr = core.alloc_bytes(4096)
+        g_pong_state_ptr = core.alloc_bytes(4096)
         var _ms: ptr = build_actor_stack(g_main_slot)
         sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
         while 1:
@@ -160,12 +460,16 @@ func tetra_entry() -> i32:
                     g_current = 0
                     sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
                 else:
-                    return 1
+                    var _wake_a: i32 = scheduler_advance_sleepers()
+                    if _wake_a == 0:
+                        return 1
             else if g_main_status == STATUS_READY:
                 g_current = 0
                 sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
             else:
-                return 1
+                var _wake_b: i32 = scheduler_advance_sleepers()
+                if _wake_b == 0:
+                    return 1
     return 1
 
 @export("__tetra_actor_spawn")
@@ -177,6 +481,7 @@ func actor_spawn(entry_id: i32) -> i32:
         g_pong_slot = core.alloc_bytes(8)
         var _ps: ptr = build_actor_stack(g_pong_slot)
         g_pong_status = STATUS_READY
+        g_pong_waiting_task = -1
         g_pong_spawned = 1
         return 1
     return 1
@@ -191,6 +496,18 @@ func actor_send_msg(to: i32, v: i32, tag: i32) -> i32:
     var _ok: i32 = mailbox_put(to, v, tag, g_current)
     return v
 
+@export("__tetra_actor_send_begin")
+func actor_send_begin(to: i32, tag: i32, slot_count: i32) -> i32:
+    return mailbox_begin_typed(to, tag, slot_count, g_current)
+
+@export("__tetra_actor_send_slot")
+func actor_send_slot(index: i32, value: i32) -> i32:
+    return mailbox_put_slot(g_pending_send, index, value)
+
+@export("__tetra_actor_send_commit")
+func actor_send_commit() -> i32:
+    return 0
+
 @export("__tetra_actor_recv")
 func actor_recv() -> i32:
     unsafe:
@@ -199,6 +516,7 @@ func actor_recv() -> i32:
             var idx: i32 = g_current
             if mailbox_has(idx) == 1:
                 return mailbox_take(idx)
+            var _wake_clear: i32 = set_actor_wake_ms(idx, 0)
             var _st: i32 = set_actor_status(idx, STATUS_BLOCKED)
             var _y: i32 = core.ctx_switch(actor_slot(idx), g_sched_slot, mem)
     return 0
@@ -213,9 +531,82 @@ func actor_recv_msg() -> actor.msg:
                 var value: i32 = mailbox_take(idx)
                 var tag: i32 = mailbox_take_tag(idx)
                 return actor.msg(value: value, tag: tag)
+            var _wake_clear: i32 = set_actor_wake_ms(idx, 0)
             var _st: i32 = set_actor_status(idx, STATUS_BLOCKED)
             var _y: i32 = core.ctx_switch(actor_slot(idx), g_sched_slot, mem)
     return actor.msg(value: 0, tag: 1)
+
+@export("__tetra_actor_recv_poll")
+func actor_recv_poll() -> actor.recv_result_i32:
+    var idx: i32 = g_current
+    if mailbox_has(idx) == 1:
+        var value: i32 = mailbox_take(idx)
+        return actor.recv_result_i32(value: value, error: 0)
+    return actor.recv_result_i32(value: 0, error: 2)
+
+@export("__tetra_actor_recv_until")
+func actor_recv_until(deadline: i32) -> actor.recv_result_i32:
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        var until: i32 = deadline
+        if until < 0:
+            until = 0
+        while 1:
+            var idx: i32 = g_current
+            if mailbox_has(idx) == 1:
+                var value: i32 = mailbox_take(idx)
+                var _wake_clear_a: i32 = set_actor_wake_ms(idx, 0)
+                return actor.recv_result_i32(value: value, error: 0)
+            if g_time_ms >= until:
+                var _wake_clear_b: i32 = set_actor_wake_ms(idx, 0)
+                return actor.recv_result_i32(value: 0, error: 2)
+            var _wake: i32 = set_actor_wake_ms(idx, until)
+            var _st: i32 = set_actor_status(idx, STATUS_BLOCKED)
+            var _y: i32 = core.ctx_switch(actor_slot(idx), g_sched_slot, mem)
+    return actor.recv_result_i32(value: 0, error: 2)
+
+@export("__tetra_actor_recv_msg_until")
+func actor_recv_msg_until(deadline: i32) -> actor.recv_msg_result:
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        var until: i32 = deadline
+        if until < 0:
+            until = 0
+        while 1:
+            var idx: i32 = g_current
+            if mailbox_has(idx) == 1:
+                var value: i32 = mailbox_take(idx)
+                var tag: i32 = mailbox_take_tag(idx)
+                var _wake_clear_a: i32 = set_actor_wake_ms(idx, 0)
+                return actor.recv_msg_result(value: value, tag: tag, error: 0)
+            if g_time_ms >= until:
+                var _wake_clear_b: i32 = set_actor_wake_ms(idx, 0)
+                return actor.recv_msg_result(value: 0, tag: 0, error: 2)
+            var _wake: i32 = set_actor_wake_ms(idx, until)
+            var _st: i32 = set_actor_status(idx, STATUS_BLOCKED)
+            var _y: i32 = core.ctx_switch(actor_slot(idx), g_sched_slot, mem)
+    return actor.recv_msg_result(value: 0, tag: 0, error: 2)
+
+@export("__tetra_actor_recv_begin")
+func actor_recv_begin() -> i32:
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        while 1:
+            var idx: i32 = g_current
+            if mailbox_has(idx) == 1:
+                return mailbox_take_begin(idx)
+            var _wake_clear: i32 = set_actor_wake_ms(idx, 0)
+            var _st: i32 = set_actor_status(idx, STATUS_BLOCKED)
+            var _y: i32 = core.ctx_switch(actor_slot(idx), g_sched_slot, mem)
+    return 0
+
+@export("__tetra_actor_recv_slot")
+func actor_recv_slot(index: i32) -> i32:
+    return mailbox_take_slot(g_pending_recv, index)
+
+@export("__tetra_actor_recv_count")
+func actor_recv_count() -> i32:
+    return mailbox_take_count(g_pending_recv)
 
 @export("__tetra_actor_self")
 func actor_self() -> i32:
@@ -224,3 +615,243 @@ func actor_self() -> i32:
 @export("__tetra_actor_sender")
 func actor_sender() -> i32:
     return mailbox_last_sender(g_current)
+
+@export("__tetra_actor_yield_now")
+func actor_yield_now() -> i32:
+    unsafe:
+        var mem: cap.mem = core.cap_mem()
+        var _yield: i32 = core.ctx_switch(actor_slot(g_current), g_sched_slot, mem)
+    return 0
+
+@export("__tetra_actor_state_load")
+func actor_state_load(slot: i32) -> i32:
+    unsafe:
+        if slot < 0:
+            return 0
+        var mem: cap.mem = core.cap_mem()
+        var base: ptr = actor_state_ptr(g_current)
+        var off: i32 = slot * 4
+        var p: ptr = core.ptr_add(base, off, mem)
+        return core.load_i32(p, mem)
+    return 0
+
+@export("__tetra_actor_state_store")
+func actor_state_store(slot: i32, value: i32) -> i32:
+    unsafe:
+        if slot < 0:
+            return value
+        var mem: cap.mem = core.cap_mem()
+        var base: ptr = actor_state_ptr(g_current)
+        var off: i32 = slot * 4
+        var p: ptr = core.ptr_add(base, off, mem)
+        var _stored: i32 = core.store_i32(p, value, mem)
+    return value
+
+@export("__tetra_task_spawn_i32")
+func rt_task_spawn_i32(entry_id: i32) -> task.i32:
+    return task.i32(value: actor_spawn(entry_id), error: 0)
+
+@export("__tetra_task_join_i32")
+func rt_task_join_i32(handle: i32, error: i32) -> i32:
+    unsafe:
+        if error != 0:
+            return 0
+        var mem: cap.mem = core.cap_mem()
+        while actor_status(handle) != STATUS_DONE:
+            var _waiting: i32 = set_actor_waiting_task(g_current, handle)
+            var _wake_clear: i32 = set_actor_wake_ms(g_current, 0)
+            var _status: i32 = set_actor_status(g_current, STATUS_WAITING_TASK)
+            var _yield: i32 = core.ctx_switch(actor_slot(g_current), g_sched_slot, mem)
+        var _clear: i32 = set_actor_waiting_task(g_current, -1)
+        var _wake_done: i32 = set_actor_wake_ms(g_current, 0)
+        if handle == 0:
+            return g_main_exit
+        return g_pong_exit
+    return 0
+
+@export("__tetra_task_join_result_i32")
+func rt_task_join_result_i32(handle: i32, error: i32) -> task.result_i32:
+    unsafe:
+        if error != 0:
+            return task.result_i32(value: 0, error: error)
+        var value: i32 = rt_task_join_i32(handle, error)
+        return task.result_i32(value: value, error: 0)
+    return task.result_i32(value: 0, error: 1)
+
+@export("__tetra_task_join_until_i32")
+func rt_task_join_until_i32(handle: i32, error: i32, deadline: i32) -> task.result_i32:
+    unsafe:
+        if error != 0:
+            return task.result_i32(value: 0, error: error)
+        var until: i32 = deadline
+        if until < 0:
+            until = 0
+        var mem: cap.mem = core.cap_mem()
+        while actor_status(handle) != STATUS_DONE:
+            if g_time_ms >= until:
+                var _clear_timeout: i32 = set_actor_waiting_task(g_current, -1)
+                var _wake_timeout: i32 = set_actor_wake_ms(g_current, 0)
+                return task.result_i32(value: 0, error: 2)
+            var _waiting: i32 = set_actor_waiting_task(g_current, handle)
+            var _wake: i32 = set_actor_wake_ms(g_current, until)
+            var _status: i32 = set_actor_status(g_current, STATUS_WAITING_TASK)
+            var _yield: i32 = core.ctx_switch(actor_slot(g_current), g_sched_slot, mem)
+        var _clear: i32 = set_actor_waiting_task(g_current, -1)
+        var _wake_done: i32 = set_actor_wake_ms(g_current, 0)
+        if handle == 0:
+            return task.result_i32(value: g_main_exit, error: 0)
+        return task.result_i32(value: g_pong_exit, error: 0)
+    return task.result_i32(value: 0, error: 1)
+
+@export("__tetra_task_poll_i32")
+func rt_task_poll_i32(handle: i32, error: i32) -> task.result_i32:
+    if error != 0:
+        return task.result_i32(value: 0, error: error)
+    if actor_status(handle) != STATUS_DONE:
+        return task.result_i32(value: 0, error: 2)
+    if handle == 0:
+        return task.result_i32(value: g_main_exit, error: 0)
+    return task.result_i32(value: g_pong_exit, error: 0)
+
+@export("__tetra_task_is_canceled")
+func rt_task_is_canceled() -> i32:
+    return 0
+
+@export("__tetra_task_checkpoint")
+func rt_task_checkpoint() -> task.error:
+    return 0
+
+@export("__tetra_task_result_begin")
+func rt_task_result_begin(slot_count: i32) -> i32:
+    g_task_result_count = slot_count
+    g_task_result_s0 = 0
+    g_task_result_s1 = 0
+    g_task_result_s2 = 0
+    g_task_result_s3 = 0
+    g_task_result_s4 = 0
+    g_task_result_s5 = 0
+    g_task_result_s6 = 0
+    g_task_result_s7 = 0
+    return slot_count
+
+@export("__tetra_task_result_slot")
+func rt_task_result_slot(index: i32, value: i32) -> i32:
+    return set_task_result_slot(index, value)
+
+@export("__tetra_task_result_get")
+func rt_task_result_get(index: i32) -> i32:
+    return task_result_slot_value(index)
+
+@export("__tetra_task_join_typed_2")
+func rt_task_join_typed_2(handle: i32, error: i32) -> task.i32:
+    var status: i32 = error
+    if status == 0:
+        status = rt_task_join_i32(handle, error)
+    if status != 0:
+        return task.i32(value: status, error: 1)
+    return task.i32(value: task_result_slot_value(0), error: 0)
+
+@export("__tetra_task_join_typed_3")
+func rt_task_join_typed_3(handle: i32, slot1: i32, error: i32) -> task_join_typed_3:
+    var _unused: i32 = slot1
+    var status: i32 = error
+    if status == 0:
+        status = rt_task_join_i32(handle, error)
+    if status != 0:
+        return task_join_typed_3(r0: 0, r1: status, r2: 1)
+    return task_join_typed_3(r0: task_result_slot_value(0), r1: task_result_slot_value(1), r2: 0)
+
+@export("__tetra_task_join_typed_4")
+func rt_task_join_typed_4(handle: i32, slot1: i32, slot2: i32, error: i32) -> task_join_typed_4:
+    var _unused1: i32 = slot1
+    var _unused2: i32 = slot2
+    var status: i32 = error
+    if status == 0:
+        status = rt_task_join_i32(handle, error)
+    if status != 0:
+        return task_join_typed_4(r0: 0, r1: 0, r2: status, r3: 1)
+    return task_join_typed_4(r0: task_result_slot_value(0), r1: task_result_slot_value(1), r2: task_result_slot_value(2), r3: 0)
+
+func staged_typed_join_status(handle: i32, error: i32, slots: i32) -> i32:
+    var status: i32 = error
+    if status != 0:
+        var _begin_err: i32 = rt_task_result_begin(slots)
+        var _set_err: i32 = set_task_result_slot(1, status)
+        return 1
+    status = rt_task_join_i32(handle, error)
+    return status
+
+@export("__tetra_task_join_typed_5")
+func rt_task_join_typed_5(handle: i32, slot1: i32, slot2: i32, slot3: i32, error: i32) -> i32:
+    var _unused1: i32 = slot1
+    var _unused2: i32 = slot2
+    var _unused3: i32 = slot3
+    return staged_typed_join_status(handle, error, 5)
+
+@export("__tetra_task_join_typed_6")
+func rt_task_join_typed_6(handle: i32, slot1: i32, slot2: i32, slot3: i32, slot4: i32, error: i32) -> i32:
+    var _unused1: i32 = slot1
+    var _unused2: i32 = slot2
+    var _unused3: i32 = slot3
+    var _unused4: i32 = slot4
+    return staged_typed_join_status(handle, error, 6)
+
+@export("__tetra_task_join_typed_7")
+func rt_task_join_typed_7(handle: i32, slot1: i32, slot2: i32, slot3: i32, slot4: i32, slot5: i32, error: i32) -> i32:
+    var _unused1: i32 = slot1
+    var _unused2: i32 = slot2
+    var _unused3: i32 = slot3
+    var _unused4: i32 = slot4
+    var _unused5: i32 = slot5
+    return staged_typed_join_status(handle, error, 7)
+
+@export("__tetra_task_join_typed_8")
+func rt_task_join_typed_8(handle: i32, slot1: i32, slot2: i32, slot3: i32, slot4: i32, slot5: i32, slot6: i32, error: i32) -> i32:
+    var _unused1: i32 = slot1
+    var _unused2: i32 = slot2
+    var _unused3: i32 = slot3
+    var _unused4: i32 = slot4
+    var _unused5: i32 = slot5
+    var _unused6: i32 = slot6
+    return staged_typed_join_status(handle, error, 8)
+
+@export("__tetra_time_now_ms")
+func rt_time_now_ms() -> i32:
+    return g_time_ms
+
+@export("__tetra_sleep_ms")
+func rt_sleep_ms(ms: i32) -> i32:
+    unsafe:
+        if ms > 0:
+            var mem: cap.mem = core.cap_mem()
+            var wake: i32 = g_time_ms + ms
+            var _stored: i32 = set_actor_wake_ms(g_current, wake)
+            var _status: i32 = set_actor_status(g_current, STATUS_SLEEPING)
+            var _yield: i32 = core.ctx_switch(actor_slot(g_current), g_sched_slot, mem)
+    return 0
+
+@export("__tetra_sleep_until_ms")
+func rt_sleep_until_ms(deadline: i32) -> i32:
+    unsafe:
+        var until: i32 = deadline
+        if until < 0:
+            until = 0
+        if until > g_time_ms:
+            var mem: cap.mem = core.cap_mem()
+            var _stored: i32 = set_actor_wake_ms(g_current, until)
+            var _status: i32 = set_actor_status(g_current, STATUS_SLEEPING)
+            var _yield: i32 = core.ctx_switch(actor_slot(g_current), g_sched_slot, mem)
+    return 0
+
+@export("__tetra_deadline_ms")
+func rt_deadline_ms(delta: i32) -> i32:
+    if delta > 0:
+        return g_time_ms + delta
+    return g_time_ms
+
+@export("__tetra_timer_ready_ms")
+func rt_timer_ready_ms(deadline: i32) -> bool:
+    var until: i32 = deadline
+    if until < 0:
+        until = 0
+    return g_time_ms >= until

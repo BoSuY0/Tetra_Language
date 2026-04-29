@@ -46,14 +46,18 @@ const (
 	IRReturn
 	IRAllocBytes
 	IRMakeSliceU8
+	IRMakeSliceU16
 	IRMakeSliceI32
 	IRIndexLoadI32
 	IRIndexStoreI32
 	IRIndexLoadU8
 	IRIndexStoreU8
+	IRIndexLoadU16
+	IRIndexStoreU16
 	// Islands memory model
 	IRIslandNew
 	IRIslandMakeSliceU8
+	IRIslandMakeSliceU16
 	IRIslandMakeSliceI32
 	IRIslandFree
 	// Capabilities + MMIO

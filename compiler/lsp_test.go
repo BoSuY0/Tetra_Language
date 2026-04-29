@@ -61,12 +61,15 @@ uses mem, io:
 	t.Fatalf("missing const hover: %#v", got.Hovers)
 }
 
-func TestAnalyzeLSPSourceDiagnostics(t *testing.T) {
-	got := AnalyzeLSPSource([]byte("actor P:\n"), "bad.tetra")
+func TestAnalyzeLSPSourceActorDeclarationDiagnostic(t *testing.T) {
+	got := AnalyzeLSPSource([]byte("actor P:\n    count: Int\n"), "bad.tetra")
 	if len(got.Diagnostics) != 1 {
 		t.Fatalf("diagnostics = %#v", got.Diagnostics)
 	}
-	if got.Diagnostics[0].File != "bad.tetra" || got.Diagnostics[0].Line != 1 {
+	if got.Diagnostics[0].File != "bad.tetra" || got.Diagnostics[0].Line != 2 {
+		t.Fatalf("diagnostic = %#v", got.Diagnostics[0])
+	}
+	if !strings.Contains(got.Diagnostics[0].Message, "actor state fields must use 'val' or 'const'") {
 		t.Fatalf("diagnostic = %#v", got.Diagnostics[0])
 	}
 }

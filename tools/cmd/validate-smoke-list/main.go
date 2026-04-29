@@ -34,6 +34,8 @@ type smokeExcludedExample struct {
 	Reason  string `json:"reason"`
 }
 
+const smokeListArtifact = "tetra.release.v0_2_0.smoke-list.v1"
+
 func main() {
 	var path string
 	var examplesRoot string
@@ -183,7 +185,7 @@ func discoverExamples(examplesRoot string) ([]string, error) {
 func requiredCasesForReport(report smokeListReport) map[string]bool {
 	if report.BuildOnly || report.Target == "wasm32-wasi" || report.Target == "wasm32-web" {
 		return map[string]bool{
-			"flow_hello":       false,
+			"legacy_hello":     false,
 			"effects_io_smoke": false,
 			"ui_web_smoke":     false,
 			"dogfood_wasi":     false,

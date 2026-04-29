@@ -18,11 +18,15 @@ out/
 reports/
 /app
 /app.exe
+/app.wasm
+/app.mjs
 /tetra
 /t
 /.codex
 /app.ui.json
 /app.ui.shell.txt
+/app.ui.web.mjs
+/app.ui.html
 /docs/generated/v1_0/security-review.md
 *.exe
 *.dll

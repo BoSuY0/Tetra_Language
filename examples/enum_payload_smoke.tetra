@@ -1,0 +1,43 @@
+enum CounterMsg:
+    case inc(Int)
+    case reset
+
+enum DecodeError:
+    case invalid(Int)
+    case eof
+
+func decode(flag: Bool) -> CounterMsg:
+    if flag:
+        return CounterMsg.inc(42)
+    else:
+        return CounterMsg.reset
+
+func error_code(err: DecodeError) -> Int:
+    let code: Int = match err:
+    case DecodeError.invalid(errCode):
+        errCode
+    case DecodeError.eof:
+        0
+    return code
+
+func bonus(msg: CounterMsg) -> Int:
+    if let CounterMsg.inc(delta) = msg:
+        return match msg:
+        case CounterMsg.inc(value) if value > 40:
+            delta
+        case CounterMsg.inc(other):
+            other
+        case CounterMsg.reset:
+            0
+    else:
+        return 0
+
+func handle(msg: CounterMsg) -> Int:
+    match msg:
+    case CounterMsg.inc(delta):
+        return delta
+    case CounterMsg.reset:
+        return 0
+
+func main() -> Int:
+    return bonus(decode(true))

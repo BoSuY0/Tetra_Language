@@ -1,11 +1,15 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
 	report := webUISmokeReport{
 		Schema:             "tetra.web-ui-smoke.v1alpha1",
 		GeneratedAt:        "2026-04-27T12:00:00Z",
@@ -16,6 +20,10 @@ func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
 		Automation:         "chromium --headless --dump-dom",
 		Status:             "pass",
 		Result:             "ok:0",
+		DOMSnapshot:        domSnapshotPath,
+		UISchema:           "tetra.ui.v1",
+		UIBundlePath:       uiBundlePath,
+		UIModulePath:       uiModulePath,
 	}
 	if err := validateWebUISmokeReport(report); err != nil {
 		t.Fatalf("validateWebUISmokeReport: %v", err)
@@ -39,6 +47,8 @@ func TestValidateWebUISmokeReportAcceptsHostBlockedReport(t *testing.T) {
 }
 
 func TestValidateWebUISmokeReportRejectsFallbackPass(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
 	report := webUISmokeReport{
 		Schema:             "tetra.web-ui-smoke.v1alpha1",
 		GeneratedAt:        "2026-04-27T12:00:00Z",
@@ -49,6 +59,10 @@ func TestValidateWebUISmokeReportRejectsFallbackPass(t *testing.T) {
 		Automation:         "chromium --headless --dump-dom",
 		Status:             "pass",
 		Result:             "ok:0",
+		DOMSnapshot:        domSnapshotPath,
+		UISchema:           "tetra.ui.v1",
+		UIBundlePath:       uiBundlePath,
+		UIModulePath:       uiModulePath,
 	}
 	err := validateWebUISmokeReport(report)
 	if err == nil || !strings.Contains(err.Error(), "fallback") {
@@ -76,6 +90,8 @@ func TestValidateWebUISmokeReportRejectsUnknownFields(t *testing.T) {
 }
 
 func TestValidateWebUISmokeReportRejectsPassWithoutOKResult(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
 	report := webUISmokeReport{
 		Schema:        "tetra.web-ui-smoke.v1alpha1",
 		GeneratedAt:   "2026-04-27T12:00:00Z",
@@ -85,9 +101,98 @@ func TestValidateWebUISmokeReportRejectsPassWithoutOKResult(t *testing.T) {
 		Automation:    "chromium --headless --dump-dom",
 		Status:        "pass",
 		Result:        "pending",
+		DOMSnapshot:   domSnapshotPath,
+		UISchema:      "tetra.ui.v1",
+		UIBundlePath:  uiBundlePath,
+		UIModulePath:  uiModulePath,
 	}
 	err := validateWebUISmokeReport(report)
 	if err == nil || !strings.Contains(err.Error(), "ok:") {
 		t.Fatalf("expected missing ok result rejection, got %v", err)
 	}
+}
+
+func TestValidateWebUISmokeReportRejectsPassWithoutUISchemaEvidence(t *testing.T) {
+	report := webUISmokeReport{
+		Schema:        "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:   "2026-04-27T12:00:00Z",
+		Target:        "wasm32-web",
+		UIScopeActive: true,
+		Source:        "examples/projects/dogfood_web_ui/src/main.tetra",
+		Automation:    "chromium --headless --dump-dom",
+		Status:        "pass",
+		Result:        "ok:0",
+		DOMSnapshot:   "docs/generated/v1_0/web-ui-smoke.dom.html",
+	}
+	err := validateWebUISmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "ui_schema") {
+		t.Fatalf("expected ui_schema rejection, got %v", err)
+	}
+}
+
+func TestValidateWebUISmokeReportRejectsPassWithMissingUISidecarArtifact(t *testing.T) {
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
+	report := webUISmokeReport{
+		Schema:        "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:   "2026-04-27T12:00:00Z",
+		Target:        "wasm32-web",
+		UIScopeActive: true,
+		Source:        "examples/projects/dogfood_web_ui/src/main.tetra",
+		Automation:    "chromium --headless --dump-dom",
+		Status:        "pass",
+		Result:        "ok:0",
+		DOMSnapshot:   domSnapshotPath,
+		UISchema:      "tetra.ui.v1",
+		UIBundlePath:  filepath.Join(t.TempDir(), "missing.ui.json"),
+		UIModulePath:  filepath.Join(t.TempDir(), "missing.ui.web.mjs"),
+	}
+	err := validateWebUISmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "existing artifact") {
+		t.Fatalf("expected missing sidecar artifact rejection, got %v", err)
+	}
+}
+
+func TestValidateWebUISmokeReportRejectsPassWithMissingDOMSnapshot(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	report := webUISmokeReport{
+		Schema:        "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:   "2026-04-27T12:00:00Z",
+		Target:        "wasm32-web",
+		UIScopeActive: true,
+		Source:        "examples/projects/dogfood_web_ui/src/main.tetra",
+		Automation:    "chromium --headless --dump-dom",
+		Status:        "pass",
+		Result:        "ok:0",
+		DOMSnapshot:   filepath.Join(t.TempDir(), "missing.dom.html"),
+		UISchema:      "tetra.ui.v1",
+		UIBundlePath:  uiBundlePath,
+		UIModulePath:  uiModulePath,
+	}
+	err := validateWebUISmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "dom_snapshot") {
+		t.Fatalf("expected missing dom_snapshot artifact rejection, got %v", err)
+	}
+}
+
+func writeWebUISidecarArtifacts(t *testing.T) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	uiBundlePath := filepath.Join(dir, "app.ui.json")
+	uiModulePath := filepath.Join(dir, "app.ui.web.mjs")
+	if err := os.WriteFile(uiBundlePath, []byte(`{"schema":"tetra.ui.v1"}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write ui bundle artifact: %v", err)
+	}
+	if err := os.WriteFile(uiModulePath, []byte("export function mountTetraUI() {}\n"), 0o644); err != nil {
+		t.Fatalf("write ui module artifact: %v", err)
+	}
+	return uiBundlePath, uiModulePath
+}
+
+func writeWebUIDOMSnapshotArtifact(t *testing.T) string {
+	t.Helper()
+	domSnapshotPath := filepath.Join(t.TempDir(), "web-ui-smoke.dom.html")
+	if err := os.WriteFile(domSnapshotPath, []byte("<!doctype html><main>Tetra UI</main>\n"), 0o644); err != nil {
+		t.Fatalf("write DOM snapshot artifact: %v", err)
+	}
+	return domSnapshotPath
 }

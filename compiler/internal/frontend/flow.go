@@ -66,7 +66,7 @@ func bridgeFlowSyntax(src []byte, filename string, opts flowBridgeOptions) ([]by
 			continue
 		}
 		if pendingBlockIndent >= 0 {
-			if !(pendingBlockKind == "match" && indent == pendingBlockIndent && strings.HasPrefix(content, "case ")) && indent <= pendingBlockIndent {
+			if !(isCaseBlockKind(pendingBlockKind) && indent == pendingBlockIndent && strings.HasPrefix(content, "case ")) && indent <= pendingBlockIndent {
 				return nil, diagnosticErrorf(Position{File: filename, Line: lineNo + 1, Col: 1}, "expected indented block after ':'")
 			}
 			pendingBlockIndent = -1
@@ -74,13 +74,13 @@ func bridgeFlowSyntax(src []byte, filename string, opts flowBridgeOptions) ([]by
 		}
 		for len(blocks) > 0 {
 			top := blocks[len(blocks)-1]
-			if strings.HasPrefix(content, "case ") && top.kind == "match" && indent == top.indent {
+			if strings.HasPrefix(content, "case ") && isCaseBlockKind(top.kind) && indent == top.indent {
 				break
 			}
 			if indent > top.indent {
 				break
 			}
-			out.WriteString("}\n")
+			out.WriteString("} ")
 			blocks = blocks[:len(blocks)-1]
 		}
 
@@ -93,6 +93,7 @@ func bridgeFlowSyntax(src []byte, filename string, opts flowBridgeOptions) ([]by
 			pendingBlockIndent = indent
 			pendingBlockKind = kind
 		}
+		out.WriteString(strings.Repeat(" ", indent))
 		out.WriteString(content)
 		out.WriteByte('\n')
 	}
@@ -112,25 +113,32 @@ func looksLikeFlowSyntax(src []byte) bool {
 		if content == "" || strings.HasPrefix(content, "//") {
 			continue
 		}
-		if strings.HasPrefix(content, "func ") || strings.HasPrefix(content, "async func ") {
+		header := strings.TrimPrefix(content, "pub ")
+		if strings.HasPrefix(header, "func ") || strings.HasPrefix(header, "async func ") {
 			return true
 		}
-		if strings.HasPrefix(content, "struct ") && strings.HasSuffix(content, ":") {
+		if strings.HasPrefix(header, "struct ") && strings.HasSuffix(header, ":") {
 			return true
 		}
-		if strings.HasPrefix(content, "enum ") && strings.HasSuffix(content, ":") {
+		if strings.HasPrefix(header, "enum ") && strings.HasSuffix(header, ":") {
 			return true
 		}
-		if strings.HasPrefix(content, "extension ") && strings.HasSuffix(content, ":") {
+		if strings.HasPrefix(header, "extension ") && strings.HasSuffix(header, ":") {
 			return true
 		}
-		if strings.HasPrefix(content, "protocol ") && strings.HasSuffix(content, ":") {
+		if strings.HasPrefix(header, "protocol ") && strings.HasSuffix(header, ":") {
 			return true
 		}
-		if strings.HasPrefix(content, "state ") && strings.HasSuffix(content, ":") {
+		if strings.HasPrefix(header, "actor ") && strings.HasSuffix(header, ":") {
 			return true
 		}
-		if strings.HasPrefix(content, "view ") && strings.HasSuffix(content, ":") {
+		if strings.HasPrefix(header, "state ") && strings.HasSuffix(header, ":") {
+			return true
+		}
+		if strings.HasPrefix(header, "view ") && strings.HasSuffix(header, ":") {
+			return true
+		}
+		if strings.HasPrefix(header, "capsule ") && strings.HasSuffix(header, ":") {
 			return true
 		}
 		if strings.HasPrefix(content, "command ") && strings.HasSuffix(content, ":") {
@@ -211,12 +219,27 @@ func flowRewriteBlockHeader(header string, opts flowBridgeOptions) string {
 }
 
 func flowBlockKind(header string) string {
+	header = strings.TrimPrefix(header, "pub ")
 	switch {
 	case strings.HasPrefix(header, "match "):
 		return "match"
+	case strings.Contains(header, " = match "):
+		return "match"
+	case strings.HasPrefix(header, "return match "):
+		return "match"
+	case strings.HasPrefix(header, "catch "):
+		return "catch"
+	case strings.Contains(header, " = catch "):
+		return "catch"
+	case strings.HasPrefix(header, "return catch "):
+		return "catch"
 	case strings.HasPrefix(header, "case "):
 		return "case"
 	default:
 		return "block"
 	}
+}
+
+func isCaseBlockKind(kind string) bool {
+	return kind == "match" || kind == "catch"
 }

@@ -54,5 +54,26 @@ state CounterState:
 view CounterView(state: CounterState):
     command reset:
         state.seed = 0
-`, "cannot assign to immutable state field")
+	`, "cannot assign to immutable state field")
+}
+
+func TestUICheckRequiresAtLeastOneCommandPerView(t *testing.T) {
+	requireCheckErrorContains(t, `
+state CounterState:
+    var count: Int = 0
+
+view CounterView(state: CounterState):
+    bind countValue: Int = state.count
+`, "view requires at least one command")
+}
+
+func TestUICheckRejectsReturnInsideViewCommand(t *testing.T) {
+	requireCheckErrorContains(t, `
+state CounterState:
+    var count: Int = 0
+
+view CounterView(state: CounterState):
+    command bad:
+        return 0
+`, "return is not allowed inside view commands")
 }

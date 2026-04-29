@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"tetra_language/compiler/internal/frontend"
+	"tetra_language/compiler/internal/lower"
 )
 
 type Diagnostic struct {
@@ -18,10 +19,12 @@ type Diagnostic struct {
 }
 
 const (
-	DiagnosticCodeParse          = frontend.DiagnosticCodeParse
-	DiagnosticCodeSemantic       = "TETRA2001"
-	DiagnosticCodeFormatter      = "TETRA_FMT001"
-	DiagnosticCodeFormatterCheck = "TETRA_FMT002"
+	DiagnosticCodeParse            = frontend.DiagnosticCodeParse
+	DiagnosticCodeSemantic         = "TETRA2001"
+	DiagnosticCodeIRVerifier       = lower.DiagnosticCodeIRVerifier
+	DiagnosticCodeLowerUnsupported = lower.DiagnosticCodeLowerUnsupported
+	DiagnosticCodeFormatter        = "TETRA_FMT001"
+	DiagnosticCodeFormatterCheck   = "TETRA_FMT002"
 )
 
 var diagnosticPosRE = regexp.MustCompile(`^(?:(.+):)?(?:line )?([0-9]+):([0-9]+): (.*)$`)
@@ -40,6 +43,14 @@ func DiagnosticCodeRegistry() map[string]DiagnosticCodeInfo {
 		DiagnosticCodeSemantic: {
 			Severity: "error",
 			Surface:  "semantic/compiler",
+		},
+		DiagnosticCodeIRVerifier: {
+			Severity: "error",
+			Surface:  "ir verifier",
+		},
+		DiagnosticCodeLowerUnsupported: {
+			Severity: "error",
+			Surface:  "lowering unsupported",
 		},
 		DiagnosticCodeFormatter: {
 			Severity: "error",

@@ -5,6 +5,10 @@
 - host: `linux amd64 Intel(R) Core(TM) i9-14900HX`
 - threshold decision: accepted as current branch baseline capture; compare future RCs with `benchstat` before release promotion
 - JSON artifact: `docs/generated/v1_0/performance-regression.json`
+- summary.metric_count: `11`
+- summary.total_iterations: `370162`
+- summary.max_ns_per_op: `220157`
+- summary.metrics_sha256: `sha256:8be60f159e4324422a8a0b02a735611dc748a12190742670a98b459d7c72cfa0`
 
 | Metric | Iterations | ns/op | Artifact bytes | Decision |
 | --- | ---: | ---: | ---: | --- |

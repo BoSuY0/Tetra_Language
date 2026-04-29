@@ -1,0 +1,9 @@
+manifest "tetra.capsule.v1"
+capsule HelloT4:
+    id "tetra://examples/hello-t4"
+    version "0.1.0"
+    entry "src/main.t4"
+    source "src"
+    source "tests"
+    target "linux-x64"
+    permission "io"

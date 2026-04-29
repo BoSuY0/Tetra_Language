@@ -260,6 +260,15 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				case 2:
 					e.PopRdx()
 					e.PopRax()
+				case 3:
+					e.PopR8()
+					e.PopRdx()
+					e.PopRax()
+				case 4:
+					e.PopR9()
+					e.PopR8()
+					e.PopRdx()
+					e.PopRax()
 				default:
 					return fmt.Errorf("unsupported return slots")
 				}
@@ -269,11 +278,11 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				if err := abi.EmitAllocBytes(e, &stackDepth, opt, importPatches); err != nil {
 					return err
 				}
-			case ir.IRMakeSliceU8, ir.IRMakeSliceI32:
+			case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
 				if err := abi.EmitMakeSlice(e, instr.Kind, &stackDepth, opt, importPatches); err != nil {
 					return err
 				}
-			case ir.IRIndexLoadI32, ir.IRIndexLoadU8:
+			case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
 				if err := pop(3); err != nil {
 					return err
 				}
@@ -284,10 +293,14 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				failAt := e.JaeRel32()
 				if instr.Kind == ir.IRIndexLoadI32 {
 					e.ShlRdxImm8(2)
+				} else if instr.Kind == ir.IRIndexLoadU16 {
+					e.ShlRdxImm8(1)
 				}
 				e.AddRaxRdx()
 				if instr.Kind == ir.IRIndexLoadI32 {
 					e.MovEaxFromRaxPtr()
+				} else if instr.Kind == ir.IRIndexLoadU16 {
+					e.MovzxEaxWordPtrRax()
 				} else {
 					e.MovzxEaxBytePtrRax()
 				}
@@ -306,7 +319,7 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
 					return err
 				}
-			case ir.IRIndexStoreI32, ir.IRIndexStoreU8:
+			case ir.IRIndexStoreI32, ir.IRIndexStoreU8, ir.IRIndexStoreU16:
 				if err := pop(4); err != nil {
 					return err
 				}
@@ -318,10 +331,14 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				failAt := e.JaeRel32()
 				if instr.Kind == ir.IRIndexStoreI32 {
 					e.ShlRdxImm8(2)
+				} else if instr.Kind == ir.IRIndexStoreU16 {
+					e.ShlRdxImm8(1)
 				}
 				e.AddRaxRdx()
 				if instr.Kind == ir.IRIndexStoreI32 {
 					e.MovMem32RaxPtrR8d()
+				} else if instr.Kind == ir.IRIndexStoreU16 {
+					e.MovMem16RaxPtrR8w()
 				} else {
 					e.MovMem8RaxPtrR8b()
 				}
@@ -341,7 +358,7 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				if err := abi.EmitIslandNew(e, &stackDepth, opt, importPatches); err != nil {
 					return err
 				}
-			case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceI32:
+			case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
 				if err := abi.EmitIslandMakeSlice(e, instr.Kind, &stackDepth, opt, importPatches); err != nil {
 					return err
 				}

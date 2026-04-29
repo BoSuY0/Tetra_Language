@@ -157,7 +157,8 @@ function parseAPIDocs(md) {
 function buildBaseline(parsed, docsPath) {
   return {
     schema: 'tetra.api.diff-baseline.v1alpha1',
-    created_at: new Date().toISOString(),
+    created_at: deterministicTimestampISO(),
+    timestamp_policy: 'deterministic (SOURCE_DATE_EPOCH, fallback 1970-01-01T00:00:00Z)',
     source_docs: docsPath,
     source_docs_sha256: parsed.sourceDocsSHA256,
     api_metadata: {
@@ -168,6 +169,17 @@ function buildBaseline(parsed, docsPath) {
     },
     symbols: parsed.symbols,
   };
+}
+
+function deterministicTimestampISO() {
+  const raw = process.env.SOURCE_DATE_EPOCH;
+  if (raw && /^[0-9]+$/.test(raw)) {
+    const seconds = Number(raw);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return new Date(seconds * 1000).toISOString();
+    }
+  }
+  return '1970-01-01T00:00:00Z';
 }
 
 function reviewMetadata(kind) {

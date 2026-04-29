@@ -62,8 +62,8 @@ func emitInitActorStackWindowsX64(e *x64.Emitter, leaPatches *[]leaPatch, import
 }
 
 func emitEntryWindowsX64(e *x64.Emitter, mainSymbol string, callPatches *[]callPatch, leaPatches *[]leaPatch, importPatches *[]importPatch) error {
-	// Allocate scheduler + actors slab (2 pages is plenty for MVP).
-	if err := emitVirtualAllocAnon(e, 8192, importPatches); err != nil {
+	// Allocate scheduler + actor slots.
+	if err := emitVirtualAllocAnon(e, schedAllocSize, importPatches); err != nil {
 		return err
 	}
 	e.MovR15Rax()
@@ -75,10 +75,15 @@ func emitEntryWindowsX64(e *x64.Emitter, mainSymbol string, callPatches *[]callP
 	e.MovRdiR15()
 	e.MovMem64RdiDispRax(schedActorsPtrOff)
 
-	// sched.capacity = 64, sched.count = 1, sched.currentIdx = 0
-	e.MovMem32RdiDispImm32(schedCapacityOff, 64)
+	// sched.capacity = maxActors, sched.count = 1, sched.currentIdx = 0
+	e.MovMem32RdiDispImm32(schedCapacityOff, maxActors)
 	e.MovMem32RdiDispImm32(schedCountOff, 1)
 	e.MovMem32RdiDispImm32(schedCurrentIdxOff, 0)
+	e.MovMem32RdiDispImm32(schedGroupCountOff, 0)
+	e.MovMem32RdiDispImm32(schedCloseGroupOff, 0)
+	e.MovMem32RdiDispImm32(schedCurrentGroupOff, 0)
+	e.MovMem32RdiDispImm32(schedSpawnGroupOff, 0)
+	e.MovMem32RdiDispImm32(schedTimeMsOff, 0)
 
 	// Message pool
 	if err := emitVirtualAllocAnon(e, msgPoolSize, importPatches); err != nil {
@@ -105,6 +110,11 @@ func emitEntryWindowsX64(e *x64.Emitter, mainSymbol string, callPatches *[]callP
 	e.MovMem64RdiDispRax(actorMailboxTailOff)
 	e.MovMem32RdiDispImm32(actorLastSenderOff, 0)
 	e.MovMem32RdiDispImm32(actorExitCodeOff, 0)
+	e.MovMem32RdiDispImm32(actorTaskCountOff, 0)
+	e.MovMem32RdiDispImm32(actorTaskGroupOff, 0)
+	for i := 0; i < maxActorStateSlots; i++ {
+		e.MovMem32RdiDispImm32(actorStateSlot0Off+int32(i*4), 0)
+	}
 
 	// Allocate actor0 stack and initialize its starting context. initRsp is in rcx.
 	if err := emitInitActorStackWindowsX64(e, leaPatches, importPatches); err != nil {
@@ -140,6 +150,8 @@ func emitEntryWindowsX64(e *x64.Emitter, mainSymbol string, callPatches *[]callP
 	noReadyAt := e.JzRel32()
 
 	tryLoop := len(e.Buf)
+	e.MovRdiR15()
+	e.MovEcxFromRdiDisp(schedCountOff)
 	// candidate++
 	e.AddEaxImm32(1)
 	// if candidate == count => candidate = 0
@@ -150,11 +162,6 @@ func emitEntryWindowsX64(e *x64.Emitter, mainSymbol string, callPatches *[]callP
 	if err := x64.PatchRel32(e.Buf, skipWrapAt, skipWrapTo); err != nil {
 		return err
 	}
-
-	// tries--
-	e.AddEdxImm32(-1)
-	e.TestEdxEdx()
-	noReadyAt2 := e.JzRel32()
 
 	// Save candidate index.
 	e.PushRax()
@@ -170,9 +177,116 @@ func emitEntryWindowsX64(e *x64.Emitter, mainSymbol string, callPatches *[]callP
 	// status = actor.status
 	e.MovEaxFromRdiDisp(actorStatusOff)
 	e.CmpEaxImm32(statusReady)
-	notReadyAt := e.JnzRel32()
+	readyAt := e.JzRel32()
+	e.CmpEaxImm32(statusSleeping)
+	sleepingAt := e.JzRel32()
+	e.CmpEaxImm32(statusBlocked)
+	blockedAt := e.JzRel32()
+	e.CmpEaxImm32(statusWaiting)
+	waitingAt := e.JzRel32()
+	notReadyAt := e.JmpRel32()
+
+	// Sleeping actors become ready when their group is canceled.
+	sleepingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, sleepingAt, sleepingTo); err != nil {
+		return err
+	}
+	e.PushRdi()
+	e.MovEaxFromRdiDisp(actorTaskGroupOff)
+	e.TestEaxEax()
+	hasGroupAt := e.JnzRel32()
+	e.PopRdi()
+	noGroupCheckWakeAt := e.JmpRel32()
+
+	hasGroupTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, hasGroupAt, hasGroupTo); err != nil {
+		return err
+	}
+	e.MovEdiEax()
+	groupStatePtrFromEdi(e)
+	e.MovEaxFromRdiDisp(0)
+	e.CmpEaxImm32(taskGroupCanceled)
+	canceledAt := e.JzRel32()
+	e.PopRdi()
+	notCanceledCheckWakeAt := e.JmpRel32()
+
+	canceledTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, canceledAt, canceledTo); err != nil {
+		return err
+	}
+	e.PopRdi()
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
+	canceledReadyAt := e.JmpRel32()
+
+	// Sleeping actors also become ready once the logical clock reaches wake_at.
+	checkWakeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, noGroupCheckWakeAt, checkWakeTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, notCanceledCheckWakeAt, checkWakeTo); err != nil {
+		return err
+	}
+	e.PushRdi()
+	e.MovEaxFromRspDisp(8)
+	actorWakeAtPtrFromEaxToRdi(e)
+	e.MovEcxFromRdiDisp(0)
+	e.PopRdi()
+	e.PushRdi()
+	e.MovRdiR15()
+	e.MovEaxFromRdiDisp(schedTimeMsOff)
+	e.PopRdi()
+	e.CmpEaxEcx()
+	dueAt := e.JaeRel32()
+	notDueAt := e.JmpRel32()
+
+	dueTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, dueAt, dueTo); err != nil {
+		return err
+	}
+	e.MovMem32RdiDispImm32(actorStatusOff, statusReady)
+	dueReadyAt := e.JmpRel32()
+
+	// Timed receive waiters become ready once their deadline is due.
+	blockedTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, blockedAt, blockedTo); err != nil {
+		return err
+	}
+	blockedReadyAts, blockedNotReadyAts, err := emitBlockedDeadlineWakeCheck(e)
+	if err != nil {
+		return err
+	}
+
+	// Task join waiters become ready when the target is done.
+	waitingTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, waitingAt, waitingTo); err != nil {
+		return err
+	}
+	waitReadyAts, waitNotReadyAts, err := emitWaitingTaskWakeCheck(e)
+	if err != nil {
+		return err
+	}
 
 	// Ready: restore candidate index and run it.
+	readyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, readyAt, readyTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, canceledReadyAt, readyTo); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, dueReadyAt, readyTo); err != nil {
+		return err
+	}
+	for _, at := range blockedReadyAts {
+		if err := x64.PatchRel32(e.Buf, at, readyTo); err != nil {
+			return err
+		}
+	}
+	for _, at := range waitReadyAts {
+		if err := x64.PatchRel32(e.Buf, at, readyTo); err != nil {
+			return err
+		}
+	}
 	e.PopRax()
 
 	// sched.currentIdx = candidate
@@ -185,6 +299,17 @@ func emitEntryWindowsX64(e *x64.Emitter, mainSymbol string, callPatches *[]callP
 	e.ShlRbxImm8(actorSizeShift)
 	e.MovRaxFromRdiDisp(schedActorsPtrOff)
 	e.AddRaxRbx()
+	e.PushRax()
+	e.MovRdiRax()
+	e.MovEdxFromRdiDisp(actorTaskGroupOff)
+	e.MovEaxEdx()
+	e.MovRdiR15()
+	e.MovMem32RdiDispEax(schedCurrentGroupOff)
+	e.PopRax()
+	e.PushRax()
+	e.MovRdiRax()
+	storeActorSavedGroupForActorPtrInRdiGroupInRdx(e)
+	e.PopRax()
 
 	// switch_to(&sched.rsp, &actor.rsp)
 	e.MovRdiR15()
@@ -199,18 +324,37 @@ func emitEntryWindowsX64(e *x64.Emitter, mainSymbol string, callPatches *[]callP
 	if err := x64.PatchRel32(e.Buf, notReadyAt, notReadyTo); err != nil {
 		return err
 	}
+	if err := x64.PatchRel32(e.Buf, notDueAt, notReadyTo); err != nil {
+		return err
+	}
+	for _, at := range blockedNotReadyAts {
+		if err := x64.PatchRel32(e.Buf, at, notReadyTo); err != nil {
+			return err
+		}
+	}
+	for _, at := range waitNotReadyAts {
+		if err := x64.PatchRel32(e.Buf, at, notReadyTo); err != nil {
+			return err
+		}
+	}
 	e.PopRax()
+	e.AddEdxImm32(-1)
+	e.TestEdxEdx()
+	noReadyAt2 := e.JzRel32()
 	jmpTry := e.JmpRel32()
 	if err := x64.PatchRel32(e.Buf, jmpTry, tryLoop); err != nil {
 		return err
 	}
 
-	// No ready actors: exit scheduler.
+	// No ready actors: advance logical time to the next sleeping actor.
 	noReadyTo := len(e.Buf)
 	if err := x64.PatchRel32(e.Buf, noReadyAt, noReadyTo); err != nil {
 		return err
 	}
 	if err := x64.PatchRel32(e.Buf, noReadyAt2, noReadyTo); err != nil {
+		return err
+	}
+	if err := emitAdvanceClockToNextSleepingWake(e, loopStart); err != nil {
 		return err
 	}
 
@@ -376,19 +520,41 @@ func emitSpawnWindowsX64(e *x64.Emitter, callPatches *[]callPatch, leaPatches *[
 	e.MovMem64RdiDispRax(actorMailboxTailOff)
 	e.MovMem32RdiDispImm32(actorLastSenderOff, 0)
 	e.MovMem32RdiDispImm32(actorExitCodeOff, 0)
+	e.MovMem32RdiDispImm32(actorTaskCountOff, 0)
+	e.MovMem32RdiDispImm32(actorTaskGroupOff, 0)
+
+	e.MovRaxRdi()
+	e.PushRax()
 
 	// Stack init (initRsp -> rcx).
 	if err := emitInitActorStackWindowsX64(e, leaPatches, importPatches); err != nil {
 		return err
 	}
 
+	e.PopRax()
+	e.MovRdiRax()
 	e.MovRaxRcx()
 	e.MovMem64RdiDispRax(actorRspOff)
+
+	e.PushRdi()
+	e.MovRdiR15()
+	e.MovEdxFromRdiDisp(schedSpawnGroupOff)
+	e.TestEdxEdx()
+	haveSpawnGroupAt := e.JnzRel32()
+	e.MovEdxR14d()
+	haveSpawnGroupTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, haveSpawnGroupAt, haveSpawnGroupTo); err != nil {
+		return err
+	}
+	e.MovMem32RdiDispImm32(schedSpawnGroupOff, 0)
+	e.PopRdi()
+	storeActorSavedGroupForActorPtrInRdiGroupInRdx(e)
 
 	// return newIdx (= sched.count - 1)
 	e.MovRdiR15()
 	e.MovEaxFromRdiDisp(schedCountOff)
 	e.AddEaxImm32(-1)
+	storeActorGroupForHandleInRaxGroupInRdx(e)
 	e.Ret()
 	return nil
 }
@@ -428,6 +594,145 @@ func emitActorSendMsgWrapperWindowsX64(e *x64.Emitter, jmpPatches *[]callPatch) 
 	e.MovRdxR8()
 	at := e.JmpRel32()
 	*jmpPatches = append(*jmpPatches, callPatch{at: at, name: "__tetra_actor_send_msg_impl"})
+	return nil
+}
+
+func emitActorSendBeginWrapperWindowsX64(e *x64.Emitter, jmpPatches *[]callPatch) error {
+	// Win64: rcx=to, rdx=tag, r8=count -> internal: rdi=to, rsi=tag, rdx=count.
+	if jmpPatches == nil {
+		return fmt.Errorf("missing jmpPatches")
+	}
+	e.MovRdiRcx()
+	e.MovRaxRdx()
+	e.MovRsiRax()
+	e.MovRdxR8()
+	at := e.JmpRel32()
+	*jmpPatches = append(*jmpPatches, callPatch{at: at, name: "__tetra_actor_send_begin_impl"})
+	return nil
+}
+
+func emitActorSendSlotWrapperWindowsX64(e *x64.Emitter, jmpPatches *[]callPatch) error {
+	// Win64: rcx=index, rdx=value -> internal: rdi=index, rsi=value.
+	if jmpPatches == nil {
+		return fmt.Errorf("missing jmpPatches")
+	}
+	e.MovRdiRcx()
+	e.MovRaxRdx()
+	e.MovRsiRax()
+	at := e.JmpRel32()
+	*jmpPatches = append(*jmpPatches, callPatch{at: at, name: "__tetra_actor_send_slot_impl"})
+	return nil
+}
+
+func emitActorOneArgWrapperWindowsX64(e *x64.Emitter, target string, jmpPatches *[]callPatch) error {
+	if jmpPatches == nil {
+		return fmt.Errorf("missing jmpPatches")
+	}
+	if target == "" {
+		return fmt.Errorf("missing wrapper target")
+	}
+	e.MovRdiRcx()
+	at := e.JmpRel32()
+	*jmpPatches = append(*jmpPatches, callPatch{at: at, name: target})
+	return nil
+}
+
+func emitTaskTwoArgWrapperWindowsX64(e *x64.Emitter, target string, jmpPatches *[]callPatch) error {
+	if jmpPatches == nil {
+		return fmt.Errorf("missing jmpPatches")
+	}
+	if target == "" {
+		return fmt.Errorf("missing wrapper target")
+	}
+	e.MovRdiRcx()
+	e.MovRaxRdx()
+	e.MovRsiRax()
+	at := e.JmpRel32()
+	*jmpPatches = append(*jmpPatches, callPatch{at: at, name: target})
+	return nil
+}
+
+func emitTaskThreeArgWrapperWindowsX64(e *x64.Emitter, target string, jmpPatches *[]callPatch) error {
+	if jmpPatches == nil {
+		return fmt.Errorf("missing jmpPatches")
+	}
+	if target == "" {
+		return fmt.Errorf("missing wrapper target")
+	}
+	e.MovRdiRcx()
+	e.MovRaxRdx()
+	e.MovRsiRax()
+	e.MovRdxR8()
+	at := e.JmpRel32()
+	*jmpPatches = append(*jmpPatches, callPatch{at: at, name: target})
+	return nil
+}
+
+func emitTaskJoinTypedWrapperWindowsX64(e *x64.Emitter, slots int, target string, jmpPatches *[]callPatch) error {
+	if jmpPatches == nil {
+		return fmt.Errorf("missing jmpPatches")
+	}
+	if target == "" {
+		return fmt.Errorf("missing wrapper target")
+	}
+	switch slots {
+	case 2:
+		e.MovRdiRcx()
+		e.MovRaxRdx()
+		e.MovRsiRax()
+	case 3:
+		e.MovRdiRcx()
+		e.MovRaxRdx()
+		e.MovRsiRax()
+		e.MovRdxR8()
+	case 4:
+		e.MovRdiRcx()
+		e.MovRaxRdx()
+		e.MovRsiRax()
+		e.MovRdxR8()
+		e.MovRcxR9()
+	case 5:
+		e.MovRdiRcx()
+		e.MovRaxRdx()
+		e.MovRsiRax()
+		e.MovRdxR8()
+		e.MovRcxR9()
+		e.MovR8FromRspDisp(40)
+	case 6:
+		e.MovRdiRcx()
+		e.MovRaxRdx()
+		e.MovRsiRax()
+		e.MovRdxR8()
+		e.MovRcxR9()
+		e.MovR8FromRspDisp(40)
+		e.MovR9FromRspDisp(48)
+	case 7:
+		e.MovRdiRcx()
+		e.MovRaxRdx()
+		e.MovRsiRax()
+		e.MovRdxR8()
+		e.MovRcxR9()
+		e.MovR8FromRspDisp(40)
+		e.MovR9FromRspDisp(48)
+		e.MovRaxFromRspDisp(56)
+		e.MovMem64RspDispRax(8)
+	case 8:
+		e.MovRdiRcx()
+		e.MovRaxRdx()
+		e.MovRsiRax()
+		e.MovRdxR8()
+		e.MovRcxR9()
+		e.MovR8FromRspDisp(40)
+		e.MovR9FromRspDisp(48)
+		e.MovRaxFromRspDisp(56)
+		e.MovMem64RspDispRax(8)
+		e.MovRaxFromRspDisp(64)
+		e.MovMem64RspDispRax(16)
+	default:
+		return fmt.Errorf("unsupported typed task join wrapper slots %d", slots)
+	}
+	at := e.JmpRel32()
+	*jmpPatches = append(*jmpPatches, callPatch{at: at, name: target})
 	return nil
 }
 

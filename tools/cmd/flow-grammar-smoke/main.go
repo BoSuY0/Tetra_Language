@@ -55,6 +55,8 @@ view CounterView(state: CounterState):
 func id<T>(x: T) -> T:
     return x
 
+func answer() -> Int = 42
+
 async func worker() -> Int:
     return 42
 
@@ -75,7 +77,7 @@ func optional(value: Int?) -> Int:
 
 func main() -> Int:
     let pair: Pair = Pair(x: 40, y: 2)
-    return pair.x + pair.y + choose(SmokeColor.red) + optional(none) + id(0)
+    return pair.x + pair.y + choose(SmokeColor.red) + optional(none) + id(0) + answer() - 42
 
 test "generated grammar smoke":
     expect 40 + 2 == 42

@@ -1,0 +1,20 @@
+// Task timer smoke: independent sleeps wake in logical deadline order.
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(4)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    let deadline: Int = core.deadline_ms(4)
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let _main_sleep: Int = core.sleep_ms(5)
+    let worker_time: Int = core.task_join_i32(task)
+    let now: Int = core.time_now_ms()
+    if deadline != 4:
+        return 10 + deadline
+    if worker_time != 4:
+        return 20 + worker_time
+    if now != 5:
+        return 30 + now
+    return 0

@@ -7,10 +7,27 @@ import (
 	"tetra_language/compiler/internal/frontend"
 )
 
+const importSymbolPrefix = "\x00symbol:"
+
 func collectImportAliases(file *frontend.FileAST) (map[string]string, error) {
 	aliases := make(map[string]string)
 	topLevel := topLevelDeclarationNames(file)
 	for _, imp := range file.Imports {
+		if len(imp.Items) > 0 {
+			for _, item := range imp.Items {
+				if item == "" {
+					return nil, fmt.Errorf("%s: empty selective import", frontend.FormatPos(imp.At))
+				}
+				if _, exists := aliases[item]; exists {
+					return nil, fmt.Errorf("%s: duplicate import alias '%s'", frontend.FormatPos(imp.At), item)
+				}
+				if _, exists := topLevel[item]; exists {
+					return nil, fmt.Errorf("%s: import alias '%s' conflicts with declaration '%s'", frontend.FormatPos(imp.At), item, item)
+				}
+				aliases[item] = importSymbolPrefix + imp.Path + "." + item
+			}
+			continue
+		}
 		if imp.Alias == "" {
 			return nil, fmt.Errorf("%s: import alias required", frontend.FormatPos(imp.At))
 		}
@@ -23,6 +40,13 @@ func collectImportAliases(file *frontend.FileAST) (map[string]string, error) {
 		aliases[imp.Alias] = imp.Path
 	}
 	return aliases, nil
+}
+
+func importSymbolTarget(target string) (string, bool) {
+	if !strings.HasPrefix(target, importSymbolPrefix) {
+		return "", false
+	}
+	return strings.TrimPrefix(target, importSymbolPrefix), true
 }
 
 func topLevelDeclarationNames(file *frontend.FileAST) map[string]struct{} {
@@ -45,8 +69,17 @@ func topLevelDeclarationNames(file *frontend.FileAST) map[string]struct{} {
 	for _, view := range file.Views {
 		names[view.Name] = struct{}{}
 	}
+	for _, actor := range file.Actors {
+		names[actor.Name] = struct{}{}
+	}
 	for _, proto := range file.Protocols {
 		names[proto.Name] = struct{}{}
+	}
+	for _, capsule := range file.Capsules {
+		if capsule == nil {
+			continue
+		}
+		names[capsule.Name] = struct{}{}
 	}
 	return names
 }
@@ -76,8 +109,8 @@ func resolveTypeName(ref *frontend.TypeRef, module string, imports map[string]st
 		if ref.Elem == nil {
 			return "", fmt.Errorf("%s: missing array element type", frontend.FormatPos(ref.At))
 		}
-		if ref.Len < 0 {
-			return "", fmt.Errorf("%s: invalid array length", frontend.FormatPos(ref.At))
+		if ref.Len <= 0 {
+			return "", fmt.Errorf("%s: array size must be positive constant", frontend.FormatPos(ref.At))
 		}
 		elem, err := resolveTypeName(ref.Elem, module, imports)
 		if err != nil {
@@ -102,15 +135,41 @@ func resolveTypeName(ref *frontend.TypeRef, module string, imports map[string]st
 		}
 		parts := strings.Split(ref.Name, ".")
 		if len(parts) == 1 {
+			if target, ok := imports[ref.Name]; ok {
+				if symbol, isSymbol := importSymbolTarget(target); isSymbol {
+					return symbol, nil
+				}
+			}
 			return qualifyName(module, ref.Name), nil
 		}
 		if target, ok := imports[parts[0]]; ok {
+			if _, isSymbol := importSymbolTarget(target); isSymbol {
+				return "", fmt.Errorf("%s: selective import '%s' cannot be used as a namespace", frontend.FormatPos(ref.At), parts[0])
+			}
 			if len(parts) != 2 {
 				return "", fmt.Errorf("%s: expected '%s.<type>'", frontend.FormatPos(ref.At), parts[0])
 			}
 			return target + "." + parts[1], nil
 		}
 		return ref.Name, nil
+	case frontend.TypeRefFunction:
+		for i := range ref.Params {
+			paramName, err := resolveTypeName(&ref.Params[i], module, imports)
+			if err != nil {
+				return "", err
+			}
+			ref.Params[i].Name = paramName
+		}
+		if ref.Return == nil {
+			return "", fmt.Errorf("%s: missing function return type", frontend.FormatPos(ref.At))
+		}
+		retName, err := resolveTypeName(ref.Return, module, imports)
+		if err != nil {
+			return "", err
+		}
+		ref.Return.Name = retName
+		// MVP: function-typed values lower through the existing ptr-sized value path.
+		return "ptr", nil
 	default:
 		return "", fmt.Errorf("%s: unsupported type reference kind %d", frontend.FormatPos(ref.At), ref.Kind)
 	}
@@ -122,6 +181,8 @@ func canonicalBuiltinType(name string) (string, bool) {
 		return "i32", true
 	case "u8", "UInt8", "Byte":
 		return "u8", true
+	case "u16", "UInt16":
+		return "u16", true
 	case "str", "String":
 		return "str", true
 	case "bool", "Bool":
@@ -159,15 +220,94 @@ func resolveEnumCaseExpr(expr frontend.Expr, locals map[string]LocalInfo, global
 	}
 	info, ok := types[typeName]
 	if !ok || info.Kind != TypeEnum {
-		return "", EnumCaseInfo{}, false, nil
+		if altName, altInfo, found := findUniqueEnumByShortName(base.Name, types); found {
+			typeName = altName
+			info = altInfo
+		} else {
+			return "", EnumCaseInfo{}, false, nil
+		}
 	}
 	caseInfo, ok := info.CaseMap[field.Field]
 	if !ok {
 		return "", EnumCaseInfo{}, true, fmt.Errorf("%s: unknown enum case '%s' for '%s'", frontend.FormatPos(field.At), field.Field, displayTypeName(typeName, module))
 	}
+	if len(caseInfo.PayloadTypes) > 0 {
+		return "", EnumCaseInfo{}, true, fmt.Errorf("%s: enum case '%s.%s' requires payload arguments", frontend.FormatPos(field.At), displayTypeName(typeName, module), field.Field)
+	}
 	field.EnumType = typeName
 	field.EnumOrdinal = caseInfo.Ordinal
 	return typeName, caseInfo, true, nil
+}
+
+func resolveEnumCasePattern(pattern *frontend.EnumCasePatternExpr, types map[string]*TypeInfo, module string, imports map[string]string) (string, EnumCaseInfo, bool, error) {
+	ref := frontend.TypeRef{At: pattern.At, Kind: frontend.TypeRefNamed, Name: pattern.TypeName}
+	typeName, err := resolveTypeName(&ref, module, imports)
+	if err != nil {
+		return "", EnumCaseInfo{}, false, err
+	}
+	info, ok := types[typeName]
+	if !ok || info.Kind != TypeEnum {
+		if altName, altInfo, found := findUniqueEnumByShortName(pattern.TypeName, types); found {
+			typeName = altName
+			info = altInfo
+		} else {
+			return "", EnumCaseInfo{}, false, nil
+		}
+	}
+	caseInfo, ok := info.CaseMap[pattern.CaseName]
+	if !ok {
+		return "", EnumCaseInfo{}, true, fmt.Errorf("%s: unknown enum case '%s' for '%s'", frontend.FormatPos(pattern.At), pattern.CaseName, displayTypeName(typeName, module))
+	}
+	pattern.EnumType = typeName
+	pattern.EnumOrdinal = caseInfo.Ordinal
+	return typeName, caseInfo, true, nil
+}
+
+func resolveEnumCaseConstructorCall(e *frontend.CallExpr, types map[string]*TypeInfo, module string, imports map[string]string) (string, EnumCaseInfo, bool, error) {
+	parts := strings.Split(e.Name, ".")
+	if len(parts) < 2 {
+		return "", EnumCaseInfo{}, false, nil
+	}
+	caseName := parts[len(parts)-1]
+	typeRef := frontend.TypeRef{At: e.At, Kind: frontend.TypeRefNamed, Name: strings.Join(parts[:len(parts)-1], ".")}
+	typeName, err := resolveTypeName(&typeRef, module, imports)
+	if err != nil {
+		return "", EnumCaseInfo{}, false, err
+	}
+	info, ok := types[typeName]
+	if !ok || info.Kind != TypeEnum {
+		shortName := strings.Join(parts[:len(parts)-1], ".")
+		if altName, altInfo, found := findUniqueEnumByShortName(shortName, types); found {
+			typeName = altName
+			info = altInfo
+		} else {
+			return "", EnumCaseInfo{}, false, nil
+		}
+	}
+	caseInfo, ok := info.CaseMap[caseName]
+	if !ok {
+		return "", EnumCaseInfo{}, true, fmt.Errorf("%s: unknown enum case '%s' for '%s'", frontend.FormatPos(e.At), caseName, displayTypeName(typeName, module))
+	}
+	return typeName, caseInfo, true, nil
+}
+
+func findUniqueEnumByShortName(shortName string, types map[string]*TypeInfo) (string, *TypeInfo, bool) {
+	var foundName string
+	var foundInfo *TypeInfo
+	for name, info := range types {
+		if info == nil || info.Kind != TypeEnum {
+			continue
+		}
+		if name != shortName && !strings.HasSuffix(name, "."+shortName) {
+			continue
+		}
+		if foundInfo != nil && foundName != name {
+			return "", nil, false
+		}
+		foundName = name
+		foundInfo = info
+	}
+	return foundName, foundInfo, foundInfo != nil
 }
 
 func displayTypeName(name, module string) string {
@@ -178,12 +318,41 @@ func displayTypeName(name, module string) string {
 	return name
 }
 
+func symbolBelongsToModule(name, module string) bool {
+	if module == "" {
+		return !strings.Contains(name, ".")
+	}
+	return name == module || strings.HasPrefix(name, module+".")
+}
+
+func ensureFuncVisible(name string, sig FuncSig, module string, pos frontend.Position) error {
+	if symbolBelongsToModule(name, module) || sig.Public || strings.HasPrefix(name, "core.") {
+		return nil
+	}
+	return fmt.Errorf("%s: private function '%s' is not visible from module '%s'", frontend.FormatPos(pos), name, module)
+}
+
+func ensureTypeVisible(name string, info *TypeInfo, module string, pos frontend.Position) error {
+	if info == nil || symbolBelongsToModule(name, module) || info.Public {
+		return nil
+	}
+	return fmt.Errorf("%s: private type '%s' is not visible from module '%s'", frontend.FormatPos(pos), name, module)
+}
+
 func resolveCallName(name string, module string, imports map[string]string, pos frontend.Position) (string, error) {
 	parts := strings.Split(name, ".")
 	if len(parts) == 1 {
+		if target, ok := imports[name]; ok {
+			if symbol, isSymbol := importSymbolTarget(target); isSymbol {
+				return symbol, nil
+			}
+		}
 		return qualifyName(module, name), nil
 	}
 	if target, ok := imports[parts[0]]; ok {
+		if _, isSymbol := importSymbolTarget(target); isSymbol {
+			return "", fmt.Errorf("%s: selective import '%s' cannot be used as a namespace", frontend.FormatPos(pos), parts[0])
+		}
 		if len(parts) < 2 {
 			return "", fmt.Errorf("%s: expected '%s.<func>'", frontend.FormatPos(pos), parts[0])
 		}
@@ -198,11 +367,14 @@ func resolveCallName(name string, module string, imports map[string]string, pos 
 }
 
 type assignTargetInfo struct {
-	Name     string
-	Mutable  bool
-	Const    bool
-	TypeName string
-	Offset   int
+	Name           string
+	Mutable        bool
+	Const          bool
+	TypeName       string
+	Offset         int
+	Global         bool
+	ActorField     bool
+	ActorFieldSlot int
 }
 
 func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, types map[string]*TypeInfo) (assignTargetInfo, string, error) {
@@ -229,7 +401,7 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, types 
 		if info.Kind == TypeStr {
 			return assignTargetInfo{}, "", fmt.Errorf("%s: cannot assign into str", frontend.FormatPos(pos))
 		}
-		if info.Kind != TypeSlice {
+		if info.Kind != TypeSlice && info.Kind != TypeArray {
 			return assignTargetInfo{}, "", fmt.Errorf("%s: cannot index '%s'", frontend.FormatPos(pos), baseType)
 		}
 		return assignTargetInfo{Name: baseName, Mutable: baseInfo.Mutable, Const: baseInfo.Const, TypeName: info.ElemType}, info.ElemType, nil
@@ -246,30 +418,74 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, types 
 	if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
 		return assignTargetInfo{}, "", err
 	}
+	if info.ActorField {
+		if len(fields) > 0 {
+			return assignTargetInfo{}, "", fmt.Errorf("%s: '%s' is not a struct", frontend.FormatPos(pos), info.TypeName)
+		}
+		return assignTargetInfo{
+			Name:           baseName,
+			Mutable:        info.Mutable,
+			Const:          info.Const,
+			TypeName:       info.TypeName,
+			ActorField:     true,
+			ActorFieldSlot: info.ActorFieldSlot,
+		}, info.TypeName, nil
+	}
 	targetType, _, offset, err := resolveFieldChain(info.TypeName, info.Base, fields, types, pos)
 	if err != nil {
+		return assignTargetInfo{}, "", err
+	}
+	if err := rejectFixedArrayInternalAssignment(info.TypeName, fields, types, pos); err != nil {
 		return assignTargetInfo{}, "", err
 	}
 	return assignTargetInfo{Name: baseName, Mutable: info.Mutable, Const: info.Const, TypeName: targetType, Offset: offset}, targetType, nil
 }
 
-func ResolveFieldAccessType(expr frontend.Expr, locals map[string]LocalInfo, types map[string]*TypeInfo) (assignTargetInfo, string, error) {
+func rejectFixedArrayInternalAssignment(typeName string, fields []string, types map[string]*TypeInfo, pos frontend.Position) error {
+	current := typeName
+	for _, field := range fields {
+		info, ok := types[current]
+		if !ok {
+			return fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(pos), current)
+		}
+		if info.Kind == TypeArray && (field == "ptr" || field == "len") {
+			return fmt.Errorf("%s: cannot assign to fixed-array internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
+		}
+		fieldInfo, ok := info.FieldMap[field]
+		if !ok {
+			return fmt.Errorf("%s: unknown field '%s'", frontend.FormatPos(pos), field)
+		}
+		current = fieldInfo.TypeName
+	}
+	return nil
+}
+
+func ResolveFieldAccessType(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, types map[string]*TypeInfo) (assignTargetInfo, string, error) {
 	baseName, fields, pos, ok := splitFieldPath(expr)
 	if !ok {
 		return assignTargetInfo{}, "", fmt.Errorf("%s: invalid field access", frontend.FormatPos(pos))
 	}
-	info, ok := locals[baseName]
-	if !ok {
-		return assignTargetInfo{}, "", fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(pos), baseName)
+	if info, ok := locals[baseName]; ok {
+		if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
+			return assignTargetInfo{}, "", err
+		}
+		targetType, _, offset, err := resolveFieldChain(info.TypeName, info.Base, fields, types, pos)
+		if err != nil {
+			return assignTargetInfo{}, "", err
+		}
+		return assignTargetInfo{Name: baseName, Mutable: info.Mutable, Const: info.Const, TypeName: targetType, Offset: offset}, targetType, nil
 	}
-	if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
-		return assignTargetInfo{}, "", err
+	if info, ok := globals[baseName]; ok {
+		if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
+			return assignTargetInfo{}, "", err
+		}
+		targetType, _, offset, err := resolveFieldChain(info.TypeName, info.DataIndex, fields, types, pos)
+		if err != nil {
+			return assignTargetInfo{}, "", err
+		}
+		return assignTargetInfo{Name: baseName, Mutable: info.Mutable, Const: info.Const, TypeName: targetType, Offset: offset, Global: true}, targetType, nil
 	}
-	targetType, _, offset, err := resolveFieldChain(info.TypeName, info.Base, fields, types, pos)
-	if err != nil {
-		return assignTargetInfo{}, "", err
-	}
-	return assignTargetInfo{Name: baseName, Mutable: info.Mutable, Const: info.Const, TypeName: targetType, Offset: offset}, targetType, nil
+	return assignTargetInfo{}, "", fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(pos), baseName)
 }
 
 func splitFieldPath(expr frontend.Expr) (string, []string, frontend.Position, bool) {
@@ -296,7 +512,7 @@ func resolveFieldChain(typeName string, baseOffset int, fields []string, types m
 		if !ok {
 			return "", 0, 0, fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(pos), current)
 		}
-		if info.Kind != TypeStruct && info.Kind != TypeSlice && info.Kind != TypeStr {
+		if info.Kind != TypeStruct && info.Kind != TypeSlice && info.Kind != TypeArray && info.Kind != TypeStr {
 			return "", 0, 0, fmt.Errorf("%s: '%s' is not a struct", frontend.FormatPos(pos), current)
 		}
 		fieldInfo, ok := info.FieldMap[field]

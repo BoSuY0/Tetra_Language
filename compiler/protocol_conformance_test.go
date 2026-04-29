@@ -35,6 +35,44 @@ func main() -> Int:
 	}
 }
 
+func TestProtocolConformanceChecksThrowingExtensionMethod(t *testing.T) {
+	src := []byte(`
+enum DrawError:
+    case failed
+
+struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int throws DrawError
+
+extension Vec2:
+    func draw(self: Vec2) -> Int throws DrawError:
+        if self.x == 0:
+            throw DrawError.failed
+        return self.x
+
+impl Vec2: Renderable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if got := checked.FuncSigs["Vec2.draw"].ThrowsType; got != "DrawError" {
+		t.Fatalf("Vec2.draw throws = %q, want DrawError", got)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
 func TestProtocolConformanceReportsMissingMethod(t *testing.T) {
 	src := []byte(`
 struct Vec2:
@@ -57,6 +95,86 @@ func main() -> Int:
 		t.Fatalf("expected conformance error")
 	}
 	if !strings.Contains(err.Error(), "missing protocol requirement 'draw'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceSupportsGenericRequirementMVP(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Mapper:
+    func map<T>(self: Vec2, value: T) -> T
+
+extension Vec2:
+    func map<T>(self: Vec2, value: T) -> T:
+        return value
+
+impl Vec2: Mapper
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if _, err := Check(prog); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+}
+
+func TestProtocolConformanceRejectsGenericRequirementCountMismatch(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Mapper:
+    func map<T>(self: Vec2, value: T) -> T
+
+extension Vec2:
+    func map(self: Vec2, value: Int) -> Int:
+        return value
+
+impl Vec2: Mapper
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected conformance error")
+	}
+	if !strings.Contains(err.Error(), "generic parameter count differs") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceRejectsUndeclaredGenericTypeInRequirement(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Mapper:
+    func map<T>(self: Vec2, value: U) -> U
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected requirement signature error")
+	}
+	if !strings.Contains(err.Error(), "unknown type 'U'") {
 		t.Fatalf("error = %v", err)
 	}
 }

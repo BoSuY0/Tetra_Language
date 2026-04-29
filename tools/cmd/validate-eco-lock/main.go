@@ -8,6 +8,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	ctarget "tetra_language/compiler/target"
@@ -32,11 +34,23 @@ type ecoLockCapsule struct {
 	Effects      []string            `json:"effects,omitempty"`
 	Permissions  []string            `json:"permissions,omitempty"`
 	Dependencies []ecoLockDependency `json:"dependencies,omitempty"`
+	Artifacts    []ecoLockArtifact   `json:"artifacts,omitempty"`
+	Policy       map[string]string   `json:"policy,omitempty"`
 }
 
 type ecoLockDependency struct {
 	ID      string `json:"id"`
 	Version string `json:"version"`
+	Path    string `json:"path,omitempty"`
+}
+
+type ecoLockArtifact struct {
+	Kind          string `json:"kind"`
+	Target        string `json:"target,omitempty"`
+	Module        string `json:"module,omitempty"`
+	PublicAPIHash string `json:"public_api_hash,omitempty"`
+	Path          string `json:"path"`
+	SHA256        string `json:"sha256,omitempty"`
 }
 
 var knownCapsuleEffects = map[string]string{
@@ -55,23 +69,27 @@ var knownCapsuleEffects = map[string]string{
 }
 
 var knownCapsulePermissions = map[string]string{
-	"actors":       "actors",
-	"alloc":        "alloc",
-	"cap.io":       "io",
-	"cap.mem":      "mem",
-	"capability":   "capability",
-	"control":      "control",
-	"io":           "io",
-	"io.read":      "io",
-	"io.write":     "io",
-	"islands":      "islands",
-	"link":         "link",
-	"mem":          "mem",
-	"mem.read":     "mem",
-	"mem.write":    "mem",
-	"mmio":         "mmio",
-	"runtime":      "runtime",
-	"runtime.exec": "runtime",
+	"actors":                "actors",
+	"alloc":                 "alloc",
+	"cap.io":                "io",
+	"cap.mem":               "mem",
+	"capability":            "capability",
+	"control":               "control",
+	"fs.read":               "fs.read",
+	"fs.readWrite.userData": "fs.readWrite.userData",
+	"fs.write":              "fs.write",
+	"io":                    "io",
+	"io.read":               "io",
+	"io.write":              "io",
+	"islands":               "islands",
+	"link":                  "link",
+	"mem":                   "mem",
+	"mem.read":              "mem",
+	"mem.write":             "mem",
+	"mmio":                  "mmio",
+	"runtime":               "runtime",
+	"runtime.exec":          "runtime",
+	"ui":                    "ui",
 }
 
 const (
@@ -154,6 +172,9 @@ func validateEcoLock(raw []byte) error {
 			}
 			if dep.ID == capsule.ID {
 				return fmt.Errorf("capsule %s cannot depend on itself", capsule.ID)
+			}
+			if dep.Path != "" && strings.Contains(dep.Path, "\\") {
+				return fmt.Errorf("capsule %s dependency %s has non-normalized path %s", capsule.ID, dep.ID, dep.Path)
 			}
 			if seenDeps[dep.ID] {
 				return fmt.Errorf("capsule %s has duplicate dependency %s", capsule.ID, dep.ID)
@@ -239,6 +260,9 @@ func validateCapsule(capsule ecoLockCapsule) (ecoLockCapsule, error) {
 	for _, triple := range ctarget.SupportedTriples() {
 		supportedTargets[triple] = true
 	}
+	for _, triple := range ctarget.BuildOnlyTriples() {
+		supportedTargets[triple] = true
+	}
 	for _, target := range capsule.Targets {
 		if target == "" {
 			return ecoLockCapsule{}, fmt.Errorf("capsule %s has empty target", capsule.ID)
@@ -279,6 +303,65 @@ func validateCapsule(capsule ecoLockCapsule) (ecoLockCapsule, error) {
 		normalizedPermissions = append(normalizedPermissions, normalized)
 	}
 	capsule.Permissions = normalizedPermissions
+	if err := validateCapsulePolicy(capsule.Policy); err != nil {
+		return ecoLockCapsule{}, fmt.Errorf("capsule %s %v", capsule.ID, err)
+	}
+	seenArtifacts := map[string]bool{}
+	normalizedArtifacts := make([]ecoLockArtifact, 0, len(capsule.Artifacts))
+	for _, artifact := range capsule.Artifacts {
+		kind, err := normalizeArtifactKind(artifact.Kind)
+		if err != nil {
+			return ecoLockCapsule{}, fmt.Errorf("capsule %s %v", capsule.ID, err)
+		}
+		if artifact.Target != "" {
+			if !supportedTargets[artifact.Target] {
+				return ecoLockCapsule{}, fmt.Errorf("capsule %s artifact %s has unsupported target %s", capsule.ID, artifact.Path, artifact.Target)
+			}
+			if kind != "object" {
+				return ecoLockCapsule{}, fmt.Errorf("capsule %s only object artifacts accept a target", capsule.ID)
+			}
+		}
+		cleanPath, err := cleanArtifactPath(artifact.Path)
+		if err != nil {
+			return ecoLockCapsule{}, fmt.Errorf("capsule %s %v", capsule.ID, err)
+		}
+		if err := validateArtifactExtension(kind, cleanPath); err != nil {
+			return ecoLockCapsule{}, fmt.Errorf("capsule %s %v", capsule.ID, err)
+		}
+		if artifact.SHA256 != "" {
+			if _, err := parseSHA256Hash(artifact.SHA256); err != nil {
+				return ecoLockCapsule{}, fmt.Errorf("capsule %s artifact %s has invalid sha256: %w", capsule.ID, cleanPath, err)
+			}
+		}
+		if artifact.PublicAPIHash != "" {
+			if _, err := parseSHA256Hash(artifact.PublicAPIHash); err != nil {
+				return ecoLockCapsule{}, fmt.Errorf("capsule %s artifact %s has invalid public_api_hash: %w", capsule.ID, cleanPath, err)
+			}
+		}
+		key := kind + "\x00" + artifact.Target + "\x00" + cleanPath
+		if seenArtifacts[key] {
+			return ecoLockCapsule{}, fmt.Errorf("capsule %s has duplicate artifact %s %s", capsule.ID, kind, cleanPath)
+		}
+		seenArtifacts[key] = true
+		normalizedArtifacts = append(normalizedArtifacts, ecoLockArtifact{
+			Kind:          kind,
+			Target:        artifact.Target,
+			Module:        artifact.Module,
+			PublicAPIHash: artifact.PublicAPIHash,
+			Path:          cleanPath,
+			SHA256:        artifact.SHA256,
+		})
+	}
+	sort.Slice(normalizedArtifacts, func(i, j int) bool {
+		if normalizedArtifacts[i].Kind == normalizedArtifacts[j].Kind {
+			if normalizedArtifacts[i].Target == normalizedArtifacts[j].Target {
+				return normalizedArtifacts[i].Path < normalizedArtifacts[j].Path
+			}
+			return normalizedArtifacts[i].Target < normalizedArtifacts[j].Target
+		}
+		return normalizedArtifacts[i].Kind < normalizedArtifacts[j].Kind
+	})
+	capsule.Artifacts = normalizedArtifacts
 	return capsule, nil
 }
 
@@ -296,6 +379,57 @@ func normalizeCapsulePermission(name string) (string, error) {
 		return "", fmt.Errorf("has unknown permission %s", name)
 	}
 	return normalized, nil
+}
+
+func normalizeArtifactKind(kind string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "interface", "t4i":
+		return "interface", nil
+	case "object", "tobj":
+		return "object", nil
+	case "seed", "t4s":
+		return "seed", nil
+	default:
+		return "", fmt.Errorf("has unknown artifact kind %s", kind)
+	}
+}
+
+func cleanArtifactPath(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", fmt.Errorf("has empty artifact path")
+	}
+	if strings.Contains(value, "\\") {
+		return "", fmt.Errorf("artifact path must use forward slashes")
+	}
+	if filepath.IsAbs(value) {
+		return "", fmt.Errorf("artifact path must be relative")
+	}
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(value)))
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
+		return "", fmt.Errorf("artifact path must stay inside capsule root")
+	}
+	return clean, nil
+}
+
+func validateArtifactExtension(kind string, path string) error {
+	switch kind {
+	case "interface":
+		if filepath.Ext(path) != ".t4i" {
+			return fmt.Errorf("interface artifact must use .t4i")
+		}
+	case "object":
+		if filepath.Ext(path) != ".tobj" {
+			return fmt.Errorf("object artifact must use .tobj")
+		}
+	case "seed":
+		if filepath.Ext(path) != ".t4s" {
+			return fmt.Errorf("seed artifact must use .t4s")
+		}
+	default:
+		return fmt.Errorf("has unknown artifact kind %s", kind)
+	}
+	return nil
 }
 
 func containsString(values []string, value string) bool {
@@ -318,15 +452,81 @@ func lockGraphFingerprint(items []ecoLockCapsule) string {
 		b.WriteByte('|')
 		b.WriteString(strings.Join(item.Permissions, ","))
 		b.WriteByte('|')
+		b.WriteString(policyFingerprint(item.Policy))
+		b.WriteByte('|')
 		for _, dep := range item.Dependencies {
 			b.WriteString(dep.ID)
 			b.WriteByte('@')
 			b.WriteString(dep.Version)
+			if dep.Path != "" {
+				b.WriteByte(':')
+				b.WriteString(dep.Path)
+			}
+			b.WriteByte(',')
+		}
+		b.WriteByte('|')
+		for _, artifact := range item.Artifacts {
+			b.WriteString(artifact.Kind)
+			b.WriteByte(':')
+			if artifact.Target != "" {
+				b.WriteString(artifact.Target)
+			}
+			b.WriteByte(':')
+			if artifact.Module != "" {
+				b.WriteString(artifact.Module)
+			}
+			b.WriteByte(':')
+			if artifact.PublicAPIHash != "" {
+				b.WriteString(artifact.PublicAPIHash)
+			}
+			b.WriteByte(':')
+			b.WriteString(artifact.Path)
+			if artifact.SHA256 != "" {
+				b.WriteByte('@')
+				b.WriteString(artifact.SHA256)
+			}
 			b.WriteByte(',')
 		}
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+func policyFingerprint(policy map[string]string) string {
+	if len(policy) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(policy))
+	for key := range policy {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, key := range keys {
+		b.WriteString(key)
+		b.WriteByte('=')
+		b.WriteString(policy[key])
+		b.WriteByte(',')
+	}
+	return b.String()
+}
+
+func validateCapsulePolicy(policy map[string]string) error {
+	for key, value := range policy {
+		switch key {
+		case "unsafe":
+			if value != "deny" && value != "allow" {
+				return fmt.Errorf("unsafe policy must be deny or allow")
+			}
+		case "reproducible":
+			if value != "required" && value != "preferred" && value != "off" {
+				return fmt.Errorf("reproducible policy must be required, preferred, or off")
+			}
+		default:
+			return fmt.Errorf("unknown policy %s", key)
+		}
+	}
+	return nil
 }
 
 func isCapsuleSemver(version string) bool {

@@ -2,10 +2,14 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -18,6 +22,7 @@ type performanceReport struct {
 	BaselineArtifact  string              `json:"baseline_artifact"`
 	ThresholdDecision string              `json:"threshold_decision"`
 	Metrics           []performanceMetric `json:"metrics"`
+	Summary           performanceSummary  `json:"summary"`
 	ResidualRisk      string              `json:"residual_risk"`
 }
 
@@ -28,6 +33,13 @@ type performanceMetric struct {
 	ArtifactBytes float64 `json:"artifact_bytes,omitempty"`
 	Threshold     string  `json:"threshold"`
 	Decision      string  `json:"decision"`
+}
+
+type performanceSummary struct {
+	MetricCount     int     `json:"metric_count"`
+	TotalIterations int     `json:"total_iterations"`
+	MaxNsPerOp      float64 `json:"max_ns_per_op"`
+	MetricsSHA256   string  `json:"metrics_sha256"`
 }
 
 func main() {
@@ -72,10 +84,35 @@ func validatePerformanceReport(raw []byte) error {
 	if !strings.Contains(report.Command, "-bench=") {
 		return fmt.Errorf("command must include -bench")
 	}
+	if strings.Contains(strings.ToLower(report.ThresholdDecision), "todo") || strings.Contains(strings.ToLower(report.ThresholdDecision), "tbd") {
+		return fmt.Errorf("threshold_decision must not contain TODO/TBD placeholders")
+	}
+	if strings.TrimSpace(report.BaselineArtifact) == "" {
+		return fmt.Errorf("baseline_artifact is required")
+	}
+	if strings.TrimSpace(report.ResidualRisk) == "" {
+		return fmt.Errorf("residual_risk is required")
+	}
 	if len(report.Metrics) == 0 {
 		return fmt.Errorf("metrics must not be empty")
 	}
+	if report.Summary.MetricCount <= 0 {
+		return fmt.Errorf("summary.metric_count must be positive")
+	}
+	if report.Summary.TotalIterations <= 0 {
+		return fmt.Errorf("summary.total_iterations must be positive")
+	}
+	if report.Summary.MaxNsPerOp <= 0 {
+		return fmt.Errorf("summary.max_ns_per_op must be positive")
+	}
+	if !strings.HasPrefix(report.Summary.MetricsSHA256, "sha256:") {
+		return fmt.Errorf("summary.metrics_sha256 must use sha256: prefix")
+	}
+
 	seen := map[string]bool{}
+	sortedNames := make([]string, 0, len(report.Metrics))
+	totalIterations := 0
+	maxNsPerOp := 0.0
 	for _, metric := range report.Metrics {
 		if metric.Name == "" {
 			return fmt.Errorf("metric missing name")
@@ -93,6 +130,45 @@ func validatePerformanceReport(raw []byte) error {
 		if strings.TrimSpace(metric.Threshold) == "" || strings.TrimSpace(metric.Decision) == "" {
 			return fmt.Errorf("metric %s missing threshold decision", metric.Name)
 		}
+		if strings.Contains(metric.Name, "BinarySize") && metric.ArtifactBytes <= 0 {
+			return fmt.Errorf("metric %s must include positive artifact_bytes", metric.Name)
+		}
+		sortedNames = append(sortedNames, metric.Name)
+		totalIterations += metric.Iterations
+		if metric.NsPerOp > maxNsPerOp {
+			maxNsPerOp = metric.NsPerOp
+		}
+	}
+	if !sort.StringsAreSorted(sortedNames) {
+		return fmt.Errorf("metrics must be sorted by name for deterministic evidence output")
+	}
+
+	if report.Summary.MetricCount != len(report.Metrics) {
+		return fmt.Errorf("summary.metric_count = %d, want %d", report.Summary.MetricCount, len(report.Metrics))
+	}
+	if report.Summary.TotalIterations != totalIterations {
+		return fmt.Errorf("summary.total_iterations = %d, want %d", report.Summary.TotalIterations, totalIterations)
+	}
+	if report.Summary.MaxNsPerOp != maxNsPerOp {
+		return fmt.Errorf("summary.max_ns_per_op = %v, want %v", report.Summary.MaxNsPerOp, maxNsPerOp)
+	}
+	wantHash := "sha256:" + metricsHash(report.Metrics)
+	if report.Summary.MetricsSHA256 != wantHash {
+		return fmt.Errorf("summary.metrics_sha256 = %q, want %q", report.Summary.MetricsSHA256, wantHash)
 	}
 	return nil
+}
+
+func metricsHash(metrics []performanceMetric) string {
+	h := sha256.New()
+	for _, metric := range metrics {
+		line := metric.Name +
+			"\t" + strconv.Itoa(metric.Iterations) +
+			"\t" + strconv.FormatFloat(metric.NsPerOp, 'g', -1, 64) +
+			"\t" + strconv.FormatFloat(metric.ArtifactBytes, 'g', -1, 64) +
+			"\t" + metric.Threshold +
+			"\t" + metric.Decision + "\n"
+		_, _ = h.Write([]byte(line))
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }

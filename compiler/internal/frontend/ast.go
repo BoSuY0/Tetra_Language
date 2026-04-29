@@ -7,38 +7,66 @@ type Position struct {
 }
 
 type FileAST struct {
-	Path       string
-	Src        []byte
-	Module     string
-	Imports    []ImportDecl
-	Enums      []*EnumDecl
-	Structs    []*StructDecl
-	States     []*StateDecl
-	Views      []*ViewDecl
-	Protocols  []*ProtocolDecl
-	Extensions []*ExtensionDecl
-	Impls      []*ImplDecl
-	Globals    []*GlobalDecl
-	Funcs      []*FuncDecl
-	Tests      []*TestDecl
+	Path          string
+	Src           []byte
+	Module        string
+	InterfaceHash string
+	Imports       []ImportDecl
+	Capsules      []*CapsuleDecl
+	Enums         []*EnumDecl
+	Structs       []*StructDecl
+	States        []*StateDecl
+	Views         []*ViewDecl
+	Actors        []*ActorDecl
+	Protocols     []*ProtocolDecl
+	Extensions    []*ExtensionDecl
+	Impls         []*ImplDecl
+	Globals       []*GlobalDecl
+	Funcs         []*FuncDecl
+	Tests         []*TestDecl
 }
 
 type ImportDecl struct {
-	At    Position
-	Path  string
-	Alias string
+	At     Position
+	Path   string
+	Alias  string
+	Items  []string
+	Public bool
 }
 
 type Program struct {
+	Capsules   []*CapsuleDecl
 	Enums      []*EnumDecl
 	Structs    []*StructDecl
 	States     []*StateDecl
 	Views      []*ViewDecl
+	Actors     []*ActorDecl
 	Protocols  []*ProtocolDecl
 	Extensions []*ExtensionDecl
 	Impls      []*ImplDecl
 	Funcs      []*FuncDecl
 	Tests      []*TestDecl
+}
+
+type ActorDecl struct {
+	At      Position
+	Name    string
+	Public  bool
+	Fields  []StateFieldDecl
+	Methods []*FuncDecl
+}
+
+type CapsuleDecl struct {
+	At      Position
+	Name    string
+	Public  bool
+	Entries []CapsuleEntryDecl
+}
+
+type CapsuleEntryDecl struct {
+	At    Position
+	Key   string
+	Value Expr
 }
 
 type GlobalDecl struct {
@@ -47,6 +75,7 @@ type GlobalDecl struct {
 	Type    TypeRef
 	Mutable bool
 	Const   bool
+	Public  bool
 	Init    Expr
 }
 
@@ -54,10 +83,12 @@ type FuncDecl struct {
 	Pos             Position
 	Name            string
 	ExportName      string
+	Public          bool
 	Synthetic       bool
 	Async           bool
 	ExtensionOf     string
 	TypeParams      []string
+	TypeParamBounds []TypeParamBound
 	ReturnType      TypeRef
 	Throws          TypeRef
 	HasThrows       bool
@@ -71,6 +102,10 @@ type TestDecl struct {
 	At   Position
 	Name string
 	Body []Stmt
+}
+
+func (d *TestDecl) Pos() Position {
+	return d.At
 }
 
 type Stmt interface {
@@ -90,6 +125,12 @@ type ParamDecl struct {
 	Ownership string
 }
 
+type TypeParamBound struct {
+	At    Position
+	Name  string
+	Bound TypeRef
+}
+
 type SemanticClause struct {
 	At    Position
 	Name  string
@@ -103,20 +144,26 @@ const (
 	TypeRefSlice
 	TypeRefArray
 	TypeRefOptional
+	TypeRefFunction
 )
 
 type TypeRef struct {
-	At   Position
-	Kind TypeRefKind
-	Name string
-	Elem *TypeRef
-	Len  int
+	At       Position
+	Kind     TypeRefKind
+	Name     string
+	TypeArgs []TypeRef
+	Elem     *TypeRef
+	Len      int
+	Params   []TypeRef
+	Return   *TypeRef
 }
 
 type StructDecl struct {
-	At     Position
-	Name   string
-	Fields []FieldDecl
+	At         Position
+	Name       string
+	TypeParams []string
+	Public     bool
+	Fields     []FieldDecl
 }
 
 type FieldDecl struct {
@@ -128,6 +175,7 @@ type FieldDecl struct {
 type StateDecl struct {
 	At     Position
 	Name   string
+	Public bool
 	Fields []StateFieldDecl
 }
 
@@ -143,6 +191,7 @@ type StateFieldDecl struct {
 type ViewDecl struct {
 	At            Position
 	Name          string
+	Public        bool
 	StateName     TypeRef
 	Bindings      []ViewBindingDecl
 	Events        []ViewEventDecl
@@ -185,25 +234,29 @@ type ViewAccessibilityDecl struct {
 }
 
 type EnumDecl struct {
-	At    Position
-	Name  string
-	Cases []EnumCaseDecl
+	At     Position
+	Name   string
+	Public bool
+	Cases  []EnumCaseDecl
 }
 
 type EnumCaseDecl struct {
-	At   Position
-	Name string
+	At      Position
+	Name    string
+	Payload []TypeRef
 }
 
 type ExtensionDecl struct {
 	At      Position
 	Target  TypeRef
+	Public  bool
 	Methods []*FuncDecl
 }
 
 type ProtocolDecl struct {
 	At           Position
 	Name         string
+	Public       bool
 	Requirements []FuncSigDecl
 }
 
@@ -216,6 +269,7 @@ type ImplDecl struct {
 type FuncSigDecl struct {
 	At         Position
 	Name       string
+	TypeParams []string
 	Async      bool
 	ReturnType TypeRef
 	Throws     TypeRef
@@ -251,6 +305,16 @@ type ThrowStmt struct {
 
 func (s *ThrowStmt) stmtNode() {}
 func (s *ThrowStmt) Pos() Position {
+	return s.At
+}
+
+type DeferStmt struct {
+	At   Position
+	Body []Stmt
+}
+
+func (s *DeferStmt) stmtNode() {}
+func (s *DeferStmt) Pos() Position {
 	return s.At
 }
 
@@ -296,6 +360,7 @@ func (s *IfStmt) Pos() Position {
 type IfLetStmt struct {
 	At         Position
 	Name       string
+	Pattern    Expr
 	Value      Expr
 	ValueLocal string
 	Then       []Stmt
@@ -368,8 +433,58 @@ func (s *MatchStmt) Pos() Position {
 type MatchCase struct {
 	At      Position
 	Pattern Expr
+	Guard   Expr
 	Default bool
 	Body    []Stmt
+}
+
+func (c *MatchCase) Pos() Position {
+	return c.At
+}
+
+type MatchExpr struct {
+	At             Position
+	Value          Expr
+	ScrutineeLocal string
+	ResultLocal    string
+	ResultType     string
+	Cases          []MatchExprCase
+}
+
+func (e *MatchExpr) exprNode() {}
+func (e *MatchExpr) Pos() Position {
+	return e.At
+}
+
+type MatchExprCase struct {
+	At      Position
+	Pattern Expr
+	Guard   Expr
+	Default bool
+	Value   Expr
+}
+
+type CatchExpr struct {
+	At          Position
+	Call        Expr
+	ErrorLocal  string
+	ResultLocal string
+	ErrorType   string
+	ResultType  string
+	Cases       []CatchExprCase
+}
+
+func (e *CatchExpr) exprNode() {}
+func (e *CatchExpr) Pos() Position {
+	return e.At
+}
+
+type CatchExprCase struct {
+	At      Position
+	Pattern Expr
+	Guard   Expr
+	Default bool
+	Value   Expr
 }
 
 type FreeStmt struct {
@@ -464,6 +579,20 @@ func (e *SomePatternExpr) Pos() Position {
 	return e.At
 }
 
+type EnumCasePatternExpr struct {
+	At          Position
+	TypeName    string
+	CaseName    string
+	Bindings    []string
+	EnumType    string
+	EnumOrdinal int32
+}
+
+func (e *EnumCasePatternExpr) exprNode() {}
+func (e *EnumCasePatternExpr) Pos() Position {
+	return e.At
+}
+
 type IdentExpr struct {
 	At   Position
 	Name string
@@ -520,6 +649,7 @@ func (e *AwaitExpr) Pos() Position {
 type CallExpr struct {
 	At        Position
 	Name      string
+	TypeArgs  []TypeRef
 	Args      []Expr
 	ArgLabels []string
 }
@@ -530,13 +660,21 @@ func (e *CallExpr) Pos() Position {
 }
 
 type ClosureExpr struct {
-	At   Position
-	Name string
+	At       Position
+	Name     string
+	Decl     *FuncDecl
+	Captures []ClosureCapture
 }
 
 func (e *ClosureExpr) exprNode() {}
 func (e *ClosureExpr) Pos() Position {
 	return e.At
+}
+
+type ClosureCapture struct {
+	At   Position
+	Name string
+	Type TypeRef
 }
 
 type StructLitExpr struct {

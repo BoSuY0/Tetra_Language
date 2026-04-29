@@ -107,6 +107,383 @@ func TestLinkObjectRejectsUnsupportedInstruction(t *testing.T) {
 	}
 }
 
+func TestCodegenObjectRejectsNegativeGlobalSlots(t *testing.T) {
+	for _, instr := range []ir.IRInstr{
+		{Kind: ir.IRLoadGlobal, Local: -1},
+		{Kind: ir.IRStoreGlobal, Local: -1},
+	} {
+		_, err := CodegenObject([]ir.IRFunc{
+			{
+				Name:        "main",
+				ParamSlots:  0,
+				LocalSlots:  0,
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					instr,
+					{Kind: ir.IRReturn},
+				},
+			},
+		}, "main")
+		if err == nil {
+			t.Fatalf("expected negative global slot diagnostic for %v", instr.Kind)
+		}
+		if got := err.Error(); !bytes.Contains([]byte(got), []byte("negative global slot -1 in function 'main'")) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+}
+
+func TestLinkObjectAllowsRepeatedSymAddrSymbol(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  2,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRSymAddr, Name: "callback"},
+				{Kind: ir.IRStoreLocal, Local: 0},
+				{Kind: ir.IRSymAddr, Name: "callback"},
+				{Kind: ir.IRStoreLocal, Local: 1},
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	if _, err := LinkObject(obj); err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+}
+
+func TestCodegenObjectAllowsRepeatedSymAddrSymbolAcrossFunctions(t *testing.T) {
+	_, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  0,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRSymAddr, Name: "callback"},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "helper",
+			ParamSlots:  0,
+			LocalSlots:  0,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRSymAddr, Name: "callback"},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+}
+
+func TestCodegenObjectRejectsSymAddrTokenCollision(t *testing.T) {
+	old := wasmSymbolTokenHash
+	wasmSymbolTokenHash = func(string) uint32 { return 0x2a }
+	defer func() { wasmSymbolTokenHash = old }()
+
+	_, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  0,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRSymAddr, Name: "alpha"},
+				{Kind: ir.IRSymAddr, Name: "beta"},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "main")
+	if err == nil {
+		t.Fatalf("expected symbol token collision diagnostic")
+	}
+	for _, want := range []string{"symbol address token collision", "alpha", "beta", "0x0000002a"} {
+		if !bytes.Contains([]byte(err.Error()), []byte(want)) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+}
+
+func TestLinkObjectRejectsSymAddrTokenCollision(t *testing.T) {
+	old := wasmSymbolTokenHash
+	wasmSymbolTokenHash = func(string) uint32 { return 0x2a }
+	defer func() { wasmSymbolTokenHash = old }()
+
+	_, err := LinkObject(&Object{
+		MainName: "main",
+		Functions: []Function{
+			{
+				Name:        "main",
+				ParamSlots:  0,
+				LocalSlots:  0,
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRSymAddr, Name: "alpha"},
+					{Kind: ir.IRReturn},
+				},
+			},
+			{
+				Name:        "helper",
+				ParamSlots:  0,
+				LocalSlots:  0,
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRSymAddr, Name: "beta"},
+					{Kind: ir.IRReturn},
+				},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected symbol token collision diagnostic")
+	}
+	for _, want := range []string{"symbol address token collision", "alpha", "beta", "0x0000002a"} {
+		if !bytes.Contains([]byte(err.Error()), []byte(want)) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+}
+
+func TestLinkObjectSupportsIslandInstructionsInBuildOnlyMode(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  5,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 64},
+				{Kind: ir.IRIslandNew},
+				{Kind: ir.IRStoreLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRIslandMakeSliceU8},
+				{Kind: ir.IRStoreLocal, Local: 2},
+				{Kind: ir.IRStoreLocal, Local: 1},
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRIslandMakeSliceI32},
+				{Kind: ir.IRStoreLocal, Local: 4},
+				{Kind: ir.IRStoreLocal, Local: 3},
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRIslandFree},
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	if _, err := LinkObject(obj); err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+}
+
+func TestLinkObjectWASIOutputIsDeterministic(t *testing.T) {
+	funcs := []ir.IRFunc{
+		{
+			Name:        "z",
+			ParamSlots:  0,
+			LocalSlots:  0,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  0,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}
+	obj1, err := CodegenObject(funcs, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject #1: %v", err)
+	}
+	obj2, err := CodegenObject(funcs, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject #2: %v", err)
+	}
+	mod1, err := LinkObject(obj1)
+	if err != nil {
+		t.Fatalf("LinkObject #1: %v", err)
+	}
+	mod2, err := LinkObject(obj2)
+	if err != nil {
+		t.Fatalf("LinkObject #2: %v", err)
+	}
+	if !bytes.Equal(mod1, mod2) {
+		t.Fatalf("WASI module output is not deterministic")
+	}
+}
+
+func TestLinkObjectRejectsMissingEntryFunction(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  0,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "missing")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	_, err = LinkObject(obj)
+	if err == nil {
+		t.Fatalf("expected missing entry error")
+	}
+	if got := err.Error(); !bytes.Contains([]byte(got), []byte("entry function 'missing' not found")) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLinkObjectRejectsMultiSlotEntryFunction(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  0,
+			ReturnSlots: 2,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRConstI32, Imm: 2},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	_, err = LinkObject(obj)
+	if err == nil {
+		t.Fatalf("expected multi-slot entry error")
+	}
+	if got := err.Error(); !bytes.Contains([]byte(got), []byte("entry function 'main' must return exactly 1 slot")) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLinkObjectSupportsControlFlowAndI32ArrayIR(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  4,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 4},
+				{Kind: ir.IRMakeSliceI32},
+				{Kind: ir.IRStoreLocal, Local: 1}, // len
+				{Kind: ir.IRStoreLocal, Local: 0}, // ptr
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRStoreLocal, Local: 2}, // i
+				{Kind: ir.IRLabel, Label: 10},
+				{Kind: ir.IRLoadLocal, Local: 2},
+				{Kind: ir.IRConstI32, Imm: 4},
+				{Kind: ir.IRCmpLtI32},
+				{Kind: ir.IRJmpIfZero, Label: 20},
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRLoadLocal, Local: 2},
+				{Kind: ir.IRLoadLocal, Local: 2},
+				{Kind: ir.IRIndexStoreI32},
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRLoadLocal, Local: 2},
+				{Kind: ir.IRIndexLoadI32},
+				{Kind: ir.IRStoreLocal, Local: 3},
+				{Kind: ir.IRLoadLocal, Local: 2},
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRAddI32},
+				{Kind: ir.IRStoreLocal, Local: 2},
+				{Kind: ir.IRJmp, Label: 10},
+				{Kind: ir.IRLabel, Label: 20},
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	if _, err := LinkObject(obj); err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+}
+
+func TestLinkObjectSupportsU8U16ArrayIR(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  6,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 2},
+				{Kind: ir.IRMakeSliceU8},
+				{Kind: ir.IRStoreLocal, Local: 1}, // len8
+				{Kind: ir.IRStoreLocal, Local: 0}, // ptr8
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRConstI32, Imm: 7},
+				{Kind: ir.IRIndexStoreU8},
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRIndexLoadU8},
+				{Kind: ir.IRStoreLocal, Local: 2},
+
+				{Kind: ir.IRConstI32, Imm: 2},
+				{Kind: ir.IRMakeSliceU16},
+				{Kind: ir.IRStoreLocal, Local: 4}, // len16
+				{Kind: ir.IRStoreLocal, Local: 3}, // ptr16
+				{Kind: ir.IRLoadLocal, Local: 3},
+				{Kind: ir.IRLoadLocal, Local: 4},
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRConstI32, Imm: 9},
+				{Kind: ir.IRIndexStoreU16},
+				{Kind: ir.IRLoadLocal, Local: 3},
+				{Kind: ir.IRLoadLocal, Local: 4},
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRIndexLoadU16},
+				{Kind: ir.IRStoreLocal, Local: 5},
+
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	if _, err := LinkObject(obj); err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+}
+
 func wasmImports(t *testing.T, mod []byte) map[string][]string {
 	t.Helper()
 	payload := wasmSection(t, mod, 2)

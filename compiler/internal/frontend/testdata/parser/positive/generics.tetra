@@ -1,5 +1,9 @@
+struct Box<T>:
+    value: T
+
 func id<T>(x: T) -> T:
     return x
 
 func main() -> Int:
-    return id(42)
+    let b: Box<Int> = Box<Int>{value: id(42)}
+    return b.value

@@ -200,22 +200,19 @@ func main() -> Int:
 	}
 }
 
-func TestStabilizationEnumPayloadsRemainExplicitlyPostV1(t *testing.T) {
-	_, err := Parse([]byte(`
+func TestStabilizationEnumPayloadsAreAccepted(t *testing.T) {
+	prog, err := Parse([]byte(`
 enum Option:
     case some(Int)
 
 func main() -> Int:
     return 0
 `))
-	if err == nil {
-		t.Fatalf("expected enum payload diagnostic")
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
 	}
-	if !strings.Contains(err.Error(), "enum payload cases are planned") {
-		t.Fatalf("error = %v", err)
-	}
-	if strings.Contains(err.Error(), "v0.") {
-		t.Fatalf("enum payload diagnostic should be versionless: %v", err)
+	if len(prog.Enums) != 1 || len(prog.Enums[0].Cases) != 1 || len(prog.Enums[0].Cases[0].Payload) != 1 {
+		t.Fatalf("payload enum = %#v", prog.Enums)
 	}
 }
 
@@ -226,7 +223,7 @@ func main() -> Int:
     for x in 12:
         total = total + x
     return total
-`, "for collection requires slice or string")
+`, "for collection requires array, slice, or string")
 }
 
 func TestStabilizationRejectsBreakContinueOutsideLoop(t *testing.T) {

@@ -6,7 +6,7 @@ for the current v1 planning baseline.
 Companion freeze decisions for unresolved TODO 12/13/15 implementation items:
 `../plans/v1_scope_freeze_backend_stdlib_ui.md`.
 
-Canonical release scope for the current v0.1.3-to-v1.0.0 plan:
+Canonical release scope for the current v0.2.0-to-v1.0.0 plan:
 `./v1_scope.md`.
 
 Decision labels used here:
@@ -20,8 +20,8 @@ Decision labels used here:
 
 | Feature | Decision | Notes / prerequisites |
 | --- | --- | --- |
-| Closures | `defer post-v1` | `fn`/`fun` literals already produce planned-feature diagnostics in the Flow MVP parser. Closure capture semantics should not land before the borrow/lifetime surface is stabilized. |
-| Semantic clauses (`noalloc`, `noblock`, `realtime`, `nothrow`) | `defer post-v1` | The Flow MVP currently documents these as deferred and diagnostics-only. v1 keeps this posture instead of introducing partial enforcement semantics. |
+| Closures and callable/function-value surface | `defer post-v1` | Parser and checker now accept closure literals, top-level `closure`, function type refs (`fn(...) -> ...`), and a narrow callable MVP (direct local calls for let-bound non-capturing closure values; callback-parameter calls when the caller passes a known symbol-backed immutable function-typed local or a direct named non-generic non-throwing function/closure symbol; plus function return of symbol-backed non-generic non-throwing values in function-typed return paths and immutable function-typed local-to-local binding when signatures match). Full first-class function-value semantics (arbitrary escape/passing/storing), full capture matrix, and ABI redesign remain post-v1 and should not land before borrow/lifetime stabilization. |
+| Semantic clauses (`noalloc`, `noblock`, `realtime`, `nothrow`) | `implement in v1` | `nothrow` validation remains static. `noalloc`/`noblock`/`realtime` now have phase-1 checker enforcement on resolved direct calls, closure-symbol calls, and function-typed callback arguments; `realtime` requires `noalloc`+`noblock`. Full whole-program/proof-level guarantees remain post-v1. |
 | Budget clauses (`budget`) | `implement in v1` | Static v1 MVP: `uses budget` plus `budget(<non-negative integer constant>)` is checked and lowered to deterministic local guards. Cross-function/runtime-wide and distributed budget accounting remains post-v1 in `v1_scope.md`. |
 | Privacy clauses (checked privacy + consent/privacy types) | `implement in v1` | Static v1 MVP: privacy clauses, `secret.i32`/`SecretInt`, consent-token signatures, and privacy builtins are checked. Cryptographic isolation and distributed consent enforcement remain post-v1 in `v1_scope.md`. |
 | UI syntax (`view`, `state`, binding/events/commands, typed style, accessibility metadata) | `implement in v1` | Scope is the metadata UI surface in `ui_v1.md`: checked declarations, deterministic UI JSON, web preview artifacts, native shell text sidecar, and smoke evidence. Full native widgets and runtime UI event dispatch are post-v1. |

@@ -1,2 +1,3 @@
 protocol P:
-    func id<T>(x: T) -> T
+    func draw(self: i32) -> i32
+    func draw(self: i32) -> i32

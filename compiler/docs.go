@@ -89,7 +89,7 @@ func collectDocFiles(paths []string) ([]string, error) {
 			return nil, err
 		}
 		if !info.IsDir() {
-			if strings.HasSuffix(path, ".tetra") {
+			if isDocSourceFile(path) {
 				seen[path] = struct{}{}
 				files = append(files, path)
 			}
@@ -105,7 +105,7 @@ func collectDocFiles(paths []string) ([]string, error) {
 				}
 				return nil
 			}
-			if strings.HasSuffix(p, ".tetra") {
+			if isDocSourceFile(p) {
 				if _, ok := seen[p]; !ok {
 					seen[p] = struct{}{}
 					files = append(files, p)
@@ -119,6 +119,14 @@ func collectDocFiles(paths []string) ([]string, error) {
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+func isDocSourceFile(path string) bool {
+	if !IsSourceFile(path) {
+		return false
+	}
+	base := filepath.Base(path)
+	return base != CapsuleFileName && base != LegacyCapsuleFileName
 }
 
 func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {

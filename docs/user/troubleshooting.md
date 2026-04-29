@@ -1,6 +1,7 @@
 # Troubleshooting
 
-Status: user guide for common v1.0 command failures.
+Status: user guide for common command failures in the current `v0.2.0` profile
+and future v1.0 preparation.
 
 Use the exact command that matches the failing workflow, then apply the fix
 listed for the diagnostic you see.
@@ -115,8 +116,9 @@ isolation evidence.
 Command:
 
 ```sh
-./tetra eco verify --target linux-x64 --lock tetra.lock.json Tetra.capsule Core.capsule
-go run ./tools/cmd/validate-eco-lock --lock tetra.lock.json
+./tetra project sync --check .
+./tetra project sync .
+go run ./tools/cmd/validate-eco-lock --lock Tetra.lock
 ```
 
 Typical diagnostic:
@@ -125,7 +127,82 @@ Typical diagnostic:
 graph_sha256 mismatch
 ```
 
-Fix: regenerate the lock from the capsule files in the same branch state, then
+Fix: run `tetra project sync .` from the project root to refresh `Tetra.lock`
+and any generated local dependency artifacts in the same branch state, then
 rerun the validator. If the mismatch came from a dependency permission or target
-change, review the capsule graph before accepting the new lock.
+change, review the capsule graph before accepting the new lock. For explicit
+capsule graph work, the lower-level `tetra eco verify --lock Tetra.lock
+Capsule.t4` path is still available.
 
+## Example Index Mismatch
+
+Command:
+
+```sh
+go run ./tools/cmd/validate-example-index --smoke-list reports/smoke-list-linux-x64.json --index docs/user/examples_index.md
+```
+
+Typical diagnostic:
+
+```text
+example index missing examples/...
+```
+
+Fix: add or correct the row in `docs/user/examples_index.md` so the example path,
+target group, and expected behavior match the smoke-list case or documented
+exclusion.
+
+## Smoke List Coverage Gap
+
+Command:
+
+```sh
+go run ./tools/cmd/validate-smoke-list --report reports/smoke-list-linux-x64.json --examples-root examples
+```
+
+Typical diagnostic:
+
+```text
+example examples/... is not assigned to a smoke case or documented exclusion
+```
+
+Fix: either add the example to smoke-list generation or add it to
+`excluded_examples` with a clear reason. Keep paths portable (`examples/...`,
+forward slashes, no absolute paths).
+
+## Test Report Shape Mismatch
+
+Command:
+
+```sh
+go run ./tools/cmd/validate-test-report --report reports/examples-test-report.json
+```
+
+Typical diagnostic:
+
+```text
+report counts mismatch
+```
+
+Fix: regenerate the JSON report with `./tetra test --report=json examples`,
+then verify per-file totals, per-test order (`filename` then `index`), and
+failure fields (`exit_code` or `error`) are consistent.
+
+## Dogfood Example Fails But Smoke List Passes
+
+Command:
+
+```sh
+./tetra run --target linux-x64 examples/projects/eco_dogfood/src/main.tetra
+```
+
+Typical diagnostic:
+
+```text
+excluded from linux-x64 smoke profile
+```
+
+Fix: for known exclusions (for example `eco_dogfood`), use direct `tetra run`
+evidence instead of treating smoke-list exclusion as a regression. For required
+dogfood smoke entries (`dogfood_cli`, `dogfood_actor_task`), any runtime failure
+is a real regression.

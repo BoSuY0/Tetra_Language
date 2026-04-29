@@ -16,6 +16,14 @@ type unsupportedCtxSwitchABI struct {
 	*x64abi.SysVUnix
 }
 
+type emitArtifacts struct {
+	code         []byte
+	dataBlobs    [][]byte
+	leaPatches   []x64obj.LeaPatch
+	callPatches  []x64obj.CallPatch
+	importPaches []x64obj.ImportPatch
+}
+
 func emitOneFunc(t *testing.T, abi x64abi.ABI, fn ir.IRFunc) []byte {
 	t.Helper()
 
@@ -29,6 +37,27 @@ func emitOneFunc(t *testing.T, abi x64abi.ABI, fn ir.IRFunc) []byte {
 		t.Fatalf("emit: %v", err)
 	}
 	return e.Buf
+}
+
+func emitWithArtifacts(t *testing.T, abi x64abi.ABI, fn ir.IRFunc) emitArtifacts {
+	t.Helper()
+
+	emitFn := NewEmitFunc(abi)
+	e := &x64.Emitter{}
+	var dataBlobs [][]byte
+	var leaPatches []x64obj.LeaPatch
+	var callPatches []x64obj.CallPatch
+	var importPatches []x64obj.ImportPatch
+	if err := emitFn(e, fn, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{}); err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	return emitArtifacts{
+		code:         e.Buf,
+		dataBlobs:    dataBlobs,
+		leaPatches:   leaPatches,
+		callPatches:  callPatches,
+		importPaches: importPatches,
+	}
 }
 
 func TestCtxSwitchUnsupportedABIDiagnostic(t *testing.T) {
@@ -205,5 +234,107 @@ func TestCtxSwitchEmissionWin64(t *testing.T) {
 	}
 	if !bytes.Equal(buf[callEnd:callEnd+len(add.Buf)], add.Buf) {
 		t.Fatalf("missing Win64 shadow-space epilogue after ctx_switch call")
+	}
+}
+
+func TestObjectEmitSharedLiteralAddsDataRelocArtifacts(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "__test_strlit",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRStrLit, Str: []byte("shared-data")},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+	art := emitWithArtifacts(t, x64abi.LinuxSysV(), fn)
+	if len(art.dataBlobs) != 1 {
+		t.Fatalf("data blob count = %d, want 1", len(art.dataBlobs))
+	}
+	if string(art.dataBlobs[0]) != "shared-data" {
+		t.Fatalf("unexpected data blob: %q", string(art.dataBlobs[0]))
+	}
+	if len(art.leaPatches) != 1 {
+		t.Fatalf("lea patch count = %d, want 1", len(art.leaPatches))
+	}
+	if art.leaPatches[0].DataIndex != 0 {
+		t.Fatalf("lea patch data index = %d, want 0", art.leaPatches[0].DataIndex)
+	}
+	if art.leaPatches[0].At < 0 || art.leaPatches[0].At+4 > len(art.code) {
+		t.Fatalf("lea patch offset out of range: at=%d len=%d", art.leaPatches[0].At, len(art.code))
+	}
+}
+
+func TestABIDiagnosticEmitSharedRejectsMissingInputs(t *testing.T) {
+	emitFn := NewEmitFunc(nil)
+	err := emitFn(nil, ir.IRFunc{Name: "__test"}, nil, nil, nil, nil, x64.CodegenOptions{})
+	if err == nil || !strings.Contains(err.Error(), "missing ABI") {
+		t.Fatalf("unexpected missing ABI error: %v", err)
+	}
+
+	emitFn = NewEmitFunc(x64abi.LinuxSysV())
+	var dataBlobs [][]byte
+	var leaPatches []x64obj.LeaPatch
+	var callPatches []x64obj.CallPatch
+	err = emitFn(nil, ir.IRFunc{Name: "__test"}, &dataBlobs, &leaPatches, &callPatches, nil, x64.CodegenOptions{})
+	if err == nil || !strings.Contains(err.Error(), "missing emitter") {
+		t.Fatalf("unexpected missing emitter error: %v", err)
+	}
+}
+
+func TestABIDiagnosticEmitSharedRejectsUnsupportedReturnSlots(t *testing.T) {
+	emitFn := NewEmitFunc(x64abi.LinuxSysV())
+	e := &x64.Emitter{}
+	var dataBlobs [][]byte
+	var leaPatches []x64obj.LeaPatch
+	var callPatches []x64obj.CallPatch
+	var importPatches []x64obj.ImportPatch
+	err := emitFn(e, ir.IRFunc{
+		Name:        "__test_bad_return_slots",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 5,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRConstI32, Imm: 3},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRConstI32, Imm: 5},
+			{Kind: ir.IRReturn},
+		},
+	}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+	if err == nil || !strings.Contains(err.Error(), "unsupported return slots") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestABIBuildOnlyEmitSharedAcrossABIs(t *testing.T) {
+	cases := []struct {
+		name string
+		abi  x64abi.ABI
+	}{
+		{name: "sysv", abi: x64abi.LinuxSysV()},
+		{name: "win64", abi: x64abi.NewWin64()},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fn := ir.IRFunc{
+				Name:        "__test_build_only_" + tc.name,
+				ParamSlots:  0,
+				LocalSlots:  0,
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRConstI32, Imm: 0},
+					{Kind: ir.IRReturn},
+				},
+			}
+			buf := emitOneFunc(t, tc.abi, fn)
+			if len(buf) == 0 {
+				t.Fatalf("empty emission")
+			}
+		})
 	}
 }

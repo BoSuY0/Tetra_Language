@@ -319,6 +319,261 @@ realtime:
 `, "realtime")
 }
 
+func TestSemanticClauseRealtimeRequiresNoallocAndNoblock(t *testing.T) {
+	requireCheckErrorContains(t, `
+func main() -> Int
+realtime
+noblock:
+  return 0
+`, "requires semantic clause 'noalloc'")
+
+	requireCheckErrorContains(t, `
+func main() -> Int
+realtime
+noalloc:
+  return 0
+`, "requires semantic clause 'noblock'")
+}
+
+func TestSemanticClauseNoallocDirectClosureAndCallGraphChecks(t *testing.T) {
+	requireCheckOK(t, `
+func inc(x: Int) -> Int:
+  return x + 1
+
+func main() -> Int
+noalloc:
+  let f: fn(Int) -> Int = fn(x: Int) -> Int:
+    return x + 1
+  return f(inc(40))
+`)
+
+	requireCheckErrorContains(t, `
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func main() -> Int
+noalloc:
+  return allocer(1)
+`, "semantic clause 'noalloc' forbids call")
+}
+
+func TestSemanticClauseNoblockDirectCallGraphChecks(t *testing.T) {
+	requireCheckOK(t, `
+func inc(x: Int) -> Int:
+  return x + 1
+
+func main() -> Int
+noblock:
+  return inc(41)
+`)
+
+	requireCheckErrorContains(t, `
+func sleeper(x: Int) -> Int
+uses runtime:
+  let _: Int = core.sleep_ms(1)
+  return x
+
+func main() -> Int
+noblock:
+  return sleeper(1)
+`, "semantic clause 'noblock' forbids call")
+}
+
+func TestSemanticClauseRealtimeDirectCallGraphChecks(t *testing.T) {
+	requireCheckOK(t, `
+func pure(x: Int) -> Int
+noalloc
+noblock:
+  return x + 1
+
+func main() -> Int
+realtime
+noalloc
+noblock:
+  return pure(41)
+`)
+
+	requireCheckErrorContains(t, `
+func sleeper(x: Int) -> Int
+uses runtime:
+  let _: Int = core.sleep_ms(1)
+  return x
+
+func main() -> Int
+realtime
+noalloc
+noblock:
+  return sleeper(1)
+`, "semantic clause 'realtime' forbids call")
+}
+
+func TestSemanticClauseCallbackChecksForNoallocNoblockRealtime(t *testing.T) {
+	requireCheckErrorContains(t, `
+func alloc_cb(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int
+noalloc:
+  return cb(x)
+
+func main() -> Int:
+  return apply(alloc_cb, 41)
+`, "function-typed callback 'cb' has unknown target and cannot be called under semantic clause 'noalloc'")
+
+	requireCheckErrorContains(t, `
+func sleep_cb(x: Int) -> Int
+uses runtime:
+  let _: Int = core.sleep_ms(1)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int
+noblock:
+  return cb(x)
+
+func main() -> Int:
+  return apply(sleep_cb, 41)
+`, "function-typed callback 'cb' has unknown target and cannot be called under semantic clause 'noblock'")
+
+	requireCheckErrorContains(t, `
+func sleep_cb(x: Int) -> Int
+uses runtime:
+  let _: Int = core.sleep_ms(1)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int
+realtime
+noalloc
+noblock:
+  return cb(x)
+
+func main() -> Int:
+  return apply(sleep_cb, 41)
+`, "function-typed callback 'cb' has unknown target and cannot be called under semantic clause 'realtime'")
+}
+
+func TestSemanticClauseCallbackWrapperBypassRegression(t *testing.T) {
+	requireCheckErrorContains(t, `
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+  return cb(x)
+
+func main() -> Int
+noalloc:
+  return apply(allocer, 41)
+`, "semantic clause 'noalloc' forbids call")
+
+	requireCheckErrorContains(t, `
+func sleeper(x: Int) -> Int
+uses runtime:
+  let _: Int = core.sleep_ms(1)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+  return cb(x)
+
+func main() -> Int
+noblock:
+  return apply(sleeper, 41)
+`, "semantic clause 'noblock' forbids call")
+
+	requireCheckErrorContains(t, `
+func sleeper(x: Int) -> Int
+uses runtime:
+  let _: Int = core.sleep_ms(1)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+  return cb(x)
+
+func main() -> Int
+realtime
+noalloc
+noblock:
+  return apply(sleeper, 41)
+`, "semantic clause 'realtime' forbids call")
+}
+
+func TestCallbackWrapperRequiresTargetEffects(t *testing.T) {
+	requireCheckErrorContains(t, `
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+  return cb(x)
+
+func main() -> Int:
+  return apply(allocer, 41)
+`, "uses effect 'alloc'")
+}
+
+func TestCallbackWrapperRequiresLocalSymbolBackedTargetEffects(t *testing.T) {
+	requireCheckErrorContains(t, `
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+  return cb(x)
+
+func main() -> Int:
+  let f: fn(Int) -> Int = allocer
+  return apply(f, 41)
+`, "uses effect 'alloc'")
+}
+
+func TestCallbackWrapperRequiresImportedTargetEffects(t *testing.T) {
+	files := map[string]string{
+		"lib/callbacks.t4": `module lib.callbacks
+
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+  return cb(x)
+`,
+		"app/main.t4": `module app.main
+import lib.callbacks.{apply, allocer}
+
+func main() -> Int:
+  return apply(allocer, 41)
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	world, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/main.t4")))
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	_, err = CheckWorld(world)
+	if err == nil {
+		t.Fatalf("expected imported callback target effect propagation error")
+	}
+	for _, want := range []string{"function 'app.main.main'", "uses effect 'alloc'"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+}
+
 func TestPrivacyEffectRequiresPrivacyClause(t *testing.T) {
 	requireCheckErrorContains(t, `
 func main() -> Int

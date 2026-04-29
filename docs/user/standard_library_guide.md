@@ -17,25 +17,47 @@ fresh evidence for them.
 | Need | Import | Example | Effects |
 | --- | --- | --- | --- |
 | Integer helpers and small arithmetic choices | `import lib.core.math as math` | `examples/core_math_smoke.tetra` | none |
-| Explicit memory capability wrappers | `import lib.core.memory as memory` | `examples/core_memory_smoke.tetra` | `capability`, `mem` |
-| Capability tokens for host-like surfaces | `import lib.core.capability as cap` | `examples/flow_unsafe_cap_mem_smoke.tetra` | `capability`, `io`, `mem` |
+| Explicit memory capability wrappers | `import lib.core.memory as memory` | `examples/core_memory_smoke.tetra` | `mem` |
+| Capability tokens for host-like surfaces | `import lib.core.capability as cap` | `examples/core_memory_smoke.tetra` | `capability`, `io`, `mem` |
 | Capability-gated IO helpers | `import lib.core.io as io` | `examples/core_io_smoke.tetra` | `capability`, `io`, `mmio` |
 | Test status helpers | `import lib.core.testing as testing` | `examples/core_testing_smoke.tetra` | none |
 | Slice length and first/fallback helpers | `import lib.core.slices as slices` | `examples/core_slices_smoke.tetra` | `mem` |
-| String length and prefix-style helpers | `import lib.core.strings as strings` | `examples/core_strings_smoke.tetra` | `mem` |
-| Collection scans over `[]i32` | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
-| Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core_serialization_smoke.tetra` | none |
-| Filesystem path/status placeholders | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | `io` |
-| Networking endpoint/status placeholders | `import lib.core.networking as networking` | `examples/core_networking_smoke.tetra` | `io` |
+| String length and prefix-style helpers | `import lib.core.strings as strings` | `examples/core_strings_smoke.tetra` | none |
+| Collection scans over `[]i32` / `[]u16` / `[]bool` | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
+| Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core_serialization_smoke.tetra` | `mem` |
+| Filesystem path/status placeholders | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | none |
+| Networking endpoint/status placeholders | `import lib.core.networking as networking` | `examples/core_networking_smoke.tetra` | none |
 | Async helper functions | `import lib.core.async as async` | `examples/core_async_smoke.tetra` | none |
 | Synchronization status helpers | `import lib.core.sync as sync` | `examples/core_sync_smoke.tetra` | none |
 | Time duration/status helpers | `import lib.core.time as time` | `examples/core_time_smoke.tetra` | none |
-| Crypto digest/status placeholders | `import lib.core.crypto as crypto` | `examples/core_crypto_smoke.tetra` | none |
+| Crypto digest/status placeholders | `import lib.core.crypto as crypto` | `examples/core_crypto_smoke.tetra` | `mem` |
 
 The modules with `capability`, `io`, `mem`, or `mmio` effects do not grant host
 permission by import alone. The calling function still declares matching
 `uses` effects and obtains any required capability token through the documented
 unsafe boundary.
+
+## Experimental Mirrors
+
+Experimental mirrors are compatibility shims with no stability guarantees.
+Prefer the stable replacement in new code.
+
+| Experimental import | Stable replacement | Status |
+| --- | --- | --- |
+| `import lib.experimental.async as async` | `import lib.core.async as async` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.collections as collections` | `import lib.core.collections as collections` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.crypto as crypto` | `import lib.core.crypto as crypto` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.filesystem as filesystem` | `import lib.core.filesystem as filesystem` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.io as io` | `import lib.core.io as io` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.math as math` | `import lib.core.math as math` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.memory as memory` | `import lib.core.memory as memory` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.networking as networking` | `import lib.core.networking as networking` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.serialization as serialization` | `import lib.core.serialization as serialization` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.slices as slices` | `import lib.core.slices as slices` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.strings as strings` | `import lib.core.strings as strings` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.sync as sync` | `import lib.core.sync as sync` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.testing as testing` | `import lib.core.testing as testing` | Experimental mirror; no stability guarantees. |
+| `import lib.experimental.time as time` | `import lib.core.time as time` | Experimental mirror; no stability guarantees. |
 
 ## Runnable Examples
 

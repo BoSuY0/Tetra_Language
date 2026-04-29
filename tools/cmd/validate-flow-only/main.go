@@ -17,6 +17,7 @@ type flowIssue struct {
 	Message string
 }
 
+// Keep these boundaries aligned with docs/spec/flow_syntax_v1.md.
 var legacyPatterns = []struct {
 	re      *regexp.Regexp
 	message string
@@ -26,6 +27,7 @@ var legacyPatterns = []struct {
 	{regexp.MustCompile(`^\s*while\s*\(.*\)\s*\{\s*$`), "legacy braced while syntax; use Flow 'while condition:'"},
 	{regexp.MustCompile(`^\s*unsafe\s*\{\s*$`), "legacy braced unsafe syntax; use Flow 'unsafe:'"},
 	{regexp.MustCompile(`^\s*island\s*\(.*\)\s+as\s+\w+\s*\{\s*$`), "legacy braced island syntax; use Flow 'island(size) as name:'"},
+	{regexp.MustCompile(`^\s*test\b.*\{\s*$`), "legacy braced test syntax; use Flow 'test \"name\":'"},
 }
 
 var inlineStructLiteralPattern = regexp.MustCompile(`\b[A-Za-z_][A-Za-z0-9_.]*\s*\{[^{}]*\}`)
@@ -56,7 +58,7 @@ func validatePaths(paths []string) ([]flowIssue, error) {
 			return nil, err
 		}
 		if !info.IsDir() {
-			if strings.HasSuffix(path, ".tetra") {
+			if isTetraSourceFile(path) {
 				files = append(files, path)
 			}
 			continue
@@ -72,7 +74,7 @@ func validatePaths(paths []string) ([]flowIssue, error) {
 				}
 				return nil
 			}
-			if strings.HasSuffix(p, ".tetra") {
+			if isTetraSourceFile(p) {
 				files = append(files, p)
 			}
 			return nil
@@ -91,6 +93,19 @@ func validatePaths(paths []string) ([]flowIssue, error) {
 		issues = append(issues, fileIssues...)
 	}
 	return issues, nil
+}
+
+func isTetraSourceFile(path string) bool {
+	base := filepath.Base(path)
+	if base == "Capsule.t4" || base == "Tetra.capsule" {
+		return false
+	}
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".t4", ".tetra":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateFile(path string) ([]flowIssue, error) {

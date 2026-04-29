@@ -42,6 +42,41 @@ func main() -> Int:
 	}
 }
 
+func TestExtensionMethodCanReturnOptionalPayload(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+extension Vec2:
+    func nonzero(self: Vec2) -> Int?:
+        if self.x == 0:
+            return none
+        return self.x
+
+func main() -> Int:
+    let v: Vec2 = Vec2(x: 42)
+    let maybe: Int? = Vec2.nonzero(v)
+    if let x = maybe:
+        return x
+    else:
+        return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if got := checked.FuncSigs["Vec2.nonzero"].ReturnType; got != "i32?" {
+		t.Fatalf("Vec2.nonzero return type = %q, want i32?", got)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
 func TestExtensionNoLongerPlannedDiagnostic(t *testing.T) {
 	_, err := Parse([]byte("extension Vec2:\n"))
 	if err == nil {

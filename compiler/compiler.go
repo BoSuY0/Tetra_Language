@@ -26,6 +26,7 @@ import (
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/lower"
 	"tetra_language/compiler/internal/semantics"
+	"tetra_language/compiler/internal/version"
 	ctarget "tetra_language/compiler/target"
 )
 
@@ -59,18 +60,32 @@ type BuildOptions struct {
 	Runtime           RuntimeMode
 	RuntimeObjectPath string
 	LinkObjectPaths   []string
+	ProjectRoot       string
+	SourceRoots       []string
+	DependencyRoots   []ModuleRoot
+	InterfaceOnly     bool
 }
 
 type BuildStats struct {
-	CompiledModules []string
-	CacheHits       []string
-	LoweredModules  []string
+	CompiledModules  []string
+	CacheHits        []string
+	LoweredModules   []string
+	InterfaceModules []string
+}
+
+type linkedObject struct {
+	path        string
+	obj         *Object
+	contentHash [32]byte
 }
 
 func BuildFileWithStats(inputPath, outputPath, target string) (*BuildStats, error) {
 	return BuildFileWithStatsOpt(inputPath, outputPath, target, BuildOptions{Jobs: 1})
 }
 
+// BuildFileWithStatsOpt compiles from an entry file path and always uses the
+// module loader graph rooted at that entry path.
+// Boundary: for in-memory single-source semantic checks use Parse + Check.
 func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOptions) (*BuildStats, error) {
 	tgt, err := ctarget.Parse(target)
 	if err != nil {
@@ -125,13 +140,23 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		return nil, fmt.Errorf("unsupported target: %s", target)
 	}
 
-	world, err := LoadWorld(inputPath)
+	world, err := loadWorldForBuild(inputPath, opt)
 	if err != nil {
 		return nil, err
 	}
 
-	checked, err := CheckWorld(world)
+	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: !opt.InterfaceOnly})
 	if err != nil {
+		return nil, err
+	}
+	if opt.InterfaceOnly {
+		return interfaceOnlyBuildStats(world), nil
+	}
+	linkedObjects, err := readLinkObjects(opt.LinkObjectPaths, target)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateInterfaceImplementationProviders(world, linkedObjects); err != nil {
 		return nil, err
 	}
 
@@ -142,13 +167,28 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	if err != nil {
 		return nil, err
 	}
-	stats := &BuildStats{}
+	stats := &BuildStats{InterfaceModules: sortedInterfaceModules(world)}
 
 	modules := make([]string, 0, len(world.ByModule))
 	for module := range world.ByModule {
+		if world.InterfaceModules[module] {
+			continue
+		}
 		modules = append(modules, module)
 	}
 	sort.Strings(modules)
+	publicAPIHashes := make(map[string]string, len(modules))
+	for _, module := range modules {
+		file := world.ByModule[module]
+		if file == nil {
+			return nil, fmt.Errorf("missing module '%s'", module)
+		}
+		hash, err := InterfaceFingerprintFromSource(file.Src, file.Path)
+		if err != nil {
+			return nil, err
+		}
+		publicAPIHashes[module] = hash
+	}
 
 	type moduleJob struct {
 		module  string
@@ -156,7 +196,7 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		depHash [32]byte
 	}
 
-	buildTag := buildTagFromOptions(opt)
+	buildTag := buildTagFromOptions(opt, linkedObjects)
 	objectsByModule := make(map[string]*Object, len(modules))
 	var toCompile []moduleJob
 
@@ -176,7 +216,7 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		for name := range typeSet {
 			typeDeps = append(typeDeps, name)
 		}
-		depHash, err := cache.DepSigHashFromDeps(callees, typeDeps, sigMap, typeSigMap)
+		depHash, err := cache.DepSigHashFromDepsWithInterfaceHashes(callees, typeDeps, sigMap, typeSigMap, world.InterfaceHashes)
 		if err != nil {
 			return nil, err
 		}
@@ -250,6 +290,8 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 				}
 				obj.Target = target
 				obj.Module = job.module
+				obj.CompilerVersion = version.CompilerVersion
+				obj.PublicAPIHash = publicAPIHashes[job.module]
 				obj.SrcHash = job.srcHash
 				obj.WorldSigHash = job.depHash
 				if err := cache.StoreCachedObject(world.Root, target, buildTag, obj); err != nil {
@@ -294,22 +336,37 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	if err != nil {
 		return nil, err
 	}
-	mainName := checked.MainName
-	if opt.RuntimeObjectPath != "" && !actorsUsed {
-		return nil, fmt.Errorf("runtime object override requires actors usage (no actor builtins found)")
+	actorStateUsed := collectActorStateRuntimeUsage(checked)
+	tasksUsed := collectTaskRuntimeUsage(checked)
+	taskGroupsUsed := collectTaskGroupRuntimeUsage(checked)
+	typedTasksUsed, typedTaskMaxSlots := collectTypedTaskRuntimeUsage(checked)
+	typedTaskStagedUsed := typedTaskMaxSlots > 4
+	timeRuntimeUsed := collectTimeRuntimeUsage(checked)
+	runtimeUsed := actorsUsed || actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed
+	if runtimeUsed && len(actorEntries) == 0 {
+		actorEntries = []string{checked.MainName}
 	}
-	if actorsUsed {
+	mainName := checked.MainName
+	if opt.RuntimeObjectPath != "" && !runtimeUsed {
+		return nil, fmt.Errorf("runtime object override requires runtime usage (no actor/task/time builtins found)")
+	}
+	if runtimeUsed {
 		runtimeMode := opt.Runtime
 		switch runtimeMode {
 		case RuntimeAuto:
-			// Default to self-host runtime.
+			// Default to self-host runtime when its ABI can express the program surface.
 			runtimeMode = RuntimeSelfHost
+			if actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed {
+				runtimeMode = RuntimeBuiltin
+			}
+			if typedTaskStagedUsed {
+				runtimeMode = RuntimeBuiltin
+			}
 		case RuntimeSelfHost, RuntimeBuiltin:
 			// ok
 		default:
 			return nil, fmt.Errorf("unsupported runtime mode: %d", opt.Runtime)
 		}
-
 		var rt *Object
 		needsDispatchGlue := true
 		needsMainEntryIDGlue := true
@@ -347,6 +404,31 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		if err := validateActorRuntimeObject(rt); err != nil {
 			return nil, err
 		}
+		if actorStateUsed {
+			if err := validateActorStateRuntimeObject(rt); err != nil {
+				return nil, err
+			}
+		}
+		if tasksUsed {
+			if err := validateTaskRuntimeObject(rt); err != nil {
+				return nil, err
+			}
+		}
+		if taskGroupsUsed {
+			if err := validateTaskGroupRuntimeObject(rt); err != nil {
+				return nil, err
+			}
+		}
+		if typedTasksUsed {
+			if err := validateTypedTaskRuntimeObject(rt, typedTaskMaxSlots); err != nil {
+				return nil, err
+			}
+		}
+		if timeRuntimeUsed {
+			if err := validateTimeRuntimeObject(rt); err != nil {
+				return nil, err
+			}
+		}
 
 		for _, sym := range rt.Symbols {
 			if sym.Name == "__tetra_actor_dispatch" {
@@ -360,7 +442,7 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		if needsDispatchGlue || needsMainEntryIDGlue {
 			var glueFuncs []IRFunc
 			if needsDispatchGlue {
-				dispatchFn, err := buildActorDispatchFunc(actorEntries)
+				dispatchFn, err := buildActorDispatchFunc(actorEntries, checked)
 				if err != nil {
 					return nil, err
 				}
@@ -394,23 +476,8 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		mainName = "__tetra_entry"
 	}
 
-	if len(opt.LinkObjectPaths) > 0 {
-		for _, path := range opt.LinkObjectPaths {
-			if path == "" {
-				continue
-			}
-			obj, err := ReadObject(path)
-			if err != nil {
-				return nil, fmt.Errorf("read link object: %w", err)
-			}
-			if obj.Target == "" {
-				return nil, fmt.Errorf("link object has no target: %s", path)
-			}
-			if obj.Target != target {
-				return nil, fmt.Errorf("link object target mismatch: got=%s want=%s (%s)", obj.Target, target, path)
-			}
-			objects = append(objects, obj)
-		}
+	for _, linked := range linkedObjects {
+		objects = append(objects, linked.obj)
 	}
 
 	switch tgt.Format {
@@ -453,9 +520,81 @@ func requiredActorRuntimeSymbols() []string {
 		"__tetra_entry",
 		"__tetra_actor_spawn",
 		"__tetra_actor_send",
+		"__tetra_actor_send_msg",
+		"__tetra_actor_send_begin",
+		"__tetra_actor_send_slot",
+		"__tetra_actor_send_commit",
 		"__tetra_actor_recv",
+		"__tetra_actor_recv_msg",
+		"__tetra_actor_recv_poll",
+		"__tetra_actor_recv_until",
+		"__tetra_actor_recv_msg_until",
+		"__tetra_actor_recv_begin",
+		"__tetra_actor_recv_slot",
+		"__tetra_actor_recv_count",
 		"__tetra_actor_self",
 		"__tetra_actor_sender",
+		"__tetra_actor_yield_now",
+	}
+}
+
+func requiredActorStateRuntimeSymbols() []string {
+	return []string{
+		"__tetra_actor_state_load",
+		"__tetra_actor_state_store",
+	}
+}
+
+func requiredTaskRuntimeSymbols() []string {
+	return []string{
+		"__tetra_task_spawn_i32",
+		"__tetra_task_join_i32",
+		"__tetra_task_join_result_i32",
+		"__tetra_task_join_until_i32",
+		"__tetra_task_poll_i32",
+		"__tetra_task_is_canceled",
+		"__tetra_task_checkpoint",
+	}
+}
+
+func requiredTaskGroupRuntimeSymbols() []string {
+	return []string{
+		"__tetra_task_group_open",
+		"__tetra_task_group_close",
+		"__tetra_task_group_cancel",
+		"__tetra_task_group_current",
+		"__tetra_task_group_status",
+		"__tetra_task_spawn_group_i32",
+	}
+}
+
+func requiredTypedTaskRuntimeSymbols(maxSlots int) []string {
+	if maxSlots < 2 {
+		maxSlots = 2
+	}
+	if maxSlots > 8 {
+		maxSlots = 8
+	}
+	symbols := []string{
+		"__tetra_task_result_begin",
+		"__tetra_task_result_slot",
+	}
+	if maxSlots > 4 {
+		symbols = append(symbols, "__tetra_task_result_get")
+	}
+	for slots := 2; slots <= maxSlots; slots++ {
+		symbols = append(symbols, fmt.Sprintf("__tetra_task_join_typed_%d", slots))
+	}
+	return symbols
+}
+
+func requiredTimeRuntimeSymbols() []string {
+	return []string{
+		"__tetra_time_now_ms",
+		"__tetra_sleep_ms",
+		"__tetra_sleep_until_ms",
+		"__tetra_deadline_ms",
+		"__tetra_timer_ready_ms",
 	}
 }
 
@@ -475,20 +614,106 @@ func validateActorRuntimeObject(rt *Object) error {
 	return nil
 }
 
+func validateActorStateRuntimeObject(rt *Object) error {
+	if rt == nil {
+		return fmt.Errorf("missing actors runtime object")
+	}
+	symbols := make(map[string]struct{}, len(rt.Symbols))
+	for _, sym := range rt.Symbols {
+		symbols[sym.Name] = struct{}{}
+	}
+	for _, name := range requiredActorStateRuntimeSymbols() {
+		if _, ok := symbols[name]; !ok {
+			return fmt.Errorf("runtime object missing required symbol '%s'", name)
+		}
+	}
+	return nil
+}
+
+func validateTimeRuntimeObject(rt *Object) error {
+	if rt == nil {
+		return fmt.Errorf("missing time runtime object")
+	}
+	symbols := make(map[string]struct{}, len(rt.Symbols))
+	for _, sym := range rt.Symbols {
+		symbols[sym.Name] = struct{}{}
+	}
+	for _, name := range requiredTimeRuntimeSymbols() {
+		if _, ok := symbols[name]; !ok {
+			return fmt.Errorf("runtime object missing required symbol '%s'", name)
+		}
+	}
+	return nil
+}
+
+func validateTypedTaskRuntimeObject(rt *Object, maxSlots int) error {
+	if rt == nil {
+		return fmt.Errorf("missing typed task runtime object")
+	}
+	symbols := make(map[string]struct{}, len(rt.Symbols))
+	for _, sym := range rt.Symbols {
+		symbols[sym.Name] = struct{}{}
+	}
+	for _, name := range requiredTypedTaskRuntimeSymbols(maxSlots) {
+		if _, ok := symbols[name]; !ok {
+			return fmt.Errorf("runtime object missing required symbol '%s'", name)
+		}
+	}
+	return nil
+}
+
+func validateTaskRuntimeObject(rt *Object) error {
+	if rt == nil {
+		return fmt.Errorf("missing task runtime object")
+	}
+	symbols := make(map[string]struct{}, len(rt.Symbols))
+	for _, sym := range rt.Symbols {
+		symbols[sym.Name] = struct{}{}
+	}
+	for _, name := range requiredTaskRuntimeSymbols() {
+		if _, ok := symbols[name]; !ok {
+			return fmt.Errorf("runtime object missing required symbol '%s'", name)
+		}
+	}
+	return nil
+}
+
+func validateTaskGroupRuntimeObject(rt *Object) error {
+	if rt == nil {
+		return fmt.Errorf("missing task group runtime object")
+	}
+	symbols := make(map[string]struct{}, len(rt.Symbols))
+	for _, sym := range rt.Symbols {
+		symbols[sym.Name] = struct{}{}
+	}
+	for _, name := range requiredTaskGroupRuntimeSymbols() {
+		if _, ok := symbols[name]; !ok {
+			return fmt.Errorf("runtime object missing required symbol '%s'", name)
+		}
+	}
+	return nil
+}
+
 func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target, opt BuildOptions) (*BuildStats, error) {
-	requireMain := opt.Emit == EmitObject
+	requireMain := opt.Emit == EmitObject && !opt.InterfaceOnly
 	codegenOptions := x64.CodegenOptions{
 		IslandsDebug:    opt.IslandsDebug,
 		DebugInfo:       opt.DebugInfo,
 		ReleaseOptimize: opt.ReleaseOptimize,
 	}
 
-	world, err := LoadWorld(inputPath)
+	world, err := loadWorldForBuild(inputPath, opt)
 	if err != nil {
 		return nil, err
 	}
 	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: requireMain})
 	if err != nil {
+		return nil, err
+	}
+	if opt.InterfaceOnly {
+		return interfaceOnlyBuildStats(world), nil
+	}
+	if err := rejectInterfaceModulesForCodegen(world); err != nil {
 		return nil, err
 	}
 
@@ -519,6 +744,17 @@ func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 		moduleName = "__entry"
 	}
 	obj.Module = moduleName
+	obj.CompilerVersion = version.CompilerVersion
+	file := world.ByModule[world.EntryModule]
+	if file != nil {
+		obj.SrcHash = sha256.Sum256(file.Src)
+		hash, err := InterfaceFingerprintFromSource(file.Src, file.Path)
+		if err != nil {
+			return nil, err
+		}
+		obj.PublicAPIHash = hash
+	}
+	obj.WorldSigHash = cache.WorldSigHash(checked)
 
 	if err := WriteObject(outputPath, obj); err != nil {
 		return nil, err
@@ -543,12 +779,18 @@ func buildWASM32WASIWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 		return nil, fmt.Errorf("wasm32-wasi does not support --link-object in this wave")
 	}
 
-	world, err := LoadWorld(inputPath)
+	world, err := loadWorldForBuild(inputPath, opt)
 	if err != nil {
 		return nil, err
 	}
-	checked, err := CheckWorld(world)
+	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: !opt.InterfaceOnly})
 	if err != nil {
+		return nil, err
+	}
+	if opt.InterfaceOnly {
+		return interfaceOnlyBuildStats(world), nil
+	}
+	if err := rejectInterfaceModulesForCodegen(world); err != nil {
 		return nil, err
 	}
 
@@ -604,12 +846,18 @@ func buildWASM32WEBWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target
 		return nil, fmt.Errorf("wasm32-web does not support --link-object in this wave")
 	}
 
-	world, err := LoadWorld(inputPath)
+	world, err := loadWorldForBuild(inputPath, opt)
 	if err != nil {
 		return nil, err
 	}
-	checked, err := CheckWorld(world)
+	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: !opt.InterfaceOnly})
 	if err != nil {
+		return nil, err
+	}
+	if opt.InterfaceOnly {
+		return interfaceOnlyBuildStats(world), nil
+	}
+	if err := rejectInterfaceModulesForCodegen(world); err != nil {
 		return nil, err
 	}
 
@@ -718,7 +966,160 @@ func uiArtifactBasePath(outputPath string) string {
 	}
 }
 
-func buildTagFromOptions(opt BuildOptions) string {
+func loadWorldForBuild(inputPath string, opt BuildOptions) (*World, error) {
+	if opt.ProjectRoot == "" && len(opt.SourceRoots) == 0 && len(opt.DependencyRoots) == 0 {
+		return LoadWorld(inputPath)
+	}
+	return LoadWorldOpt(inputPath, WorldOptions{
+		Root:            opt.ProjectRoot,
+		SourceRoots:     opt.SourceRoots,
+		DependencyRoots: opt.DependencyRoots,
+	})
+}
+
+func rejectInterfaceModulesForCodegen(world *World) error {
+	modules := sortedInterfaceModules(world)
+	if len(modules) == 0 {
+		return nil
+	}
+	return fmt.Errorf("interface-only module '%s' cannot be linked; use --interface-only or provide source/object implementation", modules[0])
+}
+
+func readLinkObjects(paths []string, target string) ([]linkedObject, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	var linked []linkedObject
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read link object: %w", err)
+		}
+		obj, err := ReadObject(path)
+		if err != nil {
+			return nil, fmt.Errorf("read link object: %w", err)
+		}
+		if obj.Target == "" {
+			return nil, fmt.Errorf("link object has no target: %s", path)
+		}
+		if obj.Target != target {
+			return nil, fmt.Errorf("link object target mismatch: got=%s want=%s (%s)", obj.Target, target, path)
+		}
+		if obj.CompilerVersion != "" && obj.CompilerVersion != version.CompilerVersion {
+			return nil, fmt.Errorf("link object compiler version mismatch: got=%s want=%s (%s)", obj.CompilerVersion, version.CompilerVersion, path)
+		}
+		linked = append(linked, linkedObject{path: path, obj: obj, contentHash: sha256.Sum256(raw)})
+	}
+	return linked, nil
+}
+
+func validateInterfaceImplementationProviders(world *World, linked []linkedObject) error {
+	modules := sortedInterfaceModules(world)
+	if len(modules) == 0 {
+		return nil
+	}
+	providers := make(map[string]linkedObject, len(modules))
+	interfaceSet := make(map[string]struct{}, len(modules))
+	for _, module := range modules {
+		interfaceSet[module] = struct{}{}
+	}
+	for _, linked := range linked {
+		obj := linked.obj
+		if obj == nil {
+			continue
+		}
+		if _, ok := interfaceSet[obj.Module]; !ok {
+			continue
+		}
+		if first, exists := providers[obj.Module]; exists {
+			return fmt.Errorf("duplicate implementation object for interface module '%s': %s and %s", obj.Module, first.path, linked.path)
+		}
+		if obj.PublicAPIHash == "" {
+			return fmt.Errorf("implementation object for interface module '%s' has no public API hash: %s", obj.Module, linked.path)
+		}
+		want := world.InterfaceHashes[obj.Module]
+		if want == "" {
+			return fmt.Errorf("missing interface hash for module '%s'", obj.Module)
+		}
+		if obj.PublicAPIHash != want {
+			return fmt.Errorf("public API hash mismatch for interface module '%s': object %s, interface %s (%s)", obj.Module, obj.PublicAPIHash, want, linked.path)
+		}
+		if err := validateInterfaceImplementationSymbols(world, obj.Module, obj, linked.path); err != nil {
+			return err
+		}
+		providers[obj.Module] = linked
+	}
+	for _, module := range modules {
+		if _, ok := providers[module]; !ok {
+			return fmt.Errorf("missing implementation object for interface module '%s'; pass --link-object with a matching TOBJ", module)
+		}
+	}
+	return nil
+}
+
+func validateInterfaceImplementationSymbols(world *World, module string, obj *Object, path string) error {
+	symbols := make(map[string]struct{}, len(obj.Symbols))
+	for _, sym := range obj.Symbols {
+		symbols[sym.Name] = struct{}{}
+	}
+	for _, name := range expectedInterfaceModuleSymbols(world, module) {
+		if _, ok := symbols[name]; !ok {
+			return fmt.Errorf("implementation object for interface module '%s' missing exported symbol '%s' (%s)", module, name, path)
+		}
+	}
+	return nil
+}
+
+func expectedInterfaceModuleSymbols(world *World, module string) []string {
+	if world == nil || world.ByModule == nil {
+		return nil
+	}
+	file := world.ByModule[module]
+	if file == nil {
+		return nil
+	}
+	var symbols []string
+	for _, fn := range file.Funcs {
+		if fn == nil || fn.Synthetic {
+			continue
+		}
+		name := fn.Name
+		if fn.ExtensionOf == "" {
+			name = qualifyObjectSymbol(module, fn.Name)
+		}
+		symbols = append(symbols, name)
+	}
+	sort.Strings(symbols)
+	return symbols
+}
+
+func qualifyObjectSymbol(module, name string) string {
+	if module == "" || strings.HasPrefix(name, module+".") {
+		return name
+	}
+	return module + "." + name
+}
+
+func interfaceOnlyBuildStats(world *World) *BuildStats {
+	return &BuildStats{InterfaceModules: sortedInterfaceModules(world)}
+}
+
+func sortedInterfaceModules(world *World) []string {
+	if world == nil || len(world.InterfaceModules) == 0 {
+		return nil
+	}
+	modules := make([]string, 0, len(world.InterfaceModules))
+	for module := range world.InterfaceModules {
+		modules = append(modules, module)
+	}
+	sort.Strings(modules)
+	return modules
+}
+
+func buildTagFromOptions(opt BuildOptions, linkedObjects []linkedObject) string {
 	var tags []string
 	if opt.IslandsDebug {
 		tags = append(tags, "islands-debug")
@@ -728,6 +1129,21 @@ func buildTagFromOptions(opt BuildOptions) string {
 	}
 	if opt.ReleaseOptimize {
 		tags = append(tags, "release-opt")
+	}
+	if opt.InterfaceOnly {
+		tags = append(tags, "interface-only")
+	}
+	if len(linkedObjects) > 0 {
+		entries := make([]string, 0, len(linkedObjects))
+		for _, linked := range linkedObjects {
+			module := ""
+			if linked.obj != nil {
+				module = linked.obj.Module
+			}
+			entries = append(entries, fmt.Sprintf("%s:%x", module, linked.contentHash))
+		}
+		sort.Strings(entries)
+		tags = append(tags, "link="+strings.Join(entries, ","))
 	}
 	return strings.Join(tags, "+")
 }
@@ -745,7 +1161,11 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 	walkExpr = func(expr frontend.Expr) error {
 		switch e := expr.(type) {
 		case *frontend.CallExpr:
-			switch e.Name {
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
 			case "core.spawn":
 				used = true
 				if len(e.Args) == 1 {
@@ -756,7 +1176,56 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 						}
 					}
 				}
-			case "core.send", "core.send_msg", "core.recv", "core.recv_msg", "core.self", "core.sender":
+			case "core.task_spawn_i32":
+				used = true
+				if len(e.Args) == 1 {
+					if lit, ok := e.Args[0].(*frontend.StringLitExpr); ok {
+						name := string(lit.Value)
+						if name != "" {
+							targets[name] = struct{}{}
+						}
+					}
+				}
+			case "core.task_spawn_group_i32":
+				used = true
+				if len(e.Args) == 2 {
+					if lit, ok := e.Args[1].(*frontend.StringLitExpr); ok {
+						name := string(lit.Value)
+						if name != "" {
+							targets[name] = struct{}{}
+						}
+					}
+				}
+			case "core.task_spawn_i32_typed":
+				used = true
+				if len(e.TypeArgs) == 1 && e.TypeArgs[0].Name != "" && len(e.Args) == 1 {
+					if lit, ok := e.Args[0].(*frontend.StringLitExpr); ok {
+						name := string(lit.Value)
+						if name != "" {
+							targets[typedTaskRuntimeWrapperName(name, e.TypeArgs[0].Name)] = struct{}{}
+						}
+					}
+				}
+			case "core.task_spawn_group_i32_typed":
+				used = true
+				if len(e.TypeArgs) == 1 && e.TypeArgs[0].Name != "" && len(e.Args) == 2 {
+					if lit, ok := e.Args[1].(*frontend.StringLitExpr); ok {
+						name := string(lit.Value)
+						if name != "" {
+							targets[typedTaskRuntimeWrapperName(name, e.TypeArgs[0].Name)] = struct{}{}
+						}
+					}
+				}
+			case "core.task_group_open", "core.task_group_close", "core.task_group_cancel", "core.task_group_current", "core.task_group_status",
+				"core.task_is_canceled", "core.task_checkpoint":
+				used = true
+			case "core.time_now_ms", "core.sleep_ms", "core.sleep_until", "core.deadline_ms", "core.timer_ready":
+				used = true
+			case "core.task_join_i32", "core.task_join_result_i32", "core.task_join_until_i32", "core.task_poll_i32", "core.select2_i32":
+				used = true
+			case "core.task_join_i32_typed", "core.task_join_group_i32_typed":
+				used = true
+			case "core.send", "core.send_msg", "core.send_typed", "core.recv", "core.recv_msg", "core.recv_poll", "core.recv_until", "core.recv_msg_until", "core.recv_typed", "core.self", "core.sender", "core.yield":
 				used = true
 			}
 			for _, arg := range e.Args {
@@ -784,6 +1253,10 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 			return walkExpr(e.Right)
 		case *frontend.UnaryExpr:
 			return walkExpr(e.X)
+		case *frontend.TryExpr:
+			return walkExpr(e.X)
+		case *frontend.CatchExpr:
+			return walkExpr(e.Call)
 		case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.BoolLitExpr, *frontend.StringLitExpr:
 			return nil
 		default:
@@ -800,6 +1273,13 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 			return walkExpr(s.Value)
 		case *frontend.ThrowStmt:
 			return walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				if err := walkStmt(inner); err != nil {
+					return err
+				}
+			}
+			return nil
 		case *frontend.BreakStmt, *frontend.ContinueStmt:
 			return nil
 		case *frontend.LetStmt:
@@ -915,13 +1395,522 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 	return true, entries, nil
 }
 
+func collectActorStateRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	if checked == nil {
+		return false
+	}
+	for _, fn := range checked.Funcs {
+		if len(fn.ActorState) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func collectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	if checked == nil {
+		return false
+	}
+	var used bool
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
+			case "core.task_spawn_i32", "core.task_spawn_group_i32", "core.task_spawn_i32_typed", "core.task_spawn_group_i32_typed",
+				"core.task_join_i32", "core.task_join_result_i32", "core.task_join_until_i32", "core.task_poll_i32", "core.select2_i32",
+				"core.task_join_i32_typed", "core.task_join_group_i32_typed",
+				"core.task_group_open", "core.task_group_close", "core.task_group_cancel", "core.task_group_current", "core.task_group_status",
+				"core.task_is_canceled", "core.task_checkpoint":
+				used = true
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return used
+}
+
+func collectTaskGroupRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	if checked == nil {
+		return false
+	}
+	var used bool
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
+			case "core.task_group_open", "core.task_group_close", "core.task_group_cancel", "core.task_group_current", "core.task_group_status",
+				"core.task_is_canceled", "core.task_checkpoint",
+				"core.task_spawn_group_i32", "core.task_spawn_group_i32_typed":
+				used = true
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return used
+}
+
+func collectTypedTaskRuntimeUsage(checked *semantics.CheckedProgram) (bool, int) {
+	if checked == nil {
+		return false, 0
+	}
+	var used bool
+	maxSlots := 0
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
+			case "core.task_spawn_i32_typed", "core.task_spawn_group_i32_typed", "core.task_join_i32_typed", "core.task_join_group_i32_typed":
+				used = true
+				if len(e.TypeArgs) == 1 && e.TypeArgs[0].Name != "" {
+					if _, handleInfo, err := semantics.EnsureTypedTaskHandleType(e.TypeArgs[0].Name, checked.Types); err == nil {
+						if handleInfo.SlotCount > maxSlots {
+							maxSlots = handleInfo.SlotCount
+						}
+					}
+				}
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	if used && maxSlots < 4 {
+		maxSlots = 4
+	}
+	return used, maxSlots
+}
+
+func collectTimeRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	if checked == nil {
+		return false
+	}
+	var used bool
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
+			case "core.time_now_ms", "core.sleep_ms", "core.sleep_until", "core.deadline_ms", "core.timer_ready":
+				used = true
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return used
+}
+
 func fnv1a32(s string) uint32 {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(s))
 	return h.Sum32()
 }
 
-func buildActorDispatchFunc(entries []string) (IRFunc, error) {
+func typedTaskRuntimeWrapperName(target, errorType string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(target))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(errorType))
+	return fmt.Sprintf("__tetra_task_typed_%08x", h.Sum32())
+}
+
+func buildActorDispatchFunc(entries []string, checked *semantics.CheckedProgram) (IRFunc, error) {
 	if len(entries) == 0 {
 		return IRFunc{}, fmt.Errorf("missing actor entries")
 	}
@@ -932,6 +1921,23 @@ func buildActorDispatchFunc(entries []string) (IRFunc, error) {
 			return IRFunc{}, fmt.Errorf("actor entry ID collision: %q and %q both hash to %d", other, name, id)
 		}
 		seen[id] = name
+	}
+
+	initByEntry := map[string][]semantics.ActorStateField{}
+	if checked != nil {
+		for _, fn := range checked.Funcs {
+			if len(fn.ActorState) == 0 {
+				continue
+			}
+			fields := make([]semantics.ActorStateField, 0, len(fn.ActorState))
+			for _, field := range fn.ActorState {
+				fields = append(fields, field)
+			}
+			sort.Slice(fields, func(i, j int) bool {
+				return fields[i].Slot < fields[j].Slot
+			})
+			initByEntry[fn.Name] = fields
+		}
 	}
 
 	var instrs []ir.IRInstr
@@ -946,6 +1952,17 @@ func buildActorDispatchFunc(entries []string) (IRFunc, error) {
 			ir.IRInstr{Kind: ir.IRConstI32, Imm: id},
 			ir.IRInstr{Kind: ir.IRCmpEqI32},
 			ir.IRInstr{Kind: ir.IRJmpIfZero, Label: skipLabel},
+		)
+		if fields, ok := initByEntry[name]; ok {
+			for _, field := range fields {
+				instrs = append(instrs,
+					ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(field.Slot)},
+					ir.IRInstr{Kind: ir.IRConstI32, Imm: field.Init},
+					ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_state_store", ArgSlots: 2, RetSlots: 0},
+				)
+			}
+		}
+		instrs = append(instrs,
 			ir.IRInstr{Kind: ir.IRCall, Name: name, ArgSlots: 0, RetSlots: 1},
 			ir.IRInstr{Kind: ir.IRReturn},
 			ir.IRInstr{Kind: ir.IRLabel, Label: skipLabel},

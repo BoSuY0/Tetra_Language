@@ -24,6 +24,10 @@ func inferExprTypeForDecl(
 		return "str", nil
 	case *frontend.NoneLitExpr:
 		return "", fmt.Errorf("cannot infer type from 'none'; add an optional type annotation")
+	case *frontend.MatchExpr:
+		return inferMatchExprType(e, locals, globals, funcs, types, module, imports)
+	case *frontend.CatchExpr:
+		return inferCatchExprType(e, locals, globals, funcs, types, module, imports)
 	case *frontend.IdentExpr:
 		if info, ok := locals[e.Name]; ok {
 			if info.TypeName == "" {
@@ -61,7 +65,7 @@ func inferExprTypeForDecl(
 			}
 			return typeName, nil
 		}
-		_, targetType, err := ResolveFieldAccessType(e, locals, types)
+		_, targetType, err := ResolveFieldAccessType(e, locals, globals, types)
 		if err != nil {
 			return "", err
 		}
@@ -90,11 +94,70 @@ func inferExprTypeForDecl(
 		}
 		return resolved, nil
 	case *frontend.CallExpr:
+		if enumType, _, ok, err := resolveEnumCaseConstructorCall(e, types, module, imports); ok || err != nil {
+			if err != nil {
+				return "", err
+			}
+			return enumType, nil
+		}
+		if builtin, ok := ResolveBuiltinAlias(e.Name); ok && builtin == "core.recv_typed" {
+			if len(e.TypeArgs) != 1 {
+				return "", fmt.Errorf("recv_typed expects one explicit type argument")
+			}
+			typeName, err := resolveTypeName(&e.TypeArgs[0], module, imports)
+			if err != nil {
+				return "", err
+			}
+			e.TypeArgs[0].Name = typeName
+			return typeName, nil
+		}
+		if builtin, ok := ResolveBuiltinAlias(e.Name); ok && builtin == "core.send_typed" {
+			return "i32", nil
+		}
+		if builtin, ok := ResolveBuiltinAlias(e.Name); ok && (builtin == "core.task_spawn_i32_typed" || builtin == "core.task_spawn_group_i32_typed") {
+			if len(e.TypeArgs) != 1 {
+				return "", fmt.Errorf("%s expects one explicit error type argument", builtin)
+			}
+			errorType, err := resolveTypeName(&e.TypeArgs[0], module, imports)
+			if err != nil {
+				return "", err
+			}
+			if err := validateTypedTaskErrorType(errorType, types, e.TypeArgs[0].At); err != nil {
+				return "", err
+			}
+			e.TypeArgs[0].Name = errorType
+			handleType, _, err := EnsureTypedTaskHandleType(errorType, types)
+			if err != nil {
+				return "", err
+			}
+			return handleType, nil
+		}
+		if builtin, ok := ResolveBuiltinAlias(e.Name); ok && (builtin == "core.task_join_i32_typed" || builtin == "core.task_join_group_i32_typed") {
+			return "i32", nil
+		}
 		if ctorType, ok, err := resolveStructConstructorCallType(e, types, module, imports); ok {
 			return ctorType, err
 		}
 		resolved := ""
-		if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
+		if local, ok := locals[e.Name]; ok {
+			if local.FunctionValue == "" {
+				if !local.FunctionTypeValue {
+					return "", fmt.Errorf("function value '%s' is not callable in this MVP; only local closure literals are supported", e.Name)
+				}
+				if len(e.Args) != len(local.FunctionParamTypes) {
+					return "", fmt.Errorf("wrong argument count for callback '%s'", e.Name)
+				}
+				return local.FunctionReturnType, nil
+			}
+			if local.GenericFunctionValue {
+				return "", fmt.Errorf("generic closure '%s' is only supported for let-bound direct local calls with inferable concrete arguments in this MVP", e.Name)
+			}
+			if err := appendClosureCaptureArgs(e, local); err != nil {
+				return "", err
+			}
+			resolved = local.FunctionValue
+			e.Name = resolved
+		} else if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
 			resolved = builtin
 		} else if _, ok := funcs[e.Name]; ok {
 			resolved = e.Name
@@ -117,6 +180,11 @@ func inferExprTypeForDecl(
 		return "ptr", nil
 	case *frontend.TryExpr:
 		call, ok := e.X.(*frontend.CallExpr)
+		if !ok {
+			if await, awaitOK := e.X.(*frontend.AwaitExpr); awaitOK {
+				call, ok = await.X.(*frontend.CallExpr)
+			}
+		}
 		if !ok {
 			return "", fmt.Errorf("try expects a throwing function call")
 		}

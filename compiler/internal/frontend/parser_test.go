@@ -57,39 +57,207 @@ func TestParserFixtureCorpus(t *testing.T) {
 	}
 }
 
-func TestParseFileDiagnosticsRecoversIndependentTopLevelErrors(t *testing.T) {
-	src := []byte(`actor Renderable:
-    func draw() -> Int
-
-capsule App:
-    name: "app"
+func TestParseFileDiagnosticsParsesCapsuleAndMainWithoutRecovery(t *testing.T) {
+	src := []byte(`capsule App:
+    id: "tetra://app"
+    version: "0.1.0"
 
 func main() -> Int:
     return 0
 `)
 	file, diagnostics := ParseFileDiagnostics(src, "recovery.tetra")
 	if file == nil {
-		t.Fatalf("expected partial file")
+		t.Fatalf("expected file")
 	}
-	if len(diagnostics) != 2 {
-		t.Fatalf("diagnostics = %#v, want 2", diagnostics)
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostics = %#v, want 0", diagnostics)
 	}
-	want := []struct {
-		line    int
-		column  int
-		message string
-	}{
-		{1, 1, "planned feature 'actor' is not implemented in the Tetra v1.0 profile"},
-		{4, 1, "planned feature 'capsule' is not implemented in the Tetra v1.0 profile"},
-	}
-	for i, exp := range want {
-		got := diagnostics[i]
-		if got.Code != DiagnosticCodeParse || got.Severity != "error" || got.File != "recovery.tetra" || got.Line != exp.line || got.Column != exp.column || got.Message != exp.message {
-			t.Fatalf("diagnostic[%d] = %#v, want line %d col %d message %q", i, got, exp.line, exp.column, exp.message)
-		}
+	if len(file.Capsules) != 1 || file.Capsules[0].Name != "App" {
+		t.Fatalf("capsules = %#v, want one capsule App", file.Capsules)
 	}
 	if len(file.Funcs) != 1 || file.Funcs[0].Name != "main" {
-		t.Fatalf("recovered funcs = %#v, want main", file.Funcs)
+		t.Fatalf("funcs = %#v, want main", file.Funcs)
+	}
+}
+
+func TestParseActorDeclarationDesugarsMethods(t *testing.T) {
+	src := []byte(`actor Worker:
+    func run() -> Int:
+        return 7
+    func stop() -> Int:
+        return 0
+
+func main() -> Int:
+    return Worker.run()
+`)
+	file, err := ParseFile(src, "actor_decl.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Funcs) != 3 {
+		t.Fatalf("func count = %d, want 3: %#v", len(file.Funcs), file.Funcs)
+	}
+	if file.Funcs[0].Name != "Worker.run" || file.Funcs[1].Name != "Worker.stop" || file.Funcs[2].Name != "main" {
+		t.Fatalf("func names = %q, %q, %q", file.Funcs[0].Name, file.Funcs[1].Name, file.Funcs[2].Name)
+	}
+}
+
+func TestParseActorDeclarationPreservesMethodUsesActors(t *testing.T) {
+	src := []byte(`actor Worker:
+    func run() -> Int
+    uses actors:
+        let me: actor = core.self()
+        return 7
+`)
+	file, err := ParseFile(src, "actor_uses.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Funcs) != 1 {
+		t.Fatalf("func count = %d, want 1: %#v", len(file.Funcs), file.Funcs)
+	}
+	fn := file.Funcs[0]
+	if fn.Name != "Worker.run" {
+		t.Fatalf("func name = %q, want Worker.run", fn.Name)
+	}
+	if got := strings.Join(fn.Uses, ","); got != "actors" {
+		t.Fatalf("uses = %q, want actors", got)
+	}
+}
+
+func TestParseActorDeclarationSupportsImmutableStateFields(t *testing.T) {
+	src := []byte(`actor Counter:
+    val step: Int
+    const ceiling: Int
+    func run() -> Int:
+        return 0
+`)
+	file, err := ParseFile(src, "actor_state.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Actors) != 1 {
+		t.Fatalf("actor count = %d, want 1: %#v", len(file.Actors), file.Actors)
+	}
+	actor := file.Actors[0]
+	if actor.Name != "Counter" {
+		t.Fatalf("actor name = %q, want Counter", actor.Name)
+	}
+	if len(actor.Fields) != 2 {
+		t.Fatalf("field count = %d, want 2: %#v", len(actor.Fields), actor.Fields)
+	}
+	if actor.Fields[0].Name != "step" || actor.Fields[0].Mutable || actor.Fields[0].Const {
+		t.Fatalf("field[0] = %#v", actor.Fields[0])
+	}
+	if actor.Fields[1].Name != "ceiling" || actor.Fields[1].Mutable || !actor.Fields[1].Const {
+		t.Fatalf("field[1] = %#v", actor.Fields[1])
+	}
+	if len(file.Funcs) != 1 || file.Funcs[0].Name != "Counter.run" {
+		t.Fatalf("funcs = %#v", file.Funcs)
+	}
+}
+
+func TestParseActorDeclarationSupportsStateFieldInitializers(t *testing.T) {
+	src := []byte(`actor Counter:
+    val step: Int = 2
+    const enabled: Bool = true
+    func run() -> Int:
+        return 0
+`)
+	file, err := ParseFile(src, "actor_state_init.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Actors) != 1 {
+		t.Fatalf("actor count = %d, want 1: %#v", len(file.Actors), file.Actors)
+	}
+	actor := file.Actors[0]
+	if len(actor.Fields) != 2 {
+		t.Fatalf("field count = %d, want 2: %#v", len(actor.Fields), actor.Fields)
+	}
+	if actor.Fields[0].Init == nil {
+		t.Fatalf("field[0] initializer = nil, want non-nil")
+	}
+	if actor.Fields[1].Init == nil {
+		t.Fatalf("field[1] initializer = nil, want non-nil")
+	}
+	if _, ok := actor.Fields[0].Init.(*NumberExpr); !ok {
+		t.Fatalf("field[0] init = %T, want *NumberExpr", actor.Fields[0].Init)
+	}
+	if _, ok := actor.Fields[1].Init.(*BoolLitExpr); !ok {
+		t.Fatalf("field[1] init = %T, want *BoolLitExpr", actor.Fields[1].Init)
+	}
+}
+
+func TestParseActorDeclarationRejectsUnsupportedMembers(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "bare field",
+			src: `actor Counter:
+    count: Int
+`,
+			want: "actor state fields must use 'val' or 'const'",
+		},
+		{
+			name: "nested state",
+			src: `actor Counter:
+    state CounterState:
+        var count: Int = 0
+`,
+			want: "actor declarations do not support nested state blocks yet",
+		},
+		{
+			name: "self member",
+			src: `actor Counter:
+    self: actor
+`,
+			want: "actor declarations do not support self members yet",
+		},
+		{
+			name: "self parameter",
+			src: `actor Counter:
+    func run(self: actor) -> Int:
+        return 0
+`,
+			want: "actor methods do not support explicit self parameters yet",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), "actor_bad.tetra")
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseActorDeclarationSupportsMutableStateField(t *testing.T) {
+	src := []byte(`actor Counter:
+    var count: Int = 0
+    func run() -> Int:
+        return count
+`)
+	file, err := ParseFile(src, "actor_mutable_state.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Actors) != 1 {
+		t.Fatalf("actor count = %d, want 1", len(file.Actors))
+	}
+	actor := file.Actors[0]
+	if len(actor.Fields) != 1 {
+		t.Fatalf("field count = %d, want 1", len(actor.Fields))
+	}
+	if !actor.Fields[0].Mutable || actor.Fields[0].Const {
+		t.Fatalf("field = %#v, want mutable non-const field", actor.Fields[0])
 	}
 }
 
@@ -106,34 +274,142 @@ func TestParseFileDiagnosticsReturnsLexerError(t *testing.T) {
 	}
 }
 
+func TestParseGrammarSurfaceExamplesPositive(t *testing.T) {
+	for _, name := range []string{"flow_grammar_surface_smoke.tetra", "flow_hello.tetra"} {
+		path := filepath.Join("..", "..", "..", "examples", name)
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if _, err := ParseFile(raw, filepath.ToSlash(path)); err != nil {
+			t.Fatalf("ParseFile(%s): %v", path, err)
+		}
+	}
+}
+
+func TestParseDeferStatementFlowSyntax(t *testing.T) {
+	src := []byte(`func main() -> Int
+uses io:
+    defer:
+        print("done\n")
+    return 0
+`)
+	file, err := ParseFile(src, "defer.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Funcs) != 1 || len(file.Funcs[0].Body) != 2 {
+		t.Fatalf("func body = %#v", file.Funcs)
+	}
+	deferStmt, ok := file.Funcs[0].Body[0].(*DeferStmt)
+	if !ok {
+		t.Fatalf("body[0] = %T, want *DeferStmt", file.Funcs[0].Body[0])
+	}
+	if len(deferStmt.Body) != 1 {
+		t.Fatalf("defer body len = %d, want 1", len(deferStmt.Body))
+	}
+	if _, ok := deferStmt.Body[0].(*PrintStmt); !ok {
+		t.Fatalf("defer body[0] = %T, want *PrintStmt", deferStmt.Body[0])
+	}
+}
+
+func TestParseGrammarSurfaceExampleNegativeDiagnostic(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "examples", "flow_grammar_surface_smoke.tetra")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	bad := "test grammar surface:\n    expect 1 == 1\n\n" + string(raw)
+	file := "examples/flow_grammar_surface_smoke.bad.tetra"
+	_, err = ParseFile([]byte(bad), file)
+	if err == nil {
+		t.Fatalf("expected diagnostic")
+	}
+	diag, ok := DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected structured diagnostic: %T %v", err, err)
+	}
+	if diag.File != file || diag.Line != 1 || diag.Column != 6 {
+		t.Fatalf("position = %q:%d:%d, want %s:1:6", diag.File, diag.Line, diag.Column, file)
+	}
+	if diag.Message != "expected string, got identifier" {
+		t.Fatalf("message = %q", diag.Message)
+	}
+}
+
+func TestParseGrammarSurfaceExampleSpanCRLFUnicode(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "examples", "flow_grammar_surface_smoke.tetra")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	base := string(raw)
+	src := base + "test \"Привіт\":\r\n    expect @\r\n"
+	baseLines := strings.Count(base, "\n") + 1
+	file := "examples/flow_grammar_surface_smoke.span.tetra"
+	_, err = ParseFile([]byte(src), file)
+	if err == nil {
+		t.Fatalf("expected diagnostic")
+	}
+	diag, ok := DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected structured diagnostic: %T %v", err, err)
+	}
+	if diag.File != file || diag.Line != baseLines+1 || diag.Column != 8 {
+		t.Fatalf("position = %q:%d:%d, want %s:%d:8", diag.File, diag.Line, diag.Column, file, baseLines+1)
+	}
+	if diag.Message != "expected expression, got ?" {
+		t.Fatalf("message = %q", diag.Message)
+	}
+}
+
 func TestParsePlannedFeatureMatrixFromFlowSyntaxV1(t *testing.T) {
 	tests := []struct {
 		name string
 		src  string
-		want string
 	}{
-		{"actor declaration", "actor Renderable:\n", "planned feature 'actor' is not implemented in the Tetra v1.0 profile"},
-		{"capsule declaration", "capsule App:\n", "planned feature 'capsule' is not implemented in the Tetra v1.0 profile"},
-		{"closure declaration keyword", "closure draw:\n", "planned feature 'closures' is not implemented in the Tetra v1.0 profile"},
-		{"generic struct", "struct Box<T>:\n    value: T\n", "generic structs are planned for a later release"},
-		{"enum payload case", "enum Option:\n    case some(Int)\n", "enum payload cases are planned for a later release"},
-		{"payload match pattern", "func main() -> Int:\n    match value:\n    case Option.some(x):\n        return x\n", "payload match patterns are planned for a later release"},
-		{"generic closure", "func main() -> Int:\n    let f: ptr = fn<T>(x: T) -> T:\n        return x\n    return 0\n", "generic closures are not supported yet"},
-		{"function pointer type", "func main(cb: fn(Int) -> Int) -> Int:\n    return 0\n", "expected identifier, got fn"},
+		{"capsule declaration", "capsule App:\n    id: \"tetra://app\"\n    version: \"0.1.0\"\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseFile([]byte(tt.src), tt.name+".tetra")
-			if err == nil {
-				t.Fatalf("expected planned-feature diagnostic")
+			file, err := ParseFile([]byte(tt.src), tt.name+".tetra")
+			if err != nil {
+				t.Fatalf("ParseFile: %v", err)
 			}
-			if !strings.Contains(err.Error(), tt.want) {
-				t.Fatalf("error = %q, want %q", err.Error(), tt.want)
-			}
-			if strings.Contains(err.Error(), "MVP profile") {
-				t.Fatalf("stale MVP wording in diagnostic: %v", err)
+			if len(file.Capsules) != 1 || file.Capsules[0].Name != "App" {
+				t.Fatalf("capsules = %#v, want one capsule App", file.Capsules)
 			}
 		})
+	}
+}
+
+func TestParseFunctionTypeRef(t *testing.T) {
+	src := `
+func apply(cb: fn(Int, Bool) -> UInt8, value: Int, flag: Bool) -> UInt8:
+    return cb(value, flag)
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) != 1 {
+		t.Fatalf("func count = %d, want 1", len(prog.Funcs))
+	}
+	cb := prog.Funcs[0].Params[0].Type
+	if cb.Kind != TypeRefFunction {
+		t.Fatalf("cb type kind = %d, want TypeRefFunction", cb.Kind)
+	}
+	if len(cb.Params) != 2 || cb.Return == nil {
+		t.Fatalf("cb function type = %#v", cb)
+	}
+	if cb.Params[0].Kind != TypeRefNamed || cb.Params[0].Name != "Int" {
+		t.Fatalf("cb param0 = %#v, want Int", cb.Params[0])
+	}
+	if cb.Params[1].Kind != TypeRefNamed || cb.Params[1].Name != "Bool" {
+		t.Fatalf("cb param1 = %#v, want Bool", cb.Params[1])
+	}
+	if cb.Return.Kind != TypeRefNamed || cb.Return.Name != "UInt8" {
+		t.Fatalf("cb return = %#v, want UInt8", cb.Return)
 	}
 }
 
@@ -149,7 +425,7 @@ func TestParserSourceSpanPrecision(t *testing.T) {
 			name:   "nested block expression",
 			src:    "func main() -> Int:\n    if true:\n        return @\n    return 0\n",
 			line:   3,
-			column: 8,
+			column: 16,
 			msg:    "expected expression, got ?",
 		},
 		{
@@ -163,7 +439,7 @@ func TestParserSourceSpanPrecision(t *testing.T) {
 			name:   "unicode string keeps following column",
 			src:    "func main() -> Int:\n    print(\"Привіт\")\n    return @\n",
 			line:   3,
-			column: 8,
+			column: 12,
 			msg:    "expected expression, got ?",
 		},
 	}
@@ -290,19 +566,83 @@ func unwrap(value: Int?) -> Int:
 	}
 }
 
-func TestParseMatchPayloadPatternDiagnostic(t *testing.T) {
+func TestParseMatchPayloadPattern(t *testing.T) {
 	src := `
+enum Result:
+    case ok(Int)
+    case err(Int, Int)
+
 func main() -> Int:
-    match value:
-    case Option.some(x):
-        return x
+    match result:
+    case Result.ok(value):
+        return value
+    case Result.err(code, detail):
+        return code + detail
 `
-	_, err := Parse([]byte(src))
-	if err == nil {
-		t.Fatalf("expected payload pattern diagnostic")
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
 	}
-	if !strings.Contains(err.Error(), "payload match patterns are planned") {
-		t.Fatalf("error = %v", err)
+	if len(prog.Enums) != 1 || len(prog.Enums[0].Cases) != 2 {
+		t.Fatalf("enums = %#v", prog.Enums)
+	}
+	if got := len(prog.Enums[0].Cases[0].Payload); got != 1 {
+		t.Fatalf("ok payload count = %d, want 1", got)
+	}
+	if got := len(prog.Enums[0].Cases[1].Payload); got != 2 {
+		t.Fatalf("err payload count = %d, want 2", got)
+	}
+	match, ok := prog.Funcs[0].Body[0].(*MatchStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want MatchStmt", prog.Funcs[0].Body[0])
+	}
+	pat, ok := match.Cases[0].Pattern.(*EnumCasePatternExpr)
+	if !ok {
+		t.Fatalf("pattern = %T, want EnumCasePatternExpr", match.Cases[0].Pattern)
+	}
+	if pat.TypeName != "Result" || pat.CaseName != "ok" || strings.Join(pat.Bindings, ",") != "value" {
+		t.Fatalf("pattern = %#v", pat)
+	}
+}
+
+func TestParseMatchExpression(t *testing.T) {
+	src := `
+enum Result:
+    case ok(Int)
+    case err(Int)
+
+func main() -> Int:
+    let score: Int = match result:
+    case Result.ok(value):
+        value
+    case Result.err(code):
+        code
+    return score
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	letStmt, ok := prog.Funcs[0].Body[0].(*LetStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want LetStmt", prog.Funcs[0].Body[0])
+	}
+	match, ok := letStmt.Value.(*MatchExpr)
+	if !ok {
+		t.Fatalf("let value = %T, want MatchExpr", letStmt.Value)
+	}
+	if len(match.Cases) != 2 {
+		t.Fatalf("case count = %d, want 2", len(match.Cases))
+	}
+	pat, ok := match.Cases[0].Pattern.(*EnumCasePatternExpr)
+	if !ok {
+		t.Fatalf("pattern = %T, want EnumCasePatternExpr", match.Cases[0].Pattern)
+	}
+	if pat.CaseName != "ok" || strings.Join(pat.Bindings, ",") != "value" {
+		t.Fatalf("pattern = %#v", pat)
+	}
+	if _, ok := match.Cases[0].Value.(*IdentExpr); !ok {
+		t.Fatalf("case value = %T, want IdentExpr", match.Cases[0].Value)
 	}
 }
 
@@ -881,20 +1221,18 @@ func TestParseErrors(t *testing.T) {
 	}
 }
 
-func TestParsePlannedFeatureDiagnostics(t *testing.T) {
+func TestParseCapsuleDiagnostics(t *testing.T) {
 	tests := []struct {
 		name string
 		src  string
 		want string
 	}{
-		{"capsule", "capsule app:\n  name: \"app\"\n", "planned feature 'capsule'"},
-		{"generic protocol requirement", "protocol P:\n  func id<T>(x: T) -> T\n", "generic protocol requirements are planned"},
-		{"generic struct", "struct Box<T>:\n  value: T\n", "generic structs are planned"},
-		{"enum payload case", "enum Option:\n  case some(Int)\n", "enum payload cases are planned"},
+		{"capsule empty block", "capsule App {}", "capsule requires at least one metadata entry"},
+		{"capsule malformed key-value", "capsule App {\n    id:\n}\n", "expected expression, got }"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Parse([]byte(tt.src))
+			_, err := ParseFile([]byte(tt.src), tt.name+".tetra")
 			if err == nil {
 				t.Fatalf("expected error")
 			}
@@ -902,6 +1240,50 @@ func TestParsePlannedFeatureDiagnostics(t *testing.T) {
 				t.Fatalf("error = %q, want %q", err.Error(), tt.want)
 			}
 		})
+	}
+}
+
+func TestParseGenericProtocolRequirement(t *testing.T) {
+	src := `
+protocol Mapper:
+    func map<T>(self: Vec2, value: T) -> T
+
+struct Vec2:
+    x: Int
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Protocols) != 1 {
+		t.Fatalf("protocol count = %d, want 1", len(prog.Protocols))
+	}
+	reqs := prog.Protocols[0].Requirements
+	if len(reqs) != 1 {
+		t.Fatalf("requirement count = %d, want 1", len(reqs))
+	}
+	req := reqs[0]
+	if req.Name != "map" {
+		t.Fatalf("requirement name = %q, want map", req.Name)
+	}
+	if len(req.TypeParams) != 1 || req.TypeParams[0] != "T" {
+		t.Fatalf("type params = %#v, want [T]", req.TypeParams)
+	}
+	if len(req.Params) != 2 || req.Params[1].Type.Name != "T" {
+		t.Fatalf("params = %#v, want second param type T", req.Params)
+	}
+	if req.ReturnType.Name != "T" {
+		t.Fatalf("return type = %q, want T", req.ReturnType.Name)
+	}
+}
+
+func TestParseGenericProtocolRequirementRejectsDuplicateTypeParam(t *testing.T) {
+	_, err := Parse([]byte("protocol P:\n  func id<T, T>(x: T) -> T\n"))
+	if err == nil {
+		t.Fatalf("expected duplicate type parameter diagnostic")
+	}
+	if !strings.Contains(err.Error(), "duplicate type parameter 'T'") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
@@ -992,6 +1374,109 @@ func TestParseClosureLiteralExpression(t *testing.T) {
 	}
 }
 
+func TestParseTopLevelClosureDeclaration(t *testing.T) {
+	src := `
+closure add1(x: Int) -> Int:
+    return x + 1
+
+func main() -> Int:
+    return add1(41)
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) != 2 {
+		t.Fatalf("func count = %d, want 2", len(prog.Funcs))
+	}
+	closure := prog.Funcs[0]
+	if closure.Name != "add1" {
+		t.Fatalf("closure name = %q, want add1", closure.Name)
+	}
+	if closure.Synthetic {
+		t.Fatalf("top-level closure should not be synthetic")
+	}
+	if len(closure.Params) != 1 || closure.Params[0].Name != "x" || closure.Params[0].Type.Name != "Int" {
+		t.Fatalf("closure params = %#v", closure.Params)
+	}
+	if closure.ReturnType.Name != "Int" {
+		t.Fatalf("closure return type = %q, want Int", closure.ReturnType.Name)
+	}
+}
+
+func TestParseGenericClosureLiteralExpression(t *testing.T) {
+	src := "fn main() -> i32 { let f: ptr = fn<T: Eq>(x: T) -> T { return x }; return 0 }"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) < 2 {
+		t.Fatalf("func count = %d, want at least 2 (main + synthetic closure)", len(prog.Funcs))
+	}
+	closure := prog.Funcs[1]
+	if len(closure.TypeParams) != 1 || closure.TypeParams[0] != "T" {
+		t.Fatalf("closure type params = %#v, want [T]", closure.TypeParams)
+	}
+	if len(closure.TypeParamBounds) != 1 {
+		t.Fatalf("closure bounds = %#v, want one bound", closure.TypeParamBounds)
+	}
+	if closure.TypeParamBounds[0].Name != "T" || closure.TypeParamBounds[0].Bound.Name != "Eq" {
+		t.Fatalf("closure bound = %#v, want T: Eq", closure.TypeParamBounds[0])
+	}
+}
+
+func TestParseClosureLiteralMayReferenceOuterIdentifier(t *testing.T) {
+	src := "fn main() -> i32 { let y: i32 = 1; let f: ptr = fn(x: i32) -> i32 { return x + y }; return 0 }"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) < 2 {
+		t.Fatalf("func count = %d, want at least 2 (main + synthetic closure)", len(prog.Funcs))
+	}
+	closure := prog.Funcs[1]
+	ret, ok := closure.Body[0].(*ReturnStmt)
+	if !ok {
+		t.Fatalf("closure stmt = %T, want ReturnStmt", closure.Body[0])
+	}
+	bin, ok := ret.Value.(*BinaryExpr)
+	if !ok {
+		t.Fatalf("return value = %T, want BinaryExpr", ret.Value)
+	}
+	right, ok := bin.Right.(*IdentExpr)
+	if !ok || right.Name != "y" {
+		t.Fatalf("binary right = %#v, want IdentExpr y", bin.Right)
+	}
+}
+
+func TestParsePropertyDeclaration(t *testing.T) {
+	src := `
+property title: Int
+property enabled: Bool = true
+
+func main() -> Int:
+    if enabled:
+        return title
+    return 0
+`
+	file, err := ParseFile([]byte(src), "property.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Funcs) != 1 || len(file.Funcs[0].Body) == 0 {
+		t.Fatalf("unexpected funcs: %#v", file.Funcs)
+	}
+	if len(file.Globals) != 2 {
+		t.Fatalf("global count = %d, want 2", len(file.Globals))
+	}
+	if file.Globals[0].Name != "title" || file.Globals[0].Mutable || file.Globals[0].Const || file.Globals[0].Type.Name != "Int" || file.Globals[0].Init != nil {
+		t.Fatalf("property title = %#v", file.Globals[0])
+	}
+	if file.Globals[1].Name != "enabled" || file.Globals[1].Mutable || file.Globals[1].Const || file.Globals[1].Type.Name != "Bool" || file.Globals[1].Init == nil {
+		t.Fatalf("property enabled = %#v", file.Globals[1])
+	}
+}
+
 func TestParseFunctionSemanticClauses(t *testing.T) {
 	src := "fn main() -> i32 noalloc noblock realtime nothrow budget(10) { return 0 }"
 	prog, err := Parse([]byte(src))
@@ -1038,8 +1523,8 @@ func TestParsePrivacyConsentSemanticClauses(t *testing.T) {
 	}
 }
 
-func TestParsePlannedFeatureStructuredDiagnostic(t *testing.T) {
-	_, err := ParseFile([]byte("actor Renderable:\n"), "ui/view.tetra")
+func TestParseCapsuleStructuredDiagnostic(t *testing.T) {
+	_, err := ParseFile([]byte("capsule Renderable {}"), "ui/view.tetra")
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -1053,11 +1538,41 @@ func TestParsePlannedFeatureStructuredDiagnostic(t *testing.T) {
 	if diag.File != "ui/view.tetra" || diag.Line != 1 || diag.Column != 1 {
 		t.Fatalf("position = %q:%d:%d, want ui/view.tetra:1:1", diag.File, diag.Line, diag.Column)
 	}
-	if !strings.Contains(diag.Message, "planned feature 'actor'") {
+	if !strings.Contains(diag.Message, "capsule requires at least one metadata entry") {
 		t.Fatalf("message = %q", diag.Message)
 	}
-	if got := err.Error(); !strings.HasPrefix(got, "ui/view.tetra:1:1: planned feature 'actor'") {
+	if got := err.Error(); !strings.HasPrefix(got, "ui/view.tetra:1:1: capsule requires at least one metadata entry") {
 		t.Fatalf("text diagnostic = %q", got)
+	}
+}
+
+func TestParseCapsuleDeclaration(t *testing.T) {
+	src := `
+capsule App:
+    id: "tetra://app"
+    version: "0.1.0"
+    target: "linux-x64"
+    flags.enabled: true
+
+func main() -> Int:
+    return 0
+`
+	file, err := ParseFile([]byte(src), "capsule_decl.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Capsules) != 1 {
+		t.Fatalf("capsule count = %d, want 1", len(file.Capsules))
+	}
+	capsule := file.Capsules[0]
+	if capsule.Name != "App" {
+		t.Fatalf("capsule name = %q, want App", capsule.Name)
+	}
+	if len(capsule.Entries) != 4 {
+		t.Fatalf("entry count = %d, want 4", len(capsule.Entries))
+	}
+	if capsule.Entries[3].Key != "flags.enabled" {
+		t.Fatalf("entry[3].key = %q, want flags.enabled", capsule.Entries[3].Key)
 	}
 }
 
@@ -1103,6 +1618,124 @@ test "math":
 	}
 }
 
+func TestParseFlowTestDeclarationCoverage(t *testing.T) {
+	file, err := ParseFile([]byte(`
+module qa.surface
+
+test "math":
+    expect 40 + 2 == 42
+
+func answer() -> Int = 42
+`), "qa/surface.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if file.Module != "qa.surface" {
+		t.Fatalf("module = %q, want qa.surface", file.Module)
+	}
+	if len(file.Tests) != 1 || file.Tests[0].Name != "math" {
+		t.Fatalf("tests = %#v, want one named math", file.Tests)
+	}
+	if len(file.Funcs) != 1 || file.Funcs[0].Name != "answer" {
+		t.Fatalf("funcs = %#v, want one named answer", file.Funcs)
+	}
+	if len(file.Funcs[0].Body) != 1 {
+		t.Fatalf("expression-bodied function should lower to one statement, got %d", len(file.Funcs[0].Body))
+	}
+	if _, ok := file.Funcs[0].Body[0].(*ReturnStmt); !ok {
+		t.Fatalf("func body stmt = %T, want ReturnStmt", file.Funcs[0].Body[0])
+	}
+}
+
+func TestParseFlowTestDeclarationDiagnostic(t *testing.T) {
+	_, err := ParseFile([]byte("test math:\n    expect 1 == 1\n"), "qa/bad_test_decl.tetra")
+	if err == nil {
+		t.Fatalf("expected diagnostic")
+	}
+	diag, ok := DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected structured diagnostic: %T %v", err, err)
+	}
+	if diag.Code != DiagnosticCodeParse || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v", diag)
+	}
+	if diag.File != "qa/bad_test_decl.tetra" || diag.Line != 1 || diag.Column != 6 {
+		t.Fatalf("position = %q:%d:%d, want qa/bad_test_decl.tetra:1:6", diag.File, diag.Line, diag.Column)
+	}
+	if diag.Message != "expected string, got identifier" {
+		t.Fatalf("message = %q, want expected string/identifier diagnostic", diag.Message)
+	}
+}
+
+func TestParseTestBlockASTShape(t *testing.T) {
+	file, err := ParseFile([]byte("test \"math\":\n    expect 40 + 2 == 42\n"), "qa/ast_shape.tetra")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Tests) != 1 {
+		t.Fatalf("tests = %d, want 1", len(file.Tests))
+	}
+	testDecl := file.Tests[0]
+	if got := testDecl.Pos(); got.Line != 1 || got.Col != 1 {
+		t.Fatalf("test decl pos = %d:%d, want 1:1", got.Line, got.Col)
+	}
+	if len(testDecl.Body) != 1 {
+		t.Fatalf("test body len = %d, want 1", len(testDecl.Body))
+	}
+	expectStmt, ok := testDecl.Body[0].(*ExpectStmt)
+	if !ok {
+		t.Fatalf("test stmt = %T, want ExpectStmt", testDecl.Body[0])
+	}
+	if pos := expectStmt.Pos(); pos.Line != 2 || pos.Col != 5 {
+		t.Fatalf("expect stmt pos = %d:%d, want 2:5", pos.Line, pos.Col)
+	}
+	root, ok := expectStmt.Cond.(*BinaryExpr)
+	if !ok {
+		t.Fatalf("expect condition = %T, want BinaryExpr", expectStmt.Cond)
+	}
+	if root.Op != TokenEqEq {
+		t.Fatalf("root op = %s, want ==", TokenName(root.Op))
+	}
+	if pos := root.Pos(); pos.Line != 2 || pos.Col != 19 {
+		t.Fatalf("root expr pos = %d:%d, want 2:19", pos.Line, pos.Col)
+	}
+}
+
+func TestParseTestBlockASTShapeDiagnostic(t *testing.T) {
+	_, err := ParseFile([]byte("test \"math\":\n    expect @\n"), "qa/ast_shape_bad.tetra")
+	if err == nil {
+		t.Fatalf("expected diagnostic")
+	}
+	diag, ok := DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected structured diagnostic: %T %v", err, err)
+	}
+	if diag.File != "qa/ast_shape_bad.tetra" || diag.Line != 2 || diag.Column != 8 {
+		t.Fatalf("position = %q:%d:%d, want qa/ast_shape_bad.tetra:2:8", diag.File, diag.Line, diag.Column)
+	}
+	if diag.Message != "expected expression, got ?" {
+		t.Fatalf("message = %q", diag.Message)
+	}
+}
+
+func TestParseFlowTestBlockSpanCRLFAndUnicode(t *testing.T) {
+	src := "test \"Привіт\":\r\n    expect @\r\n"
+	_, err := ParseFile([]byte(src), "qa/span_unicode.tetra")
+	if err == nil {
+		t.Fatalf("expected diagnostic")
+	}
+	diag, ok := DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected structured diagnostic: %T %v", err, err)
+	}
+	if diag.File != "qa/span_unicode.tetra" || diag.Line != 2 || diag.Column != 8 {
+		t.Fatalf("position = %q:%d:%d, want qa/span_unicode.tetra:2:8", diag.File, diag.Line, diag.Column)
+	}
+	if diag.Message != "expected expression, got ?" {
+		t.Fatalf("message = %q", diag.Message)
+	}
+}
+
 func TestParseStructDecl(t *testing.T) {
 	src := "struct Vec2 { x: i32, y: i32 }\nfn main() -> i32 { return 0 }"
 	prog, err := Parse([]byte(src))
@@ -1121,6 +1754,66 @@ func TestParseStructDecl(t *testing.T) {
 	}
 	if st.Fields[0].Name != "x" || st.Fields[1].Name != "y" {
 		t.Errorf("field names = %q/%q, want x/y", st.Fields[0].Name, st.Fields[1].Name)
+	}
+}
+
+func TestParseGenericStructDeclAndTypeArgs(t *testing.T) {
+	src := "struct Box<T>:\n    value: T\nfunc main() -> Int:\n    let b: Box<Int> = Box<Int>{value: 42}\n    return b.value\n"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Structs) != 1 {
+		t.Fatalf("struct count = %d, want 1", len(prog.Structs))
+	}
+	st := prog.Structs[0]
+	if st.Name != "Box" || len(st.TypeParams) != 1 || st.TypeParams[0] != "T" {
+		t.Fatalf("struct = %#v, want Box<T>", st)
+	}
+	if got := st.Fields[0].Type.Name; got != "T" {
+		t.Fatalf("field type = %q, want T", got)
+	}
+	letStmt, ok := prog.Funcs[0].Body[0].(*LetStmt)
+	if !ok {
+		t.Fatalf("body[0] = %T, want *LetStmt", prog.Funcs[0].Body[0])
+	}
+	if letStmt.Type.Name != "Box" || len(letStmt.Type.TypeArgs) != 1 || letStmt.Type.TypeArgs[0].Name != "Int" {
+		t.Fatalf("let type = %#v, want Box<Int>", letStmt.Type)
+	}
+	lit, ok := letStmt.Value.(*StructLitExpr)
+	if !ok {
+		t.Fatalf("let value = %T, want *StructLitExpr", letStmt.Value)
+	}
+	if lit.Type.Name != "Box" || len(lit.Type.TypeArgs) != 1 || lit.Type.TypeArgs[0].Name != "Int" {
+		t.Fatalf("literal type = %#v, want Box<Int>", lit.Type)
+	}
+}
+
+func TestParseGenericStructRejectsDuplicateTypeParam(t *testing.T) {
+	_, err := Parse([]byte("struct Box<T, T>:\n    value: T\n"))
+	if err == nil {
+		t.Fatalf("expected duplicate type parameter diagnostic")
+	}
+	if !strings.Contains(err.Error(), "duplicate type parameter 'T'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseGenericFunctionProtocolBound(t *testing.T) {
+	src := "protocol P:\n    func echo(self: Vec) -> Vec\nstruct Vec:\n    x: Int\nfunc id<T: P>(x: T) -> T:\n    return x\n"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) != 1 {
+		t.Fatalf("func count = %d, want 1", len(prog.Funcs))
+	}
+	fn := prog.Funcs[0]
+	if got := fn.TypeParams; len(got) != 1 || got[0] != "T" {
+		t.Fatalf("type params = %#v, want [T]", got)
+	}
+	if got := fn.TypeParamBounds; len(got) != 1 || got[0].Name != "T" || got[0].Bound.Name != "P" {
+		t.Fatalf("type param bounds = %#v, want T: P", got)
 	}
 }
 
@@ -1263,23 +1956,70 @@ func TestParseModuleAndImport(t *testing.T) {
 	}
 }
 
+func TestParsePublicAndSelectiveImports(t *testing.T) {
+	src := `module app.main
+pub import engine.math.{add, Vec}
+import engine.types as types
+pub struct Frame { v: Vec }
+pub fn main() -> i32 { return add(40, 2) }`
+	file, err := ParseFile([]byte(src), "test.t4")
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	if len(file.Imports) != 2 {
+		t.Fatalf("imports = %d, want 2", len(file.Imports))
+	}
+	if imp := file.Imports[0]; imp.Path != "engine.math" || imp.Alias != "" || !imp.Public {
+		t.Fatalf("import[0] = %#v, want public selective engine.math", imp)
+	}
+	if got := file.Imports[0].Items; len(got) != 2 || got[0] != "add" || got[1] != "Vec" {
+		t.Fatalf("import[0].Items = %#v, want [add Vec]", got)
+	}
+	if !file.Structs[0].Public {
+		t.Fatalf("struct Frame should be public")
+	}
+	if !file.Funcs[0].Public {
+		t.Fatalf("main should be public")
+	}
+}
+
 func TestParseGlobalDecl(t *testing.T) {
-	src := "var g: i32\nval c = 42\nconst k: i32 = 7\nfn main() -> i32 { return 0 }"
+	src := "var g: i32 = 1\nvar ok: bool = true\nval c = 42\nconst k: i32 = 7\nfn main() -> i32 { return 0 }"
 	file, err := ParseFile([]byte(src), "test.tetra")
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
 	}
-	if len(file.Globals) != 3 {
-		t.Fatalf("expected 3 globals, got %d", len(file.Globals))
+	if len(file.Globals) != 4 {
+		t.Fatalf("expected 4 globals, got %d", len(file.Globals))
 	}
 	if file.Globals[0].Name != "g" || !file.Globals[0].Mutable {
 		t.Errorf("global[0] = %q mutable=%v, want g/true", file.Globals[0].Name, file.Globals[0].Mutable)
 	}
-	if file.Globals[1].Name != "c" || file.Globals[1].Mutable {
-		t.Errorf("global[1] = %q mutable=%v, want c/false", file.Globals[1].Name, file.Globals[1].Mutable)
+	if file.Globals[0].Init == nil {
+		t.Fatalf("global[0] expected initializer")
 	}
-	if file.Globals[2].Name != "k" || file.Globals[2].Mutable || !file.Globals[2].Const {
-		t.Errorf("global[2] = %q mutable=%v const=%v, want k/false/true", file.Globals[2].Name, file.Globals[2].Mutable, file.Globals[2].Const)
+	if file.Globals[1].Name != "ok" || !file.Globals[1].Mutable {
+		t.Errorf("global[1] = %q mutable=%v, want ok/true", file.Globals[1].Name, file.Globals[1].Mutable)
+	}
+	if file.Globals[1].Init == nil {
+		t.Fatalf("global[1] expected initializer")
+	}
+	if file.Globals[2].Name != "c" || file.Globals[2].Mutable {
+		t.Errorf("global[2] = %q mutable=%v, want c/false", file.Globals[2].Name, file.Globals[2].Mutable)
+	}
+	if file.Globals[3].Name != "k" || file.Globals[3].Mutable || !file.Globals[3].Const {
+		t.Errorf("global[3] = %q mutable=%v const=%v, want k/false/true", file.Globals[3].Name, file.Globals[3].Mutable, file.Globals[3].Const)
+	}
+}
+
+func TestParseGlobalVarDeclRequiresExplicitType(t *testing.T) {
+	src := "var g = 1\nfn main() -> i32 { return 0 }"
+	_, err := ParseFile([]byte(src), "test.tetra")
+	if err == nil {
+		t.Fatalf("expected parse error")
+	}
+	if !strings.Contains(err.Error(), "global var requires an explicit type annotation") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

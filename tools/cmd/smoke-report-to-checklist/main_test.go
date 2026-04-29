@@ -194,7 +194,7 @@ func TestValidateSmokeReportShapeAcceptsWASMBuildOnlyTarget(t *testing.T) {
 		Passed:    &passed,
 		Failed:    &failed,
 		Cases: []smokeCaseReport{
-			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Pass: true},
 			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
 			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Pass: true},
 			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Pass: true},
@@ -287,7 +287,7 @@ func TestValidateSmokeReportShapeAcceptsRanBuildOnlyCaseWithRunner(t *testing.T)
 		Passed:    &passed,
 		Failed:    &failed,
 		Cases: []smokeCaseReport{
-			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
+			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
 			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
 			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
 			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},

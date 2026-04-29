@@ -44,6 +44,228 @@ func TestLinkObjectTargetMismatch(t *testing.T) {
 	}
 }
 
+func TestBuildLinksInterfaceDependencyWithMatchingImplementationObject(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	src := []byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	libSrc := filepath.Join(tmp, filepath.FromSlash("lib/math/core.t4"))
+	libObj := filepath.Join(tmp, "math.tobj")
+	if err := writeFile(libSrc, string(src)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildFileWithStatsOpt(libSrc, libObj, tgt.Triple, BuildOptions{Emit: EmitLibrary}); err != nil {
+		t.Fatalf("build library: %v", err)
+	}
+	iface, err := GenerateInterfaceFromSource(src, libSrc)
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/app/main.t4"))
+	if err := writeFile(appSrc, "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("app/math/core.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	outPath := filepath.Join(tmp, "app-bin"+tgt.ExeExt)
+	stats, err := BuildFileWithStatsOpt(appSrc, outPath, tgt.Triple, BuildOptions{LinkObjectPaths: []string{libObj}})
+	if err != nil {
+		t.Fatalf("build with .t4i + matching .tobj: %v", err)
+	}
+	if _, err := os.Stat(outPath); err != nil {
+		t.Fatalf("missing output: %v", err)
+	}
+	assertModules(t, stats.InterfaceModules, []string{"math.core"})
+}
+
+func TestBuildRejectsInterfaceDependencyWithoutImplementationObject(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	src := []byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	iface, err := GenerateInterfaceFromSource(src, filepath.Join(tmp, filepath.FromSlash("math/core.t4")))
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/main.t4"))
+	if err := writeFile(appSrc, "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("math/core.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app"+tgt.ExeExt), tgt.Triple, BuildOptions{})
+	if err == nil {
+		t.Fatalf("expected missing implementation object error")
+	}
+	if !strings.Contains(err.Error(), "missing implementation object for interface module 'math.core'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildRejectsInterfaceImplementationAPIHashMismatch(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	interfaceSrc := []byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	implSrc := []byte(`module math.core
+
+pub func add(a: Int, b: Bool) -> Int:
+    return a
+`)
+	libSrc := filepath.Join(tmp, filepath.FromSlash("lib/math/core.t4"))
+	libObj := filepath.Join(tmp, "math.tobj")
+	if err := writeFile(libSrc, string(implSrc)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildFileWithStatsOpt(libSrc, libObj, tgt.Triple, BuildOptions{Emit: EmitLibrary}); err != nil {
+		t.Fatalf("build library: %v", err)
+	}
+	iface, err := GenerateInterfaceFromSource(interfaceSrc, filepath.Join(tmp, filepath.FromSlash("app/math/core.t4")))
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/app/main.t4"))
+	if err := writeFile(appSrc, "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("app/math/core.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app"+tgt.ExeExt), tgt.Triple, BuildOptions{LinkObjectPaths: []string{libObj}})
+	if err == nil {
+		t.Fatalf("expected API hash mismatch")
+	}
+	if !strings.Contains(err.Error(), "public API hash mismatch for interface module 'math.core'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildRejectsDuplicateInterfaceImplementationObjects(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	src := []byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	libSrc := filepath.Join(tmp, filepath.FromSlash("lib/math/core.t4"))
+	if err := writeFile(libSrc, string(src)); err != nil {
+		t.Fatal(err)
+	}
+	var objs []string
+	for _, name := range []string{"math-a.tobj", "math-b.tobj"} {
+		objPath := filepath.Join(tmp, name)
+		if _, err := BuildFileWithStatsOpt(libSrc, objPath, tgt.Triple, BuildOptions{Emit: EmitLibrary}); err != nil {
+			t.Fatalf("build library %s: %v", name, err)
+		}
+		objs = append(objs, objPath)
+	}
+	iface, err := GenerateInterfaceFromSource(src, libSrc)
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/app/main.t4"))
+	if err := writeFile(appSrc, "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("app/math/core.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app"+tgt.ExeExt), tgt.Triple, BuildOptions{LinkObjectPaths: objs})
+	if err == nil {
+		t.Fatalf("expected duplicate implementation provider error")
+	}
+	if !strings.Contains(err.Error(), "duplicate implementation object for interface module 'math.core'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildRejectsInterfaceImplementationMissingSymbol(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	src := []byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	apiHash, err := InterfaceFingerprintFromSource(src, filepath.Join(tmp, filepath.FromSlash("math/core.t4")))
+	if err != nil {
+		t.Fatalf("InterfaceFingerprintFromSource: %v", err)
+	}
+	objPath := filepath.Join(tmp, "math.tobj")
+	if err := WriteObject(objPath, &Object{
+		Target:          tgt.Triple,
+		Module:          "math.core",
+		CompilerVersion: Version(),
+		PublicAPIHash:   apiHash,
+		Code:            []byte{0xC3},
+		Symbols:         []Symbol{{Name: "math.core.other", Offset: 0}},
+	}); err != nil {
+		t.Fatalf("write object: %v", err)
+	}
+	iface, err := GenerateInterfaceFromSource(src, filepath.Join(tmp, filepath.FromSlash("app/math/core.t4")))
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/app/main.t4"))
+	if err := writeFile(appSrc, "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("app/math/core.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app"+tgt.ExeExt), tgt.Triple, BuildOptions{LinkObjectPaths: []string{objPath}})
+	if err == nil {
+		t.Fatalf("expected missing implementation symbol error")
+	}
+	if !strings.Contains(err.Error(), "implementation object for interface module 'math.core' missing exported symbol 'math.core.add'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func writeFile(path string, body string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(body), 0o644)
+}
+
 func TestLinkObjectLibraryBuildPath(t *testing.T) {
 	tgt, ok := target.Host()
 	if !ok {

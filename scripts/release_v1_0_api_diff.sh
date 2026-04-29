@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+cd "$repo_root"
+
 report_dir=""
 baseline="docs/baselines/api-diff-baseline.v1alpha1.json"
 enforce_mode="no-change"
 write_baseline="false"
+release_artifact="tetra.release.v0_2_0.api-diff-report.v1alpha1"
 
 usage() {
   cat <<'USAGE'
@@ -15,6 +20,9 @@ Options:
   --baseline PATH     Baseline JSON path (default: docs/baselines/api-diff-baseline.v1alpha1.json).
   --enforce MODE      one of: none, no-breaking, no-change (default: no-change).
   --write-baseline    Regenerate baseline JSON from current docs before diff.
+
+Artifact mapping:
+  tetra.release.v0_2_0.api-diff-report.v1alpha1
 USAGE
 }
 
@@ -87,3 +95,4 @@ node scripts/tools/api_diff_report.mjs "${args[@]}"
 echo "api-diff docs: $docs_out"
 echo "api-diff report: $diff_out"
 echo "api-diff baseline: $baseline"
+echo "api-diff artifact: $release_artifact"

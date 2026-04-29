@@ -1,4 +1,4 @@
 func main() -> Int:
     match value:
-    case Option.some(x):
+    case Result.ok(,):
         return x

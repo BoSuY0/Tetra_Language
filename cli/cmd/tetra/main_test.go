@@ -218,6 +218,58 @@ func TestDoctorCommandJSON(t *testing.T) {
 	}
 }
 
+func TestDoctorCommandProjectJSON(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        linux-x64
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"doctor", "--format=json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doctor exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	var report struct {
+		Status string `json:"status"`
+		Checks []struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+			Detail string `json:"detail"`
+		} `json:"checks"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("doctor JSON: %v\n%s", err, stdout.String())
+	}
+	if report.Status != "pass" {
+		t.Fatalf("doctor status = %q report=%s", report.Status, stdout.String())
+	}
+	var sawCapsule, sawEntry, sawRoots, sawLockSync bool
+	for _, check := range report.Checks {
+		if check.Name == "project capsule" && check.Status == "pass" && strings.Contains(filepath.ToSlash(check.Detail), "Capsule.t4") {
+			sawCapsule = true
+		}
+		if check.Name == "project entry" && check.Status == "pass" && strings.Contains(filepath.ToSlash(check.Detail), "src/main.t4") {
+			sawEntry = true
+		}
+		if check.Name == "project source roots" && check.Status == "pass" && strings.Contains(check.Detail, "src") {
+			sawRoots = true
+		}
+		if check.Name == "project lock" && check.Status == "pass" && strings.Contains(check.Detail, "tetra project sync") {
+			sawLockSync = true
+		}
+	}
+	if !sawCapsule || !sawEntry || !sawRoots || !sawLockSync {
+		t.Fatalf("project doctor missing expected checks: %#v", report.Checks)
+	}
+}
+
 func TestDoctorCommandRejectsUnsupportedFormat(t *testing.T) {
 	var stderr bytes.Buffer
 	code := runCLI([]string{"doctor", "--format=yaml"}, &bytes.Buffer{}, &stderr)
@@ -262,7 +314,7 @@ func TestBuildCommandUsesDefaultInput(t *testing.T) {
 	}
 	dir := t.TempDir()
 	src := []byte(`fun main(): i32 { return 0 }`)
-	if err := os.WriteFile(filepath.Join(dir, "main.tetra"), src, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "main.t4"), src, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	oldWD, err := os.Getwd()
@@ -284,6 +336,1519 @@ func TestBuildCommandUsesDefaultInput(t *testing.T) {
 	}
 	if _, err := os.Stat(out); err != nil {
 		t.Fatalf("expected build output %s: %v", out, err)
+	}
+}
+
+func TestCheckCommandUsesDefaultMainT4(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.t4"), []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"check"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Checked: main.t4") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestCheckCommandDiscoversCapsuleT4ProjectEntryAndSourceRoots(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/app/main.t4"
+
+    sources:
+        src
+        ui
+
+    targets:
+        linux
+
+    allow:
+        ui
+
+    policy:
+        unsafe deny
+        reproducible required
+`)
+	writeCLIProjectFile(t, dir, "src/app/main.t4", "module app.main\nimport components.counter as counter\nfunc main() -> Int:\n    return counter.value()\n")
+	writeCLIProjectFile(t, dir, "ui/components/counter.t4", "module components.counter\nfunc value() -> Int:\n    return 42\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"check"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(filepath.ToSlash(stdout.String()), "src/app/main.t4") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestCheckCommandExplicitProjectDirectoryUsesCapsuleEntry(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+        ui
+`)
+	writeCLIProjectFile(t, dir, "src/app/main.t4", "module app.main\nimport components.counter as counter\nfunc main() -> Int:\n    return counter.value()\n")
+	writeCLIProjectFile(t, dir, "ui/components/counter.t4", "module components.counter\nfunc value() -> Int:\n    return 42\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"check", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(filepath.ToSlash(stdout.String()), "src/app/main.t4") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestBuildCommandDiscoversCapsuleT4ProjectEntry(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        linux
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	out := filepath.Join(dir, "app")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"build", "--target", mustHostTarget(t), "-o", out}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("expected build output %s: %v", out, err)
+	}
+}
+
+func TestBuildAndRunCommandsAcceptExplicitProjectDirectory(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        linux-x64
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 7\n")
+
+	out := filepath.Join(dir, "demo")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"build", "--target", mustHostTarget(t), "-o", out, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("expected build output %s: %v", out, err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"run", "--target", mustHostTarget(t), dir}, &stdout, &stderr)
+	if code != 7 {
+		t.Fatalf("run exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestCheckCommandResolvesLocalCapsuleDependencyImport(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "Math/src/math/core.t4", "module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b\n")
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(filepath.Join(dir, "App")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"check"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestEcoVerifySingleCapsuleExpandsPathDependenciesIntoTetraLock(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+
+	lockPath := filepath.Join(dir, "App", "Tetra.lock")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "verify", "--lock", lockPath, filepath.Join(dir, "App", "Capsule.t4")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read lock: %v", err)
+	}
+	if !strings.Contains(string(raw), `"tetra://app"`) || !strings.Contains(string(raw), `"tetra://math"`) {
+		t.Fatalf("lock did not include full path dependency graph:\n%s", string(raw))
+	}
+}
+
+func TestCheckCommandValidatesPresentTetraLockAgainstCapsuleGraph(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "Math/src/math/core.t4", "module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b\n")
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n")
+
+	lockPath := filepath.Join(dir, "App", "Tetra.lock")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "verify", "--lock", lockPath, filepath.Join(dir, "App", "Capsule.t4"), filepath.Join(dir, "Math", "Capsule.t4")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.2.0"
+    sources:
+        src
+`)
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(filepath.Join(dir, "App")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"check"}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected check failure for stale Tetra.lock, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "Tetra.lock") || !strings.Contains(stderr.String(), "version mismatch") {
+		t.Fatalf("stderr = %q, want Tetra.lock version mismatch", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "tetra project sync") {
+		t.Fatalf("stderr = %q, want project sync repair hint", stderr.String())
+	}
+}
+
+func TestBuildCommandUsesCapsuleInterfaceAndObjectArtifacts(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	libSrc := filepath.Join(dir, "Math", "src", "math", "core.t4")
+	writeCLIProjectFile(t, dir, "Math/src/math/core.t4", "module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b\n")
+	iface, err := compiler.GenerateInterfaceFile(libSrc)
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFile: %v", err)
+	}
+	writeCLIProjectFile(t, dir, "App/interfaces/math/core.t4i", string(iface))
+	objPath := filepath.Join(dir, "App", "artifacts", "math-core.tobj")
+	if err := os.MkdirAll(filepath.Dir(objPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(libSrc, objPath, target, compiler.BuildOptions{Jobs: 1, Emit: compiler.EmitLibrary}); err != nil {
+		t.Fatalf("emit math library: %v", err)
+	}
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", fmt.Sprintf(`capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    targets:
+        %s
+    artifacts:
+        interface interfaces/math/core.t4i
+        object artifacts/math-core.tobj
+`, target))
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(filepath.Join(dir, "App")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	out := filepath.Join(dir, "App", "app")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"build", "--target", target, "-o", out}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("expected build output %s: %v", out, err)
+	}
+}
+
+func TestEcoArtifactsBuildGeneratesDependencyArtifactsLockAndBuildsProject(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+    targets:
+        linux
+`)
+	writeCLIProjectFile(t, dir, "Math/src/math/core.t4", "module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b\n")
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", fmt.Sprintf(`capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    targets:
+        %s
+    deps:
+        tetra://math 0.1.0 ../Math
+`, target))
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n")
+
+	appRoot := filepath.Join(dir, "App")
+	lockPath := filepath.Join(appRoot, "Tetra.lock")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "artifacts", "build", "--target", target, "--lock", lockPath, filepath.Join(appRoot, "Capsule.t4")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco artifacts build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	interfaceRel := "interfaces/math/core.t4i"
+	objectRel := "artifacts/math/core." + target + ".tobj"
+	seedRel := "seeds/app-deps.t4s"
+	for _, rel := range []string{interfaceRel, objectRel, seedRel, "Tetra.lock"} {
+		if _, err := os.Stat(filepath.Join(appRoot, filepath.FromSlash(rel))); err != nil {
+			t.Fatalf("expected generated %s: %v", rel, err)
+		}
+	}
+	capsuleRaw, err := os.ReadFile(filepath.Join(appRoot, "Capsule.t4"))
+	if err != nil {
+		t.Fatalf("read Capsule.t4: %v", err)
+	}
+	capsuleText := string(capsuleRaw)
+	for _, want := range []string{
+		"artifacts:",
+		"interface " + interfaceRel,
+		"object " + target + " " + objectRel,
+		"seed " + seedRel,
+	} {
+		if !strings.Contains(capsuleText, want) {
+			t.Fatalf("Capsule.t4 missing %q:\n%s", want, capsuleText)
+		}
+	}
+	lockRaw, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read Tetra.lock: %v", err)
+	}
+	for _, want := range []string{`"kind": "object"`, `"target": "` + target + `"`, `"module": "math.core"`, `"public_api_hash": "sha256:`} {
+		if !strings.Contains(string(lockRaw), want) {
+			t.Fatalf("Tetra.lock missing %q:\n%s", want, string(lockRaw))
+		}
+	}
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(appRoot); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+	stdout.Reset()
+	stderr.Reset()
+	out := filepath.Join(appRoot, "app")
+	code = runCLI([]string{"build", "--target", target, "-o", out}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("expected build output %s: %v", out, err)
+	}
+}
+
+func TestEcoArtifactsCheckDetectsStaleInterfaceAndSuggestsRepair(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	appRoot := writeArtifactBuildFixture(t, dir, target)
+	lockPath := filepath.Join(appRoot, "Tetra.lock")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "artifacts", "build", "--target", target, "--lock", lockPath, filepath.Join(appRoot, "Capsule.t4")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco artifacts build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	writeCLIProjectFile(t, dir, "Math/src/math/core.t4", "module math.core\nfunc add(a: Int, b: Int, c: Int) -> Int:\n    return a + b + c\n")
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"eco", "artifacts", "check", "--target", target, filepath.Join(appRoot, "Capsule.t4")}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected stale artifact failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	combined := stdout.String() + stderr.String()
+	for _, want := range []string{"stale interface artifact", "math.core", "tetra eco artifacts build --target " + target} {
+		if !strings.Contains(combined, want) {
+			t.Fatalf("artifact check output missing %q:\nstdout=%s\nstderr=%s", want, stdout.String(), stderr.String())
+		}
+	}
+}
+
+func TestEcoArtifactsBuildCheckDryRunDoesNotWriteArtifacts(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	appRoot := writeArtifactBuildFixture(t, dir, target)
+	lockPath := filepath.Join(appRoot, "Tetra.lock")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "artifacts", "build", "--check", "--target", target, "--lock", lockPath, filepath.Join(appRoot, "Capsule.t4")}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected dry-run to report pending artifacts")
+	}
+	if !strings.Contains(stdout.String()+stderr.String(), "would generate") {
+		t.Fatalf("dry-run output = stdout=%q stderr=%q, want would generate", stdout.String(), stderr.String())
+	}
+	for _, rel := range []string{"interfaces/math/core.t4i", "artifacts/math/core." + target + ".tobj", "seeds/app-deps.t4s", "Tetra.lock"} {
+		if _, err := os.Stat(filepath.Join(appRoot, filepath.FromSlash(rel))); err == nil {
+			t.Fatalf("dry-run unexpectedly wrote %s", rel)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("stat %s: %v", rel, err)
+		}
+	}
+}
+
+func TestBuildCommandArtifactsAutoRepairsStaleObject(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	appRoot := writeArtifactBuildFixture(t, dir, target)
+	lockPath := filepath.Join(appRoot, "Tetra.lock")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "artifacts", "build", "--target", target, "--lock", lockPath, filepath.Join(appRoot, "Capsule.t4")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco artifacts build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	writeCLIProjectFile(t, dir, "Math/src/math/core.t4", "module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b + 1\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(appRoot); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	stdout.Reset()
+	stderr.Reset()
+	out := filepath.Join(appRoot, "app")
+	code = runCLI([]string{"build", "--artifacts=auto", "--target", target, "-o", out}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build --artifacts=auto exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("expected build output %s: %v", out, err)
+	}
+	if !strings.Contains(stdout.String(), "Artifacts repaired") {
+		t.Fatalf("stdout = %q, want repair message", stdout.String())
+	}
+}
+
+func TestEcoArtifactsBuildAllTargetsSkipsWASMObjectTargets(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	appRoot := writeArtifactBuildFixture(t, dir, target)
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", fmt.Sprintf(`capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    targets:
+        %s
+        wasm32-wasi
+    deps:
+        tetra://math 0.1.0 ../Math
+`, target))
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "artifacts", "build", "--all-targets", "--lock", filepath.Join(appRoot, "Tetra.lock"), filepath.Join(appRoot, "Capsule.t4")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco artifacts build --all-targets exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(appRoot, filepath.FromSlash("artifacts/math/core."+target+".tobj"))); err != nil {
+		t.Fatalf("expected native object artifact: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(appRoot, filepath.FromSlash("artifacts/math/core.wasm32-wasi.tobj"))); err == nil {
+		t.Fatalf("unexpected wasm object artifact")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat wasm object: %v", err)
+	}
+}
+
+func TestProjectSyncWritesLockForProjectWithoutDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        linux-x64
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "sync", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project sync exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	lockPath := filepath.Join(dir, "Tetra.lock")
+	raw, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read Tetra.lock: %v", err)
+	}
+	if !strings.Contains(string(raw), `"tetra://demo"`) {
+		t.Fatalf("Tetra.lock missing capsule id:\n%s", string(raw))
+	}
+	if !strings.Contains(stdout.String(), "Project synced") {
+		t.Fatalf("stdout = %q, want sync message", stdout.String())
+	}
+}
+
+func TestProjectSyncCheckReportsMissingLockWithoutWriting(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        linux-x64
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "sync", "--check", dir}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected project sync --check to report missing lock")
+	}
+	combined := stdout.String() + stderr.String()
+	if !strings.Contains(combined, "would generate lock") || !strings.Contains(combined, "Tetra.lock") {
+		t.Fatalf("sync --check output = stdout=%q stderr=%q, want missing lock dry-run", stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Tetra.lock")); err == nil {
+		t.Fatalf("project sync --check unexpectedly wrote Tetra.lock")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat Tetra.lock: %v", err)
+	}
+}
+
+func TestProjectSyncRejectsTargetAndAllTargetsTogether(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        linux-x64
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "sync", "--target", "linux-x64", "--all-targets", dir}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("project sync exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "either --target or --all-targets") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestProjectSyncGeneratesDependencyArtifactsAndLock(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	appRoot := writeArtifactBuildFixture(t, dir, target)
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "sync", "--target", target, appRoot}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project sync exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, rel := range []string{
+		"interfaces/math/core.t4i",
+		"artifacts/math/core." + target + ".tobj",
+		"seeds/app-deps.t4s",
+		"Tetra.lock",
+	} {
+		if _, err := os.Stat(filepath.Join(appRoot, filepath.FromSlash(rel))); err != nil {
+			t.Fatalf("expected project sync generated %s: %v", rel, err)
+		}
+	}
+	capsuleRaw, err := os.ReadFile(filepath.Join(appRoot, "Capsule.t4"))
+	if err != nil {
+		t.Fatalf("read Capsule.t4: %v", err)
+	}
+	if !strings.Contains(string(capsuleRaw), "interface interfaces/math/core.t4i") || !strings.Contains(string(capsuleRaw), "object "+target+" artifacts/math/core."+target+".tobj") {
+		t.Fatalf("Capsule.t4 missing generated artifact declarations:\n%s", string(capsuleRaw))
+	}
+	if !strings.Contains(stdout.String(), "Project synced") {
+		t.Fatalf("stdout = %q, want sync message", stdout.String())
+	}
+}
+
+func TestProjectSyncWritesLockForBuildOnlyTargetWithoutNativeArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	appRoot := writeArtifactBuildFixture(t, dir, "wasm32-wasi")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "sync", appRoot}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project sync exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(appRoot, "Tetra.lock")); err != nil {
+		t.Fatalf("expected Tetra.lock: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(appRoot, filepath.FromSlash("artifacts/math/core.wasm32-wasi.tobj"))); err == nil {
+		t.Fatalf("project sync unexpectedly wrote wasm object artifact")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat wasm object artifact: %v", err)
+	}
+}
+
+func TestProjectDepsAddPathDiscoversMetadataAndAppendsDeps(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+	appRoot := filepath.Join(dir, "App")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "deps", "add", "--path", "../Math", appRoot}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project deps add exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(filepath.Join(appRoot, "Capsule.t4"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	capsule := string(raw)
+	if !strings.Contains(capsule, "deps:") || !strings.Contains(capsule, "tetra://math 0.1.0 ../Math") {
+		t.Fatalf("Capsule.t4 missing dependency:\n%s", capsule)
+	}
+	if !strings.Contains(stdout.String(), "Added dependency") || !strings.Contains(stdout.String(), "run: tetra project sync") {
+		t.Fatalf("stdout = %q, want add message and sync hint", stdout.String())
+	}
+}
+
+func TestProjectDepsAddRejectsDuplicate(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "deps", "add", "--path", "../Math", filepath.Join(dir, "App")}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected duplicate dependency failure")
+	}
+	if !strings.Contains(stderr.String(), "duplicate dependency") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestProjectDepsAddAllowsMetadataOverride(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+	appRoot := filepath.Join(dir, "App")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "deps", "add", "--path", "../Math", "--id", "tetra://math-alt", "--version", "0.2.0", appRoot}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project deps add exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(filepath.Join(appRoot, "Capsule.t4"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "tetra://math-alt 0.2.0 ../Math") {
+		t.Fatalf("Capsule.t4 missing overridden dependency:\n%s", string(raw))
+	}
+}
+
+func TestProjectDepsListJSONReportsResolvedPath(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "deps", "list", "--format=json", filepath.Join(dir, "App")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project deps list exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	var report struct {
+		Dependencies []struct {
+			ID           string `json:"id"`
+			Version      string `json:"version"`
+			Path         string `json:"path"`
+			ResolvedPath string `json:"resolved_path"`
+			Status       string `json:"status"`
+		} `json:"dependencies"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("deps list JSON: %v\n%s", err, stdout.String())
+	}
+	if len(report.Dependencies) != 1 {
+		t.Fatalf("dependencies = %#v", report.Dependencies)
+	}
+	dep := report.Dependencies[0]
+	if dep.ID != "tetra://math" || dep.Version != "0.1.0" || dep.Path != "../Math" || dep.Status != "ok" || !strings.HasSuffix(filepath.ToSlash(dep.ResolvedPath), "/Math") {
+		t.Fatalf("dependency report = %#v", dep)
+	}
+}
+
+func TestProjectDepsRemoveByID(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+	appRoot := filepath.Join(dir, "App")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "deps", "remove", "--id", "tetra://math", appRoot}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project deps remove exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(filepath.Join(appRoot, "Capsule.t4"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "tetra://math") {
+		t.Fatalf("dependency was not removed:\n%s", string(raw))
+	}
+	if !strings.Contains(stdout.String(), "Removed dependency") || !strings.Contains(stdout.String(), "run: tetra project sync") {
+		t.Fatalf("stdout = %q, want remove message and sync hint", stdout.String())
+	}
+}
+
+func TestProjectDepsRemoveRejectsAmbiguousID(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../MathV1
+        tetra://math 0.2.0 ../MathV2
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "deps", "remove", "--id", "tetra://math", filepath.Join(dir, "App")}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("project deps remove exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "requires --version") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestProjectDepsCheckPassesForValidDependency(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "deps", "check", filepath.Join(dir, "App")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project deps check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Dependencies OK") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestProjectDepsCheckFailsForMissingPathVersionMismatchAndCycle(t *testing.T) {
+	t.Run("missing path", func(t *testing.T) {
+		dir := t.TempDir()
+		writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://missing 0.1.0 ../Missing
+`)
+		writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+		var stdout, stderr bytes.Buffer
+		code := runCLI([]string{"project", "deps", "check", filepath.Join(dir, "App")}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("expected missing dependency failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "tetra://missing") || !strings.Contains(stderr.String(), "Missing") {
+			t.Fatalf("stderr = %q", stderr.String())
+		}
+	})
+	t.Run("version mismatch", func(t *testing.T) {
+		dir := t.TempDir()
+		writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.2.0"
+    sources:
+        src
+`)
+		writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+		writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+
+		var stdout, stderr bytes.Buffer
+		code := runCLI([]string{"project", "deps", "check", filepath.Join(dir, "App")}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("expected version mismatch failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "version mismatch") {
+			t.Fatalf("stderr = %q", stderr.String())
+		}
+	})
+	t.Run("cycle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+		writeCLIProjectFile(t, dir, "App/src/app/main.t4", "func main() -> Int:\n    return 0\n")
+		writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+    deps:
+        tetra://app 0.1.0 ../App
+`)
+
+		var stdout, stderr bytes.Buffer
+		code := runCLI([]string{"project", "deps", "check", filepath.Join(dir, "App")}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("expected cycle failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "capsule dependency cycle") {
+			t.Fatalf("stderr = %q", stderr.String())
+		}
+	})
+}
+
+func TestWorkspaceInitAddListAndRemove(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "App/src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"workspace", "init", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("workspace init exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Tetra.workspace")); err != nil {
+		t.Fatalf("expected Tetra.workspace: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"workspace", "add", "App", "--workspace", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("workspace add exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "Tetra.workspace"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `member "App"`) {
+		t.Fatalf("workspace missing member:\n%s", string(raw))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"workspace", "list", "--format=json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("workspace list exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	var report struct {
+		Root    string `json:"root"`
+		Members []struct {
+			Path      string `json:"path"`
+			CapsuleID string `json:"capsule_id"`
+			Status    string `json:"status"`
+		} `json:"members"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("workspace list JSON: %v\n%s", err, stdout.String())
+	}
+	if filepath.Clean(report.Root) != filepath.Clean(dir) || len(report.Members) != 1 || report.Members[0].Path != "App" || report.Members[0].CapsuleID != "tetra://app" || report.Members[0].Status != "ok" {
+		t.Fatalf("workspace list report = %#v", report)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"workspace", "remove", "App", "--workspace", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("workspace remove exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err = os.ReadFile(filepath.Join(dir, "Tetra.workspace"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), `member "App"`) {
+		t.Fatalf("workspace member was not removed:\n%s", string(raw))
+	}
+}
+
+func TestWorkspaceCheckGraphAndSync(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	appRoot := writeArtifactBuildFixture(t, dir, target)
+	writeCLIProjectFile(t, dir, "Tetra.workspace", `workspace "tetra.workspace.v1"
+member "Math"
+member "App"
+`)
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"workspace", "check", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("workspace check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Workspace OK") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"workspace", "graph", "--format=json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("workspace graph exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	var graph struct {
+		Nodes []struct {
+			Path      string `json:"path"`
+			CapsuleID string `json:"capsule_id"`
+		} `json:"nodes"`
+		Edges []struct {
+			From string `json:"from"`
+			To   string `json:"to"`
+		} `json:"edges"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &graph); err != nil {
+		t.Fatalf("workspace graph JSON: %v\n%s", err, stdout.String())
+	}
+	if len(graph.Nodes) != 2 || len(graph.Edges) != 1 || graph.Edges[0].From != "App" || graph.Edges[0].To != "Math" {
+		t.Fatalf("workspace graph = %#v", graph)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"workspace", "sync", "--check", "--target", target, dir}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected workspace sync --check to report pending writes")
+	}
+	if !strings.Contains(stdout.String()+stderr.String(), "would generate") {
+		t.Fatalf("sync --check output = stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(appRoot, "Tetra.lock")); err == nil {
+		t.Fatalf("workspace sync --check unexpectedly wrote App Tetra.lock")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat App Tetra.lock: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"workspace", "sync", "--target", target, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("workspace sync exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, rel := range []string{"Tetra.lock", "interfaces/math/core.t4i", "artifacts/math/core." + target + ".tobj", "seeds/app-deps.t4s"} {
+		if _, err := os.Stat(filepath.Join(appRoot, filepath.FromSlash(rel))); err != nil {
+			t.Fatalf("expected workspace sync generated %s: %v", rel, err)
+		}
+	}
+}
+
+func TestWorkspaceCheckFailures(t *testing.T) {
+	t.Run("missing member", func(t *testing.T) {
+		dir := t.TempDir()
+		writeCLIProjectFile(t, dir, "Tetra.workspace", `workspace "tetra.workspace.v1"
+member "Missing"
+`)
+		var stdout, stderr bytes.Buffer
+		code := runCLI([]string{"workspace", "check", dir}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("expected missing member failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "Missing") {
+			t.Fatalf("stderr = %q", stderr.String())
+		}
+	})
+	t.Run("duplicate capsule id", func(t *testing.T) {
+		dir := t.TempDir()
+		writeCLIProjectFile(t, dir, "A/Capsule.t4", `capsule A:
+    id "tetra://dup"
+    version "0.1.0"
+`)
+		writeCLIProjectFile(t, dir, "B/Capsule.t4", `capsule B:
+    id "tetra://dup"
+    version "0.1.0"
+`)
+		writeCLIProjectFile(t, dir, "Tetra.workspace", `workspace "tetra.workspace.v1"
+member "A"
+member "B"
+`)
+		var stdout, stderr bytes.Buffer
+		code := runCLI([]string{"workspace", "check", dir}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("expected duplicate id failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "duplicate capsule id") {
+			t.Fatalf("stderr = %q", stderr.String())
+		}
+	})
+	t.Run("dependency cycle", func(t *testing.T) {
+		dir := t.TempDir()
+		writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+		writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    deps:
+        tetra://app 0.1.0 ../App
+`)
+		writeCLIProjectFile(t, dir, "Tetra.workspace", `workspace "tetra.workspace.v1"
+member "App"
+member "Math"
+`)
+		var stdout, stderr bytes.Buffer
+		code := runCLI([]string{"workspace", "check", dir}, &stdout, &stderr)
+		if code == 0 {
+			t.Fatalf("expected cycle failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "capsule dependency cycle") {
+			t.Fatalf("stderr = %q", stderr.String())
+		}
+	})
+}
+
+func TestWorkspaceBuildWritesPerMemberOutputsAndJSONSummary(t *testing.T) {
+	target := mustHostTarget(t)
+	tgt, err := ctarget.Parse(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	writeWorkspaceMainProject(t, dir, "App", "tetra://app", target, 0)
+	writeWorkspaceMainProject(t, dir, "Tool", "tetra://tool", target, 0)
+	writeCLIProjectFile(t, dir, "Tetra.workspace", `workspace "tetra.workspace.v1"
+member "App"
+member "Tool"
+`)
+	outDir := filepath.Join(dir, "dist")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"workspace", "build", "--target", target, "--format=json", "-o", outDir, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("workspace build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	var report struct {
+		Command string `json:"command"`
+		Total   int    `json:"total"`
+		Passed  int    `json:"passed"`
+		Failed  int    `json:"failed"`
+		Skipped int    `json:"skipped"`
+		Members []struct {
+			Path   string `json:"path"`
+			Status string `json:"status"`
+		} `json:"members"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("workspace build JSON: %v\n%s", err, stdout.String())
+	}
+	if report.Command != "build" || report.Total != 2 || report.Passed != 2 || report.Failed != 0 || report.Skipped != 0 {
+		t.Fatalf("workspace build report = %#v", report)
+	}
+	for _, rel := range []string{
+		filepath.ToSlash(filepath.Join("App", defaultOutput(tgt, "exe"))),
+		filepath.ToSlash(filepath.Join("Tool", defaultOutput(tgt, "exe"))),
+	} {
+		if _, err := os.Stat(filepath.Join(outDir, filepath.FromSlash(rel))); err != nil {
+			t.Fatalf("expected workspace build output %s: %v", rel, err)
+		}
+	}
+}
+
+func TestWorkspaceBuildSkipsDependentAfterFailedDependency(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Lib/Capsule.t4", fmt.Sprintf(`capsule Lib:
+    id "tetra://lib"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        %s
+`, target))
+	writeCLIProjectFile(t, dir, "Lib/src/main.t4", "func main() -> Int:\n    return\n")
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", fmt.Sprintf(`capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        %s
+    deps:
+        tetra://lib 0.1.0 ../Lib
+`, target))
+	writeCLIProjectFile(t, dir, "App/src/main.t4", "func main() -> Int:\n    return 0\n")
+	writeCLIProjectFile(t, dir, "Tetra.workspace", `workspace "tetra.workspace.v1"
+member "Lib"
+member "App"
+`)
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"workspace", "build", "--target", target, "--format=json", "-o", filepath.Join(dir, "dist"), dir}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected workspace build to fail, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	var report struct {
+		Failed  int `json:"failed"`
+		Skipped int `json:"skipped"`
+		Members []struct {
+			Path   string `json:"path"`
+			Status string `json:"status"`
+			Detail string `json:"detail"`
+		} `json:"members"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("workspace build JSON: %v\n%s", err, stdout.String())
+	}
+	if report.Failed != 1 || report.Skipped != 1 || len(report.Members) != 2 {
+		t.Fatalf("workspace build report = %#v", report)
+	}
+	if report.Members[0].Path != "Lib" || report.Members[0].Status != "fail" {
+		t.Fatalf("first member = %#v", report.Members[0])
+	}
+	if report.Members[1].Path != "App" || report.Members[1].Status != "skipped" || !strings.Contains(report.Members[1].Detail, "Lib") {
+		t.Fatalf("dependent member = %#v", report.Members[1])
+	}
+}
+
+func TestWorkspaceTestFailFastJSONSummary(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	writeWorkspaceTestProject(t, dir, "Pass", "tetra://pass", target, "pass ok", "40 + 2 == 42")
+	writeWorkspaceTestProject(t, dir, "Fail", "tetra://fail", target, "fail bad", "1 == 2")
+	writeWorkspaceTestProject(t, dir, "Later", "tetra://later", target, "later ok", "2 + 2 == 4")
+	writeCLIProjectFile(t, dir, "Tetra.workspace", `workspace "tetra.workspace.v1"
+member "Pass"
+member "Fail"
+member "Later"
+`)
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"workspace", "test", "--target", target, "--fail-fast", "--format=json", dir}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected workspace test to fail, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	var report struct {
+		Command string `json:"command"`
+		Total   int    `json:"total"`
+		Passed  int    `json:"passed"`
+		Failed  int    `json:"failed"`
+		Skipped int    `json:"skipped"`
+		Members []struct {
+			Path   string `json:"path"`
+			Status string `json:"status"`
+		} `json:"members"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("workspace test JSON: %v\n%s", err, stdout.String())
+	}
+	if report.Command != "test" || report.Total != 3 || report.Passed != 1 || report.Failed != 1 || report.Skipped != 1 {
+		t.Fatalf("workspace test report = %#v", report)
+	}
+	if report.Members[2].Path != "Later" || report.Members[2].Status != "skipped" {
+		t.Fatalf("fail-fast member = %#v", report.Members[2])
+	}
+}
+
+func TestWorkspaceRunMemberAndUnknownMember(t *testing.T) {
+	target := mustHostTarget(t)
+	dir := t.TempDir()
+	writeWorkspaceMainProject(t, dir, "App", "tetra://app", target, 7)
+	writeWorkspaceMainProject(t, dir, "Tool", "tetra://tool", target, 0)
+	writeCLIProjectFile(t, dir, "Tetra.workspace", `workspace "tetra.workspace.v1"
+member "App"
+member "Tool"
+`)
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"workspace", "run", "App", "--workspace", dir, "--target", target}, &stdout, &stderr)
+	if code != 7 {
+		t.Fatalf("workspace run exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"workspace", "run", "Missing", "--workspace", dir, "--target", target}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("unknown workspace run exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "workspace member not found") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestBuildCommandWASMProjectLockDoesNotRequireNativeArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	appRoot := writeArtifactBuildFixture(t, dir, "wasm32-wasi")
+	lockPath := filepath.Join(appRoot, "Tetra.lock")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "verify", "--lock", lockPath, filepath.Join(appRoot, "Capsule.t4")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(appRoot); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"build"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(appRoot, "app.wasm")); err != nil {
+		t.Fatalf("expected wasm build output: %v", err)
+	}
+}
+
+func TestBuildCommandUsesCapsuleDefaultTarget(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        wasm32-wasi
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"build"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "app.wasm")); err != nil {
+		t.Fatalf("expected wasm default build output: %v", err)
+	}
+}
+
+func TestBuildCommandAllTargetsBuildsCapsuleTargets(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        linux
+        wasm32-wasi
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"build", "--all-targets"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build --all-targets exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, rel := range []string{"app-linux-x64", "app-wasm32-wasi.wasm"} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+			t.Fatalf("expected %s: %v", rel, err)
+		}
+	}
+}
+
+func TestFormatsCommandListsOfficialT4Family(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"formats", "--format=json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("formats exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	var report struct {
+		Formats []struct {
+			Name      string `json:"name"`
+			Extension string `json:"extension,omitempty"`
+			FileName  string `json:"file_name,omitempty"`
+			Role      string `json:"role"`
+			Primary   bool   `json:"primary,omitempty"`
+			Legacy    bool   `json:"legacy,omitempty"`
+		} `json:"formats"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("formats json: %v\n%s", err, stdout.String())
+	}
+	seen := map[string]bool{}
+	for _, format := range report.Formats {
+		if format.Extension != "" {
+			seen[format.Extension] = true
+		}
+		if format.FileName != "" {
+			seen[format.FileName] = true
+		}
+	}
+	for _, want := range []string{".t4", ".tdx", ".t4s", ".t4i", ".t4p", ".t4r", ".t4q", ".tneed", "Tetra.lock"} {
+		if !seen[want] {
+			t.Fatalf("formats output missing %s: %#v", want, report.Formats)
+		}
 	}
 }
 
@@ -408,7 +1973,7 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	}
 }
 
-func TestSmokeCommandListsDebugOnlyCase(t *testing.T) {
+func TestSmokeCommandKeepsInvalidDoubleFreeOutOfDebugList(t *testing.T) {
 	var stdout bytes.Buffer
 	code := runCLI([]string{"smoke", "--list", "--format=json", "--islands-debug"}, &stdout, &bytes.Buffer{})
 	if code != 0 {
@@ -421,14 +1986,10 @@ func TestSmokeCommandListsDebugOnlyCase(t *testing.T) {
 	if !report.IslandsDebug {
 		t.Fatalf("islands_debug = false")
 	}
-	var sawDebug bool
 	for _, c := range report.Cases {
-		if c.Name == "islands_double_free" && c.DebugOnly {
-			sawDebug = true
+		if c.Name == "islands_double_free" {
+			t.Fatalf("debug smoke list includes semantic-negative islands_double_free: %#v", c)
 		}
-	}
-	if !sawDebug {
-		t.Fatalf("debug smoke list missing islands_double_free: %#v", report.Cases)
 	}
 }
 
@@ -662,6 +2223,37 @@ func TestEcoVerifyHelpExitsSuccessfully(t *testing.T) {
 	}
 }
 
+func TestEcoTopLevelHelpMentionsVerifyLock(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "--help"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco --help exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "eco verify --lock") {
+		t.Fatalf("stdout = %q, want verify --lock guidance", stdout.String())
+	}
+}
+
+func TestEcoPackUnpackVaultHelpExitsSuccessfully(t *testing.T) {
+	for _, args := range [][]string{
+		{"eco", "pack", "--help"},
+		{"eco", "unpack", "--help"},
+		{"eco", "vault", "--help"},
+	} {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runCLI(args, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("%v exit code = %d, stdout=%q stderr=%q", args, code, stdout.String(), stderr.String())
+			}
+			combined := stdout.String() + stderr.String()
+			if !strings.Contains(strings.ToLower(combined), "usage:") {
+				t.Fatalf("%v output missing usage text: stdout=%q stderr=%q", args, stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
 func TestEcoPackProjectBundle(t *testing.T) {
 	dir := t.TempDir()
 	capsule := filepath.Join(dir, "Tetra.capsule")
@@ -697,6 +2289,83 @@ func TestEcoPackProjectBundle(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outDir, "tetra.package.json")); err != nil {
 		t.Fatalf("expected bundled package metadata: %v", err)
+	}
+}
+
+func TestEcoPackProjectBundleUsesT4CapsuleAndSource(t *testing.T) {
+	dir := t.TempDir()
+	capsule := filepath.Join(dir, "Capsule.t4")
+	if err := os.WriteFile(capsule, []byte(`capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srcDir := filepath.Join(dir, "src")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "main.t4"), []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pkg := filepath.Join(dir, "demo.tdx")
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkg}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	outDir := filepath.Join(dir, "unpacked")
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "unpack", pkg, "-C", outDir}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco unpack exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, rel := range []string{"Capsule.t4", "src/main.t4", "tetra.package.json"} {
+		if _, err := os.Stat(filepath.Join(outDir, filepath.FromSlash(rel))); err != nil {
+			t.Fatalf("expected bundled %s: %v", rel, err)
+		}
+	}
+}
+
+func TestEcoVerifyStructuredCapsuleT4WritesPolicyLock(t *testing.T) {
+	dir := t.TempDir()
+	capsule := filepath.Join(dir, "Capsule.t4")
+	if err := os.WriteFile(capsule, []byte(`capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+
+    sources:
+        src
+        ui
+
+    targets:
+        linux
+        web
+
+    allow:
+        ui
+        fs.readWrite.userData
+
+    policy:
+        unsafe deny
+        reproducible required
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(dir, "Tetra.lock")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"eco", "verify", "--lock", lockPath, capsule}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatalf("read lock: %v", err)
+	}
+	for _, want := range []string{`"path": "` + capsule + `"`, `"linux-x64"`, `"wasm32-web"`, `"ui"`, `"fs.readWrite.userData"`, `"unsafe": "deny"`, `"reproducible": "required"`} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("lock missing %q:\n%s", want, string(raw))
+		}
 	}
 }
 
@@ -935,6 +2604,130 @@ func TestFmtCommandCheckAndStdout(t *testing.T) {
 	}
 }
 
+func TestCollectTetraFilesIncludesT4AndLegacyTetra(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"main.t4":      "func main() -> Int:\n    return 0\n",
+		"legacy.tetra": "func legacy() -> Int:\n    return 0\n",
+		"ignore.tdx":   "not source\n",
+	}
+	for rel, src := range files {
+		if err := os.WriteFile(filepath.Join(dir, rel), []byte(src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := collectTetraFiles([]string{dir})
+	if err != nil {
+		t.Fatalf("collectTetraFiles: %v", err)
+	}
+	want := []string{filepath.Join(dir, "legacy.tetra"), filepath.Join(dir, "main.t4")}
+	if len(got) != len(want) {
+		t.Fatalf("files = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("files = %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestCollectTetraFilesSkipsCapsuleManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `manifest "tetra.capsule.v1"
+capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+	got, err := collectTetraFiles([]string{dir})
+	if err != nil {
+		t.Fatalf("collectTetraFiles: %v", err)
+	}
+	want := []string{filepath.Join(dir, "src", "main.t4")}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("files = %#v, want %#v", got, want)
+	}
+}
+
+func TestFormatCommandWriteIsIdempotentAndPreservesStandaloneComments(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	src := `// module docs
+func main() -> Int uses mem, io:
+    // return path
+    return 0
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"fmt", "--write", srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("fmt --write exit code = %d, stderr=%q", code, stderr.String())
+	}
+	once, err := os.ReadFile(srcPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"// module docs", "uses io, mem:", "    // return path"} {
+		if !strings.Contains(string(once), want) {
+			t.Fatalf("formatted file missing %q:\n%s", want, string(once))
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"fmt", "--write", srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("second fmt --write exit code = %d, stderr=%q", code, stderr.String())
+	}
+	twice, err := os.ReadFile(srcPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(twice) != string(once) {
+		t.Fatalf("fmt --write not idempotent:\nonce:\n%s\ntwice:\n%s", string(once), string(twice))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"fmt", "--check", srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("fmt --check after write exit code = %d, stderr=%q", code, stderr.String())
+	}
+}
+
+func TestFormatCommandJSONDiagnosticsForInlineComment(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	if err := os.WriteFile(srcPath, []byte("func main() -> Int:\n    return 0 // keep me\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	code := runCLI([]string{"fmt", "--diagnostics=json", srcPath}, &bytes.Buffer{}, &stderr)
+	if code != 1 {
+		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+	}
+	var diag struct {
+		Code     string `json:"code"`
+		Message  string `json:"message"`
+		File     string `json:"file"`
+		Line     int    `json:"line"`
+		Column   int    `json:"column"`
+		Severity string `json:"severity"`
+	}
+	if err := json.Unmarshal(stderr.Bytes(), &diag); err != nil {
+		t.Fatalf("json diagnostic: %v\n%s", err, stderr.String())
+	}
+	if diag.Code != "TETRA_FMT001" || diag.File != srcPath || diag.Line != 2 || diag.Column != 14 || diag.Severity != "error" {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+	if !strings.Contains(diag.Message, "inline comments are not supported") {
+		t.Fatalf("diagnostic message = %q", diag.Message)
+	}
+}
+
 func TestBuildCommandJSONDiagnostics(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "bad.tetra")
@@ -1032,6 +2825,81 @@ func TestDocCommandWritesAPIDocsToStdout(t *testing.T) {
 	}
 }
 
+func TestCheckCommandRejectsLocalCapsuleDependencyCycle(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    deps:
+        tetra://math 0.1.0 ../Math
+`)
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "module app.main\nfunc main() -> Int:\n    return 0\n")
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", `capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+    deps:
+        tetra://app 0.1.0 ../App
+`)
+	writeCLIProjectFile(t, dir, "Math/src/math/core.t4", "module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(filepath.Join(dir, "App")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"check"}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected check failure for dependency cycle, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "capsule dependency cycle") {
+		t.Fatalf("stderr = %q, want capsule dependency cycle", stderr.String())
+	}
+}
+
+func TestDocCommandDiscoversCapsuleProjectSources(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "src/app/main.t4", "module app.main\nfunc answer() -> Int:\n    return 42\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"doc"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("doc exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "## app.main") || !strings.Contains(stdout.String(), "`func answer() -> i32`") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
 func TestDocCommandWritesAPIDocsToFile(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "api.tetra")
@@ -1097,6 +2965,96 @@ func TestDocCommandJSONDiagnostics(t *testing.T) {
 	}
 	if diag.Code != "TETRA0001" || diag.Severity != "error" || !strings.Contains(diag.Message, "no such file or directory") {
 		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestInterfaceCommandWritesT4IFile(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "math.t4")
+	outPath := filepath.Join(dir, "math.t4i")
+	if err := os.WriteFile(srcPath, []byte("module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"interface", "-o", outPath, srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("interface exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read interface: %v", err)
+	}
+	if !strings.Contains(string(raw), "func add(a: i32, b: i32) -> i32:") {
+		t.Fatalf("interface output = %s", raw)
+	}
+}
+
+func TestInterfaceCommandCheckReportsStalePublicAPI(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, filepath.FromSlash("math/core.t4"))
+	writeCLIProjectFile(t, dir, "math/core.t4", `module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	outPath := filepath.Join(dir, "math.t4i")
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"interface", "-o", outPath, srcPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("interface write exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	writeCLIProjectFile(t, dir, "math/core.t4", `module math.core
+
+pub func add(a: Int, b: Bool) -> Int:
+    return a
+`)
+
+	stdout.Reset()
+	stderr.Reset()
+	code := runCLI([]string{"interface", "--check", "-o", outPath, srcPath}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected stale interface check failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "public API mismatch") {
+		t.Fatalf("stderr = %q, want public API mismatch", stderr.String())
+	}
+}
+
+func TestCheckCommandInterfaceOnlyDoesNotRequireMain(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, filepath.FromSlash("math/core.t4"))
+	writeCLIProjectFile(t, dir, "math/core.t4", `module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"check", "--interface-only", srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("check --interface-only exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestBuildCommandInterfaceOnlyDoesNotRequireMain(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, filepath.FromSlash("math/core.t4"))
+	writeCLIProjectFile(t, dir, "math/core.t4", `module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+
+	outPath := filepath.Join(dir, "out", "app")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"build", "--interface-only", "--target", "linux-x64", "-o", outPath, srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build --interface-only exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(outPath); !os.IsNotExist(err) {
+		t.Fatalf("build --interface-only should not emit %s, stat err=%v", outPath, err)
+	}
+	if !strings.Contains(stdout.String(), "Interface-only build checked") {
+		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
 
@@ -1374,7 +3332,7 @@ func TestCheckCommandReportsMissingDefaultMain(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "main.tetra") {
+	if !strings.Contains(stderr.String(), "main.t4") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
@@ -1600,6 +3558,33 @@ func TestFmtCheckJSONDiagnosticsForUnformattedFile(t *testing.T) {
 	}
 }
 
+func TestFormatCommandCheckJSONDiagnosticsIncludesFirstDiffPosition(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	if err := os.WriteFile(srcPath, []byte("func main() -> Int uses io:\n    return 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	code := runCLI([]string{"fmt", "--check", "--diagnostics=json", srcPath}, &bytes.Buffer{}, &stderr)
+	if code != 1 {
+		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
+	}
+	var diag struct {
+		Code     string `json:"code"`
+		Message  string `json:"message"`
+		File     string `json:"file"`
+		Line     int    `json:"line"`
+		Column   int    `json:"column"`
+		Severity string `json:"severity"`
+	}
+	if err := json.Unmarshal(stderr.Bytes(), &diag); err != nil {
+		t.Fatalf("json diagnostic: %v\n%s", err, stderr.String())
+	}
+	if diag.Code != "TETRA_FMT002" || diag.File != srcPath || diag.Line != 1 || diag.Column != 19 || diag.Message != "not formatted" || diag.Severity != "error" {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
 func TestTestCommandRunsTetraTests(t *testing.T) {
 	if _, ok := hostTarget(); !ok {
 		t.Skip("host target unsupported")
@@ -1612,6 +3597,71 @@ func TestTestCommandRunsTetraTests(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 	code := runCLI([]string{"test", "--target", mustHostTarget(t), srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "1/1 passed") {
+		t.Fatalf("test stdout = %q", stdout.String())
+	}
+}
+
+func TestTestCommandDiscoversCapsuleSourceRoots(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+	writeCLIProjectFile(t, dir, "src/passes.t4", "test \"project ok\":\n    expect 40 + 2 == 42\n")
+	writeCLIProjectFile(t, dir, "other/fails.t4", "test \"should not run\":\n    expect 1 == 2\n")
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"test", "--target", mustHostTarget(t)}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "1/1 passed") || strings.Contains(stdout.String(), "should not run") {
+		t.Fatalf("test stdout = %q", stdout.String())
+	}
+}
+
+func TestTestCommandExplicitProjectDirectoryUsesSourceRootsAndImports(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+        tests
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+	writeCLIProjectFile(t, dir, "src/app/util.t4", "module app.util\nfunc answer() -> Int:\n    return 42\n")
+	writeCLIProjectFile(t, dir, "tests/util_test.t4", "module util_test\nimport app.util as util\ntest \"imports app util\":\n    expect util.answer() == 42\n")
+	writeCLIProjectFile(t, dir, "other/fails.t4", "test \"should not run\":\n    expect 1 == 2\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"test", "--target", mustHostTarget(t), dir}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
@@ -1927,17 +3977,23 @@ func TestLSPStdioTranscriptFixtureCoversEditingRequests(t *testing.T) {
 	for _, want := range []string{
 		`"id":1`,
 		`"id":2`,
-		`"contents":{"kind":"markdown","value":"const answer: i32"}`,
+		`"selectionRange"`,
 		`"id":3`,
-		`"label":"answer"`,
+		`"contents":{"kind":"markdown","value":"const answer: i32"}`,
 		`"id":4`,
-		`"uri":"file:///fixture.tetra"`,
+		`"label":"answer"`,
 		`"id":5`,
-		`"newText":"value"`,
+		`"start":{"character":6,"line":0}`,
 		`"id":6`,
+		`"uri":"file:///fixture.tetra"`,
+		`"id":7`,
+		`"newText":"value"`,
+		`"id":8`,
 		`"newText":"const answer: Int = 42\n\nfunc main() -> Int:\n    return answer\n"`,
 		`function 'main' uses effect 'io' but does not declare it`,
-		`"id":7`,
+		`"id":9`,
+		`"title":"Add uses io to function main"`,
+		`"id":10`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("fixture transcript output missing %q:\n%s", want, out)
@@ -2176,6 +4232,118 @@ func loadLSPTranscriptFixture(t *testing.T, name string) []string {
 	return bodies
 }
 
+func TestNewAppScaffoldCreatesRunnableT4Project(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	appDir := filepath.Join(dir, "DemoApp")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"new", "app", appDir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("new app exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, rel := range []string{"Capsule.t4", "src/main.t4", "tests/main_test.t4", "README.md"} {
+		if _, err := os.Stat(filepath.Join(appDir, filepath.FromSlash(rel))); err != nil {
+			t.Fatalf("expected scaffold file %s: %v", rel, err)
+		}
+	}
+	capsuleRaw, err := os.ReadFile(filepath.Join(appDir, "Capsule.t4"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	capsuleText := string(capsuleRaw)
+	for _, want := range []string{`capsule DemoApp:`, `id "tetra://apps/demoapp"`, `entry "src/main.t4"`, `source "src"`, `source "tests"`, `target "` + mustHostTarget(t) + `"`, `permission "io"`} {
+		if !strings.Contains(capsuleText, want) {
+			t.Fatalf("Capsule.t4 missing %q:\n%s", want, capsuleText)
+		}
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"check", appDir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("scaffold check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"test", "--target", mustHostTarget(t), appDir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("scaffold test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestNewAppLockOptionWritesTetraLock(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	appDir := filepath.Join(dir, "LockedApp")
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"new", "app", "--lock", appDir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("new app --lock exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	raw, err := os.ReadFile(filepath.Join(appDir, "Tetra.lock"))
+	if err != nil {
+		t.Fatalf("read Tetra.lock: %v", err)
+	}
+	if !strings.Contains(string(raw), `"tetra://apps/lockedapp"`) {
+		t.Fatalf("Tetra.lock missing scaffold capsule id:\n%s", string(raw))
+	}
+	if !strings.Contains(stdout.String(), "Created app") || !strings.Contains(stdout.String(), "Tetra.lock") {
+		t.Fatalf("stdout = %q, want scaffold and lock messages", stdout.String())
+	}
+}
+
+func TestNewAppRejectsExistingDirectory(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"new", "app", dir}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("new app exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "already exists") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestProjectInfoCommandJSON(t *testing.T) {
+	dir := t.TempDir()
+	writeCLIProjectFile(t, dir, "Capsule.t4", `capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        linux-x64
+`)
+	writeCLIProjectFile(t, dir, "src/main.t4", "func main() -> Int:\n    return 0\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"project", "info", "--format=json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project info exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	var report struct {
+		Found       bool     `json:"found"`
+		Root        string   `json:"root"`
+		CapsulePath string   `json:"capsule_path"`
+		EntryPath   string   `json:"entry_path"`
+		SourceRoots []string `json:"source_roots"`
+		Targets     []string `json:"targets"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("project info JSON: %v\n%s", err, stdout.String())
+	}
+	if !report.Found || filepath.Clean(report.Root) != filepath.Clean(dir) || !strings.HasSuffix(filepath.ToSlash(report.CapsulePath), "Capsule.t4") || !strings.HasSuffix(filepath.ToSlash(report.EntryPath), "src/main.t4") {
+		t.Fatalf("project info report = %#v", report)
+	}
+	if strings.Join(report.SourceRoots, ",") != "src" || strings.Join(report.Targets, ",") != "linux-x64" {
+		t.Fatalf("project info roots/targets = %#v", report)
+	}
+}
+
 func mustHostTarget(t *testing.T) string {
 	t.Helper()
 	target, ok := hostTarget()
@@ -2183,6 +4351,17 @@ func mustHostTarget(t *testing.T) string {
 		t.Skip("host target unsupported")
 	}
 	return target
+}
+
+func writeCLIProjectFile(t *testing.T, root string, rel string, src string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func nonHostTarget(t *testing.T) string {
@@ -2195,4 +4374,59 @@ func nonHostTarget(t *testing.T) string {
 	}
 	t.Fatal("no non-host target found")
 	return ""
+}
+
+func writeArtifactBuildFixture(t *testing.T, dir string, target string) string {
+	t.Helper()
+	writeCLIProjectFile(t, dir, "Math/Capsule.t4", fmt.Sprintf(`capsule Math:
+    id "tetra://math"
+    version "0.1.0"
+    sources:
+        src
+    targets:
+        %s
+`, target))
+	writeCLIProjectFile(t, dir, "Math/src/math/core.t4", "module math.core\nfunc add(a: Int, b: Int) -> Int:\n    return a + b\n")
+	writeCLIProjectFile(t, dir, "App/Capsule.t4", fmt.Sprintf(`capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+    targets:
+        %s
+    deps:
+        tetra://math 0.1.0 ../Math
+`, target))
+	writeCLIProjectFile(t, dir, "App/src/app/main.t4", "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n")
+	return filepath.Join(dir, "App")
+}
+
+func writeWorkspaceMainProject(t *testing.T, root string, name string, id string, target string, exitCode int) {
+	t.Helper()
+	writeCLIProjectFile(t, root, filepath.ToSlash(filepath.Join(name, "Capsule.t4")), fmt.Sprintf(`capsule %s:
+    id "%s"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        %s
+`, name, id, target))
+	writeCLIProjectFile(t, root, filepath.ToSlash(filepath.Join(name, "src/main.t4")), fmt.Sprintf("func main() -> Int:\n    return %d\n", exitCode))
+}
+
+func writeWorkspaceTestProject(t *testing.T, root string, name string, id string, target string, testName string, condition string) {
+	t.Helper()
+	writeCLIProjectFile(t, root, filepath.ToSlash(filepath.Join(name, "Capsule.t4")), fmt.Sprintf(`capsule %s:
+    id "%s"
+    version "0.1.0"
+    entry "src/main.t4"
+    sources:
+        src
+    targets:
+        %s
+`, name, id, target))
+	writeCLIProjectFile(t, root, filepath.ToSlash(filepath.Join(name, "src/main.t4")), "func main() -> Int:\n    return 0\n")
+	writeCLIProjectFile(t, root, filepath.ToSlash(filepath.Join(name, "src/tests.t4")), fmt.Sprintf("test %q:\n    expect %s\n", testName, condition))
 }

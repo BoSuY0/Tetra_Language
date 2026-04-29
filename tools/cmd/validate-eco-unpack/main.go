@@ -55,12 +55,12 @@ func validateEcoUnpack(dir string) error {
 	if !info.IsDir() {
 		return fmt.Errorf("%s is not a directory", dir)
 	}
-	manifestPath := filepath.Join(dir, "Tetra.capsule")
+	manifestPath, err := findCapsuleManifest(dir)
+	if err != nil {
+		return err
+	}
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("missing Tetra.capsule")
-		}
 		return err
 	}
 	if err := validateManifestText(string(raw)); err != nil {
@@ -69,7 +69,7 @@ func validateEcoUnpack(dir string) error {
 	srcDir := filepath.Join(dir, "src")
 	if info, err := os.Stat(srcDir); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("missing .tetra sources under src")
+			return fmt.Errorf("missing T4 sources under src")
 		}
 		return err
 	} else if !info.IsDir() {
@@ -83,7 +83,7 @@ func validateEcoUnpack(dir string) error {
 		if d.IsDir() {
 			return nil
 		}
-		if filepath.Ext(path) == ".tetra" {
+		if compiler.IsSourceFile(path) {
 			hasSource = true
 			raw, err := os.ReadFile(path)
 			if err != nil {
@@ -98,12 +98,24 @@ func validateEcoUnpack(dir string) error {
 		return err
 	}
 	if !hasSource {
-		return fmt.Errorf("missing .tetra sources under src")
+		return fmt.Errorf("missing T4 sources under src")
 	}
 	if err := validatePackageMetadata(dir); err != nil {
 		return err
 	}
 	return nil
+}
+
+func findCapsuleManifest(dir string) (string, error) {
+	for _, name := range []string{compiler.CapsuleFileName, compiler.LegacyCapsuleFileName} {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		} else if !os.IsNotExist(err) {
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("missing %s (or legacy %s)", compiler.CapsuleFileName, compiler.LegacyCapsuleFileName)
 }
 
 func validateManifestText(text string) error {
@@ -226,8 +238,10 @@ func validatePackageMetadata(dir string) error {
 			return fmt.Errorf("metadata hash mismatch for %s", normalizedPath)
 		}
 	}
-	if _, ok := seen["Tetra.capsule"]; !ok {
-		return fmt.Errorf("package metadata missing Tetra.capsule entry")
+	if _, ok := seen[compiler.CapsuleFileName]; !ok {
+		if _, legacyOK := seen[compiler.LegacyCapsuleFileName]; !legacyOK {
+			return fmt.Errorf("package metadata missing %s entry", compiler.CapsuleFileName)
+		}
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 )
 
 const webUISmokeSchema = "tetra.web-ui-smoke.v1alpha1"
+const uiBundleSchema = "tetra.ui.v1"
 
 type webUISmokeReport struct {
 	Schema             string `json:"schema"`
@@ -25,6 +26,9 @@ type webUISmokeReport struct {
 	Blocker            string `json:"blocker"`
 	DOMSnapshot        string `json:"dom_snapshot"`
 	ChromiumStderr     string `json:"chromium_stderr"`
+	UISchema           string `json:"ui_schema"`
+	UIBundlePath       string `json:"ui_bundle_path"`
+	UIModulePath       string `json:"ui_module_path"`
 }
 
 func main() {
@@ -70,6 +74,9 @@ func validateWebUISmokeReport(report webUISmokeReport) error {
 	if report.Automation == "" {
 		return fmt.Errorf("web UI smoke missing automation")
 	}
+	if report.UISchema != "" && report.UISchema != uiBundleSchema {
+		return fmt.Errorf("web UI smoke ui_schema = %q, want %q", report.UISchema, uiBundleSchema)
+	}
 	switch report.Status {
 	case "pass":
 		if report.UsedFallbackSource {
@@ -80,6 +87,27 @@ func validateWebUISmokeReport(report webUISmokeReport) error {
 		}
 		if !strings.HasPrefix(report.Result, "ok:") {
 			return fmt.Errorf("web UI smoke pass result must start with ok:")
+		}
+		if report.UISchema != uiBundleSchema {
+			return fmt.Errorf("web UI smoke pass ui_schema = %q, want %q", report.UISchema, uiBundleSchema)
+		}
+		if report.UIBundlePath == "" || !strings.HasSuffix(report.UIBundlePath, ".ui.json") {
+			return fmt.Errorf("web UI smoke pass must include ui_bundle_path ending with .ui.json")
+		}
+		if err := requireRegularFile(report.UIBundlePath, "ui_bundle_path"); err != nil {
+			return err
+		}
+		if report.UIModulePath == "" || !strings.HasSuffix(report.UIModulePath, ".ui.web.mjs") {
+			return fmt.Errorf("web UI smoke pass must include ui_module_path ending with .ui.web.mjs")
+		}
+		if err := requireRegularFile(report.UIModulePath, "ui_module_path"); err != nil {
+			return err
+		}
+		if report.DOMSnapshot == "" || !strings.HasSuffix(report.DOMSnapshot, ".html") {
+			return fmt.Errorf("web UI smoke pass must include dom_snapshot ending with .html")
+		}
+		if err := requireRegularFile(report.DOMSnapshot, "dom_snapshot"); err != nil {
+			return err
 		}
 		if report.Blocker != "" {
 			return fmt.Errorf("web UI smoke pass cannot include blocker")
@@ -94,6 +122,17 @@ func validateWebUISmokeReport(report webUISmokeReport) error {
 		}
 	default:
 		return fmt.Errorf("web UI smoke status = %q, want pass, blocked, or fail", report.Status)
+	}
+	return nil
+}
+
+func requireRegularFile(path string, field string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("web UI smoke pass %s must point to an existing artifact: %w", field, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("web UI smoke pass %s points to a directory, want file", field)
 	}
 	return nil
 }

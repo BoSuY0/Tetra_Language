@@ -1,7 +1,7 @@
 # Tetra Language Tour
 
-Status: user-facing tour for the v1.0 scope. This guide describes the intended
-stable profile and calls out planned or blocked areas instead of implying they
+Status: user-facing tour for the current `v0.2.0` profile with future v1.0
+notes. This guide calls out planned or blocked areas instead of implying they
 are complete.
 
 ## Source Shape
@@ -18,6 +18,16 @@ go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
 Source files define modules, imports, functions, declarations, and tests. Use
 `./tetra check <file>` for fast feedback and `./tetra fmt --check <paths>` to
 verify formatting without rewriting files.
+
+Module imports support namespace aliases and selective public imports:
+
+```tetra
+import lib.core.math as math
+import app.ui.{CounterView, render}
+```
+
+Use `pub` to define the public surface of a module. A `pub import` re-exports
+selected public names through the current module.
 
 ## Types
 

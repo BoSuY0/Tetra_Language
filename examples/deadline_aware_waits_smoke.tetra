@@ -1,0 +1,31 @@
+// Deadline-aware task, actor receive, and absolute sleep smoke.
+func delayed_sender() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    let _sent: Int = core.send(core.sender(), 7)
+    return 0
+
+func delayed_task() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(6)
+    return core.time_now_ms()
+
+func main() -> Int
+uses actors, runtime:
+    let _until: Int = core.sleep_until(core.deadline_ms(1))
+    let _actor: actor = core.spawn("delayed_sender")
+    let task: task.i32 = core.task_spawn_i32("delayed_task")
+    let recv: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+    if recv.error != 0:
+        return 20 + recv.error
+    if recv.value != 7:
+        return 40 + recv.value
+    let early: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(2))
+    if early.error != 2:
+        return 60 + early.error
+    let final: task.result_i32 = core.task_join_result_i32(task)
+    if final.error != 0:
+        return 80 + final.error
+    if final.value != 7:
+        return 100 + final.value
+    return 0

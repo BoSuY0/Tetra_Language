@@ -15,6 +15,7 @@ This document defines the concrete WASM backend architecture that must be used b
 - Packaging: `wasm32-wasi` emits one `.wasm`; `wasm32-web` emits `.wasm` plus a deterministic JS loader module.
 - Host bindings: WASI imports only from `wasi_snapshot_preview1`; web imports only from `tetra_web_v1`.
 - Release gates: WASM support is blocked until the gate commands in this document are real and green.
+- UI boundary in this architecture wave: metadata preview only. `wasm32-web` may mount `tetra.ui.v1` metadata in a preview shell, while runtime event dispatch/layout engines remain post-v1.
 
 ## Concrete Object Model
 
@@ -95,6 +96,13 @@ Policy:
 
 - Browser APIs are accessed only through these imports in v1.
 - DOM/event-loop expansion is deferred until UI MVP runtime slices are approved.
+- UI sidecar behavior for v0.2.0: `.ui.web.mjs` and `.ui.html` are metadata preview artifacts and must validate `tetra.ui.v1` schema before rendering.
+
+### UI Sidecar Boundary
+
+- `wasm32-wasi` must not emit web/native UI runtime sidecars (`.ui.web.mjs`, `.ui.html`, `.ui.shell.txt`).
+- `wasm32-web` mounts metadata and reports preview output, but does not execute UI event dispatch semantics in runtime.
+- Native targets may emit `.ui.shell.txt` as deterministic metadata text only.
 
 ## Gate Commands (Must Stay Mandatory)
 

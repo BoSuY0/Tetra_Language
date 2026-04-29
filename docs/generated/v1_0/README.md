@@ -22,6 +22,9 @@ tagged.
 - `binary-size-thresholds.json`: release target binary-size threshold report.
 - `targets.json`, `doctor.json`, `tetra-test-report.json`, `smoke-list.json`,
   and `*-smoke.json`: validated CLI and target reports.
+- `test-all/logs/19-lsp-json-rpc-stdio.log`: validated LSP JSON-RPC transcript
+  covering diagnostics plus editor requests for symbols, hover, completion,
+  definition, references, rename, formatting, and code actions.
 - `invalid-diagnostic.json`, `missing-effect-diagnostic.json`,
   `tabs-diagnostic.json`, and `planned-actor-diagnostic.json`: JSON diagnostic
   evidence from the release gate.

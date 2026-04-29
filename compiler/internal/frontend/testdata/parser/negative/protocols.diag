@@ -1,1 +1,1 @@
-testdata/parser/negative/protocols.tetra:2:6: generic protocol requirements are planned for a later release
+testdata/parser/negative/protocols.tetra:3:10: duplicate protocol requirement 'draw'

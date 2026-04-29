@@ -1,2 +1,1 @@
-enum Option:
-    case some(Int)
+enum Empty:

@@ -4,7 +4,9 @@
 > is superseded by
 > `docs/spec/v1_scope.md` and
 > `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
-> The current public release truth is the v1.0 scope contract.
+> Public release truth for this branch lives in
+> `docs/spec/current_supported_surface.md` (`v0.2.0`). The v1.0 scope remains
+> a future contract.
 
 Status: completed as the v0.5.0 Integrated Alpha profile.
 

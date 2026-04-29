@@ -66,3 +66,36 @@ func TestValidateGenericTypeRefUnsupportedKindIsActionable(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestResolveTypeNameFunctionTypeRefMVP(t *testing.T) {
+	ref := frontend.TypeRef{
+		At:   frontend.Position{File: "fn_types.tetra", Line: 2, Col: 9},
+		Kind: frontend.TypeRefFunction,
+		Params: []frontend.TypeRef{
+			{At: frontend.Position{File: "fn_types.tetra", Line: 2, Col: 12}, Kind: frontend.TypeRefNamed, Name: "Int"},
+			{At: frontend.Position{File: "fn_types.tetra", Line: 2, Col: 17}, Kind: frontend.TypeRefNamed, Name: "Bool"},
+		},
+		Return: &frontend.TypeRef{At: frontend.Position{File: "fn_types.tetra", Line: 2, Col: 26}, Kind: frontend.TypeRefNamed, Name: "UInt8"},
+	}
+	got, err := resolveTypeName(&ref, "main", nil)
+	if err != nil {
+		t.Fatalf("resolveTypeName: %v", err)
+	}
+	if got != "ptr" {
+		t.Fatalf("resolved = %q, want ptr", got)
+	}
+}
+
+func TestResolveTypeNameFunctionTypeRefRequiresReturn(t *testing.T) {
+	_, err := resolveTypeName(&frontend.TypeRef{
+		At:     frontend.Position{File: "fn_types.tetra", Line: 4, Col: 5},
+		Kind:   frontend.TypeRefFunction,
+		Params: []frontend.TypeRef{{At: frontend.Position{File: "fn_types.tetra", Line: 4, Col: 8}, Kind: frontend.TypeRefNamed, Name: "Int"}},
+	}, "main", nil)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "fn_types.tetra:4:5: missing function return type") {
+		t.Fatalf("error = %v", err)
+	}
+}

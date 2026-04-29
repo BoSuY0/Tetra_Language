@@ -10,18 +10,20 @@ import (
 
 const (
 	objectMagic   = "TOBJ"
-	objectVersion = 2
+	objectVersion = 3
 )
 
 type Object struct {
-	Target       string
-	Module       string
-	SrcHash      [32]byte
-	WorldSigHash [32]byte
-	Code         []byte
-	Data         []byte
-	Symbols      []Symbol
-	Relocs       []Reloc
+	Target          string
+	Module          string
+	CompilerVersion string
+	PublicAPIHash   string
+	SrcHash         [32]byte
+	WorldSigHash    [32]byte
+	Code            []byte
+	Data            []byte
+	Symbols         []Symbol
+	Relocs          []Reloc
 }
 
 type Symbol struct {
@@ -82,6 +84,12 @@ func writeObject(w io.Writer, obj *Object) error {
 	if _, err := w.Write(obj.WorldSigHash[:]); err != nil {
 		return err
 	}
+	if err := writeString(w, obj.CompilerVersion); err != nil {
+		return err
+	}
+	if err := writeString(w, obj.PublicAPIHash); err != nil {
+		return err
+	}
 	if err := writeU32(w, uint32(len(obj.Code))); err != nil {
 		return err
 	}
@@ -137,7 +145,7 @@ func readObject(r io.Reader) (*Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	if version != objectVersion {
+	if version != 2 && version != objectVersion {
 		return nil, fmt.Errorf("unsupported object version %d", version)
 	}
 	target, err := readString(r)
@@ -155,6 +163,18 @@ func readObject(r io.Reader) (*Object, error) {
 	var worldSig [32]byte
 	if _, err := io.ReadFull(r, worldSig[:]); err != nil {
 		return nil, err
+	}
+	compilerVersion := ""
+	publicAPIHash := ""
+	if version >= 3 {
+		compilerVersion, err = readString(r)
+		if err != nil {
+			return nil, err
+		}
+		publicAPIHash, err = readString(r)
+		if err != nil {
+			return nil, err
+		}
 	}
 	codeLen, err := readU32(r)
 	if err != nil {
@@ -213,14 +233,16 @@ func readObject(r io.Reader) (*Object, error) {
 		relocs = append(relocs, Reloc{Kind: RelocKind(kind), At: at, Name: name, Addend: addend})
 	}
 	return &Object{
-		Target:       target,
-		Module:       module,
-		SrcHash:      srcHash,
-		WorldSigHash: worldSig,
-		Code:         code,
-		Data:         data,
-		Symbols:      symbols,
-		Relocs:       relocs,
+		Target:          target,
+		Module:          module,
+		CompilerVersion: compilerVersion,
+		PublicAPIHash:   publicAPIHash,
+		SrcHash:         srcHash,
+		WorldSigHash:    worldSig,
+		Code:            code,
+		Data:            data,
+		Symbols:         symbols,
+		Relocs:          relocs,
 	}, nil
 }
 

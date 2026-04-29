@@ -1,1 +1,1 @@
-testdata/parser/negative/match.tetra:3:6: payload match patterns are planned for a later release
+testdata/parser/negative/match.tetra:3:20: expected identifier, got ,

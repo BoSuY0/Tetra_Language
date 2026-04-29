@@ -9,7 +9,11 @@ import (
 )
 
 func collectTokens(src string) ([]token, error) {
-	l := newLexer([]byte(src), "test")
+	return collectTokensFrom(src, "test")
+}
+
+func collectTokensFrom(src string, file string) ([]token, error) {
+	l := newLexer([]byte(src), file)
 	var tokens []token
 	for {
 		tok, err := l.nextToken()
@@ -39,6 +43,7 @@ func TestLexTokenTypes(t *testing.T) {
 		{"val", []TokenType{TokenVal, TokenEOF}},
 		{"module", []TokenType{TokenModule, TokenEOF}},
 		{"import", []TokenType{TokenImport, TokenEOF}},
+		{"pub", []TokenType{TokenPub, TokenEOF}},
 		{"as", []TokenType{TokenAs, TokenEOF}},
 		{"uses", []TokenType{TokenUses, TokenEOF}},
 		{"struct", []TokenType{TokenStruct, TokenEOF}},
@@ -57,6 +62,7 @@ func TestLexTokenTypes(t *testing.T) {
 		{"throws", []TokenType{TokenThrows, TokenEOF}},
 		{"try", []TokenType{TokenTry, TokenEOF}},
 		{"throw", []TokenType{TokenThrow, TokenEOF}},
+		{"catch", []TokenType{TokenCatch, TokenEOF}},
 		{"async", []TokenType{TokenAsync, TokenEOF}},
 		{"await", []TokenType{TokenAwait, TokenEOF}},
 		{"break", []TokenType{TokenBreak, TokenEOF}},
@@ -65,6 +71,8 @@ func TestLexTokenTypes(t *testing.T) {
 		{"print", []TokenType{TokenPrint, TokenEOF}},
 		{"free", []TokenType{TokenFree, TokenEOF}},
 		{"unsafe", []TokenType{TokenUnsafe, TokenEOF}},
+		{"test", []TokenType{TokenTest, TokenEOF}},
+		{"expect", []TokenType{TokenExpect, TokenEOF}},
 		{"+", []TokenType{TokenPlus, TokenEOF}},
 		{"-", []TokenType{TokenMinus, TokenEOF}},
 		{"*", []TokenType{TokenStar, TokenEOF}},
@@ -245,6 +253,69 @@ func TestLexUnicodeInStringsAndComments(t *testing.T) {
 	}
 }
 
+func TestLexFlowTestBlockTokenCoverage(t *testing.T) {
+	src := "test \"арифметика\":\n    expect 40 + 2 == 42\n"
+	tokens, err := collectTokens(src)
+	if err != nil {
+		t.Fatalf("collectTokens: %v", err)
+	}
+	want := []TokenType{
+		TokenTest, TokenString, TokenColon, TokenExpect,
+		TokenNumber, TokenPlus, TokenNumber, TokenEqEq, TokenNumber, TokenEOF,
+	}
+	if len(tokens) != len(want) {
+		t.Fatalf("tokens len = %d, want %d (%#v)", len(tokens), len(want), tokens)
+	}
+	for i, tt := range want {
+		if tokens[i].typ != tt {
+			t.Fatalf("token[%d] = %s, want %s", i, TokenName(tokens[i].typ), TokenName(tt))
+		}
+	}
+	if tokens[1].lit != "арифметика" {
+		t.Fatalf("test name literal = %q, want арифметика", tokens[1].lit)
+	}
+}
+
+func TestLexFlowTestBlockUnsupportedEscapeDiagnostic(t *testing.T) {
+	_, err := collectTokensFrom("test \"bad\\q\":\n    expect 1 == 1\n", "fixtures/flow_test_bad_escape.tetra")
+	if err == nil {
+		t.Fatalf("expected diagnostic")
+	}
+	diag, ok := DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected structured diagnostic: %T %v", err, err)
+	}
+	if diag.Code != DiagnosticCodeParse || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v", diag)
+	}
+	if diag.File != "fixtures/flow_test_bad_escape.tetra" || diag.Line != 1 || diag.Column != 6 {
+		t.Fatalf("diagnostic position = %q:%d:%d, want fixtures/flow_test_bad_escape.tetra:1:6", diag.File, diag.Line, diag.Column)
+	}
+	if diag.Message != "unsupported escape: \\q" {
+		t.Fatalf("diagnostic message = %q", diag.Message)
+	}
+}
+
+func TestLexFlowTestBlockSpanCRLFTabAndUnicode(t *testing.T) {
+	tokens, err := collectTokens("test \"Привіт\"\r\n\texpect 1 == 1\n")
+	if err != nil {
+		t.Fatalf("collectTokens: %v", err)
+	}
+	if len(tokens) < 7 {
+		t.Fatalf("token count = %d, want at least 7", len(tokens))
+	}
+	if tokens[0].typ != TokenTest || tokens[0].pos.Line != 1 || tokens[0].pos.Col != 1 {
+		t.Fatalf("test token pos = %d:%d, want 1:1", tokens[0].pos.Line, tokens[0].pos.Col)
+	}
+	if tokens[2].typ != TokenExpect || tokens[2].pos.Line != 2 || tokens[2].pos.Col != 2 {
+		t.Fatalf("expect token pos = %d:%d, want 2:2", tokens[2].pos.Line, tokens[2].pos.Col)
+	}
+	last := tokens[len(tokens)-1]
+	if last.typ != TokenEOF || last.pos.Line != 3 || last.pos.Col != 1 {
+		t.Fatalf("EOF token pos = %d:%d (%s), want 3:1 EOF", last.pos.Line, last.pos.Col, TokenName(last.typ))
+	}
+}
+
 func TestLexInvalidUTF8Diagnostic(t *testing.T) {
 	_, err := collectTokens(string([]byte{'f', 'n', ' ', 0xff, '\n'}))
 	if err == nil {
@@ -277,6 +348,9 @@ func TestLexFuzzRegressionCorpus(t *testing.T) {
 		{name: "lone pipe", src: []byte("|"), wantErr: "did you mean '||'?"},
 		{name: "unterminated escape", src: []byte(`"trailing\`), wantErr: "unterminated escape sequence"},
 		{name: "unicode comment then string", src: []byte("// Привіт 🌊\n\"ok\"")},
+		{name: "flow test block", src: []byte("test \"math\":\n    expect 40 + 2 == 42\n")},
+		{name: "flow test bad escape", src: []byte("test \"bad\\q\":\n    expect 1 == 1\n"), wantErr: "unsupported escape: \\q"},
+		{name: "flow test crlf tab unicode", src: []byte("test \"Привіт\"\r\n\texpect 1 == 1\r\n")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,0 +1,6 @@
+struct Box<T>:
+    value: T
+
+func main() -> Int:
+    let b: Box<Int> = Box<Int>(value: 42)
+    return b.value

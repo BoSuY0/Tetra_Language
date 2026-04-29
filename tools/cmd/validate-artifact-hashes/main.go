@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 )
 
 const hashManifestSchema = "tetra.release-artifact-hashes.v1alpha1"
+const hashManifestArtifact = "tetra.release.v0_2_0.artifact-hashes.v1"
 
 type hashManifest struct {
 	Schema    string           `json:"schema"`
@@ -117,17 +119,24 @@ func validateHashManifest(manifestPath string) error {
 		return err
 	}
 	var manifest hashManifest
-	if err := json.Unmarshal(raw, &manifest); err != nil {
+	if err := decodeStrictJSON(raw, &manifest); err != nil {
 		return err
 	}
 	if manifest.Schema != hashManifestSchema {
 		return fmt.Errorf("invalid schema %q", manifest.Schema)
+	}
+	if manifest.Root == "" {
+		return fmt.Errorf("root must not be empty")
+	}
+	if filepath.IsAbs(manifest.Root) || strings.Contains(manifest.Root, "..") {
+		return fmt.Errorf("unsafe root %q", manifest.Root)
 	}
 	if len(manifest.Artifacts) == 0 {
 		return fmt.Errorf("artifacts must not be empty")
 	}
 	root := filepath.Dir(manifestPath)
 	seen := map[string]bool{}
+	lastPath := ""
 	for _, expected := range manifest.Artifacts {
 		if expected.Path == "" {
 			return fmt.Errorf("artifact missing path")
@@ -135,10 +144,20 @@ func validateHashManifest(manifestPath string) error {
 		if filepath.IsAbs(expected.Path) || strings.Contains(expected.Path, "..") {
 			return fmt.Errorf("unsafe artifact path %s", expected.Path)
 		}
+		if lastPath != "" && expected.Path < lastPath {
+			return fmt.Errorf("artifacts must be sorted by path: %s appears before %s", expected.Path, lastPath)
+		}
+		lastPath = expected.Path
 		if seen[expected.Path] {
 			return fmt.Errorf("duplicate artifact path %s", expected.Path)
 		}
 		seen[expected.Path] = true
+		if expected.Size < 0 {
+			return fmt.Errorf("artifact %s has negative size", expected.Path)
+		}
+		if err := validateSHA256(expected.SHA256, expected.Path); err != nil {
+			return err
+		}
 		actual, err := hashFile(root, expected.Path)
 		if err != nil {
 			return err
@@ -151,6 +170,28 @@ func validateHashManifest(manifestPath string) error {
 		}
 		if actual.Schema != expected.Schema {
 			return fmt.Errorf("schema mismatch for %s: got %q want %q", expected.Path, actual.Schema, expected.Schema)
+		}
+	}
+	return nil
+}
+
+func decodeStrictJSON(raw []byte, out any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	return dec.Decode(out)
+}
+
+func validateSHA256(value string, path string) error {
+	if !strings.HasPrefix(value, "sha256:") {
+		return fmt.Errorf("artifact %s has invalid sha256 format %q", path, value)
+	}
+	hexPart := strings.TrimPrefix(value, "sha256:")
+	if len(hexPart) != 64 {
+		return fmt.Errorf("artifact %s sha256 must contain 64 hex chars", path)
+	}
+	for _, ch := range hexPart {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
+			return fmt.Errorf("artifact %s sha256 has non-hex characters", path)
 		}
 	}
 	return nil

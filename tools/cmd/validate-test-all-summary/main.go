@@ -7,17 +7,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type testAllSummary struct {
-	Mode        string        `json:"mode"`
-	Status      string        `json:"status"`
-	StartedAt   string        `json:"started_at"`
-	EndedAt     string        `json:"ended_at"`
-	StepCount   int           `json:"step_count"`
-	FailedCount int           `json:"failed_count"`
-	Steps       []testAllStep `json:"steps"`
+	Mode            string        `json:"mode"`
+	Status          string        `json:"status"`
+	StartedAt       string        `json:"started_at"`
+	EndedAt         string        `json:"ended_at"`
+	StepCount       int           `json:"step_count"`
+	FailedCount     int           `json:"failed_count"`
+	ReleaseArtifact string        `json:"release_artifact,omitempty"`
+	Steps           []testAllStep `json:"steps"`
 }
 
 type testAllStep struct {
@@ -28,6 +31,8 @@ type testAllStep struct {
 	Command         string `json:"command"`
 	Log             string `json:"log"`
 }
+
+const testAllSummaryArtifact = "tetra.release.v0_2_0.test-all-summary.v1"
 
 func main() {
 	var summaryPath string
@@ -75,14 +80,25 @@ func validateTestAllSummary(raw []byte, reportDir string) error {
 	if summary.EndedAt == "" {
 		return fmt.Errorf("ended_at is required")
 	}
+	startedAt, err := time.Parse(time.RFC3339, summary.StartedAt)
+	if err != nil {
+		return fmt.Errorf("started_at must be RFC3339: %w", err)
+	}
+	endedAt, err := time.Parse(time.RFC3339, summary.EndedAt)
+	if err != nil {
+		return fmt.Errorf("ended_at must be RFC3339: %w", err)
+	}
+	if endedAt.Before(startedAt) {
+		return fmt.Errorf("ended_at must not be before started_at")
+	}
 	if summary.StepCount != len(summary.Steps) {
 		return fmt.Errorf("step_count mismatch: got %d, computed %d", summary.StepCount, len(summary.Steps))
 	}
 	failed := 0
 	seenNames := make(map[string]bool, len(summary.Steps))
 	seenLogs := make(map[string]bool, len(summary.Steps))
-	for _, step := range summary.Steps {
-		if err := validateStep(step, reportDir); err != nil {
+	for i, step := range summary.Steps {
+		if err := validateStep(step, reportDir, i+1); err != nil {
 			return err
 		}
 		if seenNames[step.Name] {
@@ -106,6 +122,9 @@ func validateTestAllSummary(raw []byte, reportDir string) error {
 	if summary.Status == "fail" && failed == 0 {
 		return fmt.Errorf("fail summary contains no failing steps")
 	}
+	if summary.ReleaseArtifact != "" && summary.ReleaseArtifact != testAllSummaryArtifact {
+		return fmt.Errorf("release_artifact = %q, want %q", summary.ReleaseArtifact, testAllSummaryArtifact)
+	}
 	return nil
 }
 
@@ -115,7 +134,7 @@ func decodeStrictJSON(raw []byte, out any) error {
 	return dec.Decode(out)
 }
 
-func validateStep(step testAllStep, reportDir string) error {
+func validateStep(step testAllStep, reportDir string, expectedIndex int) error {
 	if step.Name == "" {
 		return fmt.Errorf("step missing name")
 	}
@@ -143,6 +162,9 @@ func validateStep(step testAllStep, reportDir string) error {
 	if filepath.IsAbs(step.Log) || strings.Contains(step.Log, "..") || !strings.HasPrefix(filepath.ToSlash(step.Log), "logs/") {
 		return fmt.Errorf("step %s has unsafe log path %s", step.Name, step.Log)
 	}
+	if err := validateLogOrdinal(step.Log, expectedIndex); err != nil {
+		return fmt.Errorf("step %s %w", step.Name, err)
+	}
 	logPath := filepath.Join(reportDir, step.Log)
 	if info, err := os.Stat(logPath); err != nil {
 		if os.IsNotExist(err) {
@@ -151,6 +173,25 @@ func validateStep(step testAllStep, reportDir string) error {
 		return err
 	} else if info.IsDir() {
 		return fmt.Errorf("step %s log path is a directory", step.Name)
+	}
+	return nil
+}
+
+func validateLogOrdinal(logPath string, expectedIndex int) error {
+	base := filepath.Base(logPath)
+	if len(base) < 3 {
+		return fmt.Errorf("has malformed log filename %s", logPath)
+	}
+	prefix := base[:2]
+	index, err := strconv.Atoi(prefix)
+	if err != nil {
+		return fmt.Errorf("has malformed step ordinal in log %s", logPath)
+	}
+	if index != expectedIndex {
+		return fmt.Errorf("log ordinal %02d does not match step order %02d", index, expectedIndex)
+	}
+	if len(base) == 2 || base[2] != '-' {
+		return fmt.Errorf("has malformed log filename %s", logPath)
 	}
 	return nil
 }

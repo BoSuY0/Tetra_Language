@@ -10,6 +10,13 @@
 
 **Islands** are Tetra's primary memory management abstraction. An island is a contiguous region of memory that acts as an arena/bump allocator. All allocations within an island are fast (pointer bump), and the entire island is freed as a single unit.
 
+Target boundary (current profile):
+- Island runtime paths are in the current native runtime scope.
+- Build-only WASM targets (`wasm32-wasi`, `wasm32-web`) support island IR in a
+  compile-compatible fallback mode: `island_new` returns a handle token from the
+  linear heap allocator, `island_make_*` maps to linear heap slice allocation,
+  and `island_free` is currently a no-op.
+
 ### Key Properties
 
 1. **Fast Allocation**: O(1) bump allocation within an island
@@ -31,13 +38,13 @@ The `island` type is a primitive type in Tetra with `SlotCount = 1` (8 bytes on 
 
 Creating islands directly is unsafe; prefer scoped islands for safe code.
 
-```tetra
+```tetra pseudocode
 unsafe {
     let isl: island = core.island_new(4096)
 }
 ```
 
-```tetra
+```tetra pseudocode
 island(4096) as isl {
     // ...
 }
@@ -91,7 +98,7 @@ Allocates a new island with capacity for `size` bytes of user data.
 - Only allowed inside `unsafe` blocks
 
 **Example (unsafe):**
-```tetra
+```tetra pseudocode
 unsafe {
     let isl: island = core.island_new(1024)
 }
@@ -110,7 +117,7 @@ Allocates a `[]u8` slice of `len` bytes within the given island.
 - In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter); otherwise this call requires `unsafe`.
 
 **Example:**
-```tetra
+```tetra pseudocode
 var buf: []u8 = core.island_make_u8(isl, 64)
 ```
 
@@ -123,8 +130,36 @@ Allocates a `[]i32` slice of `len` elements within the given island.
 - In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter); otherwise this call requires `unsafe`.
 
 **Example:**
-```tetra
+```tetra pseudocode
 var arr: []i32 = core.island_make_i32(isl, 100)
+```
+
+### 4.4 `core.island_make_u16(isl: island, len: i32) -> []u16`
+
+Allocates a `[]u16` slice of `len` elements within the given island.
+
+**Semantics:**
+- Same as `island_make_u8`, but required bytes = `len * 2`
+- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter); otherwise this call requires `unsafe`.
+
+**Example:**
+```tetra pseudocode
+var half: []u16 = core.island_make_u16(isl, 32)
+```
+
+### 4.5 `core.island_make_bool(isl: island, len: i32) -> []bool`
+
+Allocates a `[]bool` slice of `len` elements within the given island.
+
+**Semantics:**
+- Same region/ownership safety contract as `island_make_u8`
+- Current MVP lowering uses the same i32-width allocation layout as `[]i32`
+  (required bytes = `len * 4`)
+- In safe code, `isl` must be a tracked region (scoped island or a region-carrying parameter); otherwise this call requires `unsafe`.
+
+**Example:**
+```tetra pseudocode
+var flags: []bool = core.island_make_bool(isl, 32)
 ```
 
 ---
@@ -132,8 +167,9 @@ var arr: []i32 = core.island_make_i32(isl, 100)
 ## 5. Scoped Islands (Auto-free)
 
 Scoped islands provide automatic cleanup for most cases.
+Scoped islands remain safe when their handle is tracked by the region checker.
 
-```tetra
+```tetra pseudocode
 island(4096) as isl {
     var buf: []u8 = core.island_make_u8(isl, 64)
     // use buf
@@ -168,7 +204,7 @@ Region typing prevents slices from scoped islands escaping their scope.
 
 ## 7. The `free` Statement
 
-```tetra
+```tetra pseudocode
 free(<expr>)
 ```
 
@@ -186,7 +222,7 @@ Manual `free` is only allowed inside `unsafe` blocks. Scoped islands inject an i
 > **Debug mode (`--islands-debug`):** The runtime keeps the mapping, sets `flags |= 1`, and protects data pages. A second `free` triggers a controlled exit (exit code 2), and use-after-free faults on protected pages.
 
 **Example (unsafe):**
-```tetra
+```tetra pseudocode
 unsafe {
     let isl: island = core.island_new(1024)
     var buf: []u8 = core.island_make_u8(isl, 64)
@@ -265,3 +301,16 @@ fun main(): i32 {
 - Uses `kernel32.VirtualAlloc` for allocation
 - Uses `kernel32.VirtualFree` for deallocation
 - Requires adding `VirtualFree` to PE import table
+
+## 11. Epic 06 coverage
+
+Island and region coverage is release-blocking in the focused safety slice:
+
+```sh
+go test ./compiler/... -run "Effect|Uses|Capability|Unsafe|Ownership|Borrow|Consume|Inout|Island|Region|Privacy|Budget" -count=1
+```
+
+The slice checks safe scoped allocation, helper functions whose return region is
+tied to a single island parameter, diagnostics for scoped slices or island
+handles escaping, ambiguous control-flow region merges, and runtime examples for
+overflow and debug double-free behavior.

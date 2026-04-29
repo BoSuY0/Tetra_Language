@@ -67,6 +67,9 @@ Callers cannot manufacture `cap.mem` through `uses mem`; they must receive a
 capability from a reviewed unsafe boundary such as `lib.core.capability.mem()`
 or another explicitly audited wrapper.
 
+When callers opt into attenuated capability groups, raw memory access must also
+carry `capsule.mem`; attenuated IO follows the same pattern with `capsule.io`.
+
 ## Status
 
 This is a compile-time gating mechanism with a minimal runtime implementation:
@@ -87,3 +90,15 @@ Even though the current backend lowers MMIO operations to normal loads/stores, t
 language contract is that MMIO operations are **observable** and must not be
 removed, coalesced, or reordered across other MMIO operations by future compiler
 optimizations.
+
+## Epic 06 coverage
+
+Capability coverage is release-blocking in the focused safety test slice:
+
+```sh
+go test ./compiler/... -run "Effect|Uses|Capability|Unsafe|Ownership|Borrow|Consume|Inout|Island|Region|Privacy|Budget" -count=1
+```
+
+The slice checks that safe code cannot manufacture capability tokens, that
+unsafe raw-memory/MMIO calls require the right `cap.mem` or `cap.io` argument,
+and that attenuated capability groups require the matching capsule permission.

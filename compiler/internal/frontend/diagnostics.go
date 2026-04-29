@@ -64,12 +64,34 @@ func diagnosticErrorf(pos Position, format string, args ...interface{}) error {
 	}}
 }
 
+func shiftDiagnosticColumn(err error, delta int) error {
+	if delta == 0 {
+		return err
+	}
+	var diagErr *DiagnosticError
+	if !errors.As(err, &diagErr) {
+		return err
+	}
+	info := diagErr.Info
+	if info.Column > 0 {
+		info.Column += delta
+		if info.Column < 1 {
+			info.Column = 1
+		}
+	}
+	return &DiagnosticError{Info: info}
+}
+
 func hintForDiagnosticMessage(msg string) string {
 	switch {
 	case strings.Contains(msg, "planned feature"):
 		return "Use the supported v1.0 syntax surface, or keep this source behind a later-release feature gate."
+	case strings.Contains(msg, "capsule requires at least one metadata entry"):
+		return "Add at least one metadata entry inside the capsule block, for example: id: \"tetra://app\"."
 	case strings.Contains(msg, "expected indented block after ':'"):
 		return "Indent the block under the preceding ':' with spaces."
+	case strings.Contains(msg, "tabs are not supported in Flow indentation"):
+		return "Replace tabs with spaces in Flow-indented blocks."
 	case strings.Contains(msg, "invalid UTF-8 encoding"):
 		return "Save the source as UTF-8 before parsing."
 	case strings.Contains(msg, "inline comments are not supported"):

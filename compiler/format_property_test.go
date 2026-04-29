@@ -42,6 +42,50 @@ view CounterView(state: CounterState):
 	}
 }
 
+func TestFormatSourcePropertySuiteCoversCommentRejectionAndMalformedInput(t *testing.T) {
+	tests := []struct {
+		name        string
+		src         string
+		wantCode    string
+		wantMessage string
+		wantLine    int
+		wantColumn  int
+	}{
+		{
+			name:        "inline_comment",
+			src:         "func main() -> Int:\n    return 0 // trailing\n",
+			wantCode:    "TETRA_FMT001",
+			wantMessage: "inline comments are not supported",
+			wantLine:    2,
+			wantColumn:  14,
+		},
+		{
+			name:        "tabbed_indent",
+			src:         "func main() -> Int:\n\treturn 0\n",
+			wantCode:    "TETRA0001",
+			wantMessage: "tabs are not supported",
+			wantLine:    2,
+			wantColumn:  1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := FormatSource([]byte(tt.src), tt.name+".tetra")
+			if err == nil {
+				t.Fatalf("expected formatter diagnostic")
+			}
+			diag := DiagnosticFromError(err)
+			if diag.Code != tt.wantCode || diag.File != tt.name+".tetra" || diag.Line != tt.wantLine || diag.Column != tt.wantColumn || diag.Severity != "error" {
+				t.Fatalf("diagnostic = %#v", diag)
+			}
+			if !strings.Contains(diag.Message, tt.wantMessage) {
+				t.Fatalf("diagnostic message = %q, want substring %q", diag.Message, tt.wantMessage)
+			}
+		})
+	}
+}
+
 func TestFormatSourceRepositoryParseFormatParseProperty(t *testing.T) {
 	roots := []string{
 		filepath.Join("..", "examples"),

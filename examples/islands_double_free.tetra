@@ -1,9 +1,14 @@
 // Islands debug smoke test
-// Deliberately triggers double-free detection (expected exit code 2 with --islands-debug).
+// Deliberately triggers runtime double-free detection through an opaque helper
+// alias (expected exit code 2 with --islands-debug).
+func alias(isl: island) -> island:
+    return isl
+
 func main() -> i32
 uses alloc, capability, islands, mem:
     unsafe:
         var isl: island = core.island_new(64)
+        var other: island = alias(isl)
         free(isl)
-        free(isl)
+        free(other)
     return 0

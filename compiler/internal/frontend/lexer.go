@@ -20,6 +20,7 @@ const (
 	TokenConst
 	TokenModule
 	TokenImport
+	TokenPub
 	TokenAs
 	TokenUses
 	TokenStruct
@@ -37,6 +38,7 @@ const (
 	TokenThrows
 	TokenTry
 	TokenThrow
+	TokenCatch
 	TokenAsync
 	TokenAwait
 	TokenBreak
@@ -137,6 +139,8 @@ func (l *lexer) nextToken() (token, error) {
 			return token{typ: TokenModule, pos: pos, lit: lit}, nil
 		case "import":
 			return token{typ: TokenImport, pos: pos, lit: lit}, nil
+		case "pub":
+			return token{typ: TokenPub, pos: pos, lit: lit}, nil
 		case "as":
 			return token{typ: TokenAs, pos: pos, lit: lit}, nil
 		case "uses":
@@ -173,6 +177,8 @@ func (l *lexer) nextToken() (token, error) {
 			return token{typ: TokenTry, pos: pos, lit: lit}, nil
 		case "throw":
 			return token{typ: TokenThrow, pos: pos, lit: lit}, nil
+		case "catch":
+			return token{typ: TokenCatch, pos: pos, lit: lit}, nil
 		case "async":
 			return token{typ: TokenAsync, pos: pos, lit: lit}, nil
 		case "await":

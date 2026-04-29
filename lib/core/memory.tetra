@@ -1,8 +1,9 @@
 // Stable v0.5 memory helpers built on explicit cap.mem values.
 // Effects: mem
 // ```tetra doctest
-// func memory_doctest() -> Int:
-//     return 0
+// func memory_doctest(dst: ptr, src: ptr, mem: cap.mem) -> Int
+// uses mem:
+//     return lib.core.memory.memcpy_u8(dst, src, 0, mem)
 // ```
 module lib.core.memory
 

@@ -1,8 +1,12 @@
 # v1.0 Release Candidate Process
 
-Status: future release process policy. The current public release is `v0.1.3`;
+Status: future release process policy. The current public release is `v0.2.0`;
 no `v1.0.0` release candidate may be created while mandatory scope remains
 blocked.
+
+For the current minor line, use `docs/release/v0_2_0_release_cut_guide.md`.
+Keep the same evidence discipline: no release-candidate checkbox is valid
+without artifacts from the exact branch state under review.
 
 ## RC Entry Criteria
 

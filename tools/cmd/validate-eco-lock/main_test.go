@@ -39,6 +39,80 @@ func TestValidateEcoLockAcceptsDependencyGraph(t *testing.T) {
 	}
 }
 
+func TestValidateEcoLockAcceptsCapsulePolicy(t *testing.T) {
+	lock := `{
+  "schema": "tetra.eco.lock.v1",
+  "manifest_schema": "tetra.capsule.v1",
+  "permissions_model": "tetra.eco.permissions.v1",
+  "capsules": [
+    {
+      "id": "tetra://demo",
+      "name": "Demo",
+      "version": "0.1.0",
+      "path": "Capsule.t4",
+      "targets": ["linux-x64"],
+      "permissions": ["ui"],
+      "policy": {
+        "unsafe": "deny",
+        "reproducible": "required"
+      }
+    }
+  ]
+}`
+	out, err := runEcoLockValidator(t, lock)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoLockAcceptsArtifacts(t *testing.T) {
+	lock := `{
+  "schema": "tetra.eco.lock.v1",
+  "manifest_schema": "tetra.capsule.v1",
+  "permissions_model": "tetra.eco.permissions.v1",
+  "capsules": [
+    {
+      "id": "tetra://demo",
+      "name": "Demo",
+      "version": "0.1.0",
+      "path": "Capsule.t4",
+      "targets": ["linux-x64"],
+      "artifacts": [
+        {"kind": "interface", "path": "interfaces/math/core.t4i", "module": "math.core", "public_api_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+        {"kind": "object", "target": "linux-x64", "path": "artifacts/math-core.tobj", "module": "math.core", "public_api_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+        {"kind": "seed", "path": "seeds/tetra-core.t4s"}
+      ]
+    }
+  ]
+}`
+	out, err := runEcoLockValidator(t, lock)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
+func TestValidateEcoLockRejectsInvalidArtifactPath(t *testing.T) {
+	lock := `{
+  "capsules": [
+    {
+      "id": "tetra://demo",
+      "name": "Demo",
+      "version": "0.1.0",
+      "path": "Capsule.t4",
+      "targets": ["linux-x64"],
+      "artifacts": [{"kind": "interface", "path": "../outside.t4i"}]
+    }
+  ]
+}`
+	out, err := runEcoLockValidator(t, lock)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "artifact path must stay inside capsule root") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func TestValidateEcoLockRejectsGraphHashMismatch(t *testing.T) {
 	lock := `{
   "schema": "tetra.eco.lock.v1",
@@ -132,14 +206,14 @@ func TestValidateEcoLockRejectsNullCapsules(t *testing.T) {
 func TestValidateEcoLockRejectsUnsupportedTarget(t *testing.T) {
 	lock := `{
   "capsules": [
-    {"id": "tetra://app", "name": "App", "version": "0.1.0", "path": "/tmp/app.capsule", "targets": ["wasm32-wasi"]}
+    {"id": "tetra://app", "name": "App", "version": "0.1.0", "path": "/tmp/app.capsule", "targets": ["plan9-x64"]}
   ]
 }`
 	out, err := runEcoLockValidator(t, lock)
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "unsupported target wasm32-wasi") {
+	if !strings.Contains(string(out), "unsupported target plan9-x64") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }

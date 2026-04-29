@@ -148,19 +148,21 @@ func TestBuildMmioSmoke(t *testing.T) {
 	}
 }
 
-func TestBuildIslandsDebugDoubleFree(t *testing.T) {
-	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		t.Skip("linux/amd64 only")
-	}
+func TestBuildIslandsDebugDoubleFreeRejectedBySemantics(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+func alias(isl: island) -> island:
+    return isl
 
-	src := "fun main(): i32 uses alloc, islands, mem {\n  unsafe {\n    let isl: island = core.island_new(64)\n    free(isl)\n    free(isl)\n  }\n  return 0\n}\n"
-	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Jobs: 1, IslandsDebug: true})
-	if stdout != "" {
-		t.Fatalf("stdout mismatch: %q", stdout)
-	}
-	if exitCode != 2 {
-		t.Fatalf("exit code mismatch: %d", exitCode)
-	}
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(64)
+        let other: island = alias(isl)
+        free(isl)
+        free(other)
+    }
+    return 0
+`, "cannot use freed resource 'other'")
 }
 
 func TestBuildScopedIslandAutoFreeRunsInDebugAndNonDebug(t *testing.T) {
@@ -401,6 +403,117 @@ func TestBuildEnumMatchExhaustiveNoDefaultSmoke(t *testing.T) {
 	}
 }
 
+func TestBuildEnumPayloadMatchSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Result:\n  case ok(Int)\n  case err(Int, Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  match result:\n  case Result.ok(value):\n    return value\n  case Result.err(code, detail):\n    return code + detail\n  case Result.empty:\n    return 0\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildEnumPayloadMultiValueCaseSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Result:\n  case ok(Int)\n  case err(Int, Int)\n\nfunc main() -> Int:\n  let result: Result = Result.err(40, 2)\n  match result:\n  case Result.ok(value):\n    return value\n  case Result.err(code, detail):\n    return code + detail\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildEnumPayloadNoPayloadCaseInWideEnumSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Result:\n  case ok(Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.empty\n  match result:\n  case Result.ok(value):\n    return value\n  case Result.empty:\n    return 42\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildEnumPayloadActorMessageDataSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum CounterMsg:\n  case inc(Int)\n  case reset\n\nfunc handle(msg: CounterMsg) -> Int:\n  match msg:\n  case CounterMsg.inc(delta):\n    return delta\n  case CounterMsg.reset:\n    return 0\n\nfunc main() -> Int:\n  let msg: CounterMsg = CounterMsg.inc(42)\n  return handle(msg)\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildMatchExpressionEnumPayloadSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  let score: Int = match result:\n  case Result.ok(value):\n    value\n  case Result.err(code):\n    code\n  return score\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestMatchExpressionRequiresExhaustiveCases(t *testing.T) {
+	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  let score: Int = match result:\n  case Result.ok(value):\n    value\n  return score\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected non-exhaustive match expression diagnostic")
+	} else if !strings.Contains(err.Error(), "match expression must be exhaustive") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestMatchExpressionRejectsMismatchedCaseTypes(t *testing.T) {
+	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  let score: Int = match result:\n  case Result.ok(value):\n    value\n  case Result.err(code):\n    \"bad\"\n  return score\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected match expression case type diagnostic")
+	} else if !strings.Contains(err.Error(), "match expression case type mismatch") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestMatchExpressionBindingScopeDiagnostic(t *testing.T) {
+	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  let score: Int = match result:\n  case Result.ok(value):\n    value\n  case Result.err(code):\n    code\n  return value\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected match expression binding scope diagnostic")
+	} else if !strings.Contains(err.Error(), "out of scope") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestBuildIfLetEnumPayloadSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  if let Result.ok(value) = result:\n    return value\n  else:\n    return 0\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
+func TestBuildMatchGuardEnumPayloadSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  match result:\n  case Result.ok(value) if value > 40:\n    return value\n  case Result.ok(other):\n    return 1\n  case Result.err(code):\n    return code\n"
+	_, code := buildAndRun(t, src)
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
+	}
+}
+
 func TestEnumMatchExhaustiveThreeCasesNoDefaultCheck(t *testing.T) {
 	src := "enum Color:\n  case red\n  case green\n  case blue\n\nfunc main() -> Int:\n  let color: Color = Color.blue\n  match color:\n  case Color.red:\n    return 1\n  case Color.green:\n    return 2\n  case Color.blue:\n    return 3\n"
 	if err := checkProgram(src); err != nil {
@@ -413,6 +526,33 @@ func TestEnumMatchMissingCaseStillNeedsReturn(t *testing.T) {
 	if err := checkProgram(src); err == nil {
 		t.Fatalf("expected missing return for non-exhaustive enum match")
 	} else if !strings.Contains(err.Error(), "must end with return") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumPayloadConstructorArityDiagnostic(t *testing.T) {
+	src := "enum Result:\n  case ok(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok()\n  return 0\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected enum payload arity diagnostic")
+	} else if !strings.Contains(err.Error(), "expects 1 payload argument") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumPayloadConstructorTypeDiagnostic(t *testing.T) {
+	src := "enum Result:\n  case ok(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(\"nope\")\n  return 0\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected enum payload type diagnostic")
+	} else if !strings.Contains(err.Error(), "payload 1 expects 'i32', got 'str'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumPayloadBindingScopeDiagnostic(t *testing.T) {
+	src := "enum Result:\n  case ok(Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.ok(1)\n  match result:\n  case Result.ok(value):\n    let inside: Int = value\n  case Result.empty:\n    let other: Int = 0\n  return value\n"
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected enum payload binding scope diagnostic")
+	} else if !strings.Contains(err.Error(), "out of scope") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -436,6 +576,21 @@ func TestBuildTypedErrorsSmoke(t *testing.T) {
 
 	root := projectRoot(t)
 	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "typed_errors_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildEnumPayloadSmokeFile(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "enum_payload_smoke.tetra"))
 	if stdout != "" {
 		t.Fatalf("stdout mismatch: %q", stdout)
 	}
@@ -1932,6 +2087,150 @@ func writeTestFiles(t *testing.T, base string, files map[string]string) {
 		if err := os.WriteFile(full, []byte(src), 0o644); err != nil {
 			t.Fatalf("write source: %v", err)
 		}
+	}
+}
+
+func TestBuildRejectsInterfaceOnlyDependencyWithoutInterfaceOnlyMode(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`), "math/core.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4":   "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n",
+		"math/core.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only dependency build rejection")
+	}
+	if !strings.Contains(err.Error(), "missing implementation object for interface module 'math.core'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeAllowsT4IDependencyWithoutOutput(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`), "math/core.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4":   "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n",
+		"math/core.t4i": string(iface),
+	})
+
+	outPath := filepath.Join(tmp, "out", "app")
+	stats, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		outPath,
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only: %v", err)
+	}
+	if _, err := os.Stat(outPath); !os.IsNotExist(err) {
+		t.Fatalf("interface-only build should not emit %s, stat err=%v", outPath, err)
+	}
+	if len(stats.InterfaceModules) != 1 || stats.InterfaceModules[0] != "math.core" {
+		t.Fatalf("InterfaceModules = %#v, want [math.core]", stats.InterfaceModules)
+	}
+}
+
+func TestBuildInterfaceOnlyModeDoesNotRequireMain(t *testing.T) {
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, map[string]string{
+		"math/core.t4": "module math.core\npub func add(a: Int, b: Int) -> Int:\n    return a + b\n",
+	})
+
+	outPath := filepath.Join(tmp, "out", "app")
+	stats, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("math/core.t4")),
+		outPath,
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only no main: %v", err)
+	}
+	if _, err := os.Stat(outPath); !os.IsNotExist(err) {
+		t.Fatalf("interface-only build should not emit %s, stat err=%v", outPath, err)
+	}
+	if len(stats.InterfaceModules) != 0 {
+		t.Fatalf("InterfaceModules = %#v, want none for source-only graph", stats.InterfaceModules)
+	}
+}
+
+func TestBuildInterfaceOnlyModeAcceptsGeneratedT4IWithImportedSignatureType(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module math.core
+
+import math.types as mt
+
+pub func norm(v: mt.Vec) -> Int:
+    return v.x
+`), "math/core.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4":   "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return 0\n",
+		"math/core.t4i": string(iface),
+		"math/types.t4": "module math.types\npub struct Vec:\n    x: Int\n",
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only imported signature type: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeAcceptsGeneratedT4IWithStructReturnStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module math.core
+
+pub struct Point:
+    x: Int
+
+pub func origin() -> Point:
+    return Point(x: 0)
+`), "math/core.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4":   "module app.main\nimport math.core as math\nfunc main() -> Int:\n    math.origin()\n    return 0\n",
+		"math/core.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only struct return stub: %v", err)
 	}
 }
 

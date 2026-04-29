@@ -68,6 +68,36 @@ Platform backends are now thin:
 - `macos_x64`: TOBJ object path uses `x64core.NewEmitFunc(x64abi.MacSysV())`.
 - `windows_x64`: TOBJ object path uses `x64core.NewEmitFunc(x64abi.NewWin64())` with import collection enabled.
 
+## Native x64 verification matrix (v0.2.0 / Epic 09)
+
+### Object-level contracts
+
+- shared emitter/x64 core emits deterministic rel32 patch points and validates rel32 bounds.
+- TOBJ writer/reader preserves `target/module/code/data/symbols/relocs` and rejects invalid magic/version/header strings.
+- x64 object builder keeps deterministic symbol ordering and emits only valid reloc kinds:
+  - `RelocCallRel32` for unresolved calls,
+  - `RelocDataDisp32` for literal/data LEA fixups,
+  - `RelocIATDisp32` only on Windows import paths.
+
+### ABI edge cases
+
+- SysV and Win64 argument spilling is validated for 0..10 parameters.
+- Call lowering validates stack/register argument boundaries (including stack-argument cases above register windows).
+- Return-slot layouts (`0/1/2`) are validated on both ABIs.
+- Shared `ctx_switch` lowering has explicit SysV/Win64 emission checks.
+
+### Mismatch diagnostics
+
+- shared emission fails early on missing ABI/emitter buffers and unsupported return-slot layouts.
+- ABI helpers fail with explicit diagnostics for missing context pointers and stack underflow.
+- native linkers reject cross-target objects with a clear `linker target mismatch` diagnostic before format writing.
+
+### Build-only target expectations
+
+- native build smoke is verified for `linux-x64`, `macos-x64`, `windows-x64` on object/executable paths without requiring
+  cross-host execution.
+- execution evidence remains host-bound (`host == target`); non-host targets are build-verified only.
+
 ## Remaining OS-specific areas
 
 - **ABI/OS services**: syscalls vs imports, stack alignment, and calling conventions are handled in `x64abi`.

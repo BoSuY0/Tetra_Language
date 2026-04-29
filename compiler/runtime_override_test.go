@@ -192,6 +192,144 @@ func TestRuntimeObjectOverrideRejectsMissingRequiredSymbols(t *testing.T) {
 	}
 }
 
+func TestRuntimeObjectOverrideRejectsMissingTaggedMessageSymbols(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("amd64 only")
+	}
+
+	symbols := make([]Symbol, 0, len(requiredActorRuntimeSymbols()))
+	for _, name := range []string{
+		"__tetra_entry",
+		"__tetra_actor_spawn",
+		"__tetra_actor_send",
+		"__tetra_actor_recv",
+		"__tetra_actor_self",
+		"__tetra_actor_sender",
+	} {
+		symbols = append(symbols, Symbol{Name: name, Offset: 0})
+	}
+
+	tmp := t.TempDir()
+	rtPath := filepath.Join(tmp, "runtime_missing_tagged_msg_symbols.tobj")
+	if err := WriteObject(rtPath, &Object{
+		Target:  tgt.Triple,
+		Module:  "__runtime_missing_tagged_msg",
+		Code:    []byte{0xC3},
+		Symbols: symbols,
+	}); err != nil {
+		t.Fatalf("write runtime object: %v", err)
+	}
+
+	outPath := filepath.Join(tmp, "actors_tagged_stress"+tgt.ExeExt)
+	_, err := BuildFileWithStatsOpt(filepath.Join("..", "examples", "actors_tagged_stress.tetra"), outPath, tgt.Triple, BuildOptions{RuntimeObjectPath: rtPath})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "runtime object missing required symbol '__tetra_actor_send_msg'") &&
+		!strings.Contains(err.Error(), "runtime object missing required symbol '__tetra_actor_recv_msg'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRuntimeObjectOverrideRejectsMissingActorStateSymbols(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("amd64 only")
+	}
+
+	symbols := make([]Symbol, 0, len(requiredActorRuntimeSymbols()))
+	for _, name := range requiredActorRuntimeSymbols() {
+		symbols = append(symbols, Symbol{Name: name, Offset: 0})
+	}
+
+	tmp := t.TempDir()
+	rtPath := filepath.Join(tmp, "runtime_missing_actor_state_symbols.tobj")
+	if err := WriteObject(rtPath, &Object{
+		Target:  tgt.Triple,
+		Module:  "__runtime_missing_actor_state",
+		Code:    []byte{0xC3},
+		Symbols: symbols,
+	}); err != nil {
+		t.Fatalf("write runtime object: %v", err)
+	}
+
+	srcPath := filepath.Join(tmp, "actor_state_main.tetra")
+	src := `actor Counter:
+    var count: Int = 0
+    func run() -> Int:
+        count = count + 1
+        return count
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Counter.run")
+    return 0
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	outPath := filepath.Join(tmp, "actor_state_main"+tgt.ExeExt)
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, BuildOptions{RuntimeObjectPath: rtPath})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "runtime object missing required symbol '__tetra_actor_state_load'") &&
+		!strings.Contains(err.Error(), "runtime object missing required symbol '__tetra_actor_state_store'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRuntimeObjectOverrideRejectsMissingTimeSymbols(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("amd64 only")
+	}
+
+	symbols := make([]Symbol, 0, len(requiredActorRuntimeSymbols()))
+	for _, name := range requiredActorRuntimeSymbols() {
+		symbols = append(symbols, Symbol{Name: name, Offset: 0})
+	}
+
+	tmp := t.TempDir()
+	rtPath := filepath.Join(tmp, "runtime_missing_time_symbols.tobj")
+	if err := WriteObject(rtPath, &Object{
+		Target:  tgt.Triple,
+		Module:  "__runtime_missing_time",
+		Code:    []byte{0xC3},
+		Symbols: symbols,
+	}); err != nil {
+		t.Fatalf("write runtime object: %v", err)
+	}
+
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "time"+tgt.ExeExt)
+	if err := os.WriteFile(srcPath, []byte(`
+func main() -> Int
+uses runtime:
+    return core.time_now_ms()
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, BuildOptions{RuntimeObjectPath: rtPath})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "runtime object missing required symbol '__tetra_time_now_ms'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRuntimeObjectOverrideRejectsTargetMismatch(t *testing.T) {
 	tgt, ok := target.Host()
 	if !ok {

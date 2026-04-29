@@ -1,4 +1,4 @@
-// Experimental memory helpers built on top of cap.mem primitives.
+// Experimental memory helpers built on top of cap.mem primitives (no stability guarantees).
 //
 // Promotion note: v1 stable callers should use lib.core.memory directly.
 module lib.experimental.memory

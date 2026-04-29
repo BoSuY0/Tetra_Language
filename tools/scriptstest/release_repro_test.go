@@ -20,34 +20,42 @@ func TestReleaseV10ReproProofDoesNotChurnWallClockTimestamp(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "examples"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "examples", "flow_hello.tetra"), []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "examples", "flow_struct_smoke.tetra"), []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	tetra := `#!/usr/bin/env bash
 set -euo pipefail
-if [[ "${1:-}" != "build" ]]; then
-  echo "unexpected tetra command: $*" >&2
-  exit 2
-fi
-target=""
-out=""
-shift
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --target)
-      target="$2"
-      shift 2
-      ;;
-    -o)
-      out="$2"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-printf 'artifact:%s\n' "$target" >"$out"
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+  version)
+    echo "v0.2.0"
+    ;;
+  build)
+    target=""
+    out=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --target)
+          target="$2"
+          shift 2
+          ;;
+        -o)
+          out="$2"
+          shift 2
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+    printf 'artifact:%s\n' "$target" >"$out"
+    ;;
+  *)
+    echo "unexpected tetra command: $cmd $*" >&2
+    exit 2
+    ;;
+esac
 `
 	if err := os.WriteFile(filepath.Join(root, "tetra"), []byte(tetra), 0o755); err != nil {
 		t.Fatal(err)
@@ -79,7 +87,13 @@ printf 'artifact:%s\n' "$target" >"$out"
 	}
 
 	var proof struct {
-		Artifacts []struct {
+		CompilerVersion string   `json:"compiler_version"`
+		SourceSHA256    string   `json:"source_sha256"`
+		TargetCount     int      `json:"target_count"`
+		MatchedCount    int      `json:"matched_count"`
+		MismatchedCount int      `json:"mismatched_count"`
+		Targets         []string `json:"targets"`
+		Artifacts       []struct {
 			Target string `json:"target"`
 			Match  bool   `json:"match"`
 		} `json:"artifacts"`
@@ -90,6 +104,15 @@ printf 'artifact:%s\n' "$target" >"$out"
 	}
 	if proof.Status != "pass" {
 		t.Fatalf("proof status = %q", proof.Status)
+	}
+	if proof.CompilerVersion != "v0.2.0" {
+		t.Fatalf("compiler_version = %q", proof.CompilerVersion)
+	}
+	if !strings.HasPrefix(proof.SourceSHA256, "sha256:") {
+		t.Fatalf("source_sha256 missing sha256 prefix: %q", proof.SourceSHA256)
+	}
+	if proof.TargetCount != 5 || proof.MatchedCount != 5 || proof.MismatchedCount != 0 {
+		t.Fatalf("unexpected match counts: %+v", proof)
 	}
 	seen := map[string]bool{}
 	for _, artifact := range proof.Artifacts {
@@ -102,5 +125,90 @@ printf 'artifact:%s\n' "$target" >"$out"
 		if !seen[target] {
 			t.Fatalf("repro proof missing target %s in artifacts: %#v", target, proof.Artifacts)
 		}
+	}
+}
+
+func TestReleaseV10ReproProofFailsForNonDeterministicBuildOutput(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "scripts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyFile(filepath.Join(repoRoot(t), "scripts", "release_v1_0_repro.sh"), filepath.Join(root, "scripts", "release_v1_0_repro.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "examples"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "examples", "flow_struct_smoke.tetra"), []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tetra := `#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+  version)
+    echo "v0.2.0"
+    ;;
+  build)
+    target=""
+    out=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --target)
+          target="$2"
+          shift 2
+          ;;
+        -o)
+          out="$2"
+          shift 2
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+    counter="${REPRO_COUNTER_FILE:-counter.txt}"
+    n=0
+    if [[ -f "$counter" ]]; then
+      n="$(cat "$counter")"
+    fi
+    n=$((n + 1))
+    printf '%s' "$n" >"$counter"
+    printf 'artifact:%s:%s\n' "$target" "$n" >"$out"
+    ;;
+  *)
+    echo "unexpected tetra command: $cmd $*" >&2
+    exit 2
+    ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(root, "tetra"), []byte(tetra), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	report := filepath.Join(root, "repro.json")
+	counterPath := filepath.Join(root, "counter.txt")
+	cmd := exec.Command("bash", "scripts/release_v1_0_repro.sh", "--report", report)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "REPRO_COUNTER_FILE="+counterPath)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected reproducibility proof to fail for non-deterministic build\n%s", out)
+	}
+
+	raw, readErr := os.ReadFile(report)
+	if readErr != nil {
+		t.Fatalf("read report: %v", readErr)
+	}
+	var proof struct {
+		Status          string `json:"status"`
+		MismatchedCount int    `json:"mismatched_count"`
+	}
+	if unmarshalErr := json.Unmarshal(raw, &proof); unmarshalErr != nil {
+		t.Fatalf("unmarshal report: %v\n%s", unmarshalErr, string(raw))
+	}
+	if proof.Status != "fail" || proof.MismatchedCount == 0 {
+		t.Fatalf("unexpected failure report: %+v\n%s", proof, string(raw))
 	}
 }

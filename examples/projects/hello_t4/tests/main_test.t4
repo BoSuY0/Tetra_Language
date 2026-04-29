@@ -1,0 +1,2 @@
+test "hello t4 project":
+    expect 40 + 2 == 42

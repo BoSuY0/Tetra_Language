@@ -1,13 +1,14 @@
 {
   "schema": "tetra.api.diff-baseline.v1alpha1",
-  "created_at": "2026-04-27T10:40:44.505Z",
-  "source_docs": "docs/generated/v1_0/api-diff/api-docs.md",
-  "source_docs_sha256": "sha256:4a0a64659af1261e55ebbc34785c76d67707a7a58f56fcad2d72254a930ec84a",
+  "created_at": "1970-01-01T00:00:00Z",
+  "timestamp_policy": "deterministic (SOURCE_DATE_EPOCH, fallback 1970-01-01T00:00:00Z)",
+  "source_docs": "reports/api-diff-baseline-refresh-20260428-180357/api-docs.md",
+  "source_docs_sha256": "sha256:86a9461760c5c32a230ec6e54b899e6f3b735183ef6b1e7b33905a38e0c41559",
   "api_metadata": {
     "schema": "tetra.api.v1alpha1",
-    "api_hash": "sha256:40f6fcd0c427f7d88a52ef4e5cad9cb6afa266efda0b3905c7c0cd6f09a8fb8a",
+    "api_hash": "sha256:f0e6e040816960c1f4a333e840d1022acb357c130f4ef45d5d870fe6190ae5f4",
     "module_count": 72,
-    "entry_count": 199
+    "entry_count": 202
   },
   "symbols": [
     {
@@ -226,6 +227,13 @@
       "section": "Functions",
       "entry": "func take(x: consume i32) -> i32",
       "symbol_hash": "sha256:b5f2f203d9f0b64bd7a61fd1fda2693a3316a93db9ca0a33834e3e54fbdd92bf"
+    },
+    {
+      "id": "examples.flow_grammar_surface_smoke::Functions::func unwrap_match",
+      "module": "examples.flow_grammar_surface_smoke",
+      "section": "Functions",
+      "entry": "func unwrap_match(value: i32?) -> i32",
+      "symbol_hash": "sha256:a4aded2bd07221ff8617260f9e4eb9226f52fd715024c1e5f081768ba6ad5b97"
     },
     {
       "id": "examples.flow_grammar_surface_smoke::Globals::const answer",
@@ -690,6 +698,13 @@
       "symbol_hash": "sha256:368ee5c1cbd88c7ac64b00488600e24ca5f067b204f3dd9a2785e25c7a1e9a12"
     },
     {
+      "id": "examples/flow_hello.tetra::Functions::func greeting",
+      "module": "examples/flow_hello.tetra",
+      "section": "Functions",
+      "entry": "func greeting() -> str",
+      "symbol_hash": "sha256:9fca857d77cd3c633c70584f73c85c038572448aeff6b7a5b2f57c1097654bf7"
+    },
+    {
       "id": "examples/flow_hello.tetra::Functions::func main",
       "module": "examples/flow_hello.tetra",
       "section": "Functions",
@@ -814,6 +829,13 @@
       "section": "Functions",
       "entry": "func main() -> i32 uses io",
       "symbol_hash": "sha256:6d4ba98c54f65f80f4369c915b9e4a7de592459543ce078c5047d02ee36a13bd"
+    },
+    {
+      "id": "examples/islands_double_free.tetra::Functions::func alias",
+      "module": "examples/islands_double_free.tetra",
+      "section": "Functions",
+      "entry": "func alias(isl: island) -> island",
+      "symbol_hash": "sha256:202fb2838ba7550c6a672038ec59986130c25f7172ef0cabd648b7c63d42c9ea"
     },
     {
       "id": "examples/islands_double_free.tetra::Functions::func main",

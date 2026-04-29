@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -24,6 +25,7 @@ type manifest struct {
 	RuntimeABI struct {
 		ActorsSupportedTargets   []string `json:"actors_supported_targets"`
 		ActorsRequiredSymbols    []string `json:"actors_required_symbols"`
+		TimeRequiredSymbols      []string `json:"time_required_symbols"`
 		ActorsProgramGlueSymbols []string `json:"actors_program_glue_symbols"`
 	} `json:"runtime_abi"`
 }
@@ -60,7 +62,10 @@ func main() {
 
 	// Specs must mention supported targets and runtime ABI surface.
 	checkContains("docs/spec/actors.md", m.RuntimeABI.ActorsSupportedTargets)
-	checkContains("docs/spec/runtime_abi.md", append(append([]string(nil), m.RuntimeABI.ActorsRequiredSymbols...), m.RuntimeABI.ActorsProgramGlueSymbols...))
+	runtimeSymbols := append([]string(nil), m.RuntimeABI.ActorsRequiredSymbols...)
+	runtimeSymbols = append(runtimeSymbols, m.RuntimeABI.TimeRequiredSymbols...)
+	runtimeSymbols = append(runtimeSymbols, m.RuntimeABI.ActorsProgramGlueSymbols...)
+	checkContains("docs/spec/runtime_abi.md", runtimeSymbols)
 
 	// Unsafe spec must list all builtins that require unsafe (always/conditional).
 	var unsafeBuiltins []string
@@ -91,7 +96,13 @@ func main() {
 	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md", "docs/spec/ui_v1.md"}); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifySpecCodeBlocks(currentSpecMarkdownPaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
 	if err := verifyRequiredDoctestBlocks(stableModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyStableModuleDoctestCoverage(stableModulePaths); err != nil {
 		errs = append(errs, err.Error())
 	}
 	if err := verifyStableModuleExamples(stableModulePaths); err != nil {
@@ -101,6 +112,18 @@ func main() {
 		errs = append(errs, err.Error())
 	}
 	if err := verifyStableModuleEffectsMetadata(stableModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyExperimentalModuleMirrors(experimentalModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyStdlibGuide(filepath.FromSlash("docs/user/standard_library_guide.md"), stableModulePaths, experimentalModulePaths); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyEpic14ExampleIndex(filepath.FromSlash("docs/user/examples_index.md")); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := verifyReleaseTruthDocs(currentReleaseTruthDocPaths()); err != nil {
 		errs = append(errs, err.Error())
 	}
 	if err := verifyWASMBackendPlan("docs/backend/wasm_backend_plan.md", ctarget.WASMTriples()); err != nil {
@@ -145,12 +168,81 @@ func verifyWASMBackendPlan(path string, plannedTargets []string) error {
 	return nil
 }
 
+func verifyReleaseTruthDocs(paths []string) error {
+	type confusingPattern struct {
+		label string
+		re    *regexp.Regexp
+	}
+	patterns := []confusingPattern{
+		{label: "current.*v0.6", re: regexp.MustCompile(`(?is)\bcurrent\b.{0,120}\bv0\.6\b`)},
+		{label: "v0.1.2", re: regexp.MustCompile(`\bv0\.1\.2\b`)},
+		{label: "ready for v1.0", re: regexp.MustCompile(`(?is)\bready\s+for\s+` + "`?" + `v1\.0`)},
+	}
+
+	var errs []string
+	for _, path := range paths {
+		if releaseTruthDocExcluded(path) {
+			continue
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		text := string(raw)
+		for _, pattern := range patterns {
+			if pattern.re.MatchString(text) {
+				errs = append(errs, fmt.Sprintf("%s: misleading release language matched %q", path, pattern.label))
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func releaseTruthDocExcluded(path string) bool {
+	clean := filepath.ToSlash(path)
+	base := strings.ToLower(filepath.Base(clean))
+	if strings.Contains(base, "todo") {
+		return true
+	}
+	return strings.HasPrefix(clean, "docs/plans/")
+}
+
 func verifyDoctestBlocks(paths []string) error {
 	return verifyDoctestBlocksWithPolicy(paths, false)
 }
 
 func verifyRequiredDoctestBlocks(paths []string) error {
 	return verifyDoctestBlocksWithPolicy(paths, true)
+}
+
+func verifyStableModuleDoctestCoverage(paths []string) error {
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		blocks, err := extractTetraDoctests(string(raw))
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		moduleRef := "lib.core." + name + "."
+		covered := false
+		for _, block := range blocks {
+			if strings.Contains(block, moduleRef) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			return fmt.Errorf("%s: doctest does not reference lib.core.%s", path, name)
+		}
+	}
+	return nil
 }
 
 func verifyDoctestBlocksWithPolicy(paths []string, requireAtLeastOne bool) error {
@@ -173,6 +265,161 @@ func verifyDoctestBlocksWithPolicy(paths []string, requireAtLeastOne bool) error
 		}
 	}
 	return nil
+}
+
+type specCodeBlock struct {
+	lang      string
+	info      string
+	body      string
+	startLine int
+	check     bool
+	skip      bool
+}
+
+func currentSpecMarkdownPaths() []string {
+	paths, err := filepath.Glob(filepath.FromSlash("docs/spec/*.md"))
+	if err != nil {
+		return nil
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+func currentReleaseTruthDocPaths() []string {
+	return []string{
+		"README.md",
+		filepath.FromSlash("docs/spec/current_supported_surface.md"),
+		filepath.FromSlash("docs/spec/v0_2_scope.md"),
+		filepath.FromSlash("docs/spec/v1_feature_status.md"),
+		filepath.FromSlash("docs/spec/v1_scope.md"),
+		filepath.FromSlash("docs/user/async_actors_guide.md"),
+		filepath.FromSlash("docs/user/eco_package_guide.md"),
+		filepath.FromSlash("docs/user/examples_index.md"),
+		filepath.FromSlash("docs/user/getting_started.md"),
+		filepath.FromSlash("docs/user/language_tour.md"),
+		filepath.FromSlash("docs/user/ownership_effects_guide.md"),
+		filepath.FromSlash("docs/user/standard_library_guide.md"),
+		filepath.FromSlash("docs/user/troubleshooting.md"),
+		filepath.FromSlash("docs/user/wasm_ui_guide.md"),
+	}
+}
+
+func verifySpecCodeBlocks(paths []string) error {
+	var errs []string
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		blocks, err := extractSpecCodeBlocks(string(raw))
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		for i, block := range blocks {
+			if block.skip {
+				continue
+			}
+			filename := fmt.Sprintf("%s#spec%d", path, i+1)
+			if _, err := compiler.ParseFile([]byte(block.body), filename); err != nil {
+				errs = append(errs, fmt.Sprintf("%s spec block %d parse: %v", path, i+1, err))
+				continue
+			}
+			if !block.check {
+				continue
+			}
+			prog, err := compiler.Parse([]byte(block.body))
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("%s spec block %d check setup: %v", path, i+1, err))
+				continue
+			}
+			if _, err := compiler.Check(prog); err != nil {
+				errs = append(errs, fmt.Sprintf("%s spec block %d check: %v", path, i+1, err))
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func extractSpecCodeBlocks(doc string) ([]specCodeBlock, error) {
+	var blocks []specCodeBlock
+	lines := strings.Split(doc, "\n")
+	inBlock := false
+	var current []string
+	var block specCodeBlock
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !inBlock {
+			lang, info, ok := specCodeFenceInfo(trimmed)
+			if !ok {
+				continue
+			}
+			inBlock = true
+			current = nil
+			block = specCodeBlock{
+				lang:      lang,
+				info:      info,
+				startLine: i + 1,
+				check:     specCodeBlockHasTag(info, "check"),
+				skip:      specCodeBlockSkipped(info),
+			}
+			continue
+		}
+		if trimmed == "```" {
+			block.body = strings.Join(current, "\n") + "\n"
+			blocks = append(blocks, block)
+			inBlock = false
+			current = nil
+			block = specCodeBlock{}
+			continue
+		}
+		current = append(current, line)
+	}
+	if inBlock {
+		return nil, fmt.Errorf("unterminated %s spec block starting at line %d", block.lang, block.startLine)
+	}
+	return blocks, nil
+}
+
+func specCodeFenceInfo(trimmed string) (lang string, info string, ok bool) {
+	if !strings.HasPrefix(trimmed, "```") {
+		return "", "", false
+	}
+	info = strings.TrimSpace(strings.TrimPrefix(trimmed, "```"))
+	if info == "" {
+		return "", "", false
+	}
+	fields := strings.Fields(info)
+	if len(fields) == 0 {
+		return "", "", false
+	}
+	lang = strings.ToLower(fields[0])
+	if lang != "tetra" && lang != "t4" {
+		return "", "", false
+	}
+	return lang, strings.ToLower(info), true
+}
+
+func specCodeBlockSkipped(info string) bool {
+	for _, tag := range []string{"pseudocode", "negative", "unsupported", "skip", "noverify", "no-verify"} {
+		if specCodeBlockHasTag(info, tag) {
+			return true
+		}
+	}
+	return false
+}
+
+func specCodeBlockHasTag(info string, tag string) bool {
+	for _, field := range strings.Fields(strings.ToLower(info)) {
+		if field == tag {
+			return true
+		}
+	}
+	return false
 }
 
 func extractTetraDoctests(doc string) ([]string, error) {
@@ -430,6 +677,175 @@ func verifyStableModuleEffectsMetadata(paths []string) error {
 	return nil
 }
 
+func verifyExperimentalModuleMirrors(paths []string) error {
+	for _, path := range paths {
+		name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		text := string(raw)
+		if !strings.Contains(text, "Experimental") || !strings.Contains(text, "no stability guarantees") {
+			return fmt.Errorf("%s: missing experimental stability disclaimer", path)
+		}
+		stableModule := "lib.core." + name
+		if !strings.Contains(text, "Promotion note:") || !strings.Contains(text, stableModule) {
+			return fmt.Errorf("%s: missing promotion note for %s", path, stableModule)
+		}
+		file, err := compiler.ParseFile(raw, path)
+		if err != nil {
+			return fmt.Errorf("%s: %v", path, err)
+		}
+		foundStableImport := false
+		for _, imp := range file.Imports {
+			if imp.Path == stableModule {
+				foundStableImport = true
+				break
+			}
+		}
+		if !foundStableImport {
+			return fmt.Errorf("%s: experimental mirror must import %s", path, stableModule)
+		}
+	}
+	return nil
+}
+
+func verifyStdlibGuide(path string, stablePaths []string, experimentalPaths []string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("%s: %v", path, err)
+	}
+	text := string(raw)
+	stableRows := parseStdlibGuideStableRows(text)
+	var errs []string
+	for _, modulePath := range stablePaths {
+		name := strings.TrimSuffix(filepath.Base(modulePath), filepath.Ext(modulePath))
+		moduleImport := "import lib.core." + name + " as "
+		row, ok := stableRows[moduleImport]
+		if !ok {
+			errs = append(errs, fmt.Sprintf("missing stable guide row for lib.core.%s", name))
+			continue
+		}
+		expectedExample := stableModuleExamplePath(name)
+		if !strings.Contains(row.example, expectedExample) {
+			errs = append(errs, fmt.Sprintf("lib.core.%s example mismatch: got %q want %q", name, row.example, expectedExample))
+		}
+		moduleRaw, err := os.ReadFile(modulePath)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", modulePath, err))
+			continue
+		}
+		declaredEffects, err := stableModuleDeclaredEffects(modulePath, moduleRaw)
+		if err != nil {
+			errs = append(errs, err.Error())
+			continue
+		}
+		guideEffects, err := parseGuideEffectSet(path, row.effects)
+		if err != nil {
+			errs = append(errs, err.Error())
+			continue
+		}
+		if !sameEffectSet(guideEffects, declaredEffects) {
+			errs = append(errs, fmt.Sprintf("lib.core.%s effects mismatch: got %s want %s", name, formatEffectSet(guideEffects), formatEffectSet(declaredEffects)))
+		}
+	}
+	if len(experimentalPaths) > 0 && !strings.Contains(text, "## Experimental Mirrors") {
+		errs = append(errs, "missing experimental mirrors section")
+	}
+	for _, modulePath := range experimentalPaths {
+		name := strings.TrimSuffix(filepath.Base(modulePath), filepath.Ext(modulePath))
+		experimentalImport := "import lib.experimental." + name + " as "
+		stableImport := "import lib.core." + name + " as "
+		if !strings.Contains(text, experimentalImport) {
+			errs = append(errs, fmt.Sprintf("missing experimental guide row for lib.experimental.%s", name))
+		}
+		if !strings.Contains(text, stableImport) {
+			errs = append(errs, fmt.Sprintf("missing stable replacement for lib.experimental.%s", name))
+		}
+	}
+	if len(experimentalPaths) > 0 && (!strings.Contains(text, "Experimental mirror") || !strings.Contains(text, "no stability guarantees")) {
+		errs = append(errs, "experimental mirrors section must state Experimental mirror and no stability guarantees")
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s: %s", path, strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+type stdlibGuideStableRow struct {
+	example string
+	effects string
+}
+
+func parseStdlibGuideStableRows(text string) map[string]stdlibGuideStableRow {
+	rows := map[string]stdlibGuideStableRow{}
+	inStableTable := false
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "## Stable Module Choices") {
+			inStableTable = false
+		}
+		if trimmed == "| Need | Import | Example | Effects |" {
+			inStableTable = true
+			continue
+		}
+		if !inStableTable || !strings.HasPrefix(trimmed, "|") || strings.Contains(trimmed, "---") {
+			continue
+		}
+		cells := splitMarkdownTableRow(trimmed)
+		if len(cells) != 4 {
+			continue
+		}
+		importCell := strings.ReplaceAll(cells[1], "`", "")
+		importStart := strings.Index(importCell, "import lib.core.")
+		if importStart == -1 {
+			continue
+		}
+		importText := importCell[importStart:]
+		asIndex := strings.Index(importText, " as ")
+		if asIndex == -1 {
+			continue
+		}
+		importKey := importText[:asIndex+4]
+		rows[importKey] = stdlibGuideStableRow{
+			example: cells[2],
+			effects: cells[3],
+		}
+	}
+	return rows
+}
+
+func splitMarkdownTableRow(row string) []string {
+	trimmed := strings.Trim(row, "|")
+	parts := strings.Split(trimmed, "|")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
+func parseGuideEffectSet(path string, raw string) ([]string, error) {
+	normalized := strings.TrimSpace(strings.ReplaceAll(raw, "`", ""))
+	if strings.EqualFold(normalized, "none") {
+		return nil, nil
+	}
+	effects := map[string]struct{}{}
+	for _, part := range strings.Split(normalized, ",") {
+		effect := strings.TrimSpace(part)
+		if effect == "" {
+			return nil, fmt.Errorf("%s: invalid guide effects %q", path, raw)
+		}
+		expanded, err := expandStableEffect(effect)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %v", path, err)
+		}
+		for _, name := range expanded {
+			effects[name] = struct{}{}
+		}
+	}
+	return sortedEffectNames(effects), nil
+}
+
 func parseStableEffectsMetadata(path string, metadata string) ([]string, error) {
 	if strings.EqualFold(metadata, "none") {
 		return nil, nil
@@ -576,4 +992,93 @@ func currentExperimentalModulePaths() []string {
 	}
 	sort.Strings(paths)
 	return paths
+}
+
+func verifyEpic14ExampleIndex(path string) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("%s: %v", path, err)
+	}
+	text := string(raw)
+
+	requiredExamples := []string{
+		"examples/hello.tetra",
+		"examples/flow_hello.tetra",
+		"examples/bool_smoke.tetra",
+		"examples/for_range_smoke.tetra",
+		"examples/for_collection_smoke.tetra",
+		"examples/loop_control_smoke.tetra",
+		"examples/const_smoke.tetra",
+		"examples/const_bool_smoke.tetra",
+		"examples/local_const_smoke.tetra",
+		"examples/compound_assignment_smoke.tetra",
+		"examples/enum_match_smoke.tetra",
+		"examples/enum_exhaustive_match_smoke.tetra",
+		"examples/optional_smoke.tetra",
+		"examples/optional_match_smoke.tetra",
+		"examples/typed_errors_smoke.tetra",
+		"examples/generic_smoke.tetra",
+		"examples/generic_struct_smoke.tetra",
+		"examples/protocol_impl_smoke.tetra",
+		"examples/extension_smoke.tetra",
+		"examples/ownership_smoke.tetra",
+		"examples/async_smoke.tetra",
+		"examples/task_smoke.tetra",
+		"examples/actors_pingpong.tetra",
+		"examples/islands_hello.tetra",
+		"examples/islands_i32.tetra",
+		"examples/islands_overflow.tetra",
+		"examples/cap_mem_smoke.tetra",
+		"examples/mmio_smoke.tetra",
+		"examples/memset_smoke.tetra",
+		"examples/ui_web_smoke.tetra",
+		"examples/ui_native_shell_smoke.tetra",
+		"examples/projects/dogfood_wasi/src/main.tetra",
+		"examples/projects/dogfood_web_ui/src/main.tetra",
+		"examples/projects/dogfood_cli/src/main.tetra",
+		"examples/projects/dogfood_actor_task/src/main.tetra",
+		"examples/projects/eco_dogfood/src/main.tetra",
+	}
+
+	requiredHeadings := []string{
+		"### Basic language examples (`V020-0701..0705`)",
+		"### Control-flow examples (`V020-0706..0710`)",
+		"### Const and assignment examples (`V020-0711..0715`)",
+		"### Enum/match examples (`V020-0716..0720`)",
+		"### Optional/error examples (`V020-0721..0725`)",
+		"### Generic/protocol/extension examples (`V020-0726..0730`)",
+		"### Safety/runtime examples (`V020-0731..0735`)",
+		"### Memory/capability examples (`V020-0736..0740`)",
+		"### UI/WASM examples (`V020-0741..0745`)",
+		"### Project dogfood examples (`V020-0746..0750`)",
+	}
+
+	var missing []string
+	for _, example := range requiredExamples {
+		if !strings.Contains(text, "`"+example+"`") {
+			missing = append(missing, "example entry "+example)
+		}
+	}
+	for _, heading := range requiredHeadings {
+		if !strings.Contains(text, heading) {
+			missing = append(missing, "heading "+heading)
+		}
+	}
+	if !strings.Contains(text, "## Epic 14 Verification Commands") && !strings.Contains(text, "## Epic 15 Verification Commands") {
+		missing = append(missing, "heading ## Epic 14 Verification Commands or ## Epic 15 Verification Commands")
+	}
+	if !strings.Contains(text, "## Troubleshooting Notes (Epic 14)") && !strings.Contains(text, "## Troubleshooting Notes (Epic 15)") {
+		missing = append(missing, "heading ## Troubleshooting Notes (Epic 14) or ## Troubleshooting Notes (Epic 15)")
+	}
+	if !strings.Contains(strings.ToLower(text), "unsupported") {
+		missing = append(missing, "troubleshooting keyword unsupported")
+	}
+	if !strings.Contains(strings.ToLower(text), "regression") {
+		missing = append(missing, "troubleshooting keyword regression")
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("%s: missing Epic 14 index coverage: %s", path, strings.Join(missing, ", "))
+	}
+	return nil
 }

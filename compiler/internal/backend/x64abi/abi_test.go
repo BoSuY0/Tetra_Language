@@ -3,6 +3,7 @@ package x64abi
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 
 	"tetra_language/compiler/internal/backend/x64"
@@ -161,6 +162,221 @@ func TestEmitCallRejectsInvalidABIInputs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEmitIslandNewDebugInitializesDebugHeader(t *testing.T) {
+	cases := []struct {
+		name            string
+		abi             ABI
+		wantAllocImport string
+	}{
+		{name: "sysv", abi: LinuxSysV()},
+		{name: "win64", abi: NewWin64(), wantAllocImport: winImportVirtualAlloc},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &x64.Emitter{}
+			stackDepth := 1
+			var importPatches []x64obj.ImportPatch
+			if err := tc.abi.EmitIslandNew(e, &stackDepth, x64.CodegenOptions{IslandsDebug: true}, &importPatches); err != nil {
+				t.Fatalf("EmitIslandNew: %v", err)
+			}
+			if stackDepth != 1 {
+				t.Fatalf("stack depth = %d, want 1", stackDepth)
+			}
+
+			header := &x64.Emitter{}
+			header.MovMem32RaxPtrImm32(0, x64.IslandsDebugPageSize)
+			if !bytes.Contains(e.Buf, header.Buf) {
+				t.Fatalf("debug island header size not emitted\n got=% x\nwant contains=% x", e.Buf, header.Buf)
+			}
+			freedMarkerClear := &x64.Emitter{}
+			freedMarkerClear.MovMem32RaxPtrImm32(12, 0)
+			if !bytes.Contains(e.Buf, freedMarkerClear.Buf) {
+				t.Fatalf("debug island freed marker clear not emitted\n got=% x\nwant contains=% x", e.Buf, freedMarkerClear.Buf)
+			}
+			if tc.wantAllocImport != "" && !hasImportPatch(importPatches, tc.wantAllocImport) {
+				t.Fatalf("import patches = %#v, want %s", importPatches, tc.wantAllocImport)
+			}
+		})
+	}
+}
+
+func TestEmitIslandFreeDebugEmitsDoubleFreeGuard(t *testing.T) {
+	cases := []struct {
+		name              string
+		abi               ABI
+		wantExitCodeBytes func() []byte
+		wantProtectImport string
+	}{
+		{
+			name: "sysv",
+			abi:  LinuxSysV(),
+			wantExitCodeBytes: func() []byte {
+				want := &x64.Emitter{}
+				want.MovEdiImm32(2)
+				return want.Buf
+			},
+		},
+		{
+			name: "win64",
+			abi:  NewWin64(),
+			wantExitCodeBytes: func() []byte {
+				want := &x64.Emitter{}
+				want.MovEcxImm32(2)
+				return want.Buf
+			},
+			wantProtectImport: winImportVirtualProtect,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &x64.Emitter{}
+			stackDepth := 1
+			var importPatches []x64obj.ImportPatch
+			if err := tc.abi.EmitIslandFree(e, &stackDepth, x64.CodegenOptions{IslandsDebug: true}, &importPatches); err != nil {
+				t.Fatalf("EmitIslandFree: %v", err)
+			}
+			if stackDepth != 0 {
+				t.Fatalf("stack depth = %d, want 0", stackDepth)
+			}
+
+			freedCheck := &x64.Emitter{}
+			freedCheck.MovEaxFromRdiDisp(12)
+			freedCheck.TestEaxEax()
+			if !bytes.Contains(e.Buf, freedCheck.Buf) {
+				t.Fatalf("debug island freed check not emitted\n got=% x\nwant contains=% x", e.Buf, freedCheck.Buf)
+			}
+			if !bytes.Contains(e.Buf, tc.wantExitCodeBytes()) {
+				t.Fatalf("debug island exit code 2 not emitted\n got=% x", e.Buf)
+			}
+			freedMarkerSet := &x64.Emitter{}
+			freedMarkerSet.MovRaxRdi()
+			freedMarkerSet.MovMem32RaxPtrImm32(12, 1)
+			if !bytes.Contains(e.Buf, freedMarkerSet.Buf) {
+				t.Fatalf("debug island freed marker set not emitted\n got=% x\nwant contains=% x", e.Buf, freedMarkerSet.Buf)
+			}
+			protectLen := &x64.Emitter{}
+			protectLen.SubEaxImm32(x64.IslandsDebugPageSize)
+			if !bytes.Contains(e.Buf, protectLen.Buf) {
+				t.Fatalf("debug island protected length adjustment not emitted\n got=% x\nwant contains=% x", e.Buf, protectLen.Buf)
+			}
+			if tc.wantProtectImport != "" && !hasImportPatch(importPatches, tc.wantProtectImport) {
+				t.Fatalf("import patches = %#v, want %s", importPatches, tc.wantProtectImport)
+			}
+		})
+	}
+}
+
+func hasImportPatch(patches []x64obj.ImportPatch, name string) bool {
+	for _, patch := range patches {
+		if patch.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func TestABIEdgeCallStackArgCases(t *testing.T) {
+	cases := []struct {
+		name         string
+		abi          ABI
+		argSlots     int
+		containsCode []byte
+	}{
+		{
+			name:         "sysv_arg7_spills_to_stack_area",
+			abi:          LinuxSysV(),
+			argSlots:     7,
+			containsCode: []byte{0x48, 0x89, 0x84, 0x24}, // mov [rsp+disp], rax
+		},
+		{
+			name:         "win64_arg5_uses_shadow_space_frame",
+			abi:          NewWin64(),
+			argSlots:     5,
+			containsCode: []byte{0x48, 0x81, 0xEC, 0x28, 0x00, 0x00, 0x00}, // sub rsp, 40
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &x64.Emitter{}
+			stackDepth := tc.argSlots
+			var callPatches []x64obj.CallPatch
+			err := tc.abi.EmitCall(e, ir.IRInstr{
+				Kind:     ir.IRCall,
+				Name:     "callee",
+				ArgSlots: tc.argSlots,
+				RetSlots: 2,
+			}, &stackDepth, &callPatches)
+			if err != nil {
+				t.Fatalf("EmitCall: %v", err)
+			}
+			if len(callPatches) != 1 || callPatches[0].Name != "callee" {
+				t.Fatalf("call patches = %#v", callPatches)
+			}
+			if stackDepth != 2 {
+				t.Fatalf("stack depth = %d, want 2", stackDepth)
+			}
+			if !bytes.Contains(e.Buf, tc.containsCode) {
+				t.Fatalf("expected call sequence to contain % x\nbuf=% x", tc.containsCode, e.Buf)
+			}
+		})
+	}
+}
+
+func TestABIDiagnosticMethodsRejectMissingPointers(t *testing.T) {
+	cases := []struct {
+		name string
+		abi  ABI
+	}{
+		{name: "sysv", abi: LinuxSysV()},
+		{name: "win64", abi: NewWin64()},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name+"/call_missing_pointers", func(t *testing.T) {
+			e := &x64.Emitter{}
+			err := tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "callee"}, nil, nil)
+			if err == nil || !strings.Contains(err.Error(), "internal error") {
+				t.Fatalf("expected internal error, got %v", err)
+			}
+		})
+
+		t.Run(tc.name+"/write_missing_stack", func(t *testing.T) {
+			e := &x64.Emitter{}
+			err := tc.abi.EmitWriteStdout(e, nil, nil)
+			if err == nil || !strings.Contains(err.Error(), "internal error") {
+				t.Fatalf("expected internal error, got %v", err)
+			}
+		})
+
+		t.Run(tc.name+"/alloc_missing_stack", func(t *testing.T) {
+			e := &x64.Emitter{}
+			err := tc.abi.EmitAllocBytes(e, nil, x64.CodegenOptions{}, nil)
+			if err == nil || !strings.Contains(err.Error(), "internal error") {
+				t.Fatalf("expected internal error, got %v", err)
+			}
+		})
+
+		t.Run(tc.name+"/make_slice_missing_stack", func(t *testing.T) {
+			e := &x64.Emitter{}
+			err := tc.abi.EmitMakeSlice(e, ir.IRMakeSliceU8, nil, x64.CodegenOptions{}, nil)
+			if err == nil || !strings.Contains(err.Error(), "internal error") {
+				t.Fatalf("expected internal error, got %v", err)
+			}
+		})
+	}
+
+	t.Run("win64_exit_missing_imports", func(t *testing.T) {
+		e := &x64.Emitter{}
+		err := NewWin64().EmitExit(e, 0, 0, nil)
+		if err == nil || !strings.Contains(err.Error(), "internal error") {
+			t.Fatalf("expected internal error, got %v", err)
+		}
+	})
 }
 
 func argCountName(n int) string {

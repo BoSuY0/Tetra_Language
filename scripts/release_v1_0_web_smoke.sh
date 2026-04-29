@@ -56,6 +56,11 @@ result=""
 scope_active="false"
 source_path=""
 used_fallback="false"
+ui_schema=""
+ui_bundle_path=""
+ui_module_path=""
+ui_bundle_artifact_path=""
+ui_module_artifact_path=""
 
 if [[ -n "$source_override" ]]; then
   source_path="$source_override"
@@ -90,6 +95,52 @@ if ! command -v chromium >/dev/null 2>&1; then
 else
   build_out="$tmp_dir/web_smoke"
   if ./tetra build --target wasm32-web -o "$build_out" "$source_path" >"$tmp_dir/build.out" 2>"$tmp_dir/build.err"; then
+    if [[ "$scope_active" == "true" ]]; then
+      ui_bundle_path="$build_out.ui.json"
+      ui_module_path="$build_out.ui.web.mjs"
+      if [[ ! -f "$ui_bundle_path" || ! -f "$ui_module_path" ]]; then
+        status="fail"
+        blocker="missing UI metadata sidecars for ${source_path}"
+      else
+        if ! ui_schema="$(node - "$ui_bundle_path" <<'JS'
+const fs = require('fs');
+const raw = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+process.stdout.write(String(raw.schema || ''));
+JS
+)"; then
+          status="fail"
+          blocker="unable to parse UI metadata schema for ${source_path}"
+        fi
+      fi
+    fi
+    if [[ "$status" == "fail" ]]; then
+      :
+    elif [[ "$scope_active" == "true" ]]; then
+      cat >"$tmp_dir/index.html" <<'HTML'
+<!doctype html>
+<html>
+  <body>
+    <pre id="result">pending</pre>
+    <script type="module">
+      import { runTetra } from './web_smoke.mjs';
+      import { mountTetraUI } from './web_smoke.ui.web.mjs';
+      const el = document.getElementById('result');
+      try {
+        const bundle = await mountTetraUI(document.body);
+        if (!bundle || bundle.schema !== 'tetra.ui.v1') {
+          throw new Error(`ui-schema:${String(bundle && bundle.schema)}`);
+        }
+        const code = await runTetra();
+        const views = Array.isArray(bundle.views) ? bundle.views.length : 0;
+        el.textContent = `ok:${code}:ui=${views}`;
+      } catch (err) {
+        el.textContent = `error:${String(err)}`;
+      }
+    </script>
+  </body>
+</html>
+HTML
+    else
     cat >"$tmp_dir/index.html" <<'HTML'
 <!doctype html>
 <html>
@@ -108,6 +159,7 @@ else
   </body>
 </html>
 HTML
+    fi
 
     port=""
     for candidate in 8711 8712 8713 8714 8715; do
@@ -132,7 +184,15 @@ HTML
         result="$(sed -n 's/.*id="result">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
         if [[ "$result" == ok:* ]]; then
           if [[ "$scope_active" == "true" ]]; then
-            status="pass"
+            if [[ "$ui_schema" != "tetra.ui.v1" ]]; then
+              status="fail"
+              blocker="unexpected UI schema '${ui_schema}'"
+            elif [[ "$result" != ok:*:ui=* ]]; then
+              status="fail"
+              blocker="UI smoke result missing ui=* metadata marker"
+            else
+              status="pass"
+            fi
           else
             status="blocked"
             blocker="no UI-specific smoke source found in examples/; fallback wasm web smoke ran successfully"
@@ -155,11 +215,21 @@ fi
 
 dom_path="${report_path%.json}.dom.html"
 chromium_err_path="${report_path%.json}.chromium.err"
+ui_bundle_artifact_path="${report_path%.json}.ui.json"
+ui_module_artifact_path="${report_path%.json}.ui.web.mjs"
 if [[ -f "$tmp_dir/dom.html" ]]; then
   cp "$tmp_dir/dom.html" "$dom_path"
 fi
 if [[ -f "$tmp_dir/chromium.err" ]]; then
   cp "$tmp_dir/chromium.err" "$chromium_err_path"
+fi
+if [[ -f "$ui_bundle_path" ]]; then
+  cp "$ui_bundle_path" "$ui_bundle_artifact_path"
+  ui_bundle_path="$ui_bundle_artifact_path"
+fi
+if [[ -f "$ui_module_path" ]]; then
+  cp "$ui_module_path" "$ui_module_artifact_path"
+  ui_module_path="$ui_module_artifact_path"
 fi
 
 REPORT_PATH="$report_path" \
@@ -171,6 +241,9 @@ SOURCE_PATH="$source_path" \
 USED_FALLBACK="$used_fallback" \
 DOM_PATH="$dom_path" \
 CHROMIUM_ERR_PATH="$chromium_err_path" \
+UI_SCHEMA="$ui_schema" \
+UI_BUNDLE_PATH="$ui_bundle_path" \
+UI_MODULE_PATH="$ui_module_path" \
 node <<'JS'
 const fs = require('fs');
 const reportPath = process.env.REPORT_PATH;
@@ -187,6 +260,9 @@ const report = {
   blocker: process.env.BLOCKER || '',
   dom_snapshot: process.env.DOM_PATH || '',
   chromium_stderr: process.env.CHROMIUM_ERR_PATH || '',
+  ui_schema: process.env.UI_SCHEMA || '',
+  ui_bundle_path: process.env.UI_BUNDLE_PATH || '',
+  ui_module_path: process.env.UI_MODULE_PATH || '',
 };
 fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
 JS

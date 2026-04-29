@@ -20,6 +20,18 @@ func TestValidateEcoUnpackAcceptsProjectBundle(t *testing.T) {
 	}
 }
 
+func TestValidateEcoUnpackAcceptsT4CapsuleProjectBundle(t *testing.T) {
+	root := makeUnpackedProjectWithFiles(t, "Capsule.t4", "src/main.t4", `capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    target "linux-x64"
+`, "func main() -> Int:\n    return 0\n")
+	out, err := runUnpackValidator(t, root)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
 func TestValidateEcoUnpackAcceptsFormatterStyleIndentedManifest(t *testing.T) {
 	root := makeUnpackedProjectWithManifest(t, `capsule App:
     id "tetra://app"
@@ -38,7 +50,7 @@ func TestValidateEcoUnpackRejectsMissingCapsuleManifest(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "missing Tetra.capsule") {
+	if !strings.Contains(string(out), "missing Capsule.t4") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
@@ -49,7 +61,7 @@ func TestValidateEcoUnpackRejectsMissingSources(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "missing .tetra sources under src") {
+	if !strings.Contains(string(out), "missing T4 sources under src") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
@@ -187,6 +199,27 @@ func makeUnpackedProjectWithManifest(t *testing.T, manifest string, source bool)
 	return root
 }
 
+func makeUnpackedProjectWithFiles(t *testing.T, manifestRel string, sourceRel string, manifest string, source string) string {
+	t.Helper()
+	root := t.TempDir()
+	if manifestRel != "" {
+		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(manifestRel)), []byte(manifest), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if sourceRel != "" {
+		sourcePath := filepath.Join(root, filepath.FromSlash(sourceRel))
+		if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(sourcePath, []byte(source), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeUnpackMetadataFixture(t, root)
+	return root
+}
+
 type unpackPackageMetadata struct {
 	Schema           string                  `json:"schema"`
 	Compression      string                  `json:"compression"`
@@ -208,7 +241,7 @@ type unpackPackageFileMeta struct {
 func writeUnpackMetadataFixture(t *testing.T, root string) {
 	t.Helper()
 	var files []unpackPackageFileMeta
-	for _, rel := range []string{"Tetra.capsule", "src/main.tetra"} {
+	for _, rel := range []string{"Capsule.t4", "Tetra.capsule", "src/main.t4", "src/main.tetra"} {
 		abs := filepath.Join(root, rel)
 		raw, err := os.ReadFile(abs)
 		if err != nil {

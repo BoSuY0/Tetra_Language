@@ -57,3 +57,23 @@ func TestValidateDiagnosticRejectsMissingRequiredPosition(t *testing.T) {
 		t.Fatalf("expected missing position failure")
 	}
 }
+
+func TestValidateDiagnosticRejectsWhitespaceDrift(t *testing.T) {
+	diag, err := parseDiagnostic([]byte(`{"code":"TETRA2001 ","message":"bad","severity":"error"}`))
+	if err != nil {
+		t.Fatalf("parse diagnostic: %v", err)
+	}
+	if err := validateDiagnostic(diag, "", "", "", false); err == nil {
+		t.Fatalf("expected whitespace drift failure")
+	}
+}
+
+func TestValidateDiagnosticRejectsPartialPositionWithoutFile(t *testing.T) {
+	diag, err := parseDiagnostic([]byte(`{"code":"TETRA2001","message":"bad","severity":"error","line":1,"column":1}`))
+	if err != nil {
+		t.Fatalf("parse diagnostic: %v", err)
+	}
+	if err := validateDiagnostic(diag, "", "", "", false); err == nil {
+		t.Fatalf("expected partial position failure")
+	}
+}

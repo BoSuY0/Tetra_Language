@@ -63,9 +63,12 @@ post-v1.
 
 The v1 async surface is a checked synchronous lowering MVP: `async func` and
 `await` are parsed, type-checked, lowered, and tested, but cancellation,
-structured concurrency, and async typed-error propagation are post-v1. Combining
-`try` and `await` intentionally produces a stable diagnostic until the shared
-async/error ABI is designed.
+structured concurrency, and async typed-error behavior beyond the tested
+boundary remain post-v1. The supported boundary form is `try await <call>()`
+for propagating an async throwing call through the current synchronous lowering
+path. The alternate spelling `await try <call>()` intentionally produces a
+stable diagnostic pointing to `try await`; no broader async/error runtime ABI is
+claimed here.
 
 The task MVP is `core.task_spawn_i32`, `core.task_spawn_group_i32`,
 `core.task_join_i32`, `core.task_join_result_i32`, and task group open/cancel/
@@ -75,3 +78,15 @@ non-literal, async, throwing, wrong-shape, and mutable-global worker targets.
 The actor MVP is local-process actor spawn/send/receive with tagged-message
 support. Distributed actors and non-host runtime execution evidence remain
 release-lab or post-v1 items, not a language guarantee for `v1.0.0`.
+
+## Epic 06 release evidence
+
+The release-blocking safety slice is:
+
+```sh
+go test ./compiler/... -run "Effect|Uses|Capability|Unsafe|Ownership|Borrow|Consume|Inout|Island|Region|Privacy|Budget" -count=1
+```
+
+That slice includes positive and negative checks for transitive `uses`
+propagation, capability attenuation, unsafe-only builtins, ownership transfer,
+region escape prevention, privacy consent clauses, and budget lowering guards.
