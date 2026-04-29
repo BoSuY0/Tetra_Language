@@ -576,6 +576,189 @@ func main() -> Int:
 	}
 }
 
+func TestFunctionTypedLocalDeclaredEffectsPropagate(t *testing.T) {
+	requireCheckErrorContains(t, `
+func main() -> Int:
+  let f: fn(Int) -> Int uses io = fn(x: Int) -> Int
+  uses io:
+    print("call\n")
+    return x
+  return f(41)
+`, "uses effect 'io'")
+
+	requireCheckOK(t, `
+func main() -> Int
+uses io:
+  let f: fn(Int) -> Int uses io = fn(x: Int) -> Int
+  uses io:
+    print("call\n")
+    return x
+  return f(41)
+`)
+}
+
+func TestFunctionTypeDeclaredEffectsEnforcedForCallbackBody(t *testing.T) {
+	requireCheckErrorContains(t, `
+func apply(x: Int, cb: fn(Int) -> Int uses io) -> Int:
+  return cb(x)
+
+func main() -> Int:
+  return 0
+`, "function 'apply' uses effect 'io'")
+
+	requireCheckOK(t, `
+func say(x: Int) -> Int
+uses io:
+  print("call\n")
+  return x
+
+func apply(x: Int, cb: fn(Int) -> Int uses io) -> Int
+uses io:
+  return cb(x)
+
+func main() -> Int
+uses io:
+  return apply(41, say)
+`)
+}
+
+func TestCallbackWrapperDeclaredEffectsCannotBypassSemanticClauses(t *testing.T) {
+	requireCheckErrorContains(t, `
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func apply(x: Int, cb: fn(Int) -> Int uses alloc, mem) -> Int
+uses alloc, mem:
+  return cb(x)
+
+func main() -> Int
+noalloc:
+  return apply(41, allocer)
+`, "semantic clause 'noalloc' forbids call")
+
+	requireCheckErrorContains(t, `
+func sleeper(x: Int) -> Int
+uses runtime:
+  let _: Int = core.sleep_ms(1)
+  return x
+
+func apply(x: Int, cb: fn(Int) -> Int uses runtime) -> Int
+uses runtime:
+  return cb(x)
+
+func main() -> Int
+noblock:
+  return apply(41, sleeper)
+`, "semantic clause 'noblock' forbids call")
+
+	requireCheckErrorContains(t, `
+func sleeper(x: Int) -> Int
+uses runtime:
+  let _: Int = core.sleep_ms(1)
+  return x
+
+func apply(x: Int, cb: fn(Int) -> Int uses runtime) -> Int
+uses runtime:
+  return cb(x)
+
+func main() -> Int
+realtime
+noalloc
+noblock:
+  return apply(41, sleeper)
+`, "semantic clause 'realtime' forbids call")
+}
+
+func TestImportedCallbackTargetDeclaredEffectsPropagate(t *testing.T) {
+	files := map[string]string{
+		"lib/callbacks.t4": `module lib.callbacks
+
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func apply(x: Int, cb: fn(Int) -> Int uses alloc, mem) -> Int
+uses alloc, mem:
+  return cb(x)
+`,
+		"app/main.t4": `module app.main
+import lib.callbacks.{apply, allocer}
+
+func main() -> Int:
+  return apply(41, allocer)
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	world, err := LoadWorld(filepath.Join(tmp, filepath.FromSlash("app/main.t4")))
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	_, err = CheckWorld(world)
+	if err == nil {
+		t.Fatalf("expected imported callback target declared effect propagation error")
+	}
+	for _, want := range []string{"function 'app.main.main'", "uses effect 'alloc'"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+}
+
+func TestReturnedFunctionTypedValuesPropagateEffects(t *testing.T) {
+	requireCheckErrorContains(t, `
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func pick() -> fn(Int) -> Int uses alloc, mem:
+  let f: fn(Int) -> Int uses alloc, mem = allocer
+  return f
+
+func main() -> Int:
+  let f: fn(Int) -> Int uses alloc, mem = pick()
+  return f(41)
+`, "uses effect 'alloc'")
+
+	requireCheckErrorContains(t, `
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func pick() -> fn(Int) -> Int uses alloc, mem:
+  let f: fn(Int) -> Int uses alloc, mem = allocer
+  return f
+
+func main() -> Int
+noalloc:
+  let f: fn(Int) -> Int uses alloc, mem = pick()
+  return f(41)
+`, "semantic clause 'noalloc' forbids call")
+}
+
+func TestFunctionTypeDeclaredEffectsRejectUndeclaredTargets(t *testing.T) {
+	requireCheckErrorContains(t, `
+func allocer(x: Int) -> Int
+uses alloc, mem:
+  unsafe:
+    let _: ptr = core.alloc_bytes(4)
+  return x
+
+func main() -> Int:
+  let f: fn(Int) -> Int uses alloc = allocer
+  return f(41)
+`, "requires effects mem but function type does not declare them")
+}
+
 func TestPrivacyEffectRequiresPrivacyClause(t *testing.T) {
 	requireCheckErrorContains(t, `
 func main() -> Int

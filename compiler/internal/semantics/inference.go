@@ -144,6 +144,9 @@ func inferExprTypeForDecl(
 				if !local.FunctionTypeValue {
 					return "", fmt.Errorf("function value '%s' is not callable in this MVP; only local closure literals are supported", e.Name)
 				}
+				if len(local.FunctionCaptures) > 0 {
+					return "", fmt.Errorf("function-typed callback '%s' captures local values; captured function values cannot be called through function type in this MVP", e.Name)
+				}
 				if len(e.Args) != len(local.FunctionParamTypes) {
 					return "", fmt.Errorf("wrong argument count for callback '%s'", e.Name)
 				}

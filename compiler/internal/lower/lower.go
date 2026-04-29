@@ -514,6 +514,30 @@ func collectFunctionTypedParamTargets(checked *semantics.CheckedProgram, module 
 		funcsByName[fn.Name] = fn
 	}
 	targetSets := map[string]map[string]map[string]bool{}
+	type callableTargetEdge struct {
+		callee      string
+		param       string
+		sourceFunc  string
+		sourceParam string
+	}
+	var edges []callableTargetEdge
+
+	addTarget := func(callee, paramName, targetSymbol string) bool {
+		if callee == "" || paramName == "" || targetSymbol == "" {
+			return false
+		}
+		if _, ok := targetSets[callee]; !ok {
+			targetSets[callee] = map[string]map[string]bool{}
+		}
+		if _, ok := targetSets[callee][paramName]; !ok {
+			targetSets[callee][paramName] = map[string]bool{}
+		}
+		if targetSets[callee][paramName][targetSymbol] {
+			return false
+		}
+		targetSets[callee][paramName][targetSymbol] = true
+		return true
+	}
 
 	var walkExpr func(frontend.Expr, semantics.CheckedFunc)
 	var walkStmt func(frontend.Stmt, semantics.CheckedFunc)
@@ -539,26 +563,29 @@ func collectFunctionTypedParamTargets(checked *semantics.CheckedProgram, module 
 			if !ok {
 				continue
 			}
-			targetSymbol := ""
-			if local, ok := caller.Locals[id.Name]; ok && local.FunctionTypeValue && local.FunctionValue != "" {
-				targetSymbol = local.FunctionValue
-			} else if _, ok := checked.FuncSigs[id.Name]; ok {
-				targetSymbol = id.Name
-			}
-			if targetSymbol == "" {
-				continue
-			}
 			paramName := callee.Decl.Params[i].Name
 			if paramName == "" {
 				continue
 			}
-			if _, ok := targetSets[resolved]; !ok {
-				targetSets[resolved] = map[string]map[string]bool{}
+			if local, ok := caller.Locals[id.Name]; ok {
+				if !local.FunctionTypeValue {
+					continue
+				}
+				if local.FunctionValue != "" {
+					addTarget(resolved, paramName, local.FunctionValue)
+					continue
+				}
+				edges = append(edges, callableTargetEdge{
+					callee:      resolved,
+					param:       paramName,
+					sourceFunc:  caller.Name,
+					sourceParam: id.Name,
+				})
+				continue
 			}
-			if _, ok := targetSets[resolved][paramName]; !ok {
-				targetSets[resolved][paramName] = map[string]bool{}
+			if _, ok := checked.FuncSigs[id.Name]; ok {
+				addTarget(resolved, paramName, id.Name)
 			}
-			targetSets[resolved][paramName][targetSymbol] = true
 		}
 	}
 
@@ -677,6 +704,17 @@ func collectFunctionTypedParamTargets(checked *semantics.CheckedProgram, module 
 		}
 		for _, stmt := range fn.Decl.Body {
 			walkStmt(stmt, fn)
+		}
+	}
+
+	for changed := true; changed; {
+		changed = false
+		for _, edge := range edges {
+			for target := range targetSets[edge.sourceFunc][edge.sourceParam] {
+				if addTarget(edge.callee, edge.param, target) {
+					changed = true
+				}
+			}
 		}
 	}
 

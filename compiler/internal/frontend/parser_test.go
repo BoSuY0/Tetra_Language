@@ -413,6 +413,136 @@ func apply(cb: fn(Int, Bool) -> UInt8, value: Int, flag: Bool) -> UInt8:
 	}
 }
 
+func TestParseFunctionTypeSyntaxMatrix(t *testing.T) {
+	tests := []struct {
+		name      string
+		typeSrc   string
+		wantParms []string
+		wantRet   string
+		wantUses  string
+		wantKind  TypeRefKind
+	}{
+		{
+			name:      "zero params",
+			typeSrc:   "fn() -> Int",
+			wantParms: nil,
+			wantRet:   "Int",
+		},
+		{
+			name:      "single param",
+			typeSrc:   "fn(Int) -> Bool",
+			wantParms: []string{"Int"},
+			wantRet:   "Bool",
+		},
+		{
+			name:      "multi param qualified return",
+			typeSrc:   "fn(Int, core.String) -> app.Result",
+			wantParms: []string{"Int", "core.String"},
+			wantRet:   "app.Result",
+		},
+		{
+			name:      "uses effects",
+			typeSrc:   "fn(Int) -> Int uses io, privacy",
+			wantParms: []string{"Int"},
+			wantRet:   "Int",
+			wantUses:  "io,privacy",
+		},
+		{
+			name:      "optional return",
+			typeSrc:   "fn(Int) -> Int?",
+			wantParms: []string{"Int"},
+			wantKind:  TypeRefOptional,
+		},
+		{
+			name:      "nested function param",
+			typeSrc:   "fn(fn(Int) -> Int) -> Int",
+			wantParms: []string{"fn"},
+			wantRet:   "Int",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			src := "func apply(cb: " + tt.typeSrc + ") -> Int:\n    return 0\n"
+			prog, err := Parse([]byte(src))
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			cb := prog.Funcs[0].Params[0].Type
+			if cb.Kind != TypeRefFunction {
+				t.Fatalf("cb kind = %d, want TypeRefFunction", cb.Kind)
+			}
+			if got := len(cb.Params); got != len(tt.wantParms) {
+				t.Fatalf("param count = %d, want %d: %#v", got, len(tt.wantParms), cb.Params)
+			}
+			for i, want := range tt.wantParms {
+				param := cb.Params[i]
+				if want == "fn" {
+					if param.Kind != TypeRefFunction || param.Return == nil || param.Return.Name != "Int" {
+						t.Fatalf("param[%d] = %#v, want nested fn(Int)->Int", i, param)
+					}
+					continue
+				}
+				if param.Kind != TypeRefNamed || param.Name != want {
+					t.Fatalf("param[%d] = %#v, want named %s", i, param, want)
+				}
+			}
+			if cb.Return == nil {
+				t.Fatalf("return = nil")
+			}
+			if tt.wantKind != 0 {
+				if cb.Return.Kind != tt.wantKind {
+					t.Fatalf("return kind = %d, want %d", cb.Return.Kind, tt.wantKind)
+				}
+			} else if cb.Return.Kind != TypeRefNamed || cb.Return.Name != tt.wantRet {
+				t.Fatalf("return = %#v, want named %s", cb.Return, tt.wantRet)
+			}
+			if got := strings.Join(cb.Uses, ","); got != tt.wantUses {
+				t.Fatalf("uses = %q, want %q", got, tt.wantUses)
+			}
+		})
+	}
+}
+
+func TestParseFunctionTypeSyntaxDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "trailing comma",
+			src:  "func apply(cb: fn(Int,) -> Int) -> Int:\n    return 0\n",
+			want: "function type parameter list does not allow a trailing comma",
+		},
+		{
+			name: "missing arrow",
+			src:  "func apply(cb: fn(Int) Int) -> Int:\n    return 0\n",
+			want: "expected ->, got identifier",
+		},
+		{
+			name: "throws unsupported in function type",
+			src:  "func apply(cb: fn(Int) -> Int throws Boom) -> Int:\n    return 0\n",
+			want: "expected ), got throws",
+		},
+		{
+			name: "semantic clauses unsupported in function type",
+			src:  "func apply(cb: fn(Int) -> Int nothrow) -> Int:\n    return 0\n",
+			want: "semantic clauses are not allowed in function types",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse([]byte(tt.src))
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestParserSourceSpanPrecision(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -1622,6 +1752,204 @@ func main() -> Int:
 	}
 	if closure.ReturnType.Name != "Int" {
 		t.Fatalf("closure return type = %q, want Int", closure.ReturnType.Name)
+	}
+}
+
+func TestParseTopLevelClosureDeclarationMatrix(t *testing.T) {
+	tests := []struct {
+		name        string
+		src         string
+		wantName    string
+		wantParams  []string
+		wantRetKind TypeRefKind
+		wantRetName string
+		wantUses    string
+		wantClauses string
+		wantBodyLen int
+	}{
+		{
+			name: "expression bodied",
+			src: `closure add1(x: Int) -> Int = x + 1
+`,
+			wantName:    "add1",
+			wantParams:  []string{"x:Int"},
+			wantRetName: "Int",
+			wantBodyLen: 1,
+		},
+		{
+			name:        "generic bounded uses and clause",
+			src:         `closure id<T: Eq>(x: T) -> T uses io nothrow { return x }`,
+			wantName:    "id",
+			wantParams:  []string{"x:T"},
+			wantRetName: "T",
+			wantUses:    "io",
+			wantClauses: "nothrow",
+			wantBodyLen: 1,
+		},
+		{
+			name:        "throws",
+			src:         `closure fail() -> Int throws Boom { throw Boom.bad }`,
+			wantName:    "fail",
+			wantRetName: "Int",
+			wantBodyLen: 1,
+		},
+		{
+			name:        "optional return",
+			src:         `closure maybe(x: Int) -> Int? { return none }`,
+			wantName:    "maybe",
+			wantParams:  []string{"x:Int"},
+			wantRetKind: TypeRefOptional,
+			wantBodyLen: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prog, err := Parse([]byte(tt.src))
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if len(prog.Funcs) != 1 {
+				t.Fatalf("func count = %d, want 1: %#v", len(prog.Funcs), prog.Funcs)
+			}
+			fn := prog.Funcs[0]
+			if fn.Name != tt.wantName || fn.Synthetic {
+				t.Fatalf("closure identity = name %q synthetic %v", fn.Name, fn.Synthetic)
+			}
+			if got := len(fn.Params); got != len(tt.wantParams) {
+				t.Fatalf("param count = %d, want %d", got, len(tt.wantParams))
+			}
+			for i, want := range tt.wantParams {
+				got := fn.Params[i].Name + ":" + fn.Params[i].Type.Name
+				if got != want {
+					t.Fatalf("param[%d] = %q, want %q", i, got, want)
+				}
+			}
+			if tt.wantRetKind != 0 {
+				if fn.ReturnType.Kind != tt.wantRetKind {
+					t.Fatalf("return kind = %d, want %d", fn.ReturnType.Kind, tt.wantRetKind)
+				}
+			} else if fn.ReturnType.Name != tt.wantRetName {
+				t.Fatalf("return type = %#v, want %s", fn.ReturnType, tt.wantRetName)
+			}
+			if got := strings.Join(fn.Uses, ","); got != tt.wantUses {
+				t.Fatalf("uses = %q, want %q", got, tt.wantUses)
+			}
+			var clauses []string
+			for _, clause := range fn.SemanticClauses {
+				clauses = append(clauses, clause.Name)
+			}
+			if got := strings.Join(clauses, ","); got != tt.wantClauses {
+				t.Fatalf("clauses = %q, want %q", got, tt.wantClauses)
+			}
+			if tt.name == "generic bounded uses and clause" {
+				if len(fn.TypeParams) != 1 || fn.TypeParams[0] != "T" || len(fn.TypeParamBounds) != 1 || fn.TypeParamBounds[0].Bound.Name != "Eq" {
+					t.Fatalf("generic metadata = params %#v bounds %#v", fn.TypeParams, fn.TypeParamBounds)
+				}
+			}
+			if fn.HasThrows != (tt.name == "throws") {
+				t.Fatalf("HasThrows = %v", fn.HasThrows)
+			}
+			if got := len(fn.Body); got != tt.wantBodyLen {
+				t.Fatalf("body len = %d, want %d", got, tt.wantBodyLen)
+			}
+		})
+	}
+}
+
+func TestParseClosureASTInvariants(t *testing.T) {
+	src := `
+func main() -> Int:
+    let f: fn(Int) -> Int = fn(x: Int) -> Int = x + 1
+    return 0
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) != 2 {
+		t.Fatalf("func count = %d, want main plus synthetic closure", len(prog.Funcs))
+	}
+	mainFn, synthetic := prog.Funcs[0], prog.Funcs[1]
+	letStmt, ok := mainFn.Body[0].(*LetStmt)
+	if !ok {
+		t.Fatalf("main stmt[0] = %T, want LetStmt", mainFn.Body[0])
+	}
+	if letStmt.Type.Kind != TypeRefFunction || letStmt.Type.Return == nil || letStmt.Type.Return.Name != "Int" {
+		t.Fatalf("let type = %#v, want function type returning Int", letStmt.Type)
+	}
+	closure, ok := letStmt.Value.(*ClosureExpr)
+	if !ok {
+		t.Fatalf("let value = %T, want ClosureExpr", letStmt.Value)
+	}
+	if closure.Name == "" || closure.Decl == nil {
+		t.Fatalf("closure expr = %#v, want name and decl", closure)
+	}
+	if closure.Decl != synthetic {
+		t.Fatalf("closure.Decl does not point at appended synthetic function")
+	}
+	if closure.Pos() != closure.At {
+		t.Fatalf("closure Pos() = %#v, want At %#v", closure.Pos(), closure.At)
+	}
+	if synthetic.Name != closure.Name || !synthetic.Synthetic {
+		t.Fatalf("synthetic identity = %#v, closure name %q", synthetic, closure.Name)
+	}
+	if synthetic.Pos.Line != closure.At.Line || synthetic.Pos.Col != closure.At.Col {
+		t.Fatalf("synthetic pos = %d:%d, closure pos = %d:%d", synthetic.Pos.Line, synthetic.Pos.Col, closure.At.Line, closure.At.Col)
+	}
+	if len(synthetic.Body) != 1 {
+		t.Fatalf("synthetic body len = %d, want 1", len(synthetic.Body))
+	}
+	ret, ok := synthetic.Body[0].(*ReturnStmt)
+	if !ok {
+		t.Fatalf("synthetic body[0] = %T, want ReturnStmt", synthetic.Body[0])
+	}
+	if got := exprString(ret.Value); got != "+(x, 1)" {
+		t.Fatalf("return expr = %s, want +(x, 1)", got)
+	}
+}
+
+func TestParseClosureLiteralSyntaxDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "missing params",
+			src:  "fn main() -> i32 { let f: ptr = fn -> i32 { return 0 }; return 0 }",
+			want: "expected (, got ->",
+		},
+		{
+			name: "named fn literal",
+			src:  "fn main() -> i32 { let f: ptr = fn add1(x: i32) -> i32 { return x }; return 0 }",
+			want: "closure literals cannot have names",
+		},
+		{
+			name: "closure keyword literal",
+			src:  "fn main() -> i32 { let f: ptr = closure(x: i32) -> i32 { return x }; return 0 }",
+			want: "closure literal expressions use 'fn(...) -> Type'",
+		},
+		{
+			name: "missing return arrow",
+			src:  "fn main() -> i32 { let f: ptr = fn(x: i32) i32 { return x }; return 0 }",
+			want: "expected -> or :, got identifier",
+		},
+		{
+			name: "missing body",
+			src:  "fn main() -> i32 { let f: ptr = fn(x: i32) -> i32; return 0 }",
+			want: "expected {, got ;",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse([]byte(tt.src))
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
 	}
 }
 

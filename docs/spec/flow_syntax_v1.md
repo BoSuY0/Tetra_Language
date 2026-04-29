@@ -64,17 +64,19 @@ packing. Generic calls are inferred only from value arguments; return-only type
 parameters and `none` without an expected optional type are diagnostics that ask
 for an explicit annotation.
 
-Closures are accepted in MVP as function literals:
+Closures are accepted in the current Level 0 callable MVP as function literals:
 
 ```tetra
 func main() -> Int:
-    let f: ptr = fn(x: Int) -> Int:
+    let f: fn(Int) -> Int = fn(x: Int) -> Int:
         return x
-    return 0
+    return f(0)
 ```
 
-The current MVP lowering materializes closure literals as synthetic module
-functions and a `ptr` value to that symbol.
+The current MVP lowering materializes supported non-capturing closure literals
+as synthetic module functions with a symbol-backed callable value. Older `ptr`
+annotations may still appear in migration-era snippets, but they are not the
+current callable contract.
 
 Function type references are parser-accepted in type positions:
 
@@ -83,20 +85,29 @@ func apply(cb: fn(Int, Bool) -> UInt8, x: Int, ok: Bool) -> UInt8:
     return cb(x, ok)
 ```
 
-Callable MVP boundaries in this wave:
+Callable boundary levels in this wave:
 
-- supported: `let`-bound function-typed locals initialized with a
-  non-capturing, non-generic, non-throwing closure literal, followed by direct
-  local calls; and callee-side callback parameter calls when the caller passes
-  either a known symbol-backed function-typed local (for example
-  `apply(f, 41)`) or a direct named non-generic non-throwing function/closure
-  symbol (for example `apply(add1, 41)`); plus return of symbol-backed
-  non-generic non-throwing values from function-typed return paths and
-  immutable function-typed local-to-local binding when signatures match, with
-  function-typed local reassignment rejected in this MVP-safe path;
-- unsupported with explicit diagnostics: function-value escape/passing/storing,
-  capturing closure binding to function type, generic/throwing callback symbols
-  in this path, and signature mismatches.
+- Level 0 current MVP: `fn(...) -> ...` type references plus `let`-bound
+  function-typed locals initialized with a non-capturing, non-generic,
+  non-throwing closure literal, followed by direct local calls; and callee-side
+  callback parameter calls when the caller passes either a known symbol-backed
+  function-typed local (for example `apply(f, 41)`) or a direct named
+  non-generic non-throwing function/closure symbol (for example
+  `apply(add1, 41)`); plus return of symbol-backed non-generic non-throwing
+  values from function-typed return paths and immutable function-typed
+  local-to-local binding when signatures match, with function-typed local
+  reassignment rejected in this MVP-safe path.
+- Level 1 experimental: non-capturing callable expansion beyond Level 0 may be
+  developed under explicit experimental labels. It must remain symbol-backed,
+  diagnostics-first, and outside the `v0.2.0` stable claim until promoted.
+- Level 2 planned/experimental: captured closures, broader callback movement,
+  lifetime validation, and ABI evidence are design work, not current support.
+- Unsupported with explicit diagnostics in the current profile: arbitrary
+  function-value escape/passing/storing, capturing closure binding to function
+  type, generic/throwing callback symbols in this path, and signature
+  mismatches.
+
+These levels intentionally do not claim full first-class functions in `v0.2.0`.
 
 Generic closure literal syntax (`fn<T>(...)`) is parser-accepted and supported
 only in the existing local direct-call subset with inferable concrete arguments.
@@ -590,7 +601,8 @@ the latter is project/package manifest metadata.
 
 Advanced payload pattern forms beyond the promoted positional enum payload
 slice, richer ADT constructors/destructuring, exhaustive integer match checking,
-collection `for` exhaustiveness improvements, full first-class
-function-value/callable matrix, effect polymorphism/inference, protocol-bound
-generic dispatch, implicit receiver-call syntax, distributed actors, and
-structured concurrency are planned for later releases.
+collection `for` exhaustiveness improvements, Callable Level 2 captured-closure
+semantics, full first-class function-value/callable matrix, effect
+polymorphism/inference, protocol-bound generic dispatch, implicit receiver-call
+syntax, distributed actors, and structured concurrency are planned for later
+releases.

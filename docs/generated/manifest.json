@@ -1051,11 +1051,36 @@
       "name": "Callable/function type MVP",
       "status": "current",
       "since": "v0.2.0",
-      "scope": "function type references and narrow symbol-backed non-capturing callable paths",
-      "stability": "limited MVP; full first-class function values remain out of scope",
+      "scope": "Level 0 callable surface: function type references and narrow symbol-backed non-capturing callable paths",
+      "stability": "current constrained MVP; full first-class function values remain out of scope",
       "docs": [
         "docs/spec/current_supported_surface.md",
+        "docs/spec/flow_syntax_v1.md",
         "docs/spec/v1_feature_status.md"
+      ]
+    },
+    {
+      "id": "language.callable-level1",
+      "name": "Callable Level 1 non-capturing expansion",
+      "status": "experimental",
+      "scope": "experimental non-capturing callable expansion beyond the Level 0 MVP, limited to symbol-backed immutable function-typed values with stable diagnostics",
+      "stability": "experimental; not part of the v0.2.0 stable baseline and not a full first-class function-value claim",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/flow_syntax_v1.md",
+        "docs/spec/v1_scope.md"
+      ]
+    },
+    {
+      "id": "language.callable-level2",
+      "name": "Callable Level 2 captured closure and escape model",
+      "status": "planned",
+      "scope": "planned/experimental design space for captured closures, broader callback movement, lifetime validation, and ABI evidence before promotion",
+      "stability": "planned; no current v0.2.0 support guarantee and no full first-class callable semantics until gated",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/flow_syntax_v1.md",
+        "docs/spec/v1_scope.md"
       ]
     },
     {

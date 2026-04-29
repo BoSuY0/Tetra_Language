@@ -1946,8 +1946,12 @@ func (p *parser) parseFunctionTypeRef() (TypeRef, error) {
 		if p.cur.typ != TokenComma {
 			break
 		}
+		commaPos := p.cur.pos
 		if err := p.next(); err != nil {
 			return TypeRef{}, err
+		}
+		if p.cur.typ == TokenRParen {
+			return TypeRef{}, diagnosticErrorf(commaPos, "function type parameter list does not allow a trailing comma")
 		}
 	}
 	if _, err := p.expect(TokenRParen); err != nil {
@@ -1960,9 +1964,12 @@ func (p *parser) parseFunctionTypeRef() (TypeRef, error) {
 	if err != nil {
 		return TypeRef{}, err
 	}
-	uses, _, err := p.parseFunctionModifiers()
+	uses, clauses, err := p.parseFunctionModifiers()
 	if err != nil {
 		return TypeRef{}, err
+	}
+	if len(clauses) > 0 {
+		return TypeRef{}, diagnosticErrorf(clauses[0].At, "semantic clauses are not allowed in function types")
 	}
 	return TypeRef{At: at, Kind: TypeRefFunction, Params: params, Return: &ret, Uses: uses}, nil
 }
@@ -3160,6 +3167,9 @@ func (p *parser) parsePrimary() (Expr, error) {
 		}
 		return p.parsePostfix(&StringLitExpr{At: tok.pos, Value: tok.str})
 	case TokenIdent:
+		if p.cur.lit == "closure" && p.peek.typ == TokenLParen {
+			return nil, diagnosticErrorf(p.cur.pos, "closure literal expressions use 'fn(...) -> Type'; named callables use top-level 'closure Name(...)' declarations")
+		}
 		pos := p.cur.pos
 		parts, err := p.parsePathParts()
 		if err != nil {
@@ -3235,6 +3245,9 @@ func (p *parser) parseClosureExpr() (Expr, error) {
 	pos := p.cur.pos
 	if err := p.next(); err != nil {
 		return nil, err
+	}
+	if p.cur.typ == TokenIdent {
+		return nil, diagnosticErrorf(p.cur.pos, "closure literals cannot have names; use top-level closure declarations for named callables")
 	}
 	typeParams, typeParamBounds, err := p.parseTypeParamsWithBounds(true)
 	if err != nil {

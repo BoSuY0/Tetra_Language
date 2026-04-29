@@ -57,15 +57,16 @@ green `scripts/release_v0_2_0_gate.sh` report and matching handoff evidence.
   are reported with structured diagnostics.
 - Generic protocol requirement parsing/checking in MVP form (`func req<T>(...)`)
   with signature-shape conformance checks and no new runtime dispatch model.
-- Function type references in type positions (`fn(T1, T2) -> R`) plus callable
-  MVP for direct local calls of let-bound non-capturing closure values, plus
-  callback-parameter calls in callees when the call-site passes a known
-  symbol-backed function-typed local or a direct named non-generic
-  non-throwing function/closure symbol (immutable in this MVP path;
-  reassignment of function-typed locals is rejected). The current safe subset
-  also allows returning symbol-backed non-generic non-throwing function values
-  from functions with function-typed returns, and immutable function-typed
-  local-to-local binding (`let g: fn(...) -> ... = f`) when signatures match.
+- Function type references in type positions (`fn(T1, T2) -> R`) plus the
+  current Level 0 callable MVP for direct local calls of let-bound
+  non-capturing closure values, plus callback-parameter calls in callees when
+  the call-site passes a known symbol-backed function-typed local or a direct
+  named non-generic non-throwing function/closure symbol (immutable in this MVP
+  path; reassignment of function-typed locals is rejected). The current safe
+  subset also allows returning symbol-backed non-generic non-throwing function
+  values from functions with function-typed returns, and immutable
+  function-typed local-to-local binding (`let g: fn(...) -> ... = f`) when
+  signatures match. This is not a full first-class function-value model.
 - Semantic-clause checker phase 1 for `noalloc`/`noblock`/`realtime`:
   resolved direct calls, closure-symbol calls, and function-typed callback
   arguments are validated against clause contracts; `realtime` requires
@@ -95,9 +96,15 @@ green `scripts/release_v0_2_0_gate.sh` report and matching handoff evidence.
 - Full `v1.0.0` language guarantees remain future work.
 - Distributed EcoNet, production TetraHub publishing, global trust scoring, and
   proof-carrying capsules remain post-v1 unless explicitly promoted.
-- Full first-class callable/function-pointer semantics (escape/passing/storing,
-  complete capture matrix, and ABI redesign) remain outside the current
-  supported callable MVP.
+- Callable Level 1 is experimental: non-capturing, symbol-backed callable
+  expansion beyond the Level 0 MVP may be documented or tested behind explicit
+  experimental labels, but it is not part of the stable `v0.2.0` baseline.
+  Callable Level 2 is planned/experimental design work for captured closures,
+  broader callback movement, lifetime validation, and ABI evidence; it must not
+  be marketed as current support.
+- Full first-class callable/function-pointer semantics (arbitrary
+  escape/passing/storing, complete capture matrix, and ABI redesign) remain
+  outside the current supported callable MVP.
 - Enum payload constructors and exhaustive enum match/catch coverage are an
   experimental next-cycle promotion slice. The represented slice is limited to
   same-module enum constructors with positional payload arguments/bindings and

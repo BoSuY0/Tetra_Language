@@ -427,7 +427,7 @@ func main() -> Int:
     let f: fn(Int) -> Int = add1
     return 0
 `,
-			want: "must be initialized with a named function/closure symbol in this MVP",
+			want: "must be initialized with an immutable symbol-backed function value or direct named function/closure symbol in this MVP",
 		},
 		{
 			name: "generic named symbol unsupported",
@@ -519,6 +519,20 @@ func main() -> Int:
     return apply(add1, 41)
 `,
 			want: "throwing function symbol",
+		},
+		{
+			name: "capturing function-typed callback argument rejected",
+			src: `
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+    return cb(x)
+
+func main() -> Int:
+    let base: Int = 1
+    let f: ptr = fn(x: Int) -> Int:
+        return x + base
+    return apply(f, 41)
+`,
+			want: "callback argument must be a symbol-backed local function value or direct named function/closure symbol in this MVP",
 		},
 	}
 	for _, tt := range tests {

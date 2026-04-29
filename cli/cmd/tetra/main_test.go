@@ -219,6 +219,36 @@ func TestFeaturesCommandJSON(t *testing.T) {
 				}
 			}
 		}
+		if feature.ID == "language.callable-mvp" {
+			if feature.Status != "current" || feature.Since != "v0.2.0" {
+				t.Fatalf("callable MVP lifecycle = status %q since %q, want current since v0.2.0", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"Level 0 callable surface", "symbol-backed non-capturing callable paths", "full first-class function values remain out of scope"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("callable MVP feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
+		if feature.ID == "language.callable-level1" {
+			if feature.Status != "experimental" || feature.Since != "" {
+				t.Fatalf("callable Level 1 lifecycle = status %q since %q, want experimental without v0.2.0 since marker", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"experimental non-capturing callable expansion", "not part of the v0.2.0 stable baseline", "not a full first-class function-value claim"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("callable Level 1 feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
+		if feature.ID == "language.callable-level2" {
+			if feature.Status != "planned" || feature.Since != "" {
+				t.Fatalf("callable Level 2 lifecycle = status %q since %q, want planned without v0.2.0 since marker", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"captured closures", "ABI evidence before promotion", "no current v0.2.0 support guarantee"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("callable Level 2 feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
 	}
 	for _, status := range []string{"current", "experimental", "planned", "post-v1"} {
 		if !statusSeen[status] {
@@ -227,9 +257,12 @@ func TestFeaturesCommandJSON(t *testing.T) {
 	}
 	for id, wantStatus := range map[string]string{
 		"cli.core":                            "current",
+		"language.callable-mvp":               "current",
 		"targets.wasm-build-only":             "current",
 		"stdlib.experimental-mirrors":         "experimental",
+		"language.callable-level1":            "experimental",
 		"language.enum-payload-match":         "experimental",
+		"language.callable-level2":            "planned",
 		"wasm.runtime-execution":              "planned",
 		"eco.distributed-network":             "post-v1",
 		"language.full-first-class-callables": "post-v1",

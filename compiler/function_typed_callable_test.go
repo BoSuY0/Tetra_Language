@@ -368,6 +368,87 @@ func main() -> Int:
 `,
 			want: "argument labels are not supported for callback 'cb' in this MVP",
 		},
+		{
+			name: "direct callback signature parameter mismatch",
+			src: `func as_bool(flag: Bool) -> Int:
+    if flag:
+        return 1
+    return 0
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+    return cb(x)
+
+func main() -> Int:
+    return apply(as_bool, 1)
+`,
+			want: "callback function symbol 'as_bool' parameter 1 type mismatch: expected 'i32', got 'bool'",
+		},
+		{
+			name: "direct callback signature return mismatch",
+			src: `func truthy(x: Int) -> Bool:
+    return true
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+    return cb(x)
+
+func main() -> Int:
+    return apply(truthy, 1)
+`,
+			want: "callback function symbol 'truthy' return type mismatch: expected 'i32', got 'bool'",
+		},
+		{
+			name: "immutable alias flow from function-typed return without target set",
+			src: `func add1(x: Int) -> Int:
+    return x + 1
+
+func add2(x: Int) -> Int:
+    return x + 2
+
+func pick(flag: Bool) -> fn(Int) -> Int:
+    let f: fn(Int) -> Int = add1
+    let g: fn(Int) -> Int = add2
+    if flag:
+        return f
+    return g
+
+func main() -> Int:
+    let cb: fn(Int) -> Int = pick(true)
+    return cb(1)
+`,
+			want: "function return symbol mismatch across return paths",
+		},
+		{
+			name: "mutable alias flow rejected",
+			src: `func add1(x: Int) -> Int:
+    return x + 1
+
+func main() -> Int:
+    var f: fn(Int) -> Int = add1
+    let g: fn(Int) -> Int = f
+    return g(1)
+`,
+			want: "must be initialized with an immutable symbol-backed function value or direct named function/closure symbol in this MVP",
+		},
+		{
+			name: "function-typed struct field rejected",
+			src: `struct Holder:
+    cb: fn(Int) -> Int
+
+func main() -> Int:
+    return 0
+`,
+			want: "struct field 'Holder.cb' uses function type; storing function-typed values in structs is not supported in this MVP",
+		},
+		{
+			name: "function-typed enum payload rejected",
+			src: `enum MaybeCallback:
+    case some(fn(Int) -> Int)
+
+func main() -> Int:
+    return 0
+`,
+			want: "function type payload",
+		},
 	}
 
 	for _, tc := range cases {

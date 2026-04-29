@@ -38,14 +38,41 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	for id, wantStatus := range map[string]FeatureStatus{
 		"cli.core":                            FeatureStatusCurrent,
 		"targets.wasm-build-only":             FeatureStatusCurrent,
+		"language.callable-mvp":               FeatureStatusCurrent,
+		"language.callable-level1":            FeatureStatusExperimental,
 		"stdlib.experimental-mirrors":         FeatureStatusExperimental,
 		"language.enum-payload-match":         FeatureStatusExperimental,
+		"language.callable-level2":            FeatureStatusPlanned,
 		"wasm.runtime-execution":              FeatureStatusPlanned,
 		"eco.distributed-network":             FeatureStatusPostV1,
 		"language.full-first-class-callables": FeatureStatusPostV1,
 	} {
 		if gotStatus := seenID[id]; gotStatus != wantStatus {
 			t.Fatalf("feature %s status = %q, want %q", id, gotStatus, wantStatus)
+		}
+	}
+	callableMVP := seenFeature["language.callable-mvp"]
+	for _, want := range []string{"Level 0 callable surface", "full first-class function values remain out of scope"} {
+		if !strings.Contains(callableMVP.Scope+" "+callableMVP.Stability, want) {
+			t.Fatalf("callable MVP feature missing %q boundary: %#v", want, callableMVP)
+		}
+	}
+	callableLevel1 := seenFeature["language.callable-level1"]
+	if callableLevel1.Since != "" {
+		t.Fatalf("callable Level 1 should not claim v0.2.0 since marker: %#v", callableLevel1)
+	}
+	for _, want := range []string{"experimental", "not part of the v0.2.0 stable baseline", "not a full first-class function-value claim"} {
+		if !strings.Contains(callableLevel1.Scope+" "+callableLevel1.Stability, want) {
+			t.Fatalf("callable Level 1 feature missing %q boundary: %#v", want, callableLevel1)
+		}
+	}
+	callableLevel2 := seenFeature["language.callable-level2"]
+	if callableLevel2.Since != "" {
+		t.Fatalf("callable Level 2 should not claim v0.2.0 since marker: %#v", callableLevel2)
+	}
+	for _, want := range []string{"planned/experimental", "captured closures", "no current v0.2.0 support guarantee", "no full first-class callable semantics"} {
+		if !strings.Contains(callableLevel2.Scope+" "+callableLevel2.Stability, want) {
+			t.Fatalf("callable Level 2 feature missing %q boundary: %#v", want, callableLevel2)
 		}
 	}
 	enumFeature := seenFeature["language.enum-payload-match"]

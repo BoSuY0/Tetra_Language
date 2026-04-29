@@ -304,9 +304,12 @@ func validateFeatures(features []featureManifest) error {
 	requiredIDs := map[string]string{
 		"cli.core":                            "current",
 		"language.flow":                       "current",
+		"language.callable-mvp":               "current",
+		"language.callable-level1":            "experimental",
 		"targets.wasm-build-only":             "current",
 		"stdlib.experimental-mirrors":         "experimental",
 		"language.enum-payload-match":         "experimental",
+		"language.callable-level2":            "planned",
 		"wasm.runtime-execution":              "planned",
 		"language.full-v1-guarantees":         "planned",
 		"eco.distributed-network":             "post-v1",

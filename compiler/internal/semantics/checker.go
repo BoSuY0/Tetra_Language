@@ -794,6 +794,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		slotCount := 0
 		for i := range ctx.decl.Fields {
 			field := &ctx.decl.Fields[i]
+			if field.Type.Kind == frontend.TypeRefFunction {
+				return nil, fmt.Errorf("%s: struct field '%s.%s' uses function type; storing function-typed values in structs is not supported in this MVP", frontend.FormatPos(field.At), displayTypeName(name, ctx.module), field.Name)
+			}
 			if _, exists := fieldMap[field.Name]; exists {
 				return nil, fmt.Errorf("%s: duplicate field '%s'", frontend.FormatPos(field.At), field.Name)
 			}
@@ -900,6 +903,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			totalPayloadSlots := 0
 			for j := range declCase.Payload {
 				payload := &declCase.Payload[j]
+				if payload.Kind == frontend.TypeRefFunction {
+					return nil, fmt.Errorf("%s: enum case '%s.%s' uses function type payload; storing function-typed values in enum payloads is not supported in this MVP", frontend.FormatPos(payload.At), displayTypeName(name, ctx.module), declCase.Name)
+				}
 				resolved, err := resolveTypeName(payload, ctx.module, ctx.imports)
 				if err != nil {
 					return nil, err
@@ -4025,7 +4031,10 @@ func validateFunctionTypeNamedSymbolBinding(
 	}
 	if localInfo, ok := locals[init.Name]; ok {
 		if !localInfo.FunctionTypeValue || localInfo.FunctionValue == "" || localInfo.Mutable {
-			return "", fmt.Errorf("%s: function-typed local '%s' must be initialized with a named function/closure symbol in this MVP", frontend.FormatPos(init.At), name)
+			return "", fmt.Errorf("%s: function-typed local '%s' must be initialized with an immutable symbol-backed function value or direct named function/closure symbol in this MVP", frontend.FormatPos(init.At), name)
+		}
+		if len(localInfo.FunctionCaptures) > 0 {
+			return "", fmt.Errorf("%s: function-typed local '%s' aliases capturing function value '%s'; captures are not supported for function-typed values in this MVP", frontend.FormatPos(init.At), name, init.Name)
 		}
 		sig, ok := funcs[localInfo.FunctionValue]
 		if !ok {
@@ -4684,7 +4693,10 @@ func checkStmts(
 			valRegion := regionNone
 			handledFunctionSymbol := false
 			if s.Type.Kind == frontend.TypeRefFunction {
-				if _, ok := s.Value.(*frontend.IdentExpr); ok {
+				if id, ok := s.Value.(*frontend.IdentExpr); ok {
+					if localInfo, exists := locals[id.Name]; exists && localInfo.FunctionTypeValue && localInfo.Mutable {
+						return fmt.Errorf("%s: function-typed local '%s' cannot be initialized from mutable function-typed local '%s'; only immutable symbol-backed aliases are supported in this MVP", frontend.FormatPos(s.At), s.Name, id.Name)
+					}
 					if info, exists := locals[s.Name]; exists && info.FunctionTypeValue {
 						if info.FunctionValue == "" {
 							return fmt.Errorf("%s: function-typed local '%s' must be initialized with a non-capturing closure literal or named function/closure symbol in this MVP", frontend.FormatPos(s.At), s.Name)
@@ -5588,25 +5600,32 @@ func collectLocals(
 				case *frontend.CallExpr:
 					resolvedCall, err := resolveCheckedCallName(init.Name, funcs, module, imports, init.At)
 					if err != nil {
-						return fmt.Errorf("%s: function-typed local '%s' must be initialized with a non-capturing closure literal or named function/closure symbol in this MVP", frontend.FormatPos(s.At), s.Name)
+						return fmt.Errorf("%s: function-typed local '%s' must be initialized with a non-capturing closure literal, immutable symbol-backed alias, function-typed return, or named function/closure symbol in this MVP", frontend.FormatPos(s.At), s.Name)
 					}
 					callSig, ok := funcs[resolvedCall]
-					if ok && callSig.ReturnFunctionType && callSig.ReturnFunctionSymbol != "" {
-						targetSig, ok := funcs[callSig.ReturnFunctionSymbol]
-						if !ok {
-							return fmt.Errorf("%s: unknown returned function symbol '%s'", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol)
-						}
-						if targetSig.Generic {
-							return fmt.Errorf("%s: generic function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol, s.Name)
-						}
-						if targetSig.ThrowsType != "" {
-							return fmt.Errorf("%s: throwing function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol, s.Name)
-						}
-						if err := validateFunctionTypeSymbolSignature(s.Name, s.Type, targetSig, module, imports, init.At); err != nil {
-							return err
-						}
-						functionValue = callSig.ReturnFunctionSymbol
+					if !ok {
+						return fmt.Errorf("%s: function-typed local '%s' must be initialized from a known function-typed return in this MVP", frontend.FormatPos(init.At), s.Name)
 					}
+					if !callSig.ReturnFunctionType {
+						return fmt.Errorf("%s: function-typed local '%s' initializer call '%s' does not return a function type", frontend.FormatPos(init.At), s.Name, init.Name)
+					}
+					if callSig.ReturnFunctionSymbol == "" {
+						return fmt.Errorf("%s: function-typed local '%s' initializer call '%s' has no stable function target in this MVP", frontend.FormatPos(init.At), s.Name, init.Name)
+					}
+					targetSig, ok := funcs[callSig.ReturnFunctionSymbol]
+					if !ok {
+						return fmt.Errorf("%s: unknown returned function symbol '%s'", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol)
+					}
+					if targetSig.Generic {
+						return fmt.Errorf("%s: generic function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol, s.Name)
+					}
+					if targetSig.ThrowsType != "" {
+						return fmt.Errorf("%s: throwing function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol, s.Name)
+					}
+					if err := validateFunctionTypeSymbolSignature(s.Name, s.Type, targetSig, module, imports, init.At); err != nil {
+						return err
+					}
+					functionValue = callSig.ReturnFunctionSymbol
 				default:
 					return fmt.Errorf("%s: function-typed local '%s' must be initialized with a non-capturing closure literal or named function/closure symbol in this MVP", frontend.FormatPos(s.At), s.Name)
 				}

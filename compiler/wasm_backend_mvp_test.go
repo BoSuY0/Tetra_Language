@@ -113,6 +113,40 @@ func main() -> Int:
 	buildWasmTargets(t, src, "direct-named-callable")
 }
 
+func TestWasmBuildOnlyCallableAliasSmoke(t *testing.T) {
+	src := `func add1(x: Int) -> Int:
+    return x + 1
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+    return cb(x)
+
+func main() -> Int:
+    let f: fn(Int) -> Int = add1
+    let g: fn(Int) -> Int = f
+    return apply(g, 41)
+`
+	buildWasmTargets(t, src, "callable-alias")
+}
+
+func TestWasmBuildOnlyReturnedCallableValueSmoke(t *testing.T) {
+	src := `func add1(x: Int) -> Int:
+    return x + 1
+
+func pick() -> fn(Int) -> Int:
+    let f: fn(Int) -> Int = add1
+    let g: fn(Int) -> Int = f
+    return g
+
+func apply(cb: fn(Int) -> Int, x: Int) -> Int:
+    return cb(x)
+
+func main() -> Int:
+    let cb: fn(Int) -> Int = pick()
+    return apply(cb, 41)
+`
+	buildWasmTargets(t, src, "returned-callable")
+}
+
 func TestWasmBuildOnlyMultiTargetCallableParamSmoke(t *testing.T) {
 	src := `func add1(x: Int) -> Int:
     return x + 1

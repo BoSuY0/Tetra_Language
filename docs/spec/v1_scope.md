@@ -14,7 +14,9 @@ promoted to `v1.0.x` and every mandatory artifact below has fresh evidence.
 | --- | --- | --- | --- | --- |
 | Flow syntax as canonical source syntax | Required | Flow-only scan and formatter check over `examples`, `lib`, `__rt`, and `compiler/selfhostrt` | `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt`; `./tetra fmt --check examples lib __rt compiler/selfhostrt` | frontend agent |
 | Parser and diagnostics for supported Flow forms | Required | Frontend parser/diagnostic tests and docs verification | `go test ./compiler/internal/frontend/... -count=1` | frontend agent |
-| Function-type/callable MVP boundary | Required as constrained MVP | `fn(T...) -> R` type parsing/checking plus direct-local callable subset are covered, and unsupported callable forms keep stable diagnostics | `go test ./compiler/... -run 'Closure|FunctionType|Callable|Type' -count=1` | frontend/semantics agent |
+| Function-type/callable Level 0 MVP boundary | Required as constrained MVP | `fn(T...) -> R` type parsing/checking plus direct-local callable subset are covered, and unsupported callable forms keep stable diagnostics; this is not a full first-class function-value claim | `go test ./compiler/... -run 'Closure|FunctionType|Callable|Type' -count=1` | frontend/semantics agent |
+| Callable Level 1 non-capturing expansion | Experimental until promoted | Symbol-backed non-capturing callable expansion requires explicit experimental labeling, docs verifier coverage, and stable diagnostics before any release claim | `go test ./compiler/... -run 'Closure|FunctionType|Callable' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json` | frontend/semantics/docs agents |
+| Callable Level 2 captured closure and escape model | Planned/experimental | Captured closures, broader callback movement, lifetime validation, and ABI evidence remain design work until gated; full first-class function values remain outside the current baseline | future gated compiler/runtime ABI tests plus docs verification | frontend/semantics/runtime agents |
 | Top-level `capsule` metadata declaration MVP | Required as metadata-only surface | Parser/semantic validation for capsule key/value metadata; no runtime/ABI coupling in this scope | `go test ./compiler/internal/frontend/... -count=1`; `go test ./compiler/... -run 'Capsule|Property' -count=1` | frontend/semantics agent |
 | Stable primitive, structural, optional, typed-error, enum payload, generic, protocol, extension, and module contracts | Required as the promoted positional enum payload slice only | Compiler tests plus spec alignment for same-module enum payload constructors with positional arguments/bindings and exhaustive enum match/catch coverage; advanced ADT constructors, nested destructuring patterns, guard expansion, and richer payload pattern algebra stay future/post-v1 unless separately promoted | `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module' -count=1` | semantics agent |
 | Ownership, lifetime, island, actor/task transfer, and race-safety checks | Required before release label | Negative tests for use-after-move, escaping borrows, aliasing, invalid transfers, and actor/task races | `go test ./compiler/... -run 'Ownership|Borrow|Lifetime|Island|Actor|Task' -count=1` | safety agent |
@@ -58,6 +60,9 @@ notes, and security review when applicable.
 - EcoOracle, live evolution, time-travel execution, and multiverse optimizer
   features.
 - Advanced AI/model types and model-runtime integration.
+- Callable Level 2 captured closure and escape semantics, broader callback
+  movement, and full first-class function-value behavior unless promoted with
+  lifetime and ABI evidence.
 - Distributed actors beyond the release actor/task safety contract.
 - Async typed-error behavior beyond the supported `try await <call>()`
   synchronous-lowering boundary, plus cancellation and structured concurrency.

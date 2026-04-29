@@ -697,6 +697,9 @@ func checkCallExprWithEffects(
 			if !local.FunctionTypeValue {
 				return "", regionNone, fmt.Errorf("%s: function value '%s' is not callable in this MVP; only local closure literals are supported", frontend.FormatPos(e.At), e.Name)
 			}
+			if len(local.FunctionCaptures) > 0 {
+				return "", regionNone, fmt.Errorf("%s: function-typed callback '%s' captures local values; captured function values cannot be called through function type in this MVP", frontend.FormatPos(e.At), e.Name)
+			}
 			if len(e.TypeArgs) > 0 {
 				return "", regionNone, fmt.Errorf("%s: explicit type arguments are not supported for function-typed callback values in this MVP", frontend.FormatPos(e.At))
 			}
@@ -847,6 +850,9 @@ func checkCallExprWithEffects(
 			callbackType, callbackSymbol, err := resolveCallbackArgumentType(id, resolved, sig, i, locals, funcs, module, imports, hasCallerSig && hasStrictSemanticCallClauses(callerSig))
 			if err != nil {
 				return "", regionNone, err
+			}
+			if callbackSymbol == "" {
+				return "", regionNone, fmt.Errorf("%s: callback argument for '%s' has unknown target; pass a symbol-backed local function value or direct named function/closure symbol in this MVP", frontend.FormatPos(arg.Pos()), resolved)
 			}
 			if hasCallerSig {
 				if callbackSymbol == "" {
