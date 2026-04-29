@@ -81,9 +81,19 @@ type linkedObject struct {
 
 type nativeCodegenFunc func([]IRFunc, [][]byte) (*Object, error)
 
+type nativeExecutableBackend struct {
+	name         string
+	os           ctarget.OS
+	format       ctarget.Format
+	codegen      func(x64.CodegenOptions) nativeCodegenFunc
+	link         func(outputPath string, objects []*Object, mainName string) error
+	actorRuntime func(actorEntries []string) (*Object, error)
+}
+
 type nativeBuildTarget struct {
 	target  ctarget.Target
 	triple  string
+	backend nativeExecutableBackend
 	codegen nativeCodegenFunc
 }
 
@@ -188,30 +198,96 @@ func resolveExecutableBuildTarget(inputPath, outputPath, target string, opt Buil
 	if err != nil {
 		return nativeBuildTarget{}, false, nil, err
 	}
-	return nativeBuildTarget{target: tgt, triple: tgt.Triple, codegen: codegen}, false, nil, nil
+	backend, ok := nativeExecutableBackendForTarget(tgt)
+	if !ok {
+		return nativeBuildTarget{}, false, nil, fmt.Errorf("unsupported target: %s", tgt.Triple)
+	}
+	return nativeBuildTarget{target: tgt, triple: tgt.Triple, backend: backend, codegen: codegen}, false, nil, nil
 }
 
 func nativeCodegenForTarget(tgt ctarget.Target, opt BuildOptions) (nativeCodegenFunc, error) {
-	codegenOptions := x64.CodegenOptions{
+	backend, ok := nativeExecutableBackendForTarget(tgt)
+	if !ok {
+		return nil, fmt.Errorf("unsupported target: %s", tgt.Triple)
+	}
+	return backend.codegen(nativeCodegenOptions(opt)), nil
+}
+
+func nativeExecutableBackendForTarget(tgt ctarget.Target) (nativeExecutableBackend, bool) {
+	if tgt.Arch != ctarget.ArchX64 {
+		return nativeExecutableBackend{}, false
+	}
+	backend, ok := nativeExecutableBackends()[tgt.OS]
+	if !ok || backend.format != tgt.Format {
+		return nativeExecutableBackend{}, false
+	}
+	return backend, true
+}
+
+func nativeCodegenOptions(opt BuildOptions) x64.CodegenOptions {
+	return x64.CodegenOptions{
 		IslandsDebug:    opt.IslandsDebug,
 		DebugInfo:       opt.DebugInfo,
 		ReleaseOptimize: opt.ReleaseOptimize,
 	}
-	switch tgt.OS {
-	case ctarget.OSLinux:
-		return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
-			return linux_x64.CodegenObjectLinuxX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
-		}, nil
-	case ctarget.OSWindows:
-		return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
-			return windows_x64.CodegenObjectWindowsX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
-		}, nil
-	case ctarget.OSMacOS:
-		return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
-			return macos_x64.CodegenObjectMacOSX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported target: %s", tgt.Triple)
+}
+
+func nativeExecutableBackends() map[ctarget.OS]nativeExecutableBackend {
+	return map[ctarget.OS]nativeExecutableBackend{
+		ctarget.OSLinux: {
+			name:   "linux-x64",
+			os:     ctarget.OSLinux,
+			format: ctarget.FormatELF,
+			codegen: func(opt x64.CodegenOptions) nativeCodegenFunc {
+				return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+					return linux_x64.CodegenObjectLinuxX64WithOptionsAndDataPrefix(funcs, dataPrefix, opt)
+				}
+			},
+			link: func(outputPath string, objects []*Object, mainName string) error {
+				img, err := LinkLinuxX64(objects, mainName)
+				if err != nil {
+					return err
+				}
+				return WriteELF64LinuxX64(outputPath, img)
+			},
+			actorRuntime: actorsrt.BuildLinuxX64,
+		},
+		ctarget.OSWindows: {
+			name:   "windows-x64",
+			os:     ctarget.OSWindows,
+			format: ctarget.FormatPE,
+			codegen: func(opt x64.CodegenOptions) nativeCodegenFunc {
+				return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+					return windows_x64.CodegenObjectWindowsX64WithOptionsAndDataPrefix(funcs, dataPrefix, opt)
+				}
+			},
+			link: func(outputPath string, objects []*Object, mainName string) error {
+				img, err := LinkWindowsX64(objects, mainName)
+				if err != nil {
+					return err
+				}
+				return WritePE64WindowsX64(outputPath, img)
+			},
+			actorRuntime: actorsrt.BuildWindowsX64,
+		},
+		ctarget.OSMacOS: {
+			name:   "macos-x64",
+			os:     ctarget.OSMacOS,
+			format: ctarget.FormatMachO,
+			codegen: func(opt x64.CodegenOptions) nativeCodegenFunc {
+				return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+					return macos_x64.CodegenObjectMacOSX64WithOptionsAndDataPrefix(funcs, dataPrefix, opt)
+				}
+			},
+			link: func(outputPath string, objects []*Object, mainName string) error {
+				img, err := LinkMacOSX64(objects, mainName)
+				if err != nil {
+					return err
+				}
+				return WriteMachO64MacOSX64(outputPath, img)
+			},
+			actorRuntime: actorsrt.BuildMacOSX64,
+		},
 	}
 }
 
@@ -483,16 +559,10 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 			case RuntimeSelfHost:
 				rt, err = buildEmbeddedSelfHostActorsRuntimeObject(native.triple, native.codegen)
 			case RuntimeBuiltin:
-				switch native.target.OS {
-				case ctarget.OSLinux:
-					rt, err = actorsrt.BuildLinuxX64(actorEntries)
-				case ctarget.OSMacOS:
-					rt, err = actorsrt.BuildMacOSX64(actorEntries)
-				case ctarget.OSWindows:
-					rt, err = actorsrt.BuildWindowsX64(actorEntries)
-				default:
+				if native.backend.actorRuntime == nil {
 					return fmt.Errorf("actors runtime is not supported on target %s", native.triple)
 				}
+				rt, err = native.backend.actorRuntime(actorEntries)
 			}
 			if err != nil {
 				return err
@@ -577,35 +647,10 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 		objects = append(objects, linked.obj)
 	}
 
-	switch native.target.Format {
-	case ctarget.FormatELF:
-		img, err := LinkLinuxX64(objects, mainName)
-		if err != nil {
-			return err
-		}
-		if err := WriteELF64LinuxX64(outputPath, img); err != nil {
-			return err
-		}
-	case ctarget.FormatPE:
-		img, err := LinkWindowsX64(objects, mainName)
-		if err != nil {
-			return err
-		}
-		if err := WritePE64WindowsX64(outputPath, img); err != nil {
-			return err
-		}
-	case ctarget.FormatMachO:
-		img, err := LinkMacOSX64(objects, mainName)
-		if err != nil {
-			return err
-		}
-		if err := WriteMachO64MacOSX64(outputPath, img); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unsupported target format: %s", native.target.Format)
+	if native.backend.link == nil {
+		return fmt.Errorf("target backend has no linker: %s", native.triple)
 	}
-	return nil
+	return native.backend.link(outputPath, objects, mainName)
 }
 
 func requiredActorRuntimeSymbols() []string {
@@ -1083,17 +1128,27 @@ func readLinkObjects(paths []string, target string) ([]linkedObject, error) {
 		return nil, nil
 	}
 	var linked []linkedObject
+	seenPaths := make(map[string]string, len(paths))
+	seenSymbols := make(map[string]linkedObject)
 	for _, path := range paths {
 		if path == "" {
 			continue
 		}
+		pathKey, err := filepath.Abs(path)
+		if err != nil {
+			pathKey = filepath.Clean(path)
+		}
+		if first, exists := seenPaths[pathKey]; exists {
+			return nil, fmt.Errorf("duplicate link object path: %s and %s", first, path)
+		}
+		seenPaths[pathKey] = path
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("read link object: %w", err)
+			return nil, fmt.Errorf("read link object %s: %w", path, err)
 		}
 		obj, err := ReadObject(path)
 		if err != nil {
-			return nil, fmt.Errorf("read link object: %w", err)
+			return nil, fmt.Errorf("read link object %s: %w", path, err)
 		}
 		if obj.Target == "" {
 			return nil, fmt.Errorf("link object has no target: %s", path)
@@ -1101,12 +1156,40 @@ func readLinkObjects(paths []string, target string) ([]linkedObject, error) {
 		if obj.Target != target {
 			return nil, fmt.Errorf("link object target mismatch: got=%s want=%s (%s)", obj.Target, target, path)
 		}
+		if obj.Module == "" {
+			return nil, fmt.Errorf("link object has no module identity: %s", path)
+		}
 		if obj.CompilerVersion != "" && obj.CompilerVersion != version.CompilerVersion {
 			return nil, fmt.Errorf("link object compiler version mismatch: got=%s want=%s (%s)", obj.CompilerVersion, version.CompilerVersion, path)
 		}
-		linked = append(linked, linkedObject{path: path, obj: obj, contentHash: sha256.Sum256(raw)})
+		current := linkedObject{path: path, obj: obj, contentHash: sha256.Sum256(raw)}
+		if err := validateLinkedObjectSymbols(current, seenSymbols); err != nil {
+			return nil, err
+		}
+		linked = append(linked, current)
 	}
 	return linked, nil
+}
+
+func validateLinkedObjectSymbols(current linkedObject, seen map[string]linkedObject) error {
+	if current.obj == nil {
+		return nil
+	}
+	local := make(map[string]struct{}, len(current.obj.Symbols))
+	for _, sym := range current.obj.Symbols {
+		if sym.Name == "" {
+			return fmt.Errorf("link object has empty symbol name: %s", current.path)
+		}
+		if _, exists := local[sym.Name]; exists {
+			return fmt.Errorf("duplicate symbol '%s' inside link object %s", sym.Name, current.path)
+		}
+		local[sym.Name] = struct{}{}
+		if first, exists := seen[sym.Name]; exists {
+			return fmt.Errorf("duplicate symbol '%s' in link objects: %s and %s", sym.Name, first.path, current.path)
+		}
+		seen[sym.Name] = current
+	}
+	return nil
 }
 
 func validateInterfaceImplementationProviders(world *World, linked []linkedObject) error {

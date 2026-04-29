@@ -25,6 +25,23 @@ func TestPipelineResolveNativeTargetStage(t *testing.T) {
 	if native.target.Format != ctarget.FormatELF {
 		t.Fatalf("native target format = %s, want elf", native.target.Format)
 	}
+	if native.backend.name != "linux-x64" || native.backend.link == nil || native.backend.actorRuntime == nil {
+		t.Fatalf("native backend = %#v, want linux-x64 backend with linker and actor runtime", native.backend)
+	}
+
+	for _, triple := range []string{"windows-x64", "macos-x64"} {
+		tgt, err := ctarget.Parse(triple)
+		if err != nil {
+			t.Fatalf("parse %s: %v", triple, err)
+		}
+		backend, ok := nativeExecutableBackendForTarget(tgt)
+		if !ok {
+			t.Fatalf("missing native backend for %s", triple)
+		}
+		if backend.link == nil || backend.codegen == nil || backend.actorRuntime == nil {
+			t.Fatalf("incomplete backend for %s: %#v", triple, backend)
+		}
+	}
 
 	_, handled, _, err = resolveExecutableBuildTarget("missing.tetra", "out.wasm", "wasm32-wasi", BuildOptions{Jobs: 1, DebugInfo: true})
 	if err == nil || !strings.Contains(err.Error(), "target does not support debug info: wasm32-wasi") {
@@ -85,7 +102,11 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("native codegen: %v", err)
 	}
-	native := nativeBuildTarget{target: tgt, triple: tgt.Triple, codegen: codegen}
+	backend, ok := nativeExecutableBackendForTarget(tgt)
+	if !ok {
+		t.Fatalf("native backend: %s", tgt.Triple)
+	}
+	native := nativeBuildTarget{target: tgt, triple: tgt.Triple, backend: backend, codegen: codegen}
 
 	plan1, stats1, err := planNativeModuleBuild(build.world, build.checked, native.triple, opt, nil)
 	if err != nil {

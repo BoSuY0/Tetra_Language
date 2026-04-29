@@ -206,7 +206,7 @@ pub func add(a: Int, b: Int) -> Int:
 	if err == nil {
 		t.Fatalf("expected duplicate implementation provider error")
 	}
-	if !strings.Contains(err.Error(), "duplicate implementation object for interface module 'math.core'") {
+	if !strings.Contains(err.Error(), "duplicate implementation object for interface module 'math.core'") && !strings.Contains(err.Error(), "duplicate symbol 'math.core.add'") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -255,6 +255,117 @@ pub func add(a: Int, b: Int) -> Int:
 		t.Fatalf("expected missing implementation symbol error")
 	}
 	if !strings.Contains(err.Error(), "implementation object for interface module 'math.core' missing exported symbol 'math.core.add'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadLinkObjectsRejectsDuplicatePath(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	objPath := filepath.Join(tmp, "lib.tobj")
+	if err := WriteObject(objPath, &Object{
+		Target:  tgt.Triple,
+		Module:  "dup.path",
+		Code:    []byte{0xC3},
+		Symbols: []Symbol{{Name: "dup.path.entry", Offset: 0}},
+	}); err != nil {
+		t.Fatalf("write object: %v", err)
+	}
+
+	_, err := readLinkObjects([]string{objPath, filepath.Join(tmp, ".", "lib.tobj")}, tgt.Triple)
+	if err == nil {
+		t.Fatalf("expected duplicate path error")
+	}
+	if !strings.Contains(err.Error(), "duplicate link object path") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadLinkObjectsRejectsMissingModuleIdentity(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	objPath := filepath.Join(tmp, "nomodule.tobj")
+	if err := WriteObject(objPath, &Object{
+		Target:  tgt.Triple,
+		Code:    []byte{0xC3},
+		Symbols: []Symbol{{Name: "nomodule.entry", Offset: 0}},
+	}); err != nil {
+		t.Fatalf("write object: %v", err)
+	}
+
+	_, err := readLinkObjects([]string{objPath}, tgt.Triple)
+	if err == nil {
+		t.Fatalf("expected missing module identity error")
+	}
+	if !strings.Contains(err.Error(), "link object has no module identity") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadLinkObjectsRejectsDuplicateSymbolsBeforeLinking(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	paths := []string{
+		filepath.Join(tmp, "a.tobj"),
+		filepath.Join(tmp, "b.tobj"),
+	}
+	for i, path := range paths {
+		if err := WriteObject(path, &Object{
+			Target:  tgt.Triple,
+			Module:  []string{"a", "b"}[i],
+			Code:    []byte{0xC3},
+			Symbols: []Symbol{{Name: "shared.symbol", Offset: 0}},
+		}); err != nil {
+			t.Fatalf("write object %s: %v", path, err)
+		}
+	}
+
+	_, err := readLinkObjects(paths, tgt.Triple)
+	if err == nil {
+		t.Fatalf("expected duplicate symbol error")
+	}
+	if !strings.Contains(err.Error(), "duplicate symbol 'shared.symbol' in link objects") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadLinkObjectsRejectsDuplicateSymbolsInsideObject(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	objPath := filepath.Join(tmp, "dup-symbol.tobj")
+	if err := WriteObject(objPath, &Object{
+		Target: tgt.Triple,
+		Module: "dup.symbol",
+		Code:   []byte{0xC3},
+		Symbols: []Symbol{
+			{Name: "dup.entry", Offset: 0},
+			{Name: "dup.entry", Offset: 0},
+		},
+	}); err != nil {
+		t.Fatalf("write object: %v", err)
+	}
+
+	_, err := readLinkObjects([]string{objPath}, tgt.Triple)
+	if err == nil {
+		t.Fatalf("expected duplicate symbol error")
+	}
+	if !strings.Contains(err.Error(), "duplicate symbol 'dup.entry' inside link object") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
