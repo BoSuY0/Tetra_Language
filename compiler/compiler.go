@@ -523,25 +523,16 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 		return fmt.Errorf("runtime object override requires runtime usage (no actor/task/time builtins found)")
 	}
 	if runtimeUsed {
-		runtimeMode := opt.Runtime
-		switch runtimeMode {
-		case RuntimeAuto:
-			// Default to self-host runtime when its ABI can express the program surface.
-			runtimeMode = RuntimeSelfHost
-			if actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed {
-				runtimeMode = RuntimeBuiltin
-			}
-			if typedTaskMaxSlots > 4 {
-				runtimeMode = RuntimeBuiltin
-			}
-		case RuntimeSelfHost:
-			if typedTasksUsed {
-				return fmt.Errorf("self-host runtime does not support typed task handles; use runtime=auto or runtime=builtin")
-			}
-		case RuntimeBuiltin:
-			// ok
-		default:
-			return fmt.Errorf("unsupported runtime mode: %d", opt.Runtime)
+		runtimeMode, err := selectRuntimeMode(opt.Runtime, runtimeUsageProfile{
+			actorStateUsed:    actorStateUsed,
+			tasksUsed:         tasksUsed,
+			taskGroupsUsed:    taskGroupsUsed,
+			typedTasksUsed:    typedTasksUsed,
+			typedTaskMaxSlots: typedTaskMaxSlots,
+			timeRuntimeUsed:   timeRuntimeUsed,
+		})
+		if err != nil {
+			return err
 		}
 		var rt *Object
 		needsDispatchGlue := true
@@ -654,6 +645,35 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 		return fmt.Errorf("target backend has no linker: %s", native.triple)
 	}
 	return native.backend.link(outputPath, objects, mainName)
+}
+
+type runtimeUsageProfile struct {
+	actorStateUsed    bool
+	tasksUsed         bool
+	taskGroupsUsed    bool
+	typedTasksUsed    bool
+	typedTaskMaxSlots int
+	timeRuntimeUsed   bool
+}
+
+func selectRuntimeMode(requested RuntimeMode, usage runtimeUsageProfile) (RuntimeMode, error) {
+	switch requested {
+	case RuntimeAuto:
+		// Default to self-host runtime when its ABI can express the program surface.
+		if usage.actorStateUsed || usage.tasksUsed || usage.taskGroupsUsed || usage.typedTasksUsed || usage.timeRuntimeUsed || usage.typedTaskMaxSlots > 4 {
+			return RuntimeBuiltin, nil
+		}
+		return RuntimeSelfHost, nil
+	case RuntimeSelfHost:
+		if usage.typedTasksUsed {
+			return 0, fmt.Errorf("self-host runtime does not support typed task handles; use runtime=auto or runtime=builtin")
+		}
+		return RuntimeSelfHost, nil
+	case RuntimeBuiltin:
+		return RuntimeBuiltin, nil
+	default:
+		return 0, fmt.Errorf("unsupported runtime mode: %d", requested)
+	}
 }
 
 func requiredActorRuntimeSymbols() []string {

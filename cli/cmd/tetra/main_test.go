@@ -134,16 +134,27 @@ func TestTargetsCommandJSON(t *testing.T) {
 	}
 	byTriple := map[string]targetMeta{}
 	for _, tgt := range report.Targets {
+		if byTriple[tgt.Triple].Triple != "" {
+			t.Fatalf("duplicate target metadata for %s in %#v", tgt.Triple, report.Targets)
+		}
 		byTriple[tgt.Triple] = tgt
 	}
-	if got := byTriple["linux-x64"]; got.Status != "supported" || got.OS != "linux" || got.Arch != "x64" || got.ABI != "sysv" || got.Format != "elf" || got.BuildOnly {
+	for _, triple := range append(append([]string{}, report.Supported...), report.BuildOnly...) {
+		if byTriple[triple].Triple == "" {
+			t.Fatalf("target metadata missing %s in %#v", triple, report.Targets)
+		}
+	}
+	if got := byTriple["linux-x64"]; got.Status != "supported" || got.OS != "linux" || got.Arch != "x64" || got.ABI != "sysv" || got.Format != "elf" || got.BuildOnly || !got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 		t.Fatalf("linux-x64 metadata = %#v", got)
 	}
-	if got := byTriple["windows-x64"]; got.Status != "supported" || got.OS != "windows" || got.ABI != "win64" || got.Format != "pe" || got.ExeExt != ".exe" {
+	if got := byTriple["windows-x64"]; got.Status != "supported" || got.OS != "windows" || got.ABI != "win64" || got.Format != "pe" || got.ExeExt != ".exe" || !got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 		t.Fatalf("windows-x64 metadata = %#v", got)
 	}
-	if got := byTriple["wasm32-wasi"]; got.Status != "build_only" || got.OS != "wasi" || got.Arch != "wasm32" || got.ABI != "wasi" || got.Format != "wasm" || !got.BuildOnly || got.RunSupported {
-		t.Fatalf("wasm32-wasi metadata = %#v", got)
+	for _, triple := range []string{"wasm32-wasi", "wasm32-web"} {
+		got := byTriple[triple]
+		if got.Status != "build_only" || got.Arch != "wasm32" || got.Format != "wasm" || got.ExeExt != ".wasm" || !got.BuildOnly || got.RunSupported || got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
+			t.Fatalf("%s metadata = %#v", triple, got)
+		}
 	}
 }
 
@@ -1845,10 +1856,32 @@ func TestFormatsCommandListsOfficialT4Family(t *testing.T) {
 			seen[format.FileName] = true
 		}
 	}
-	for _, want := range []string{".t4", ".tdx", ".t4s", ".t4i", ".t4p", ".t4r", ".t4q", ".tneed", "Tetra.lock"} {
+	for _, want := range []string{".t4", ".tetra", ".tdx", ".t4s", ".t4i", ".t4p", ".t4r", ".t4q", ".tneed", "Tetra.lock"} {
 		if !seen[want] {
 			t.Fatalf("formats output missing %s: %#v", want, report.Formats)
 		}
+	}
+	byExtension := map[string]struct {
+		Name    string
+		Role    string
+		Primary bool
+		Legacy  bool
+	}{}
+	for _, format := range report.Formats {
+		if format.Extension != "" {
+			byExtension[format.Extension] = struct {
+				Name    string
+				Role    string
+				Primary bool
+				Legacy  bool
+			}{Name: format.Name, Role: format.Role, Primary: format.Primary, Legacy: format.Legacy}
+		}
+	}
+	if got := byExtension[".t4"]; got.Role != "source" || !got.Primary || got.Legacy {
+		t.Fatalf(".t4 format metadata = %#v", got)
+	}
+	if got := byExtension[".tetra"]; got.Role != "source" || got.Primary || !got.Legacy {
+		t.Fatalf(".tetra format metadata = %#v", got)
 	}
 }
 
@@ -1935,6 +1968,10 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 			ExpectedExit int    `json:"expected_exit"`
 			DebugOnly    bool   `json:"debug_only"`
 		} `json:"cases"`
+		ExcludedExamples []struct {
+			SrcPath string `json:"src_path"`
+			Reason  string `json:"reason"`
+		} `json:"excluded_examples"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("smoke list JSON: %v\n%s", err, stdout.String())
@@ -1951,6 +1988,7 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	var sawFlowHello bool
 	var sawUINative bool
 	var sawComplexControl bool
+	var sawHelloT4Exclusion bool
 	for _, c := range report.Cases {
 		if c.Name == "flow_hello" && c.SrcPath == "examples/flow_hello.tetra" && c.TargetGroup == "native" && c.ExpectedExit == 0 {
 			sawFlowHello = true
@@ -1970,6 +2008,14 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	}
 	if !sawComplexControl {
 		t.Fatalf("smoke list missing complex_control_flow_smoke: %#v", report.Cases)
+	}
+	for _, exclusion := range report.ExcludedExamples {
+		if exclusion.SrcPath == "examples/projects/hello_t4/src/main.t4" && strings.Contains(exclusion.Reason, report.Target) {
+			sawHelloT4Exclusion = true
+		}
+	}
+	if !sawHelloT4Exclusion {
+		t.Fatalf("smoke list missing T4 example exclusion for hello_t4: %#v", report.ExcludedExamples)
 	}
 }
 

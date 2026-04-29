@@ -52,6 +52,19 @@ func TestPipelineResolveNativeTargetStage(t *testing.T) {
 		t.Fatalf("capability rejection should fail before wasm build dispatch")
 	}
 
+	for _, triple := range []string{"wasm32-wasi", "wasm32-web"} {
+		_, handled, stats, err = resolveExecutableBuildTarget("missing.tetra", "out.wasm", triple, BuildOptions{Jobs: 1, Emit: EmitObject})
+		if err == nil || !strings.Contains(err.Error(), "supports only --emit=exe") {
+			t.Fatalf("%s object emit error = %v, want build-only emit rejection", triple, err)
+		}
+		if !handled {
+			t.Fatalf("%s should be handled by build-only WASM pipeline before native emit/object dispatch", triple)
+		}
+		if stats != nil {
+			t.Fatalf("%s failed dispatch returned stats %#v", triple, stats)
+		}
+	}
+
 	_, _, _, err = resolveExecutableBuildTarget("missing.tetra", "out", "unknown-target", BuildOptions{Jobs: 1})
 	if err == nil || !strings.Contains(err.Error(), "unsupported target: unknown-target") {
 		t.Fatalf("unknown target error = %v", err)

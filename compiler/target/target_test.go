@@ -140,3 +140,27 @@ func TestTargetCapabilitiesForDebugInfoAndReleaseOptimize(t *testing.T) {
 		t.Fatalf("wasm32-web SupportsReleaseOptimize = false")
 	}
 }
+
+func TestCurrentTargetContractHasNoPlannedOrRunnableWASMTargets(t *testing.T) {
+	all := All()
+	if len(all) != len(SupportedTriples()) {
+		t.Fatalf("All() = %#v, want only supported native triples %#v", all, SupportedTriples())
+	}
+	for _, tgt := range all {
+		if tgt.Status != StatusSupported || IsBuildOnlyTarget(tgt.Triple) || IsPlannedTarget(tgt.Triple) {
+			t.Fatalf("All() included non-supported runnable target: %#v", tgt)
+		}
+	}
+	for _, triple := range WASMTriples() {
+		tgt, err := Parse(triple)
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", triple, err)
+		}
+		if tgt.Status != StatusBuildOnly || !IsBuildOnlyTarget(triple) || IsPlannedTarget(triple) {
+			t.Fatalf("WASM target %s contract drifted: %#v", triple, tgt)
+		}
+		if tgt.Arch != ArchWASM32 || tgt.Format != FormatWASM || tgt.ExeExt != ".wasm" || tgt.SupportsDebugInfo {
+			t.Fatalf("WASM target %s metadata drifted: %#v", triple, tgt)
+		}
+	}
+}

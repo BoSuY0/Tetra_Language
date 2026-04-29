@@ -162,6 +162,42 @@ func buildHostRuntimeObject(triple string, actorEntries []string) (*Object, erro
 	}
 }
 
+func TestRuntimeObjectOverrideRejectsWithoutRuntimeUsage(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("amd64 only")
+	}
+
+	tmp := t.TempDir()
+	rtPath := filepath.Join(tmp, "runtime_unused.tobj")
+	if err := WriteObject(rtPath, &Object{
+		Target:  tgt.Triple,
+		Module:  "__runtime_unused",
+		Code:    []byte{0xC3},
+		Symbols: []Symbol{{Name: "__tetra_entry", Offset: 0}},
+	}); err != nil {
+		t.Fatalf("write runtime object: %v", err)
+	}
+
+	srcPath := filepath.Join(tmp, "plain_main.t4")
+	if err := os.WriteFile(srcPath, []byte(`func main() -> Int:
+    return 0
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	outPath := filepath.Join(tmp, "plain_main"+tgt.ExeExt)
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, BuildOptions{RuntimeObjectPath: rtPath})
+	if err == nil {
+		t.Fatalf("expected runtime object override without runtime usage to fail")
+	}
+	if !strings.Contains(err.Error(), "runtime object override requires runtime usage") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRuntimeObjectOverrideRejectsMissingRequiredSymbols(t *testing.T) {
 	tgt, ok := target.Host()
 	if !ok {

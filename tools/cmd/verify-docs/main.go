@@ -1033,6 +1033,7 @@ func verifyEpic14ExampleIndex(path string) error {
 		"examples/memset_smoke.tetra",
 		"examples/ui_web_smoke.tetra",
 		"examples/ui_native_shell_smoke.tetra",
+		"examples/projects/hello_t4/src/main.t4",
 		"examples/projects/dogfood_wasi/src/main.tetra",
 		"examples/projects/dogfood_web_ui/src/main.tetra",
 		"examples/projects/dogfood_cli/src/main.tetra",

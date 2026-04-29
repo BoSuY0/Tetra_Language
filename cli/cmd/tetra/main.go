@@ -3536,7 +3536,7 @@ func smokeExampleExclusions(repoRoot string, cases []smokeCase, tgt ctarget.Targ
 	examplesRoot := filepath.Join(repoRoot, "examples")
 	var out []smokeExcludedExample
 	_ = filepath.WalkDir(examplesRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".tetra") {
+		if err != nil || d.IsDir() || !compiler.IsSourceFile(path) {
 			return nil
 		}
 		rel, err := filepath.Rel(examplesRoot, path)

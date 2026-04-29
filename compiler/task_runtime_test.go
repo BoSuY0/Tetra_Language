@@ -14,6 +14,99 @@ import (
 	"tetra_language/compiler/internal/ir"
 )
 
+func TestSelectRuntimeModeStabilizationMatrix(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		requested RuntimeMode
+		usage     runtimeUsageProfile
+		want      RuntimeMode
+		wantErr   string
+	}{
+		{
+			name:      "auto_actor_only_uses_selfhost",
+			requested: RuntimeAuto,
+			want:      RuntimeSelfHost,
+		},
+		{
+			name:      "auto_actor_state_uses_builtin",
+			requested: RuntimeAuto,
+			usage:     runtimeUsageProfile{actorStateUsed: true},
+			want:      RuntimeBuiltin,
+		},
+		{
+			name:      "auto_task_uses_builtin",
+			requested: RuntimeAuto,
+			usage:     runtimeUsageProfile{tasksUsed: true},
+			want:      RuntimeBuiltin,
+		},
+		{
+			name:      "auto_task_group_uses_builtin",
+			requested: RuntimeAuto,
+			usage:     runtimeUsageProfile{taskGroupsUsed: true},
+			want:      RuntimeBuiltin,
+		},
+		{
+			name:      "auto_typed_task_uses_builtin",
+			requested: RuntimeAuto,
+			usage:     runtimeUsageProfile{typedTasksUsed: true, typedTaskMaxSlots: 4},
+			want:      RuntimeBuiltin,
+		},
+		{
+			name:      "auto_staged_typed_task_slots_use_builtin",
+			requested: RuntimeAuto,
+			usage:     runtimeUsageProfile{typedTasksUsed: true, typedTaskMaxSlots: 8},
+			want:      RuntimeBuiltin,
+		},
+		{
+			name:      "auto_time_uses_builtin",
+			requested: RuntimeAuto,
+			usage:     runtimeUsageProfile{timeRuntimeUsed: true},
+			want:      RuntimeBuiltin,
+		},
+		{
+			name:      "explicit_selfhost_actor_only_allowed",
+			requested: RuntimeSelfHost,
+			want:      RuntimeSelfHost,
+		},
+		{
+			name:      "explicit_selfhost_rejects_typed_tasks",
+			requested: RuntimeSelfHost,
+			usage:     runtimeUsageProfile{typedTasksUsed: true, typedTaskMaxSlots: 4},
+			wantErr:   "self-host runtime does not support typed task handles",
+		},
+		{
+			name:      "explicit_builtin_allowed",
+			requested: RuntimeBuiltin,
+			usage:     runtimeUsageProfile{typedTasksUsed: true, typedTaskMaxSlots: 8, timeRuntimeUsed: true},
+			want:      RuntimeBuiltin,
+		},
+		{
+			name:      "invalid_runtime_rejected",
+			requested: RuntimeMode(99),
+			wantErr:   "unsupported runtime mode: 99",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := selectRuntimeMode(tc.requested, tc.usage)
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("error = %v, want contains %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("selectRuntimeMode returned error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("selectRuntimeMode = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestTaskSpawnI32CollectsRuntimeEntry(t *testing.T) {
 	src := []byte(`
 func worker() -> Int:
@@ -76,6 +169,52 @@ func TestRequiredTypedTaskRuntimeSymbolsSupportStagedSlotsUpToEight(t *testing.T
 	if _, ok := got["__tetra_task_result_get"]; !ok {
 		t.Fatalf("missing required staged typed task runtime symbol %q", "__tetra_task_result_get")
 	}
+}
+
+func TestRequiredTypedTaskRuntimeSymbolsClampToSupportedABIEnvelope(t *testing.T) {
+	low := requiredTypedTaskRuntimeSymbols(0)
+	if got, want := strings.Join(low, ","), strings.Join(requiredTypedTaskRuntimeSymbols(2), ","); got != want {
+		t.Fatalf("low slot clamp = %q, want %q", got, want)
+	}
+	for _, forbidden := range []string{"__tetra_task_join_typed_0", "__tetra_task_join_typed_1", "__tetra_task_result_get"} {
+		if containsString(low, forbidden) {
+			t.Fatalf("low slot ABI unexpectedly contains %q: %#v", forbidden, low)
+		}
+	}
+
+	high := requiredTypedTaskRuntimeSymbols(99)
+	if got, want := strings.Join(high, ","), strings.Join(requiredTypedTaskRuntimeSymbols(8), ","); got != want {
+		t.Fatalf("high slot clamp = %q, want %q", got, want)
+	}
+	for _, required := range []string{"__tetra_task_join_typed_8", "__tetra_task_result_get"} {
+		if !containsString(high, required) {
+			t.Fatalf("high slot ABI missing %q: %#v", required, high)
+		}
+	}
+	if containsString(high, "__tetra_task_join_typed_9") {
+		t.Fatalf("high slot ABI exceeded supported envelope: %#v", high)
+	}
+}
+
+func TestValidateTypedTaskRuntimeObjectRejectsMissingStagedSymbols(t *testing.T) {
+	obj := &Object{}
+	for _, name := range requiredTypedTaskRuntimeSymbols(4) {
+		obj.Symbols = append(obj.Symbols, Symbol{Name: name})
+	}
+	if err := validateTypedTaskRuntimeObject(obj, 8); err == nil {
+		t.Fatalf("expected missing staged typed task runtime symbol failure")
+	} else if !strings.Contains(err.Error(), "__tetra_task_result_get") {
+		t.Fatalf("unexpected typed task runtime validation error: %v", err)
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestTaskSpawnI32LowersToRuntimeSpawn(t *testing.T) {

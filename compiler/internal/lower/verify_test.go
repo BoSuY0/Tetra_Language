@@ -305,6 +305,32 @@ func TestVerifyFuncRejectsUnreachableUnknownInstructionKind(t *testing.T) {
 	}
 }
 
+func TestVerifyFuncRejectsDuplicateBranchLabelsWithStableDiagnostic(t *testing.T) {
+	pos := frontend.Position{File: "duplicate_label.t4", Line: 4, Col: 9}
+	fn := ir.IRFunc{
+		Name: "bad_duplicate_label",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRLabel, Label: 1, Pos: pos},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected duplicate label verifier error")
+	}
+	if !strings.Contains(err.Error(), "duplicate label 1") {
+		t.Fatalf("error = %v", err)
+	}
+	diag, ok := frontend.DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected diagnostic error, got %T", err)
+	}
+	if diag.Code != DiagnosticCodeIRVerifier || diag.File != "duplicate_label.t4" || diag.Line != 4 || diag.Column != 9 || diag.Hint == "" {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
 func TestVerifyProgramAcceptsRepresentativeLoweringFamilies(t *testing.T) {
 	tests := []struct {
 		name string

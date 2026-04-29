@@ -340,7 +340,7 @@ func TestValidateSmokeListRejectsUnassignedExampleWhenRootProvided(t *testing.T)
 		}
 	}
 	writeExample("covered.tetra")
-	writeExample("missing.tetra")
+	writeExample("missing.t4")
 
 	raw := []byte(`{
   "target": "wasm32-web",
@@ -358,15 +358,15 @@ func TestValidateSmokeListRejectsUnassignedExampleWhenRootProvided(t *testing.T)
 
 	if err := validateSmokeListWithExamplesRoot(raw, root); err == nil {
 		t.Fatalf("expected uncovered example failure")
-	} else if !strings.Contains(err.Error(), "examples/missing.tetra") {
+	} else if !strings.Contains(err.Error(), "examples/missing.t4") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestValidateSmokeListAcceptsDocumentedExampleExclusion(t *testing.T) {
 	root := t.TempDir()
-	full := filepath.Join(root, "excluded.tetra")
-	if err := os.WriteFile(full, []byte("fun main(): i32 { return 0 }\n"), 0o644); err != nil {
+	full := filepath.Join(root, "excluded.t4")
+	if err := os.WriteFile(full, []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -383,7 +383,7 @@ func TestValidateSmokeListAcceptsDocumentedExampleExclusion(t *testing.T) {
     {"name":"dogfood_web_ui","src_path":"examples/projects/dogfood_web_ui/src/main.tetra","target_group":"wasm","expected_exit":0}
   ],
   "excluded_examples": [
-    {"src_path":"examples/excluded.tetra","reason":"not part of wasm32-web smoke profile"}
+    {"src_path":"examples/excluded.t4","reason":"not part of wasm32-web smoke profile"}
   ]
 }`)
 

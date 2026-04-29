@@ -57,6 +57,10 @@ func main() {
 	}
 }
 
+func isSmokeSourceFile(path string) bool {
+	return strings.HasSuffix(path, ".t4") || strings.HasSuffix(path, ".tetra")
+}
+
 func validateSmokeList(raw []byte) error {
 	return validateSmokeListWithExamplesRoot(raw, "")
 }
@@ -92,8 +96,8 @@ func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
 		if c.SrcPath == "" {
 			return fmt.Errorf("smoke case %s missing src_path", c.Name)
 		}
-		if !strings.HasSuffix(c.SrcPath, ".tetra") {
-			return fmt.Errorf("smoke case %s src_path must be a .tetra file", c.Name)
+		if !isSmokeSourceFile(c.SrcPath) {
+			return fmt.Errorf("smoke case %s src_path must be a .t4 or .tetra file", c.Name)
 		}
 		if seenSources[c.SrcPath] {
 			return fmt.Errorf("duplicate smoke src_path %s", c.SrcPath)
@@ -126,8 +130,8 @@ func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
 		if exclusion.Reason == "" {
 			return fmt.Errorf("smoke exclusion %s missing reason", exclusion.SrcPath)
 		}
-		if !strings.HasSuffix(exclusion.SrcPath, ".tetra") {
-			return fmt.Errorf("smoke exclusion %s src_path must be a .tetra file", exclusion.SrcPath)
+		if !isSmokeSourceFile(exclusion.SrcPath) {
+			return fmt.Errorf("smoke exclusion %s src_path must be a .t4 or .tetra file", exclusion.SrcPath)
 		}
 		if seenSources[exclusion.SrcPath] {
 			return fmt.Errorf("smoke exclusion %s is also an active smoke case", exclusion.SrcPath)
@@ -165,7 +169,7 @@ func discoverExamples(examplesRoot string) ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if !strings.HasSuffix(d.Name(), ".tetra") {
+		if !isSmokeSourceFile(d.Name()) {
 			return nil
 		}
 		rel, err := filepath.Rel(examplesRoot, path)

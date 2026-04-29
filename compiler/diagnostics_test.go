@@ -98,6 +98,70 @@ func main() -> Int:
 	}
 }
 
+func TestDiagnosticFromPositionedSemanticErrorStripsTextPrefix(t *testing.T) {
+	err := checkProgram(`
+func main() -> Int:
+    let x: Int = true
+    return x
+`)
+	if err == nil {
+		t.Fatalf("expected semantic diagnostic")
+	}
+
+	diag := DiagnosticFromError(err)
+	if diag.Code != DiagnosticCodeSemantic || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v", diag)
+	}
+	if diag.File != "" || diag.Line != 3 || diag.Column != 5 {
+		t.Fatalf("position = %q:%d:%d, want :3:5", diag.File, diag.Line, diag.Column)
+	}
+	if strings.Contains(diag.Message, ":3:5:") {
+		t.Fatalf("semantic diagnostic message retained text prefix: %q", diag.Message)
+	}
+	if !strings.Contains(diag.Message, "type mismatch: expected 'i32', got 'bool'") {
+		t.Fatalf("message = %q", diag.Message)
+	}
+	raw, err := json.Marshal(diag)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	for _, want := range []string{`"code":"TETRA2001"`, `"line":3`, `"column":5`, `"severity":"error"`} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("json = %s, missing %s", raw, want)
+		}
+	}
+}
+
+func TestDiagnosticFromPositionedSemanticErrorWithFile(t *testing.T) {
+	tmp := t.TempDir()
+	mainPath := filepath.Join(tmp, "main.t4")
+	writeTestFiles(t, tmp, map[string]string{
+		"main.t4": "func main() -> Int:\n    let x: Int = true\n    return x\n",
+	})
+	world, err := LoadWorld(mainPath)
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	_, err = CheckWorld(world)
+	if err == nil {
+		t.Fatalf("expected semantic diagnostic")
+	}
+
+	diag := DiagnosticFromError(err)
+	if diag.Code != DiagnosticCodeSemantic || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v", diag)
+	}
+	if !strings.HasSuffix(diag.File, "main.t4") || diag.Line != 2 || diag.Column != 5 {
+		t.Fatalf("position = %q:%d:%d, want main.t4:2:5", diag.File, diag.Line, diag.Column)
+	}
+	if strings.Contains(diag.Message, "main.t4:2:5:") {
+		t.Fatalf("semantic diagnostic message retained text prefix: %q", diag.Message)
+	}
+	if !strings.Contains(diag.Message, "type mismatch: expected 'i32', got 'bool'") {
+		t.Fatalf("message = %q", diag.Message)
+	}
+}
+
 func TestDiagnosticFromInvalidUTF8ParserError(t *testing.T) {
 	_, err := ParseFile([]byte{'f', 'n', ' ', 0xff, '\n'}, "bad/utf8.tetra")
 	if err == nil {

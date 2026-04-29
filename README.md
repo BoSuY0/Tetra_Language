@@ -420,7 +420,7 @@ that surface for daily local use.
 - v0.5 protocols MVP: `protocol Name:` declarations plus `impl Type: Protocol` conformance checks against extension/static methods, including minimal generic protocol requirements (`func req<T>(...) -> ...`) with signature-shape checks only (no new runtime dispatch model)
 - v0.5 extensions MVP: `extension Type:` methods lower to namespaced static functions such as `Type.method(value)`
 - v0.5 generics MVP: simple same-module generic functions such as `func id<T>(x: T) -> T` are monomorphized at call sites
-- Typed task handles are currently bounded to explicit 2..4 slot runtime wrappers; larger typed task error payload layouts are rejected during checking
+- Typed task handles are currently bounded to explicit 2..8 slot runtime wrappers; layouts above `8` are rejected during checking
 - v0.6 tooling hardening: formatter coverage for examples/libs, LSP stdio MVP, and Eco project bundle mode
 - Expressions: integer literals, `true`/`false`, string literals, identifiers, enum cases (`Color.red`), calls `foo(1, 2)`, field/index access, `+`, `-`, `*`, `/`, `%`, comparisons, `&&`, `||`, unary `-`, unary `!`, and parentheses
 - Semicolons are optional after statements

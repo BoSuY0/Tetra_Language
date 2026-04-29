@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
 )
 
@@ -61,21 +62,71 @@ uses runtime:
 }
 
 func TestPublicCodegenRejectsInvalidIRBeforeBackend(t *testing.T) {
-	_, err := CodegenObjectLinuxX64([]IRFunc{
-		{
-			Name:        "main",
-			ReturnSlots: 1,
-			Instrs: []ir.IRInstr{
-				{Kind: ir.IRReturn},
-			},
+	backends := []struct {
+		name    string
+		codegen func([]IRFunc) (*Object, error)
+	}{
+		{name: "linux-x64", codegen: CodegenObjectLinuxX64},
+		{name: "windows-x64", codegen: CodegenObjectWindowsX64},
+		{name: "macos-x64", codegen: CodegenObjectMacOSX64},
+	}
+	for _, backend := range backends {
+		t.Run(backend.name, func(t *testing.T) {
+			_, err := backend.codegen([]IRFunc{
+				{
+					Name:        "main",
+					ReturnSlots: 1,
+					Instrs: []ir.IRInstr{
+						{Kind: ir.IRReturn},
+					},
+				},
+			})
+			if err == nil {
+				t.Fatalf("expected verifier error")
+			}
+			diag := DiagnosticFromError(err)
+			if diag.Code != DiagnosticCodeIRVerifier {
+				t.Fatalf("diagnostic = %#v", diag)
+			}
+			if diag.Severity != "error" || diag.Hint == "" || diag.Message == "" {
+				t.Fatalf("incomplete verifier diagnostic = %#v", diag)
+			}
+		})
+	}
+}
+
+func TestPublicIRVerifierRejectsProgramAndFunctionDriftWithStableDiagnostic(t *testing.T) {
+	programErr := VerifyIRProgram(&IRProgram{
+		MainIndex: 0,
+		MainName:  "main",
+		Funcs: []IRFunc{
+			{Name: "not_main", Instrs: []ir.IRInstr{{Kind: ir.IRReturn}}},
 		},
 	})
-	if err == nil {
-		t.Fatalf("expected verifier error")
+	if programErr == nil {
+		t.Fatalf("expected program verifier error")
 	}
-	diag := DiagnosticFromError(err)
-	if diag.Code != DiagnosticCodeIRVerifier {
-		t.Fatalf("diagnostic = %#v", diag)
+	programDiag := DiagnosticFromError(programErr)
+	if programDiag.Code != DiagnosticCodeIRVerifier || programDiag.Severity != "error" || programDiag.Hint == "" {
+		t.Fatalf("program diagnostic = %#v", programDiag)
+	}
+
+	pos := frontend.Position{File: "api_bad_ir.t4", Line: 12, Col: 7}
+	funcErr := VerifyIRFunc(IRFunc{
+		Name: "bad_branch",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRJmpIfZero, Label: 1, Pos: pos},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRReturn},
+		},
+	})
+	if funcErr == nil {
+		t.Fatalf("expected function verifier error")
+	}
+	funcDiag := DiagnosticFromError(funcErr)
+	if funcDiag.Code != DiagnosticCodeIRVerifier || funcDiag.File != "api_bad_ir.t4" || funcDiag.Line != 12 || funcDiag.Column != 7 {
+		t.Fatalf("function diagnostic = %#v", funcDiag)
 	}
 }
 
