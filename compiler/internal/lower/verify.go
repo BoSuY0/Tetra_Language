@@ -60,6 +60,9 @@ func VerifyFunc(fn ir.IRFunc) error {
 		labels[instr.Label] = i
 	}
 	for i, instr := range fn.Instrs {
+		if _, _, known := stackEffect(instr); !known {
+			return verifyError(fn, i, "unknown instruction kind %d", instr.Kind)
+		}
 		switch instr.Kind {
 		case ir.IRJmp, ir.IRJmpIfZero:
 			if _, ok := labels[instr.Label]; !ok {

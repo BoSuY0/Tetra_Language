@@ -270,6 +270,41 @@ func TestVerifyFuncRejectsUnknownInstructionKind(t *testing.T) {
 	}
 }
 
+func TestVerifyFuncRejectsNegativeCallABISlots(t *testing.T) {
+	fn := ir.IRFunc{
+		Name: "bad_call_abi",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRCall, Name: "callee", ArgSlots: -1, RetSlots: 0},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), `call "callee" has negative ABI slots`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyFuncRejectsUnreachableUnknownInstructionKind(t *testing.T) {
+	fn := ir.IRFunc{
+		Name: "bad_unreachable_kind",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRJmp, Label: 1},
+			{Kind: ir.IRInstrKind(999)},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), "instr 1: unknown instruction kind 999") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestVerifyProgramAcceptsRepresentativeLoweringFamilies(t *testing.T) {
 	tests := []struct {
 		name string
