@@ -79,6 +79,33 @@ type linkedObject struct {
 	contentHash [32]byte
 }
 
+type nativeCodegenFunc func([]IRFunc, [][]byte) (*Object, error)
+
+type nativeBuildTarget struct {
+	target  ctarget.Target
+	triple  string
+	codegen nativeCodegenFunc
+}
+
+type checkedBuildWorld struct {
+	world   *World
+	checked *semantics.CheckedProgram
+}
+
+type moduleBuildJob struct {
+	module  string
+	srcHash [32]byte
+	depHash [32]byte
+}
+
+type moduleBuildPlan struct {
+	modules         []string
+	publicAPIHashes map[string]string
+	buildTag        string
+	objectsByModule map[string]*Object
+	toCompile       []moduleBuildJob
+}
+
 func BuildFileWithStats(inputPath, outputPath, target string) (*BuildStats, error) {
 	return BuildFileWithStatsOpt(inputPath, outputPath, target, BuildOptions{Jobs: 1})
 }
@@ -87,85 +114,137 @@ func BuildFileWithStats(inputPath, outputPath, target string) (*BuildStats, erro
 // module loader graph rooted at that entry path.
 // Boundary: for in-memory single-source semantic checks use Parse + Check.
 func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOptions) (*BuildStats, error) {
-	tgt, err := ctarget.Parse(target)
+	native, handled, stats, err := resolveExecutableBuildTarget(inputPath, outputPath, target, opt)
+	if handled || err != nil {
+		return stats, err
+	}
+
+	build, err := loadCheckedBuildWorld(inputPath, opt, !opt.InterfaceOnly)
 	if err != nil {
 		return nil, err
 	}
-	if opt.DebugInfo && !tgt.SupportsDebugInfo {
-		return nil, fmt.Errorf("target does not support debug info: %s", tgt.Triple)
+	if opt.InterfaceOnly {
+		return interfaceOnlyBuildStats(build.world), nil
 	}
-	if opt.ReleaseOptimize && !tgt.SupportsReleaseOptimize {
-		return nil, fmt.Errorf("target does not support release optimization: %s", tgt.Triple)
-	}
-	target = tgt.Triple
-	if target == "wasm32-wasi" {
-		return buildWASM32WASIWithStatsOpt(inputPath, outputPath, tgt, opt)
-	}
-	if target == "wasm32-web" {
-		return buildWASM32WEBWithStatsOpt(inputPath, outputPath, tgt, opt)
-	}
-	if ctarget.IsBuildOnlyTarget(target) {
-		return nil, fmt.Errorf("target backend not implemented: %s (codegen/link/run blocked)", target)
+	linkedObjects, err := prepareLinkedObjects(build.world, opt.LinkObjectPaths, native.triple)
+	if err != nil {
+		return nil, err
 	}
 
+	plan, stats, err := planNativeModuleBuild(build.world, build.checked, native.triple, opt, linkedObjects)
+	if err != nil {
+		return nil, err
+	}
+	if err := compileNativeModulePlan(build.world, build.checked, native, opt, plan, stats); err != nil {
+		return nil, err
+	}
+
+	objects, err := objectsFromModulePlan(plan)
+	if err != nil {
+		return nil, err
+	}
+	if err := linkNativeExecutable(outputPath, native, opt, build.checked, objects, linkedObjects); err != nil {
+		return nil, err
+	}
+	if err := emitUIArtifacts(outputPath, native.triple, build.checked); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
+
+func resolveExecutableBuildTarget(inputPath, outputPath, target string, opt BuildOptions) (nativeBuildTarget, bool, *BuildStats, error) {
+	tgt, err := ctarget.Parse(target)
+	if err != nil {
+		return nativeBuildTarget{}, false, nil, err
+	}
+	if opt.DebugInfo && !tgt.SupportsDebugInfo {
+		return nativeBuildTarget{}, false, nil, fmt.Errorf("target does not support debug info: %s", tgt.Triple)
+	}
+	if opt.ReleaseOptimize && !tgt.SupportsReleaseOptimize {
+		return nativeBuildTarget{}, false, nil, fmt.Errorf("target does not support release optimization: %s", tgt.Triple)
+	}
+	if tgt.Triple == "wasm32-wasi" {
+		stats, err := buildWASM32WASIWithStatsOpt(inputPath, outputPath, tgt, opt)
+		return nativeBuildTarget{}, true, stats, err
+	}
+	if tgt.Triple == "wasm32-web" {
+		stats, err := buildWASM32WEBWithStatsOpt(inputPath, outputPath, tgt, opt)
+		return nativeBuildTarget{}, true, stats, err
+	}
+	if ctarget.IsBuildOnlyTarget(tgt.Triple) {
+		return nativeBuildTarget{}, false, nil, fmt.Errorf("target backend not implemented: %s (codegen/link/run blocked)", tgt.Triple)
+	}
 	switch opt.Emit {
 	case EmitExe:
 		// continue
 	case EmitObject, EmitLibrary:
-		return buildObjectFileWithStatsOpt(inputPath, outputPath, tgt, opt)
+		stats, err := buildObjectFileWithStatsOpt(inputPath, outputPath, tgt, opt)
+		return nativeBuildTarget{}, true, stats, err
 	default:
-		return nil, fmt.Errorf("unsupported emit mode: %d", opt.Emit)
+		return nativeBuildTarget{}, false, nil, fmt.Errorf("unsupported emit mode: %d", opt.Emit)
 	}
+	codegen, err := nativeCodegenForTarget(tgt, opt)
+	if err != nil {
+		return nativeBuildTarget{}, false, nil, err
+	}
+	return nativeBuildTarget{target: tgt, triple: tgt.Triple, codegen: codegen}, false, nil, nil
+}
 
+func nativeCodegenForTarget(tgt ctarget.Target, opt BuildOptions) (nativeCodegenFunc, error) {
 	codegenOptions := x64.CodegenOptions{
 		IslandsDebug:    opt.IslandsDebug,
 		DebugInfo:       opt.DebugInfo,
 		ReleaseOptimize: opt.ReleaseOptimize,
 	}
-	var codegen func([]IRFunc, [][]byte) (*Object, error)
 	switch tgt.OS {
 	case ctarget.OSLinux:
-		codegen = func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+		return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
 			return linux_x64.CodegenObjectLinuxX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
-		}
+		}, nil
 	case ctarget.OSWindows:
-		codegen = func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+		return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
 			return windows_x64.CodegenObjectWindowsX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
-		}
+		}, nil
 	case ctarget.OSMacOS:
-		codegen = func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+		return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
 			return macos_x64.CodegenObjectMacOSX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
-		}
+		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported target: %s", target)
+		return nil, fmt.Errorf("unsupported target: %s", tgt.Triple)
 	}
+}
 
+func loadCheckedBuildWorld(inputPath string, opt BuildOptions, requireMain bool) (checkedBuildWorld, error) {
 	world, err := loadWorldForBuild(inputPath, opt)
 	if err != nil {
-		return nil, err
+		return checkedBuildWorld{}, err
 	}
-
-	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: !opt.InterfaceOnly})
+	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: requireMain})
 	if err != nil {
-		return nil, err
+		return checkedBuildWorld{}, err
 	}
-	if opt.InterfaceOnly {
-		return interfaceOnlyBuildStats(world), nil
-	}
-	linkedObjects, err := readLinkObjects(opt.LinkObjectPaths, target)
+	return checkedBuildWorld{world: world, checked: checked}, nil
+}
+
+func prepareLinkedObjects(world *World, paths []string, target string) ([]linkedObject, error) {
+	linkedObjects, err := readLinkObjects(paths, target)
 	if err != nil {
 		return nil, err
 	}
 	if err := validateInterfaceImplementationProviders(world, linkedObjects); err != nil {
 		return nil, err
 	}
+	return linkedObjects, nil
+}
 
+func planNativeModuleBuild(world *World, checked *semantics.CheckedProgram, target string, opt BuildOptions, linkedObjects []linkedObject) (moduleBuildPlan, *BuildStats, error) {
 	sigMap := cache.BuildSigMap(checked)
 	depsByModule := deps.CollectExternalCalleesByModule(checked)
 	typeDepsByModule := deps.CollectExternalTypesByModule(checked)
 	typeSigMap, err := cache.BuildTypeSigMap(checked.Types)
 	if err != nil {
-		return nil, err
+		return moduleBuildPlan{}, nil, err
 	}
 	stats := &BuildStats{InterfaceModules: sortedInterfaceModules(world)}
 
@@ -181,29 +260,23 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	for _, module := range modules {
 		file := world.ByModule[module]
 		if file == nil {
-			return nil, fmt.Errorf("missing module '%s'", module)
+			return moduleBuildPlan{}, nil, fmt.Errorf("missing module '%s'", module)
 		}
 		hash, err := InterfaceFingerprintFromSource(file.Src, file.Path)
 		if err != nil {
-			return nil, err
+			return moduleBuildPlan{}, nil, err
 		}
 		publicAPIHashes[module] = hash
 	}
 
-	type moduleJob struct {
-		module  string
-		srcHash [32]byte
-		depHash [32]byte
-	}
-
 	buildTag := buildTagFromOptions(opt, linkedObjects)
 	objectsByModule := make(map[string]*Object, len(modules))
-	var toCompile []moduleJob
+	var toCompile []moduleBuildJob
 
 	for _, module := range modules {
 		file := world.ByModule[module]
 		if file == nil {
-			return nil, fmt.Errorf("missing module '%s'", module)
+			return moduleBuildPlan{}, nil, fmt.Errorf("missing module '%s'", module)
 		}
 		srcHash := sha256.Sum256(file.Src)
 		depSet := depsByModule[module]
@@ -218,123 +291,147 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		}
 		depHash, err := cache.DepSigHashFromDepsWithInterfaceHashes(callees, typeDeps, sigMap, typeSigMap, world.InterfaceHashes)
 		if err != nil {
-			return nil, err
+			return moduleBuildPlan{}, nil, err
 		}
 		obj, hit, err := cache.LoadCachedObject(world.Root, target, buildTag, module, srcHash, depHash)
 		if err != nil {
-			return nil, err
+			return moduleBuildPlan{}, nil, err
 		}
 		if hit {
 			stats.CacheHits = append(stats.CacheHits, module)
 			objectsByModule[module] = obj
 			continue
 		}
-		toCompile = append(toCompile, moduleJob{module: module, srcHash: srcHash, depHash: depHash})
+		toCompile = append(toCompile, moduleBuildJob{module: module, srcHash: srcHash, depHash: depHash})
 	}
 
-	if len(toCompile) > 0 {
-		jobs := opt.Jobs
-		if jobs <= 0 {
-			jobs = runtime.NumCPU()
-		}
-		if jobs < 1 {
-			jobs = 1
-		}
-		if jobs > len(toCompile) {
-			jobs = len(toCompile)
-		}
+	return moduleBuildPlan{
+		modules:         modules,
+		publicAPIHashes: publicAPIHashes,
+		buildTag:        buildTag,
+		objectsByModule: objectsByModule,
+		toCompile:       toCompile,
+	}, stats, nil
+}
 
-		jobsCh := make(chan moduleJob)
-		var wg sync.WaitGroup
-		var mu sync.Mutex
-		var errMu sync.Mutex
-		var firstErr error
+func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, native nativeBuildTarget, opt BuildOptions, plan moduleBuildPlan, stats *BuildStats) error {
+	if len(plan.toCompile) == 0 {
+		sortBuildStats(stats)
+		return nil
+	}
+	jobs := opt.Jobs
+	if jobs <= 0 {
+		jobs = runtime.NumCPU()
+	}
+	if jobs < 1 {
+		jobs = 1
+	}
+	if jobs > len(plan.toCompile) {
+		jobs = len(plan.toCompile)
+	}
 
-		setErr := func(err error) {
-			if err == nil {
-				return
+	jobsCh := make(chan moduleBuildJob)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var errMu sync.Mutex
+	var firstErr error
+
+	setErr := func(err error) {
+		if err == nil {
+			return
+		}
+		errMu.Lock()
+		if firstErr == nil {
+			firstErr = err
+		}
+		errMu.Unlock()
+	}
+
+	getErr := func() error {
+		errMu.Lock()
+		defer errMu.Unlock()
+		return firstErr
+	}
+
+	worker := func() {
+		defer wg.Done()
+		for job := range jobsCh {
+			if getErr() != nil {
+				continue
 			}
-			errMu.Lock()
-			if firstErr == nil {
-				firstErr = err
+			funcs, err := LowerModule(checked, job.module)
+			if err != nil {
+				setErr(err)
+				continue
 			}
-			errMu.Unlock()
-		}
+			mu.Lock()
+			stats.LoweredModules = append(stats.LoweredModules, job.module)
+			mu.Unlock()
 
-		getErr := func() error {
-			errMu.Lock()
-			defer errMu.Unlock()
-			return firstErr
-		}
-
-		worker := func() {
-			defer wg.Done()
-			for job := range jobsCh {
-				if getErr() != nil {
-					continue
-				}
-				funcs, err := LowerModule(checked, job.module)
-				if err != nil {
-					setErr(err)
-					continue
-				}
-				mu.Lock()
-				stats.LoweredModules = append(stats.LoweredModules, job.module)
-				mu.Unlock()
-
-				dataPrefix := checked.GlobalDataByModule[job.module]
-				obj, err := codegen(funcs, dataPrefix)
-				if err != nil {
-					setErr(err)
-					continue
-				}
-				obj.Target = target
-				obj.Module = job.module
-				obj.CompilerVersion = version.CompilerVersion
-				obj.PublicAPIHash = publicAPIHashes[job.module]
-				obj.SrcHash = job.srcHash
-				obj.WorldSigHash = job.depHash
-				if err := cache.StoreCachedObject(world.Root, target, buildTag, obj); err != nil {
-					setErr(err)
-					continue
-				}
-				mu.Lock()
-				stats.CompiledModules = append(stats.CompiledModules, job.module)
-				objectsByModule[job.module] = obj
-				mu.Unlock()
+			dataPrefix := checked.GlobalDataByModule[job.module]
+			obj, err := native.codegen(funcs, dataPrefix)
+			if err != nil {
+				setErr(err)
+				continue
 			}
-		}
-
-		wg.Add(jobs)
-		for i := 0; i < jobs; i++ {
-			go worker()
-		}
-		for _, job := range toCompile {
-			jobsCh <- job
-		}
-		close(jobsCh)
-		wg.Wait()
-		if err := getErr(); err != nil {
-			return nil, err
+			obj.Target = native.triple
+			obj.Module = job.module
+			obj.CompilerVersion = version.CompilerVersion
+			obj.PublicAPIHash = plan.publicAPIHashes[job.module]
+			obj.SrcHash = job.srcHash
+			obj.WorldSigHash = job.depHash
+			if err := cache.StoreCachedObject(world.Root, native.triple, plan.buildTag, obj); err != nil {
+				setErr(err)
+				continue
+			}
+			mu.Lock()
+			stats.CompiledModules = append(stats.CompiledModules, job.module)
+			plan.objectsByModule[job.module] = obj
+			mu.Unlock()
 		}
 	}
 
+	wg.Add(jobs)
+	for i := 0; i < jobs; i++ {
+		go worker()
+	}
+	for _, job := range plan.toCompile {
+		jobsCh <- job
+	}
+	close(jobsCh)
+	wg.Wait()
+	if err := getErr(); err != nil {
+		return err
+	}
+	sortBuildStats(stats)
+	return nil
+}
+
+func sortBuildStats(stats *BuildStats) {
+	if stats == nil {
+		return
+	}
 	sort.Strings(stats.CacheHits)
 	sort.Strings(stats.CompiledModules)
 	sort.Strings(stats.LoweredModules)
+}
 
-	objects := make([]*Object, 0, len(modules))
-	for _, module := range modules {
-		obj := objectsByModule[module]
+func objectsFromModulePlan(plan moduleBuildPlan) ([]*Object, error) {
+	objects := make([]*Object, 0, len(plan.modules))
+	for _, module := range plan.modules {
+		obj := plan.objectsByModule[module]
 		if obj == nil {
 			return nil, fmt.Errorf("missing object for module '%s'", module)
 		}
 		objects = append(objects, obj)
 	}
+	return objects, nil
+}
 
+func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt BuildOptions, checked *semantics.CheckedProgram, objects []*Object, linkedObjects []linkedObject) error {
 	actorsUsed, actorEntries, err := collectActorEntries(checked)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	actorStateUsed := collectActorStateRuntimeUsage(checked)
 	tasksUsed := collectTaskRuntimeUsage(checked)
@@ -348,7 +445,7 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	}
 	mainName := checked.MainName
 	if opt.RuntimeObjectPath != "" && !runtimeUsed {
-		return nil, fmt.Errorf("runtime object override requires runtime usage (no actor/task/time builtins found)")
+		return fmt.Errorf("runtime object override requires runtime usage (no actor/task/time builtins found)")
 	}
 	if runtimeUsed {
 		runtimeMode := opt.Runtime
@@ -365,7 +462,7 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		case RuntimeSelfHost, RuntimeBuiltin:
 			// ok
 		default:
-			return nil, fmt.Errorf("unsupported runtime mode: %d", opt.Runtime)
+			return fmt.Errorf("unsupported runtime mode: %d", opt.Runtime)
 		}
 		var rt *Object
 		needsDispatchGlue := true
@@ -373,20 +470,20 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		if opt.RuntimeObjectPath != "" {
 			rt, err = ReadObject(opt.RuntimeObjectPath)
 			if err != nil {
-				return nil, fmt.Errorf("read runtime object: %w", err)
+				return fmt.Errorf("read runtime object: %w", err)
 			}
 			if rt.Target == "" {
-				return nil, fmt.Errorf("runtime object has no target: %s", opt.RuntimeObjectPath)
+				return fmt.Errorf("runtime object has no target: %s", opt.RuntimeObjectPath)
 			}
-			if rt.Target != target {
-				return nil, fmt.Errorf("runtime object target mismatch: got=%s want=%s", rt.Target, target)
+			if rt.Target != native.triple {
+				return fmt.Errorf("runtime object target mismatch: got=%s want=%s", rt.Target, native.triple)
 			}
 		} else {
 			switch runtimeMode {
 			case RuntimeSelfHost:
-				rt, err = buildEmbeddedSelfHostActorsRuntimeObject(target, codegen)
+				rt, err = buildEmbeddedSelfHostActorsRuntimeObject(native.triple, native.codegen)
 			case RuntimeBuiltin:
-				switch tgt.OS {
+				switch native.target.OS {
 				case ctarget.OSLinux:
 					rt, err = actorsrt.BuildLinuxX64(actorEntries)
 				case ctarget.OSMacOS:
@@ -394,39 +491,39 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 				case ctarget.OSWindows:
 					rt, err = actorsrt.BuildWindowsX64(actorEntries)
 				default:
-					return nil, fmt.Errorf("actors runtime is not supported on target %s", target)
+					return fmt.Errorf("actors runtime is not supported on target %s", native.triple)
 				}
 			}
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if err := validateActorRuntimeObject(rt); err != nil {
-			return nil, err
+			return err
 		}
 		if actorStateUsed {
 			if err := validateActorStateRuntimeObject(rt); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if tasksUsed {
 			if err := validateTaskRuntimeObject(rt); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if taskGroupsUsed {
 			if err := validateTaskGroupRuntimeObject(rt); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if typedTasksUsed {
 			if err := validateTypedTaskRuntimeObject(rt, typedTaskMaxSlots); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if timeRuntimeUsed {
 			if err := validateTimeRuntimeObject(rt); err != nil {
-				return nil, err
+				return err
 			}
 		}
 
@@ -444,26 +541,26 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 			if needsDispatchGlue {
 				dispatchFn, err := buildActorDispatchFunc(actorEntries, checked)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				glueFuncs = append(glueFuncs, dispatchFn)
 			}
 			if needsMainEntryIDGlue {
 				mainIDFn, err := buildActorMainEntryIDFunc(actorEntries[0])
 				if err != nil {
-					return nil, err
+					return err
 				}
 				glueFuncs = append(glueFuncs, mainIDFn)
 			}
-			glueObj, err := codegen(glueFuncs, nil)
+			glueObj, err := native.codegen(glueFuncs, nil)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			glueObj.Target = target
+			glueObj.Target = native.triple
 			glueObj.Module = "__actorsglue"
 			objects = append(objects, glueObj)
 		}
-		rt.Target = target
+		rt.Target = native.triple
 		switch {
 		case opt.RuntimeObjectPath != "":
 			rt.Module = "__runtime"
@@ -480,39 +577,35 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		objects = append(objects, linked.obj)
 	}
 
-	switch tgt.Format {
+	switch native.target.Format {
 	case ctarget.FormatELF:
 		img, err := LinkLinuxX64(objects, mainName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if err := WriteELF64LinuxX64(outputPath, img); err != nil {
-			return nil, err
+			return err
 		}
 	case ctarget.FormatPE:
 		img, err := LinkWindowsX64(objects, mainName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if err := WritePE64WindowsX64(outputPath, img); err != nil {
-			return nil, err
+			return err
 		}
 	case ctarget.FormatMachO:
 		img, err := LinkMacOSX64(objects, mainName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if err := WriteMachO64MacOSX64(outputPath, img); err != nil {
-			return nil, err
+			return err
 		}
 	default:
-		return nil, fmt.Errorf("unsupported target format: %s", tgt.Format)
+		return fmt.Errorf("unsupported target format: %s", native.target.Format)
 	}
-	if err := emitUIArtifacts(outputPath, tgt.Triple, checked); err != nil {
-		return nil, err
-	}
-
-	return stats, nil
+	return nil
 }
 
 func requiredActorRuntimeSymbols() []string {
