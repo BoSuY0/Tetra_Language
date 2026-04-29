@@ -261,3 +261,124 @@ func main() -> Int:
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestBuildFunctionTypedCallableMVPRejectsUnsupportedForms(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "capturing literal binding",
+			src: `func main() -> Int:
+    let base: Int = 1
+    let f: fn(Int) -> Int = fn(x: Int) -> Int:
+        return x + base
+    return f(41)
+`,
+			want: "requires a non-capturing closure literal",
+		},
+		{
+			name: "generic literal binding",
+			src: `func main() -> Int:
+    let f: fn(Int) -> Int = fn<T>(x: T) -> T:
+        return x
+    return f(41)
+`,
+			want: "generic closure literals are not supported for function-typed local",
+		},
+		{
+			name: "throwing literal binding",
+			src: `enum Boom:
+    case bad
+
+func main() -> Int:
+    let f: fn(Int) -> Int = fn(x: Int) -> Int throws Boom:
+        throw Boom.bad
+    return f(41)
+`,
+			want: "throwing closure literals are not supported for function-typed local",
+		},
+		{
+			name: "generic named symbol binding",
+			src: `func id<T>(x: T) -> T:
+    return x
+
+func main() -> Int:
+    let f: fn(Int) -> Int = id
+    return f(41)
+`,
+			want: "generic function symbol 'id' is not supported for function-typed local",
+		},
+		{
+			name: "throwing named symbol binding",
+			src: `enum Boom:
+    case bad
+
+func risky(x: Int) -> Int throws Boom:
+    throw Boom.bad
+
+func main() -> Int:
+    let f: fn(Int) -> Int = risky
+    return f(41)
+`,
+			want: "throwing function symbol 'risky' is not supported for function-typed local",
+		},
+		{
+			name: "symbol backed value escape",
+			src: `func add1(x: Int) -> Int:
+    return x + 1
+
+func take_ptr(x: ptr) -> Int:
+    return 0
+
+func main() -> Int:
+    let f: fn(Int) -> Int = add1
+    return take_ptr(f)
+`,
+			want: "function value 'f' cannot escape as a first-class value in this MVP",
+		},
+		{
+			name: "callback wrong argument count",
+			src: `func call(cb: fn(Int) -> Int) -> Int:
+    return cb()
+
+func main() -> Int:
+    return 0
+`,
+			want: "wrong argument count for callback 'cb'",
+		},
+		{
+			name: "callback argument type mismatch",
+			src: `func call(cb: fn(Int) -> Int) -> Int:
+    return cb(true)
+
+func main() -> Int:
+    return 0
+`,
+			want: "type mismatch for callback 'cb' arg 1",
+		},
+		{
+			name: "callback argument labels",
+			src: `func call(cb: fn(Int) -> Int) -> Int:
+    return cb(x: 41)
+
+func main() -> Int:
+    return 0
+`,
+			want: "argument labels are not supported for callback 'cb' in this MVP",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := buildOnly(t, tc.src)
+			if err == nil {
+				t.Fatalf("expected diagnostic containing %q", tc.want)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want substring %q", err, tc.want)
+			}
+		})
+	}
+}
