@@ -759,6 +759,52 @@ func TestTestAllFullValidatesCrossTargetSmokeReports(t *testing.T) {
 	}
 }
 
+func TestTestAllStabilizationRunsFocusedGates(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	goLog := filepath.Join(root, "go.log")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_GO_LOG=" + goLog}, "--stabilization", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all stabilization failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "pass" {
+		t.Fatalf("summary status = %q", summary.Status)
+	}
+	if !hasTestAllStep(summary, "compiler pipeline focused gate") || !hasTestAllStep(summary, "api diff no-change") {
+		t.Fatalf("stabilization summary missing focused gates: %#v", summary.Steps)
+	}
+	if !hasTestAllStep(summary, "wasi runner smoke") || !hasTestAllStep(summary, "web ui browser smoke") {
+		t.Fatalf("stabilization summary missing smoke gates: %#v", summary.Steps)
+	}
+	if summary.StepCount <= 24 {
+		t.Fatalf("stabilization should extend full gate step count, got %d", summary.StepCount)
+	}
+	raw, err := os.ReadFile(goLog)
+	if err != nil {
+		t.Fatalf("read fake go log: %v", err)
+	}
+	log := string(raw)
+	for _, want := range []string{
+		"test ./tools/cmd/validate-lsp-stdio/...",
+		"./tools/cmd/validate-api-docs/...",
+		"./tools/cmd/verify-docs/...",
+	} {
+		if !strings.Contains(log, want) {
+			t.Fatalf("stabilization missing validator go invocation %q in log:\n%s", want, log)
+		}
+	}
+}
+
+func hasTestAllStep(summary testAllSummary, name string) bool {
+	for _, step := range summary.Steps {
+		if step.Name == name && step.Status == "pass" {
+			return true
+		}
+	}
+	return false
+}
+
 func testAllFakeRepo(t *testing.T, failFmt bool) string {
 	t.Helper()
 	root := t.TempDir()
@@ -772,6 +818,15 @@ func testAllFakeRepo(t *testing.T, failFmt bool) string {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "scripts", "test.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "scripts", "release_v1_0_wasi_smoke.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nreport=\"\"\nwhile [[ $# -gt 0 ]]; do case \"$1\" in --report) report=\"$2\"; shift 2 ;; *) shift ;; esac; done\nmkdir -p \"$(dirname \"$report\")\"\nprintf '{\"status\":\"pass\",\"cases\":[]}\\n' >\"$report\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "scripts", "release_v1_0_web_smoke.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nreport=\"\"\nwhile [[ $# -gt 0 ]]; do case \"$1\" in --report) report=\"$2\"; shift 2 ;; *) shift ;; esac; done\nmkdir -p \"$(dirname \"$report\")\"\nprintf '{\"status\":\"pass\",\"ui_schema\":\"tetra.ui.bundle.v1\",\"cases\":[]}\\n' >\"$report\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "scripts", "release_v1_0_api_diff.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nreport_dir=\"\"\nwhile [[ $# -gt 0 ]]; do case \"$1\" in --report-dir) report_dir=\"$2\"; shift 2 ;; *) shift ;; esac; done\nmkdir -p \"$report_dir\"\nprintf '{\"review\":{\"status\":\"clean\"},\"diff\":{\"added\":[],\"removed\":[],\"changed\":[]}}\\n' >\"$report_dir/api-diff.json\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(root, "docs", "generated"), 0o755); err != nil {

@@ -27,6 +27,26 @@ func TestValidateTestAllSummaryAcceptsPassingReport(t *testing.T) {
 	}
 }
 
+func TestValidateTestAllSummaryAcceptsStabilizationReport(t *testing.T) {
+	dir := makeSummaryReport(t, `{
+  "mode": "stabilization",
+  "status": "pass",
+  "started_at": "2026-04-25T13:00:00Z",
+  "ended_at": "2026-04-25T13:00:01Z",
+  "step_count": 2,
+  "failed_count": 0,
+  "release_artifact": "tetra.release.v0_2_0.test-all-summary.v1",
+  "steps": [
+    {"name":"one","status":"pass","duration_seconds":0,"exit_code":0,"command":"true","log":"logs/01-one.log"},
+    {"name":"two","status":"pass","duration_seconds":1,"exit_code":0,"command":"true","log":"logs/02-two.log"}
+  ]
+}`)
+	out, err := runSummaryValidator(t, dir)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
 func TestValidateTestAllSummaryRejectsCountMismatch(t *testing.T) {
 	dir := makeSummaryReport(t, `{
   "mode": "quick",

@@ -14,11 +14,12 @@ release_artifact="tetra.release.v0_2_0.test-all-summary.v1"
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/test_all.sh [--quick|--full] [--keep-going] [--json-only] [--report-dir DIR]
+Usage: bash scripts/test_all.sh [--quick|--full|--stabilization] [--keep-going] [--json-only] [--report-dir DIR]
 
 Modes:
-  --quick  Run the fast stabilization gate for local iteration.
-  --full   Run the full v0.2.0 stabilization gate with logs and summaries.
+  --quick          Run the fast stabilization gate for local iteration.
+  --full           Run the full v0.2.0 stabilization gate with logs and summaries.
+  --stabilization  Run --full plus v0.3/v1.0-pre focused stabilization gates.
 
 Output:
   --keep-going  Run remaining steps after a failure and exit 1 at the end.
@@ -46,6 +47,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --full)
       mode="full"
+      shift
+      ;;
+    --stabilization)
+      mode="stabilization"
       shift
       ;;
     --report-dir)
@@ -223,6 +228,14 @@ run_step() {
       fi
       exit 1
     fi
+  fi
+}
+
+check_working_tree_whitespace() {
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git diff --check
+  else
+    echo "not a git work tree; skipping whitespace audit"
   fi
 }
 
@@ -576,7 +589,7 @@ fi
 
 run_step "go test all packages" go test ./compiler/... ./cli/... ./tools/...
 
-if [[ "$mode" == "full" ]]; then
+if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "repo test script" bash scripts/test.sh
 fi
 
@@ -592,13 +605,13 @@ run_step "json diagnostic shape" check_json_diagnostic
 run_step "smoke list json report" check_smoke_list
 run_step "tetra test examples" ./tetra test examples
 
-if [[ "$mode" == "full" ]]; then
+if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "tetra test json report" check_test_json
 fi
 
 run_step "host smoke linux-x64" check_host_smoke
 
-if [[ "$mode" == "full" ]]; then
+if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "docs manifest diff" check_docs_manifest
   run_step "docs verification" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
   run_step "performance report schema" check_performance_report
@@ -608,6 +621,20 @@ if [[ "$mode" == "full" ]]; then
   run_step "generated api docs" check_generated_api_docs
   run_step "eco graph bundle vault" check_eco_suite
   run_step "cross-target build smoke" check_cross_target_smoke
+fi
+
+if [[ "$mode" == "stabilization" ]]; then
+  run_step "compiler pipeline focused gate" go test ./compiler/... -run 'Pipeline|Build|Target|Backend|Cache|Object|Link|Stats|Runtime|ABI' -count=1
+  run_step "frontend callable focused gate" go test ./compiler/... -run 'Diagnostic|Parser|Frontend|Flow|Lexer|FunctionTyped|Callable|Closure|Type|Inference|Enum|Optional|Protocol|Extension|Module' -count=1
+  run_step "safety runtime focused gate" go test ./compiler/... -run 'Ownership|Borrow|Lifetime|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem|Async|Await|TypedError|Stress|SelfHost|Builtin' -count=1
+  run_step "lowering ir focused gate" go test ./compiler/internal/lower ./compiler -run 'Lower|IR|Verify|Unsupported|Loop|Task|Actor|UI|Unsafe|Runtime|Island|Budget' -count=1
+  run_step "wasm ui focused gate" go test ./compiler/... -run 'UI|View|State|Style|Accessibility|NativeShell|WASM|Web' -count=1
+  run_step "eco dx focused gate" go test ./cli/... ./tools/... -run 'Eco|Project|Workspace|Permission|Capsule|Trust|Lock|Vault|Publish|Unpack|Materialize|Download|TetraHub' -count=1
+  run_step "lsp docs validators focused gate" go test ./tools/cmd/validate-lsp-stdio/... ./tools/cmd/validate-lsp-smoke/... ./tools/cmd/validate-diagnostic/... ./tools/cmd/validate-api-docs/... ./tools/cmd/verify-docs/... -count=1
+  run_step "wasi runner smoke" bash scripts/release_v1_0_wasi_smoke.sh --report "$report_dir/wasi-smoke.json"
+  run_step "web ui browser smoke" bash scripts/release_v1_0_web_smoke.sh --report "$report_dir/web-ui-smoke.json"
+  run_step "api diff no-change" bash scripts/release_v1_0_api_diff.sh --report-dir "$report_dir/api-diff" --baseline docs/baselines/api-diff-baseline.v1alpha1.json --enforce no-change
+  run_step "working tree whitespace audit" check_working_tree_whitespace
 fi
 
 if [[ "$failed_count" -gt 0 ]]; then

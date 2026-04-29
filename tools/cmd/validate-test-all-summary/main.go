@@ -65,7 +65,7 @@ func validateTestAllSummary(raw []byte, reportDir string) error {
 		return err
 	}
 	switch summary.Mode {
-	case "quick", "full":
+	case "quick", "full", "stabilization":
 	default:
 		return fmt.Errorf("invalid mode %q", summary.Mode)
 	}
