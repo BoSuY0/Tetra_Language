@@ -213,6 +213,124 @@ func TestDiagnosticHintsForCommonParserFailures(t *testing.T) {
 	}
 }
 
+func TestParserDiagnosticFixtureMatrixJSONReady(t *testing.T) {
+	tests := []struct {
+		name    string
+		src     string
+		line    int
+		column  int
+		message string
+	}{
+		{
+			name: "invalid indentation in flow block",
+			src: `func main() -> Int:
+return 0
+`,
+			line:    2,
+			column:  1,
+			message: "expected indented block after ':'",
+		},
+		{
+			name: "malformed function type missing parameter type",
+			src: `func apply(cb: fn(, Int) -> Int) -> Int:
+    return 0
+`,
+			line:    1,
+			column:  19,
+			message: "expected identifier, got ,",
+		},
+		{
+			name: "malformed function type missing return arrow",
+			src: `func apply(cb: fn(Int) Int) -> Int:
+    return 0
+`,
+			line:    1,
+			column:  24,
+			message: "expected ->, got identifier",
+		},
+		{
+			name: "malformed capsule empty block",
+			src: `capsule App {}
+`,
+			line:    1,
+			column:  1,
+			message: "capsule requires at least one metadata entry",
+		},
+		{
+			name: "malformed property missing name",
+			src: `property : String = "title"
+
+func main() -> Int:
+    return 0
+`,
+			line:    1,
+			column:  10,
+			message: "expected identifier, got :",
+		},
+		{
+			name: "malformed actor member",
+			src: `actor Worker:
+    let value: Int = 1
+`,
+			line:    2,
+			column:  5,
+			message: "actor declarations currently support state fields and func methods only",
+		},
+		{
+			name: "malformed await operand",
+			src: `async func work() -> Int:
+    return 1
+
+func main() -> Int:
+    return await @
+`,
+			line:    5,
+			column:  18,
+			message: "expected expression, got ?",
+		},
+		{
+			name: "unsupported character in expression",
+			src: `func main() -> Int:
+    return @
+`,
+			line:    2,
+			column:  12,
+			message: "expected expression, got ?",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), "fixtures/"+strings.ReplaceAll(tt.name, " ", "_")+".tetra")
+			if err == nil {
+				t.Fatalf("expected parser diagnostic")
+			}
+			diag := DiagnosticFromError(err)
+			if diag.Code != DiagnosticCodeParse || diag.Severity != "error" {
+				t.Fatalf("diagnostic identity = %#v", diag)
+			}
+			if diag.Line != tt.line || diag.Column != tt.column {
+				t.Fatalf("position = %d:%d, want %d:%d; err=%v", diag.Line, diag.Column, tt.line, tt.column, err)
+			}
+			if diag.Message != tt.message {
+				t.Fatalf("message = %q, want %q", diag.Message, tt.message)
+			}
+			if diag.File == "" {
+				t.Fatalf("expected diagnostic file")
+			}
+			raw, err := json.Marshal(diag)
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
+			for _, want := range []string{`"code":"TETRA0001"`, `"severity":"error"`, `"message":`} {
+				if !strings.Contains(string(raw), want) {
+					t.Fatalf("json = %s, missing %s", raw, want)
+				}
+			}
+		})
+	}
+}
+
 func TestDiagnosticCodeRegistryListsPublicCodes(t *testing.T) {
 	registry := DiagnosticCodeRegistry()
 	for _, want := range []string{
