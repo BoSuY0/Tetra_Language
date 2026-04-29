@@ -161,6 +161,50 @@ func TestValidateLSPStdioRejectsMissingRenameCapability(t *testing.T) {
 	}
 }
 
+func TestValidateLSPStdioRejectsDuplicateDocumentSymbolResponse(t *testing.T) {
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
+		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"duplicate","kind":14}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra"},{"uri":"file:///sample.tetra"}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[]}}}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":8,"result":[{"newText":"formatted"}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix"}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`)
+	out, err := runStdioValidator(t, transcript)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "duplicate documentSymbol response") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateLSPStdioRejectsDuplicateShutdownResponse(t *testing.T) {
+	transcript := lspFrame(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"documentSymbolProvider":true,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"completionProvider":{"resolveProvider":false},"documentFormattingProvider":true,"codeActionProvider":true}}}`) +
+		lspFrame(`{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///sample.tetra","diagnostics":[]}}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":2,"result":[{"name":"answer","kind":14}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":3,"result":{"contents":{"kind":"markdown","value":"const answer: i32"}}}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":4,"result":[{"label":"answer","kind":21}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":5,"result":[{"uri":"file:///sample.tetra"}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":6,"result":[{"uri":"file:///sample.tetra"},{"uri":"file:///sample.tetra"}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":7,"result":{"changes":{"file:///sample.tetra":[]}}}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":8,"result":[{"newText":"formatted"}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":9,"result":[{"title":"Add uses io to function main","kind":"quickfix"}]}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`) +
+		lspFrame(`{"jsonrpc":"2.0","id":10,"result":null}`)
+	out, err := runStdioValidator(t, transcript)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "duplicate shutdown response") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func lspFrame(body string) string {
 	return fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(body), body)
 }

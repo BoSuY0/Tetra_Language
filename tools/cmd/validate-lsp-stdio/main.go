@@ -93,6 +93,9 @@ func validateLSPTranscript(raw []byte) error {
 		}
 		if msg.ID != nil {
 			if *msg.ID >= 2 && *msg.ID <= 9 {
+				if _, exists := editorResponses[*msg.ID]; exists {
+					return fmt.Errorf("duplicate %s response", editorResponseName(*msg.ID))
+				}
 				editorResponses[*msg.ID] = msg.Result
 			}
 		}
@@ -106,6 +109,9 @@ func validateLSPTranscript(raw []byte) error {
 			sawDiagnostics = true
 		}
 		if msg.ID != nil && *msg.ID == 10 {
+			if sawShutdown {
+				return fmt.Errorf("duplicate shutdown response")
+			}
 			sawShutdown = true
 		}
 	}
@@ -140,6 +146,29 @@ func validateLSPTranscript(raw []byte) error {
 		return fmt.Errorf("missing shutdown response")
 	}
 	return nil
+}
+
+func editorResponseName(id int) string {
+	switch id {
+	case 2:
+		return "documentSymbol"
+	case 3:
+		return "hover"
+	case 4:
+		return "completion"
+	case 5:
+		return "definition"
+	case 6:
+		return "references"
+	case 7:
+		return "rename"
+	case 8:
+		return "formatting"
+	case 9:
+		return "codeAction"
+	default:
+		return fmt.Sprintf("id %d", id)
+	}
 }
 
 func validateEditorResponse(id int, raw json.RawMessage) error {
