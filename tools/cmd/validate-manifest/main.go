@@ -304,6 +304,8 @@ func validateFeatures(features []featureManifest) error {
 	requiredIDs := map[string]string{
 		"cli.core":                            "current",
 		"language.flow":                       "current",
+		"language.generics-mvp":               "current",
+		"language.protocol-conformance-mvp":   "current",
 		"language.callable-mvp":               "current",
 		"language.callable-level1":            "experimental",
 		"targets.wasm-build-only":             "current",
@@ -316,6 +318,7 @@ func validateFeatures(features []featureManifest) error {
 		"language.full-first-class-callables": "post-v1",
 	}
 	seen := map[string]string{}
+	featureByID := map[string]featureManifest{}
 	for _, feature := range features {
 		if feature.ID == "" {
 			return fmt.Errorf("feature missing id")
@@ -330,6 +333,7 @@ func validateFeatures(features []featureManifest) error {
 			return fmt.Errorf("duplicate feature %s (%s and %s)", feature.ID, seenStatus, feature.Status)
 		}
 		seen[feature.ID] = feature.Status
+		featureByID[feature.ID] = feature
 		requiredStatus[feature.Status] = true
 		if feature.Status == "current" && feature.Since == "" {
 			return fmt.Errorf("current feature %s missing since", feature.ID)
@@ -359,7 +363,54 @@ func validateFeatures(features []featureManifest) error {
 			return fmt.Errorf("feature %s status = %s, want %s", id, gotStatus, wantStatus)
 		}
 	}
+	if err := validateFeatureTruthBoundaries(featureByID); err != nil {
+		return err
+	}
 	return nil
+}
+
+func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
+	checks := map[string][]string{
+		"language.generics-mvp": {
+			"statically monomorphized",
+			"no runtime generic values or dynamic dispatch",
+			"generic structs",
+			"future/post-v1",
+		},
+		"language.protocol-conformance-mvp": {
+			"checked statically",
+			"generic requirement signature shape",
+			"no witness tables",
+			"dynamic dispatch remain post-v1",
+		},
+	}
+	for id, required := range checks {
+		feature, ok := features[id]
+		if !ok {
+			return fmt.Errorf("features missing %s", id)
+		}
+		haystack := feature.Scope + " " + feature.Stability
+		for _, want := range required {
+			if !strings.Contains(haystack, want) {
+				return fmt.Errorf("feature %s missing truth-boundary phrase %q", id, want)
+			}
+		}
+		for _, doc := range []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"} {
+			if !containsString(feature.Docs, doc) {
+				return fmt.Errorf("feature %s missing doc reference %s", id, doc)
+			}
+		}
+	}
+	return nil
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {

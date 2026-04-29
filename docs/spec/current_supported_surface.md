@@ -55,6 +55,18 @@ green `scripts/release_v0_2_0_gate.sh` report and matching handoff evidence.
   main metadata, function slot metadata, branch labels, stack heights, local
   slots, returns, calls, unknown instructions, and unsupported lowering paths
   are reported with structured diagnostics.
+- Static monomorphized generic functions: generic functions with inferred value
+  arguments are parsed, checked, formatted, documented, and specialized with
+  deterministic names across modules. The current truth boundary excludes
+  runtime generic values, explicit type arguments, generic structs,
+  higher-ranked generics, full protocol-bound generic dispatch, specialization
+  optimization, and any dynamic dispatch claim.
+- Static protocol conformance: protocol declarations and `impl Type: Protocol`
+  are checked against extension/static methods, including compatible effects,
+  async, throws, params, return types, and MVP generic requirement signature
+  shape (`func req<T>(...)`). This is static conformance only: no witness
+  tables, trait objects, runtime protocol values, or dynamic dispatch model are
+  introduced.
 - Generic protocol requirement parsing/checking in MVP form (`func req<T>(...)`)
   with signature-shape conformance checks and no new runtime dispatch model.
 - Function type references in type positions (`fn(T1, T2) -> R`) plus the
@@ -105,6 +117,11 @@ green `scripts/release_v0_2_0_gate.sh` report and matching handoff evidence.
 - Full first-class callable/function-pointer semantics (arbitrary
   escape/passing/storing, complete capture matrix, and ABI redesign) remain
   outside the current supported callable MVP.
+- Generic structs, explicit type arguments, higher-ranked generics, runtime
+  generic values, protocol-bound generic dispatch, specialization optimization,
+  witness tables, trait objects, runtime protocol values, and protocol dynamic
+  dispatch remain outside the current `v0.2.0` support claim unless separately
+  promoted by a later gate.
 - Enum payload constructors and exhaustive enum match/catch coverage are an
   experimental next-cycle promotion slice. The represented slice is limited to
   same-module enum constructors with positional payload arguments/bindings and

@@ -50,11 +50,27 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if _, ok := checked.FuncSigs["id__T_i32"]; !ok {
+	sig, ok := checked.FuncSigs["id__T_i32"]
+	if !ok {
 		t.Fatalf("missing monomorphized signature: %#v", checked.FuncSigs)
 	}
-	if _, err := Lower(checked); err != nil {
+	if sig.Generic {
+		t.Fatalf("id__T_i32 should be concrete after monomorphization: %#v", sig)
+	}
+	if sig.ParamSlots != 1 || sig.ReturnSlots != 1 || sig.ReturnType != "i32" {
+		t.Fatalf("id__T_i32 ABI = params %d returns %d type %q, want params 1 returns 1 type i32", sig.ParamSlots, sig.ReturnSlots, sig.ReturnType)
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
 		t.Fatalf("Lower: %v", err)
+	}
+	idFn := findIRFunc(t, irProg.Funcs, "id__T_i32")
+	if idFn.ParamSlots != 1 || idFn.ReturnSlots != 1 {
+		t.Fatalf("lowered id__T_i32 ABI = params %d returns %d, want params 1 returns 1", idFn.ParamSlots, idFn.ReturnSlots)
+	}
+	mainFn := findIRFunc(t, irProg.Funcs, "main")
+	if !hasIRCall(mainFn, "id__T_i32") {
+		t.Fatalf("main did not call monomorphized id__T_i32: %#v", mainFn.Instrs)
 	}
 }
 
@@ -88,11 +104,27 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if _, ok := checked.FuncSigs["id__T_Vec2"]; !ok {
+	sig, ok := checked.FuncSigs["id__T_Vec2"]
+	if !ok {
 		t.Fatalf("missing protocol-bound monomorphized signature: %#v", checked.FuncSigs)
 	}
-	if _, err := Lower(checked); err != nil {
+	if sig.Generic {
+		t.Fatalf("id__T_Vec2 should be concrete after monomorphization: %#v", sig)
+	}
+	if sig.ParamSlots != 1 || sig.ReturnSlots != 1 || sig.ReturnType != "Vec2" {
+		t.Fatalf("id__T_Vec2 ABI = params %d returns %d type %q, want params 1 returns 1 type Vec2", sig.ParamSlots, sig.ReturnSlots, sig.ReturnType)
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
 		t.Fatalf("Lower: %v", err)
+	}
+	idFn := findIRFunc(t, irProg.Funcs, "id__T_Vec2")
+	if idFn.ParamSlots != 1 || idFn.ReturnSlots != 1 {
+		t.Fatalf("lowered id__T_Vec2 ABI = params %d returns %d, want params 1 returns 1", idFn.ParamSlots, idFn.ReturnSlots)
+	}
+	mainFn := findIRFunc(t, irProg.Funcs, "main")
+	if !hasIRCall(mainFn, "id__T_Vec2") {
+		t.Fatalf("main did not call protocol-bound id__T_Vec2: %#v", mainFn.Instrs)
 	}
 }
 
@@ -160,6 +192,222 @@ func main() -> Int:
 	}
 }
 
+func TestGenericFunctionProtocolBoundCrossModuleConformancePasses(t *testing.T) {
+	files := map[string]string{
+		"engine/core.tetra": `module engine.core
+pub struct Vec2:
+    x: Int
+
+pub protocol Echoable:
+    func echo(self: Vec2) -> Vec2
+
+extension Vec2:
+    func echo(self: Vec2) -> Vec2:
+        return self
+
+impl Vec2: Echoable
+
+pub func id<T: Echoable>(x: T) -> T:
+    return x
+`,
+		"app/main.tetra": `module app.main
+import engine.core as core
+
+func main() -> Int:
+    let v: core.Vec2 = core.Vec2(x: 42)
+    let out: core.Vec2 = core.id(v)
+    return out.x
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.tetra"))
+
+	world, err := LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	if _, ok := checked.FuncSigs["engine.core.id__T_engine_2e_core_2e_Vec2"]; !ok {
+		t.Fatalf("missing cross-module protocol-bound monomorphized signature: %#v", checked.FuncSigs)
+	}
+	if _, err := LowerModules(checked); err != nil {
+		t.Fatalf("LowerModules: %v", err)
+	}
+}
+
+func TestGenericFunctionProtocolBoundCrossModuleRejectsMissingImpl(t *testing.T) {
+	files := map[string]string{
+		"engine/core.tetra": `module engine.core
+pub struct Vec2:
+    x: Int
+
+pub protocol Echoable:
+    func echo(self: Vec2) -> Vec2
+
+pub func id<T: Echoable>(x: T) -> T:
+    return x
+`,
+		"app/main.tetra": `module app.main
+import engine.core as core
+
+func main() -> Int:
+    let v: core.Vec2 = core.Vec2(x: 42)
+    let out: core.Vec2 = core.id(v)
+    return out.x
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.tetra"))
+
+	world, err := LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	_, err = CheckWorld(world)
+	if err == nil {
+		t.Fatalf("expected cross-module protocol-bound conformance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "generic argument 'Vec2' does not satisfy bound 'Echoable' for 'T'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGenericFunctionProtocolBoundRejectsUnknownProtocolBound(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+func id<T: MissingProtocol>(x: T) -> T:
+    return x
+
+func main() -> Int:
+    let v: Vec2 = Vec2(x: 42)
+    let out: Vec2 = id(v)
+    return out.x
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected unknown protocol bound diagnostic")
+	}
+	if !strings.Contains(err.Error(), "unknown protocol bound 'MissingProtocol' for generic parameter 'T'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGenericFunctionProtocolBoundRejectsNonProtocolBound(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+func id<T: Vec2>(x: T) -> T:
+    return x
+
+func main() -> Int:
+    let v: Vec2 = Vec2(x: 42)
+    let out: Vec2 = id(v)
+    return out.x
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected non-protocol bound diagnostic")
+	}
+	if !strings.Contains(err.Error(), "generic bound 'Vec2' for 'T' must name a protocol") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGenericFunctionProtocolBoundRejectsPrivateCrossModuleProtocolBound(t *testing.T) {
+	files := map[string]string{
+		"engine/core.tetra": `module engine.core
+pub struct Vec2:
+    x: Int
+
+protocol HiddenEchoable:
+    func echo(self: Vec2) -> Vec2
+
+extension Vec2:
+    func echo(self: Vec2) -> Vec2:
+        return self
+
+impl Vec2: HiddenEchoable
+
+pub func id<T: HiddenEchoable>(x: T) -> T:
+    return x
+`,
+		"app/main.tetra": `module app.main
+import engine.core as core
+
+func main() -> Int:
+    let v: core.Vec2 = core.Vec2(x: 42)
+    let out: core.Vec2 = core.id(v)
+    return out.x
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.tetra"))
+
+	world, err := LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	_, err = CheckWorld(world)
+	if err == nil {
+		t.Fatalf("expected private protocol bound visibility diagnostic")
+	}
+	if !strings.Contains(err.Error(), "private protocol 'engine.core.HiddenEchoable' is not visible from module 'app.main'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGenericFunctionProtocolBoundRequirementCallUnsupported(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Echoable:
+    func echo(self: Vec2) -> Vec2
+
+extension Vec2:
+    func echo(self: Vec2) -> Vec2:
+        return self
+
+impl Vec2: Echoable
+
+func echoThroughBound<T: Echoable>(x: T) -> T:
+    return T.echo(x)
+
+func main() -> Int:
+    let v: Vec2 = Vec2(x: 42)
+    let out: Vec2 = echoThroughBound(v)
+    return out.x
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected unsupported generic-bound requirement call diagnostic")
+	}
+	if !strings.Contains(err.Error(), "calling protocol requirement 'echo' through generic bound 'T' is not supported in this MVP") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestGenericStructSameModuleMonomorphizedHappyPath(t *testing.T) {
 	src := []byte(`
 struct Box<T>:
@@ -177,11 +425,23 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if _, ok := checked.Types["Box__T_i32"]; !ok {
+	box, ok := checked.Types["Box__T_i32"]
+	if !ok {
 		t.Fatalf("missing monomorphized struct type: %#v", checked.Types)
 	}
-	if _, err := Lower(checked); err != nil {
+	if box.SlotCount != 1 || len(box.Fields) != 1 || box.Fields[0].TypeName != "i32" || box.Fields[0].SlotCount != 1 {
+		t.Fatalf("Box__T_i32 layout = %#v, want one i32 field", box)
+	}
+	if _, exists := checked.Types["Box"]; exists {
+		t.Fatalf("generic struct template should not remain in checked types: %#v", checked.Types["Box"])
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
 		t.Fatalf("Lower: %v", err)
+	}
+	mainFn := findIRFunc(t, irProg.Funcs, "main")
+	if mainFn.ReturnSlots != 1 {
+		t.Fatalf("main ReturnSlots = %d, want 1", mainFn.ReturnSlots)
 	}
 }
 
@@ -205,8 +465,12 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if _, ok := checked.Types["Box__T_i32"]; !ok {
+	box, ok := checked.Types["Box__T_i32"]
+	if !ok {
 		t.Fatalf("missing monomorphized struct type: %#v", checked.Types)
+	}
+	if box.SlotCount != 1 || len(box.Fields) != 1 || box.Fields[0].TypeName != "i32" {
+		t.Fatalf("Box__T_i32 layout = %#v, want one i32 field", box)
 	}
 	sig, ok := checked.FuncSigs["make__T_i32"]
 	if !ok {
@@ -215,8 +479,20 @@ func main() -> Int:
 	if sig.ReturnType != "Box__T_i32" {
 		t.Fatalf("make__T_i32 return type = %q, want Box__T_i32", sig.ReturnType)
 	}
-	if _, err := Lower(checked); err != nil {
+	if sig.ParamSlots != 1 || sig.ReturnSlots != 1 {
+		t.Fatalf("make__T_i32 ABI = params %d returns %d, want params 1 returns 1", sig.ParamSlots, sig.ReturnSlots)
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
 		t.Fatalf("Lower: %v", err)
+	}
+	makeFn := findIRFunc(t, irProg.Funcs, "make__T_i32")
+	if makeFn.ParamSlots != 1 || makeFn.ReturnSlots != 1 {
+		t.Fatalf("lowered make__T_i32 ABI = params %d returns %d, want params 1 returns 1", makeFn.ParamSlots, makeFn.ReturnSlots)
+	}
+	mainFn := findIRFunc(t, irProg.Funcs, "main")
+	if !hasIRCall(mainFn, "make__T_i32") {
+		t.Fatalf("main did not call monomorphized make__T_i32: %#v", mainFn.Instrs)
 	}
 }
 
@@ -458,7 +734,259 @@ func main() -> Int:
 	if names[0] == names[1] {
 		t.Fatalf("colliding monomorphized names: %v", names)
 	}
+	if names[0] != "util.gen.id__T_a_2e_b__c" || names[1] != "util.gen.id__T_a__b_2e_c" {
+		t.Fatalf("monomorphized util.id variants = %v, want deterministic non-colliding names", names)
+	}
 	if _, err := LowerModules(checked); err != nil {
 		t.Fatalf("LowerModules: %v", err)
+	}
+}
+
+func TestGenericFunctionMultiTypeParametersMonomorphized(t *testing.T) {
+	src := []byte(`
+func choose<T, U>(left: T, right: U) -> T:
+    return left
+
+func main() -> Int:
+    return choose(42, false)
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	sig, ok := checked.FuncSigs["choose__T_i32__U_bool"]
+	if !ok {
+		t.Fatalf("missing multi-type monomorphized signature: %#v", checked.FuncSigs)
+	}
+	if sig.ReturnType != "i32" {
+		t.Fatalf("choose__T_i32__U_bool return type = %q, want i32", sig.ReturnType)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestGenericStructMultiTypeParametersMonomorphized(t *testing.T) {
+	src := []byte(`
+struct Pair<T, U>:
+    left: T
+    right: U
+
+func main() -> Int:
+    let p: Pair<Int, Bool> = Pair<Int, Bool>{left: 42, right: true}
+    if p.right:
+        return p.left
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, ok := checked.Types["Pair__T_i32__U_bool"]; !ok {
+		t.Fatalf("missing multi-type monomorphized struct type: %#v", checked.Types)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestGenericStructMonomorphizedNamesAvoidTypeCollisions(t *testing.T) {
+	files := map[string]string{
+		"a.tetra": `module a
+pub struct b_c:
+    x: Int
+`,
+		"a_b.tetra": `module a_b
+pub struct c:
+    y: Int
+`,
+		"util/box.tetra": `module util.box
+pub struct Box<T>:
+    value: T
+`,
+		"app/main.tetra": `module app.main
+import a as a
+import a_b as ab
+import util.box as box
+
+func main() -> Int:
+    let first: box.Box<a.b_c> = box.Box<a.b_c>{value: a.b_c{x: 1}}
+    let second: box.Box<ab.c> = box.Box<ab.c>{value: ab.c{y: 2}}
+    return first.value.x + second.value.y
+`,
+	}
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, files)
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.tetra"))
+
+	world, err := LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld: %v", err)
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	var names []string
+	for name := range checked.Types {
+		if strings.HasPrefix(name, "util.box.Box__") {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	want := []string{"util.box.Box__T_a_2e_b__c", "util.box.Box__T_a__b_2e_c"}
+	if len(names) != len(want) || names[0] != want[0] || names[1] != want[1] {
+		t.Fatalf("monomorphized Box variants = %v, want %v", names, want)
+	}
+	if _, err := LowerModules(checked); err != nil {
+		t.Fatalf("LowerModules: %v", err)
+	}
+}
+
+func TestGenericStructOptionalFieldMonomorphized(t *testing.T) {
+	src := []byte(`
+struct MaybeBox<T>:
+    value: T?
+
+func main() -> Int:
+    let b: MaybeBox<Int> = MaybeBox<Int>{value: none}
+    if let x = b.value:
+        return x
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	info, ok := checked.Types["MaybeBox__T_i32"]
+	if !ok {
+		t.Fatalf("missing optional generic struct type: %#v", checked.Types)
+	}
+	field := info.FieldMap["value"]
+	if field.TypeName != "i32?" {
+		t.Fatalf("MaybeBox__T_i32.value type = %q, want i32?", field.TypeName)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestGenericStructNestedGenericFieldExplicitDiagnostic(t *testing.T) {
+	src := []byte(`
+struct Box<T>:
+    value: T
+
+struct Outer<T>:
+    inner: Box<T>
+
+func main() -> Int:
+    let outer: Outer<Int> = Outer<Int>{inner: Box<Int>{value: 42}}
+    return outer.inner.value
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected nested generic struct diagnostic")
+	}
+	if !strings.Contains(err.Error(), "nested generic struct instantiation") || !strings.Contains(err.Error(), "Outer__T_i32.inner") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestGenericFunctionReturnOnlyInferenceDiagnosticStable(t *testing.T) {
+	src := []byte(`
+func make<T>() -> T:
+    return 0
+
+func main() -> Int:
+    return make()
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected return-only inference diagnostic")
+	}
+	for _, want := range []string{"line 6:12", "cannot infer generic argument 'T' for 'make'"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "v0.") || strings.Contains(err.Error(), "MVP") {
+		t.Fatalf("return-only inference diagnostic should remain stable and versionless: %v", err)
+	}
+}
+
+func TestGenericFunctionDuplicateRecursiveWorkMonomorphizesOnce(t *testing.T) {
+	src := []byte(`
+func down<T>(x: T, n: Int) -> T:
+    if n == 0:
+        return x
+    return down(x, n - 1)
+
+func main() -> Int:
+    return down(42, 2)
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	count := 0
+	for name := range checked.FuncSigs {
+		if name == "down__T_i32" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("down__T_i32 signatures = %d, want 1", count)
+	}
+	if _, err := Lower(checked); err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestGenericStructFunctionTypeArgumentRejected(t *testing.T) {
+	src := []byte(`
+struct Holder<T>:
+    cb: T
+
+func add1(x: Int) -> Int:
+    return x + 1
+
+func main() -> Int:
+    let holder: Holder<fn(Int) -> Int> = Holder<fn(Int) -> Int>{cb: add1}
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected function type argument diagnostic")
+	}
+	if !strings.Contains(err.Error(), "generic struct 'Holder' type argument 'T' uses function type") || !strings.Contains(err.Error(), "storing function-typed values in structs is not supported") {
+		t.Fatalf("error = %v", err)
 	}
 }

@@ -38,6 +38,8 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	for id, wantStatus := range map[string]FeatureStatus{
 		"cli.core":                            FeatureStatusCurrent,
 		"targets.wasm-build-only":             FeatureStatusCurrent,
+		"language.generics-mvp":               FeatureStatusCurrent,
+		"language.protocol-conformance-mvp":   FeatureStatusCurrent,
 		"language.callable-mvp":               FeatureStatusCurrent,
 		"language.callable-level1":            FeatureStatusExperimental,
 		"stdlib.experimental-mirrors":         FeatureStatusExperimental,
@@ -49,6 +51,18 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	} {
 		if gotStatus := seenID[id]; gotStatus != wantStatus {
 			t.Fatalf("feature %s status = %q, want %q", id, gotStatus, wantStatus)
+		}
+	}
+	genericsMVP := seenFeature["language.generics-mvp"]
+	for _, want := range []string{"statically monomorphized", "no runtime generic values or dynamic dispatch", "generic structs", "future/post-v1"} {
+		if !strings.Contains(genericsMVP.Scope+" "+genericsMVP.Stability, want) {
+			t.Fatalf("generics MVP feature missing %q boundary: %#v", want, genericsMVP)
+		}
+	}
+	protocolMVP := seenFeature["language.protocol-conformance-mvp"]
+	for _, want := range []string{"checked statically", "generic requirement signature shape", "no witness tables", "dynamic dispatch remain post-v1"} {
+		if !strings.Contains(protocolMVP.Scope+" "+protocolMVP.Stability, want) {
+			t.Fatalf("protocol conformance MVP feature missing %q boundary: %#v", want, protocolMVP)
 		}
 	}
 	callableMVP := seenFeature["language.callable-mvp"]

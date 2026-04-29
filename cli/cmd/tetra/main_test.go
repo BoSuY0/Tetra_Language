@@ -219,6 +219,26 @@ func TestFeaturesCommandJSON(t *testing.T) {
 				}
 			}
 		}
+		if feature.ID == "language.generics-mvp" {
+			if feature.Status != "current" || feature.Since != "v0.2.0" {
+				t.Fatalf("generics MVP lifecycle = status %q since %q, want current since v0.2.0", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"statically monomorphized", "no runtime generic values or dynamic dispatch", "generic structs", "future/post-v1"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("generics MVP feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
+		if feature.ID == "language.protocol-conformance-mvp" {
+			if feature.Status != "current" || feature.Since != "v0.2.0" {
+				t.Fatalf("protocol conformance MVP lifecycle = status %q since %q, want current since v0.2.0", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"checked statically", "generic requirement signature shape", "no witness tables", "dynamic dispatch remain post-v1"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("protocol conformance MVP feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
 		if feature.ID == "language.callable-mvp" {
 			if feature.Status != "current" || feature.Since != "v0.2.0" {
 				t.Fatalf("callable MVP lifecycle = status %q since %q, want current since v0.2.0", feature.Status, feature.Since)
@@ -257,6 +277,8 @@ func TestFeaturesCommandJSON(t *testing.T) {
 	}
 	for id, wantStatus := range map[string]string{
 		"cli.core":                            "current",
+		"language.generics-mvp":               "current",
+		"language.protocol-conformance-mvp":   "current",
 		"language.callable-mvp":               "current",
 		"targets.wasm-build-only":             "current",
 		"stdlib.experimental-mirrors":         "experimental",

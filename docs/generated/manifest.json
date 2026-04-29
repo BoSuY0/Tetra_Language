@@ -1047,6 +1047,32 @@
       ]
     },
     {
+      "id": "language.generics-mvp",
+      "name": "Static monomorphized generics MVP",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "generic functions with inferred value arguments are statically monomorphized across modules; no runtime generic values or dynamic dispatch",
+      "stability": "supported static MVP; explicit type arguments, generic structs, higher-ranked generics, full protocol-bound generic dispatch, and specialization optimization remain future/post-v1",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/flow_syntax_v1.md",
+        "docs/spec/v1_scope.md"
+      ]
+    },
+    {
+      "id": "language.protocol-conformance-mvp",
+      "name": "Static protocol conformance MVP",
+      "status": "current",
+      "since": "v0.2.0",
+      "scope": "protocol declarations and impl conformance are checked statically against extension/static methods, including generic requirement signature shape; no witness tables, trait objects, or dynamic dispatch model",
+      "stability": "supported static conformance MVP; runtime polymorphism and dynamic dispatch remain post-v1 unless separately gated",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/flow_syntax_v1.md",
+        "docs/spec/v1_scope.md"
+      ]
+    },
+    {
       "id": "language.callable-mvp",
       "name": "Callable/function type MVP",
       "status": "current",

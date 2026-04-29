@@ -290,7 +290,7 @@ func main() -> Int:
 	}
 }
 
-func TestProtocolConformanceReportsWrongSignature(t *testing.T) {
+func TestProtocolConformanceReportsReturnTypeMismatch(t *testing.T) {
 	src := []byte(`
 struct Vec2:
     x: Int
@@ -316,6 +316,286 @@ func main() -> Int:
 		t.Fatalf("expected wrong signature conformance error")
 	}
 	if !strings.Contains(err.Error(), "return type differs") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceRejectsDuplicateRequirement(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int
+    func draw(self: Vec2) -> Int
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		if !strings.Contains(err.Error(), "duplicate protocol requirement 'draw'") {
+			t.Fatalf("Parse error = %v", err)
+		}
+		return
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected duplicate requirement error")
+	}
+	if !strings.Contains(err.Error(), "duplicate protocol requirement 'draw'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceReportsParameterCountMismatch(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Scalable:
+    func scale(self: Vec2, factor: Int) -> Int
+
+extension Vec2:
+    func scale(self: Vec2) -> Int:
+        return self.x
+
+impl Vec2: Scalable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected parameter count conformance error")
+	}
+	if !strings.Contains(err.Error(), "parameter count differs") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceReportsParameterTypeMismatch(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Scalable:
+    func scale(self: Vec2, factor: Int) -> Int
+
+extension Vec2:
+    func scale(self: Vec2, factor: Bool) -> Int:
+        return self.x
+
+impl Vec2: Scalable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected parameter type conformance error")
+	}
+	if !strings.Contains(err.Error(), "parameter 2 type differs") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceRejectsThrowingMethodForNonThrowingRequirement(t *testing.T) {
+	src := []byte(`
+enum DrawError:
+    case failed
+
+struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int
+
+extension Vec2:
+    func draw(self: Vec2) -> Int throws DrawError:
+        if self.x == 0:
+            throw DrawError.failed
+        return self.x
+
+impl Vec2: Renderable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected throws conformance error")
+	}
+	if !strings.Contains(err.Error(), "throws type differs") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceRejectsThrowTypeMismatch(t *testing.T) {
+	src := []byte(`
+enum DrawError:
+    case failed
+
+enum OtherError:
+    case failed
+
+struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int throws DrawError
+
+extension Vec2:
+    func draw(self: Vec2) -> Int throws OtherError:
+        if self.x == 0:
+            throw OtherError.failed
+        return self.x
+
+impl Vec2: Renderable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected throws type conformance error")
+	}
+	if !strings.Contains(err.Error(), "throws type differs") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceRejectsMissingRequiredEffect(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Vec2) -> Int uses io
+
+extension Vec2:
+    func draw(self: Vec2) -> Int:
+        return self.x
+
+impl Vec2: Renderable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected effects conformance error")
+	}
+	if !strings.Contains(err.Error(), "missing required effects io") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceSupportsGenericRequirementAlphaEquivalence(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Mapper:
+    func map<T>(self: Vec2, value: T) -> T
+
+extension Vec2:
+    func map<U>(self: Vec2, value: U) -> U:
+        return value
+
+impl Vec2: Mapper
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if _, err := Check(prog); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+}
+
+func TestProtocolConformanceRejectsInvalidSelfParameterName(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+protocol Renderable:
+    func draw(this: Vec2) -> Int
+
+extension Vec2:
+    func draw(this: Vec2) -> Int:
+        return this.x
+
+impl Vec2: Renderable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected self parameter conformance error")
+	}
+	if !strings.Contains(err.Error(), "first parameter must be 'self'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProtocolConformanceRejectsSelfParameterTypeMismatch(t *testing.T) {
+	src := []byte(`
+struct Vec2:
+    x: Int
+
+struct Point:
+    x: Int
+
+protocol Renderable:
+    func draw(self: Point) -> Int
+
+extension Vec2:
+    func draw(self: Vec2) -> Int:
+        return self.x
+
+impl Vec2: Renderable
+
+func main() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected self parameter type conformance error")
+	}
+	if !strings.Contains(err.Error(), "self parameter type must be 'Vec2'") {
 		t.Fatalf("error = %v", err)
 	}
 }

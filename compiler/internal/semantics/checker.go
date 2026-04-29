@@ -936,13 +936,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 	}
 
 	for name, ctx := range protocols {
-		seenReqs := map[string]struct{}{}
+		seenReqs := map[string]frontend.Position{}
 		for i := range ctx.decl.Requirements {
 			req := &ctx.decl.Requirements[i]
-			if _, exists := seenReqs[req.Name]; exists {
-				return nil, fmt.Errorf("%s: duplicate protocol requirement '%s'", frontend.FormatPos(req.At), req.Name)
+			if first, exists := seenReqs[req.Name]; exists {
+				return nil, fmt.Errorf("%s: duplicate protocol requirement '%s' (first at %s)", frontend.FormatPos(req.At), req.Name, frontend.FormatPos(first))
 			}
-			seenReqs[req.Name] = struct{}{}
+			seenReqs[req.Name] = req.At
 			reqEffects, err := normalizeEffects(req.Uses, req.At)
 			if err != nil {
 				return nil, fmt.Errorf("%s: protocol '%s' requirement '%s': %v", frontend.FormatPos(req.At), name, req.Name, err)
@@ -1254,7 +1254,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				return nil, err
 			}
 			if len(fn.TypeParams) > 0 {
-				if err := validateGenericFuncDecl(fn); err != nil {
+				if err := validateGenericFuncDecl(fn, module, imports, collectGenericProtocolInfos(world), types); err != nil {
 					return nil, err
 				}
 				effects, err := normalizeEffects(fn.Uses, fn.Pos)
@@ -1433,6 +1433,10 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if _, ok := types[typeName]; !ok {
 				return nil, fmt.Errorf("%s: impl target type '%s' is not defined", frontend.FormatPos(impl.Type.At), typeName)
 			}
+			typeInfo := types[typeName]
+			if err := ensureTypeVisible(typeName, typeInfo, module, impl.Type.At); err != nil {
+				return nil, err
+			}
 			implKey := typeName + "->" + protoName
 			if first, exists := seenImpls[implKey]; exists {
 				return nil, fmt.Errorf("%s: duplicate impl conformance '%s: %s' (first at %s)", frontend.FormatPos(impl.At), typeName, protoName, frontend.FormatPos(first))
@@ -1440,7 +1444,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			seenImpls[implKey] = impl.At
 			proto, ok := protocols[protoName]
 			if !ok {
+				if _, isType := types[protoName]; isType {
+					return nil, fmt.Errorf("%s: impl protocol '%s' must name a protocol, got non-protocol type '%s'", frontend.FormatPos(impl.Protocol.At), displayTypeName(protoName, module), displayTypeName(protoName, module))
+				}
 				return nil, fmt.Errorf("%s: protocol '%s' is not defined", frontend.FormatPos(impl.Protocol.At), protoName)
+			}
+			if !symbolBelongsToModule(protoName, module) && !proto.public {
+				return nil, fmt.Errorf("%s: private protocol '%s' is not visible from module '%s'", frontend.FormatPos(impl.Protocol.At), protoName, module)
 			}
 			for _, req := range proto.decl.Requirements {
 				methodName := typeName + "." + req.Name
@@ -2505,7 +2515,7 @@ func stmtEndsWithReturn(stmt frontend.Stmt) bool {
 	}
 }
 
-func validateGenericFuncDecl(fn *frontend.FuncDecl) error {
+func validateGenericFuncDecl(fn *frontend.FuncDecl, module string, imports map[string]string, protocolInfos map[string]genericProtocolInfo, types map[string]*TypeInfo) error {
 	if len(fn.TypeParams) == 0 {
 		return nil
 	}
@@ -2513,12 +2523,29 @@ func validateGenericFuncDecl(fn *frontend.FuncDecl) error {
 	for _, name := range fn.TypeParams {
 		params[name] = struct{}{}
 	}
+	boundParams := map[string]struct{}{}
 	for _, bound := range fn.TypeParamBounds {
 		if _, ok := params[bound.Name]; !ok {
 			return fmt.Errorf("%s: generic bound references unknown type parameter '%s'", frontend.FormatPos(bound.At), bound.Name)
 		}
+		boundParams[bound.Name] = struct{}{}
 		if bound.Bound.Kind != frontend.TypeRefNamed || len(bound.Bound.TypeArgs) > 0 {
 			return fmt.Errorf("%s: generic bound for '%s' must name a protocol", frontend.FormatPos(bound.Bound.At), bound.Name)
+		}
+		boundRef := bound.Bound
+		resolved, err := resolveTypeName(&boundRef, module, imports)
+		if err != nil {
+			return err
+		}
+		proto, ok := protocolInfos[resolved]
+		if !ok {
+			if _, isType := types[resolved]; isType {
+				return fmt.Errorf("%s: generic bound '%s' for '%s' must name a protocol, got non-protocol type '%s'", frontend.FormatPos(bound.Bound.At), displayTypeName(resolved, module), bound.Name, displayTypeName(resolved, module))
+			}
+			return fmt.Errorf("%s: unknown protocol bound '%s' for generic parameter '%s'", frontend.FormatPos(bound.Bound.At), displayTypeName(resolved, module), bound.Name)
+		}
+		if !symbolBelongsToModule(resolved, module) && !proto.public {
+			return fmt.Errorf("%s: private protocol '%s' is not visible from module '%s'", frontend.FormatPos(bound.Bound.At), resolved, module)
 		}
 	}
 	if err := validateGenericTypeRef(fn.ReturnType, params); err != nil {
@@ -2532,6 +2559,210 @@ func validateGenericFuncDecl(fn *frontend.FuncDecl) error {
 	for _, param := range fn.Params {
 		if err := validateGenericTypeRef(param.Type, params); err != nil {
 			return fmt.Errorf("%s: %v", frontend.FormatPos(param.At), err)
+		}
+	}
+	if err := validateGenericBoundRequirementCalls(fn.Body, boundParams); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateGenericBoundRequirementCalls(stmts []frontend.Stmt, boundParams map[string]struct{}) error {
+	if len(boundParams) == 0 {
+		return nil
+	}
+	return walkGenericBoundRequirementCallsInStmts(stmts, boundParams)
+}
+
+func walkGenericBoundRequirementCallsInStmts(stmts []frontend.Stmt, boundParams map[string]struct{}) error {
+	for _, stmt := range stmts {
+		switch s := stmt.(type) {
+		case *frontend.ReturnStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Value, boundParams); err != nil {
+				return err
+			}
+		case *frontend.ThrowStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Value, boundParams); err != nil {
+				return err
+			}
+		case *frontend.DeferStmt:
+			if err := walkGenericBoundRequirementCallsInStmts(s.Body, boundParams); err != nil {
+				return err
+			}
+		case *frontend.PrintStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Value, boundParams); err != nil {
+				return err
+			}
+		case *frontend.ExpectStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Cond, boundParams); err != nil {
+				return err
+			}
+		case *frontend.FreeStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Value, boundParams); err != nil {
+				return err
+			}
+		case *frontend.LetStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Value, boundParams); err != nil {
+				return err
+			}
+		case *frontend.AssignStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Target, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInExpr(s.Value, boundParams); err != nil {
+				return err
+			}
+		case *frontend.IfStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Cond, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInStmts(s.Then, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInStmts(s.Else, boundParams); err != nil {
+				return err
+			}
+		case *frontend.IfLetStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Pattern, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInExpr(s.Value, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInStmts(s.Then, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInStmts(s.Else, boundParams); err != nil {
+				return err
+			}
+		case *frontend.WhileStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Cond, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInStmts(s.Body, boundParams); err != nil {
+				return err
+			}
+		case *frontend.ForRangeStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Start, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInExpr(s.End, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInExpr(s.Iterable, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInStmts(s.Body, boundParams); err != nil {
+				return err
+			}
+		case *frontend.MatchStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Value, boundParams); err != nil {
+				return err
+			}
+			for i := range s.Cases {
+				if err := walkGenericBoundRequirementCallsInExpr(s.Cases[i].Pattern, boundParams); err != nil {
+					return err
+				}
+				if err := walkGenericBoundRequirementCallsInExpr(s.Cases[i].Guard, boundParams); err != nil {
+					return err
+				}
+				if err := walkGenericBoundRequirementCallsInStmts(s.Cases[i].Body, boundParams); err != nil {
+					return err
+				}
+			}
+		case *frontend.UnsafeStmt:
+			if err := walkGenericBoundRequirementCallsInStmts(s.Body, boundParams); err != nil {
+				return err
+			}
+		case *frontend.IslandStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Size, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInStmts(s.Body, boundParams); err != nil {
+				return err
+			}
+		case *frontend.ExprStmt:
+			if err := walkGenericBoundRequirementCallsInExpr(s.Expr, boundParams); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func walkGenericBoundRequirementCallsInExpr(expr frontend.Expr, boundParams map[string]struct{}) error {
+	if expr == nil {
+		return nil
+	}
+	switch e := expr.(type) {
+	case *frontend.CallExpr:
+		if parts := strings.Split(e.Name, "."); len(parts) == 2 {
+			if _, ok := boundParams[parts[0]]; ok {
+				return fmt.Errorf("%s: calling protocol requirement '%s' through generic bound '%s' is not supported in this MVP; specialize the operation outside the generic", frontend.FormatPos(e.At), parts[1], parts[0])
+			}
+		}
+		for _, arg := range e.Args {
+			if err := walkGenericBoundRequirementCallsInExpr(arg, boundParams); err != nil {
+				return err
+			}
+		}
+	case *frontend.MatchExpr:
+		if err := walkGenericBoundRequirementCallsInExpr(e.Value, boundParams); err != nil {
+			return err
+		}
+		for i := range e.Cases {
+			if err := walkGenericBoundRequirementCallsInExpr(e.Cases[i].Pattern, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInExpr(e.Cases[i].Guard, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInExpr(e.Cases[i].Value, boundParams); err != nil {
+				return err
+			}
+		}
+	case *frontend.CatchExpr:
+		if err := walkGenericBoundRequirementCallsInExpr(e.Call, boundParams); err != nil {
+			return err
+		}
+		for i := range e.Cases {
+			if err := walkGenericBoundRequirementCallsInExpr(e.Cases[i].Pattern, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInExpr(e.Cases[i].Guard, boundParams); err != nil {
+				return err
+			}
+			if err := walkGenericBoundRequirementCallsInExpr(e.Cases[i].Value, boundParams); err != nil {
+				return err
+			}
+		}
+	case *frontend.UnaryExpr:
+		return walkGenericBoundRequirementCallsInExpr(e.X, boundParams)
+	case *frontend.BinaryExpr:
+		if err := walkGenericBoundRequirementCallsInExpr(e.Left, boundParams); err != nil {
+			return err
+		}
+		return walkGenericBoundRequirementCallsInExpr(e.Right, boundParams)
+	case *frontend.FieldAccessExpr:
+		return walkGenericBoundRequirementCallsInExpr(e.Base, boundParams)
+	case *frontend.IndexExpr:
+		if err := walkGenericBoundRequirementCallsInExpr(e.Base, boundParams); err != nil {
+			return err
+		}
+		return walkGenericBoundRequirementCallsInExpr(e.Index, boundParams)
+	case *frontend.TryExpr:
+		return walkGenericBoundRequirementCallsInExpr(e.X, boundParams)
+	case *frontend.AwaitExpr:
+		return walkGenericBoundRequirementCallsInExpr(e.X, boundParams)
+	case *frontend.StructLitExpr:
+		for _, field := range e.Fields {
+			if err := walkGenericBoundRequirementCallsInExpr(field.Value, boundParams); err != nil {
+				return err
+			}
+		}
+	case *frontend.ClosureExpr:
+		if e.Decl != nil {
+			return walkGenericBoundRequirementCallsInStmts(e.Decl.Body, boundParams)
 		}
 	}
 	return nil
@@ -2732,26 +2963,40 @@ func compareProtocolRequirement(typeName, protoName string, req frontend.FuncSig
 	if len(req.TypeParams) != len(method.TypeParams) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': generic parameter count differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
+	typeParamMap := make(map[string]string, len(req.TypeParams))
 	for i := range req.TypeParams {
-		if req.TypeParams[i] != method.TypeParams[i] {
-			return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': generic parameter %d name differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name, i+1)
-		}
+		typeParamMap[req.TypeParams[i]] = method.TypeParams[i]
 	}
 	if len(req.Params) != len(method.Params) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': parameter count differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
+	if len(req.Params) == 0 {
+		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': missing self parameter", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
+	}
+	if req.Params[0].Name != "self" {
+		return fmt.Errorf("%s: protocol '%s' requirement '%s': first parameter must be 'self'", frontend.FormatPos(req.Params[0].At), protoName, req.Name)
+	}
+	if method.Params[0].Name != "self" {
+		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': first parameter must be 'self'", frontend.FormatPos(method.Params[0].At), method.Name, protoName, req.Name)
+	}
+	if genericTypeName(req.Params[0].Type) != typeName {
+		return fmt.Errorf("%s: protocol '%s' requirement '%s': self parameter type must be '%s'", frontend.FormatPos(req.Params[0].At), protoName, req.Name, typeName)
+	}
+	if genericTypeName(method.Params[0].Type) != typeName {
+		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': self parameter type must be '%s'", frontend.FormatPos(method.Params[0].At), method.Name, protoName, req.Name, typeName)
+	}
 	for i := range req.Params {
-		if genericTypeName(req.Params[i].Type) != genericTypeName(method.Params[i].Type) {
+		if !protocolTypeRefsEquivalent(req.Params[i].Type, method.Params[i].Type, typeParamMap) {
 			return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': parameter %d type differs", frontend.FormatPos(method.Params[i].At), method.Name, protoName, req.Name, i+1)
 		}
 	}
-	if genericTypeName(req.ReturnType) != genericTypeName(method.ReturnType) {
+	if !protocolTypeRefsEquivalent(req.ReturnType, method.ReturnType, typeParamMap) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': return type differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
 	if req.Async != method.Async {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': async marker differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
-	if req.HasThrows != method.HasThrows || genericTypeName(req.Throws) != genericTypeName(method.Throws) {
+	if req.HasThrows != method.HasThrows || !protocolTypeRefsEquivalent(req.Throws, method.Throws, typeParamMap) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': throws type differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
 	reqEffects, err := normalizeEffects(req.Uses, req.At)
@@ -2767,6 +3012,71 @@ func compareProtocolRequirement(typeName, protoName string, req frontend.FuncSig
 		return fmt.Errorf("%s: method '%s' for type '%s' does not match protocol '%s' requirement '%s': missing required effects %s", frontend.FormatPos(method.Pos), method.Name, typeName, protoName, req.Name, strings.Join(missing, ", "))
 	}
 	return nil
+}
+
+func protocolTypeRefsEquivalent(req frontend.TypeRef, method frontend.TypeRef, typeParamMap map[string]string) bool {
+	if req.Kind != method.Kind {
+		return false
+	}
+	switch req.Kind {
+	case frontend.TypeRefNamed:
+		reqName := genericTypeName(req)
+		methodName := genericTypeName(method)
+		if mapped, ok := typeParamMap[reqName]; ok {
+			return mapped == methodName
+		}
+		if len(req.TypeArgs) != len(method.TypeArgs) {
+			return false
+		}
+		if req.Name != method.Name {
+			return false
+		}
+		for i := range req.TypeArgs {
+			if !protocolTypeRefsEquivalent(req.TypeArgs[i], method.TypeArgs[i], typeParamMap) {
+				return false
+			}
+		}
+		return true
+	case frontend.TypeRefSlice, frontend.TypeRefOptional:
+		if req.Elem == nil || method.Elem == nil {
+			return req.Elem == nil && method.Elem == nil
+		}
+		return protocolTypeRefsEquivalent(*req.Elem, *method.Elem, typeParamMap)
+	case frontend.TypeRefArray:
+		if req.Len != method.Len {
+			return false
+		}
+		if req.Elem == nil || method.Elem == nil {
+			return req.Elem == nil && method.Elem == nil
+		}
+		return protocolTypeRefsEquivalent(*req.Elem, *method.Elem, typeParamMap)
+	case frontend.TypeRefFunction:
+		if len(req.Params) != len(method.Params) {
+			return false
+		}
+		for i := range req.Params {
+			if !protocolTypeRefsEquivalent(req.Params[i], method.Params[i], typeParamMap) {
+				return false
+			}
+		}
+		if req.Return == nil || method.Return == nil {
+			return req.Return == nil && method.Return == nil
+		}
+		if !protocolTypeRefsEquivalent(*req.Return, *method.Return, typeParamMap) {
+			return false
+		}
+		reqEffects, err := normalizeEffects(req.Uses, req.At)
+		if err != nil {
+			return false
+		}
+		methodEffects, err := normalizeEffects(method.Uses, method.At)
+		if err != nil {
+			return false
+		}
+		return len(missingRequiredEffects(reqEffects, methodEffects)) == 0 && len(missingRequiredEffects(methodEffects, reqEffects)) == 0
+	default:
+		return genericTypeName(req) == genericTypeName(method)
+	}
 }
 
 func missingRequiredEffects(required []string, declared []string) []string {

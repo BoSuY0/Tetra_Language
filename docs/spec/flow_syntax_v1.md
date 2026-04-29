@@ -468,7 +468,10 @@ The v1 protocols contract accepts declarations with typed required function
 signatures, validates referenced types, and exposes them to formatter,
 generated docs, and LSP symbols. `impl Type: Protocol` checks that matching
 extension/static methods exist with compatible signatures, including effects,
-async, throws, params, and return type. Duplicate impls are rejected.
+async, throws, params, and return type. Duplicate impls are rejected. Protocol
+conformance is a static compile-time contract in this MVP: no witness tables,
+trait objects, runtime protocol values, existential containers, or dynamic
+dispatch model are introduced.
 Minimal generic protocol requirements are supported using syntax such as
 `func map<T>(self: Vec2, value: T) -> T`. Current MVP limits:
 
@@ -506,11 +509,13 @@ func id<T>(x: T) -> T:
     return x
 ```
 
-The v1 generics MVP parses, validates, formats, documents, and monomorphizes
-generic function calls with inferred value arguments across modules. Generated
-specialization names are deterministic and encode fully qualified type names to
-avoid collisions. Higher-ranked generics, explicit type arguments,
-full protocol-bound generic dispatch, and specialization optimization remain
+The v1 generics MVP parses, validates, formats, documents, and statically
+monomorphizes generic function calls with inferred value arguments across
+modules. Generated specialization names are deterministic and encode fully
+qualified type names to avoid collisions. No runtime generic value model,
+metadata-driven specialization, or dynamic dispatch behavior is introduced.
+Higher-ranked generics, explicit type arguments, generic structs, full
+protocol-bound generic dispatch, and specialization optimization remain
 post-v1.
 
 Unsafe and scoped islands:

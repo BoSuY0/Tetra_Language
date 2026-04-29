@@ -16,6 +16,8 @@ type genericDef struct {
 	imports      map[string]string
 	decl         *frontend.FuncDecl
 	conformances map[protocolConformanceKey]frontend.Position
+	protocols    map[string]genericProtocolInfo
+	knownTypes   map[string]struct{}
 }
 
 type genericStructDef struct {
@@ -33,6 +35,11 @@ type genericWorkItem struct {
 type protocolConformanceKey struct {
 	typeName string
 	protocol string
+}
+
+type genericProtocolInfo struct {
+	module string
+	public bool
 }
 
 func monomorphizeGenerics(world *module.World) error {
@@ -60,8 +67,12 @@ func monomorphizeGenerics(world *module.World) error {
 	if err != nil {
 		return err
 	}
+	protocols := collectGenericProtocolInfos(world)
+	knownTypes := collectGenericKnownTypes(world)
 	for name, def := range generics {
 		def.conformances = conformances
+		def.protocols = protocols
+		def.knownTypes = knownTypes
 		generics[name] = def
 	}
 	structCtx := newGenericStructContext(world, fileImports)
@@ -142,6 +153,39 @@ func collectProtocolConformances(world *module.World, fileImports map[*frontend.
 		}
 	}
 	return conformances, nil
+}
+
+func collectGenericProtocolInfos(world *module.World) map[string]genericProtocolInfo {
+	protocols := map[string]genericProtocolInfo{}
+	for _, file := range world.Files {
+		for _, proto := range file.Protocols {
+			fullName := qualifyName(file.Module, proto.Name)
+			protocols[fullName] = genericProtocolInfo{
+				module: file.Module,
+				public: declarationIsPublic(file, proto.Public),
+			}
+		}
+	}
+	return protocols
+}
+
+func collectGenericKnownTypes(world *module.World) map[string]struct{} {
+	known := map[string]struct{}{}
+	for name := range baseTypes() {
+		known[name] = struct{}{}
+	}
+	for _, file := range world.Files {
+		for _, st := range file.Structs {
+			known[qualifyName(file.Module, st.Name)] = struct{}{}
+		}
+		for _, st := range file.States {
+			known[qualifyName(file.Module, st.Name)] = struct{}{}
+		}
+		for _, en := range file.Enums {
+			known[qualifyName(file.Module, en.Name)] = struct{}{}
+		}
+	}
+	return known
 }
 
 func monomorphizeGenericStructs(world *module.World, fileImports map[*frontend.FileAST]map[string]string) error {
@@ -293,13 +337,16 @@ func (ctx *genericStructContext) rewriteTypeRef(ref *frontend.TypeRef, module st
 		}
 		subst := map[string]string{}
 		for i, tp := range generic.decl.TypeParams {
+			if containsFunctionTypeRef(ref.TypeArgs[i]) {
+				return fmt.Errorf("%s: generic struct '%s' type argument '%s' uses function type; storing function-typed values in structs is not supported in this MVP", frontend.FormatPos(ref.TypeArgs[i].At), ref.Name, tp)
+			}
 			argName, err := resolveTypeName(&ref.TypeArgs[i], module, imports)
 			if err != nil {
 				return err
 			}
 			subst[tp] = argName
 		}
-		name, err := ctx.instantiate(generic, subst)
+		name, err := ctx.instantiate(generic, subst, ref.At)
 		if err != nil {
 			return err
 		}
@@ -311,10 +358,13 @@ func (ctx *genericStructContext) rewriteTypeRef(ref *frontend.TypeRef, module st
 	}
 }
 
-func (ctx *genericStructContext) instantiate(generic genericStructDef, subst map[string]string) (string, error) {
+func (ctx *genericStructContext) instantiate(generic genericStructDef, subst map[string]string, at frontend.Position) (string, error) {
 	name := mangleGenericName(generic.decl.Name, generic.decl.TypeParams, subst)
 	fullName := qualifyName(generic.module, name)
-	if _, exists := ctx.created[fullName]; exists {
+	if existing, exists := ctx.created[fullName]; exists {
+		if hasGenericStructTemplateRefs(existing) {
+			return "", fmt.Errorf("%s: nested generic struct instantiation for '%s' is not supported in this MVP", frontend.FormatPos(at), displayTypeName(fullName, generic.module))
+		}
 		return name, nil
 	}
 	clone := *generic.decl
@@ -330,11 +380,77 @@ func (ctx *genericStructContext) instantiate(generic genericStructDef, subst map
 	for i, field := range generic.decl.Fields {
 		clone.Fields[i] = field
 		clone.Fields[i].Type = substituteTypeRef(field.Type, subst)
+		if hasDirectFunctionTypeRef(clone.Fields[i].Type) {
+			return "", fmt.Errorf("%s: struct field '%s.%s' uses function type; storing function-typed values in structs is not supported in this MVP", frontend.FormatPos(clone.Fields[i].At), displayTypeName(fullName, generic.module), clone.Fields[i].Name)
+		}
+		if hasGenericTypeArgs(clone.Fields[i].Type) {
+			return "", fmt.Errorf("%s: nested generic struct instantiation for '%s.%s' is not supported in this MVP", frontend.FormatPos(clone.Fields[i].At), displayTypeName(fullName, generic.module), clone.Fields[i].Name)
+		}
 		if err := ctx.rewriteTypeRef(&clone.Fields[i].Type, generic.module, imports); err != nil {
 			return "", err
 		}
 	}
+	if hasGenericStructTemplateRefs(&clone) {
+		return "", fmt.Errorf("%s: nested generic struct instantiation for '%s' is not supported in this MVP", frontend.FormatPos(at), displayTypeName(fullName, generic.module))
+	}
 	return name, nil
+}
+
+func hasGenericStructTemplateRefs(st *frontend.StructDecl) bool {
+	if st == nil {
+		return false
+	}
+	for i := range st.Fields {
+		if hasGenericTypeArgs(st.Fields[i].Type) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasGenericTypeArgs(ref frontend.TypeRef) bool {
+	if len(ref.TypeArgs) > 0 {
+		return true
+	}
+	if ref.Elem != nil && hasGenericTypeArgs(*ref.Elem) {
+		return true
+	}
+	if ref.Return != nil && hasGenericTypeArgs(*ref.Return) {
+		return true
+	}
+	for i := range ref.Params {
+		if hasGenericTypeArgs(ref.Params[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasDirectFunctionTypeRef(ref frontend.TypeRef) bool {
+	return ref.Kind == frontend.TypeRefFunction
+}
+
+func containsFunctionTypeRef(ref frontend.TypeRef) bool {
+	if ref.Kind == frontend.TypeRefFunction {
+		return true
+	}
+	if ref.Elem != nil && containsFunctionTypeRef(*ref.Elem) {
+		return true
+	}
+	if ref.Return != nil && containsFunctionTypeRef(*ref.Return) {
+		return true
+	}
+	for i := range ref.Params {
+		if containsFunctionTypeRef(ref.Params[i]) {
+			return true
+		}
+	}
+	for i := range ref.TypeArgs {
+		if containsFunctionTypeRef(ref.TypeArgs[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 func (ctx *genericStructContext) rewriteStmts(stmts []frontend.Stmt, module string, imports map[string]string) error {
@@ -847,7 +963,7 @@ func monomorphizeExpr(
 				return "", fmt.Errorf("%s: cannot infer generic argument '%s' for '%s'", frontend.FormatPos(e.At), tp, e.Name)
 			}
 		}
-		if err := checkGenericProtocolBounds(e.At, e.Name, generic, subst); err != nil {
+		if err := checkGenericProtocolBounds(e.At, e.Name, generic, subst, module); err != nil {
 			return "", err
 		}
 		name := mangleGenericName(generic.decl.Name, generic.decl.TypeParams, subst)
@@ -880,7 +996,7 @@ func monomorphizeExpr(
 	}
 }
 
-func checkGenericProtocolBounds(callPos frontend.Position, callName string, generic genericDef, subst map[string]string) error {
+func checkGenericProtocolBounds(callPos frontend.Position, callName string, generic genericDef, subst map[string]string, callerModule string) error {
 	for _, bound := range generic.decl.TypeParamBounds {
 		actual := subst[bound.Name]
 		if actual == "" {
@@ -890,6 +1006,29 @@ func checkGenericProtocolBounds(callPos frontend.Position, callName string, gene
 		protoName, err := resolveTypeName(&boundRef, generic.module, generic.imports)
 		if err != nil {
 			return err
+		}
+		protoInfo, ok := generic.protocols[protoName]
+		if !ok {
+			if _, isType := generic.knownTypes[protoName]; isType {
+				return fmt.Errorf("%s: generic bound '%s' for '%s' must name a protocol, got non-protocol type '%s'",
+					frontend.FormatPos(bound.Bound.At),
+					displayTypeName(protoName, generic.module),
+					bound.Name,
+					displayTypeName(protoName, generic.module),
+				)
+			}
+			return fmt.Errorf("%s: unknown protocol bound '%s' for generic parameter '%s'",
+				frontend.FormatPos(bound.Bound.At),
+				displayTypeName(protoName, generic.module),
+				bound.Name,
+			)
+		}
+		if !symbolBelongsToModule(protoName, callerModule) && !protoInfo.public {
+			return fmt.Errorf("%s: private protocol '%s' is not visible from module '%s'",
+				frontend.FormatPos(callPos),
+				protoName,
+				callerModule,
+			)
 		}
 		if _, ok := generic.conformances[protocolConformanceKey{typeName: actual, protocol: protoName}]; ok {
 			continue

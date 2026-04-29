@@ -201,6 +201,8 @@ func verifyFeatureRegistry(features []featureManifest) error {
 	requiredIDs := map[string]string{
 		"cli.core":                            "current",
 		"language.flow":                       "current",
+		"language.generics-mvp":               "current",
+		"language.protocol-conformance-mvp":   "current",
 		"language.callable-mvp":               "current",
 		"language.callable-level1":            "experimental",
 		"targets.wasm-build-only":             "current",
@@ -213,6 +215,7 @@ func verifyFeatureRegistry(features []featureManifest) error {
 		"language.full-first-class-callables": "post-v1",
 	}
 	seen := map[string]string{}
+	featureByID := map[string]featureManifest{}
 	var currentCount int
 	for _, feature := range features {
 		if feature.ID == "" {
@@ -228,6 +231,7 @@ func verifyFeatureRegistry(features []featureManifest) error {
 			return fmt.Errorf("feature %s is duplicated with statuses %s and %s", feature.ID, seenStatus, feature.Status)
 		}
 		seen[feature.ID] = feature.Status
+		featureByID[feature.ID] = feature
 		requiredStatus[feature.Status] = true
 		if feature.Status == "current" {
 			currentCount++
@@ -269,7 +273,54 @@ func verifyFeatureRegistry(features []featureManifest) error {
 			return fmt.Errorf("feature registry %s status = %s, want %s", id, gotStatus, wantStatus)
 		}
 	}
+	if err := verifyFeatureTruthBoundaries(featureByID); err != nil {
+		return err
+	}
 	return nil
+}
+
+func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
+	checks := map[string][]string{
+		"language.generics-mvp": {
+			"statically monomorphized",
+			"no runtime generic values or dynamic dispatch",
+			"generic structs",
+			"future/post-v1",
+		},
+		"language.protocol-conformance-mvp": {
+			"checked statically",
+			"generic requirement signature shape",
+			"no witness tables",
+			"dynamic dispatch remain post-v1",
+		},
+	}
+	for id, required := range checks {
+		feature, ok := features[id]
+		if !ok {
+			return fmt.Errorf("feature registry missing %s", id)
+		}
+		haystack := feature.Scope + " " + feature.Stability
+		for _, want := range required {
+			if !strings.Contains(haystack, want) {
+				return fmt.Errorf("feature registry %s missing truth-boundary phrase %q", id, want)
+			}
+		}
+		for _, doc := range []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"} {
+			if !hasString(feature.Docs, doc) {
+				return fmt.Errorf("feature registry %s missing doc reference %s", id, doc)
+			}
+		}
+	}
+	return nil
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func statFromRepoRoot(path string) (os.FileInfo, error) {
