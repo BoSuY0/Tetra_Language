@@ -258,6 +258,138 @@ uses actors:
 	}
 }
 
+func TestEpic06OwnershipAliasRejectionMatrix(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "consume requires local value",
+			src: `
+func take(x: consume Int) -> Int:
+    return x
+
+func main() -> Int:
+    return take(1 + 2)
+`,
+			want: "consume argument for 'take' must be a local value",
+		},
+		{
+			name: "double consume same local in one call",
+			src: `
+func take_pair(left: consume Int, right: consume Int) -> Int:
+    return left + right
+
+func main() -> Int:
+    let value: Int = 1
+    return take_pair(value, value)
+`,
+			want: "value 'value' consumed more than once in call to 'take_pair'",
+		},
+		{
+			name: "borrow and inout alias rejected",
+			src: `
+func mix(read: borrow Int, write: inout Int) -> Int:
+    write = write + read
+    return write
+
+func main() -> Int:
+    var value: Int = 1
+    return mix(value, value)
+`,
+			want: "inout argument 'value' aliases borrowed argument in call to 'mix'",
+		},
+		{
+			name: "inout and borrow alias rejected",
+			src: `
+func mix(write: inout Int, read: borrow Int) -> Int:
+    write = write + read
+    return write
+
+func main() -> Int:
+    var value: Int = 1
+    return mix(value, value)
+`,
+			want: "borrowed argument 'value' aliases inout argument in call to 'mix'",
+		},
+		{
+			name: "consume and inout alias rejected",
+			src: `
+func move_and_write(moved: consume Int, write: inout Int) -> Int:
+    write = write + moved
+    return write
+
+func main() -> Int:
+    var value: Int = 1
+    return move_and_write(value, value)
+`,
+			want: "inout argument 'value' aliases consumed argument in call to 'move_and_write'",
+		},
+		{
+			name: "inout and consume alias rejected",
+			src: `
+func write_and_move(write: inout Int, moved: consume Int) -> Int:
+    write = write + moved
+    return write
+
+func main() -> Int:
+    var value: Int = 1
+    return write_and_move(value, value)
+`,
+			want: "consumed argument 'value' aliases inout argument in call to 'write_and_move'",
+		},
+		{
+			name: "borrowed island slice cannot pass to non-borrow parameter",
+			src: `
+func use_buf(buf: []u8) -> Int:
+    return 0
+
+func forward(buf: borrow []u8) -> Int:
+    return use_buf(buf)
+
+func main() -> Int:
+    return 0
+`,
+			want: "borrowed value derived from 'buf' cannot be passed to non-borrow parameter 1 of 'use_buf'",
+		},
+		{
+			name: "borrowed island slice cannot pass as inout",
+			src: `
+func mutate(buf: inout []u8) -> Int:
+    return 0
+
+func forward(buf: borrow []u8) -> Int:
+    return mutate(buf)
+
+func main() -> Int:
+    return 0
+`,
+			want: "borrowed value derived from 'buf' cannot be passed as inout to 'mutate'",
+		},
+		{
+			name: "borrowed island slice cannot be consumed",
+			src: `
+func take(buf: consume []u8) -> Int:
+    return 0
+
+func forward(buf: borrow []u8) -> Int:
+    return take(buf)
+
+func main() -> Int:
+    return 0
+`,
+			want: "borrowed value derived from 'buf' cannot be consumed by 'take'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requireCheckFileErrorContains(t, tt.src, tt.want)
+		})
+	}
+}
+
 func TestEpic06CapabilityAndIslandExamplesUseAuditedEffects(t *testing.T) {
 	for _, path := range []string{
 		"examples/cap_mem_smoke.tetra",
