@@ -589,6 +589,16 @@ capsule Demo:
 	if meta["schema"] != "tetra.eco.publish.v1beta" || meta["channel"] != "beta" {
 		t.Fatalf("publish metadata = %#v", meta)
 	}
+	trustMeta, ok := meta["trust"].(map[string]any)
+	if !ok {
+		t.Fatalf("publish metadata missing trust object: %#v", meta)
+	}
+	if trustMeta["snapshot_file"] != "trust.snapshot.json" {
+		t.Fatalf("trust snapshot file should be registry-local relative path: %#v", trustMeta)
+	}
+	if _, err := os.Stat(filepath.Join(registry, "packages", "tetra_demo", "0.1.0", "linux-x64", "trust.snapshot.json")); err != nil {
+		t.Fatalf("published trust snapshot missing: %v", err)
+	}
 }
 
 func TestEcoDownloadRejectsTamperedPublishedPackage(t *testing.T) {

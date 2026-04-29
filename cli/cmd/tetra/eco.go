@@ -2878,6 +2878,10 @@ func publishPackage(pkgPath string, registry string, target string, trustPath st
 			return "", err
 		}
 		hash := sha256.Sum256(raw)
+		trustFile := "trust.snapshot.json"
+		if err := os.WriteFile(filepath.Join(targetDir, trustFile), raw, 0o644); err != nil {
+			return "", err
+		}
 		tier := "unknown"
 		var snapshot ecoTrustSnapshot
 		if err := json.Unmarshal(raw, &snapshot); err == nil {
@@ -2889,7 +2893,7 @@ func publishPackage(pkgPath string, registry string, target string, trustPath st
 			}
 		}
 		meta.Trust = &ecoPublishTrust{
-			SnapshotFile: filepath.Clean(trustPath),
+			SnapshotFile: trustFile,
 			SnapshotHash: "sha256:" + hex.EncodeToString(hash[:]),
 			TrustTier:    tier,
 		}

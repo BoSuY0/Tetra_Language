@@ -129,11 +129,24 @@ func validatePublishedPackage(registry string, id string, version string, target
 		return fmt.Errorf("capsule targets missing selected target %s", target)
 	}
 	if meta.Trust != nil {
-		if _, err := parseSHA256Hash(meta.Trust.SnapshotHash); err != nil {
+		if err := validateRelativeMetadataPath(meta.Trust.SnapshotFile, "trust snapshot file"); err != nil {
+			return err
+		}
+		hexHash, err := parseSHA256Hash(meta.Trust.SnapshotHash)
+		if err != nil {
 			return err
 		}
 		if meta.Trust.TrustTier == "" {
 			return fmt.Errorf("trust tier is required")
+		}
+		snapshotPath := filepath.Join(targetDir, filepath.FromSlash(meta.Trust.SnapshotFile))
+		rawSnapshot, err := os.ReadFile(snapshotPath)
+		if err != nil {
+			return err
+		}
+		snapshotSum := sha256.Sum256(rawSnapshot)
+		if hex.EncodeToString(snapshotSum[:]) != hexHash {
+			return fmt.Errorf("trust snapshot hash mismatch for %s", snapshotPath)
 		}
 	}
 	if err := validateRelativeMetadataPath(meta.Package.File, "package file"); err != nil {

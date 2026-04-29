@@ -94,6 +94,41 @@ func TestValidateEcoPublishRejectsDownloadPathMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateEcoPublishRejectsUnsafeTrustSnapshotPath(t *testing.T) {
+	root, id, version, target := makePublishFixture(t)
+	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	raw, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.Replace(string(raw), `"snapshot_file": "trust.snapshot.json"`, `"snapshot_file": "../trust.snapshot.json"`, 1)
+	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runPublishValidator(t, root, id, version, target)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unsafe trust snapshot file path") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateEcoPublishRejectsTrustSnapshotHashMismatch(t *testing.T) {
+	root, id, version, target := makePublishFixture(t)
+	snapshotPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "trust.snapshot.json")
+	if err := os.WriteFile(snapshotPath, []byte(`{"schema":"tetra.eco.trust-snapshot.v1","tampered":true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runPublishValidator(t, root, id, version, target)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "trust snapshot hash mismatch") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func makePublishFixture(t *testing.T) (root string, id string, version string, target string) {
 	t.Helper()
 	root = t.TempDir()
@@ -106,6 +141,12 @@ func makePublishFixture(t *testing.T) (root string, id string, version string, t
 	}
 	pkg := []byte("todex")
 	sum := sha256.Sum256(pkg)
+	trustSnapshot := []byte(`{"schema":"tetra.eco.trust-snapshot.v1","record_count":0}`)
+	trustSum := sha256.Sum256(trustSnapshot)
+	trustHash := hex.EncodeToString(trustSum[:])
+	if err := os.WriteFile(filepath.Join(dir, "trust.snapshot.json"), trustSnapshot, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, "package.todex"), pkg, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +177,7 @@ func makePublishFixture(t *testing.T) (root string, id string, version string, t
     {"target": %q, "path": "packages/tetra_demo/0.1.0/linux-x64/package.todex"}
   ]
 }
-`, id, version, target, target, len(pkg), hex.EncodeToString(sum[:]), strings.Repeat("a", 64), target)
+`, id, version, target, target, len(pkg), hex.EncodeToString(sum[:]), trustHash, target)
 	if err := os.WriteFile(filepath.Join(dir, "metadata.json"), []byte(meta), 0o644); err != nil {
 		t.Fatal(err)
 	}
