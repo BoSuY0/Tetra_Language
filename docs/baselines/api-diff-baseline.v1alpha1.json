@@ -2,13 +2,13 @@
   "schema": "tetra.api.diff-baseline.v1alpha1",
   "created_at": "1970-01-01T00:00:00Z",
   "timestamp_policy": "deterministic (SOURCE_DATE_EPOCH, fallback 1970-01-01T00:00:00Z)",
-  "source_docs": "reports/api-diff-baseline-refresh-20260428-180357/api-docs.md",
-  "source_docs_sha256": "sha256:86a9461760c5c32a230ec6e54b899e6f3b735183ef6b1e7b33905a38e0c41559",
+  "source_docs": "/tmp/tetra-api-baseline-refresh-20260429/api-docs.md",
+  "source_docs_sha256": "sha256:d4fc8e4edeb3930a3af30535589d12076ea73f7ae6f79179f3825fd540943200",
   "api_metadata": {
     "schema": "tetra.api.v1alpha1",
-    "api_hash": "sha256:f0e6e040816960c1f4a333e840d1022acb357c130f4ef45d5d870fe6190ae5f4",
-    "module_count": 72,
-    "entry_count": 202
+    "api_hash": "sha256:0966ebbb412ee53a91f9737731d7e4f786bf3dfc3a5400723a5de8d8039ca390",
+    "module_count": 81,
+    "entry_count": 226
   },
   "symbols": [
     {
@@ -404,6 +404,34 @@
       "symbol_hash": "sha256:ea1a92b89a342ba3636d872e8dde2f60687e52687d2c6ef1bd268cbacfe8a649"
     },
     {
+      "id": "examples/actor_sleep_pingpong.tetra::Functions::func delayed_pong",
+      "module": "examples/actor_sleep_pingpong.tetra",
+      "section": "Functions",
+      "entry": "func delayed_pong() -> i32 uses actors, runtime",
+      "symbol_hash": "sha256:8d10c68ff4a05f79f4c9322550e1d4fb0d252740b18fe1fcd9e442cfcd92e47f"
+    },
+    {
+      "id": "examples/actor_sleep_pingpong.tetra::Functions::func main",
+      "module": "examples/actor_sleep_pingpong.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses actors, runtime",
+      "symbol_hash": "sha256:86030993984da4e93ca496be039dec2d4d2659ace3b430d7841ca32d7555494f"
+    },
+    {
+      "id": "examples/actors_decl_spawn.tetra::Functions::func main",
+      "module": "examples/actors_decl_spawn.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses actors",
+      "symbol_hash": "sha256:f1dd09144937da464cde675efeab6db933fc557857a0bcc9edddce59441c7972"
+    },
+    {
+      "id": "examples/actors_decl_spawn.tetra::Functions::func Ponger.run() -> i32 uses actors",
+      "module": "examples/actors_decl_spawn.tetra",
+      "section": "Functions",
+      "entry": "func Ponger.run() -> i32 uses actors",
+      "symbol_hash": "sha256:ecc0f7dfe5dce4e28a2f65996fd64723d3d71637afa76a558968d871f3e691ff"
+    },
+    {
       "id": "examples/actors_pingpong.tetra::Functions::func main",
       "module": "examples/actors_pingpong.tetra",
       "section": "Functions",
@@ -600,6 +628,27 @@
       "symbol_hash": "sha256:793d807303eb5d53684b3360405cd69de6397e2ca8e25fdf641b4da6a2999013"
     },
     {
+      "id": "examples/deadline_aware_waits_smoke.tetra::Functions::func delayed_sender",
+      "module": "examples/deadline_aware_waits_smoke.tetra",
+      "section": "Functions",
+      "entry": "func delayed_sender() -> i32 uses actors, runtime",
+      "symbol_hash": "sha256:4da5410373d005ee4195a169bfee3ecdc0ceaaf524d81ca33d32da94405fc0b3"
+    },
+    {
+      "id": "examples/deadline_aware_waits_smoke.tetra::Functions::func delayed_task",
+      "module": "examples/deadline_aware_waits_smoke.tetra",
+      "section": "Functions",
+      "entry": "func delayed_task() -> i32 uses runtime",
+      "symbol_hash": "sha256:badac47dc177a50b90a673b82451fae3a6f36c40732c7953e17a2d9c73423e27"
+    },
+    {
+      "id": "examples/deadline_aware_waits_smoke.tetra::Functions::func main",
+      "module": "examples/deadline_aware_waits_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses actors, runtime",
+      "symbol_hash": "sha256:ccb0f6fe9165d2883752c29ecf5e9ca272fcfeb812e2b25d5092bd5d0063945d"
+    },
+    {
       "id": "examples/effects_actors_smoke.tetra::Functions::func main",
       "module": "examples/effects_actors_smoke.tetra",
       "section": "Functions",
@@ -654,6 +703,55 @@
       "section": "Functions",
       "entry": "func main() -> i32",
       "symbol_hash": "sha256:a48f3ae2244e7d0c78f4164cdcba61f7848e9e52ed6ff14e0b972f0a51cba637"
+    },
+    {
+      "id": "examples/enum_payload_smoke.tetra::Enums::`CounterMsg`: inc, reset",
+      "module": "examples/enum_payload_smoke.tetra",
+      "section": "Enums",
+      "entry": "`CounterMsg`: inc, reset",
+      "symbol_hash": "sha256:2dc9b094f42131679aac7e3e39a975161d1611164c255b16bf03f68600907cb5"
+    },
+    {
+      "id": "examples/enum_payload_smoke.tetra::Enums::`DecodeError`: invalid, eof",
+      "module": "examples/enum_payload_smoke.tetra",
+      "section": "Enums",
+      "entry": "`DecodeError`: invalid, eof",
+      "symbol_hash": "sha256:4ec5aa1ea248770e19dfcbd1ebc7db25158a67545cccd1b669d17cb56ac0cdab"
+    },
+    {
+      "id": "examples/enum_payload_smoke.tetra::Functions::func bonus",
+      "module": "examples/enum_payload_smoke.tetra",
+      "section": "Functions",
+      "entry": "func bonus(msg: CounterMsg) -> i32",
+      "symbol_hash": "sha256:944b258b46bd57aefb13c25848c7954c3f1a7d664f740d2154cdd9e5319317bc"
+    },
+    {
+      "id": "examples/enum_payload_smoke.tetra::Functions::func decode",
+      "module": "examples/enum_payload_smoke.tetra",
+      "section": "Functions",
+      "entry": "func decode(flag: bool) -> CounterMsg",
+      "symbol_hash": "sha256:60f422a615297f5cc85396dc8c0da302795bdfd5e886963ff910a4b8e1d6f41f"
+    },
+    {
+      "id": "examples/enum_payload_smoke.tetra::Functions::func error_code",
+      "module": "examples/enum_payload_smoke.tetra",
+      "section": "Functions",
+      "entry": "func error_code(err: DecodeError) -> i32",
+      "symbol_hash": "sha256:810fdb8b8b098e86f9b21bd3d794a10235861ce9aa1c3389103c8c9afb83e7c0"
+    },
+    {
+      "id": "examples/enum_payload_smoke.tetra::Functions::func handle",
+      "module": "examples/enum_payload_smoke.tetra",
+      "section": "Functions",
+      "entry": "func handle(msg: CounterMsg) -> i32",
+      "symbol_hash": "sha256:749731ab6dfecaff436381400ea404035c59b33709b0d8f9a82b55511da05bdf"
+    },
+    {
+      "id": "examples/enum_payload_smoke.tetra::Functions::func main",
+      "module": "examples/enum_payload_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:388cafc80dc809c2b1dc0273d9f85c9b5d56f3814604c51c33e3494ee62e3d3b"
     },
     {
       "id": "examples/extension_smoke.tetra::Extensions::func Vec2.sum(self: Vec2) -> i32",
@@ -787,6 +885,27 @@
       "section": "Functions",
       "entry": "func main() -> i32",
       "symbol_hash": "sha256:36eaad03749f301cb6346e71ca220a941a7064520083fd7744bf22bbd9938414"
+    },
+    {
+      "id": "examples/generic_struct_smoke.tetra::Functions::func main",
+      "module": "examples/generic_struct_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:ec5696cb73573f80e3c7fd6fc1160fbc6a62e26ea33e9e7e84f1fa4948ec18e0"
+    },
+    {
+      "id": "examples/generic_struct_smoke.tetra::Structs::Box",
+      "module": "examples/generic_struct_smoke.tetra",
+      "section": "Structs",
+      "entry": "Box",
+      "symbol_hash": "sha256:1fc66a20942af302d66dc53960d372005454c0e4daac608e5ed69b42e2cfb98c"
+    },
+    {
+      "id": "examples/generic_struct_smoke.tetra::Structs::value: T",
+      "module": "examples/generic_struct_smoke.tetra",
+      "section": "Structs",
+      "entry": "value: T",
+      "symbol_hash": "sha256:dcd6ce08dd4281a806bd9150270b68c2be217740bd39bc4ab68ff98555d1e611"
     },
     {
       "id": "examples/globals_smoke.tetra::Functions::func main",
@@ -1188,6 +1307,34 @@
       "symbol_hash": "sha256:ba824d41329672555d11ed8009c8edf79f295c6442c4fe2a2d884eb15c23c3d1"
     },
     {
+      "id": "examples/task_join_wait_smoke.tetra::Functions::func main",
+      "module": "examples/task_join_wait_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses runtime",
+      "symbol_hash": "sha256:9774da56e75886a4e2b03d12420bd88d53f0e2776f22b1663e6a4baca929a841"
+    },
+    {
+      "id": "examples/task_join_wait_smoke.tetra::Functions::func worker",
+      "module": "examples/task_join_wait_smoke.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> i32 uses runtime",
+      "symbol_hash": "sha256:da80a41529b84299d72c09fe5d43f4e1ca811c9f84556046127b1a399dd0108c"
+    },
+    {
+      "id": "examples/task_sleep_deadline_smoke.tetra::Functions::func main",
+      "module": "examples/task_sleep_deadline_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses runtime",
+      "symbol_hash": "sha256:e8402f409fbd74527f8f273c46d16ff0b863887824618a5f274e481611120f11"
+    },
+    {
+      "id": "examples/task_sleep_deadline_smoke.tetra::Functions::func worker",
+      "module": "examples/task_sleep_deadline_smoke.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> i32 uses runtime",
+      "symbol_hash": "sha256:3ea0bc0f04d93eb2dc34cba141780bc56b3886fcb54cdc7ae20ea7eec5069041"
+    },
+    {
       "id": "examples/task_smoke.tetra::Functions::func main",
       "module": "examples/task_smoke.tetra",
       "section": "Functions",
@@ -1200,6 +1347,13 @@
       "section": "Functions",
       "entry": "func worker() -> i32",
       "symbol_hash": "sha256:050c58e25941c64ebfbed4786369df481f4cfdfbf7d5604caeac94f7a3757645"
+    },
+    {
+      "id": "examples/time_sleep_smoke.tetra::Functions::func main",
+      "module": "examples/time_sleep_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses runtime",
+      "symbol_hash": "sha256:c68050f58ef14146beffbf5ec8273d3db42ca0e1932cf30105645316d6bf10a4"
     },
     {
       "id": "examples/tooling_tests.tetra::Tests::math",
@@ -1424,6 +1578,20 @@
       "section": "Functions",
       "entry": "func main() -> i32",
       "symbol_hash": "sha256:5434c90d175c401217cae2bc881516a77b78403009cebd659fb41e3f6530a329"
+    },
+    {
+      "id": "examples/wait_composition_smoke.tetra::Functions::func main",
+      "module": "examples/wait_composition_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses actors, runtime",
+      "symbol_hash": "sha256:aea69e482018f4618a4ebbd442b31b1585123d839b776dbfc1d2c94d81cca7b5"
+    },
+    {
+      "id": "examples/wait_composition_smoke.tetra::Functions::func worker",
+      "module": "examples/wait_composition_smoke.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> i32 uses actors, runtime",
+      "symbol_hash": "sha256:07cb13a75c8be7d7e73a74305ab2bb4914e5a849f67e51dc4205c8d7dad060e7"
     }
   ]
 }
