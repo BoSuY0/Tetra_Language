@@ -269,27 +269,105 @@ uses runtime:
 	}
 }
 
-func TestTaskSpawnI32TypedStagedSelfHostRuntimeBuildAndRun(t *testing.T) {
-	src := `
+func TestTaskSpawnI32TypedRejectsExplicitSelfHostRuntime(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "main")
+	if err := os.WriteFile(srcPath, []byte(`
 enum TaskErr:
-    case boom(Int, Int)
+    case boom(Int)
+    case stopped
 
 func worker() -> Int throws TaskErr:
-    throw TaskErr.boom(20, 22)
+    throw TaskErr.boom(42)
 
 func main() -> Int
 uses runtime:
     let task = core.task_spawn_i32_typed<TaskErr>("worker")
     return catch core.task_join_i32_typed<TaskErr>(task):
-    case TaskErr.boom(a, b):
-        a + b
-`
-	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeSelfHost})
-	if stdout != "" {
-		t.Fatalf("stdout mismatch: %q", stdout)
+    case TaskErr.boom(code):
+        code
+    case TaskErr.stopped:
+        9
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
 	}
-	if exitCode != 42 {
-		t.Fatalf("exit code = %d, want 42", exitCode)
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", BuildOptions{Runtime: RuntimeSelfHost})
+	if err == nil {
+		t.Fatalf("expected explicit selfhost typed task rejection")
+	}
+	if !strings.Contains(err.Error(), "self-host runtime does not support typed task handles") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTaskSpawnI32TypedStagedSlotsEightNestedSpawnAutoAndBuiltinRuntimeParity(t *testing.T) {
+	src := `
+enum TaskErr:
+    case boom(Int, Int, Int, Int, Int)
+
+func child() -> Int throws TaskErr:
+    throw TaskErr.boom(1, 2, 3, 4, 5)
+
+func worker() -> Int throws TaskErr
+uses runtime:
+    let child_task = core.task_spawn_i32_typed<TaskErr>("child")
+    return catch core.task_join_i32_typed<TaskErr>(child_task):
+    case TaskErr.boom(a, b, c, d, e):
+        a + b + c + d + e
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(a, b, c, d, e):
+        90 + a + b + c + d + e
+`
+	for _, tc := range []struct {
+		name string
+		rt   RuntimeMode
+	}{
+		{name: "auto", rt: RuntimeAuto},
+		{name: "builtin", rt: RuntimeBuiltin},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: tc.rt})
+			if stdout != "" {
+				t.Fatalf("stdout mismatch: %q", stdout)
+			}
+			if exitCode != 15 {
+				t.Fatalf("exit code = %d, want 15", exitCode)
+			}
+		})
+	}
+}
+
+func TestTaskSpawnI32TypedStagedSlotsRejectsExplicitSelfHostRuntime(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "main")
+	if err := os.WriteFile(srcPath, []byte(`
+enum TaskErr:
+    case boom(Int, Int, Int, Int, Int)
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom(1, 2, 3, 4, 5)
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(a, b, c, d, e):
+        a + b + c + d + e
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", BuildOptions{Runtime: RuntimeSelfHost})
+	if err == nil {
+		t.Fatalf("expected explicit selfhost staged typed task rejection")
+	}
+	if !strings.Contains(err.Error(), "self-host runtime does not support typed task handles") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

@@ -513,7 +513,6 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 	tasksUsed := collectTaskRuntimeUsage(checked)
 	taskGroupsUsed := collectTaskGroupRuntimeUsage(checked)
 	typedTasksUsed, typedTaskMaxSlots := collectTypedTaskRuntimeUsage(checked)
-	typedTaskStagedUsed := typedTaskMaxSlots > 4
 	timeRuntimeUsed := collectTimeRuntimeUsage(checked)
 	runtimeUsed := actorsUsed || actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed
 	if runtimeUsed && len(actorEntries) == 0 {
@@ -532,10 +531,14 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 			if actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed {
 				runtimeMode = RuntimeBuiltin
 			}
-			if typedTaskStagedUsed {
+			if typedTaskMaxSlots > 4 {
 				runtimeMode = RuntimeBuiltin
 			}
-		case RuntimeSelfHost, RuntimeBuiltin:
+		case RuntimeSelfHost:
+			if typedTasksUsed {
+				return fmt.Errorf("self-host runtime does not support typed task handles; use runtime=auto or runtime=builtin")
+			}
+		case RuntimeBuiltin:
 			// ok
 		default:
 			return fmt.Errorf("unsupported runtime mode: %d", opt.Runtime)

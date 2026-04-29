@@ -346,12 +346,22 @@ uses actors:
     let _sent: Int = core.send(peer, 1)
     return core.recv()
 `
-	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeAuto})
-	if stdout != "" {
-		t.Fatalf("stdout mismatch: %q", stdout)
-	}
-	if exitCode != 6 {
-		t.Fatalf("exit code = %d, want 6", exitCode)
+	for _, tc := range []struct {
+		name string
+		rt   RuntimeMode
+	}{
+		{name: "auto", rt: RuntimeAuto},
+		{name: "selfhost", rt: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: tc.rt})
+			if stdout != "" {
+				t.Fatalf("stdout mismatch: %q", stdout)
+			}
+			if exitCode != 6 {
+				t.Fatalf("exit code = %d, want 6", exitCode)
+			}
+		})
 	}
 }
 
