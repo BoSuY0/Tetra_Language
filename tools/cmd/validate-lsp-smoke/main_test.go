@@ -84,6 +84,76 @@ func TestValidateLSPSmokeRejectsHoverWithoutSymbol(t *testing.T) {
 	}
 }
 
+func TestValidateLSPSmokeRejectsNonTetraURI(t *testing.T) {
+	report := `{
+  "uri": "sample.txt",
+  "diagnostics": [],
+  "symbols": [],
+  "hovers": []
+}`
+	out, err := runLSPValidator(t, report)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "uri must reference a .tetra file") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateLSPSmokeRejectsDuplicateSymbol(t *testing.T) {
+	report := `{
+  "uri": "sample.tetra",
+  "diagnostics": [],
+  "symbols": [
+    {"name": "main", "kind": "function", "line": 1, "column": 5},
+    {"name": "main", "kind": "function", "line": 1, "column": 5}
+  ],
+  "hovers": []
+}`
+	out, err := runLSPValidator(t, report)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "duplicate symbol main") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateLSPSmokeRejectsDuplicateHover(t *testing.T) {
+	report := `{
+  "uri": "sample.tetra",
+  "diagnostics": [],
+  "symbols": [{"name": "main", "kind": "function", "line": 1, "column": 5}],
+  "hovers": [
+    {"name": "main", "line": 1, "column": 5, "contents": "func main() -> Int"},
+    {"name": "main", "line": 1, "column": 5, "contents": "func main() -> Int"}
+  ]
+}`
+	out, err := runLSPValidator(t, report)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "duplicate hover main") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateLSPSmokeRejectsHoverWithoutContents(t *testing.T) {
+	report := `{
+  "uri": "sample.tetra",
+  "diagnostics": [],
+  "symbols": [{"name": "main", "kind": "function", "line": 1, "column": 5}],
+  "hovers": [{"name": "main", "line": 1, "column": 5, "contents": ""}]
+}`
+	out, err := runLSPValidator(t, report)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "hover main missing contents") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func runLSPValidator(t *testing.T, report string) ([]byte, error) {
 	t.Helper()
 	dir := t.TempDir()
