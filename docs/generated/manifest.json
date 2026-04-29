@@ -1019,7 +1019,7 @@
       "stability": "supported target metadata is validated by release checks",
       "docs": [
         "docs/spec/current_supported_surface.md",
-        "docs/spec/targets.md"
+        "docs/spec/cli_contracts.md"
       ]
     },
     {
@@ -1079,7 +1079,7 @@
       "stability": "supported MVP with explicit initializer/runtime limitations",
       "docs": [
         "docs/spec/current_supported_surface.md",
-        "docs/spec/capsule_metadata_v1.md"
+        "docs/spec/flow_syntax_v1.md"
       ]
     },
     {
@@ -1127,6 +1127,18 @@
       "stability": "experimental mirrors with no stability guarantees",
       "docs": [
         "docs/user/standard_library_guide.md"
+      ]
+    },
+    {
+      "id": "language.enum-payload-match",
+      "name": "Enum payload constructors and exhaustive match/catch",
+      "status": "experimental",
+      "scope": "next-cycle experimental promotion of positional enum payload constructors/bindings plus exhaustive enum match/catch coverage",
+      "stability": "experimental next-cycle slice; not part of the current v0.2.0 stable baseline until gated",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/flow_syntax_v1.md",
+        "docs/spec/v1_scope.md"
       ]
     },
     {

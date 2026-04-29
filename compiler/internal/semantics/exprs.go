@@ -2061,7 +2061,7 @@ func reportBarePayloadMatchExprPatterns(
 	}
 	for i := range e.Cases {
 		c := &e.Cases[i]
-		if c.Default || c.Guard != nil {
+		if c.Default {
 			continue
 		}
 		caseName, ok := bareEnumPatternCaseName(c.Pattern, scrutType, module, imports)
@@ -2095,7 +2095,7 @@ func reportBarePayloadCatchExprPatterns(
 	}
 	for i := range e.Cases {
 		c := &e.Cases[i]
-		if c.Default || c.Guard != nil {
+		if c.Default {
 			continue
 		}
 		caseName, ok := bareEnumPatternCaseName(c.Pattern, e.ErrorType, module, imports)
@@ -2123,20 +2123,36 @@ func bareEnumPatternCaseName(pattern frontend.Expr, expectedType string, module 
 	if !ok {
 		return "", false
 	}
+	typeName, caseName, ok := resolveBareEnumPatternParts(field, module, imports)
+	if !ok || typeName != expectedType {
+		return "", false
+	}
+	return caseName, true
+}
+
+func bareEnumPatternTypeAndCase(pattern frontend.Expr, module string, imports map[string]string) (string, string, bool) {
+	field, ok := pattern.(*frontend.FieldAccessExpr)
+	if !ok {
+		return "", "", false
+	}
+	return resolveBareEnumPatternParts(field, module, imports)
+}
+
+func resolveBareEnumPatternParts(field *frontend.FieldAccessExpr, module string, imports map[string]string) (string, string, bool) {
 	baseName, fields, pos, ok := splitFieldPath(field.Base)
 	if !ok {
-		return "", false
+		return "", "", false
 	}
 	parts := append([]string{baseName}, fields...)
 	if len(parts) == 0 {
-		return "", false
+		return "", "", false
 	}
 	ref := frontend.TypeRef{At: pos, Kind: frontend.TypeRefNamed, Name: strings.Join(parts, ".")}
 	typeName, err := resolveTypeName(&ref, module, imports)
-	if err != nil || typeName != expectedType {
-		return "", false
+	if err != nil {
+		return "", "", false
 	}
-	return field.Field, true
+	return typeName, field.Field, true
 }
 
 func comparableTypes(left, right string, types map[string]*TypeInfo) bool {

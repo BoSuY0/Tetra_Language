@@ -306,6 +306,7 @@ func validateFeatures(features []featureManifest) error {
 		"language.flow":                       "current",
 		"targets.wasm-build-only":             "current",
 		"stdlib.experimental-mirrors":         "experimental",
+		"language.enum-payload-match":         "experimental",
 		"wasm.runtime-execution":              "planned",
 		"language.full-v1-guarantees":         "planned",
 		"eco.distributed-network":             "post-v1",
@@ -334,8 +335,12 @@ func validateFeatures(features []featureManifest) error {
 			return fmt.Errorf("feature %s missing docs", feature.ID)
 		}
 		for _, doc := range feature.Docs {
-			if doc == "" || filepath.IsAbs(doc) || strings.Contains(filepath.ToSlash(doc), "..") {
+			docPath := filepath.ToSlash(doc)
+			if doc == "" || filepath.IsAbs(doc) || strings.Contains(docPath, "..") {
 				return fmt.Errorf("feature %s invalid doc reference %q", feature.ID, doc)
+			}
+			if !strings.HasPrefix(docPath, "docs/") || !strings.HasSuffix(docPath, ".md") {
+				return fmt.Errorf("feature %s doc reference %q must point at docs/*.md", feature.ID, doc)
 			}
 		}
 	}

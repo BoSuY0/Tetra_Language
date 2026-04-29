@@ -27,7 +27,7 @@ func bonus(msg: CounterMsg) -> Int:
             delta
         case CounterMsg.inc(other):
             other
-        case CounterMsg.reset:
+        case _:
             0
     else:
         return 0

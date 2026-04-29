@@ -400,8 +400,8 @@ func read() -> Int throws ReadError:
 
 func main() -> Int:
     return catch read():
-    case ReadError.eof():
-        0
+    case ReadError.eof(code):
+        code
     case ReadError.denied(code):
         code
 `)
@@ -533,8 +533,8 @@ func main() -> Int:
     return catch read():
     case ReadError.denied(code) if code > 0:
         code
-    case _:
-        0
+    case ReadError.denied(other):
+        other
 `)
 	prog, err := Parse(src)
 	if err != nil {
@@ -546,6 +546,120 @@ func main() -> Int:
 	}
 	if _, err := Lower(checked); err != nil {
 		t.Fatalf("Lower: %v", err)
+	}
+}
+
+func TestTypedErrorsCatchGuardedEnumPayloadCaseIsNotExhaustive(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case denied(Int)
+    case eof
+
+func read() -> Int throws ReadError:
+    throw ReadError.denied(7)
+
+func main() -> Int:
+    return catch read():
+    case ReadError.denied(code) if code > 0:
+        code
+    case ReadError.eof:
+        0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected guarded catch exhaustiveness error")
+	}
+	if !strings.Contains(err.Error(), "catch expression must be exhaustive") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsCatchDuplicateUnguardedEnumPayloadCaseDiagnostic(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case denied(Int)
+
+func read() -> Int throws ReadError:
+    throw ReadError.denied(7)
+
+func main() -> Int:
+    return catch read():
+    case ReadError.denied(code):
+        code
+    case ReadError.denied(other):
+        other
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected duplicate catch enum payload case diagnostic")
+	}
+	if !strings.Contains(err.Error(), "duplicate catch pattern") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsCatchDefaultMustBeLastDiagnostic(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case eof
+    case denied(Int)
+
+func read() -> Int throws ReadError:
+    throw ReadError.eof
+
+func main() -> Int:
+    return catch read():
+    case _:
+        0
+    case ReadError.eof:
+        1
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected catch default ordering diagnostic")
+	}
+	if !strings.Contains(err.Error(), "catch default must be last") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestTypedErrorsCatchRejectsWrongEnumCaseDiagnostic(t *testing.T) {
+	src := []byte(`
+enum ReadError:
+    case denied(Int)
+enum WriteError:
+    case denied(Int)
+
+func read() -> Int throws ReadError:
+    throw ReadError.denied(7)
+
+func main() -> Int:
+    return catch read():
+    case WriteError.denied(code):
+        code
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected wrong catch enum case diagnostic")
+	}
+	if !strings.Contains(err.Error(), "enum pattern type mismatch") && !strings.Contains(err.Error(), "catch pattern type mismatch") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

@@ -1961,6 +1961,9 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 					if pat.EnumType == "" {
 						return fmt.Errorf("%s: enum match pattern was not resolved", frontend.FormatPos(c.At))
 					}
+					if err := l.validateEnumPatternLayout(pat, info); err != nil {
+						return err
+					}
 					l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: pat.EnumOrdinal, Pos: c.At})
 				default:
 					return fmt.Errorf("%s: enum match supports enum case patterns and '_'", frontend.FormatPos(c.At))
@@ -2115,6 +2118,9 @@ func (l *lowerer) lowerMatchExpr(e *frontend.MatchExpr) (int, error) {
 			case *frontend.EnumCasePatternExpr:
 				if pat.EnumType == "" {
 					return 0, fmt.Errorf("%s: enum match pattern was not resolved", frontend.FormatPos(c.At))
+				}
+				if err := l.validateEnumPatternLayout(pat, info); err != nil {
+					return 0, err
 				}
 				l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: pat.EnumOrdinal, Pos: c.At})
 			default:
@@ -2316,6 +2322,9 @@ func (l *lowerer) lowerCatchExpr(e *frontend.CatchExpr) (int, error) {
 				if pat.EnumType == "" {
 					return 0, fmt.Errorf("%s: enum catch pattern was not resolved", frontend.FormatPos(c.At))
 				}
+				if err := l.validateEnumPatternLayout(pat, errorInfo); err != nil {
+					return 0, err
+				}
 				l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: pat.EnumOrdinal, Pos: c.At})
 			default:
 				return 0, fmt.Errorf("%s: enum catch supports enum case patterns and '_'", frontend.FormatPos(c.At))
@@ -2424,6 +2433,9 @@ func (l *lowerer) emitIfLetPatternCheck(pattern frontend.Expr, valueInfo semanti
 			if pat.EnumType == "" {
 				return fmt.Errorf("%s: enum if-let pattern was not resolved", frontend.FormatPos(pos))
 			}
+			if err := l.validateEnumPatternLayout(pat, valueInfo); err != nil {
+				return err
+			}
 			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: pat.EnumOrdinal, Pos: pos})
 		default:
 			return fmt.Errorf("%s: enum if let supports enum case patterns", frontend.FormatPos(pos))
@@ -2433,6 +2445,52 @@ func (l *lowerer) emitIfLetPatternCheck(pattern frontend.Expr, valueInfo semanti
 		return nil
 	}
 	return fmt.Errorf("%s: if let pattern requires optional or enum value", frontend.FormatPos(pos))
+}
+
+func enumPayloadSlotCount(pat *frontend.EnumCasePatternExpr, fallbackBindings map[string]semantics.LocalInfo) (int, error) {
+	if pat == nil {
+		return 0, nil
+	}
+	if len(pat.PayloadSlots) > 0 {
+		if len(pat.PayloadSlots) != len(pat.Bindings) {
+			return 0, fmt.Errorf("%s: enum payload pattern slot metadata mismatch", frontend.FormatPos(pat.At))
+		}
+		total := 0
+		for _, slots := range pat.PayloadSlots {
+			if slots <= 0 {
+				return 0, fmt.Errorf("%s: enum payload pattern slot metadata mismatch", frontend.FormatPos(pat.At))
+			}
+			total += slots
+		}
+		return total, nil
+	}
+	total := 0
+	for _, binding := range pat.Bindings {
+		bindInfo, ok := fallbackBindings[binding]
+		if !ok {
+			return 0, fmt.Errorf("%s: unknown enum payload binding '%s'", frontend.FormatPos(pat.At), binding)
+		}
+		if bindInfo.SlotCount <= 0 {
+			return 0, fmt.Errorf("%s: enum payload binding '%s' slot mismatch", frontend.FormatPos(pat.At), binding)
+		}
+		total += bindInfo.SlotCount
+	}
+	return total, nil
+}
+
+func (l *lowerer) validateEnumPatternLayout(pattern frontend.Expr, valueInfo semantics.LocalInfo) error {
+	enumPat, ok := pattern.(*frontend.EnumCasePatternExpr)
+	if !ok {
+		return nil
+	}
+	payloadSlots, err := enumPayloadSlotCount(enumPat, l.locals)
+	if err != nil {
+		return err
+	}
+	if payloadSlots > valueInfo.SlotCount-1 {
+		return fmt.Errorf("%s: enum payload pattern exceeds value layout", frontend.FormatPos(enumPat.At))
+	}
+	return nil
 }
 
 func (l *lowerer) emitIfLetPatternBindings(pattern frontend.Expr, valueInfo semantics.LocalInfo) error {
@@ -3926,7 +3984,11 @@ func (l *lowerer) lowerEnumCaseConstructorCall(e *frontend.CallExpr) (int, bool,
 		}
 		payloadSlots += slots
 	}
-	l.emitZeroSlots(info.SlotCount-1-payloadSlots, e.At)
+	padding := info.SlotCount - 1 - payloadSlots
+	if padding < 0 {
+		return 0, true, fmt.Errorf("%s: enum case '%s.%s' payload layout exceeds enum layout", frontend.FormatPos(e.At), typeName, caseInfo.Name)
+	}
+	l.emitZeroSlots(padding, e.At)
 	return info.SlotCount, true, nil
 }
 

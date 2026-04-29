@@ -98,6 +98,13 @@ green `scripts/release_v0_2_0_gate.sh` report and matching handoff evidence.
 - Full first-class callable/function-pointer semantics (escape/passing/storing,
   complete capture matrix, and ABI redesign) remain outside the current
   supported callable MVP.
+- Enum payload constructors and exhaustive enum match/catch coverage are an
+  experimental next-cycle promotion slice. The represented slice is limited to
+  same-module enum constructors with positional payload arguments/bindings and
+  tested exhaustive enum match/catch behavior; it is not a `v0.2.0` stable
+  baseline claim. Advanced ADT constructors, nested destructuring patterns,
+  richer payload algebra, and guard expansion remain future/post-v1 unless
+  separately promoted.
 - Distributed actors, full async cancellation/structured concurrency, full UI
   runtime event dispatch, and native widget rendering remain outside the
   current `v0.2.0` support claim.

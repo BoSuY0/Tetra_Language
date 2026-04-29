@@ -313,13 +313,16 @@ func main() -> Int:
 ```
 
 `match` is accepted as both a statement and an expression. Patterns support
-same-module enum cases with zero or more payload bindings, integer literals,
-`none` and `some(name)` for one-slot optionals, optional guards with `if`, and
-`_` default. An enum match is treated as complete when every enum case is
-covered; integer matches still require `_` when used as a terminal returning
-statement. An optional match with both `none` and `some(name)` is treated as
-complete. Match expressions must be exhaustive and all case bodies must produce
-the same result type.
+same-module enum cases with zero or more positional payload bindings, integer
+literals, `none` and `some(name)` for one-slot optionals, optional guards with
+`if`, and `_` default. The next-cycle `language.enum-payload-match` promotion is
+limited to this positional payload slice plus exhaustive enum match/catch
+coverage; richer ADT constructors, nested destructuring patterns, and expanded
+guard algebra remain future work. An enum match is treated as complete when every
+enum case is covered; integer matches still require `_` when used as a terminal
+returning statement. An optional match with both `none` and `some(name)` is
+treated as complete. Match expressions must be exhaustive and all case bodies
+must produce the same result type.
 
 Optionals:
 
@@ -585,8 +588,9 @@ Language `capsule` declarations are distinct from Eco project packaging files
 (`Capsule.t4` / `Tetra.capsule`). The former is source-language metadata;
 the latter is project/package manifest metadata.
 
-Payload pattern forms beyond the currently tested enum/optional cases,
-exhaustive integer match checking, collection `for` exhaustiveness
-improvements, full first-class function-value/callable matrix, effect
-polymorphism/inference, protocol-bound generic dispatch, implicit receiver-call syntax,
-distributed actors, and structured concurrency are planned for later releases.
+Advanced payload pattern forms beyond the promoted positional enum payload
+slice, richer ADT constructors/destructuring, exhaustive integer match checking,
+collection `for` exhaustiveness improvements, full first-class
+function-value/callable matrix, effect polymorphism/inference, protocol-bound
+generic dispatch, implicit receiver-call syntax, distributed actors, and
+structured concurrency are planned for later releases.

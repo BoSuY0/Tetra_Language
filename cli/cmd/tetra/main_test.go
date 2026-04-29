@@ -209,6 +209,16 @@ func TestFeaturesCommandJSON(t *testing.T) {
 		}
 		statusByID[feature.ID] = feature.Status
 		statusSeen[feature.Status] = true
+		if feature.ID == "language.enum-payload-match" {
+			if feature.Status != "experimental" || feature.Since != "" {
+				t.Fatalf("enum payload feature lifecycle = status %q since %q, want experimental without v0.2.0 since marker", feature.Status, feature.Since)
+			}
+			for _, want := range []string{"positional enum payload constructors", "exhaustive enum match/catch", "not part of the current v0.2.0 stable baseline"} {
+				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+					t.Fatalf("enum payload feature missing %q boundary: %#v", want, feature)
+				}
+			}
+		}
 	}
 	for _, status := range []string{"current", "experimental", "planned", "post-v1"} {
 		if !statusSeen[status] {
@@ -219,6 +229,7 @@ func TestFeaturesCommandJSON(t *testing.T) {
 		"cli.core":                            "current",
 		"targets.wasm-build-only":             "current",
 		"stdlib.experimental-mirrors":         "experimental",
+		"language.enum-payload-match":         "experimental",
 		"wasm.runtime-execution":              "planned",
 		"eco.distributed-network":             "post-v1",
 		"language.full-first-class-callables": "post-v1",

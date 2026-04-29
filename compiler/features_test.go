@@ -1,6 +1,9 @@
 package compiler
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	features := FeatureRegistry()
@@ -9,6 +12,7 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	}
 	seenStatus := map[FeatureStatus]bool{}
 	seenID := map[string]FeatureStatus{}
+	seenFeature := map[string]FeatureInfo{}
 	for _, feature := range features {
 		if feature.ID == "" || feature.Name == "" || feature.Scope == "" || feature.Stability == "" {
 			t.Fatalf("feature has missing required metadata: %#v", feature)
@@ -17,6 +21,7 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 			t.Fatalf("duplicate feature ID %s", feature.ID)
 		}
 		seenID[feature.ID] = feature.Status
+		seenFeature[feature.ID] = feature
 		seenStatus[feature.Status] = true
 		if feature.Status == FeatureStatusCurrent && feature.Since == "" {
 			t.Fatalf("current feature %s missing since", feature.ID)
@@ -34,12 +39,22 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 		"cli.core":                            FeatureStatusCurrent,
 		"targets.wasm-build-only":             FeatureStatusCurrent,
 		"stdlib.experimental-mirrors":         FeatureStatusExperimental,
+		"language.enum-payload-match":         FeatureStatusExperimental,
 		"wasm.runtime-execution":              FeatureStatusPlanned,
 		"eco.distributed-network":             FeatureStatusPostV1,
 		"language.full-first-class-callables": FeatureStatusPostV1,
 	} {
 		if gotStatus := seenID[id]; gotStatus != wantStatus {
 			t.Fatalf("feature %s status = %q, want %q", id, gotStatus, wantStatus)
+		}
+	}
+	enumFeature := seenFeature["language.enum-payload-match"]
+	if enumFeature.Since != "" {
+		t.Fatalf("enum payload feature should not claim v0.2.0 since marker: %#v", enumFeature)
+	}
+	for _, want := range []string{"positional enum payload constructors", "exhaustive enum match/catch", "not part of the current v0.2.0 stable baseline"} {
+		if !strings.Contains(enumFeature.Scope+" "+enumFeature.Stability, want) {
+			t.Fatalf("enum payload feature missing %q boundary: %#v", want, enumFeature)
 		}
 	}
 }

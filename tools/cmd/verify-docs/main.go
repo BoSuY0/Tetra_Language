@@ -203,6 +203,7 @@ func verifyFeatureRegistry(features []featureManifest) error {
 		"language.flow":                       "current",
 		"targets.wasm-build-only":             "current",
 		"stdlib.experimental-mirrors":         "experimental",
+		"language.enum-payload-match":         "experimental",
 		"wasm.runtime-execution":              "planned",
 		"language.full-v1-guarantees":         "planned",
 		"eco.distributed-network":             "post-v1",
@@ -238,8 +239,15 @@ func verifyFeatureRegistry(features []featureManifest) error {
 			if doc == "" {
 				return fmt.Errorf("feature %s has empty doc reference", feature.ID)
 			}
-			if filepath.IsAbs(doc) || strings.Contains(filepath.ToSlash(doc), "..") {
+			docPath := filepath.ToSlash(doc)
+			if filepath.IsAbs(doc) || strings.Contains(docPath, "..") {
 				return fmt.Errorf("feature %s has unsafe doc reference %q", feature.ID, doc)
+			}
+			if !strings.HasPrefix(docPath, "docs/") || !strings.HasSuffix(docPath, ".md") {
+				return fmt.Errorf("feature %s doc reference %q must point at docs/*.md", feature.ID, doc)
+			}
+			if _, err := statFromRepoRoot(docPath); err != nil {
+				return fmt.Errorf("feature %s doc reference %q is not readable: %v", feature.ID, doc, err)
 			}
 		}
 	}
@@ -259,6 +267,27 @@ func verifyFeatureRegistry(features []featureManifest) error {
 		}
 	}
 	return nil
+}
+
+func statFromRepoRoot(path string) (os.FileInfo, error) {
+	if info, err := os.Stat(filepath.FromSlash(path)); err == nil {
+		return info, nil
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	for dir := wd; ; dir = filepath.Dir(dir) {
+		candidate := filepath.Join(dir, filepath.FromSlash(path))
+		if info, err := os.Stat(candidate); err == nil {
+			return info, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+	}
+	return nil, os.ErrNotExist
 }
 
 func verifyReleaseTruthDocs(paths []string) error {

@@ -242,9 +242,10 @@ type EnumDecl struct {
 }
 
 type EnumCaseDecl struct {
-	At      Position
-	Name    string
-	Payload []TypeRef
+	At         Position
+	Name       string
+	Payload    []TypeRef
+	HasPayload bool
 }
 
 type ExtensionDecl struct {

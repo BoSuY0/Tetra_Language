@@ -1799,30 +1799,11 @@ func (p *parser) parseEnumDecl(public bool) (*EnumDecl, error) {
 		if err != nil {
 			return nil, err
 		}
-		var payload []TypeRef
-		if p.cur.typ == TokenLParen {
-			if err := p.next(); err != nil {
-				return nil, err
-			}
-			for p.cur.typ != TokenRParen && p.cur.typ != TokenEOF {
-				typ, err := p.parseTypeRef()
-				if err != nil {
-					return nil, err
-				}
-				payload = append(payload, typ)
-				if p.cur.typ == TokenComma {
-					if err := p.next(); err != nil {
-						return nil, err
-					}
-					continue
-				}
-				break
-			}
-			if _, err := p.expect(TokenRParen); err != nil {
-				return nil, err
-			}
+		payload, hasPayload, err := p.parseEnumCasePayload()
+		if err != nil {
+			return nil, err
 		}
-		cases = append(cases, EnumCaseDecl{At: casePos, Name: nameTok.lit, Payload: payload})
+		cases = append(cases, EnumCaseDecl{At: casePos, Name: nameTok.lit, Payload: payload, HasPayload: hasPayload})
 		if p.cur.typ == TokenComma || p.cur.typ == TokenSemicolon {
 			if err := p.next(); err != nil {
 				return nil, err
@@ -1836,6 +1817,41 @@ func (p *parser) parseEnumDecl(public bool) (*EnumDecl, error) {
 		return nil, diagnosticErrorf(pos, "enum '%s' must declare at least one case", nameTok.lit)
 	}
 	return &EnumDecl{At: pos, Name: nameTok.lit, Public: public, Cases: cases}, nil
+}
+
+func (p *parser) parseEnumCasePayload() ([]TypeRef, bool, error) {
+	if p.cur.typ != TokenLParen {
+		return nil, false, nil
+	}
+	payloadPos := p.cur.pos
+	if err := p.next(); err != nil {
+		return nil, false, err
+	}
+	if p.cur.typ == TokenRParen {
+		return nil, false, diagnosticErrorf(payloadPos, "enum payload list must contain at least one type")
+	}
+	var payload []TypeRef
+	for {
+		typ, err := p.parseTypeRef()
+		if err != nil {
+			return nil, false, err
+		}
+		payload = append(payload, typ)
+		if p.cur.typ != TokenComma {
+			break
+		}
+		commaPos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, false, err
+		}
+		if p.cur.typ == TokenRParen {
+			return nil, false, diagnosticErrorf(commaPos, "enum payload declaration does not allow a trailing comma")
+		}
+	}
+	if _, err := p.expect(TokenRParen); err != nil {
+		return nil, false, err
+	}
+	return payload, true, nil
 }
 
 func (p *parser) parseTypeRef() (TypeRef, error) {
@@ -2869,12 +2885,9 @@ func (p *parser) parseMatchPattern() (Expr, error) {
 				if err := p.next(); err != nil {
 					return nil, err
 				}
-				nameTok, err := p.expect(TokenIdent)
+				nameTok, err := p.expectPayloadBindingIdent("some pattern binding")
 				if err != nil {
 					return nil, err
-				}
-				if nameTok.lit == "_" {
-					return nil, diagnosticErrorf(nameTok.pos, "some pattern binding must be an identifier")
 				}
 				if p.cur.typ == TokenComma {
 					return nil, diagnosticErrorf(p.cur.pos, "some pattern expects one binding")
@@ -2885,36 +2898,8 @@ func (p *parser) parseMatchPattern() (Expr, error) {
 				return &SomePatternExpr{At: pos, Name: nameTok.lit}, nil
 			}
 			if len(parts) >= 2 {
-				if err := p.next(); err != nil {
-					return nil, err
-				}
-				var bindings []string
-				seenBindings := map[string]struct{}{}
-				for p.cur.typ != TokenRParen && p.cur.typ != TokenEOF {
-					nameTok, err := p.expect(TokenIdent)
-					if err != nil {
-						return nil, err
-					}
-					if nameTok.lit == "_" {
-						return nil, diagnosticErrorf(nameTok.pos, "enum payload pattern binding must be an identifier")
-					}
-					if _, exists := seenBindings[nameTok.lit]; exists {
-						return nil, diagnosticErrorf(nameTok.pos, "duplicate enum payload binding '%s'", nameTok.lit)
-					}
-					seenBindings[nameTok.lit] = struct{}{}
-					bindings = append(bindings, nameTok.lit)
-					if p.cur.typ == TokenComma {
-						if err := p.next(); err != nil {
-							return nil, err
-						}
-						if p.cur.typ == TokenRParen {
-							return nil, diagnosticErrorf(p.cur.pos, "enum payload pattern does not allow a trailing comma")
-						}
-						continue
-					}
-					break
-				}
-				if _, err := p.expect(TokenRParen); err != nil {
+				bindings, err := p.parseEnumPayloadPatternBindings()
+				if err != nil {
 					return nil, err
 				}
 				return &EnumCasePatternExpr{At: pos, TypeName: strings.Join(parts[:len(parts)-1], "."), CaseName: parts[len(parts)-1], Bindings: bindings, HasPayload: true}, nil
@@ -2931,6 +2916,54 @@ func (p *parser) parseMatchPattern() (Expr, error) {
 	default:
 		return nil, p.unexpected("match pattern")
 	}
+}
+
+func (p *parser) parseEnumPayloadPatternBindings() ([]string, error) {
+	payloadPos := p.cur.pos
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	if p.cur.typ == TokenRParen {
+		return nil, diagnosticErrorf(payloadPos, "enum payload pattern requires at least one binding")
+	}
+	var bindings []string
+	seenBindings := map[string]struct{}{}
+	for {
+		nameTok, err := p.expectPayloadBindingIdent("enum payload pattern binding")
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := seenBindings[nameTok.lit]; exists {
+			return nil, diagnosticErrorf(nameTok.pos, "duplicate enum payload binding '%s'", nameTok.lit)
+		}
+		seenBindings[nameTok.lit] = struct{}{}
+		bindings = append(bindings, nameTok.lit)
+		if p.cur.typ != TokenComma {
+			break
+		}
+		commaPos := p.cur.pos
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		if p.cur.typ == TokenRParen {
+			return nil, diagnosticErrorf(commaPos, "enum payload pattern does not allow a trailing comma")
+		}
+	}
+	if _, err := p.expect(TokenRParen); err != nil {
+		return nil, err
+	}
+	return bindings, nil
+}
+
+func (p *parser) expectPayloadBindingIdent(context string) (token, error) {
+	tok, err := p.expect(TokenIdent)
+	if err != nil {
+		return token{}, err
+	}
+	if tok.lit == "_" {
+		return token{}, diagnosticErrorf(tok.pos, "%s must be a named identifier", context)
+	}
+	return tok, nil
 }
 
 func (p *parser) parseExpr() (Expr, error) {

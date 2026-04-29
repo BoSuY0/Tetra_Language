@@ -588,7 +588,20 @@ func TestEnumPayloadPatternArityDiagnostic(t *testing.T) {
 }
 
 func TestEnumPayloadPatternRequiresPayloadSyntaxDiagnostic(t *testing.T) {
-	src := "enum Result:\n  case ok(Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.ok(1)\n  let score: Int = match result:\n  case Result.ok:\n    1\n  case Result.empty:\n    0\n  return score\n"
+	src := `
+enum Result:
+  case ok(Int)
+  case empty
+
+func main() -> Int:
+  let result: Result = Result.ok(1)
+  let score: Int = match result:
+  case Result.ok:
+    1
+  case Result.empty:
+    0
+  return score
+`
 	if err := checkProgram(src); err == nil {
 		t.Fatalf("expected enum payload syntax diagnostic")
 	} else if !strings.Contains(err.Error(), "carries 1 payload value(s); use 'Result.ok(value1)'") {
@@ -596,8 +609,175 @@ func TestEnumPayloadPatternRequiresPayloadSyntaxDiagnostic(t *testing.T) {
 	}
 }
 
+func TestEnumPayloadGuardedBarePatternStillRequiresDestructuring(t *testing.T) {
+	src := `
+enum Result:
+  case ok(Int)
+  case empty
+
+func main() -> Int:
+  let result: Result = Result.ok(1)
+  match result:
+  case Result.ok if true:
+    return 1
+  case Result.ok(value):
+    return value
+  case Result.empty:
+    return 0
+`
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected guarded enum payload syntax diagnostic")
+	} else if !strings.Contains(err.Error(), "requires payload arguments") && !strings.Contains(err.Error(), "carries 1 payload value(s); use 'Result.ok(value1)'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestMatchExpressionGuardedEnumPayloadCaseIsNotExhaustive(t *testing.T) {
+	src := `
+enum Result:
+  case ok(Int)
+  case empty
+
+func main() -> Int:
+  let result: Result = Result.ok(1)
+  let score: Int = match result:
+  case Result.ok(value) if value > 0:
+    value
+  case Result.empty:
+    0
+  return score
+`
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected non-exhaustive guarded enum payload match expression diagnostic")
+	} else if !strings.Contains(err.Error(), "match expression must be exhaustive") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumMatchGuardedCasesDoNotCountAsExhaustive(t *testing.T) {
+	src := `
+enum Result:
+  case ok(Int)
+  case empty
+
+func main() -> Int:
+  let result: Result = Result.ok(1)
+  match result:
+  case Result.ok(value) if value > 0:
+    return value
+  case Result.empty:
+    return 0
+`
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected missing return for guarded non-exhaustive enum match")
+	} else if !strings.Contains(err.Error(), "must end with return") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumMatchDuplicateUnguardedPayloadCaseDiagnostic(t *testing.T) {
+	src := `
+enum Result:
+  case ok(Int)
+  case empty
+
+func main() -> Int:
+  let result: Result = Result.ok(1)
+  match result:
+  case Result.ok(value):
+    return value
+  case Result.ok(other):
+    return other
+  case Result.empty:
+    return 0
+`
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected duplicate enum payload case diagnostic")
+	} else if !strings.Contains(err.Error(), "duplicate match pattern") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumMatchDefaultMustBeLastDiagnostic(t *testing.T) {
+	src := `
+enum Color:
+  case red
+  case green
+
+func main() -> Int:
+  let color: Color = Color.red
+  match color:
+  case _:
+    return 0
+  case Color.red:
+    return 1
+`
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected default ordering diagnostic")
+	} else if !strings.Contains(err.Error(), "match default must be last") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestMatchExpressionDefaultMustBeLastDiagnostic(t *testing.T) {
+	src := `
+enum Color:
+  case red
+  case green
+
+func main() -> Int:
+  let color: Color = Color.red
+  let score: Int = match color:
+  case _:
+    0
+  case Color.red:
+    1
+  return score
+`
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected match expression default ordering diagnostic")
+	} else if !strings.Contains(err.Error(), "match default must be last") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestEnumMatchRejectsWrongEnumCaseDiagnostic(t *testing.T) {
+	src := `
+enum Result:
+  case ok(Int)
+  case empty
+enum Other:
+  case ok(Int)
+
+func main() -> Int:
+  let result: Result = Result.ok(1)
+  match result:
+  case Other.ok(value):
+    return value
+  case Result.empty:
+    return 0
+`
+	if err := checkProgram(src); err == nil {
+		t.Fatalf("expected wrong enum case diagnostic")
+	} else if !strings.Contains(err.Error(), "enum pattern type mismatch") && !strings.Contains(err.Error(), "match pattern type mismatch") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestEnumNoPayloadPatternRejectsPayloadSyntaxDiagnostic(t *testing.T) {
-	src := "enum Result:\n  case ok(Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.empty\n  match result:\n  case Result.ok(value):\n    return value\n  case Result.empty():\n    return 0\n"
+	src := `
+enum Result:
+  case ok(Int)
+  case empty
+
+func main() -> Int:
+  let result: Result = Result.empty
+  match result:
+  case Result.ok(value):
+    return value
+  case Result.empty(value):
+    return value
+`
 	if err := checkProgram(src); err == nil {
 		t.Fatalf("expected no-payload enum pattern diagnostic")
 	} else if !strings.Contains(err.Error(), "has no payload; use 'Result.empty'") {

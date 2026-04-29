@@ -43,7 +43,7 @@ func FeatureRegistry() []FeatureInfo {
 			Since:     "v0.2.0",
 			Scope:     "linux-x64 build/run plus macos-x64 and windows-x64 build-only release coverage",
 			Stability: "supported target metadata is validated by release checks",
-			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/targets.md"},
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/cli_contracts.md"},
 		},
 		{
 			ID:        "targets.wasm-build-only",
@@ -88,7 +88,7 @@ func FeatureRegistry() []FeatureInfo {
 			Since:     "v0.2.0",
 			Scope:     "constant global initializers, property declarations, and compile-time capsule metadata validation",
 			Stability: "supported MVP with explicit initializer/runtime limitations",
-			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/capsule_metadata_v1.md"},
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md"},
 		},
 		{
 			ID:        "language.slice-mvp",
@@ -125,6 +125,14 @@ func FeatureRegistry() []FeatureInfo {
 			Scope:     "lib.experimental mirrors for selected lib.core modules",
 			Stability: "experimental mirrors with no stability guarantees",
 			Docs:      []string{"docs/user/standard_library_guide.md"},
+		},
+		{
+			ID:        "language.enum-payload-match",
+			Name:      "Enum payload constructors and exhaustive match/catch",
+			Status:    FeatureStatusExperimental,
+			Scope:     "next-cycle experimental promotion of positional enum payload constructors/bindings plus exhaustive enum match/catch coverage",
+			Stability: "experimental next-cycle slice; not part of the current v0.2.0 stable baseline until gated",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
 		},
 		{
 			ID:        "ui.metadata-v1",

@@ -2011,24 +2011,23 @@ func matchHasCompleteEnumPatterns(
 		}
 		switch pat := c.Pattern.(type) {
 		case *frontend.FieldAccessExpr:
-			patType, err := inferExprTypeForDecl(c.Pattern, locals, globals, funcs, types, module, imports)
-			if err != nil || patType != scrutType || pat.EnumType != scrutType {
+			caseType, caseName, ok := bareEnumPatternTypeAndCase(pat, module, imports)
+			if !ok || caseType != scrutType {
 				return false
 			}
-			caseInfo, ok := info.CaseMap[pat.Field]
-			if !ok {
+			caseInfo, ok := info.CaseMap[caseName]
+			if !ok || len(caseInfo.PayloadTypes) != 0 {
 				return false
 			}
-			if len(caseInfo.PayloadTypes) != 0 {
-				c.RequiresPayload = true
-				c.PayloadArity = len(caseInfo.PayloadTypes)
-				seen[pat.Field] = struct{}{}
-				continue
-			}
-			seen[pat.Field] = struct{}{}
+			pat.EnumType = scrutType
+			pat.EnumOrdinal = caseInfo.Ordinal
+			seen[caseName] = struct{}{}
 		case *frontend.EnumCasePatternExpr:
-			caseType, _, found, err := resolveEnumCasePattern(pat, types, module, imports)
+			caseType, caseInfo, found, err := resolveEnumCasePattern(pat, types, module, imports)
 			if err != nil || !found || caseType != scrutType {
+				return false
+			}
+			if err := validateEnumCasePatternPayload(pat, caseType, caseInfo, module); err != nil {
 				return false
 			}
 			seen[pat.CaseName] = struct{}{}
@@ -2092,24 +2091,23 @@ func matchExprHasCompleteEnumPatterns(
 		}
 		switch pat := c.Pattern.(type) {
 		case *frontend.FieldAccessExpr:
-			patType, err := inferExprTypeForDecl(c.Pattern, locals, globals, funcs, types, module, imports)
-			if err != nil || patType != scrutType || pat.EnumType != scrutType {
+			caseType, caseName, ok := bareEnumPatternTypeAndCase(pat, module, imports)
+			if !ok || caseType != scrutType {
 				return false
 			}
-			caseInfo, ok := info.CaseMap[pat.Field]
-			if !ok {
+			caseInfo, ok := info.CaseMap[caseName]
+			if !ok || len(caseInfo.PayloadTypes) != 0 {
 				return false
 			}
-			if len(caseInfo.PayloadTypes) != 0 {
-				c.RequiresPayload = true
-				c.PayloadArity = len(caseInfo.PayloadTypes)
-				seen[pat.Field] = struct{}{}
-				continue
-			}
-			seen[pat.Field] = struct{}{}
+			pat.EnumType = scrutType
+			pat.EnumOrdinal = caseInfo.Ordinal
+			seen[caseName] = struct{}{}
 		case *frontend.EnumCasePatternExpr:
-			caseType, _, found, err := resolveEnumCasePattern(pat, types, module, imports)
+			caseType, caseInfo, found, err := resolveEnumCasePattern(pat, types, module, imports)
 			if err != nil || !found || caseType != scrutType {
+				return false
+			}
+			if err := validateEnumCasePatternPayload(pat, caseType, caseInfo, module); err != nil {
 				return false
 			}
 			seen[pat.CaseName] = struct{}{}
@@ -2352,24 +2350,23 @@ func catchExprHasCompleteEnumPatterns(
 		}
 		switch pat := c.Pattern.(type) {
 		case *frontend.FieldAccessExpr:
-			patType, err := inferExprTypeForDecl(c.Pattern, locals, globals, funcs, types, module, imports)
-			if err != nil || patType != errorType || pat.EnumType != errorType {
+			caseType, caseName, ok := bareEnumPatternTypeAndCase(pat, module, imports)
+			if !ok || caseType != errorType {
 				return false
 			}
-			caseInfo, ok := info.CaseMap[pat.Field]
-			if !ok {
+			caseInfo, ok := info.CaseMap[caseName]
+			if !ok || len(caseInfo.PayloadTypes) != 0 {
 				return false
 			}
-			if len(caseInfo.PayloadTypes) != 0 {
-				c.RequiresPayload = true
-				c.PayloadArity = len(caseInfo.PayloadTypes)
-				seen[pat.Field] = struct{}{}
-				continue
-			}
-			seen[pat.Field] = struct{}{}
+			pat.EnumType = errorType
+			pat.EnumOrdinal = caseInfo.Ordinal
+			seen[caseName] = struct{}{}
 		case *frontend.EnumCasePatternExpr:
-			caseType, _, found, err := resolveEnumCasePattern(pat, types, module, imports)
+			caseType, caseInfo, found, err := resolveEnumCasePattern(pat, types, module, imports)
 			if err != nil || !found || caseType != errorType {
+				return false
+			}
+			if err := validateEnumCasePatternPayload(pat, caseType, caseInfo, module); err != nil {
 				return false
 			}
 			seen[pat.CaseName] = struct{}{}

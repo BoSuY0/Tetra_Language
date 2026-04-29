@@ -16,7 +16,7 @@ promoted to `v1.0.x` and every mandatory artifact below has fresh evidence.
 | Parser and diagnostics for supported Flow forms | Required | Frontend parser/diagnostic tests and docs verification | `go test ./compiler/internal/frontend/... -count=1` | frontend agent |
 | Function-type/callable MVP boundary | Required as constrained MVP | `fn(T...) -> R` type parsing/checking plus direct-local callable subset are covered, and unsupported callable forms keep stable diagnostics | `go test ./compiler/... -run 'Closure|FunctionType|Callable|Type' -count=1` | frontend/semantics agent |
 | Top-level `capsule` metadata declaration MVP | Required as metadata-only surface | Parser/semantic validation for capsule key/value metadata; no runtime/ABI coupling in this scope | `go test ./compiler/internal/frontend/... -count=1`; `go test ./compiler/... -run 'Capsule|Property' -count=1` | frontend/semantics agent |
-| Stable primitive, structural, optional, typed-error, enum payload, generic, protocol, extension, and module contracts | Required | Compiler tests plus spec alignment | `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module' -count=1` | semantics agent |
+| Stable primitive, structural, optional, typed-error, enum payload, generic, protocol, extension, and module contracts | Required as the promoted positional enum payload slice only | Compiler tests plus spec alignment for same-module enum payload constructors with positional arguments/bindings and exhaustive enum match/catch coverage; advanced ADT constructors, nested destructuring patterns, guard expansion, and richer payload pattern algebra stay future/post-v1 unless separately promoted | `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module' -count=1` | semantics agent |
 | Ownership, lifetime, island, actor/task transfer, and race-safety checks | Required before release label | Negative tests for use-after-move, escaping borrows, aliasing, invalid transfers, and actor/task races | `go test ./compiler/... -run 'Ownership|Borrow|Lifetime|Island|Actor|Task' -count=1` | safety agent |
 | Effects, capabilities, unsafe boundaries, and public diagnostics | Required | Spec/docs validation, stable module effect metadata audit, and diagnostics shape tests | `go test ./compiler/... -run 'Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go test ./tools/cmd/validate-diagnostic/... -count=1` | safety/tooling agent |
 | Privacy, consent, and budget contract | Required as static v1 MVP | Privacy clauses, consent-token signatures, and deterministic budget guards are checked and lowered; distributed/runtime-wide accounting is post-v1 | `go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1` | safety/tooling agent |
@@ -61,9 +61,10 @@ notes, and security review when applicable.
 - Distributed actors beyond the release actor/task safety contract.
 - Async typed-error behavior beyond the supported `try await <call>()`
   synchronous-lowering boundary, plus cancellation and structured concurrency.
-- Enum payload behavior beyond the currently tested payload cases,
-  constructors, destructuring patterns, guards, and exhaustive match/catch
-  coverage.
+- Advanced ADT work beyond the promoted positional enum payload slice:
+  arbitrary constructors, nested destructuring patterns, guard expansion, richer
+  payload pattern algebra, and match/catch coverage outside the gated enum
+  payload promotion.
 - Distributed privacy/consent enforcement and runtime-wide resource-budget
   accounting beyond deterministic local guard lowering.
 - Real macOS/Windows host execution evidence for actor/runtime binaries when
