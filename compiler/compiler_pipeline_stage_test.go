@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"crypto/sha256"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -57,6 +58,38 @@ func TestPipelineResolveNativeTargetStage(t *testing.T) {
 	}
 }
 
+func TestBuildTagFromOptionsIncludesLinkedObjectContentDeterministically(t *testing.T) {
+	firstHash := sha256.Sum256([]byte("first-object"))
+	secondHash := sha256.Sum256([]byte("second-object"))
+	changedHash := sha256.Sum256([]byte("second-object-changed"))
+
+	base := BuildOptions{DebugInfo: true}
+	firstOrder := []linkedObject{
+		{path: "b.tobj", obj: &Object{Module: "dep.b"}, contentHash: secondHash},
+		{path: "a.tobj", obj: &Object{Module: "dep.a"}, contentHash: firstHash},
+	}
+	secondOrder := []linkedObject{
+		{path: "a.tobj", obj: &Object{Module: "dep.a"}, contentHash: firstHash},
+		{path: "b.tobj", obj: &Object{Module: "dep.b"}, contentHash: secondHash},
+	}
+
+	got := buildTagFromOptions(base, firstOrder)
+	if got == "" || !strings.Contains(got, "debug-info") || !strings.Contains(got, "link=") {
+		t.Fatalf("build tag = %q, want debug/link components", got)
+	}
+	if reordered := buildTagFromOptions(base, secondOrder); reordered != got {
+		t.Fatalf("linked object build tag should be order independent: %q vs %q", got, reordered)
+	}
+
+	changed := buildTagFromOptions(base, []linkedObject{
+		{path: "a.tobj", obj: &Object{Module: "dep.a"}, contentHash: firstHash},
+		{path: "b.tobj", obj: &Object{Module: "dep.b"}, contentHash: changedHash},
+	})
+	if changed == got {
+		t.Fatalf("linked object build tag did not change after content hash changed: %q", got)
+	}
+}
+
 func TestPipelineLoadCheckedBuildWorldRequireMainStage(t *testing.T) {
 	tmp := t.TempDir()
 	writeTestFiles(t, tmp, map[string]string{
@@ -78,6 +111,65 @@ func TestPipelineLoadCheckedBuildWorldRequireMainStage(t *testing.T) {
 	_, err = loadCheckedBuildWorld(entry, BuildOptions{Jobs: 1}, true)
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "main") {
 		t.Fatalf("require-main error = %v", err)
+	}
+}
+
+func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *testing.T) {
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": "module app.main\nfun main(): i32 {\n  return 42\n}\n",
+	})
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.t4"))
+	opt := BuildOptions{Jobs: 1}
+
+	build, err := loadCheckedBuildWorld(entry, opt, true)
+	if err != nil {
+		t.Fatalf("load checked world: %v", err)
+	}
+	target := "linux-x64"
+	linkedA := []linkedObject{{path: "dep.tobj", obj: &Object{Module: "dep.lib"}, contentHash: sha256.Sum256([]byte("dep-v1"))}}
+	plan1, stats1, err := planNativeModuleBuild(build.world, build.checked, target, opt, linkedA)
+	if err != nil {
+		t.Fatalf("plan first build: %v", err)
+	}
+	if len(plan1.toCompile) != 1 {
+		t.Fatalf("first plan toCompile = %#v, want app.main", plan1.toCompile)
+	}
+	tgt, err := ctarget.Parse(target)
+	if err != nil {
+		t.Fatalf("parse target: %v", err)
+	}
+	codegen, err := nativeCodegenForTarget(tgt, opt)
+	if err != nil {
+		t.Fatalf("native codegen: %v", err)
+	}
+	backend, ok := nativeExecutableBackendForTarget(tgt)
+	if !ok {
+		t.Fatalf("native backend: %s", tgt.Triple)
+	}
+	native := nativeBuildTarget{target: tgt, triple: tgt.Triple, backend: backend, codegen: codegen}
+	if err := compileNativeModulePlan(build.world, build.checked, native, opt, plan1, stats1); err != nil {
+		t.Fatalf("compile first plan: %v", err)
+	}
+
+	plan2, stats2, err := planNativeModuleBuild(build.world, build.checked, target, opt, linkedA)
+	if err != nil {
+		t.Fatalf("plan cached build: %v", err)
+	}
+	if len(plan2.toCompile) != 0 || len(stats2.CacheHits) != 1 {
+		t.Fatalf("cached plan toCompile=%#v cacheHits=%#v, want one cache hit", plan2.toCompile, stats2.CacheHits)
+	}
+
+	linkedB := []linkedObject{{path: "dep.tobj", obj: &Object{Module: "dep.lib"}, contentHash: sha256.Sum256([]byte("dep-v2"))}}
+	plan3, stats3, err := planNativeModuleBuild(build.world, build.checked, target, opt, linkedB)
+	if err != nil {
+		t.Fatalf("plan changed link object build: %v", err)
+	}
+	if len(plan3.toCompile) != 1 {
+		t.Fatalf("changed link object plan toCompile=%#v, want rebuild", plan3.toCompile)
+	}
+	if len(stats3.CacheHits) != 0 {
+		t.Fatalf("changed link object cache hits=%#v, want none", stats3.CacheHits)
 	}
 }
 
