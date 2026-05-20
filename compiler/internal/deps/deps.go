@@ -23,106 +23,122 @@ func CollectExternalCalleesByModule(checked *semantics.CheckedProgram) map[strin
 		if fn.Decl == nil {
 			continue
 		}
+		globals := checked.GlobalsByModule[mod]
 		for _, stmt := range fn.Decl.Body {
-			collectCalleesFromStmt(stmt, mod, out, checked.Types, fn.Locals)
+			collectCalleesFromStmt(stmt, mod, out, checked.Types, fn.Locals, globals, fn.Imports)
 		}
 	}
 	return deps
 }
 
-func collectCalleesFromStmt(stmt frontend.Stmt, mod string, out map[string]struct{}, types map[string]*semantics.TypeInfo, locals map[string]semantics.LocalInfo) {
+func collectCalleesFromStmt(stmt frontend.Stmt, mod string, out map[string]struct{}, types map[string]*semantics.TypeInfo, locals map[string]semantics.LocalInfo, globals map[string]semantics.GlobalInfo, imports map[string]string) {
 	switch s := stmt.(type) {
 	case *frontend.PrintStmt:
-		collectCalleesFromExpr(s.Value, mod, out, types, locals)
+		collectCalleesFromExpr(s.Value, mod, out, types, locals, globals, imports)
 	case *frontend.ReturnStmt:
-		collectCalleesFromExpr(s.Value, mod, out, types, locals)
+		collectCalleesFromExpr(s.Value, mod, out, types, locals, globals, imports)
 	case *frontend.ThrowStmt:
-		collectCalleesFromExpr(s.Value, mod, out, types, locals)
+		collectCalleesFromExpr(s.Value, mod, out, types, locals, globals, imports)
 	case *frontend.DeferStmt:
 		for _, inner := range s.Body {
-			collectCalleesFromStmt(inner, mod, out, types, locals)
+			collectCalleesFromStmt(inner, mod, out, types, locals, globals, imports)
 		}
 	case *frontend.BreakStmt, *frontend.ContinueStmt:
 	case *frontend.LetStmt:
-		collectCalleesFromExpr(s.Value, mod, out, types, locals)
+		collectCalleesFromExpr(s.Value, mod, out, types, locals, globals, imports)
 	case *frontend.AssignStmt:
-		collectCalleesFromExpr(s.Target, mod, out, types, locals)
-		collectCalleesFromExpr(s.Value, mod, out, types, locals)
+		collectCalleesFromExpr(s.Target, mod, out, types, locals, globals, imports)
+		collectCalleesFromExpr(s.Value, mod, out, types, locals, globals, imports)
 	case *frontend.IfStmt:
-		collectCalleesFromExpr(s.Cond, mod, out, types, locals)
+		collectCalleesFromExpr(s.Cond, mod, out, types, locals, globals, imports)
 		for _, inner := range s.Then {
-			collectCalleesFromStmt(inner, mod, out, types, locals)
+			collectCalleesFromStmt(inner, mod, out, types, locals, globals, imports)
 		}
 		for _, inner := range s.Else {
-			collectCalleesFromStmt(inner, mod, out, types, locals)
+			collectCalleesFromStmt(inner, mod, out, types, locals, globals, imports)
 		}
 	case *frontend.WhileStmt:
-		collectCalleesFromExpr(s.Cond, mod, out, types, locals)
+		collectCalleesFromExpr(s.Cond, mod, out, types, locals, globals, imports)
 		for _, inner := range s.Body {
-			collectCalleesFromStmt(inner, mod, out, types, locals)
+			collectCalleesFromStmt(inner, mod, out, types, locals, globals, imports)
 		}
 	case *frontend.ForRangeStmt:
 		if s.Iterable != nil {
-			collectCalleesFromExpr(s.Iterable, mod, out, types, locals)
+			collectCalleesFromExpr(s.Iterable, mod, out, types, locals, globals, imports)
 		} else {
-			collectCalleesFromExpr(s.Start, mod, out, types, locals)
-			collectCalleesFromExpr(s.End, mod, out, types, locals)
+			collectCalleesFromExpr(s.Start, mod, out, types, locals, globals, imports)
+			collectCalleesFromExpr(s.End, mod, out, types, locals, globals, imports)
 		}
 		for _, inner := range s.Body {
-			collectCalleesFromStmt(inner, mod, out, types, locals)
+			collectCalleesFromStmt(inner, mod, out, types, locals, globals, imports)
 		}
 	case *frontend.MatchStmt:
-		collectCalleesFromExpr(s.Value, mod, out, types, locals)
+		collectCalleesFromExpr(s.Value, mod, out, types, locals, globals, imports)
 		for _, c := range s.Cases {
 			if !c.Default {
-				collectCalleesFromExpr(c.Pattern, mod, out, types, locals)
+				collectCalleesFromExpr(c.Pattern, mod, out, types, locals, globals, imports)
 			}
 			if c.Guard != nil {
-				collectCalleesFromExpr(c.Guard, mod, out, types, locals)
+				collectCalleesFromExpr(c.Guard, mod, out, types, locals, globals, imports)
 			}
 			for _, inner := range c.Body {
-				collectCalleesFromStmt(inner, mod, out, types, locals)
+				collectCalleesFromStmt(inner, mod, out, types, locals, globals, imports)
 			}
 		}
 	case *frontend.ExprStmt:
-		collectCalleesFromExpr(s.Expr, mod, out, types, locals)
+		collectCalleesFromExpr(s.Expr, mod, out, types, locals, globals, imports)
 	}
 }
 
-func collectCalleesFromExpr(expr frontend.Expr, mod string, out map[string]struct{}, types map[string]*semantics.TypeInfo, locals map[string]semantics.LocalInfo) {
+func collectCalleesFromExpr(expr frontend.Expr, mod string, out map[string]struct{}, types map[string]*semantics.TypeInfo, locals map[string]semantics.LocalInfo, globals map[string]semantics.GlobalInfo, imports map[string]string) {
 	switch e := expr.(type) {
 	case *frontend.MatchExpr:
-		collectCalleesFromExpr(e.Value, mod, out, types, locals)
+		collectCalleesFromExpr(e.Value, mod, out, types, locals, globals, imports)
 		for _, c := range e.Cases {
 			if !c.Default {
-				collectCalleesFromExpr(c.Pattern, mod, out, types, locals)
+				collectCalleesFromExpr(c.Pattern, mod, out, types, locals, globals, imports)
 			}
 			if c.Guard != nil {
-				collectCalleesFromExpr(c.Guard, mod, out, types, locals)
+				collectCalleesFromExpr(c.Guard, mod, out, types, locals, globals, imports)
 			}
-			collectCalleesFromExpr(c.Value, mod, out, types, locals)
+			collectCalleesFromExpr(c.Value, mod, out, types, locals, globals, imports)
 		}
 	case *frontend.CatchExpr:
-		collectCalleesFromExpr(e.Call, mod, out, types, locals)
+		collectCalleesFromExpr(e.Call, mod, out, types, locals, globals, imports)
 		for _, c := range e.Cases {
 			if !c.Default {
-				collectCalleesFromExpr(c.Pattern, mod, out, types, locals)
+				collectCalleesFromExpr(c.Pattern, mod, out, types, locals, globals, imports)
 			}
 			if c.Guard != nil {
-				collectCalleesFromExpr(c.Guard, mod, out, types, locals)
+				collectCalleesFromExpr(c.Guard, mod, out, types, locals, globals, imports)
 			}
-			collectCalleesFromExpr(c.Value, mod, out, types, locals)
+			collectCalleesFromExpr(c.Value, mod, out, types, locals, globals, imports)
 		}
 	case *frontend.CallExpr:
-		if isEnumCaseConstructorName(e.Name, types) {
+		if isEnumCaseConstructorName(e.Name, mod, types, imports) {
 			for _, arg := range e.Args {
-				collectCalleesFromExpr(arg, mod, out, types, locals)
+				collectCalleesFromExpr(arg, mod, out, types, locals, globals, imports)
 			}
 			return
 		}
 		if local, ok := locals[e.Name]; ok && local.FunctionTypeValue {
 			for _, arg := range e.Args {
-				collectCalleesFromExpr(arg, mod, out, types, locals)
+				collectCalleesFromExpr(arg, mod, out, types, locals, globals, imports)
+			}
+			return
+		}
+		if isFunctionFieldCallName(e.Name, locals) {
+			for _, arg := range e.Args {
+				collectCalleesFromExpr(arg, mod, out, types, locals, globals, imports)
+			}
+			return
+		}
+		if global, ok := globals[e.Name]; ok && global.FunctionTypeValue {
+			if global.FunctionValue != "" && cache.ModuleOf(global.FunctionValue) != mod {
+				out[global.FunctionValue] = struct{}{}
+			}
+			for _, arg := range e.Args {
+				collectCalleesFromExpr(arg, mod, out, types, locals, globals, imports)
 			}
 			return
 		}
@@ -131,39 +147,133 @@ func collectCalleesFromExpr(expr frontend.Expr, mod string, out map[string]struc
 			out[e.Name] = struct{}{}
 		}
 		for _, arg := range e.Args {
-			collectCalleesFromExpr(arg, mod, out, types, locals)
+			collectCalleesFromExpr(arg, mod, out, types, locals, globals, imports)
 		}
 	case *frontend.StructLitExpr:
 		for _, field := range e.Fields {
-			collectCalleesFromExpr(field.Value, mod, out, types, locals)
+			collectCalleesFromExpr(field.Value, mod, out, types, locals, globals, imports)
 		}
 	case *frontend.FieldAccessExpr:
-		collectCalleesFromExpr(e.Base, mod, out, types, locals)
+		if isEnumCaseOrImportedTypeFieldAccess(e, types, imports) {
+			return
+		}
+		if target, ok := functionTypedGlobalFieldTargetFromExpr(e, globals); ok {
+			if cache.ModuleOf(target) != mod {
+				out[target] = struct{}{}
+			}
+			return
+		}
+		if target, ok := importedFunctionTargetName(e, imports); ok && cache.ModuleOf(target) != mod {
+			out[target] = struct{}{}
+		}
+		collectCalleesFromExpr(e.Base, mod, out, types, locals, globals, imports)
 	case *frontend.IndexExpr:
-		collectCalleesFromExpr(e.Base, mod, out, types, locals)
-		collectCalleesFromExpr(e.Index, mod, out, types, locals)
+		collectCalleesFromExpr(e.Base, mod, out, types, locals, globals, imports)
+		collectCalleesFromExpr(e.Index, mod, out, types, locals, globals, imports)
 	case *frontend.BinaryExpr:
-		collectCalleesFromExpr(e.Left, mod, out, types, locals)
-		collectCalleesFromExpr(e.Right, mod, out, types, locals)
+		collectCalleesFromExpr(e.Left, mod, out, types, locals, globals, imports)
+		collectCalleesFromExpr(e.Right, mod, out, types, locals, globals, imports)
 	case *frontend.UnaryExpr:
-		collectCalleesFromExpr(e.X, mod, out, types, locals)
+		collectCalleesFromExpr(e.X, mod, out, types, locals, globals, imports)
 	case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.BoolLitExpr, *frontend.StringLitExpr:
 		return
 	}
 }
 
-func isEnumCaseConstructorName(name string, types map[string]*semantics.TypeInfo) bool {
+func isEnumCaseConstructorName(name string, mod string, types map[string]*semantics.TypeInfo, imports map[string]string) bool {
 	parts := strings.Split(name, ".")
 	if len(parts) < 2 {
 		return false
 	}
-	typeName := strings.Join(parts[:len(parts)-1], ".")
-	info, ok := types[typeName]
-	if !ok || info.Kind != semantics.TypeEnum {
+	caseName := parts[len(parts)-1]
+	typeParts := parts[:len(parts)-1]
+	candidates := []string{strings.Join(typeParts, ".")}
+	if resolved, ok := resolveImportedTypePath(typeParts, imports); ok && resolved != candidates[0] {
+		candidates = append(candidates, resolved)
+	}
+	if mod != "" && len(typeParts) == 1 {
+		candidates = append(candidates, mod+"."+typeParts[0])
+	}
+	for _, typeName := range candidates {
+		info, ok := types[typeName]
+		if !ok || info.Kind != semantics.TypeEnum {
+			continue
+		}
+		if _, ok := info.CaseMap[caseName]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func importedFunctionTargetName(expr *frontend.FieldAccessExpr, imports map[string]string) (string, bool) {
+	if expr == nil {
+		return "", false
+	}
+	base, ok := expr.Base.(*frontend.IdentExpr)
+	if !ok {
+		return "", false
+	}
+	module, ok := imports[base.Name]
+	if !ok || module == "" {
+		return "", false
+	}
+	return module + "." + expr.Field, true
+}
+
+func isEnumCaseOrImportedTypeFieldAccess(expr *frontend.FieldAccessExpr, types map[string]*semantics.TypeInfo, imports map[string]string) bool {
+	parts := fieldAccessParts(expr)
+	if len(parts) < 2 {
 		return false
 	}
-	_, ok = info.CaseMap[parts[len(parts)-1]]
-	return ok
+	for typeLen := len(parts); typeLen >= 1; typeLen-- {
+		typeName, ok := resolveImportedTypePath(parts[:typeLen], imports)
+		if !ok {
+			continue
+		}
+		info, exists := types[typeName]
+		if !exists {
+			continue
+		}
+		if typeLen == len(parts) {
+			return true
+		}
+		if info.Kind != semantics.TypeEnum || typeLen != len(parts)-1 {
+			continue
+		}
+		_, ok = info.CaseMap[parts[len(parts)-1]]
+		return ok
+	}
+	return false
+}
+
+func fieldAccessParts(expr frontend.Expr) []string {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		return []string{e.Name}
+	case *frontend.FieldAccessExpr:
+		parts := fieldAccessParts(e.Base)
+		if len(parts) == 0 {
+			return nil
+		}
+		return append(parts, e.Field)
+	default:
+		return nil
+	}
+}
+
+func resolveImportedTypePath(parts []string, imports map[string]string) (string, bool) {
+	if len(parts) == 0 {
+		return "", false
+	}
+	if module, ok := imports[parts[0]]; ok && module != "" {
+		module = strings.TrimPrefix(module, "\x00symbol:")
+		if len(parts) == 1 {
+			return module, true
+		}
+		return module + "." + strings.Join(parts[1:], "."), true
+	}
+	return strings.Join(parts, "."), true
 }
 
 func CollectExternalTypesByModule(checked *semantics.CheckedProgram) map[string]map[string]struct{} {
@@ -269,6 +379,49 @@ func collectTypesFromStmt(stmt frontend.Stmt, mod string, addType func(string, s
 		collectTypesFromExpr(s.Value, mod, addType)
 	case *frontend.ExprStmt:
 		collectTypesFromExpr(s.Expr, mod, addType)
+	}
+}
+
+func isFunctionFieldCallName(name string, locals map[string]semantics.LocalInfo) bool {
+	parts := strings.Split(name, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	local, ok := locals[parts[0]]
+	if !ok || len(local.FunctionFields) == 0 {
+		return false
+	}
+	_, ok = local.FunctionFields[strings.Join(parts[1:], ".")]
+	return ok
+}
+
+func functionTypedGlobalFieldTargetFromExpr(expr *frontend.FieldAccessExpr, globals map[string]semantics.GlobalInfo) (string, bool) {
+	if expr == nil {
+		return "", false
+	}
+	name := fieldAccessName(expr)
+	if name == "" {
+		return "", false
+	}
+	global, ok := globals[name]
+	if !ok || !global.FunctionTypeValue || global.FunctionValue == "" {
+		return "", false
+	}
+	return global.FunctionValue, true
+}
+
+func fieldAccessName(expr frontend.Expr) string {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		return e.Name
+	case *frontend.FieldAccessExpr:
+		base := fieldAccessName(e.Base)
+		if base == "" || e.Field == "" {
+			return ""
+		}
+		return base + "." + e.Field
+	default:
+		return ""
 	}
 }
 

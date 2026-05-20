@@ -49,6 +49,41 @@ func main() -> Int:
 	}
 }
 
+func TestLowerImplicitOptionalCallArgumentUsesCalleeParamSlots(t *testing.T) {
+	src := []byte(`
+func unwrap(value: Int?) -> Int:
+    if let some(x) = value:
+        return x
+    else:
+        return 0
+
+func main() -> Int:
+    return unwrap(41)
+`)
+	prog, err := frontend.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := semantics.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	irProg, err := Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	mainFn := irProg.Funcs[irProg.MainIndex]
+	for _, instr := range mainFn.Instrs {
+		if instr.Kind == ir.IRCall && instr.Name == "unwrap" {
+			if instr.ArgSlots != 2 || instr.RetSlots != 1 {
+				t.Fatalf("unwrap call ABI = args %d rets %d, want args 2 rets 1", instr.ArgSlots, instr.RetSlots)
+			}
+			return
+		}
+	}
+	t.Fatalf("main did not lower an unwrap call: %#v", mainFn.Instrs)
+}
+
 func TestVerifyFuncRejectsUnbalancedReturnStack(t *testing.T) {
 	fn := ir.IRFunc{
 		Name:        "bad_return",
@@ -62,6 +97,17 @@ func TestVerifyFuncRejectsUnbalancedReturnStack(t *testing.T) {
 		t.Fatalf("expected verifier error")
 	}
 	if !strings.Contains(err.Error(), "return expects 1 stack slots") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyFuncRejectsEmptyReturningFunction(t *testing.T) {
+	fn := ir.IRFunc{Name: "empty", ReturnSlots: 1}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), "empty body cannot produce 1 return slots") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -104,6 +150,40 @@ func TestVerifyProgramRejectsDuplicateFunctionNames(t *testing.T) {
 		t.Fatalf("expected verifier error")
 	}
 	if !strings.Contains(err.Error(), `duplicate function name "main"`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyProgramRejectsKnownFunctionCallSignatureMismatch(t *testing.T) {
+	prog := &ir.IRProgram{
+		MainIndex: 0,
+		MainName:  "main",
+		Funcs: []ir.IRFunc{
+			{
+				Name:        "main",
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRCall, Name: "helper", ArgSlots: 0, RetSlots: 1},
+					{Kind: ir.IRReturn},
+				},
+			},
+			{
+				Name:        "helper",
+				ParamSlots:  1,
+				LocalSlots:  1,
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRLoadLocal, Local: 0},
+					{Kind: ir.IRReturn},
+				},
+			},
+		},
+	}
+	err := VerifyProgram(prog)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), `call "helper" ABI mismatch`) {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -159,6 +239,24 @@ func TestVerifyFuncRejectsUnknownBranchLabel(t *testing.T) {
 	}
 }
 
+func TestVerifyFuncRejectsNegativeBranchLabel(t *testing.T) {
+	fn := ir.IRFunc{
+		Name: "bad_negative_label",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRJmp, Label: -1},
+			{Kind: ir.IRLabel, Label: -1},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), "negative label -1") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestVerifyFuncRejectsLocalSlotOutOfBounds(t *testing.T) {
 	pos := frontend.Position{File: "bad_lower.t4", Line: 7, Col: 5}
 	fn := ir.IRFunc{
@@ -182,6 +280,47 @@ func TestVerifyFuncRejectsLocalSlotOutOfBounds(t *testing.T) {
 	}
 	if diag.Code != DiagnosticCodeIRVerifier || diag.File != "bad_lower.t4" || diag.Line != 7 || diag.Column != 5 {
 		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestVerifyFuncRejectsNegativeGlobalSlotOperands(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   ir.IRFunc
+	}{
+		{
+			name: "load_global",
+			fn: ir.IRFunc{
+				Name:        "bad_load_global",
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRLoadGlobal, Local: -1},
+					{Kind: ir.IRReturn},
+				},
+			},
+		},
+		{
+			name: "store_global",
+			fn: ir.IRFunc{
+				Name: "bad_store_global",
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRConstI32, Imm: 7},
+					{Kind: ir.IRStoreGlobal, Local: -1},
+					{Kind: ir.IRReturn},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyFunc(tt.fn)
+			if err == nil {
+				t.Fatalf("expected verifier error")
+			}
+			if !strings.Contains(err.Error(), "global slot -1 out of bounds") {
+				t.Fatalf("error = %v", err)
+			}
+		})
 	}
 }
 
@@ -286,6 +425,344 @@ func TestVerifyFuncRejectsNegativeCallABISlots(t *testing.T) {
 	}
 }
 
+func TestVerifyFuncRejectsKnownRuntimeCallSignatureMismatch(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "bad_runtime_call",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32},
+			{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 0, RetSlots: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), `runtime call "__tetra_actor_spawn" ABI mismatch`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyFuncRejectsTypedTaskRuntimeCallSignatureMismatch(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "bad_typed_task_runtime_call",
+		ReturnSlots: 5,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32},
+			{Kind: ir.IRConstI32},
+			{Kind: ir.IRConstI32},
+			{Kind: ir.IRConstI32},
+			{Kind: ir.IRConstI32},
+			{Kind: ir.IRCall, Name: "__tetra_task_join_typed_5", ArgSlots: 5, RetSlots: 5},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), `runtime call "__tetra_task_join_typed_5" ABI mismatch`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyFuncAcceptsKnownRuntimeCallSignature(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "runtime_call",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32},
+			{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRReturn},
+		},
+	}
+	if err := VerifyFunc(fn); err != nil {
+		t.Fatalf("VerifyFunc: %v", err)
+	}
+}
+
+func TestVerifyFuncRejectsMissingNamedOperands(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   ir.IRFunc
+		want string
+	}{
+		{
+			name: "call",
+			fn: ir.IRFunc{
+				Name: "bad_call_name",
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRCall, ArgSlots: 0, RetSlots: 0},
+					{Kind: ir.IRReturn},
+				},
+			},
+			want: "call is missing target name",
+		},
+		{
+			name: "symbol_address",
+			fn: ir.IRFunc{
+				Name:        "bad_symbol_name",
+				ReturnSlots: 1,
+				Instrs: []ir.IRInstr{
+					{Kind: ir.IRSymAddr},
+					{Kind: ir.IRReturn},
+				},
+			},
+			want: "symbol address is missing name",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyFunc(tt.fn)
+			if err == nil {
+				t.Fatalf("expected verifier error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestVerifyFuncAcceptsPolicyGuardShape(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "guarded",
+		ParamSlots:  1,
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Policy: ir.IRPolicy{
+			HasBudget:    true,
+			Budget:       3,
+			BudgetLocal:  1,
+			HasConsent:   true,
+			ConsentLocal: 0,
+			FailLabel:    1,
+		},
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 3},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: consentTokenRuntimeSentinel},
+			{Kind: ir.IRCmpEqI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRSubI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRCmpGeI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRCall, Name: "callee", ArgSlots: 0, RetSlots: 1},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+	if err := VerifyFunc(fn); err != nil {
+		t.Fatalf("VerifyFunc: %v", err)
+	}
+}
+
+func TestVerifyFuncRejectsMissingBudgetGuardBeforeChargedInstruction(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "bad_budget_guard",
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Policy: ir.IRPolicy{
+			HasBudget:   true,
+			Budget:      1,
+			BudgetLocal: 0,
+			FailLabel:   1,
+		},
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRCall, Name: "callee", ArgSlots: 0, RetSlots: 1},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), "missing budget guard") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestStackEffectCoversEveryIRInstrKind(t *testing.T) {
+	for kind := ir.IRWrite; kind < ir.IRInstrKindCount; kind++ {
+		_, _, known := stackEffect(ir.IRInstr{Kind: kind, ArgSlots: 1, RetSlots: 1})
+		if !known {
+			t.Fatalf("missing stack effect for IR kind %d", kind)
+		}
+	}
+}
+
+func TestBudgetChargeModelIsExplicit(t *testing.T) {
+	charged := map[ir.IRInstrKind]int32{
+		ir.IRWrite:              1,
+		ir.IRCall:               1,
+		ir.IRAllocBytes:         1,
+		ir.IRMakeSliceU8:        1,
+		ir.IRMakeSliceU16:       1,
+		ir.IRMakeSliceI32:       1,
+		ir.IRIndexLoadI32:       1,
+		ir.IRIndexStoreI32:      1,
+		ir.IRIndexLoadU8:        1,
+		ir.IRIndexStoreU8:       1,
+		ir.IRIndexLoadU16:       1,
+		ir.IRIndexStoreU16:      1,
+		ir.IRIslandNew:          1,
+		ir.IRIslandMakeSliceU8:  1,
+		ir.IRIslandMakeSliceU16: 1,
+		ir.IRIslandMakeSliceI32: 1,
+		ir.IRIslandFree:         1,
+		ir.IRCapIO:              1,
+		ir.IRCapMem:             1,
+		ir.IRMemReadI32:         1,
+		ir.IRMemWriteI32:        1,
+		ir.IRMemReadU8:          1,
+		ir.IRMemWriteU8:         1,
+		ir.IRMemReadPtr:         1,
+		ir.IRMemWritePtr:        1,
+		ir.IRMemReadI32Offset:   1,
+		ir.IRMemWriteI32Offset:  1,
+		ir.IRMemReadU8Offset:    1,
+		ir.IRMemWriteU8Offset:   1,
+		ir.IRMemReadPtrOffset:   1,
+		ir.IRMemWritePtrOffset:  1,
+		ir.IRPtrAdd:             1,
+		ir.IRMmioReadI32:        1,
+		ir.IRMmioWriteI32:       1,
+		ir.IRSymAddr:            1,
+		ir.IRCtxSwitch:          1,
+	}
+	for kind, want := range charged {
+		got, ok := budgetChargeForInstr(kind)
+		if !ok {
+			t.Fatalf("kind %v missing from budget charge model", kind)
+		}
+		if got != want {
+			t.Fatalf("kind %v cost = %d, want %d", kind, got, want)
+		}
+	}
+
+	uncharged := []ir.IRInstrKind{
+		ir.IRStrLit,
+		ir.IRConstI32,
+		ir.IRLoadLocal,
+		ir.IRStoreLocal,
+		ir.IRLoadGlobal,
+		ir.IRStoreGlobal,
+		ir.IRAddI32,
+		ir.IRSubI32,
+		ir.IRNegI32,
+		ir.IRCmpEqI32,
+		ir.IRCmpLtI32,
+		ir.IRMulI32,
+		ir.IRDivI32,
+		ir.IRModI32,
+		ir.IRCmpGtI32,
+		ir.IRCmpGeI32,
+		ir.IRCmpLeI32,
+		ir.IRCmpNeI32,
+		ir.IRLabel,
+		ir.IRJmp,
+		ir.IRJmpIfZero,
+		ir.IRReturn,
+	}
+	classified := make(map[ir.IRInstrKind]string, len(charged)+len(uncharged))
+	for kind := range charged {
+		classified[kind] = "charged"
+	}
+	for _, kind := range uncharged {
+		if previous, exists := classified[kind]; exists {
+			t.Fatalf("kind %d classified as both %s and uncharged", kind, previous)
+		}
+		classified[kind] = "uncharged"
+		if got, ok := budgetChargeForInstr(kind); ok {
+			t.Fatalf("kind %v unexpectedly charged with cost %d", kind, got)
+		}
+	}
+	for kind := ir.IRWrite; kind < ir.IRInstrKindCount; kind++ {
+		if _, ok := classified[kind]; !ok {
+			t.Fatalf("missing budget charge classification for IR kind %d", kind)
+		}
+	}
+}
+
+func TestVerifyFuncRejectsMissingBudgetGuardBeforeIndexedAccess(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "bad_index_budget_guard",
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Policy: ir.IRPolicy{
+			HasBudget:   true,
+			Budget:      1,
+			BudgetLocal: 0,
+			FailLabel:   1,
+		},
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 100},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRIndexLoadI32},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), "missing budget guard") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyFuncRejectsMalformedConsentGuardShape(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "bad_consent_guard",
+		ParamSlots:  1,
+		LocalSlots:  1,
+		ReturnSlots: 1,
+		Policy: ir.IRPolicy{
+			HasConsent:   true,
+			ConsentLocal: 0,
+			FailLabel:    1,
+		},
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRCmpNeI32},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRReturn},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), "malformed consent guard") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestVerifyFuncRejectsUnreachableUnknownInstructionKind(t *testing.T) {
 	fn := ir.IRFunc{
 		Name: "bad_unreachable_kind",
@@ -301,6 +778,25 @@ func TestVerifyFuncRejectsUnreachableUnknownInstructionKind(t *testing.T) {
 		t.Fatalf("expected verifier error")
 	}
 	if !strings.Contains(err.Error(), "instr 1: unknown instruction kind 999") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyFuncRejectsUnreachableLinearStackUnderflow(t *testing.T) {
+	fn := ir.IRFunc{
+		Name: "bad_unreachable_stack",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRJmp, Label: 1},
+			{Kind: ir.IRAddI32},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRReturn},
+		},
+	}
+	err := VerifyFunc(fn)
+	if err == nil {
+		t.Fatalf("expected verifier error")
+	}
+	if !strings.Contains(err.Error(), "linear stack underflow") {
 		t.Fatalf("error = %v", err)
 	}
 }

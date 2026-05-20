@@ -1,7 +1,8 @@
 # Eco Publishing Model v1
 
-Status: Accepted for Wave 10 completion on 2026-04-26. Used as the local Eco/Todex
-contract baseline for v0.2.0 release gating.
+Status: Originally accepted for Wave 10 completion on 2026-04-26; synchronized
+with the current `v0.4.0` release truth on 2026-05-20. This spec applies to
+the local Eco/Todex contract baseline for the current `v0.4.0` release line.
 
 This document stabilizes local Eco/Todex v1 contracts and defines which network/distributed capabilities are beta vs post-v1.
 
@@ -67,7 +68,7 @@ stale object files, stale dependency seeds, and stale semantic locks with a
 repair command. `tetra eco artifacts build --check` is the dry-run form of the
 builder and reports pending writes as `would generate ...`. `tetra eco artifacts
 build --all-targets` emits native object artifacts for every native target in
-`Capsule.t4` and skips build-only targets such as WASM object outputs.
+`Capsule.t4` and skips runner-gated WASM object outputs.
 `tetra build --artifacts=auto` runs the repair step before compiling; the
 default strict build mode only validates declared artifacts and reports
 diagnostics.
@@ -204,26 +205,31 @@ Minimal unpacked project bundle metadata example:
 }
 ```
 
-## 8) Beta Package Publishing
+## 8) Package Publishing
 
-Publishing metadata schema: `tetra.eco.publish.v1beta`.
+Publishing metadata schemas:
+
+- `tetra.eco.publish.v1` for stable local production metadata
+- `tetra.eco.publish.v1beta` for beta metadata
 
 Command:
-- `tetra eco publish --package <pkg.todex> --registry <dir> --target <triple> [--trust <snapshot.json>]`
+- `tetra eco publish --package <pkg.todex> --registry <dir> --target <triple> [--trust <snapshot.json>] [--channel beta|stable]`
 
 Contract:
-- channel is beta-only in v1 (`channel = "beta"`)
+- `channel = "stable"` writes `tetra.eco.publish.v1`
+- `channel = "beta"` writes `tetra.eco.publish.v1beta`
 - published metadata records package hash/size and optional trust snapshot linkage
 - metadata is target-specific and must point at the package file for that target
-- validators reject unknown metadata fields, unsafe paths, size/hash mismatches, and mismatched download entries
+- validators reject unknown metadata fields, unsafe paths, size/hash mismatches,
+  schema/channel mismatches, and mismatched download entries
 
 Stable local metadata fields:
 
 ```json
 {
-  "schema": "tetra.eco.publish.v1beta",
-  "channel": "beta",
-  "hub": "local-beta",
+  "schema": "tetra.eco.publish.v1",
+  "channel": "stable",
+  "hub": "production",
   "published_at_unix": 0,
   "capsule": {
     "id": "tetra://demo",
@@ -255,10 +261,50 @@ Stable local metadata fields:
 ## 9) TetraHub Beta Path
 
 Commands:
-- `tetra eco tetrahub publish ...`
+- `tetra eco tetrahub publish ... [--channel beta|stable]`
 - `tetra eco tetrahub download ...`
+- `tetra eco tetrahub mirror --from <store> --to <store> --id <id> --version <x.y.z> --target <triple> -o <report.json>`
+- `tetra eco tetrahub fetch --url <http-url> --to <store> --id <id> --version <x.y.z> --target <triple> -o <report.json>`
 
-`tetra eco tetrahub` is an explicit beta path over local/store-backed metadata layout.
+`tetra eco tetrahub publish --channel stable` writes local production metadata
+with schema `tetra.eco.publish.v1` and `hub = "tetrahub-stable"`. The default
+channel remains beta over the local/store-backed metadata layout.
+
+`tetra eco tetrahub mirror` is a local store-to-store synchronization primitive,
+not a network mesh. It validates the source package metadata, package bytes, and
+optional trust snapshot before copying them byte-for-byte into the destination
+store. The command emits `tetra.eco.mirror.v1`, validated by
+`tools/cmd/validate-eco-mirror`.
+
+`tetra eco tetrahub fetch` is the matching single-origin HTTP(S) fetch primitive.
+It downloads `metadata.json`, `package.todex`, and the optional trust snapshot
+from one TetraHub store URL, validates size/hash/schema fields before accepting
+the package, writes the verified bytes into a local destination store, and emits
+the same `tetra.eco.mirror.v1` report. This proves network transport integrity
+for a concrete store entry; it is not hub discovery, federation, consensus, or a
+distributed mesh.
+
+Mirror report fields:
+
+```json
+{
+  "schema": "tetra.eco.mirror.v1",
+  "mirrored_at_unix": 0,
+  "source_store": ".tetra/tetrahub-stable",
+  "destination_store": ".tetra/tetrahub-mirror",
+  "id": "tetra://demo",
+  "version": "0.1.0",
+  "target": "linux-x64",
+  "channel": "stable",
+  "hub": "tetrahub-stable",
+  "package_path": "packages/tetra_demo/0.1.0/linux-x64/package.todex",
+  "package_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "metadata_path": "packages/tetra_demo/0.1.0/linux-x64/metadata.json",
+  "metadata_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "trust_snapshot_path": "packages/tetra_demo/0.1.0/linux-x64/trust.snapshot.json",
+  "trust_snapshot_sha256": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+}
+```
 
 ## 10) Target-Aware Downloads
 
@@ -275,7 +321,7 @@ Trust metadata is published and consumed via:
 - `trust.snapshot_sha256` in publish metadata
 - capsule trust tier and score from TrustSnapshot
 
-This is intentionally local/beta metadata and not a global trust network claim.
+This is intentionally local metadata and not a global trust network claim.
 
 Trust snapshot example:
 
@@ -304,26 +350,42 @@ Trust snapshot example:
 In v1:
 - local manifest/lock/seed/needmap/trust snapshot/materialization flows
 - local vault verification
+- stable local publish metadata and target-aware downloads
+- stable local TetraHub store metadata and downloads
+- local TetraHub mirror reports and byte-preserving store-to-store copies
+- single-origin HTTP(S) TetraHub fetch into a local verified store
 - beta publishing and target-aware downloads through local/TetraHub beta paths
 
 Post-v1 (explicitly out of v1 contract):
-- distributed Todex mesh synchronization
+- distributed Todex mesh synchronization beyond local store-to-store mirroring
+  and single-origin HTTP(S) fetch
 - global EcoTrust network scoring
 - EcoOracle federation/consensus
 - proof-carrying capsule mesh enforcement and live-evolution protocol
 
 Promotion rule: any post-v1 capability needs an explicit schema/version and release-gate command before being treated as v1-stable.
 
-## 13) v0.2.0 release evidence
+## 13) v0.3.0 release evidence
 
-v0.2.0 treats Eco/Todex as local-only workflows with validator-backed metadata.
+`v0.3.0` treats Eco/Todex as local-only workflows with validator-backed
+metadata. It covers local package lifecycle validation for verify,
+lock-generation and lock-validation through `--lock` workflows, pack/unpack,
+vault, and publish metadata fixtures. `v0.4.0` adds stable local publish
+metadata through `tetra.eco.publish.v1`, local TetraHub mirror reports through
+`tetra.eco.mirror.v1`, and single-origin HTTP(S) TetraHub fetch with the same
+integrity checks. Hosted production TetraHub, distributed Todex mesh
+synchronization beyond local mirroring/fetch, and global trust federation remain
+outside the current support claim.
 
 Focused verification command:
 
-`go test ./cli/... ./tools/cmd/validate-eco-lock ./tools/cmd/validate-eco-unpack ./tools/cmd/validate-eco-vault ./tools/cmd/validate-eco-publish -count=1`
+`go test ./cli/... ./tools/... -run 'Eco|Project|Workspace|Artifact|Capsule|Lock' -count=1`
 
 Gate workflow command:
 
-`bash scripts/test_all.sh --full --keep-going`
+`bash scripts/release/v0_3_0/gate.sh`
 
-Both commands must pass before claiming Eco publish metadata health.
+That gate invokes the stabilization wrapper around `scripts/ci/test-all.sh` and
+must pass before claiming current Eco/Todex release health. For user-facing
+command coverage, keep this spec aligned with `docs/user/eco_package_guide.md`
+and the current release-truth layer in `docs/spec/current_supported_surface.md`.

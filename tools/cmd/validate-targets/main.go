@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 )
 
@@ -25,6 +26,8 @@ type targetReportEntry struct {
 	Format                  string `json:"format"`
 	ExeExt                  string `json:"exe_ext"`
 	BuildOnly               bool   `json:"build_only"`
+	RunMode                 string `json:"run_mode"`
+	RunRunner               string `json:"run_runner,omitempty"`
 	RunSupported            bool   `json:"run_supported"`
 	RunUnsupportedReason    string `json:"run_unsupported_reason,omitempty"`
 	SupportsDebugInfo       bool   `json:"supports_debug_info"`
@@ -55,10 +58,10 @@ func validateTargetsReport(raw []byte) error {
 	if err := decodeStrictJSON(raw, &report); err != nil {
 		return fmt.Errorf("invalid targets JSON: %w", err)
 	}
-	if err := validateTargetList("supported", report.Supported, []string{"linux-x64", "windows-x64", "macos-x64"}); err != nil {
+	if err := validateTargetList("supported", report.Supported, []string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web"}); err != nil {
 		return err
 	}
-	if err := validateTargetList("build_only", report.BuildOnly, []string{"wasm32-wasi", "wasm32-web"}); err != nil {
+	if err := validateTargetList("build_only", report.BuildOnly, []string{}); err != nil {
 		return err
 	}
 	if err := validateTargetList("planned", report.Planned, []string{}); err != nil {
@@ -95,11 +98,11 @@ func validateTargetList(name string, got []string, want []string) error {
 
 func validateTargetMetadata(got []targetReportEntry) error {
 	want := []targetReportEntry{
-		{Triple: "linux-x64", Status: "supported", OS: "linux", Arch: "x64", ABI: "sysv", Format: "elf", ExeExt: "", BuildOnly: false, SupportsDebugInfo: true, SupportsReleaseOptimize: true},
-		{Triple: "windows-x64", Status: "supported", OS: "windows", Arch: "x64", ABI: "win64", Format: "pe", ExeExt: ".exe", BuildOnly: false, SupportsDebugInfo: true, SupportsReleaseOptimize: true},
-		{Triple: "macos-x64", Status: "supported", OS: "macos", Arch: "x64", ABI: "sysv", Format: "macho", ExeExt: "", BuildOnly: false, SupportsDebugInfo: true, SupportsReleaseOptimize: true},
-		{Triple: "wasm32-wasi", Status: "build_only", OS: "wasi", Arch: "wasm32", ABI: "wasi", Format: "wasm", ExeExt: ".wasm", BuildOnly: true, SupportsDebugInfo: false, SupportsReleaseOptimize: true},
-		{Triple: "wasm32-web", Status: "build_only", OS: "web", Arch: "wasm32", ABI: "web", Format: "wasm", ExeExt: ".wasm", BuildOnly: true, SupportsDebugInfo: false, SupportsReleaseOptimize: true},
+		{Triple: "linux-x64", Status: "supported", OS: "linux", Arch: "x64", ABI: "sysv", Format: "elf", ExeExt: "", BuildOnly: false, RunMode: "host_native", SupportsDebugInfo: true, SupportsReleaseOptimize: true},
+		{Triple: "windows-x64", Status: "supported", OS: "windows", Arch: "x64", ABI: "win64", Format: "pe", ExeExt: ".exe", BuildOnly: false, RunMode: "host_native", SupportsDebugInfo: true, SupportsReleaseOptimize: true},
+		{Triple: "macos-x64", Status: "supported", OS: "macos", Arch: "x64", ABI: "sysv", Format: "macho", ExeExt: "", BuildOnly: false, RunMode: "host_native", SupportsDebugInfo: true, SupportsReleaseOptimize: true},
+		{Triple: "wasm32-wasi", Status: "supported", OS: "wasi", Arch: "wasm32", ABI: "wasi", Format: "wasm", ExeExt: ".wasm", BuildOnly: false, RunMode: "wasi_runner", SupportsDebugInfo: false, SupportsReleaseOptimize: true},
+		{Triple: "wasm32-web", Status: "supported", OS: "web", Arch: "wasm32", ABI: "web", Format: "wasm", ExeExt: ".wasm", BuildOnly: false, RunMode: "web_runner", SupportsDebugInfo: false, SupportsReleaseOptimize: true},
 	}
 	if len(got) != len(want) {
 		return fmt.Errorf("target metadata count = %d, want %d", len(got), len(want))
@@ -126,14 +129,13 @@ func validateTargetMetadata(got []targetReportEntry) error {
 		if got[i].BuildOnly != want[i].BuildOnly {
 			return fmt.Errorf("target metadata[%s].build_only = %v, want %v", got[i].Triple, got[i].BuildOnly, want[i].BuildOnly)
 		}
-		if got[i].BuildOnly && got[i].RunSupported {
-			return fmt.Errorf("target metadata[%s].run_supported must be false for build-only targets", got[i].Triple)
+		if got[i].RunMode != want[i].RunMode {
+			return fmt.Errorf("target metadata[%s].run_mode = %q, want %q", got[i].Triple, got[i].RunMode, want[i].RunMode)
 		}
-		if got[i].BuildOnly {
-			if !strings.Contains(got[i].RunUnsupportedReason, "build-only") || !strings.Contains(got[i].RunUnsupportedReason, "does not provide a production runtime runner") {
-				return fmt.Errorf("target metadata[%s].run_unsupported_reason must explain build-only artifact-only runtime status", got[i].Triple)
-			}
-		} else if !got[i].RunSupported && got[i].RunUnsupportedReason == "" {
+		if err := validateRunContract(got[i]); err != nil {
+			return err
+		}
+		if !got[i].RunSupported && got[i].RunUnsupportedReason == "" {
 			return fmt.Errorf("target metadata[%s].run_unsupported_reason is required when run_supported is false", got[i].Triple)
 		}
 		if got[i].SupportsDebugInfo != want[i].SupportsDebugInfo {
@@ -144,4 +146,78 @@ func validateTargetMetadata(got []targetReportEntry) error {
 		}
 	}
 	return nil
+}
+
+func validateRunContract(entry targetReportEntry) error {
+	switch entry.RunMode {
+	case "host_native":
+		if entry.RunRunner != "" {
+			return fmt.Errorf("target metadata[%s].run_runner = %q, want empty for host_native", entry.Triple, entry.RunRunner)
+		}
+		hostTriple, hostOK := validatorHostTriple()
+		if hostOK && entry.Triple == hostTriple {
+			if !entry.RunSupported {
+				return fmt.Errorf("target metadata[%s].run_supported = false, want true on host %s/%s", entry.Triple, runtime.GOOS, runtime.GOARCH)
+			}
+			if entry.RunUnsupportedReason != "" {
+				return fmt.Errorf("target metadata[%s].run_unsupported_reason must be empty on matching host", entry.Triple)
+			}
+		} else if entry.RunSupported {
+			return fmt.Errorf("target metadata[%s].run_supported = true, want false on host %s/%s", entry.Triple, runtime.GOOS, runtime.GOARCH)
+		}
+	case "wasi_runner":
+		if entry.BuildOnly || entry.Triple != "wasm32-wasi" {
+			return fmt.Errorf("target metadata[%s].run_mode wasi_runner is only valid for supported wasm32-wasi target", entry.Triple)
+		}
+		if entry.RunSupported {
+			if entry.RunRunner != "wasmtime" && entry.RunRunner != "node-wasi" {
+				return fmt.Errorf("target metadata[%s].run_runner = %q, want wasmtime or node-wasi when run_supported is true", entry.Triple, entry.RunRunner)
+			}
+			if entry.RunUnsupportedReason != "" {
+				return fmt.Errorf("target metadata[%s].run_unsupported_reason must be empty when WASI runner is available", entry.Triple)
+			}
+		} else {
+			if entry.RunRunner != "" {
+				return fmt.Errorf("target metadata[%s].run_runner = %q, want empty when WASI runner is unavailable", entry.Triple, entry.RunRunner)
+			}
+			if !strings.Contains(entry.RunUnsupportedReason, "missing WASI runner") {
+				return fmt.Errorf("target metadata[%s].run_unsupported_reason must explain missing WASI runner", entry.Triple)
+			}
+		}
+	case "web_runner":
+		if entry.Triple != "wasm32-web" || entry.BuildOnly {
+			return fmt.Errorf("target metadata[%s].run_mode web_runner is only valid for supported wasm32-web target", entry.Triple)
+		}
+		if entry.RunSupported {
+			if entry.RunRunner == "" {
+				return fmt.Errorf("target metadata[%s].run_runner is required when web runner is available", entry.Triple)
+			}
+			if entry.RunUnsupportedReason != "" {
+				return fmt.Errorf("target metadata[%s].run_unsupported_reason must be empty when web runner is available", entry.Triple)
+			}
+		} else {
+			if entry.RunRunner != "" {
+				return fmt.Errorf("target metadata[%s].run_runner = %q, want empty when web runner is unavailable", entry.Triple, entry.RunRunner)
+			}
+			if !strings.Contains(entry.RunUnsupportedReason, "web runner unavailable") && !strings.Contains(entry.RunUnsupportedReason, "browser runner unavailable") {
+				return fmt.Errorf("target metadata[%s].run_unsupported_reason must explain missing web runner", entry.Triple)
+			}
+		}
+	default:
+		return fmt.Errorf("target metadata[%s].run_mode = %q, want host_native, wasi_runner, or web_runner", entry.Triple, entry.RunMode)
+	}
+	return nil
+}
+
+func validatorHostTriple() (string, bool) {
+	switch runtime.GOOS + "/" + runtime.GOARCH {
+	case "linux/amd64":
+		return "linux-x64", true
+	case "windows/amd64":
+		return "windows-x64", true
+	case "darwin/amd64":
+		return "macos-x64", true
+	default:
+		return "", false
+	}
 }

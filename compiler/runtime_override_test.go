@@ -228,6 +228,58 @@ func TestRuntimeObjectOverrideRejectsMissingRequiredSymbols(t *testing.T) {
 	}
 }
 
+func TestRuntimeObjectOverrideRejectsSignatureMismatch(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("amd64 only")
+	}
+
+	srcPath := filepath.Join("..", "examples", "actors_pingpong.tetra")
+	world, err := LoadWorld(srcPath)
+	if err != nil {
+		t.Fatalf("load world: %v", err)
+	}
+	checked, err := CheckWorld(world)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	actorsUsed, actorEntries, err := collectActorEntries(checked)
+	if err != nil {
+		t.Fatalf("collect actor entries: %v", err)
+	}
+	if !actorsUsed || len(actorEntries) == 0 {
+		t.Fatalf("expected actors usage")
+	}
+
+	rt, err := buildHostRuntimeObject(tgt.Triple, actorEntries)
+	if err != nil {
+		t.Fatalf("build runtime: %v", err)
+	}
+	rt.Target = tgt.Triple
+	rt.Module = "__runtime"
+	annotateRuntimeObjectSignatures(rt)
+	replaceRuntimeSymbolSignature(rt, "__tetra_actor_spawn", 2, 1)
+
+	tmp := t.TempDir()
+	rtPath := filepath.Join(tmp, "runtime_wrong_signature.tobj")
+	if err := WriteObject(rtPath, rt); err != nil {
+		t.Fatalf("write runtime object: %v", err)
+	}
+
+	outPath := filepath.Join(tmp, "actors_pingpong"+tgt.ExeExt)
+	_, err = BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, BuildOptions{RuntimeObjectPath: rtPath})
+	if err == nil {
+		t.Fatalf("expected signature mismatch error, got nil")
+	}
+	if !strings.Contains(err.Error(), "runtime object symbol '__tetra_actor_spawn' signature mismatch") ||
+		!strings.Contains(err.Error(), "params=2 want=1") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRuntimeObjectOverrideRejectsMissingTaggedMessageSymbols(t *testing.T) {
 	tgt, ok := target.Host()
 	if !ok {
@@ -431,6 +483,7 @@ func TestRuntimeObjectOverrideBuildsForAllX64Targets(t *testing.T) {
 			}
 			rt.Target = triple
 			rt.Module = "__runtime"
+			annotateRuntimeObjectSignatures(rt)
 
 			tmp := t.TempDir()
 			rtPath := filepath.Join(tmp, "runtime.tobj")

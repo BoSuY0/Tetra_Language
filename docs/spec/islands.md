@@ -12,7 +12,7 @@
 
 Target boundary (current profile):
 - Island runtime paths are in the current native runtime scope.
-- Build-only WASM targets (`wasm32-wasi`, `wasm32-web`) support island IR in a
+- WASM targets (`wasm32-wasi`, `wasm32-web`) support island IR in a
   compile-compatible fallback mode: `island_new` returns a handle token from the
   linear heap allocator, `island_make_*` maps to linear heap slice allocation,
   and `island_free` is currently a no-op.

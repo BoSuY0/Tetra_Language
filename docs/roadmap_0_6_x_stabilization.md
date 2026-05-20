@@ -2,8 +2,7 @@
 
 > Historical checkpoint. This roadmap belongs to the older v0.6 stabilization
 > line and is superseded by
-> `docs/spec/v1_scope.md` and
-> `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+> `docs/spec/v1_scope.md` and `docs/checklists/v1_0_release_gate.md`.
 > Public release truth for this branch lives in
 > `docs/spec/current_supported_surface.md` (`v0.2.0`). The v1.0 scope remains
 > a future contract.
@@ -15,9 +14,9 @@ compiler, runtime, tooling, docs, and local Eco flows repeatably testable.
 ## Historical Baseline
 
 - `tetra version` reports `v0.6.0`.
-- The v0.6 release gate is captured by `scripts/release_v0_6_gate.sh`.
-- The 0.6.x stabilization wrapper is `scripts/test_all.sh`.
-- Reports from `scripts/test_all.sh` contain per-step logs, `summary.md`, and
+- The v0.6 release gate is captured by `scripts/release/v0_6/gate.sh`.
+- The 0.6.x stabilization wrapper is `scripts/ci/test-all.sh`.
+- Reports from `scripts/ci/test-all.sh` contain per-step logs, `summary.md`, and
   `summary.json`; each JSON step includes `name`, `status`,
   `duration_seconds`, `exit_code`, `command`, and `log`. The JSON envelope also
   includes top-level `step_count` and `failed_count` fields for CI consumers. The
@@ -32,31 +31,31 @@ compiler, runtime, tooling, docs, and local Eco flows repeatably testable.
 Fast local iteration:
 
 ```sh
-bash scripts/test_all.sh --quick
+bash scripts/ci/test-all.sh --quick
 ```
 
 Full stabilization gate:
 
 ```sh
-bash scripts/test_all.sh --full
+bash scripts/ci/test-all.sh --full
 ```
 
 Collect every selected failure before exiting:
 
 ```sh
-bash scripts/test_all.sh --full --keep-going
+bash scripts/ci/test-all.sh --full --keep-going
 ```
 
 Emit only machine-readable summary JSON:
 
 ```sh
-bash scripts/test_all.sh --full --json-only
+bash scripts/ci/test-all.sh --full --json-only
 ```
 
 Canonical v0.6.0 release compatibility gate:
 
 ```sh
-bash scripts/release_v0_6_gate.sh
+bash scripts/release/v0_6/gate.sh
 ```
 
 The full wrapper currently covers:
@@ -81,8 +80,8 @@ The full wrapper currently covers:
 
 ## 0.6.1 Target: Test Envelope Hardening
 
-- Keep `scripts/test_all.sh --full` green.
-- Keep `scripts/test_all.sh --quick --json-only` valid for machine consumers.
+- Keep `scripts/ci/test-all.sh --full` green.
+- Keep `scripts/ci/test-all.sh --quick --json-only` valid for machine consumers.
 - Keep per-step JSON `exit_code` stable so CI can distinguish command failures
   without scraping logs.
 - Preserve machine-readable failure summaries even when secondary report
@@ -112,8 +111,8 @@ The full wrapper currently covers:
 
 ## Release Rules For 0.6.x
 
-- A point release cannot be cut while `scripts/test_all.sh --full` fails.
-- A point release cannot be cut while `scripts/release_v0_6_gate.sh` fails,
+- A point release cannot be cut while `scripts/ci/test-all.sh --full` fails.
+- A point release cannot be cut while `scripts/release/v0_6/gate.sh` fails,
   unless the version has intentionally advanced and the release gate was updated
   in the same patch.
 - Generated docs manifest changes must be intentional and verified.

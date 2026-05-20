@@ -10,6 +10,9 @@ tetra_cache/
 examples/.tetra_cache/
 *.tobj
 
+# Local agent/orchestration state
+.orchestrator/
+
 # Build outputs
 dumps/
 bin/

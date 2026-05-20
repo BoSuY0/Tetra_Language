@@ -2,7 +2,7 @@
   "target": "linux-x64",
   "build_only": false,
   "run_supported": true,
-  "total": 43,
+  "total": 62,
   "islands_debug": false,
   "cases": [
     {
@@ -44,6 +44,12 @@
     {
       "name": "actors_pingpong",
       "src_path": "examples/actors_pingpong.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "actor_sleep_pingpong",
+      "src_path": "examples/actor_sleep_pingpong.tetra",
       "target_group": "native",
       "expected_exit": 0
     },
@@ -222,6 +228,36 @@
       "expected_exit": 42
     },
     {
+      "name": "time_sleep_smoke",
+      "src_path": "examples/time_sleep_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "task_sleep_deadline_smoke",
+      "src_path": "examples/task_sleep_deadline_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "task_join_wait_smoke",
+      "src_path": "examples/task_join_wait_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 5
+    },
+    {
+      "name": "deadline_aware_waits_smoke",
+      "src_path": "examples/deadline_aware_waits_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "wait_composition_smoke",
+      "src_path": "examples/wait_composition_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
       "name": "core_math_smoke",
       "src_path": "examples/core_math_smoke.tetra",
       "target_group": "native",
@@ -230,6 +266,84 @@
     {
       "name": "core_memory_smoke",
       "src_path": "examples/core_memory_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_strings_smoke",
+      "src_path": "examples/core_strings_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_slices_smoke",
+      "src_path": "examples/core_slices_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_io_smoke",
+      "src_path": "examples/core_io_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_testing_smoke",
+      "src_path": "examples/core_testing_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_collections_smoke",
+      "src_path": "examples/core_collections_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_serialization_smoke",
+      "src_path": "examples/core_serialization_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_filesystem_smoke",
+      "src_path": "examples/core_filesystem_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_networking_smoke",
+      "src_path": "examples/core_networking_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_async_smoke",
+      "src_path": "examples/core_async_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_sync_smoke",
+      "src_path": "examples/core_sync_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_time_smoke",
+      "src_path": "examples/core_time_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_crypto_smoke",
+      "src_path": "examples/core_crypto_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_capability_smoke",
+      "src_path": "examples/core_capability_smoke.tetra",
       "target_group": "native",
       "expected_exit": 42
     },
@@ -266,6 +380,10 @@
   ],
   "excluded_examples": [
     {
+      "src_path": "examples/actors_decl_spawn.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
       "src_path": "examples/actors_tagged_stress.tetra",
       "reason": "not part of linux-x64 smoke profile"
     },
@@ -274,59 +392,15 @@
       "reason": "not part of linux-x64 smoke profile"
     },
     {
-      "src_path": "examples/core_async_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_collections_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_crypto_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_filesystem_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_io_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_networking_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_serialization_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_slices_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_strings_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_sync_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_testing_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
-      "src_path": "examples/core_time_smoke.tetra",
-      "reason": "not part of linux-x64 smoke profile"
-    },
-    {
       "src_path": "examples/ctx_switch_sysv_smoke.tetra",
       "reason": "not part of linux-x64 smoke profile"
     },
     {
       "src_path": "examples/ctx_switch_win64_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/enum_payload_smoke.tetra",
       "reason": "not part of linux-x64 smoke profile"
     },
     {
@@ -339,6 +413,10 @@
     },
     {
       "src_path": "examples/flow_grammar_surface_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/generic_struct_smoke.tetra",
       "reason": "not part of linux-x64 smoke profile"
     },
     {
@@ -366,6 +444,18 @@
       "reason": "not part of linux-x64 smoke profile"
     },
     {
+      "src_path": "examples/projects/hello_t4/Capsule.t4",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/projects/hello_t4/src/main.t4",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/projects/hello_t4/tests/main_test.t4",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
       "src_path": "examples/struct_ctor_smoke.tetra",
       "reason": "not part of linux-x64 smoke profile"
     },
@@ -379,6 +469,22 @@
     },
     {
       "src_path": "examples/ui_web_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/wasm_globals_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/wasm_multi_return_2_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/wasm_multi_return_3_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/wasm_multi_return_4_smoke.tetra",
       "reason": "not part of linux-x64 smoke profile"
     }
   ]

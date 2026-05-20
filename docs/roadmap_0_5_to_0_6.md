@@ -20,7 +20,7 @@ large new language syntax.
 - LSP-basic grows from `--stdio-smoke` into a minimal stdio JSON-RPC loop with
   initialize, shutdown, didOpen diagnostics, document symbols, and hover.
 - Eco pack gains project bundle mode while preserving single-manifest packs.
-- Release gating is captured in `scripts/release_v0_6_gate.sh`.
+- Release gating is captured in `scripts/release/v0_6/gate.sh`.
 
 ## Still Deferred
 

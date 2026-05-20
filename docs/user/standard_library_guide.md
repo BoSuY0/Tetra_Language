@@ -4,13 +4,33 @@ Status: user guide for release-covered stdlib expectations.
 
 The stable module list and examples are documented in `docs/spec/stdlib.md`.
 Module naming and versioning rules are documented in
-`docs/spec/stdlib_naming_versioning.md`.
+`docs/spec/stdlib_naming_versioning.md`. The current support boundary is
+`docs/spec/current_supported_surface.md`.
 
 ## Finding Stable Modules
 
 Stable modules live under `lib/core`. Experimental or lower-level modules must
-not be described as stable release APIs unless the v1.0 checklist includes
-fresh evidence for them.
+not be described as stable release APIs unless the current `v0.3.0` checklist
+includes fresh evidence for them.
+
+Stability labels used below:
+
+- `stable helper`: release-covered helper behavior for the current profile.
+- `capability-bound helper`: release-covered helper that still requires matching
+  `uses` effects and capability tokens at call sites.
+
+## Generated Docs Naming Policy
+
+Generated docs use a dotted module path for files that declare `module ...`.
+For example, stable stdlib modules render as `lib.core.<name>`,
+experimental stdlib modules render as `lib.experimental.<name>`, and smoke
+files that declare modules render as names like `examples.core_math_smoke`.
+
+Generated docs use a portable file path for source files without a module
+declaration. Those entries remain spelled with slashes, such as
+`examples/flow_hello.tetra`. Treat dotted `examples.*` headings as module names
+and `examples/...` headings as file paths; both forms can appear in one
+generated docs run.
 
 ## Stable Module Choices
 
@@ -21,26 +41,381 @@ fresh evidence for them.
 | Capability tokens for host-like surfaces | `import lib.core.capability as cap` | `examples/core_memory_smoke.tetra` | `capability`, `io`, `mem` |
 | Capability-gated IO helpers | `import lib.core.io as io` | `examples/core_io_smoke.tetra` | `capability`, `io`, `mmio` |
 | Test status helpers | `import lib.core.testing as testing` | `examples/core_testing_smoke.tetra` | none |
-| Slice length and first/fallback helpers | `import lib.core.slices as slices` | `examples/core_slices_smoke.tetra` | `mem` |
-| String length and prefix-style helpers | `import lib.core.strings as strings` | `examples/core_strings_smoke.tetra` | none |
-| Collection scans over `[]i32` / `[]u16` / `[]bool` | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
+| Slice summation helpers (`sum_i32`, `weighted_sum_i32`, `sum_u8`) | `import lib.core.slices as slices` | `examples/core_slices_smoke.tetra` | `mem` |
+| ASCII length, ASCII sum, and empty checks (`ascii_len`, `ascii_sum`, `is_empty`) | `import lib.core.strings as strings` | `examples/core_strings_smoke.tetra` | none |
+| Collection scans over `[]i32` | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
 | Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core_serialization_smoke.tetra` | `mem` |
-| Filesystem path/status placeholders | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | none |
-| Networking endpoint/status placeholders | `import lib.core.networking as networking` | `examples/core_networking_smoke.tetra` | none |
+| Filesystem path helpers and host-backed `exists` | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | `io` |
+| Networking endpoint policy helpers | `import lib.core.networking as networking` | `examples/core_networking_smoke.tetra` | none |
 | Async helper functions | `import lib.core.async as async` | `examples/core_async_smoke.tetra` | none |
 | Synchronization status helpers | `import lib.core.sync as sync` | `examples/core_sync_smoke.tetra` | none |
 | Time duration/status helpers | `import lib.core.time as time` | `examples/core_time_smoke.tetra` | none |
-| Crypto digest/status placeholders | `import lib.core.crypto as crypto` | `examples/core_crypto_smoke.tetra` | `mem` |
+| Crypto interface helpers | `import lib.core.crypto as crypto` | `examples/core_crypto_smoke.tetra` | `mem` |
+
+Call-shape reminders used by generated docs and smoke examples:
+`slices.sum_i32(values)`, `slices.weighted_sum_i32(values)`,
+`slices.sum_u8(values)`, `strings.ascii_len(value)`,
+`strings.ascii_sum(value)`, `strings.is_empty(value)`,
+`collections.len_i32(values)`, `collections.contains_i32(values, needle)`,
+`collections.count_i32(values, needle)`, and
+`collections.first_or_i32(values, fallback)`.
+
+`lib.core.filesystem` now has a capability-gated linux-x64 `exists` slice plus
+pure path-shape helpers. `lib.core.crypto` is a stable crypto interface-helper
+surface. `lib.core.networking` is a stable endpoint policy-helper surface.
+
+## Capability Unsafe Boundary Recipe
+
+Use `import lib.core.capability as cap` when a stable helper needs an explicit
+`cap.mem` or `cap.io` token. Imports and `uses` declarations are only audit
+surface: they do not manufacture tokens, validate pointers, or grant host
+permission by themselves.
+
+The current recipe is:
+
+1. Declare the effects required by the token and the operation. `cap.mem()`
+   needs `uses capability, mem`; `cap.io()` needs `uses capability, io`; MMIO
+   calls also need `uses mmio`.
+2. Enter a narrow `unsafe:` block for capability acquisition.
+3. Call `cap.mem()` or `cap.io()` inside that block.
+4. Pass the token to the helper that requires it, such as
+   `memory.memset_u8(..., mem_cap)` or `io.mmio_read_i32(..., io_cap)`.
+5. Keep the token flow local and auditable. The token proves that the caller
+   crossed the reviewed unsafe boundary; it does not prove that an address,
+   length, device register, or buffer is valid.
+
+Minimal memory-token flow:
+
+```tetra
+import lib.core.capability as cap
+import lib.core.memory as memory
+
+func clear_four_bytes(dst: ptr) -> Int
+uses capability, mem:
+    unsafe:
+        let mem_cap: cap.mem = cap.mem()
+        return memory.memset_u8(dst, 0, 4, mem_cap)
+    return 0
+```
+
+Minimal IO-token flow:
+
+```tetra
+import lib.core.capability as cap
+import lib.core.io as io
+
+func read_mmio_word(addr: ptr) -> Int
+uses capability, io, mmio:
+    unsafe:
+        let io_cap: cap.io = cap.io()
+        return io.mmio_read_i32(addr, io_cap)
+    return 0
+```
+
+`lib.core.io.capability_io()` is the IO-module equivalent for creating a
+`cap.io` token; it has the same `uses capability, io` boundary expectation.
+
+## IO/MMIO Helper Contract
+
+Use `import lib.core.io as io` for the current stable MMIO wrapper surface.
+These helpers are capability-gated and describe MMIO-shaped operations. In the
+current backend, MMIO reads and writes lower to normal memory loads and stores,
+so this is not a production device-driver or host-IO abstraction.
+
+| Function | Required effects | Behavior |
+| --- | --- | --- |
+| `io.capability_io()` | `capability`, `io` | Returns a `cap.io` token from the reviewed unsafe boundary. It does not perform MMIO by itself. |
+| `io.mmio_read_i32(addr, io_cap)` | `io`, `mmio` | Reads the current `i32` value at `addr` through the supplied `cap.io` token and returns it as `Int`. |
+| `io.mmio_write_i32(addr, value, io_cap)` | `io`, `mmio` | Writes `value` as an `i32` at `addr` through the supplied `cap.io` token and returns the written value. |
+
+Minimal MMIO example:
+
+```tetra
+import lib.core.io as io
+
+func mmio_roundtrip() -> Int
+uses alloc, capability, io, mem, mmio:
+    unsafe:
+        let io_cap: cap.io = io.capability_io()
+        let p: ptr = core.alloc_bytes(4)
+        let _: Int = io.mmio_write_i32(p, 42, io_cap)
+        return io.mmio_read_i32(p, io_cap)
+    return 0
+```
+
+The caller remains responsible for choosing a valid address. The `cap.io` token
+and `uses io, mmio` effects are gates for the operation; they are not bounds
+checks, device discovery, ordering beyond the documented MMIO operation shape,
+or broad host permission grants.
+
+## Collections Helper Contract
+
+`lib.core.collections` currently documents and implements only `[]i32` helper
+scans. Do not infer `[]u16`, `[]bool`, generic collection helpers, sorting,
+mutation, allocation, or iterator APIs from this module.
+
+- `collections.len_i32(values)` counts the number of `i32` elements by scanning
+  the slice and returns that count.
+- `collections.contains_i32(values, needle)` returns true when any element is
+  equal to `needle`, otherwise false.
+- `collections.count_i32(values, needle)` returns the number of elements equal
+  to `needle`.
+- `collections.first_or_i32(values, fallback)` returns the first element when
+  the slice is non-empty, otherwise `fallback`.
+
+All four helpers require `uses mem` because they scan a slice supplied by the
+caller. They do not allocate, mutate the slice, or validate ownership beyond
+the current slice/effect checks.
+
+## Memory Helper Contract
+
+Use `import lib.core.memory as memory` for capability-bound byte helpers. Calls
+still require matching `uses mem` effects and an explicit `cap.mem` token; the
+import alone does not grant memory access or validate pointers.
+
+- `memory.memset_u8(dst, value, n, mem)` writes the `UInt8` value to `n` bytes
+  starting at `dst` and returns `0`. Passing `0` as the value is the documented
+  clear-buffer pattern once the caller has selected a valid writable region.
+  Negative `n` values are rejected before the byte loop and return status `2`.
+- `memory.memcpy_u8(dst, src, n, mem)` copies `n` bytes from `src` to `dst` in
+  increasing byte order and returns `0`. Negative `n` values are rejected before
+  the byte loop and return status `2`.
+
+Both helpers are thin capability wrappers over caller-provided regions. The
+caller remains responsible for valid readable/writable memory, suitable sizes,
+and avoiding overlap assumptions; these helpers are not bounds checks, null
+checks, allocation helpers, or host permission grants.
+
+## Writing Raw Memory Safely
+
+For the Memory Production Core, `cap.mem` is not ownership: the token
+allows a raw operation, but it does not prove that the pointer still belongs to
+the caller, that the region is large enough, or that the same region is not
+being accessed through another alias. Always check sizes before calling
+`memory.memcpy_u8` or `memory.memset_u8`, keep the token and pointer flow local,
+and avoid transferring memory-bearing values across task/actor boundaries unless
+the checker accepts the transfer.
+
+The runtime bounds diagnostics are a separate production requirement. Until a
+validated `tetra.memory.production.v1` report proves those diagnostics for the
+exercised Linux-x64 path, these helpers should be used as explicit unsafe
+building blocks rather than treated as a complete production allocator/runtime
+memory model.
+
+The current Linux-x64 slice rejects negative `core.ptr_add` offsets as a
+runtime bounds diagnostic before returning the derived pointer. Still check
+sizes before calling helpers: non-negative offsets are not yet full upper-bound
+proofs for arbitrary raw pointers.
+
+For pointers returned directly by `core.alloc_bytes`, allocation-base `core.ptr_add` upper bounds
+reject offsets greater than or equal to the requested allocation size. This
+covers helper loops and direct `core.load_*`/`core.store_*` calls whose address
+is a visible `core.ptr_add(base, offset, mem)`, but callers should still avoid
+passing arbitrary derived pointers as if they carried complete provenance.
+
+For pointers returned directly by `core.alloc_bytes`, allocation-base `core.store_i32` width bounds
+reject a 4-byte store into allocations smaller than 4 bytes. Treat this as a
+narrow Linux-x64 runtime diagnostic slice; direct visible base+offset raw
+accesses get offset+width checks, but stored arbitrary derived pointers still
+need a future provenance table for general guarantees.
+
+For pointers returned directly by `core.alloc_bytes`, allocation-base `core.store_ptr` width bounds
+reject an 8-byte pointer store into allocations smaller than 8 bytes. The
+current Linux-x64 backend shares that allocation-base check for `core.load_ptr`,
+and direct visible base+offset pointer loads/stores get offset+width checks, but
+complete pointer-slot safety for arbitrary derived pointers remains unfinished.
+
+The stable helpers reject negative `memcpy_u8` and `memset_u8` lengths with
+status `2` before entering the raw byte loop. Positive lengths still rely on
+the caller selecting valid regions plus the runtime checks available for the
+exercised Linux-x64 path.
+
+## Filesystem Contract
+
+`lib.core.filesystem` contains one host-backed linux-x64 slice and several pure
+string-scanning helpers. `filesystem.exists(path, io_cap)` calls the runtime
+`__tetra_fs_exists(path_ptr, path_len, io_cap)` ABI, requires an explicit
+`cap.io` token, returns true when the host path exists, and returns false when
+the path is missing, invalid, too long, or unsupported by the target runtime.
+The runtime copies `ptr,len` into a bounded NUL-terminated buffer before using
+the host filesystem API.
+
+The path-shape helpers scan the ASCII slash character `/`. They do not inspect
+permissions, normalize path syntax, resolve `.` or `..`, follow symlinks, or
+grant filesystem access by import alone.
+
+Safe intended uses are limited to path-shape checks in tests, examples, and
+configuration defaults:
+
+- `filesystem.has_leading_slash(path)` returns true only when the first
+  character is `/`. The empty string returns false.
+- `filesystem.ends_with_slash(path)` returns true only when the final character
+  is `/`. The empty string returns false.
+- `filesystem.is_root(path)` returns true only for `/`; other strings with a
+  leading slash, trailing slash, or multiple slash characters are not root.
+- `filesystem.slash_count(path)` counts every `/` character in the string.
+- `filesystem.directory_depth(path)` counts non-empty path segments separated
+  by `/`. Leading, trailing, and repeated slash characters do not add empty
+  segments.
+- `filesystem.exists(path, io_cap)` checks host existence on linux-x64 through
+  the runtime ABI. Unsupported native targets report a filesystem runtime
+  diagnostic; WASM targets reject the filesystem runtime builtin.
+
+| Path | `has_leading_slash` | `ends_with_slash` | `is_root` | `slash_count` | `directory_depth` |
+| --- | --- | --- | --- | --- | --- |
+| `""` | false | false | false | `0` | `0` |
+| `"/"` | true | true | true | `1` | `0` |
+| `"/tmp/cache"` | true | false | false | `2` | `2` |
+| `"tmp/cache"` | false | false | false | `1` | `2` |
+| `"/tmp/"` | true | true | false | `2` | `1` |
+
+Warning: `filesystem.exists` is an existence probe only. It does not open files,
+return metadata, distinguish permission errors from missing paths, or imply
+cross-platform filesystem support.
+
+## Serialization Boundary Examples
+
+Use `import lib.core.serialization as serialization` for small byte-oriented
+helpers that make boundary behavior explicit before values are packed or
+unpacked.
+
+- `serialization.clamp_u8(value)` returns `0` for negative values, `255` for
+  values greater than `255`, and the original value for integers already in the
+  inclusive `0..255` range. For example, `clamp_u8(-7) == 0`,
+  `clamp_u8(42) == 42`, and `clamp_u8(300) == 255`.
+- `serialization.pack_u8_pair(high, low)` clamps both inputs with
+  `clamp_u8`, then returns `high * 256 + low`. For example,
+  `pack_u8_pair(-1, 300) == 255` because the packed high byte becomes `0` and
+  the packed low byte becomes `255`.
+- `serialization.unpack_u8_high(packed)` and
+  `serialization.unpack_u8_low(packed)` both return `0` for a negative packed
+  value. For non-negative packed values, the high byte is `packed / 256`
+  clamped to `0..255`, and the low byte is `packed % 256` clamped to `0..255`.
+  For example, `unpack_u8_high(-1) == 0`, `unpack_u8_low(-1) == 0`,
+  `unpack_u8_high(297) == 1`, and `unpack_u8_low(297) == 41`.
+- `serialization.checksum_u8(values)` iterates over the `[]u8` values and
+  returns their integer sum. It does not clamp, wrap, hash, authenticate, or
+  encrypt the result; an empty slice returns `0`, and `[20, 22]` returns `42`.
+
+Concrete example:
+
+```tetra
+import lib.core.serialization as serialization
+
+func serialization_boundary_example() -> Int
+uses alloc, mem:
+    let packed: Int = serialization.pack_u8_pair(-1, 300)
+    let neg_hi: Int = serialization.unpack_u8_high(-1)
+    let neg_lo: Int = serialization.unpack_u8_low(-1)
+    var payload: []u8 = core.make_u8(2)
+    payload[0] = 20
+    payload[1] = 22
+    let checksum: Int = serialization.checksum_u8(payload)
+    if packed == 255 && neg_hi == 0 && neg_lo == 0 && checksum == 42:
+        return 42
+    return 1
+```
+
+## Networking Endpoint Policy Contract
+
+`lib.core.networking` is a stable endpoint policy-helper surface. Its helpers
+are pure integer routines for deterministic port and retry choices in examples,
+smoke tests, docs, and configuration defaults. They do not open connections,
+reserve ports, inspect host networking state, perform name resolution, or grant
+network permission.
+
+Safe intended uses are limited to endpoint-shape checks in tests, examples, and
+configuration defaults:
+
+- `networking.default_port_http()` returns `80`.
+- `networking.default_port_https()` returns `443`.
+- `networking.clamp_port(port)` clamps an integer to the inclusive port range
+  `0..65535`. Negative values return `0`; values above `65535` return `65535`.
+- `networking.is_valid_port(port)` returns true for every integer in
+  `0..65535`, including `0`, and false for negative values or values greater
+  than `65535`.
+- `networking.choose_port(preferred, fallback)` returns `preferred` only when
+  it is in `1..65535`. A `preferred` value of `0` is treated as "not selected",
+  so the helper returns `clamp_port(fallback)` instead. Invalid preferred
+  values, including negatives and values above `65535`, also fall back through
+  `clamp_port`.
+- `networking.retry_backoff_ms(attempt, base_ms, max_ms)` starts from
+  `base_ms` clamped at a minimum of `0`, doubles once for each loop iteration
+  while `step < attempt`, and caps the result at `max_ms` when `max_ms` is
+  non-negative. A negative `attempt` performs no doubling. A negative `max_ms`
+  means no upper cap.
+
+Host transport APIs should layer sockets, DNS, HTTP, and timers behind a
+separate capability boundary. This module promises deterministic endpoint
+policy helpers only.
+
+## Crypto Interface Contract
+
+`lib.core.crypto` is a stable interface-helper surface for deterministic
+byte-oriented examples, smoke coverage, and API docs. It does not expose keys,
+ciphers, signatures, random generation, host entropy, or authenticated
+encryption.
+
+Intended uses:
+
+- `crypto.checksum_u8(values)` provides a deterministic checksum for smoke
+  assertions and documentation examples.
+- `crypto.mix_seed(seed, value)` provides deterministic mixing for repeatable
+  examples.
+- `crypto.constant_time_eq_u8(lhs, rhs)` compares byte slices and scans
+  equal-length inputs without returning early on the first value mismatch.
+- `crypto.interface_strength()` returns a stable marker used by examples to
+  assert that the interface module is linked and callable.
+
+Security-sensitive products should layer reviewed algorithms and host entropy
+behind a separate capability boundary; this module only promises the interface
+helpers listed above.
 
 The modules with `capability`, `io`, `mem`, or `mmio` effects do not grant host
 permission by import alone. The calling function still declares matching
 `uses` effects and obtains any required capability token through the documented
 unsafe boundary.
 
+## Testing Status Helpers
+
+Use `import lib.core.testing as testing` for small status-returning checks in
+examples, smoke tests, and documentation tests. These helpers use process-style
+status conventions: `0` means pass and `1` means fail.
+
+| Helper | Pass status | Fail status |
+| --- | --- | --- |
+| `testing.assert_true(value)` | `0` when `value` is true | `1` when `value` is false |
+| `testing.assert_false(value)` | `0` when `value` is false | `1` when `value` is true |
+| `testing.assert_eq_i32(actual, expected)` | `0` when both `i32` values are equal | `1` when they differ |
+
+Use `testing.combine(lhs, rhs)` to merge status values. It returns `lhs` when
+`lhs` is non-zero, otherwise it returns `rhs`, so the first failing status is
+preserved and later checks run only as far as the caller chooses to evaluate
+them.
+
+## Time Duration Helpers
+
+Use `import lib.core.time as time` for small duration arithmetic that stays in
+integer milliseconds or seconds and has no effects.
+
+- `time.millis_from_seconds(seconds)` converts seconds to milliseconds by
+  multiplying by `1000`. A negative seconds value is treated as a negative
+  duration and clamps to `0`.
+- `time.seconds_from_millis(milliseconds)` converts milliseconds to seconds by
+  integer division by `1000`. A negative milliseconds value is treated as a
+  negative duration and clamps to `0`.
+- `time.clamp_timeout_ms(value, lo, hi)` clamps a millisecond timeout to the
+  inclusive `lo`/`hi` range supplied by the caller.
+- `time.add_duration_ms(base, delta)` adds the millisecond `delta` to `base`.
+  If the result would be negative, it returns `0`; otherwise it returns the
+  summed millisecond duration.
+
 ## Experimental Mirrors
 
-Experimental mirrors are compatibility shims with no stability guarantees.
-Prefer the stable replacement in new code.
+Experimental mirrors are production compatibility shims in the `v0.4.0`
+surface: each mirror forwards to the matching `lib.core.*` module so legacy
+imports keep compiling. The mirror namespace still has no stability guarantees
+for new API growth, so prefer the stable replacement in new code.
 
 | Experimental import | Stable replacement | Status |
 | --- | --- | --- |
@@ -61,11 +436,17 @@ Prefer the stable replacement in new code.
 
 ## Runnable Examples
 
-Compile a stable module smoke without running it:
+Compile the default linux-x64 smoke profile without running it:
 
 ```sh
 ./tetra smoke --target linux-x64 --run=false
 ```
+
+The default linux-x64 smoke profile is intentionally narrower than the stable
+stdlib completeness workflow. In the current profile, `core_math_smoke` and
+`core_memory_smoke` are active smoke cases; the other stable-core
+`examples/core_*_smoke.tetra` files are reported through `excluded_examples`
+with `not part of linux-x64 smoke profile`.
 
 Run a focused native example:
 
@@ -87,12 +468,62 @@ Prefer examples already tracked in `examples/` or documented in
 - API docs generated by `./tetra doc`.
 - At least one parseable documentation example where appropriate.
 - Effects metadata where required by the stdlib spec.
-- Coverage in `bash scripts/test_all.sh --full --keep-going` or the v1.0
+- Coverage in `bash scripts/ci/test-all.sh --full --keep-going` or the `v0.3.0`
   release gate.
 
 ## Verification
 
+Use this stdlib completeness workflow before changing the release-covered module
+set or any `lib/core` or `lib/experimental` API docs:
+
 ```sh
+mkdir -p reports
+./tetra doc \
+  lib/core \
+  lib/experimental \
+  examples/core_async_smoke.tetra \
+  examples/core_capability_smoke.tetra \
+  examples/core_collections_smoke.tetra \
+  examples/core_crypto_smoke.tetra \
+  examples/core_filesystem_smoke.tetra \
+  examples/core_io_smoke.tetra \
+  examples/core_math_smoke.tetra \
+  examples/core_memory_smoke.tetra \
+  examples/core_networking_smoke.tetra \
+  examples/core_serialization_smoke.tetra \
+  examples/core_slices_smoke.tetra \
+  examples/core_strings_smoke.tetra \
+  examples/core_sync_smoke.tetra \
+  examples/core_testing_smoke.tetra \
+  examples/core_time_smoke.tetra \
+  > reports/stdlib-api-docs.md
+go run ./tools/cmd/validate-api-docs --docs reports/stdlib-api-docs.md
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
-./tetra doc examples
 ```
+
+This workflow catches missing stable module docs, doctests, effects metadata,
+and generated API rendering for `lib.core.*` and `lib.experimental.*` modules
+and their release-covered core smoke examples. This is the separate stable
+stdlib verification workflow for stable-core smoke evidence that is outside the
+default linux-x64 smoke profile. The `verify-docs` command is the completeness
+gate; the `./tetra doc lib/core lib/experimental ...` command proves the public
+API docs render for the same stdlib surface.
+
+Use this separate examples workflow before changing the example index or smoke
+profile:
+
+```sh
+mkdir -p reports
+./tetra doc examples > reports/examples-docs.md
+go run ./tools/cmd/validate-api-docs --docs reports/examples-docs.md
+./tetra smoke --list --format=json > reports/smoke-list-linux-x64.json
+go run ./tools/cmd/validate-smoke-list --report reports/smoke-list-linux-x64.json --examples-root examples
+go run ./tools/cmd/validate-example-index --smoke-list reports/smoke-list-linux-x64.json --index docs/user/examples_index.md
+```
+
+The examples workflow validates example-only generated docs, catches missing
+example rows through `validate-example-index`, and catches smoke-profile drift
+through `./tetra smoke --list --format=json` plus `validate-smoke-list`. Its
+smoke-list semantics are intentionally binary for each example: active cases
+belong in `cases`, while examples outside the default linux-x64 profile belong
+in `excluded_examples` with an explicit reason.

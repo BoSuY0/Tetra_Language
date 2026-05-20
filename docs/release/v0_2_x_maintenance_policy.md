@@ -30,7 +30,7 @@ work under `v0.2.x`.
 
 ```sh
 go test ./compiler/... ./cli/... ./tools/... -count=1
-bash scripts/test_all.sh --full --keep-going
+bash scripts/ci/test-all.sh --full --keep-going
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 git diff --check
 ```

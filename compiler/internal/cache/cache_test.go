@@ -22,6 +22,17 @@ func TestCacheKeyIncludesCompilerVersion(t *testing.T) {
 	}
 }
 
+func TestCacheKeyIncludesCompilerCacheABI(t *testing.T) {
+	srcHash := sha256.Sum256([]byte("source"))
+	depHash := sha256.Sum256([]byte("deps"))
+
+	got := cacheKey("app.game", "linux-x64", "release-opt", srcHash, depHash)
+	want := expectedCacheKeyWithCompilerCacheABI("app.game", "linux-x64", "release-opt", srcHash, depHash)
+	if got != want {
+		t.Fatalf("cacheKey mismatch without compiler cache ABI discriminator: got %s want %s", got, want)
+	}
+}
+
 func TestCacheKeyIncludesTargetAndBuildTag(t *testing.T) {
 	srcHash := sha256.Sum256([]byte("source"))
 	depHash := sha256.Sum256([]byte("deps"))
@@ -68,6 +79,25 @@ func expectedCacheKey(module, target, buildTag string, srcHash, depHash [32]byte
 	h.Write([]byte(buildTag))
 	h.Write([]byte{0})
 	h.Write([]byte(version.CompilerVersion))
+	h.Write([]byte{0})
+	h.Write([]byte(compilerCacheABIVersion))
+	h.Write([]byte{0})
+	h.Write(srcHash[:])
+	h.Write(depHash[:])
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func expectedCacheKeyWithCompilerCacheABI(module, target, buildTag string, srcHash, depHash [32]byte) string {
+	h := sha256.New()
+	h.Write([]byte(module))
+	h.Write([]byte{0})
+	h.Write([]byte(target))
+	h.Write([]byte{0})
+	h.Write([]byte(buildTag))
+	h.Write([]byte{0})
+	h.Write([]byte(version.CompilerVersion))
+	h.Write([]byte{0})
+	h.Write([]byte(compilerCacheABIVersion))
 	h.Write([]byte{0})
 	h.Write(srcHash[:])
 	h.Write(depHash[:])

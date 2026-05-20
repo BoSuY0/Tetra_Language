@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	wasmPageSize = 65536
+	wasmPageSize  = 65536
+	wasmHeapAlign = 16
 
 	// Reserved scratch area for fd_write iovec and written-bytes output.
 	iovecAddr   = uint32(0x0800)
@@ -31,18 +32,33 @@ type Object struct {
 	Functions   []Function
 	MainName    string
 	GlobalSlots int
+	GlobalInits []int32
+}
+
+type wasmFunctionSignature struct {
+	ParamSlots  int
+	ReturnSlots int
 }
 
 func CodegenObject(funcs []ir.IRFunc, mainName string) (*Object, error) {
+	return CodegenObjectWithDataPrefix(funcs, mainName, nil)
+}
+
+func CodegenObjectWithDataPrefix(funcs []ir.IRFunc, mainName string, dataPrefix [][]byte) (*Object, error) {
 	if len(funcs) == 0 {
 		return nil, fmt.Errorf("wasm backend: no functions to compile")
 	}
 	out := make([]Function, 0, len(funcs))
 	globalSlots := 0
 	symbolTokens := make(map[uint32]string)
+	functionNames := make(map[string]struct{}, len(funcs))
+	functionSigs := make(map[string]wasmFunctionSignature, len(funcs))
 	for _, fn := range funcs {
-		if fn.LocalSlots < fn.ParamSlots {
-			return nil, fmt.Errorf("wasm backend: function '%s' has invalid slots", fn.Name)
+		if err := validateWasmFunctionMetadata(functionNames, fn.Name, fn.ParamSlots, fn.LocalSlots, fn.ReturnSlots); err != nil {
+			return nil, err
+		}
+		if err := validateWasmLabelMetadata(fn.Name, fn.Instrs); err != nil {
+			return nil, err
 		}
 		out = append(out, Function{
 			Name:        fn.Name,
@@ -51,6 +67,9 @@ func CodegenObject(funcs []ir.IRFunc, mainName string) (*Object, error) {
 			ReturnSlots: fn.ReturnSlots,
 			Instrs:      fn.Instrs,
 		})
+		functionSigs[fn.Name] = wasmFunctionSignature{ParamSlots: fn.ParamSlots, ReturnSlots: fn.ReturnSlots}
+	}
+	for _, fn := range funcs {
 		for _, instr := range fn.Instrs {
 			if instr.Kind == ir.IRLoadGlobal || instr.Kind == ir.IRStoreGlobal {
 				if instr.Local < 0 {
@@ -63,11 +82,23 @@ func CodegenObject(funcs []ir.IRFunc, mainName string) (*Object, error) {
 				if err := validateWasmSymbolToken(symbolTokens, instr.Name); err != nil {
 					return nil, err
 				}
+			} else if instr.Kind == ir.IRCall {
+				if err := validateWasmCallMetadata(fn.Name, instr, functionSigs); err != nil {
+					return nil, err
+				}
+			} else if instr.Kind == ir.IRLoadLocal || instr.Kind == ir.IRStoreLocal {
+				if err := validateWasmLocalSlot(fn.Name, fn.LocalSlots, instr.Local); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return &Object{Functions: out, MainName: mainName, GlobalSlots: globalSlots}, nil
+	globalInits, err := wasmGlobalInitializers(globalSlots, dataPrefix)
+	if err != nil {
+		return nil, err
+	}
+	return &Object{Functions: out, MainName: mainName, GlobalSlots: globalSlots, GlobalInits: globalInits}, nil
 }
 
 func LinkObject(obj *Object) ([]byte, error) {
@@ -76,6 +107,21 @@ func LinkObject(obj *Object) ([]byte, error) {
 	}
 	if len(obj.Functions) == 0 {
 		return nil, fmt.Errorf("wasm backend: missing functions")
+	}
+	if err := validateWasmObjectFunctions(obj.Functions); err != nil {
+		return nil, err
+	}
+	if err := validateWasmObjectGlobalSlots(obj); err != nil {
+		return nil, err
+	}
+	if err := validateWasmObjectLabels(obj.Functions); err != nil {
+		return nil, err
+	}
+	if err := validateWasmObjectLocalSlots(obj.Functions); err != nil {
+		return nil, err
+	}
+	if err := validateWasmObjectCalls(obj.Functions); err != nil {
+		return nil, err
 	}
 	if err := validateWasmObjectSymbolTokens(obj.Functions); err != nil {
 		return nil, err
@@ -142,17 +188,15 @@ func LinkObject(obj *Object) ([]byte, error) {
 	startBody := compileStartFunction(mainFuncIdx, procExitImport)
 	codeBodies = append(codeBodies, startBody)
 
-	memoryMinPages := uint32(1)
 	maxUsed := data.maxUsed()
 	if reserved := nwrittenPtr + 4; reserved > maxUsed {
 		maxUsed = reserved
 	}
-	if maxUsed > 0 {
-		memoryMinPages = (maxUsed + wasmPageSize - 1) / wasmPageSize
-		if memoryMinPages == 0 {
-			memoryMinPages = 1
-		}
+	heapBase, err := alignedWASMHeapBase(maxUsed)
+	if err != nil {
+		return nil, err
 	}
+	memoryMinPages := wasmMemoryMinPagesForBytes(heapBase)
 
 	var module bytes.Buffer
 	module.Write([]byte{0x00, 0x61, 0x73, 0x6d}) // \0asm
@@ -200,7 +244,6 @@ func LinkObject(obj *Object) ([]byte, error) {
 		writeULEB(sec, memoryMinPages)
 	})
 
-	heapBase := maxUsed
 	writeSection(&module, 6, func(sec *bytes.Buffer) {
 		writeULEB(sec, uint32(1+obj.GlobalSlots)) // heap plus lowered global slots
 		sec.WriteByte(0x7f)
@@ -210,7 +253,11 @@ func LinkObject(obj *Object) ([]byte, error) {
 		for i := 0; i < obj.GlobalSlots; i++ {
 			sec.WriteByte(0x7f)
 			sec.WriteByte(0x01) // mutable
-			writeI32Const(sec, 0)
+			init := int32(0)
+			if i < len(obj.GlobalInits) {
+				init = obj.GlobalInits[i]
+			}
+			writeI32Const(sec, init)
 			sec.WriteByte(0x0b) // end init expr
 		}
 	})
@@ -277,6 +324,22 @@ func (d *dataBuilder) addString(raw []byte) uint32 {
 
 func (d *dataBuilder) maxUsed() uint32 {
 	return dataBase + uint32(len(d.bytes))
+}
+
+func alignedWASMHeapBase(maxUsed uint32) (uint32, error) {
+	const mask = wasmHeapAlign - 1
+	if maxUsed > ^uint32(0)-mask {
+		return 0, fmt.Errorf("wasm backend: static data exceeds addressable heap layout")
+	}
+	return (maxUsed + mask) &^ mask, nil
+}
+
+func wasmMemoryMinPagesForBytes(used uint32) uint32 {
+	pages := (uint64(used) + uint64(wasmPageSize) - 1) / uint64(wasmPageSize)
+	if pages == 0 {
+		return 1
+	}
+	return uint32(pages)
 }
 
 func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]uint32, fdWriteImport int, heapGlobalIndex uint32) ([]byte, error) {
@@ -375,6 +438,13 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 				return nil, err
 			}
 			body.WriteByte(0x6b) // i32.sub
+			push(1)
+		case ir.IRNegI32:
+			if err := pop(1, "neg_i32"); err != nil {
+				return nil, err
+			}
+			writeI32Const(&body, -1)
+			body.WriteByte(0x6c) // i32.mul
 			push(1)
 		case ir.IRMulI32:
 			if err := pop(2, "mul_i32"); err != nil {
@@ -911,6 +981,13 @@ func emitWASINonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, 
 		}
 		body.WriteByte(0x6b)
 		push(1)
+	case ir.IRNegI32:
+		if err := pop(1, "neg_i32"); err != nil {
+			return 0, err
+		}
+		writeI32Const(body, -1)
+		body.WriteByte(0x6c)
+		push(1)
 	case ir.IRMulI32:
 		if err := pop(2, "mul_i32"); err != nil {
 			return 0, err
@@ -1223,6 +1300,9 @@ func verifyControlFlowStackModel(fn Function) (map[int]int, []int, error) {
 		if cur.idx < 0 || cur.idx >= len(fn.Instrs) {
 			continue
 		}
+		if fn.Instrs[cur.idx].Kind == ir.IRLabel && cur.height != 0 {
+			return nil, nil, fmt.Errorf("wasm backend: unsupported non-zero stack at label %d in function '%s'", fn.Instrs[cur.idx].Label, fn.Name)
+		}
 		if seen[cur.idx] {
 			if heights[cur.idx] != cur.height {
 				return nil, nil, fmt.Errorf("wasm backend: inconsistent stack height at instr %d in '%s'", cur.idx, fn.Name)
@@ -1270,6 +1350,8 @@ func wasmStackEffect(instr ir.IRInstr) (int, int, bool) {
 		ir.IRMulI32, ir.IRDivI32, ir.IRModI32, ir.IRCmpGtI32,
 		ir.IRCmpGeI32, ir.IRCmpLeI32, ir.IRCmpNeI32:
 		return 2, 1, true
+	case ir.IRNegI32:
+		return 1, 1, true
 	case ir.IRCall:
 		return instr.ArgSlots, instr.RetSlots, true
 	case ir.IRLabel, ir.IRJmp:
@@ -1290,6 +1372,10 @@ func wasmStackEffect(instr ir.IRInstr) (int, int, bool) {
 		return 3, 1, true
 	case ir.IRIndexStoreI32, ir.IRIndexStoreU8, ir.IRIndexStoreU16:
 		return 4, 0, true
+	case ir.IRMemReadI32Offset, ir.IRMemReadU8Offset, ir.IRMemReadPtrOffset:
+		return 3, 1, true
+	case ir.IRMemWriteI32Offset, ir.IRMemWriteU8Offset, ir.IRMemWritePtrOffset:
+		return 4, 1, true
 	default:
 		return 0, 0, false
 	}
@@ -1306,8 +1392,157 @@ func wasmDataGlobalIndex(fnName string, heapGlobalIndex uint32, slot int) (uint3
 	return heapGlobalIndex + 1 + uint32(slot), nil
 }
 
+func wasmGlobalInitializers(globalSlots int, dataPrefix [][]byte) ([]int32, error) {
+	inits := make([]int32, globalSlots)
+	for i := 0; i < globalSlots && i < len(dataPrefix); i++ {
+		if len(dataPrefix[i]) == 0 {
+			continue
+		}
+		if len(dataPrefix[i]) < 4 {
+			return nil, fmt.Errorf("wasm backend: global data slot %d is %d bytes, want at least 4", i, len(dataPrefix[i]))
+		}
+		inits[i] = int32(binary.LittleEndian.Uint32(dataPrefix[i][:4]))
+	}
+	return inits, nil
+}
+
 func wasmNegativeGlobalSlotError(fnName string, slot int) error {
 	return fmt.Errorf("wasm backend: negative global slot %d in function '%s'", slot, fnName)
+}
+
+func validateWasmObjectFunctions(funcs []Function) error {
+	functionNames := make(map[string]struct{}, len(funcs))
+	for _, fn := range funcs {
+		if err := validateWasmFunctionMetadata(functionNames, fn.Name, fn.ParamSlots, fn.LocalSlots, fn.ReturnSlots); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateWasmFunctionMetadata(seen map[string]struct{}, name string, paramSlots int, localSlots int, returnSlots int) error {
+	if name == "" {
+		return fmt.Errorf("wasm backend: function name is empty")
+	}
+	if _, ok := seen[name]; ok {
+		return fmt.Errorf("wasm backend: duplicate function '%s'", name)
+	}
+	seen[name] = struct{}{}
+	if paramSlots < 0 || localSlots < 0 || returnSlots < 0 || localSlots < paramSlots {
+		return fmt.Errorf("wasm backend: function '%s' has invalid slots params=%d locals=%d returns=%d", name, paramSlots, localSlots, returnSlots)
+	}
+	return nil
+}
+
+func validateWasmObjectGlobalSlots(obj *Object) error {
+	if obj.GlobalSlots < 0 {
+		return fmt.Errorf("wasm backend: invalid global slot count %d", obj.GlobalSlots)
+	}
+	for _, fn := range obj.Functions {
+		for _, instr := range fn.Instrs {
+			if instr.Kind != ir.IRLoadGlobal && instr.Kind != ir.IRStoreGlobal {
+				continue
+			}
+			if instr.Local < 0 {
+				return wasmNegativeGlobalSlotError(fn.Name, instr.Local)
+			}
+			if instr.Local >= obj.GlobalSlots {
+				return fmt.Errorf("wasm backend: global slot %d in function '%s' exceeds object global slot count %d", instr.Local, fn.Name, obj.GlobalSlots)
+			}
+		}
+	}
+	return nil
+}
+
+func validateWasmObjectLabels(funcs []Function) error {
+	for _, fn := range funcs {
+		if err := validateWasmLabelMetadata(fn.Name, fn.Instrs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateWasmLabelMetadata(fnName string, instrs []ir.IRInstr) error {
+	labels := make(map[int]struct{})
+	for _, instr := range instrs {
+		if instr.Kind != ir.IRLabel {
+			continue
+		}
+		if instr.Label < 0 {
+			return fmt.Errorf("wasm backend: function '%s' negative label %d", fnName, instr.Label)
+		}
+		if _, exists := labels[instr.Label]; exists {
+			return fmt.Errorf("wasm backend: function '%s' duplicate label %d", fnName, instr.Label)
+		}
+		labels[instr.Label] = struct{}{}
+	}
+	for _, instr := range instrs {
+		if instr.Kind != ir.IRJmp && instr.Kind != ir.IRJmpIfZero {
+			continue
+		}
+		if instr.Label < 0 {
+			return fmt.Errorf("wasm backend: function '%s' negative label %d", fnName, instr.Label)
+		}
+		if _, ok := labels[instr.Label]; !ok {
+			return fmt.Errorf("wasm backend: function '%s' unknown label %d", fnName, instr.Label)
+		}
+	}
+	return nil
+}
+
+func validateWasmObjectLocalSlots(funcs []Function) error {
+	for _, fn := range funcs {
+		for _, instr := range fn.Instrs {
+			if instr.Kind == ir.IRLoadLocal || instr.Kind == ir.IRStoreLocal {
+				if err := validateWasmLocalSlot(fn.Name, fn.LocalSlots, instr.Local); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateWasmLocalSlot(fnName string, localSlots int, slot int) error {
+	if slot < 0 || slot >= localSlots {
+		return fmt.Errorf("wasm backend: function '%s' local slot %d out of bounds (locals=%d)", fnName, slot, localSlots)
+	}
+	return nil
+}
+
+func validateWasmObjectCalls(funcs []Function) error {
+	functionSigs := make(map[string]wasmFunctionSignature, len(funcs))
+	for _, fn := range funcs {
+		functionSigs[fn.Name] = wasmFunctionSignature{ParamSlots: fn.ParamSlots, ReturnSlots: fn.ReturnSlots}
+	}
+	for _, fn := range funcs {
+		for _, instr := range fn.Instrs {
+			if instr.Kind == ir.IRCall {
+				if err := validateWasmCallMetadata(fn.Name, instr, functionSigs); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateWasmCallMetadata(fnName string, instr ir.IRInstr, functionSigs map[string]wasmFunctionSignature) error {
+	if instr.Name == "" {
+		return fmt.Errorf("wasm backend: function '%s' call is missing target name", fnName)
+	}
+	if instr.ArgSlots < 0 || instr.RetSlots < 0 {
+		return fmt.Errorf("wasm backend: function '%s' call %q has negative ABI slots args=%d rets=%d", fnName, instr.Name, instr.ArgSlots, instr.RetSlots)
+	}
+	sig, ok := functionSigs[instr.Name]
+	if !ok {
+		return fmt.Errorf("wasm backend: function '%s' calls unsupported symbol '%s'", fnName, instr.Name)
+	}
+	if instr.ArgSlots != sig.ParamSlots || instr.RetSlots != sig.ReturnSlots {
+		return fmt.Errorf("wasm backend: function '%s' call %q ABI mismatch args=%d rets=%d want args=%d rets=%d", fnName, instr.Name, instr.ArgSlots, instr.RetSlots, sig.ParamSlots, sig.ReturnSlots)
+	}
+	return nil
 }
 
 func validateWasmObjectSymbolTokens(funcs []Function) error {
@@ -1325,6 +1560,9 @@ func validateWasmObjectSymbolTokens(funcs []Function) error {
 }
 
 func validateWasmSymbolToken(seen map[uint32]string, name string) error {
+	if name == "" {
+		return fmt.Errorf("wasm backend: symbol address is missing name")
+	}
 	token := wasmSymbolToken(name)
 	if previous, ok := seen[token]; ok {
 		if previous != name {

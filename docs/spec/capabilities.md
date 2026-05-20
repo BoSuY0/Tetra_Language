@@ -70,6 +70,18 @@ or another explicitly audited wrapper.
 When callers opt into attenuated capability groups, raw memory access must also
 carry `capsule.mem`; attenuated IO follows the same pattern with `capsule.io`.
 
+## Memory Production Boundary
+
+`cap.mem` is permission, not provenance. It proves that raw memory access crossed
+an explicit unsafe/capability boundary, but it does not by itself prove pointer
+validity, allocation lifetime, region size, alias exclusivity, or thread/actor
+sendability.
+
+The Memory Production Core requires deterministic runtime bounds diagnostics for
+raw memory paths before they can be promoted as production memory evidence. Until
+that evidence exists, wrappers that take `cap.mem` must still document the
+caller-owned pointer validity and size obligations.
+
 ## Status
 
 This is a compile-time gating mechanism with a minimal runtime implementation:

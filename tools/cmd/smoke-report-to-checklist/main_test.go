@@ -10,6 +10,59 @@ import (
 	"testing"
 )
 
+func nativeSmokeReportForTest(omit string) *smokeReport {
+	cases := []struct {
+		name         string
+		srcPath      string
+		expectedExit int
+	}{
+		{"flow_hello", "examples/flow_hello.tetra", 0},
+		{"flow_struct_smoke", "examples/flow_struct_smoke.tetra", 42},
+		{"flow_islands_smoke", "examples/flow_islands_smoke.tetra", 0},
+		{"flow_unsafe_cap_mem_smoke", "examples/flow_unsafe_cap_mem_smoke.tetra", 42},
+		{"core_async_smoke", "examples/core_async_smoke.tetra", 42},
+		{"core_capability_smoke", "examples/core_capability_smoke.tetra", 42},
+		{"core_collections_smoke", "examples/core_collections_smoke.tetra", 42},
+		{"core_crypto_smoke", "examples/core_crypto_smoke.tetra", 42},
+		{"core_filesystem_smoke", "examples/core_filesystem_smoke.tetra", 42},
+		{"core_io_smoke", "examples/core_io_smoke.tetra", 42},
+		{"core_math_smoke", "examples/core_math_smoke.tetra", 42},
+		{"core_memory_smoke", "examples/core_memory_smoke.tetra", 42},
+		{"core_networking_smoke", "examples/core_networking_smoke.tetra", 42},
+		{"core_serialization_smoke", "examples/core_serialization_smoke.tetra", 42},
+		{"core_slices_smoke", "examples/core_slices_smoke.tetra", 42},
+		{"core_strings_smoke", "examples/core_strings_smoke.tetra", 42},
+		{"core_sync_smoke", "examples/core_sync_smoke.tetra", 42},
+		{"core_testing_smoke", "examples/core_testing_smoke.tetra", 42},
+		{"core_time_smoke", "examples/core_time_smoke.tetra", 42},
+	}
+	reportCases := make([]smokeCaseReport, 0, len(cases))
+	for _, c := range cases {
+		if c.name == omit {
+			continue
+		}
+		reportCases = append(reportCases, smokeCaseReport{
+			Name:         c.name,
+			SrcPath:      c.srcPath,
+			ExpectedExit: c.expectedExit,
+			Pass:         true,
+		})
+	}
+	total := len(reportCases)
+	passed := total
+	failed := 0
+	return &smokeReport{
+		Target:       "linux-x64",
+		Host:         "linux-x64",
+		Version:      "v0.6.0",
+		IslandsDebug: false,
+		Total:        &total,
+		Passed:       &passed,
+		Failed:       &failed,
+		Cases:        reportCases,
+	}
+}
+
 func TestValidateSmokeReportCountsAcceptsConsistentCounts(t *testing.T) {
 	total := 2
 	passed := 1
@@ -119,6 +172,22 @@ func TestValidateSmokeReportShapeRejectsMissingCaseSource(t *testing.T) {
 	}
 }
 
+func TestValidateSmokeReportShapeAcceptsNativeRequiredProfile(t *testing.T) {
+	if err := validateSmokeReport(nativeSmokeReportForTest("")); err != nil {
+		t.Fatalf("validate native smoke report: %v", err)
+	}
+}
+
+func TestValidateSmokeReportShapeRejectsMissingCoreStdlibCase(t *testing.T) {
+	err := validateSmokeReport(nativeSmokeReportForTest("core_crypto_smoke"))
+	if err == nil {
+		t.Fatalf("expected missing core stdlib smoke case")
+	}
+	if !strings.Contains(err.Error(), "core_crypto_smoke") {
+		t.Fatalf("missing core stdlib error = %v", err)
+	}
+}
+
 func TestValidateSmokeReportShapeRejectsDuplicateCaseName(t *testing.T) {
 	total := 2
 	passed := 2
@@ -181,18 +250,17 @@ func TestValidateSmokeReportShapeRejectsUnsupportedTarget(t *testing.T) {
 	}
 }
 
-func TestValidateSmokeReportShapeAcceptsWASMBuildOnlyTarget(t *testing.T) {
+func TestValidateSmokeReportShapeAcceptsWASMSupportedArtifactTarget(t *testing.T) {
 	total := 5
 	passed := 5
 	failed := 0
 	report := &smokeReport{
-		Target:    "wasm32-web",
-		BuildOnly: true,
-		Host:      "linux-x64",
-		Version:   "v0.6.0",
-		Total:     &total,
-		Passed:    &passed,
-		Failed:    &failed,
+		Target:  "wasm32-web",
+		Host:    "linux-x64",
+		Version: "v0.6.0",
+		Total:   &total,
+		Passed:  &passed,
+		Failed:  &failed,
 		Cases: []smokeCaseReport{
 			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Pass: true},
 			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
@@ -211,13 +279,12 @@ func TestValidateSmokeReportShapeRejectsWASMMissingDogfoodProfile(t *testing.T) 
 	passed := 3
 	failed := 0
 	report := &smokeReport{
-		Target:    "wasm32-web",
-		BuildOnly: true,
-		Host:      "linux-x64",
-		Version:   "v0.6.0",
-		Total:     &total,
-		Passed:    &passed,
-		Failed:    &failed,
+		Target:  "wasm32-web",
+		Host:    "linux-x64",
+		Version: "v0.6.0",
+		Total:   &total,
+		Passed:  &passed,
+		Failed:  &failed,
 		Cases: []smokeCaseReport{
 			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
 			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
@@ -230,62 +297,68 @@ func TestValidateSmokeReportShapeRejectsWASMMissingDogfoodProfile(t *testing.T) 
 	}
 }
 
-func TestValidateSmokeReportShapeRejectsBuildOnlyTargetWithoutBuildOnlyFlag(t *testing.T) {
-	total := 1
-	passed := 1
+func TestValidateSmokeReportShapeRejectsStaleBuildOnlyFlagForSupportedWASMTarget(t *testing.T) {
+	total := 5
+	passed := 5
 	failed := 0
 	report := &smokeReport{
-		Target:  "wasm32-wasi",
+		Target:    "wasm32-wasi",
+		BuildOnly: true,
+		Host:      "linux-x64",
+		Version:   "v0.6.0",
+		Total:     &total,
+		Passed:    &passed,
+		Failed:    &failed,
+		Cases: []smokeCaseReport{
+			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "dogfood_web_ui", SrcPath: "examples/projects/dogfood_web_ui/src/main.tetra", ExpectedExit: 0, Pass: true},
+		},
+	}
+	err := validateSmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "build_only = true, want false") {
+		t.Fatalf("expected stale build_only error, got %v", err)
+	}
+}
+
+func TestValidateSmokeReportShapeAcceptsRanWASMCaseForSupportedTarget(t *testing.T) {
+	total := 5
+	passed := 5
+	failed := 0
+	report := &smokeReport{
+		Target:  "wasm32-web",
 		Host:    "linux-x64",
 		Version: "v0.6.0",
 		Total:   &total,
 		Passed:  &passed,
 		Failed:  &failed,
 		Cases: []smokeCaseReport{
-			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
-		},
-	}
-	err := validateSmokeReport(report)
-	if err == nil || !strings.Contains(err.Error(), "build_only") {
-		t.Fatalf("expected build_only error, got %v", err)
-	}
-}
-
-func TestValidateSmokeReportShapeRejectsRanBuildOnlyCase(t *testing.T) {
-	total := 1
-	passed := 1
-	failed := 0
-	report := &smokeReport{
-		Target:    "wasm32-web",
-		BuildOnly: true,
-		Host:      "linux-x64",
-		Version:   "v0.6.0",
-		Total:     &total,
-		Passed:    &passed,
-		Failed:    &failed,
-		Cases: []smokeCaseReport{
+			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Pass: true},
 			{Name: "ui_web_smoke", SrcPath: "examples/ui_web_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
+			{Name: "dogfood_wasi", SrcPath: "examples/projects/dogfood_wasi/src/main.tetra", ExpectedExit: 0, Pass: true},
+			{Name: "dogfood_web_ui", SrcPath: "examples/projects/dogfood_web_ui/src/main.tetra", ExpectedExit: 0, Pass: true},
 		},
 	}
-	err := validateSmokeReport(report)
-	if err == nil || !strings.Contains(err.Error(), "build-only") {
-		t.Fatalf("expected build-only run error, got %v", err)
+	if err := validateSmokeReport(report); err != nil {
+		t.Fatalf("validateSmokeReport(wasm32-web ran case): %v", err)
 	}
 }
 
-func TestValidateSmokeReportShapeAcceptsRanBuildOnlyCaseWithRunner(t *testing.T) {
+func TestValidateSmokeReportShapeAcceptsRanWASMCaseWithRunner(t *testing.T) {
 	total := 5
 	passed := 5
 	failed := 0
 	report := &smokeReport{
-		Target:    "wasm32-web",
-		BuildOnly: true,
-		Runner:    "node-wasi",
-		Host:      "linux-x64",
-		Version:   "v0.6.0",
-		Total:     &total,
-		Passed:    &passed,
-		Failed:    &failed,
+		Target:  "wasm32-web",
+		Runner:  "chromium",
+		Host:    "linux-x64",
+		Version: "v0.6.0",
+		Total:   &total,
+		Passed:  &passed,
+		Failed:  &failed,
 		Cases: []smokeCaseReport{
 			{Name: "legacy_hello", SrcPath: "examples/hello.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
 			{Name: "effects_io_smoke", SrcPath: "examples/effects_io_smoke.tetra", ExpectedExit: 0, Ran: true, ActualExit: intPtr(0), Pass: true},
@@ -304,13 +377,12 @@ func TestValidateSmokeReportShapeRejectsMissingWASMRequiredCase(t *testing.T) {
 	passed := 1
 	failed := 0
 	report := &smokeReport{
-		Target:    "wasm32-wasi",
-		BuildOnly: true,
-		Host:      "linux-x64",
-		Version:   "v0.6.0",
-		Total:     &total,
-		Passed:    &passed,
-		Failed:    &failed,
+		Target:  "wasm32-wasi",
+		Host:    "linux-x64",
+		Version: "v0.6.0",
+		Total:   &total,
+		Passed:  &passed,
+		Failed:  &failed,
 		Cases: []smokeCaseReport{
 			{Name: "flow_hello", SrcPath: "examples/flow_hello.tetra", ExpectedExit: 0, Pass: true},
 		},
@@ -388,20 +460,11 @@ func TestValidateSmokeReportShapeRejectsPassedRunWithWrongExit(t *testing.T) {
 func TestSmokeReportToChecklistValidateOnly(t *testing.T) {
 	dir := t.TempDir()
 	report := filepath.Join(dir, "smoke.json")
-	if err := os.WriteFile(report, []byte(`{
-  "target": "linux-x64",
-  "host": "linux-x64",
-  "version": "v0.6.0",
-  "total": 4,
-  "passed": 4,
-  "failed": 0,
-  "cases": [
-    {"name": "flow_hello", "src_path": "examples/flow_hello.tetra", "actual_exit": 0, "ran": true, "pass": true},
-    {"name": "flow_struct_smoke", "src_path": "examples/flow_struct_smoke.tetra", "expected_exit": 42, "actual_exit": 42, "ran": true, "pass": true},
-    {"name": "flow_islands_smoke", "src_path": "examples/flow_islands_smoke.tetra", "actual_exit": 0, "ran": true, "pass": true},
-    {"name": "flow_unsafe_cap_mem_smoke", "src_path": "examples/flow_unsafe_cap_mem_smoke.tetra", "expected_exit": 42, "actual_exit": 42, "ran": true, "pass": true}
-  ]
-}`), 0o644); err != nil {
+	raw, err := json.Marshal(nativeSmokeReportForTest(""))
+	if err != nil {
+		t.Fatalf("marshal native smoke report: %v", err)
+	}
+	if err := os.WriteFile(report, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cmd := exec.Command("go", "run", ".", "--validate-only", "--report", report)

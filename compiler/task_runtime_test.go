@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/runtimeabi"
+	"tetra_language/compiler/internal/testkit"
 )
 
 func TestSelectRuntimeModeStabilizationMatrix(t *testing.T) {
@@ -61,6 +63,12 @@ func TestSelectRuntimeModeStabilizationMatrix(t *testing.T) {
 			name:      "auto_time_uses_builtin",
 			requested: RuntimeAuto,
 			usage:     runtimeUsageProfile{timeRuntimeUsed: true},
+			want:      RuntimeBuiltin,
+		},
+		{
+			name:      "auto_filesystem_uses_builtin",
+			requested: RuntimeAuto,
+			usage:     runtimeUsageProfile{filesystemUsed: true},
 			want:      RuntimeBuiltin,
 		},
 		{
@@ -206,6 +214,105 @@ func TestValidateTypedTaskRuntimeObjectRejectsMissingStagedSymbols(t *testing.T)
 	} else if !strings.Contains(err.Error(), "__tetra_task_result_get") {
 		t.Fatalf("unexpected typed task runtime validation error: %v", err)
 	}
+}
+
+func TestValidateTaskRuntimeObjectChecksSignatureMetadata(t *testing.T) {
+	t.Run("correct metadata passes", func(t *testing.T) {
+		obj := runtimeObjectWithTaskRuntimeSignatures()
+		if err := validateTaskRuntimeObject(obj); err != nil {
+			t.Fatalf("validate task runtime object: %v", err)
+		}
+	})
+
+	t.Run("wrong arity fails", func(t *testing.T) {
+		obj := runtimeObjectWithTaskRuntimeSignatures()
+		replaceRuntimeSymbolSignature(obj, "__tetra_task_join_i32", 1, 1)
+		err := validateTaskRuntimeObject(obj)
+		if err == nil {
+			t.Fatalf("expected wrong arity failure")
+		}
+		if !strings.Contains(err.Error(), "runtime object symbol '__tetra_task_join_i32' signature mismatch") ||
+			!strings.Contains(err.Error(), "params=1 want=2") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("wrong return slot count fails", func(t *testing.T) {
+		obj := runtimeObjectWithTaskRuntimeSignatures()
+		replaceRuntimeSymbolSignature(obj, "__tetra_task_join_result_i32", 2, 1)
+		err := validateTaskRuntimeObject(obj)
+		if err == nil {
+			t.Fatalf("expected wrong return slot failure")
+		}
+		if !strings.Contains(err.Error(), "runtime object symbol '__tetra_task_join_result_i32' signature mismatch") ||
+			!strings.Contains(err.Error(), "returns=1 want=2") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("legacy symbols without metadata remain compatible", func(t *testing.T) {
+		obj := &Object{}
+		for _, name := range requiredTaskRuntimeSymbols() {
+			obj.Symbols = append(obj.Symbols, Symbol{Name: name})
+		}
+		if err := validateTaskRuntimeObject(obj); err != nil {
+			t.Fatalf("legacy task runtime object should remain compatible: %v", err)
+		}
+	})
+}
+
+func runtimeObjectWithTaskRuntimeSignatures() *Object {
+	obj := &Object{}
+	for _, name := range requiredTaskRuntimeSymbols() {
+		sig, ok := runtimeObjectSignature(name)
+		if !ok {
+			panic("missing task runtime signature for " + name)
+		}
+		obj.Symbols = append(obj.Symbols, Symbol{
+			Name:         name,
+			HasSignature: true,
+			ParamSlots:   sig.paramSlots,
+			ReturnSlots:  sig.returnSlots,
+		})
+	}
+	return obj
+}
+
+func TestRuntimeObjectSignatureUsesSharedRuntimeABI(t *testing.T) {
+	names := append([]string{}, requiredActorRuntimeSymbols()...)
+	names = append(names, requiredActorStateRuntimeSymbols()...)
+	names = append(names, requiredDistributedActorRuntimeSymbols()...)
+	names = append(names, requiredTaskRuntimeSymbols()...)
+	names = append(names, requiredTaskGroupRuntimeSymbols()...)
+	names = append(names, requiredTypedTaskRuntimeSymbols(8)...)
+	names = append(names, requiredTimeRuntimeSymbols()...)
+	names = append(names, requiredFilesystemRuntimeSymbols()...)
+
+	for _, name := range names {
+		objectSig, ok := runtimeObjectSignature(name)
+		if !ok {
+			t.Fatalf("missing runtime object signature for %q", name)
+		}
+		sharedSig, ok := runtimeabi.SignatureForSymbol(name)
+		if !ok {
+			t.Fatalf("missing shared runtime ABI signature for %q", name)
+		}
+		if sharedSig.ParamSlots != objectSig.paramSlots || sharedSig.ReturnSlots != objectSig.returnSlots {
+			t.Fatalf("%s ABI mismatch: shared params=%d returns=%d object params=%d returns=%d", name, sharedSig.ParamSlots, sharedSig.ReturnSlots, objectSig.paramSlots, objectSig.returnSlots)
+		}
+	}
+}
+
+func replaceRuntimeSymbolSignature(obj *Object, name string, paramSlots int, returnSlots int) {
+	for i := range obj.Symbols {
+		if obj.Symbols[i].Name == name {
+			obj.Symbols[i].HasSignature = true
+			obj.Symbols[i].ParamSlots = paramSlots
+			obj.Symbols[i].ReturnSlots = returnSlots
+			return
+		}
+	}
+	panic("missing runtime symbol " + name)
 }
 
 func TestRequiredTaskRuntimeSymbolsIncludeDeadlineAndCancellationABI(t *testing.T) {
@@ -561,8 +668,72 @@ uses runtime:
 	}
 }
 
+func TestDocumentedTypedTaskSelfHostRuntimeDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "direct_slots",
+			src: `
+enum TaskErr:
+    case boom(Int)
+    case stopped
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom(42)
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(code):
+        code
+    case TaskErr.stopped:
+        9
+`,
+		},
+		{
+			name: "staged_slots",
+			src: `
+enum TaskErr:
+    case boom(Int, Int, Int, Int, Int)
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom(1, 2, 3, 4, 5)
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(a, b, c, d, e):
+        a + b + c + d + e
+`,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			srcPath := filepath.Join(tmp, "main.tetra")
+			outPath := filepath.Join(tmp, "main")
+			if err := os.WriteFile(srcPath, []byte(tc.src), 0o644); err != nil {
+				t.Fatalf("write source: %v", err)
+			}
+			_, err := BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", BuildOptions{Runtime: RuntimeSelfHost})
+			if err == nil {
+				t.Fatalf("expected explicit selfhost typed task rejection")
+			}
+			if !strings.Contains(err.Error(), "self-host runtime does not support typed task handles") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
 func TestTaskSpawnI32TypedRejectsHandleSlotsAboveEightEarly(t *testing.T) {
-	requireCheckErrorContains(t, `
+	testkit.RequireCheckErrorContains(t, `
 enum TaskErr:
     case huge(Int, Int, Int, Int, Int, Int)
 
@@ -1139,6 +1310,141 @@ uses runtime:
 	}
 	if exitCode != 33 {
 		t.Fatalf("exit code = %d, want final task value after select timeout", exitCode)
+	}
+}
+
+func TestDocumentedTaskTimeBuiltinSelfHostParity(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		exit int
+	}{
+		{
+			name: "sleep",
+			src: `
+func main() -> Int
+uses runtime:
+    let start: Int = core.time_now_ms()
+    let err: Int = core.sleep_ms(3)
+    if err != 0:
+        return 20 + err
+    let after: Int = core.time_now_ms()
+    let untilErr: Int = core.sleep_until(core.deadline_ms(2))
+    if untilErr != 0:
+        return 40 + untilErr
+    let finalTime: Int = core.time_now_ms()
+    return (after - start) * 10 + (finalTime - after)
+`,
+			exit: 32,
+		},
+		{
+			name: "deadline_join",
+			src: `
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let result: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(5))
+    if result.error != 0:
+        return 20 + result.error
+    return result.value
+`,
+			exit: 2,
+		},
+		{
+			name: "poll",
+			src: `
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    return 31
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let early: task.result_i32 = core.task_poll_i32(task)
+    if early.error != 2:
+        return 20 + early.error
+    if early.value != 0:
+        return 40 + early.value
+    let _sleep: Int = core.sleep_ms(3)
+    let late: task.result_i32 = core.task_poll_i32(task)
+    if late.error != 0:
+        return 60 + late.error
+    return late.value
+`,
+			exit: 31,
+		},
+		{
+			name: "select2_timer",
+			src: `
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return 33
+
+func main() -> Int
+uses runtime:
+    let deadline: Int = core.deadline_ms(2)
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let selected: task.result_i32 = core.select2_i32(task, deadline)
+    if selected.error != 2:
+        return 20 + selected.error
+    if !core.timer_ready(deadline):
+        return 40
+    let final: task.result_i32 = core.task_join_result_i32(task)
+    if final.error != 0:
+        return 60 + final.error
+    return final.value
+`,
+			exit: 33,
+		},
+	}
+
+	runtimes := []struct {
+		name string
+		mode RuntimeMode
+	}{
+		{name: "builtin", mode: RuntimeBuiltin},
+		{name: "selfhost", mode: RuntimeSelfHost},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			var want *struct {
+				stdout string
+				exit   int
+			}
+			for _, rt := range runtimes {
+				rt := rt
+				t.Run(rt.name, func(t *testing.T) {
+					stdout, exitCode, timedOut := buildAndRunWithOptionsTimeout(t, tt.src, BuildOptions{Runtime: rt.mode}, 250*time.Millisecond)
+					if timedOut {
+						t.Fatalf("program timed out for runtime %s", rt.name)
+					}
+					got := struct {
+						stdout string
+						exit   int
+					}{stdout: stdout, exit: exitCode}
+					if want == nil {
+						want = &got
+					} else if got != *want {
+						t.Fatalf("runtime parity mismatch: got=%#v want=%#v", got, *want)
+					}
+					if stdout != "" {
+						t.Fatalf("stdout mismatch: %q", stdout)
+					}
+					if exitCode != tt.exit {
+						t.Fatalf("exit code = %d, want %d", exitCode, tt.exit)
+					}
+				})
+			}
+		})
 	}
 }
 

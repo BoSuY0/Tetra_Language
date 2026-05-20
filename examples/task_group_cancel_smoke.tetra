@@ -1,0 +1,25 @@
+// Task group cancellation smoke: cancel wakes a sleeping child before its timer.
+func worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(10)
+    let checkpoint: task.error = core.task_checkpoint()
+    if checkpoint != 0:
+        return core.time_now_ms()
+    return 99
+
+func main() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let _delay: Int = core.sleep_ms(2)
+    group = core.task_group_cancel(group)
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let _closed: Int = core.task_group_close(group)
+    if result.value != 0:
+        return result.value
+    if result.error != 1:
+        return 20 + result.error
+    let now: Int = core.time_now_ms()
+    if now != 2:
+        return 40 + now
+    return result.error

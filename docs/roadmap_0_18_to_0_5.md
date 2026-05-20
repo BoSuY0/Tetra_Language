@@ -2,8 +2,7 @@
 
 > Historical checkpoint. This roadmap describes the completed v0.5 profile and
 > is superseded by
-> `docs/spec/v1_scope.md` and
-> `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+> `docs/spec/v1_scope.md` and `docs/checklists/v1_0_release_gate.md`.
 > Public release truth for this branch lives in
 > `docs/spec/current_supported_surface.md` (`v0.2.0`). The v1.0 scope remains
 > a future contract.

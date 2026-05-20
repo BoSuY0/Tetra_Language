@@ -18,8 +18,8 @@ Use this checklist before labeling a build or branch as v0.6 Usable Alpha.
 ## Verification
 
 - [x] `go test ./compiler/... ./cli/... ./tools/...`
-- [x] `bash scripts/test.sh`
-- [x] `bash scripts/bootstrap.sh`
+- [x] `bash scripts/ci/test.sh`
+- [x] `bash scripts/dev/bootstrap.sh`
 - [x] `./tetra version` prints `v0.6.0`
 - [x] `./t version` matches `./tetra version`
 - [x] `./tetra fmt --check examples lib __rt compiler/selfhostrt`
@@ -33,9 +33,9 @@ Use this checklist before labeling a build or branch as v0.6 Usable Alpha.
 - [x] `./tetra smoke --target linux-x64 --run=true --report ...` with validated
       JSON counts and case metadata
 - [x] `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
-- [x] Canonical gate: `bash scripts/release_v0_6_gate.sh`
-- [x] v0.6.x wrapper: `bash scripts/test_all.sh --full`
-- [x] v0.6.x machine-output wrapper: `bash scripts/test_all.sh --quick --json-only`
+- [x] Canonical gate: `bash scripts/release/v0_6/gate.sh`
+- [x] v0.6.x wrapper: `bash scripts/ci/test-all.sh --full`
+- [x] v0.6.x machine-output wrapper: `bash scripts/ci/test-all.sh --quick --json-only`
 
 ## Profile Smoke Coverage
 
@@ -45,7 +45,7 @@ Use this checklist before labeling a build or branch as v0.6 Usable Alpha.
       single-manifest pack, and validated project bundle unpack are exercised.
 - [x] Build-only smoke passes for `linux-x64`, `macos-x64`, and `windows-x64`;
       native execution is verified only when host and target match.
-- [x] `scripts/test_all.sh` writes per-step logs plus Markdown and JSON
+- [x] `scripts/ci/test-all.sh` writes per-step logs plus Markdown and JSON
       summaries for local stabilization runs.
-- [x] `scripts/test_all.sh --keep-going` and `--json-only` are covered by CLI
+- [x] `scripts/ci/test-all.sh --keep-going` and `--json-only` are covered by CLI
       regression tests.

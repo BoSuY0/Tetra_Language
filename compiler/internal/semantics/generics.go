@@ -88,6 +88,22 @@ func monomorphizeGenerics(world *module.World) error {
 		return nil
 	}
 
+	funcDecls := map[string]*frontend.FuncDecl{}
+	structDecls := map[string]*frontend.StructDecl{}
+	enumDecls := map[string]*frontend.EnumDecl{}
+	for _, file := range world.Files {
+		for _, enum := range file.Enums {
+			enumDecls[qualifyName(file.Module, enum.Name)] = enum
+		}
+		for _, st := range file.Structs {
+			if len(st.TypeParams) == 0 {
+				structDecls[qualifyName(file.Module, st.Name)] = st
+			}
+		}
+		for _, fn := range file.Funcs {
+			funcDecls[qualifyName(file.Module, fn.Name)] = fn
+		}
+	}
 	created := map[string]*frontend.FuncDecl{}
 	createdByFile := map[*frontend.FileAST]map[string]*frontend.FuncDecl{}
 	var work []genericWorkItem
@@ -98,6 +114,14 @@ func monomorphizeGenerics(world *module.World) error {
 				continue
 			}
 			work = append(work, genericWorkItem{fn: fn, module: file.Module, imports: imports})
+		}
+	}
+	for _, file := range world.Files {
+		imports := fileImports[file]
+		for _, glob := range file.Globals {
+			if err := monomorphizeFunctionTypedGlobalInitializer(glob, generics, created, createdByFile, &work, fileImports, file.Module, imports, structCtx); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -111,7 +135,7 @@ func monomorphizeGenerics(world *module.World) error {
 			}
 			env[param.Name] = resolved
 		}
-		if err := monomorphizeStmts(item.fn.Body, env, generics, created, createdByFile, &work, fileImports, item.module, item.imports, structCtx); err != nil {
+		if err := monomorphizeStmts(item.fn.Body, env, map[string]frontend.TypeRef{}, item.fn.ReturnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, &work, fileImports, item.module, item.imports, structCtx); err != nil {
 			return err
 		}
 	}
@@ -134,6 +158,50 @@ func monomorphizeGenerics(world *module.World) error {
 		structCtx.finalize(world)
 	}
 	return nil
+}
+
+func monomorphizeFunctionTypedGlobalInitializer(
+	glob *frontend.GlobalDecl,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+	structCtx *genericStructContext,
+) error {
+	if glob == nil || glob.Type.Kind != frontend.TypeRefFunction || glob.Init == nil {
+		return nil
+	}
+	original := glob.Init
+	replacement, specialized, err := monomorphizeGenericFunctionValueExpr(glob.Init, glob.Type, fmt.Sprintf("function-typed global '%s'", glob.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+	if err != nil || !specialized {
+		return err
+	}
+	if id, ok := replacement.(*frontend.IdentExpr); ok {
+		switch init := original.(type) {
+		case *frontend.FieldAccessExpr:
+			glob.Init = &frontend.FieldAccessExpr{At: init.At, Base: init.Base, Field: lastNameSegment(id.Name)}
+			return nil
+		case *frontend.IdentExpr:
+			name := id.Name
+			if module != "" {
+				name = strings.TrimPrefix(name, module+".")
+			}
+			glob.Init = &frontend.IdentExpr{At: init.At, Name: name}
+			return nil
+		}
+	}
+	glob.Init = replacement
+	return nil
+}
+
+func lastNameSegment(name string) string {
+	if idx := strings.LastIndex(name, "."); idx >= 0 {
+		return name[idx+1:]
+	}
+	return name
 }
 
 func collectProtocolConformances(world *module.World, fileImports map[*frontend.FileAST]map[string]string) (map[protocolConformanceKey]frontend.Position, error) {
@@ -338,7 +406,7 @@ func (ctx *genericStructContext) rewriteTypeRef(ref *frontend.TypeRef, module st
 		subst := map[string]string{}
 		for i, tp := range generic.decl.TypeParams {
 			if containsFunctionTypeRef(ref.TypeArgs[i]) {
-				return fmt.Errorf("%s: generic struct '%s' type argument '%s' uses function type; storing function-typed values in structs is not supported in this MVP", frontend.FormatPos(ref.TypeArgs[i].At), ref.Name, tp)
+				return fmt.Errorf("%s: generic struct '%s' type argument '%s' uses function type; generic struct instantiation cannot carry function-typed values under the supported fnptr ABI", frontend.FormatPos(ref.TypeArgs[i].At), ref.Name, tp)
 			}
 			argName, err := resolveTypeName(&ref.TypeArgs[i], module, imports)
 			if err != nil {
@@ -380,9 +448,6 @@ func (ctx *genericStructContext) instantiate(generic genericStructDef, subst map
 	for i, field := range generic.decl.Fields {
 		clone.Fields[i] = field
 		clone.Fields[i].Type = substituteTypeRef(field.Type, subst)
-		if hasDirectFunctionTypeRef(clone.Fields[i].Type) {
-			return "", fmt.Errorf("%s: struct field '%s.%s' uses function type; storing function-typed values in structs is not supported in this MVP", frontend.FormatPos(clone.Fields[i].At), displayTypeName(fullName, generic.module), clone.Fields[i].Name)
-		}
 		if hasGenericTypeArgs(clone.Fields[i].Type) {
 			return "", fmt.Errorf("%s: nested generic struct instantiation for '%s.%s' is not supported in this MVP", frontend.FormatPos(clone.Fields[i].At), displayTypeName(fullName, generic.module), clone.Fields[i].Name)
 		}
@@ -641,6 +706,11 @@ func (ctx *genericStructContext) rewriteExpr(expr frontend.Expr, module string, 
 func monomorphizeStmts(
 	stmts []frontend.Stmt,
 	env map[string]string,
+	functionLocals map[string]frontend.TypeRef,
+	returnType frontend.TypeRef,
+	funcDecls map[string]*frontend.FuncDecl,
+	structDecls map[string]*frontend.StructDecl,
+	enumDecls map[string]*frontend.EnumDecl,
 	generics map[string]genericDef,
 	created map[string]*frontend.FuncDecl,
 	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
@@ -653,32 +723,57 @@ func monomorphizeStmts(
 	for _, stmt := range stmts {
 		switch s := stmt.(type) {
 		case *frontend.ReturnStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if returnType.Kind == frontend.TypeRefFunction {
+				if closure, ok := s.Value.(*frontend.ClosureExpr); ok && closure != nil && closure.Decl != nil && len(closure.Decl.TypeParams) > 0 {
+					outerLocals := monomorphizeEnvLocals(env)
+					if name, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, outerLocals)); ok {
+						return unsupportedGenericClosureCaptureError(pos, name)
+					}
+					replacement, specialized, err := monomorphizeGenericClosureLiteralValue(closure, returnType, "function return", generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+					if err != nil {
+						return err
+					}
+					if specialized {
+						s.Value = replacement
+					}
+				}
+				replacement, specialized, err := monomorphizeGenericFunctionValueExpr(s.Value, returnType, "function return", generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+				if err != nil {
+					return err
+				}
+				if specialized {
+					s.Value = replacement
+				}
+			}
+			if _, err := monomorphizeExpr(s.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.ThrowStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.DeferStmt:
-			if err := monomorphizeStmts(s.Body, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Body, cloneStringMap(env), cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.BreakStmt, *frontend.ContinueStmt:
 		case *frontend.PrintStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.ExpectStmt:
-			if _, err := monomorphizeExpr(s.Cond, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Cond, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.FreeStmt:
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.LetStmt:
-			valType, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+			if err := monomorphizeFunctionTypedBinding(s, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+				return err
+			}
+			valType, err := monomorphizeExpr(s.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 			if err != nil {
 				return err
 			}
@@ -688,6 +783,9 @@ func monomorphizeStmts(
 					return err
 				}
 				env[s.Name] = resolved
+			} else if s.Type.Kind == frontend.TypeRefFunction {
+				functionLocals[s.Name] = s.Type
+				env[s.Name] = genericTypeName(s.Type)
 			} else {
 				env[s.Name] = valType
 			}
@@ -697,30 +795,75 @@ func monomorphizeStmts(
 				if closure, ok := s.Value.(*frontend.ClosureExpr); ok && closure != nil && closure.Decl != nil && len(closure.Decl.TypeParams) > 0 {
 					outerLocals := monomorphizeEnvLocals(env)
 					if name, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, outerLocals)); ok {
-						return fmt.Errorf("%s: generic closure literals do not support captures in this MVP (captured '%s')", frontend.FormatPos(pos), name)
+						return unsupportedGenericClosureCaptureError(pos, name)
 					}
 					env[closureBindingKey] = qualifyName(module, closure.Name)
 				}
 			}
 		case *frontend.AssignStmt:
-			if _, err := monomorphizeExpr(s.Target, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Target, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
-			if _, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if id, ok := s.Target.(*frontend.IdentExpr); ok {
+				if declared, exists := functionLocals[id.Name]; exists && declared.Kind == frontend.TypeRefFunction {
+					if closure, ok := s.Value.(*frontend.ClosureExpr); ok && closure != nil && closure.Decl != nil && len(closure.Decl.TypeParams) > 0 {
+						outerLocals := monomorphizeEnvLocals(env)
+						if name, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, outerLocals)); ok {
+							return unsupportedGenericClosureCaptureError(pos, name)
+						}
+						replacement, specialized, err := monomorphizeGenericClosureLiteralValue(closure, declared, fmt.Sprintf("function-typed assignment to '%s'", id.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+						if err != nil {
+							return err
+						}
+						if specialized {
+							s.Value = replacement
+						}
+					}
+					replacement, specialized, err := monomorphizeGenericFunctionValueExpr(s.Value, declared, fmt.Sprintf("function-typed assignment to '%s'", id.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+					if err != nil {
+						return err
+					}
+					if specialized {
+						s.Value = replacement
+					}
+				}
+			} else if declared, targetName, ok := functionTypeForFieldAssignmentTarget(s.Target, env, structDecls); ok && declared.Kind == frontend.TypeRefFunction {
+				if closure, ok := s.Value.(*frontend.ClosureExpr); ok && closure != nil && closure.Decl != nil && len(closure.Decl.TypeParams) > 0 {
+					outerLocals := monomorphizeEnvLocals(env)
+					if name, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, outerLocals)); ok {
+						return unsupportedGenericClosureCaptureError(pos, name)
+					}
+					replacement, specialized, err := monomorphizeGenericClosureLiteralValue(closure, declared, fmt.Sprintf("function-typed assignment to '%s'", targetName), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+					if err != nil {
+						return err
+					}
+					if specialized {
+						s.Value = replacement
+					}
+				}
+				replacement, specialized, err := monomorphizeGenericFunctionValueExpr(s.Value, declared, fmt.Sprintf("function-typed assignment to '%s'", targetName), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+				if err != nil {
+					return err
+				}
+				if specialized {
+					s.Value = replacement
+				}
+			}
+			if _, err := monomorphizeExpr(s.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.IfStmt:
-			if _, err := monomorphizeExpr(s.Cond, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Cond, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
-			if err := monomorphizeStmts(s.Then, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Then, cloneStringMap(env), cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
-			if err := monomorphizeStmts(s.Else, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Else, cloneStringMap(env), cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.IfLetStmt:
-			valueType, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+			valueType, err := monomorphizeExpr(s.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 			if err != nil {
 				return err
 			}
@@ -730,23 +873,23 @@ func monomorphizeStmts(
 			} else {
 				thenEnv[s.Name] = "i32"
 			}
-			if err := monomorphizeStmts(s.Then, thenEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Then, thenEnv, cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
-			if err := monomorphizeStmts(s.Else, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Else, cloneStringMap(env), cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.WhileStmt:
-			if _, err := monomorphizeExpr(s.Cond, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Cond, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
-			if err := monomorphizeStmts(s.Body, cloneStringMap(env), generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Body, cloneStringMap(env), cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.ForRangeStmt:
 			bodyEnv := cloneStringMap(env)
 			if s.Iterable != nil {
-				iterType, err := monomorphizeExpr(s.Iterable, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+				iterType, err := monomorphizeExpr(s.Iterable, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 				if err != nil {
 					return err
 				}
@@ -756,19 +899,19 @@ func monomorphizeStmts(
 					bodyEnv[s.Name] = "i32"
 				}
 			} else {
-				if _, err := monomorphizeExpr(s.Start, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+				if _, err := monomorphizeExpr(s.Start, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 					return err
 				}
-				if _, err := monomorphizeExpr(s.End, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+				if _, err := monomorphizeExpr(s.End, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 					return err
 				}
 				bodyEnv[s.Name] = "i32"
 			}
-			if err := monomorphizeStmts(s.Body, bodyEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Body, bodyEnv, cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.MatchStmt:
-			scrutType, err := monomorphizeExpr(s.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+			scrutType, err := monomorphizeExpr(s.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 			if err != nil {
 				return err
 			}
@@ -779,34 +922,34 @@ func monomorphizeStmts(
 					caseEnv[some.Name] = someElemType
 				}
 				if !c.Default {
-					if _, err := monomorphizeExpr(c.Pattern, caseEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+					if _, err := monomorphizeExpr(c.Pattern, caseEnv, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 						return err
 					}
 				}
 				if c.Guard != nil {
-					if _, err := monomorphizeExpr(c.Guard, caseEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+					if _, err := monomorphizeExpr(c.Guard, caseEnv, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 						return err
 					}
 				}
-				if err := monomorphizeStmts(c.Body, caseEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+				if err := monomorphizeStmts(c.Body, caseEnv, cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 					return err
 				}
 			}
 		case *frontend.UnsafeStmt:
-			if err := monomorphizeStmts(s.Body, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Body, env, functionLocals, returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.IslandStmt:
-			if _, err := monomorphizeExpr(s.Size, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Size, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 			bodyEnv := cloneStringMap(env)
 			bodyEnv[s.Name] = "island"
-			if err := monomorphizeStmts(s.Body, bodyEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if err := monomorphizeStmts(s.Body, bodyEnv, cloneFunctionTypeMap(functionLocals), returnType, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		case *frontend.ExprStmt:
-			if _, err := monomorphizeExpr(s.Expr, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(s.Expr, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return err
 			}
 		}
@@ -814,9 +957,413 @@ func monomorphizeStmts(
 	return nil
 }
 
+func monomorphizeFunctionTypedBinding(
+	stmt *frontend.LetStmt,
+	env map[string]string,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+	structCtx *genericStructContext,
+) error {
+	if stmt.Type.Kind != frontend.TypeRefFunction {
+		return nil
+	}
+	if closure, ok := stmt.Value.(*frontend.ClosureExpr); ok && closure != nil && closure.Decl != nil && len(closure.Decl.TypeParams) > 0 {
+		outerLocals := monomorphizeEnvLocals(env)
+		if name, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, outerLocals)); ok {
+			return unsupportedGenericClosureCaptureError(pos, name)
+		}
+		replacement, specialized, err := monomorphizeGenericClosureLiteralValue(closure, stmt.Type, fmt.Sprintf("function-typed local '%s'", stmt.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		if err != nil || !specialized {
+			return err
+		}
+		stmt.Value = replacement
+		return nil
+	}
+	replacement, specialized, err := monomorphizeGenericFunctionValueExpr(stmt.Value, stmt.Type, fmt.Sprintf("function-typed local '%s'", stmt.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+	if err != nil || !specialized {
+		return err
+	}
+	stmt.Value = replacement
+	return nil
+}
+
+func monomorphizeGenericClosureLiteralValue(
+	closure *frontend.ClosureExpr,
+	declared frontend.TypeRef,
+	context string,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+	structCtx *genericStructContext,
+) (frontend.Expr, bool, error) {
+	if declared.Kind != frontend.TypeRefFunction || closure == nil || closure.Decl == nil || len(closure.Decl.TypeParams) == 0 {
+		return closure, false, nil
+	}
+	fullOriginal := qualifyName(module, closure.Name)
+	generic, ok := generics[fullOriginal]
+	if !ok {
+		return closure, false, nil
+	}
+	declaredParams, declaredReturn, _, err := functionTypeRefSignatureAndEffects(declared, module, imports)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(declaredParams) != len(generic.decl.Params) {
+		return nil, false, fmt.Errorf("%s: %s generic closure literal parameter count mismatch: expected %d, got %d", frontend.FormatPos(closure.At), context, len(declaredParams), len(generic.decl.Params))
+	}
+	subst := map[string]string{}
+	for i, param := range generic.decl.Params {
+		if err := bindGenericType(param.Type, declaredParams[i], generic.decl.TypeParams, subst); err != nil {
+			return nil, false, fmt.Errorf("%s: %v", frontend.FormatPos(closure.At), err)
+		}
+	}
+	if err := bindGenericType(generic.decl.ReturnType, declaredReturn, generic.decl.TypeParams, subst); err != nil {
+		return nil, false, fmt.Errorf("%s: %v", frontend.FormatPos(closure.At), err)
+	}
+	for _, tp := range generic.decl.TypeParams {
+		if subst[tp] == "" {
+			return nil, false, fmt.Errorf("%s: cannot infer generic argument '%s' for %s", frontend.FormatPos(closure.At), tp, context)
+		}
+	}
+	if err := checkGenericProtocolBounds(closure.At, closure.Name, generic, subst, module); err != nil {
+		return nil, false, err
+	}
+	name := mangleGenericName(generic.decl.Name, generic.decl.TypeParams, subst)
+	fullName := qualifyName(generic.module, name)
+	clone, exists := created[fullName]
+	if !exists {
+		clone = cloneGenericFunc(generic.decl, name, subst)
+		cloneImports := fileImports[generic.file]
+		if structCtx != nil {
+			if err := rewriteGenericFuncStructRefs(structCtx, clone, generic.module, cloneImports); err != nil {
+				return nil, false, err
+			}
+		}
+		created[fullName] = clone
+		if _, ok := createdByFile[generic.file]; !ok {
+			createdByFile[generic.file] = map[string]*frontend.FuncDecl{}
+		}
+		createdByFile[generic.file][name] = clone
+		*work = append(*work, genericWorkItem{fn: clone, module: generic.module, imports: fileImports[generic.file]})
+	}
+	return &frontend.ClosureExpr{At: closure.At, Name: name, Decl: clone}, true, nil
+}
+
+func monomorphizeGenericFunctionValueExpr(
+	expr frontend.Expr,
+	declared frontend.TypeRef,
+	context string,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+	structCtx *genericStructContext,
+) (frontend.Expr, bool, error) {
+	switch init := expr.(type) {
+	case *frontend.IdentExpr:
+		fullName, specialized, err := monomorphizeGenericFunctionValue(init, declared, context, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		if err != nil || !specialized {
+			return expr, specialized, err
+		}
+		init.Name = fullName
+		return init, true, nil
+	case *frontend.FieldAccessExpr:
+		name := callbackArgumentName(init)
+		if name == "" {
+			return expr, false, nil
+		}
+		asIdent := &frontend.IdentExpr{At: init.At, Name: name}
+		fullName, specialized, err := monomorphizeGenericFunctionValue(asIdent, declared, context, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		if err != nil || !specialized {
+			return expr, specialized, err
+		}
+		return &frontend.IdentExpr{At: init.At, Name: fullName}, true, nil
+	default:
+		return expr, false, nil
+	}
+}
+
+func monomorphizeGenericFunctionValue(
+	init *frontend.IdentExpr,
+	declared frontend.TypeRef,
+	context string,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+	structCtx *genericStructContext,
+) (string, bool, error) {
+	if declared.Kind != frontend.TypeRefFunction {
+		return "", false, nil
+	}
+	resolved, err := resolveCallName(init.Name, module, imports, init.At)
+	if err != nil {
+		return "", false, nil
+	}
+	generic, ok := generics[resolved]
+	if !ok {
+		return "", false, nil
+	}
+	declaredParams, declaredReturn, _, err := functionTypeRefSignatureAndEffects(declared, module, imports)
+	if err != nil {
+		return "", false, err
+	}
+	if len(declaredParams) != len(generic.decl.Params) {
+		return "", false, fmt.Errorf("%s: %s generic function symbol '%s' parameter count mismatch: expected %d, got %d", frontend.FormatPos(init.At), context, init.Name, len(declaredParams), len(generic.decl.Params))
+	}
+	subst := map[string]string{}
+	for i, param := range generic.decl.Params {
+		if err := bindGenericType(param.Type, declaredParams[i], generic.decl.TypeParams, subst); err != nil {
+			return "", false, fmt.Errorf("%s: %v", frontend.FormatPos(init.At), err)
+		}
+	}
+	if err := bindGenericType(generic.decl.ReturnType, declaredReturn, generic.decl.TypeParams, subst); err != nil {
+		return "", false, fmt.Errorf("%s: %v", frontend.FormatPos(init.At), err)
+	}
+	for _, tp := range generic.decl.TypeParams {
+		if subst[tp] == "" {
+			return "", false, fmt.Errorf("%s: cannot infer generic argument '%s' for %s", frontend.FormatPos(init.At), tp, context)
+		}
+	}
+	if err := checkGenericProtocolBounds(init.At, init.Name, generic, subst, module); err != nil {
+		return "", false, err
+	}
+	name := mangleGenericName(generic.decl.Name, generic.decl.TypeParams, subst)
+	fullName := qualifyName(generic.module, name)
+	if _, exists := created[fullName]; !exists {
+		clone := cloneGenericFunc(generic.decl, name, subst)
+		cloneImports := fileImports[generic.file]
+		if structCtx != nil {
+			if err := rewriteGenericFuncStructRefs(structCtx, clone, generic.module, cloneImports); err != nil {
+				return "", false, err
+			}
+		}
+		created[fullName] = clone
+		if _, ok := createdByFile[generic.file]; !ok {
+			createdByFile[generic.file] = map[string]*frontend.FuncDecl{}
+		}
+		createdByFile[generic.file][name] = clone
+		*work = append(*work, genericWorkItem{fn: clone, module: generic.module, imports: fileImports[generic.file]})
+	}
+	return fullName, true, nil
+}
+
+func monomorphizeFunctionTypedCallArgs(
+	call *frontend.CallExpr,
+	callee *frontend.FuncDecl,
+	env map[string]string,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+	structCtx *genericStructContext,
+) error {
+	limit := len(call.Args)
+	if len(callee.Params) < limit {
+		limit = len(callee.Params)
+	}
+	for i := 0; i < limit; i++ {
+		if callee.Params[i].Type.Kind != frontend.TypeRefFunction {
+			continue
+		}
+		if closure, ok := call.Args[i].(*frontend.ClosureExpr); ok && closure != nil && closure.Decl != nil && len(closure.Decl.TypeParams) > 0 {
+			outerLocals := monomorphizeEnvLocals(env)
+			if name, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, outerLocals)); ok {
+				return unsupportedGenericClosureCallbackCaptureError(pos, name)
+			}
+			replacement, specialized, err := monomorphizeGenericClosureLiteralValue(closure, callee.Params[i].Type, fmt.Sprintf("callback argument for '%s'", call.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+			if err != nil {
+				return err
+			}
+			if specialized {
+				call.Args[i] = replacement
+				continue
+			}
+		}
+		replacement, specialized, err := monomorphizeGenericFunctionValueExpr(call.Args[i], callee.Params[i].Type, fmt.Sprintf("callback argument for '%s'", call.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		if err != nil {
+			return err
+		}
+		if specialized {
+			call.Args[i] = replacement
+		}
+	}
+	return nil
+}
+
+func monomorphizeFunctionTypedEnumPayloadArgs(
+	call *frontend.CallExpr,
+	enumDecls map[string]*frontend.EnumDecl,
+	env map[string]string,
+	generics map[string]genericDef,
+	created map[string]*frontend.FuncDecl,
+	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
+	work *[]genericWorkItem,
+	fileImports map[*frontend.FileAST]map[string]string,
+	module string,
+	imports map[string]string,
+	structCtx *genericStructContext,
+) error {
+	parts := strings.Split(call.Name, ".")
+	if len(parts) < 2 {
+		return nil
+	}
+	caseName := parts[len(parts)-1]
+	typeRef := frontend.TypeRef{At: call.At, Kind: frontend.TypeRefNamed, Name: strings.Join(parts[:len(parts)-1], ".")}
+	typeName, err := resolveTypeName(&typeRef, module, imports)
+	if err != nil {
+		return nil
+	}
+	enumDecl, ok := enumDecls[typeName]
+	if !ok {
+		return nil
+	}
+	var enumCase *frontend.EnumCaseDecl
+	for i := range enumDecl.Cases {
+		if enumDecl.Cases[i].Name == caseName {
+			enumCase = &enumDecl.Cases[i]
+			break
+		}
+	}
+	if enumCase == nil {
+		return nil
+	}
+	limit := len(call.Args)
+	if len(enumCase.Payload) < limit {
+		limit = len(enumCase.Payload)
+	}
+	for i := 0; i < limit; i++ {
+		declared := enumCase.Payload[i]
+		if declared.Kind != frontend.TypeRefFunction {
+			continue
+		}
+		if closure, ok := call.Args[i].(*frontend.ClosureExpr); ok && closure != nil && closure.Decl != nil && len(closure.Decl.TypeParams) > 0 {
+			outerLocals := monomorphizeEnvLocals(env)
+			if name, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, outerLocals)); ok {
+				return unsupportedGenericClosureCaptureError(pos, name)
+			}
+			replacement, specialized, err := monomorphizeGenericClosureLiteralValue(closure, declared, fmt.Sprintf("enum payload '%s.%s[%d]'", typeRef.Name, caseName, i+1), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+			if err != nil {
+				return err
+			}
+			if specialized {
+				call.Args[i] = replacement
+				continue
+			}
+		}
+		replacement, specialized, err := monomorphizeGenericFunctionValueExpr(call.Args[i], declared, fmt.Sprintf("enum payload '%s.%s[%d]'", typeRef.Name, caseName, i+1), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		if err != nil {
+			return err
+		}
+		if specialized {
+			call.Args[i] = replacement
+		}
+	}
+	return nil
+}
+
+func monomorphizeEnumConstructorTypeName(call *frontend.CallExpr, enumDecls map[string]*frontend.EnumDecl, module string, imports map[string]string) (string, bool) {
+	parts := strings.Split(call.Name, ".")
+	if len(parts) < 2 {
+		return "", false
+	}
+	caseName := parts[len(parts)-1]
+	typeRef := frontend.TypeRef{At: call.At, Kind: frontend.TypeRefNamed, Name: strings.Join(parts[:len(parts)-1], ".")}
+	typeName, err := resolveTypeName(&typeRef, module, imports)
+	if err != nil {
+		return "", false
+	}
+	enumDecl, ok := enumDecls[typeName]
+	if !ok {
+		return "", false
+	}
+	for i := range enumDecl.Cases {
+		if enumDecl.Cases[i].Name == caseName {
+			return typeName, true
+		}
+	}
+	return "", false
+}
+
+func functionTypeForFieldAssignmentTarget(expr frontend.Expr, env map[string]string, structDecls map[string]*frontend.StructDecl) (frontend.TypeRef, string, bool) {
+	return functionTypeForFieldAssignmentTargetFrom(expr, "", env, structDecls)
+}
+
+func functionTypeForFieldAssignmentTargetFrom(expr frontend.Expr, path string, env map[string]string, structDecls map[string]*frontend.StructDecl) (frontend.TypeRef, string, bool) {
+	switch target := expr.(type) {
+	case *frontend.IdentExpr:
+		typeName := env[target.Name]
+		if typeName == "" {
+			return frontend.TypeRef{}, "", false
+		}
+		if path == "" {
+			path = target.Name
+		}
+		return frontend.TypeRef{Kind: frontend.TypeRefNamed, Name: typeName}, path, true
+	case *frontend.FieldAccessExpr:
+		baseType, basePath, ok := functionTypeForFieldAssignmentTargetFrom(target.Base, path, env, structDecls)
+		if !ok || baseType.Name == "" {
+			return frontend.TypeRef{}, "", false
+		}
+		decl, ok := structDecls[baseType.Name]
+		if !ok {
+			return frontend.TypeRef{}, "", false
+		}
+		for _, field := range decl.Fields {
+			if field.Name != target.Field {
+				continue
+			}
+			if basePath == "" {
+				basePath = target.Field
+			} else {
+				basePath += "." + target.Field
+			}
+			return qualifyFieldAssignmentPathType(field.Type, baseType.Name), basePath, true
+		}
+	}
+	return frontend.TypeRef{}, "", false
+}
+
+func qualifyFieldAssignmentPathType(ref frontend.TypeRef, ownerType string) frontend.TypeRef {
+	if ref.Kind != frontend.TypeRefNamed || ref.Name == "" {
+		return ref
+	}
+	if _, ok := canonicalBuiltinType(ref.Name); ok {
+		return ref
+	}
+	if strings.Contains(ref.Name, ".") {
+		return ref
+	}
+	if idx := strings.LastIndex(ownerType, "."); idx >= 0 {
+		ref.Name = qualifyName(ownerType[:idx], ref.Name)
+	}
+	return ref
+}
+
 func monomorphizeExpr(
 	expr frontend.Expr,
 	env map[string]string,
+	funcDecls map[string]*frontend.FuncDecl,
+	structDecls map[string]*frontend.StructDecl,
+	enumDecls map[string]*frontend.EnumDecl,
 	generics map[string]genericDef,
 	created map[string]*frontend.FuncDecl,
 	createdByFile map[*frontend.FileAST]map[string]*frontend.FuncDecl,
@@ -845,26 +1392,26 @@ func monomorphizeExpr(
 		}
 		return "", nil
 	case *frontend.FieldAccessExpr:
-		if _, err := monomorphizeExpr(e.Base, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+		if _, err := monomorphizeExpr(e.Base, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 			return "", err
 		}
 		return "", nil
 	case *frontend.IndexExpr:
-		if _, err := monomorphizeExpr(e.Base, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+		if _, err := monomorphizeExpr(e.Base, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 			return "", err
 		}
-		if _, err := monomorphizeExpr(e.Index, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+		if _, err := monomorphizeExpr(e.Index, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 			return "", err
 		}
 		return "", nil
 	case *frontend.UnaryExpr:
-		_, err := monomorphizeExpr(e.X, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		_, err := monomorphizeExpr(e.X, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 		return "i32", err
 	case *frontend.BinaryExpr:
-		if _, err := monomorphizeExpr(e.Left, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+		if _, err := monomorphizeExpr(e.Left, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 			return "", err
 		}
-		if _, err := monomorphizeExpr(e.Right, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+		if _, err := monomorphizeExpr(e.Right, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 			return "", err
 		}
 		switch e.Op {
@@ -875,9 +1422,9 @@ func monomorphizeExpr(
 			return "i32", nil
 		}
 	case *frontend.TryExpr:
-		return monomorphizeExpr(e.X, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		return monomorphizeExpr(e.X, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 	case *frontend.CatchExpr:
-		resultType, err := monomorphizeExpr(e.Call, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		resultType, err := monomorphizeExpr(e.Call, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 		if err != nil {
 			return "", err
 		}
@@ -887,42 +1434,82 @@ func monomorphizeExpr(
 				caseEnv[some.Name] = "i32"
 			}
 			if !c.Default {
-				if _, err := monomorphizeExpr(c.Pattern, caseEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+				if _, err := monomorphizeExpr(c.Pattern, caseEnv, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 					return "", err
 				}
 			}
 			if c.Guard != nil {
-				if _, err := monomorphizeExpr(c.Guard, caseEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+				if _, err := monomorphizeExpr(c.Guard, caseEnv, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 					return "", err
 				}
 			}
-			if _, err := monomorphizeExpr(c.Value, caseEnv, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			if _, err := monomorphizeExpr(c.Value, caseEnv, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 				return "", err
 			}
 		}
 		return resultType, nil
 	case *frontend.AwaitExpr:
-		return monomorphizeExpr(e.X, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		return monomorphizeExpr(e.X, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 	case *frontend.StructLitExpr:
-		for _, field := range e.Fields {
-			if _, err := monomorphizeExpr(field.Value, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
-				return "", err
-			}
-		}
 		resolved, err := resolveTypeName(&e.Type, module, imports)
 		if err != nil {
 			return "", err
 		}
+		if decl, ok := structDecls[resolved]; ok {
+			fields := make(map[string]frontend.TypeRef, len(decl.Fields))
+			for _, field := range decl.Fields {
+				fields[field.Name] = field.Type
+			}
+			for i := range e.Fields {
+				field := &e.Fields[i]
+				declared := fields[field.Name]
+				if declared.Kind != frontend.TypeRefFunction {
+					continue
+				}
+				if closure, ok := field.Value.(*frontend.ClosureExpr); ok && closure != nil && closure.Decl != nil && len(closure.Decl.TypeParams) > 0 {
+					outerLocals := monomorphizeEnvLocals(env)
+					if name, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, outerLocals)); ok {
+						return "", unsupportedGenericClosureCaptureError(pos, name)
+					}
+					replacement, specialized, err := monomorphizeGenericClosureLiteralValue(closure, declared, fmt.Sprintf("struct field '%s.%s'", e.Type.Name, field.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+					if err != nil {
+						return "", err
+					}
+					if specialized {
+						field.Value = replacement
+						continue
+					}
+				}
+				replacement, specialized, err := monomorphizeGenericFunctionValueExpr(field.Value, declared, fmt.Sprintf("struct field '%s.%s'", e.Type.Name, field.Name), generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+				if err != nil {
+					return "", err
+				}
+				if specialized {
+					field.Value = replacement
+				}
+			}
+		}
+		for _, field := range e.Fields {
+			if _, err := monomorphizeExpr(field.Value, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+				return "", err
+			}
+		}
 		e.Type.Name = resolved
 		return resolved, nil
 	case *frontend.CallExpr:
+		if err := monomorphizeFunctionTypedEnumPayloadArgs(e, enumDecls, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+			return "", err
+		}
 		argTypes := make([]string, 0, len(e.Args))
 		for _, arg := range e.Args {
-			tname, err := monomorphizeExpr(arg, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+			tname, err := monomorphizeExpr(arg, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
 			if err != nil {
 				return "", err
 			}
 			argTypes = append(argTypes, tname)
+		}
+		if enumTypeName, ok := monomorphizeEnumConstructorTypeName(e, enumDecls, module, imports); ok {
+			return enumTypeName, nil
 		}
 
 		resolved := e.Name
@@ -944,6 +1531,11 @@ func monomorphizeExpr(
 		}
 		generic, ok := generics[resolved]
 		if !ok {
+			if callee, exists := funcDecls[resolved]; exists {
+				if err := monomorphizeFunctionTypedCallArgs(e, callee, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+					return "", err
+				}
+			}
 			return "", nil
 		}
 		if len(e.Args) != len(generic.decl.Params) {
@@ -1283,9 +1875,10 @@ func cloneClosureCaptures(captures []frontend.ClosureCapture, subst map[string]s
 	out := make([]frontend.ClosureCapture, len(captures))
 	for i, capture := range captures {
 		out[i] = frontend.ClosureCapture{
-			At:   capture.At,
-			Name: capture.Name,
-			Type: substituteTypeRef(capture.Type, subst),
+			At:      capture.At,
+			Name:    capture.Name,
+			Type:    substituteTypeRef(capture.Type, subst),
+			Mutable: capture.Mutable,
 		}
 	}
 	return out
@@ -1307,7 +1900,7 @@ func substituteTypeRef(ref frontend.TypeRef, subst map[string]string) frontend.T
 	}
 	if ref.Kind == frontend.TypeRefNamed {
 		if concrete := subst[ref.Name]; concrete != "" {
-			out.Name = concrete
+			return typeRefFromGenericTypeName(ref.At, concrete)
 		}
 		return out
 	}
@@ -1320,6 +1913,22 @@ func substituteTypeRef(ref frontend.TypeRef, subst map[string]string) frontend.T
 		out.Elem = &elem
 	}
 	return out
+}
+
+func typeRefFromGenericTypeName(at frontend.Position, name string) frontend.TypeRef {
+	if elem, ok := optionalElemName(name); ok {
+		elemRef := typeRefFromGenericTypeName(at, elem)
+		return frontend.TypeRef{At: at, Kind: frontend.TypeRefOptional, Elem: &elemRef}
+	}
+	if elem, ok := sliceElemName(name); ok {
+		elemRef := typeRefFromGenericTypeName(at, elem)
+		return frontend.TypeRef{At: at, Kind: frontend.TypeRefSlice, Elem: &elemRef}
+	}
+	if n, elem, ok := parseArrayTypeName(name); ok {
+		elemRef := typeRefFromGenericTypeName(at, elem)
+		return frontend.TypeRef{At: at, Kind: frontend.TypeRefArray, Elem: &elemRef, Len: n}
+	}
+	return frontend.TypeRef{At: at, Kind: frontend.TypeRefNamed, Name: name}
 }
 
 func substituteGenericTypeName(ref frontend.TypeRef, subst map[string]string) string {
@@ -1374,14 +1983,21 @@ func genericTypeName(ref frontend.TypeRef) string {
 		return genericTypeName(*ref.Elem) + "?"
 	case frontend.TypeRefFunction:
 		params := make([]string, 0, len(ref.Params))
-		for _, param := range ref.Params {
-			params = append(params, genericTypeName(param))
+		for i, param := range ref.Params {
+			formatted := genericTypeName(param)
+			if i < len(ref.ParamOwnership) && ref.ParamOwnership[i] != "" {
+				formatted = ref.ParamOwnership[i] + " " + formatted
+			}
+			params = append(params, formatted)
 		}
 		ret := "?"
 		if ref.Return != nil {
 			ret = genericTypeName(*ref.Return)
 		}
 		out := "fn(" + strings.Join(params, ",") + ")->" + ret
+		if ref.Throws != nil {
+			out += " throws " + genericTypeName(*ref.Throws)
+		}
 		if len(ref.Uses) > 0 {
 			out += " uses " + strings.Join(ref.Uses, ",")
 		}
@@ -1420,6 +2036,14 @@ func monomorphizeEnvLocals(env map[string]string) map[string]LocalInfo {
 
 func cloneStringMap(src map[string]string) map[string]string {
 	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func cloneFunctionTypeMap(src map[string]frontend.TypeRef) map[string]frontend.TypeRef {
+	dst := make(map[string]frontend.TypeRef, len(src))
 	for k, v := range src {
 		dst[k] = v
 	}

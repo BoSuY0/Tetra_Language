@@ -64,8 +64,14 @@ func (a *SysVUnix) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, c
 	if stackDepth == nil || callPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/callPatches")
 	}
-	if instr.ArgSlots < 0 {
-		return fmt.Errorf("invalid argument count")
+	if instr.Name == "" {
+		return fmt.Errorf("call is missing target name")
+	}
+	if instr.ArgSlots < 0 || instr.RetSlots < 0 {
+		return fmt.Errorf("call %q has negative ABI slots args=%d rets=%d", instr.Name, instr.ArgSlots, instr.RetSlots)
+	}
+	if instr.RetSlots > maxCallReturnSlots {
+		return fmt.Errorf("call %q has unsupported return slots %d (max=%d)", instr.Name, instr.RetSlots, maxCallReturnSlots)
 	}
 	if *stackDepth < instr.ArgSlots {
 		return fmt.Errorf("stack underflow in call to '%s'", instr.Name)
@@ -147,6 +153,30 @@ func (a *SysVUnix) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, c
 		e.PushR9()
 		*stackDepth++
 	}
+	if instr.RetSlots > 4 {
+		e.PushR10()
+		*stackDepth++
+	}
+	if instr.RetSlots > 5 {
+		e.PushR11()
+		*stackDepth++
+	}
+	if instr.RetSlots > 6 {
+		e.PushR12()
+		*stackDepth++
+	}
+	if instr.RetSlots > 7 {
+		e.PushR13()
+		*stackDepth++
+	}
+	if instr.RetSlots > 8 {
+		e.PushR14()
+		*stackDepth++
+	}
+	if instr.RetSlots > 9 {
+		e.PushR15()
+		*stackDepth++
+	}
 	return nil
 }
 
@@ -187,6 +217,18 @@ func (a *SysVUnix) EmitAllocBytes(e *x64.Emitter, stackDepth *int, opt x64.Codeg
 	}
 	*stackDepth--
 	e.PopRsi()
+	e.MovEaxEsi()
+	e.CmpEaxImm32(1)
+	sizeOKAt := e.JgeRel32()
+	if err := a.EmitExit(e, 2, *stackDepth, nil); err != nil {
+		return err
+	}
+	sizeOKOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, sizeOKAt, sizeOKOff); err != nil {
+		return err
+	}
+	e.PushRsi()
+	e.AddRsiImm32(8)
 	e.MovEdiImm32(0)
 	e.MovEdxImm32(3)
 	e.MovR10dImm32(0x22)
@@ -194,6 +236,12 @@ func (a *SysVUnix) EmitAllocBytes(e *x64.Emitter, stackDepth *int, opt x64.Codeg
 	e.MovR9dImm32(0)
 	e.MovEaxImm32(a.SysMmap)
 	e.Syscall()
+	if err := a.emitMmapFailureGuard(e, *stackDepth); err != nil {
+		return err
+	}
+	e.PopRsi()
+	e.MovMem32RaxPtrEsi()
+	e.AddRaxImm32(8)
 	e.PushRax()
 	*stackDepth++
 	return nil
@@ -225,6 +273,9 @@ func (a *SysVUnix) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth
 	e.MovR9dImm32(0)
 	e.MovEaxImm32(a.SysMmap)
 	e.Syscall()
+	if err := a.emitMmapFailureGuard(e, *stackDepth); err != nil {
+		return err
+	}
 	*stackDepth--
 	e.PopRcx()
 	e.PushRax()
@@ -259,6 +310,9 @@ func (a *SysVUnix) EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.Codege
 	e.MovR9dImm32(0)
 	e.MovEaxImm32(a.SysMmap)
 	e.Syscall()
+	if err := a.emitMmapFailureGuard(e, *stackDepth); err != nil {
+		return err
+	}
 	*stackDepth--
 	e.PopRcx()
 	e.MovMem32RaxPtrImm32(0, headerSize)
@@ -312,6 +366,24 @@ func (a *SysVUnix) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stac
 
 	failOff := len(e.Buf)
 	if err := a.EmitExit(e, 1, *stackDepth, nil); err != nil {
+		return err
+	}
+	doneOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *SysVUnix) emitMmapFailureGuard(e *x64.Emitter, stackSlots int) error {
+	e.CmpRaxImm32(-4095)
+	failAt := e.JaeRel32()
+	doneAt := e.JmpRel32()
+	failOff := len(e.Buf)
+	if err := a.EmitExit(e, 2, stackSlots, nil); err != nil {
 		return err
 	}
 	doneOff := len(e.Buf)

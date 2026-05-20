@@ -3,14 +3,44 @@ name: ci
 on:
   push:
   pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  lint-workflows-and-shell-linux:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Shell syntax
+        shell: bash
+        run: find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
+
+      - name: Action lint
+        shell: bash
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+
   test:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -20,11 +50,11 @@ jobs:
 
       - name: Bootstrap
         shell: bash
-        run: bash scripts/bootstrap.sh
+        run: bash scripts/dev/bootstrap.sh
 
       - name: Test
         shell: bash
-        run: bash scripts/test.sh
+        run: bash scripts/ci/test.sh
 
       - name: Verify docs manifest
         shell: bash
@@ -47,6 +77,8 @@ jobs:
           "${tetra_bin}" version
           "${tetra_bin}" smoke --target "${target}" --run=true --report "smoke_${target}.json"
           "${tetra_bin}" smoke --target "${target}" --run=true --islands-debug --report "smoke_${target}_islands_debug.json"
+          go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "smoke_${target}.json"
+          go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "smoke_${target}_islands_debug.json"
 
       - name: Smoke summary
         shell: bash
@@ -109,6 +141,195 @@ jobs:
       - name: Upload smoke report
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-report-${{ runner.os }}
+          name: tetra-v0.3.0-${{ github.sha }}-smoke-${{ runner.os }}
           path: |
             smoke_*.json
+
+  test-all-quick-linux:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: Quick stabilization wrapper
+        shell: bash
+        run: bash scripts/ci/test-all.sh --quick --keep-going --report-dir reports/ci-test-all-quick
+
+      - name: Upload quick test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-v0.3.0-${{ github.sha }}-test-all-quick-linux
+          path: reports/ci-test-all-quick
+
+  stabilization-linux:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: v0.3 stabilization wrapper
+        shell: bash
+        run: bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir reports/ci-test-all-stabilization
+
+      - name: Upload stabilization test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-v0.3.0-${{ github.sha }}-test-all-stabilization-linux
+          path: reports/ci-test-all-stabilization
+
+  release-v0-3-0-gate-linux:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TETRA_RELEASE_GATE_CI_ALLOW_MISSING_SECURITY_SIGNOFF: "1"
+      TETRA_MACOS_RUNTIME_SMOKE_REPORT: reports/ci-smoke-runtime/tetra-v0.3.0-${{ github.sha }}-smoke-macOS/smoke_macos-x64.json
+      TETRA_WINDOWS_RUNTIME_SMOKE_REPORT: reports/ci-smoke-runtime/tetra-v0.3.0-${{ github.sha }}-smoke-Windows/smoke_windows-x64.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Download host runtime smoke reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tetra-v0.3.0-${{ github.sha }}-smoke-*
+          path: reports/ci-smoke-runtime
+
+      - name: Canonical v0.3.0 release gate
+        shell: bash
+        run: bash scripts/release/v0_3_0/gate.sh --report-dir reports/ci-release-v0.3.0-gate
+
+      - name: Upload v0.3.0 release gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-v0.3.0-${{ github.sha }}-release-gate-linux
+          path: reports/ci-release-v0.3.0-gate
+
+  coverage-linux:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Coverage
+        shell: bash
+        run: |
+          go test ./compiler/... ./cli/... ./tools/... -covermode=atomic -coverprofile=coverage.out -count=1
+          go tool cover -func=coverage.out | tee coverage.txt
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-v0.3.0-${{ github.sha }}-coverage-linux
+          path: |
+            coverage.out
+            coverage.txt
+
+  race-linux:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Race detector
+        shell: bash
+        run: go test -race ./compiler/... ./cli/... ./tools/... -count=1
+
+  supply-chain-vulnerability-scan-linux:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Install govulncheck
+        shell: bash
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.2
+
+      - name: govulncheck
+        shell: bash
+        run: govulncheck ./...
+
+  fuzz-short-linux:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Short fuzz smoke
+        shell: bash
+        run: bash scripts/dev/fuzz-nightly.sh --short --out-dir "$RUNNER_TEMP/fuzz-short"
+
+      - name: Upload fuzz short report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-v0.3.0-${{ github.sha }}-fuzz-short-linux
+          path: ${{ runner.temp }}/fuzz-short
+
+  fuzz-nightly-linux:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Nightly fuzz/property/stress
+        shell: bash
+        run: bash scripts/dev/fuzz-nightly.sh --fuzztime 10m --out-dir "$RUNNER_TEMP/fuzz-nightly"
+
+      - name: Upload fuzz nightly report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-v0.3.0-${{ github.sha }}-fuzz-nightly-linux
+          path: ${{ runner.temp }}/fuzz-nightly

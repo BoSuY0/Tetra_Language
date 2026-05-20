@@ -49,12 +49,26 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 	if emit == nil {
 		return nil, fmt.Errorf("missing emit function")
 	}
+	functionSigs := make(map[string]ir.IRFunc, len(funcs))
+	for _, fn := range funcs {
+		if fn.Name == "" {
+			return nil, fmt.Errorf("function name is empty")
+		}
+		if fn.ParamSlots < 0 || fn.LocalSlots < 0 || fn.LocalSlots < fn.ParamSlots || fn.ReturnSlots < 0 {
+			return nil, fmt.Errorf("function '%s' has invalid slots", fn.Name)
+		}
+		if _, exists := functionSigs[fn.Name]; exists {
+			return nil, fmt.Errorf("duplicate function '%s'", fn.Name)
+		}
+		functionSigs[fn.Name] = fn
+	}
 
 	e := &x64.Emitter{}
 	var leaPatches []LeaPatch
 	dataBlobs := append([][]byte(nil), dataPrefix...)
 	funcOffsets := make(map[string]int)
 	symbolOffsets := make(map[string]int)
+	symbolSigs := make(map[string]ir.IRFunc)
 	var callPatches []CallPatch
 	var importPatches []ImportPatch
 
@@ -64,16 +78,27 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 	}
 
 	for _, fn := range funcs {
+		if fn.Name == "" {
+			return nil, fmt.Errorf("function name is empty")
+		}
+		if fn.ParamSlots < 0 || fn.LocalSlots < 0 || fn.LocalSlots < fn.ParamSlots || fn.ReturnSlots < 0 {
+			return nil, fmt.Errorf("function '%s' has invalid slots", fn.Name)
+		}
 		if _, exists := funcOffsets[fn.Name]; exists {
 			return nil, fmt.Errorf("duplicate function '%s'", fn.Name)
 		}
+		if err := validateObjectLocalCallSignatures(fn, functionSigs); err != nil {
+			return nil, err
+		}
 		funcOffsets[fn.Name] = len(e.Buf)
 		symbolOffsets[fn.Name] = len(e.Buf)
+		symbolSigs[fn.Name] = fn
 		if fn.ExportName != "" {
 			if _, exists := symbolOffsets[fn.ExportName]; exists {
 				return nil, fmt.Errorf("duplicate exported symbol '%s'", fn.ExportName)
 			}
 			symbolOffsets[fn.ExportName] = len(e.Buf)
+			symbolSigs[fn.ExportName] = fn
 		}
 		if err := emit(e, fn, &dataBlobs, &leaPatches, &callPatches, importPatchesPtr, opt); err != nil {
 			return nil, err
@@ -82,8 +107,20 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 
 	code := e.Buf
 	var relocs []tobj.Reloc
+	validatePatchOffset := func(kind string, at int) error {
+		if at < 0 || at > len(code)-4 {
+			return fmt.Errorf("invalid patch offset %d for %s", at, kind)
+		}
+		return nil
+	}
 
 	for _, patch := range callPatches {
+		if err := validatePatchOffset("call", patch.At); err != nil {
+			return nil, err
+		}
+		if patch.Name == "" {
+			return nil, fmt.Errorf("call patch name is empty")
+		}
 		if target, ok := funcOffsets[patch.Name]; ok {
 			if err := x64.PatchRel32(code, patch.At, target); err != nil {
 				return nil, err
@@ -93,6 +130,12 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 		relocs = append(relocs, tobj.Reloc{Kind: tobj.RelocCallRel32, At: uint32(patch.At), Name: patch.Name, Addend: 0})
 	}
 	for _, patch := range importPatches {
+		if err := validatePatchOffset("import", patch.At); err != nil {
+			return nil, err
+		}
+		if patch.Name == "" {
+			return nil, fmt.Errorf("import patch name is empty")
+		}
 		relocs = append(relocs, tobj.Reloc{Kind: tobj.RelocIATDisp32, At: uint32(patch.At), Name: patch.Name, Addend: 0})
 	}
 
@@ -108,6 +151,9 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 	}
 
 	for _, patch := range leaPatches {
+		if err := validatePatchOffset("data", patch.At); err != nil {
+			return nil, err
+		}
 		if patch.DataIndex < 0 || patch.DataIndex >= len(dataOffsets) {
 			return nil, fmt.Errorf("invalid data patch index %d", patch.DataIndex)
 		}
@@ -127,8 +173,31 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 	sort.Strings(names)
 	symbols := make([]tobj.Symbol, 0, len(names))
 	for _, name := range names {
-		symbols = append(symbols, tobj.Symbol{Name: name, Offset: uint32(symbolOffsets[name])})
+		fn := symbolSigs[name]
+		symbols = append(symbols, tobj.Symbol{
+			Name:         name,
+			Offset:       uint32(symbolOffsets[name]),
+			HasSignature: true,
+			ParamSlots:   fn.ParamSlots,
+			ReturnSlots:  fn.ReturnSlots,
+		})
 	}
 
 	return &tobj.Object{Code: code, Data: data, Symbols: symbols, Relocs: relocs}, nil
+}
+
+func validateObjectLocalCallSignatures(fn ir.IRFunc, functionSigs map[string]ir.IRFunc) error {
+	for _, instr := range fn.Instrs {
+		if instr.Kind != ir.IRCall {
+			continue
+		}
+		target, ok := functionSigs[instr.Name]
+		if !ok {
+			continue
+		}
+		if instr.ArgSlots != target.ParamSlots || instr.RetSlots != target.ReturnSlots {
+			return fmt.Errorf("function '%s' call %q ABI mismatch args=%d rets=%d want args=%d rets=%d", fn.Name, instr.Name, instr.ArgSlots, instr.RetSlots, target.ParamSlots, target.ReturnSlots)
+		}
+	}
+	return nil
 }

@@ -40,11 +40,16 @@ type BuiltinManifest struct {
 }
 
 type RuntimeManifest struct {
-	ReservedPrefix           string   `json:"reserved_prefix"`
-	ActorsSupportedTargets   []string `json:"actors_supported_targets"`
-	ActorsRequiredSymbols    []string `json:"actors_required_symbols"`
-	TimeRequiredSymbols      []string `json:"time_required_symbols,omitempty"`
-	ActorsProgramGlueSymbols []string `json:"actors_program_glue_symbols"`
+	ReservedPrefix            string   `json:"reserved_prefix"`
+	ActorsSupportedTargets    []string `json:"actors_supported_targets"`
+	ActorsRequiredSymbols     []string `json:"actors_required_symbols"`
+	ActorStateRequiredSymbols []string `json:"actor_state_required_symbols"`
+	TaskRequiredSymbols       []string `json:"task_required_symbols"`
+	TaskGroupRequiredSymbols  []string `json:"task_group_required_symbols"`
+	TypedTaskRequiredSymbols  []string `json:"typed_task_required_symbols"`
+	TimeRequiredSymbols       []string `json:"time_required_symbols,omitempty"`
+	FilesystemRequiredSymbols []string `json:"filesystem_required_symbols,omitempty"`
+	ActorsProgramGlueSymbols  []string `json:"actors_program_glue_symbols"`
 }
 
 func GetManifest() (Manifest, error) {
@@ -65,7 +70,7 @@ func GetManifest() (Manifest, error) {
 		})
 	}
 
-	targets := ctarget.All()
+	targets := ctarget.AllBuildable()
 	targetOut := make([]TargetManifest, 0, len(targets))
 	for _, t := range targets {
 		targetOut = append(targetOut, TargetManifest{
@@ -85,10 +90,15 @@ func GetManifest() (Manifest, error) {
 		Targets:         targetOut,
 		Builtins:        builtinOut,
 		RuntimeABI: RuntimeManifest{
-			ReservedPrefix:         "__tetra_",
-			ActorsSupportedTargets: []string{"linux-x64", "macos-x64", "windows-x64"},
-			ActorsRequiredSymbols:  requiredActorRuntimeSymbols(),
-			TimeRequiredSymbols:    requiredTimeRuntimeSymbols(),
+			ReservedPrefix:            "__tetra_",
+			ActorsSupportedTargets:    []string{"linux-x64", "macos-x64", "windows-x64"},
+			ActorsRequiredSymbols:     requiredActorRuntimeSymbols(),
+			ActorStateRequiredSymbols: requiredActorStateRuntimeSymbols(),
+			TaskRequiredSymbols:       requiredTaskRuntimeSymbols(),
+			TaskGroupRequiredSymbols:  requiredTaskGroupRuntimeSymbols(),
+			TypedTaskRequiredSymbols:  requiredTypedTaskRuntimeSymbols(8),
+			TimeRequiredSymbols:       requiredTimeRuntimeSymbols(),
+			FilesystemRequiredSymbols: requiredFilesystemRuntimeSymbols(),
 			ActorsProgramGlueSymbols: []string{
 				"__tetra_actor_dispatch",
 				"__tetra_actor_main_entry_id",

@@ -2,9 +2,8 @@
 
 Date: 2026-04-26
 
-This document closes unresolved items from
-`docs/plans/2026-04-26-tetra-language-todo.md` (lines 234-374) for the
-frontend/type/ownership/effects/async-runtime domain.
+This document closes historical frontend/type/ownership/effects/async-runtime
+scope items now summarized by `docs/spec/v1_scope.md`.
 
 Classification labels used below:
 

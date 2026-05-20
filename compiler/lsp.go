@@ -209,10 +209,7 @@ func formatLSPFuncDetail(fn *frontend.FuncDecl) string {
 	if fn.Async {
 		prefix = "async func"
 	}
-	typeParams := ""
-	if len(fn.TypeParams) > 0 {
-		typeParams = "<" + strings.Join(fn.TypeParams, ", ") + ">"
-	}
+	typeParams := formatLSPTypeParams(fn.TypeParams, fn.TypeParamBounds)
 	detail := fmt.Sprintf("%s %s%s(%s) -> %s", prefix, fn.Name, typeParams, strings.Join(params, ", "), formatLSPTypeRef(fn.ReturnType))
 	if fn.HasThrows {
 		detail += " throws " + formatLSPTypeRef(fn.Throws)
@@ -223,6 +220,25 @@ func formatLSPFuncDetail(fn *frontend.FuncDecl) string {
 		detail += " uses " + strings.Join(uses, ", ")
 	}
 	return detail
+}
+
+func formatLSPTypeParams(names []string, bounds []frontend.TypeParamBound) string {
+	if len(names) == 0 {
+		return ""
+	}
+	byName := make(map[string]frontend.TypeRef, len(bounds))
+	for _, bound := range bounds {
+		byName[bound.Name] = bound.Bound
+	}
+	formatted := make([]string, 0, len(names))
+	for _, name := range names {
+		if bound, ok := byName[name]; ok {
+			formatted = append(formatted, name+": "+formatLSPTypeRef(bound))
+			continue
+		}
+		formatted = append(formatted, name)
+	}
+	return "<" + strings.Join(formatted, ", ") + ">"
 }
 
 func formatLSPFuncSigDecl(sig frontend.FuncSigDecl) string {
@@ -238,7 +254,8 @@ func formatLSPFuncSigDecl(sig frontend.FuncSigDecl) string {
 	if sig.Async {
 		prefix = "async func"
 	}
-	detail := fmt.Sprintf("%s %s(%s) -> %s", prefix, sig.Name, strings.Join(params, ", "), formatLSPTypeRef(sig.ReturnType))
+	typeParams := formatLSPTypeParams(sig.TypeParams, nil)
+	detail := fmt.Sprintf("%s %s%s(%s) -> %s", prefix, sig.Name, typeParams, strings.Join(params, ", "), formatLSPTypeRef(sig.ReturnType))
 	if sig.HasThrows {
 		detail += " throws " + formatLSPTypeRef(sig.Throws)
 	}
@@ -258,8 +275,39 @@ func formatLSPTypeRef(ref frontend.TypeRef) string {
 		return fmt.Sprintf("[%d]%s", ref.Len, formatLSPTypeRef(*ref.Elem))
 	case frontend.TypeRefOptional:
 		return formatLSPTypeRef(*ref.Elem) + "?"
+	case frontend.TypeRefFunction:
+		params := make([]string, 0, len(ref.Params))
+		for i, param := range ref.Params {
+			formatted := formatLSPTypeRef(param)
+			if i < len(ref.ParamOwnership) && ref.ParamOwnership[i] != "" {
+				formatted = ref.ParamOwnership[i] + " " + formatted
+			}
+			params = append(params, formatted)
+		}
+		ret := "?"
+		if ref.Return != nil {
+			ret = formatLSPTypeRef(*ref.Return)
+		}
+		out := "fn(" + strings.Join(params, ", ") + ") -> " + ret
+		if ref.Throws != nil {
+			out += " throws " + formatLSPTypeRef(*ref.Throws)
+		}
+		if len(ref.Uses) > 0 {
+			uses := append([]string(nil), ref.Uses...)
+			sort.Strings(uses)
+			out += " uses " + strings.Join(uses, ", ")
+		}
+		return out
 	default:
-		return canonicalLSPTypeName(ref.Name)
+		name := canonicalLSPTypeName(ref.Name)
+		if len(ref.TypeArgs) == 0 {
+			return name
+		}
+		args := make([]string, 0, len(ref.TypeArgs))
+		for _, arg := range ref.TypeArgs {
+			args = append(args, formatLSPTypeRef(arg))
+		}
+		return name + "<" + strings.Join(args, ", ") + ">"
 	}
 }
 

@@ -11,7 +11,19 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"tetra_language/compiler/internal/testkit"
 )
+
+func requireCheckFileErrorContains(t *testing.T, src string, want string) {
+	t.Helper()
+	testkit.RequireFileSemanticCheckErrorContains(t, src, want)
+}
+
+func requireCheckFileOK(t *testing.T, src string) {
+	t.Helper()
+	testkit.RequireFileSemanticCheckOK(t, src)
+}
 
 func TestBuildHello(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
@@ -217,6 +229,190 @@ func TestBuildSliceBoundsCheck(t *testing.T) {
 	}
 	if exitCode != 1 {
 		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestBuildRawPtrAddNegativeOffsetBoundsDiagnostic(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(4)
+        let q: ptr = core.ptr_add(p, 0 - 1, mem)
+        let _: UInt8 = core.store_u8(q, 7, mem)
+        return 0
+    return 0
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 2 {
+		t.Fatalf("exit code mismatch: got %d, want 2", exitCode)
+	}
+}
+
+func TestBuildRawPtrAddAllocationUpperBoundDiagnostic(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(4)
+        let q: ptr = core.ptr_add(p, 4, mem)
+        let _: UInt8 = core.store_u8(q, 7, mem)
+        return 0
+    return 0
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 2 {
+		t.Fatalf("exit code mismatch: got %d, want 2", exitCode)
+	}
+}
+
+func TestBuildRawPtrAddDirectI32OffsetAccess(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(8)
+        let _: Int = core.store_i32(core.ptr_add(p, 4, mem), 42, mem)
+        return core.load_i32(core.ptr_add(p, 4, mem), mem)
+    return 0
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildRawPtrAddDirectPtrOffsetAccess(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(16)
+        let stored: ptr = core.store_ptr(core.ptr_add(p, 8, mem), p, mem)
+        let loaded: ptr = core.load_ptr(core.ptr_add(p, 8, mem), mem)
+        return 42
+    return 0
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildRawAllocZeroSizeDiagnostic(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func main() -> Int
+uses alloc, mem:
+    unsafe:
+        let _: ptr = core.alloc_bytes(0)
+        return 0
+    return 0
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 2 {
+		t.Fatalf("exit code mismatch: got %d, want 2", exitCode)
+	}
+}
+
+func TestBuildRawStoreI32AllocationBaseWidthDiagnostic(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(3)
+        let _: Int = core.store_i32(p, 123, mem)
+        return 0
+    return 0
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 2 {
+		t.Fatalf("exit code mismatch: got %d, want 2", exitCode)
+	}
+}
+
+func TestBuildRawStorePtrAllocationBaseWidthDiagnostic(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(7)
+        let _: ptr = core.store_ptr(p, p, mem)
+        return 0
+    return 0
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 2 {
+		t.Fatalf("exit code mismatch: got %d, want 2", exitCode)
+	}
+}
+
+func TestBuildMemoryHelpersRejectNegativeLength(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_memory_negative_length_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 2 {
+		t.Fatalf("exit code mismatch: got %d, want 2", exitCode)
 	}
 }
 
@@ -465,7 +661,7 @@ func TestBuildMatchExpressionEnumPayloadSmoke(t *testing.T) {
 
 func TestMatchExpressionRequiresExhaustiveCases(t *testing.T) {
 	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  let score: Int = match result:\n  case Result.ok(value):\n    value\n  return score\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected non-exhaustive match expression diagnostic")
 	} else if !strings.Contains(err.Error(), "match expression must be exhaustive") {
 		t.Fatalf("error = %v", err)
@@ -474,7 +670,7 @@ func TestMatchExpressionRequiresExhaustiveCases(t *testing.T) {
 
 func TestMatchExpressionRejectsMismatchedCaseTypes(t *testing.T) {
 	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  let score: Int = match result:\n  case Result.ok(value):\n    value\n  case Result.err(code):\n    \"bad\"\n  return score\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected match expression case type diagnostic")
 	} else if !strings.Contains(err.Error(), "match expression case type mismatch") {
 		t.Fatalf("error = %v", err)
@@ -483,7 +679,7 @@ func TestMatchExpressionRejectsMismatchedCaseTypes(t *testing.T) {
 
 func TestMatchExpressionBindingScopeDiagnostic(t *testing.T) {
 	src := "enum Result:\n  case ok(Int)\n  case err(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(42)\n  let score: Int = match result:\n  case Result.ok(value):\n    value\n  case Result.err(code):\n    code\n  return value\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected match expression binding scope diagnostic")
 	} else if !strings.Contains(err.Error(), "out of scope") {
 		t.Fatalf("error = %v", err)
@@ -528,14 +724,14 @@ func TestBuildMatchGuardEnumPayloadSmoke(t *testing.T) {
 
 func TestEnumMatchExhaustiveThreeCasesNoDefaultCheck(t *testing.T) {
 	src := "enum Color:\n  case red\n  case green\n  case blue\n\nfunc main() -> Int:\n  let color: Color = Color.blue\n  match color:\n  case Color.red:\n    return 1\n  case Color.green:\n    return 2\n  case Color.blue:\n    return 3\n"
-	if err := checkProgram(src); err != nil {
+	if err := testkit.CheckProgram(src); err != nil {
 		t.Fatalf("unexpected non-exhaustive enum diagnostic: %v", err)
 	}
 }
 
 func TestEnumMatchMissingCaseStillNeedsReturn(t *testing.T) {
 	src := "enum Color:\n  case red\n  case green\n\nfunc main() -> Int:\n  let color: Color = Color.green\n  match color:\n  case Color.red:\n    return 1\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected missing return for non-exhaustive enum match")
 	} else if !strings.Contains(err.Error(), "must end with return") {
 		t.Fatalf("error = %v", err)
@@ -544,7 +740,7 @@ func TestEnumMatchMissingCaseStillNeedsReturn(t *testing.T) {
 
 func TestEnumPayloadConstructorArityDiagnostic(t *testing.T) {
 	src := "enum Result:\n  case ok(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok()\n  return 0\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected enum payload arity diagnostic")
 	} else if !strings.Contains(err.Error(), "expects 1 payload argument") {
 		t.Fatalf("error = %v", err)
@@ -553,7 +749,7 @@ func TestEnumPayloadConstructorArityDiagnostic(t *testing.T) {
 
 func TestEnumPayloadConstructorTypeDiagnostic(t *testing.T) {
 	src := "enum Result:\n  case ok(Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(\"nope\")\n  return 0\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected enum payload type diagnostic")
 	} else if !strings.Contains(err.Error(), "payload 1 expects 'i32', got 'str'") {
 		t.Fatalf("error = %v", err)
@@ -562,7 +758,7 @@ func TestEnumPayloadConstructorTypeDiagnostic(t *testing.T) {
 
 func TestEnumPayloadBindingScopeDiagnostic(t *testing.T) {
 	src := "enum Result:\n  case ok(Int)\n  case empty\n\nfunc main() -> Int:\n  let result: Result = Result.ok(1)\n  match result:\n  case Result.ok(value):\n    let inside: Int = value\n  case Result.empty:\n    let other: Int = 0\n  return value\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected enum payload binding scope diagnostic")
 	} else if !strings.Contains(err.Error(), "out of scope") {
 		t.Fatalf("error = %v", err)
@@ -571,7 +767,7 @@ func TestEnumPayloadBindingScopeDiagnostic(t *testing.T) {
 
 func TestEnumNoPayloadConstructorCallDiagnostic(t *testing.T) {
 	src := "enum Color:\n  case red\n\nfunc main() -> Int:\n  let color: Color = Color.red()\n  return 0\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected no-payload enum constructor diagnostic")
 	} else if !strings.Contains(err.Error(), "has no payload; use 'Color.red'") {
 		t.Fatalf("error = %v", err)
@@ -580,7 +776,7 @@ func TestEnumNoPayloadConstructorCallDiagnostic(t *testing.T) {
 
 func TestEnumPayloadPatternArityDiagnostic(t *testing.T) {
 	src := "enum Result:\n  case ok(Int, Int)\n\nfunc main() -> Int:\n  let result: Result = Result.ok(1, 2)\n  match result:\n  case Result.ok(value):\n    return value\n"
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected enum payload pattern arity diagnostic")
 	} else if !strings.Contains(err.Error(), "pattern expects 2 binding(s), got 1") {
 		t.Fatalf("error = %v", err)
@@ -602,7 +798,7 @@ func main() -> Int:
     0
   return score
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected enum payload syntax diagnostic")
 	} else if !strings.Contains(err.Error(), "carries 1 payload value(s); use 'Result.ok(value1)'") {
 		t.Fatalf("error = %v", err)
@@ -625,7 +821,7 @@ func main() -> Int:
   case Result.empty:
     return 0
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected guarded enum payload syntax diagnostic")
 	} else if !strings.Contains(err.Error(), "requires payload arguments") && !strings.Contains(err.Error(), "carries 1 payload value(s); use 'Result.ok(value1)'") {
 		t.Fatalf("error = %v", err)
@@ -647,7 +843,7 @@ func main() -> Int:
     0
   return score
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected non-exhaustive guarded enum payload match expression diagnostic")
 	} else if !strings.Contains(err.Error(), "match expression must be exhaustive") {
 		t.Fatalf("error = %v", err)
@@ -668,7 +864,7 @@ func main() -> Int:
   case Result.empty:
     return 0
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected missing return for guarded non-exhaustive enum match")
 	} else if !strings.Contains(err.Error(), "must end with return") {
 		t.Fatalf("error = %v", err)
@@ -691,7 +887,7 @@ func main() -> Int:
   case Result.empty:
     return 0
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected duplicate enum payload case diagnostic")
 	} else if !strings.Contains(err.Error(), "duplicate match pattern") {
 		t.Fatalf("error = %v", err)
@@ -712,7 +908,7 @@ func main() -> Int:
   case Color.red:
     return 1
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected default ordering diagnostic")
 	} else if !strings.Contains(err.Error(), "match default must be last") {
 		t.Fatalf("error = %v", err)
@@ -734,7 +930,7 @@ func main() -> Int:
     1
   return score
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected match expression default ordering diagnostic")
 	} else if !strings.Contains(err.Error(), "match default must be last") {
 		t.Fatalf("error = %v", err)
@@ -757,7 +953,7 @@ func main() -> Int:
   case Result.empty:
     return 0
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected wrong enum case diagnostic")
 	} else if !strings.Contains(err.Error(), "enum pattern type mismatch") && !strings.Contains(err.Error(), "match pattern type mismatch") {
 		t.Fatalf("error = %v", err)
@@ -778,7 +974,7 @@ func main() -> Int:
   case Result.empty(value):
     return value
 `
-	if err := checkProgram(src); err == nil {
+	if err := testkit.CheckProgram(src); err == nil {
 		t.Fatalf("expected no-payload enum pattern diagnostic")
 	} else if !strings.Contains(err.Error(), "has no payload; use 'Result.empty'") {
 		t.Fatalf("error = %v", err)
@@ -811,6 +1007,22 @@ func TestCrossModuleEnumPayloadConstructorAndMatchCheckLower(t *testing.T) {
 	}
 	if _, err := LowerModules(checked); err != nil {
 		t.Fatalf("LowerModules: %v", err)
+	}
+}
+
+func TestBuildCrossModuleNoPayloadEnumMatchSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	files := map[string]string{
+		"lib/result.tetra": "module lib.result\n\npub enum Result:\n  case ok(Int)\n  case empty\n",
+		"app/main.tetra":   "module app.main\nimport lib.result as res\n\nfunc main() -> Int:\n  let result: res.Result = res.Result.empty\n  match result:\n  case res.Result.ok(value):\n    return value\n  case res.Result.empty:\n    return 42\n",
+	}
+
+	_, code := buildAndRunFiles(t, files, "app/main.tetra")
+	if code != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", code)
 	}
 }
 
@@ -1270,12 +1482,108 @@ uses budget
 budget(0):
     return tick()
 `
-	stdout, exitCode = buildAndRun(t, failSrc)
-	if stdout != "" {
-		t.Fatalf("stdout mismatch: %q", stdout)
+	err := buildOnly(t, failSrc)
+	if err == nil {
+		t.Fatalf("expected compile-time budget context rejection")
 	}
-	if exitCode != 0 {
-		t.Fatalf("exit code = %d, want policy failure return 0", exitCode)
+	if !strings.Contains(err.Error(), "budget context for call to 'tick' requires caller budget at least 1, got 0") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestBuildBudgetFailureABIReturnAndThrowShapes(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tests := []struct {
+		name     string
+		src      string
+		wantExit int
+	}{
+		{
+			name: "non throwing multi slot return defaults to zero slots",
+			src: `struct Pair:
+    x: Int
+    y: Int
+
+func one() -> Int:
+    return 7
+
+func pair() -> Pair
+uses budget
+budget(0):
+    return Pair(x: one(), y: 8)
+
+func main() -> Int
+uses budget
+budget(16):
+    let p: Pair = pair()
+    return p.x + p.y
+`,
+			wantExit: 0,
+		},
+		{
+			name: "throwing compact result returns thrown default payload",
+			src: `enum BudgetTrap:
+    case exhausted
+    case other
+
+func one() -> Int:
+    return 99
+
+func guarded() -> Int throws BudgetTrap
+uses budget
+budget(0):
+    return one()
+
+func main() -> Int
+uses budget
+budget(16):
+    return catch guarded():
+    case BudgetTrap.exhausted:
+        21
+    case BudgetTrap.other:
+        22
+`,
+			wantExit: 21,
+		},
+		{
+			name: "throwing non compact result returns thrown zero payload",
+			src: `enum BudgetTrap:
+    case exhausted(Int)
+    case other(Int)
+
+func one() -> Int:
+    return 99
+
+func guarded() -> Int throws BudgetTrap
+uses budget
+budget(0):
+    return one()
+
+func main() -> Int
+uses budget
+budget(16):
+    return catch guarded():
+    case BudgetTrap.exhausted(code):
+        30 + code
+    case BudgetTrap.other(otherCode):
+        40 + otherCode
+`,
+			wantExit: 30,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, exitCode := buildAndRun(t, tt.src)
+			if stdout != "" {
+				t.Fatalf("stdout mismatch: %q", stdout)
+			}
+			if exitCode != tt.wantExit {
+				t.Fatalf("exit code = %d, want %d", exitCode, tt.wantExit)
+			}
+		})
 	}
 }
 
@@ -1309,6 +1617,36 @@ privacy:
 	}
 	if exitCode != 33 {
 		t.Fatalf("exit code = %d, want 33", exitCode)
+	}
+}
+
+func TestBuildPrivacySealUnsealStaticOnlyDeterministicIdentity(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `func roundtrip(token: consent.token, value: Int) -> Int
+uses privacy
+privacy
+consent(token):
+    let sealed: secret.i32 = core.secret_seal_i32(value, token)
+    return core.secret_unseal_i32(sealed, token)
+
+func main() -> Int
+uses privacy
+privacy:
+    let token: consent.token = core.consent_token()
+    let first: Int = roundtrip(token, 17)
+    let second: Int = roundtrip(token, 17)
+    let third: Int = roundtrip(token, 9)
+    return (first - second) + third
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 9 {
+		t.Fatalf("exit code = %d, want 9", exitCode)
 	}
 }
 
@@ -1367,6 +1705,32 @@ func TestBuildStructCrossModule(t *testing.T) {
 		t.Fatalf("stdout mismatch: %q", stdout)
 	}
 	if exitCode != 5 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestBuildImportedGlobalOnlyModuleSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	files := map[string]string{
+		"lib/constants.t4": `module lib.constants
+
+pub val answer: Int = 42
+`,
+		"app/main.t4": `module app.main
+import lib.constants as constants
+
+func main() -> Int:
+    return 42
+`,
+	}
+	stdout, exitCode := buildAndRunFiles(t, files, "app/main.t4")
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
 		t.Fatalf("exit code mismatch: %d", exitCode)
 	}
 }
@@ -1835,6 +2199,21 @@ func TestExampleCapMemPtr(t *testing.T) {
 	}
 }
 
+func TestExampleCapMemPtrAddLocal(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "cap_mem_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 77 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
 func TestNewOperatorMul(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -2129,8 +2508,28 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("read native ui shell sidecar: %v", err)
 	}
-	if !strings.Contains(string(sidecar), "ShellView") || !strings.Contains(string(sidecar), "event submit -> toggle") {
+	if !strings.Contains(string(sidecar), "ShellView") || !strings.Contains(string(sidecar), "event submit -> toggle") || !strings.Contains(string(sidecar), "state.toggles = 1") {
 		t.Fatalf("unexpected native ui sidecar:\n%s", string(sidecar))
+	}
+	tracePath := outPath + ".ui.shell.json"
+	trace, err := os.ReadFile(tracePath)
+	if err != nil {
+		t.Fatalf("read native ui shell json trace: %v", err)
+	}
+	for _, want := range []string{
+		`"schema": "tetra.ui.native-shell.v1"`,
+		`"runtime": "native shell command dispatch"`,
+		`"widgets":`,
+		`"kind": "value"`,
+		`"binding": "toggles"`,
+		`"kind": "action"`,
+		`"event": "submit"`,
+		`"state_field": "toggles"`,
+		`"state_value": "1"`,
+	} {
+		if !strings.Contains(string(trace), want) {
+			t.Fatalf("native ui shell json trace missing %q:\n%s", want, trace)
+		}
 	}
 }
 
@@ -2152,7 +2551,7 @@ func TestBuildCacheSeparatesNativeDebugAndReleaseModes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build1: %v", err)
 	}
-	assertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
 	if len(stats1.CacheHits) != 0 {
 		t.Fatalf("unexpected cache hits on first base build")
 	}
@@ -2164,14 +2563,14 @@ func TestBuildCacheSeparatesNativeDebugAndReleaseModes(t *testing.T) {
 	if len(stats2.CompiledModules) != 0 {
 		t.Fatalf("expected no compiled modules on base cache hit")
 	}
-	assertModules(t, stats2.CacheHits, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats2.CacheHits, []string{"app.game", "engine.render"})
 
 	debugOpt := BuildOptions{Jobs: 1, DebugInfo: true}
 	stats3, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", debugOpt)
 	if err != nil {
 		t.Fatalf("build3 debug: %v", err)
 	}
-	assertModules(t, stats3.CompiledModules, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats3.CompiledModules, []string{"app.game", "engine.render"})
 	if len(stats3.CacheHits) != 0 {
 		t.Fatalf("unexpected cache hits on first debug build")
 	}
@@ -2183,14 +2582,14 @@ func TestBuildCacheSeparatesNativeDebugAndReleaseModes(t *testing.T) {
 	if len(stats4.CompiledModules) != 0 {
 		t.Fatalf("expected no compiled modules on debug cache hit")
 	}
-	assertModules(t, stats4.CacheHits, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats4.CacheHits, []string{"app.game", "engine.render"})
 
 	releaseOpt := BuildOptions{Jobs: 1, ReleaseOptimize: true}
 	stats5, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", releaseOpt)
 	if err != nil {
 		t.Fatalf("build5 release: %v", err)
 	}
-	assertModules(t, stats5.CompiledModules, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats5.CompiledModules, []string{"app.game", "engine.render"})
 	if len(stats5.CacheHits) != 0 {
 		t.Fatalf("unexpected cache hits on first release build")
 	}
@@ -2202,7 +2601,7 @@ func TestBuildCacheSeparatesNativeDebugAndReleaseModes(t *testing.T) {
 	if len(stats6.CompiledModules) != 0 {
 		t.Fatalf("expected no compiled modules on release cache hit")
 	}
-	assertModules(t, stats6.CacheHits, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats6.CacheHits, []string{"app.game", "engine.render"})
 
 	stats7, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", baseOpt)
 	if err != nil {
@@ -2211,7 +2610,7 @@ func TestBuildCacheSeparatesNativeDebugAndReleaseModes(t *testing.T) {
 	if len(stats7.CompiledModules) != 0 {
 		t.Fatalf("expected base mode cache to remain warm")
 	}
-	assertModules(t, stats7.CacheHits, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats7.CacheHits, []string{"app.game", "engine.render"})
 }
 
 func TestBuildWASMCacheStatsRemainColdAcrossBuilds(t *testing.T) {
@@ -2232,7 +2631,7 @@ func TestBuildWASMCacheStatsRemainColdAcrossBuilds(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build1 %s: %v", target, err)
 		}
-		assertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
+		testkit.AssertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
 		if len(stats1.CacheHits) != 0 {
 			t.Fatalf("%s unexpected cache hits on first build: %#v", target, stats1.CacheHits)
 		}
@@ -2241,7 +2640,7 @@ func TestBuildWASMCacheStatsRemainColdAcrossBuilds(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build2 %s: %v", target, err)
 		}
-		assertModules(t, stats2.CompiledModules, []string{"app.game", "engine.render"})
+		testkit.AssertModules(t, stats2.CompiledModules, []string{"app.game", "engine.render"})
 		if len(stats2.CacheHits) != 0 {
 			t.Fatalf("%s expected cache to stay cold: %#v", target, stats2.CacheHits)
 		}
@@ -2411,6 +2810,882 @@ pub func add(a: Int, b: Int) -> Int:
 	}
 }
 
+func TestBuildInterfaceOnlyModePreservesTypedErrorResourceThrowProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub enum TaskErr:
+    case wrap(task.i32)
+
+pub func fail(task: task.i32) -> Int throws TaskErr
+uses runtime:
+    throw TaskErr.wrap(task)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    return catch resources.fail(task):
+    case resources.TaskErr.wrap(other):
+        core.task_join_i32(task) + core.task_join_i32(other)
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only typed-error resource provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesTypedErrorFieldLocalAliasResourceThrowProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    handle: task.i32
+
+pub enum TaskErr:
+    case wrap(task.i32)
+
+pub func fail(box: TaskBox) -> Int throws TaskErr
+uses runtime:
+    let other: task.i32 = box.handle
+    throw TaskErr.wrap(other)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let box: resources.TaskBox = resources.TaskBox(handle: task)
+    return catch resources.fail(box):
+    case resources.TaskErr.wrap(other):
+        core.task_join_i32(task) + core.task_join_i32(other)
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only typed-error field local alias resource provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesTypedErrorResourceRethrowProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub enum TaskErr:
+    case wrap(task.i32)
+
+pub func fail(task: task.i32) -> Int throws TaskErr
+uses runtime:
+    throw TaskErr.wrap(task)
+
+pub func wrapper(task: task.i32) -> Int throws TaskErr
+uses runtime:
+    return try fail(task)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    return catch resources.wrapper(task):
+    case resources.TaskErr.wrap(other):
+        core.task_join_i32(task) + core.task_join_i32(other)
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only typed-error rethrow resource provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesTypedErrorFieldLocalAliasResourceRethrowProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    handle: task.i32
+
+pub enum TaskErr:
+    case wrap(task.i32)
+
+pub func fail(task: task.i32) -> Int throws TaskErr
+uses runtime:
+    throw TaskErr.wrap(task)
+
+pub func wrapper(box: TaskBox) -> Int throws TaskErr
+uses runtime:
+    let other: task.i32 = box.handle
+    return try fail(other)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let box: resources.TaskBox = resources.TaskBox(handle: task)
+    return catch resources.wrapper(box):
+    case resources.TaskErr.wrap(other):
+        core.task_join_i32(task) + core.task_join_i32(other)
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only typed-error field local alias rethrow resource provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub enum TaskMsg:
+    case wrap(task.i32)
+
+pub func wrap(task: task.i32) -> TaskMsg:
+    return TaskMsg.wrap(task)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let returned: resources.TaskMsg = resources.wrap(task)
+    match returned:
+    case resources.TaskMsg.wrap(other):
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesOptionalResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub func maybe(task: task.i32) -> task.i32?:
+    var out: task.i32? = none
+    out = task
+    return out
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let returned: task.i32? = resources.maybe(task)
+    if let other = returned:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only optional resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesLocalAliasResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub func alias(task: task.i32) -> task.i32:
+    let other: task.i32 = task
+    return other
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let other: task.i32 = resources.alias(task)
+    let first: Int = core.task_join_i32(task)
+    return first + core.task_join_i32(other)
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only local alias resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesAggregateLocalAliasResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    handle: task.i32
+
+pub func box(task: task.i32) -> TaskBox:
+    let other: task.i32 = task
+    return TaskBox(handle: other)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let returned: resources.TaskBox = resources.box(task)
+    let first: Int = core.task_join_i32(task)
+    return first + core.task_join_i32(returned.handle)
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only aggregate local alias resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'returned.handle'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesAggregateFieldResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    handle: task.i32
+
+pub func pass(box: TaskBox) -> TaskBox:
+    return TaskBox(handle: box.handle)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let box: resources.TaskBox = resources.TaskBox(handle: task)
+    let returned: resources.TaskBox = resources.pass(box)
+    let first: Int = core.task_join_i32(task)
+    return first + core.task_join_i32(returned.handle)
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only aggregate field resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'returned.handle'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesAggregateFieldLocalAliasResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    handle: task.i32
+
+pub func pass(box: TaskBox) -> TaskBox:
+    let other: task.i32 = box.handle
+    return TaskBox(handle: other)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let box: resources.TaskBox = resources.TaskBox(handle: task)
+    let returned: resources.TaskBox = resources.pass(box)
+    let first: Int = core.task_join_i32(task)
+    return first + core.task_join_i32(returned.handle)
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only aggregate field local alias resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'returned.handle'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesLetOptionalResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub func maybe(task: task.i32) -> task.i32?:
+    let out: task.i32? = task
+    return out
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let returned: task.i32? = resources.maybe(task)
+    if let other = returned:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only let optional resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesOptionalFieldLocalAliasResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    handle: task.i32
+
+pub func maybe(box: TaskBox) -> task.i32?:
+    let out: task.i32? = box.handle
+    return out
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let box: resources.TaskBox = resources.TaskBox(handle: task)
+    let returned: task.i32? = resources.maybe(box)
+    if let other = returned:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only optional field local alias resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesDirectIfLetOptionalResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    maybe: task.i32?
+
+pub func maybe(input: TaskBox) -> task.i32?:
+    if let other = input.maybe:
+        return other
+    else:
+        return none
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let input: resources.TaskBox = resources.TaskBox(maybe: task)
+    let returned: task.i32? = resources.maybe(input)
+    if let other = returned:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only direct if-let optional resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesDirectMatchOptionalResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    maybe: task.i32?
+
+pub func maybe(input: TaskBox) -> task.i32?:
+    match input.maybe:
+    case some(other):
+        return other
+    case none:
+        return none
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let input: resources.TaskBox = resources.TaskBox(maybe: task)
+    let returned: task.i32? = resources.maybe(input)
+    if let other = returned:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only direct match optional resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesStructOptionalResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    maybe: task.i32?
+
+pub func box(task: task.i32) -> TaskBox:
+    var out: task.i32? = none
+    out = task
+    return TaskBox(maybe: out)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let returned: resources.TaskBox = resources.box(task)
+    if let other = returned.maybe:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only struct optional resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesStructOptionalFieldLocalAliasResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct TaskBox:
+    maybe: task.i32?
+
+pub struct InputBox:
+    handle: task.i32
+
+pub func box(input: InputBox) -> TaskBox:
+    let out: task.i32? = input.handle
+    return TaskBox(maybe: out)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let input: resources.InputBox = resources.InputBox(handle: task)
+    let returned: resources.TaskBox = resources.box(input)
+    if let other = returned.maybe:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only struct optional field local alias resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesIfLetOptionalResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct InputBox:
+    maybe: task.i32?
+
+pub struct TaskBox:
+    maybe: task.i32?
+
+pub func box(input: InputBox) -> TaskBox:
+    if let other = input.maybe:
+        return TaskBox(maybe: other)
+    else:
+        return TaskBox(maybe: none)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let input: resources.InputBox = resources.InputBox(maybe: task)
+    let returned: resources.TaskBox = resources.box(input)
+    if let other = returned.maybe:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only if-let optional resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModePreservesMatchOptionalResourceReturnProvenance(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources
+
+pub struct InputBox:
+    maybe: task.i32?
+
+pub struct TaskBox:
+    maybe: task.i32?
+
+pub func box(input: InputBox) -> TaskBox:
+    match input.maybe:
+    case some(other):
+        return TaskBox(maybe: other)
+    case none:
+        return TaskBox(maybe: none)
+`), "lib/resources.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.resources as resources
+
+func worker() -> Int:
+    return 7
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let input: resources.InputBox = resources.InputBox(maybe: task)
+    let returned: resources.TaskBox = resources.box(input)
+    if let other = returned.maybe:
+        let first: Int = core.task_join_i32(task)
+        return first + core.task_join_i32(other)
+    else:
+        return 0
+`,
+		"lib/resources.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only match optional resource return provenance diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use joined resource 'other'") {
+		t.Fatalf("error = %v, want joined resource alias diagnostic", err)
+	}
+}
+
 func TestBuildInterfaceOnlyModeDoesNotRequireMain(t *testing.T) {
 	tmp := t.TempDir()
 	writeTestFiles(t, tmp, map[string]string{
@@ -2490,6 +3765,1717 @@ pub func origin() -> Point:
 	)
 	if err != nil {
 		t.Fatalf("BuildFileWithStatsOpt interface-only struct return stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func make_pair(a: island, b: island) -> PairBuf
+uses alloc, islands, mem:
+    return PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var pair: buffers.PairBuf = buffers.PairBuf(left: make_u8(1), right: make_u8(1))
+    island(64) as a:
+        island(64) as b:
+            pair = buffers.make_pair(a, b)
+    return pair.left[0]
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only aggregate region return escape diagnostic")
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsOptionalAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func maybe_pair(a: island, b: island) -> PairBuf?
+uses alloc, islands, mem:
+    var out: PairBuf? = none
+    out = PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    return out
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var maybe: buffers.PairBuf? = none
+    island(64) as a:
+        island(64) as b:
+            maybe = buffers.maybe_pair(a, b)
+    match maybe:
+    case some(pair):
+        return pair.left[0]
+    case none:
+        return 0
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only optional aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsEnumPayloadRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub enum BufMsg:
+    case both([]u8, []u8)
+    case empty
+
+pub func make_msg(a: island, b: island) -> BufMsg
+uses alloc, islands, mem:
+    return BufMsg.both(core.island_make_u8(a, 1), core.island_make_u8(b, 1))
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var msg: buffers.BufMsg = buffers.BufMsg.empty
+    island(64) as a:
+        island(64) as b:
+            msg = buffers.make_msg(a, b)
+    match msg:
+    case buffers.BufMsg.both(left, right):
+        return left[0]
+    case buffers.BufMsg.empty:
+        return 0
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only enum payload region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsOptionalEnumPayloadRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub enum BufMsg:
+    case both([]u8, []u8)
+    case empty
+
+pub func maybe_msg(a: island, b: island) -> BufMsg?
+uses alloc, islands, mem:
+    var out: BufMsg? = none
+    out = BufMsg.both(core.island_make_u8(a, 1), core.island_make_u8(b, 1))
+    return out
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var maybe: buffers.BufMsg? = none
+    island(64) as a:
+        island(64) as b:
+            maybe = buffers.maybe_msg(a, b)
+    match maybe:
+    case some(msg):
+        match msg:
+        case buffers.BufMsg.both(left, right):
+            return left[0]
+        case buffers.BufMsg.empty:
+            return 0
+    case none:
+        return 0
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only optional enum payload region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsBranchAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func choose_pair(flag: Bool, a: island, b: island) -> PairBuf
+uses alloc, islands, mem:
+    if flag:
+        return PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    else:
+        return PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var pair: buffers.PairBuf = buffers.PairBuf(left: make_u8(1), right: make_u8(1))
+    island(64) as a:
+        island(64) as b:
+            pair = buffers.choose_pair(true, a, b)
+    return pair.left[0]
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only branch aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsBranchOptionalAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func choose_pair(flag: Bool, a: island, b: island) -> PairBuf?
+uses alloc, islands, mem:
+    var out: PairBuf? = none
+    if flag:
+        out = PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    else:
+        out = PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    return out
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var maybe: buffers.PairBuf? = none
+    island(64) as a:
+        island(64) as b:
+            maybe = buffers.choose_pair(true, a, b)
+    match maybe:
+    case some(pair):
+        return pair.left[0]
+    case none:
+        return 0
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only branch optional aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsBranchOptionalMixedAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func choose_pair(flag: Bool, a: island, b: island) -> PairBuf?
+uses alloc, islands, mem:
+    var out: PairBuf? = none
+    if flag:
+        out = PairBuf(left: make_u8(1), right: make_u8(1))
+    else:
+        out = PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    return out
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var maybe: buffers.PairBuf? = none
+    island(64) as a:
+        island(64) as b:
+            maybe = buffers.choose_pair(false, a, b)
+    match maybe:
+    case some(pair):
+        return pair.left[0]
+    case none:
+        return 0
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only branch optional mixed aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsMatchAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub enum Mode:
+    case fast
+    case slow
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func choose_pair(mode: Mode, a: island, b: island) -> PairBuf
+uses alloc, islands, mem:
+    match mode:
+    case Mode.fast:
+        return PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    case Mode.slow:
+        return PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var pair: buffers.PairBuf = buffers.PairBuf(left: make_u8(1), right: make_u8(1))
+    island(64) as a:
+        island(64) as b:
+            pair = buffers.choose_pair(buffers.Mode.fast, a, b)
+    return pair.left[0]
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only match aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsMatchOptionalAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub enum Mode:
+    case fast
+    case slow
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func choose_pair(mode: Mode, a: island, b: island) -> PairBuf?
+uses alloc, islands, mem:
+    var out: PairBuf? = none
+    match mode:
+    case Mode.fast:
+        out = PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    case Mode.slow:
+        out = PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    return out
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var maybe: buffers.PairBuf? = none
+    island(64) as a:
+        island(64) as b:
+            maybe = buffers.choose_pair(buffers.Mode.fast, a, b)
+    match maybe:
+    case some(pair):
+        return pair.left[0]
+    case none:
+        return 0
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only match optional aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsIfLetOptionalAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func choose_pair(flag: Bool?, a: island, b: island) -> PairBuf?
+uses alloc, islands, mem:
+    var out: PairBuf? = none
+    if let enabled = flag:
+        out = PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    else:
+        out = PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+    return out
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var maybe: buffers.PairBuf? = none
+    island(64) as a:
+        island(64) as b:
+            maybe = buffers.choose_pair(true, a, b)
+    match maybe:
+    case some(pair):
+        return pair.left[0]
+    case none:
+        return 0
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only if-let optional aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsIfLetMixedAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func choose_pair(flag: Bool?, a: island, b: island) -> PairBuf
+uses alloc, islands, mem:
+    if let enabled = flag:
+        return PairBuf(left: make_u8(1), right: make_u8(1))
+    else:
+        return PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var pair: buffers.PairBuf = buffers.PairBuf(left: make_u8(1), right: make_u8(1))
+    island(64) as a:
+        island(64) as b:
+            pair = buffers.choose_pair(none, a, b)
+    return pair.left[0]
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only if-let mixed aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeRejectsMatchMixedAggregateRegionReturnEscape(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.buffers
+
+pub enum Mode:
+    case fast
+    case slow
+
+pub struct PairBuf:
+    left: []u8
+    right: []u8
+
+pub func choose_pair(mode: Mode, a: island, b: island) -> PairBuf
+uses alloc, islands, mem:
+    match mode:
+    case Mode.fast:
+        return PairBuf(left: make_u8(1), right: make_u8(1))
+    case Mode.slow:
+        return PairBuf(left: core.island_make_u8(a, 1), right: core.island_make_u8(b, 1))
+`), "lib/buffers.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.buffers as buffers
+
+func main() -> Int
+uses alloc, islands, mem:
+    var pair: buffers.PairBuf = buffers.PairBuf(left: make_u8(1), right: make_u8(1))
+    island(64) as a:
+        island(64) as b:
+            pair = buffers.choose_pair(buffers.Mode.slow, a, b)
+    return pair.left[0]
+`,
+		"lib/buffers.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only match mixed aggregate region return escape diagnostic\ninterface:\n%s", iface)
+	}
+	if !strings.Contains(err.Error(), "slice from scoped island cannot escape") {
+		t.Fatalf("error = %v, want scoped island escape diagnostic\ninterface:\n%s", err, iface)
+	}
+}
+
+func TestBuildInterfaceOnlyModeFunctionTypedParameterReturnGlobalEscapeDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.identity
+
+pub func identity(f: fn(Int) -> Int) -> fn(Int) -> Int:
+    return f
+`), "lib/identity.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.identity as id
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func store(f: fn(Int) -> Int) -> Int:
+    cb = id.identity(f)
+    return 0
+
+func main() -> Int:
+    let base: Int = 1
+    return store(fn(x: Int) -> Int:
+        return x + base
+    )
+`,
+		"lib/identity.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only function-typed parameter-return global escape diagnostic")
+	}
+	want := "function-typed parameter 'f' cannot be stored in global function-typed value 'cb'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeFunctionTypedParameterLocalAliasReturnGlobalEscapeDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.identity
+
+pub func identity(f: fn(Int) -> Int) -> fn(Int) -> Int:
+    let alias: fn(Int) -> Int = f
+    return alias
+`), "lib/identity.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.identity as id
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func store(f: fn(Int) -> Int) -> Int:
+    cb = id.identity(f)
+    return 0
+
+func main() -> Int:
+    let base: Int = 1
+    return store(fn(x: Int) -> Int:
+        return x + base
+    )
+`,
+		"lib/identity.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only function-typed parameter local-alias return global escape diagnostic")
+	}
+	want := "function-typed parameter 'f' cannot be stored in global function-typed value 'cb'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeFunctionTypedStructFieldReturnGlobalEscapeDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub struct Holder:
+    cb: fn(Int) -> Int
+
+pub func pick(holder: Holder) -> fn(Int) -> Int:
+    return holder.cb
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	libIface, err := ParseFile(iface, "lib/callbacks.t4i")
+	if err != nil {
+		t.Fatalf("ParseFile interface: %v\ninterface:\n%s", err, iface)
+	}
+	checkedIface, err := CheckWorldOpt(&World{
+		EntryModule:      "lib.callbacks",
+		Files:            []*FileAST{libIface},
+		InterfaceModules: map[string]bool{"lib.callbacks": true},
+		ByModule: map[string]*FileAST{
+			"lib.callbacks": libIface,
+		},
+	}, CheckOptions{RequireMain: false})
+	if err != nil {
+		t.Fatalf("CheckWorld interface: %v\ninterface:\n%s", err, iface)
+	}
+	pickSig := checkedIface.FuncSigs["lib.callbacks.pick"]
+	if got := pickSig.ReturnFunctionParamName; got != "holder.cb" {
+		t.Fatalf("pick ReturnFunctionParamName = %q, want holder.cb; interface:\n%s", got, iface)
+	}
+	if len(pickSig.ParamTypes) != 1 || pickSig.ParamTypes[0] != "lib.callbacks.Holder" {
+		t.Fatalf("pick ParamTypes = %#v, want lib.callbacks.Holder; interface:\n%s", pickSig.ParamTypes, iface)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func store(f: fn(Int) -> Int) -> Int:
+    let holder: callbacks.Holder = callbacks.Holder(cb: f)
+    cb = callbacks.pick(holder)
+    return 0
+
+func main() -> Int:
+    let base: Int = 1
+    return store(fn(x: Int) -> Int:
+        return x + base
+    )
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only function-typed struct-field-return global escape diagnostic")
+	}
+	want := "function-typed parameter 'f' cannot be stored in global function-typed value 'cb'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeFunctionTypedNestedStructFieldReturnGlobalEscapeDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub struct Holder:
+    cb: fn(Int) -> Int
+
+pub struct Box:
+    holder: Holder
+
+pub func pick(box: Box) -> fn(Int) -> Int:
+    return box.holder.cb
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func store(f: fn(Int) -> Int) -> Int:
+    let box: callbacks.Box = callbacks.Box(holder: callbacks.Holder(cb: f))
+    cb = callbacks.pick(box)
+    return 0
+
+func main() -> Int:
+    let base: Int = 1
+    return store(fn(x: Int) -> Int:
+        return x + base
+    )
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only function-typed nested-struct-field-return global escape diagnostic")
+	}
+	want := "function-typed parameter 'f' cannot be stored in global function-typed value 'cb'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeFunctionTypedStructParameterWholeReturnGlobalEscapeDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub struct Holder:
+    cb: fn(Int) -> Int
+
+pub struct Box:
+    holder: Holder
+
+pub func echo(box: Box) -> Box:
+    return box
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func store(f: fn(Int) -> Int) -> Int:
+    let box: callbacks.Box = callbacks.Box(holder: callbacks.Holder(cb: f))
+    let returned: callbacks.Box = callbacks.echo(box)
+    cb = returned.holder.cb
+    return 0
+
+func main() -> Int:
+    let base: Int = 1
+    return store(fn(x: Int) -> Int:
+        return x + base
+    )
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only function-typed struct-parameter whole-return global escape diagnostic")
+	}
+	want := "function-typed parameter 'f' cannot be stored in global function-typed value 'cb'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeFunctionTypedEnumParameterWholeReturnGlobalEscapeDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int)
+    case empty
+
+pub func echo(choice: MaybeCallback) -> MaybeCallback:
+    return choice
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func store(f: fn(Int) -> Int) -> Int:
+    let choice: callbacks.MaybeCallback = callbacks.echo(callbacks.MaybeCallback.some(f))
+    match choice:
+    case callbacks.MaybeCallback.some(local):
+        cb = local
+        return 0
+    case callbacks.MaybeCallback.empty:
+        return 0
+
+func main() -> Int:
+    let base: Int = 1
+    return store(fn(x: Int) -> Int:
+        return x + base
+    )
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only function-typed enum-parameter whole-return global escape diagnostic")
+	}
+	want := "function-typed parameter 'f' cannot be stored in global function-typed value 'cb'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeFunctionTypedEnumPayloadMatchReturnGlobalEscapeDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int)
+    case empty
+
+pub func fallback(x: Int) -> Int:
+    return x
+
+pub func pick(choice: MaybeCallback) -> fn(Int) -> Int:
+    match choice:
+    case some(local):
+        return local
+    case empty:
+        return fallback
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func store(f: fn(Int) -> Int) -> Int:
+    cb = callbacks.pick(callbacks.MaybeCallback.some(f))
+    return 0
+
+func main() -> Int:
+    let base: Int = 1
+    return store(fn(x: Int) -> Int:
+        return x + base
+    )
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only function-typed enum-payload match return global escape diagnostic\ninterface:\n%s", iface)
+	}
+	want := "function-typed parameter 'f' cannot be stored in global function-typed value 'cb'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedAggregateClosurePayloadStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int)
+    case empty
+
+pub struct Box:
+    choice: MaybeCallback
+
+pub func makeBox() -> Box:
+    let base: Int = 1
+    return Box(choice: MaybeCallback.some(fn(x: Int) -> Int:
+        return x + base
+    ))
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func main() -> Int:
+    let box: callbacks.Box = callbacks.makeBox()
+    match box.choice:
+    case callbacks.MaybeCallback.some(local):
+        cb = local
+        return 0
+    case callbacks.MaybeCallback.empty:
+        return 0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	if _, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only returned aggregate closure stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedEnumClosurePayloadStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int)
+    case empty
+
+pub func makeChoice() -> MaybeCallback:
+    let base: Int = 1
+    return MaybeCallback.some(fn(x: Int) -> Int:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+var cb: fn(Int) -> Int = add0
+
+func add0(x: Int) -> Int:
+    return x
+
+func main() -> Int:
+    let choice: callbacks.MaybeCallback = callbacks.makeChoice()
+    match choice:
+    case callbacks.MaybeCallback.some(local):
+        cb = local
+        return 0
+    case callbacks.MaybeCallback.empty:
+        return 0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	if _, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only returned enum closure stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingAggregateClosurePayloadStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int throws Boom)
+    case empty
+
+pub struct Box:
+    choice: MaybeCallback
+
+pub func makeBox() -> Box:
+    let base: Int = 1
+    return Box(choice: MaybeCallback.some(fn(x: Int) -> Int throws Boom:
+        return x + base
+    ))
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func caller() -> Int throws callbacks.Boom:
+    let box: callbacks.Box = callbacks.makeBox()
+    match box.choice:
+    case callbacks.MaybeCallback.some(local):
+        return try local(41)
+    case callbacks.MaybeCallback.empty:
+        return 0
+
+func main() -> Int:
+    return catch caller():
+    case callbacks.Boom.bad:
+        0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	if _, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only returned throwing aggregate closure stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingEnumClosurePayloadStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int throws Boom)
+    case empty
+
+pub func makeChoice() -> MaybeCallback:
+    let base: Int = 1
+    return MaybeCallback.some(fn(x: Int) -> Int throws Boom:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func caller() -> Int throws callbacks.Boom:
+    let choice: callbacks.MaybeCallback = callbacks.makeChoice()
+    match choice:
+    case callbacks.MaybeCallback.some(local):
+        return try local(41)
+    case callbacks.MaybeCallback.empty:
+        return 0
+
+func main() -> Int:
+    return catch caller():
+    case callbacks.Boom.bad:
+        0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	if _, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only returned throwing enum closure stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingAggregateClosurePayloadRequiresTryDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int throws Boom)
+    case empty
+
+pub struct Box:
+    choice: MaybeCallback
+
+pub func makeBox() -> Box:
+    let base: Int = 1
+    return Box(choice: MaybeCallback.some(fn(x: Int) -> Int throws Boom:
+        return x + base
+    ))
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func main() -> Int:
+    let box: callbacks.Box = callbacks.makeBox()
+    match box.choice:
+    case callbacks.MaybeCallback.some(local):
+        return local(41)
+    case callbacks.MaybeCallback.empty:
+        return 0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only returned throwing aggregate closure payload requires-try diagnostic")
+	}
+	want := "call to throwing function 'local' requires try"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingEnumClosurePayloadRequiresTryDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int throws Boom)
+    case empty
+
+pub func makeChoice() -> MaybeCallback:
+    let base: Int = 1
+    return MaybeCallback.some(fn(x: Int) -> Int throws Boom:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func main() -> Int:
+    let choice: callbacks.MaybeCallback = callbacks.makeChoice()
+    match choice:
+    case callbacks.MaybeCallback.some(local):
+        return local(41)
+    case callbacks.MaybeCallback.empty:
+        return 0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only returned throwing enum closure payload requires-try diagnostic")
+	}
+	want := "call to throwing function 'local' requires try"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingStructFieldClosureStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub struct Holder:
+    cb: fn(Int) -> Int throws Boom
+
+pub func makeHolder() -> Holder:
+    let base: Int = 1
+    return Holder(cb: fn(x: Int) -> Int throws Boom:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func caller() -> Int throws callbacks.Boom:
+    let holder: callbacks.Holder = callbacks.makeHolder()
+    return try holder.cb(41)
+
+func main() -> Int:
+    return catch caller():
+    case callbacks.Boom.bad:
+        0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	if _, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only returned throwing struct-field closure stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingStructFieldClosureRequiresTryDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub struct Holder:
+    cb: fn(Int) -> Int throws Boom
+
+pub func makeHolder() -> Holder:
+    let base: Int = 1
+    return Holder(cb: fn(x: Int) -> Int throws Boom:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func main() -> Int:
+    let holder: callbacks.Holder = callbacks.makeHolder()
+    return holder.cb(41)
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only returned throwing struct-field closure requires-try diagnostic")
+	}
+	want := "call to throwing function 'holder.cb' requires try"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingStructFieldClosureCallbackStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub struct Holder:
+    cb: fn(Int) -> Int throws Boom
+
+pub func makeHolder() -> Holder:
+    let base: Int = 1
+    return Holder(cb: fn(x: Int) -> Int throws Boom:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func apply(f: fn(Int) -> Int throws callbacks.Boom, x: Int) -> Int throws callbacks.Boom:
+    return try f(x)
+
+func caller() -> Int throws callbacks.Boom:
+    let holder: callbacks.Holder = callbacks.makeHolder()
+    return try apply(holder.cb, 41)
+
+func main() -> Int:
+    return catch caller():
+    case callbacks.Boom.bad:
+        0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	if _, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only returned throwing struct-field closure callback stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingStructFieldClosureCallbackThrowsMismatchDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub struct Holder:
+    cb: fn(Int) -> Int throws Boom
+
+pub func makeHolder() -> Holder:
+    let base: Int = 1
+    return Holder(cb: fn(x: Int) -> Int throws Boom:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func apply(f: fn(Int) -> Int, x: Int) -> Int:
+    return f(x)
+
+func main() -> Int:
+    let holder: callbacks.Holder = callbacks.makeHolder()
+    return apply(holder.cb, 41)
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only returned throwing struct-field closure callback throws mismatch diagnostic")
+	}
+	want := "callback function symbol 'holder.cb' throws type mismatch: expected '', got 'lib.callbacks.Boom'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingAggregateClosurePayloadCallbackStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int throws Boom)
+    case empty
+
+pub struct Box:
+    choice: MaybeCallback
+
+pub func makeBox() -> Box:
+    let base: Int = 1
+    return Box(choice: MaybeCallback.some(fn(x: Int) -> Int throws Boom:
+        return x + base
+    ))
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func apply(f: fn(Int) -> Int throws callbacks.Boom, x: Int) -> Int throws callbacks.Boom:
+    return try f(x)
+
+func caller() -> Int throws callbacks.Boom:
+    let box: callbacks.Box = callbacks.makeBox()
+    match box.choice:
+    case callbacks.MaybeCallback.some(local):
+        return try apply(local, 41)
+    case callbacks.MaybeCallback.empty:
+        return 0
+
+func main() -> Int:
+    return catch caller():
+    case callbacks.Boom.bad:
+        0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	if _, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only returned throwing aggregate closure callback stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingEnumClosurePayloadCallbackStub(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int throws Boom)
+    case empty
+
+pub func makeChoice() -> MaybeCallback:
+    let base: Int = 1
+    return MaybeCallback.some(fn(x: Int) -> Int throws Boom:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func apply(f: fn(Int) -> Int throws callbacks.Boom, x: Int) -> Int throws callbacks.Boom:
+    return try f(x)
+
+func caller() -> Int throws callbacks.Boom:
+    let choice: callbacks.MaybeCallback = callbacks.makeChoice()
+    match choice:
+    case callbacks.MaybeCallback.some(local):
+        return try apply(local, 41)
+    case callbacks.MaybeCallback.empty:
+        return 0
+
+func main() -> Int:
+    return catch caller():
+    case callbacks.Boom.bad:
+        0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	if _, err := BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt interface-only returned throwing enum closure callback stub: %v", err)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingEnumClosurePayloadCallbackThrowsMismatchDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int throws Boom)
+    case empty
+
+pub func makeChoice() -> MaybeCallback:
+    let base: Int = 1
+    return MaybeCallback.some(fn(x: Int) -> Int throws Boom:
+        return x + base
+    )
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func apply(f: fn(Int) -> Int, x: Int) -> Int:
+    return f(x)
+
+func main() -> Int:
+    let choice: callbacks.MaybeCallback = callbacks.makeChoice()
+    match choice:
+    case callbacks.MaybeCallback.some(local):
+        return apply(local, 41)
+    case callbacks.MaybeCallback.empty:
+        return 0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only returned throwing enum closure callback throws mismatch diagnostic")
+	}
+	want := "callback function symbol 'local' throws type mismatch: expected '', got 'lib.callbacks.Boom'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
+	}
+}
+
+func TestBuildInterfaceOnlyModeReturnedThrowingAggregateClosurePayloadCallbackThrowsMismatchDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.callbacks
+
+pub enum Boom:
+    case bad
+
+pub enum MaybeCallback:
+    case some(fn(Int) -> Int throws Boom)
+    case empty
+
+pub struct Box:
+    choice: MaybeCallback
+
+pub func makeBox() -> Box:
+    let base: Int = 1
+    return Box(choice: MaybeCallback.some(fn(x: Int) -> Int throws Boom:
+        return x + base
+    ))
+`), "lib/callbacks.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.callbacks as callbacks
+
+func apply(f: fn(Int) -> Int, x: Int) -> Int:
+    return f(x)
+
+func main() -> Int:
+    let box: callbacks.Box = callbacks.makeBox()
+    match box.choice:
+    case callbacks.MaybeCallback.some(local):
+        return apply(local, 41)
+    case callbacks.MaybeCallback.empty:
+        return 0
+`,
+		"lib/callbacks.t4i": string(iface),
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil {
+		t.Fatalf("expected interface-only returned throwing aggregate closure callback throws mismatch diagnostic")
+	}
+	want := "callback function symbol 'local' throws type mismatch: expected '', got 'lib.callbacks.Boom'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want substring %q", err, want)
 	}
 }
 

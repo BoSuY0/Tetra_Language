@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -63,7 +64,7 @@ func main() {
 
 func validateLSPSmoke(raw []byte) error {
 	var report lspSmokeEnvelope
-	if err := json.Unmarshal(raw, &report); err != nil {
+	if err := strictDecodeJSON(raw, &report); err != nil {
 		return err
 	}
 	if report.URI == "" {
@@ -146,8 +147,23 @@ func unmarshalArray[T any](raw json.RawMessage, field string, out *[]T) error {
 	if bytes.Equal(trimmed, []byte("null")) || trimmed[0] != '[' {
 		return fmt.Errorf("%s must be an array, not null", field)
 	}
-	if err := json.Unmarshal(trimmed, out); err != nil {
+	if err := strictDecodeJSON(trimmed, out); err != nil {
 		return fmt.Errorf("%s: %w", field, err)
+	}
+	return nil
+}
+
+func strictDecodeJSON(raw []byte, out any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(out); err != nil {
+		return err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("unexpected extra JSON value")
+		}
+		return err
 	}
 	return nil
 }

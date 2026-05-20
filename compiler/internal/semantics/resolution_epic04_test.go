@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"tetra_language/compiler/internal/frontend"
+	"tetra_language/compiler/internal/module"
 )
 
 func TestResolutionModuleImportAliasResolvesCallAndType(t *testing.T) {
@@ -107,6 +108,52 @@ func TestResolutionImportAliasRequiredBoundary(t *testing.T) {
 		t.Fatalf("expected alias required error")
 	}
 	if !strings.Contains(err.Error(), "app/main.tetra:2:1: import alias required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestResolutionImportPathRequiredBoundary(t *testing.T) {
+	file := &frontend.FileAST{
+		Imports: []frontend.ImportDecl{
+			{
+				Path:  "",
+				Alias: "math",
+				At:    frontend.Position{File: "app/main.tetra", Line: 2, Col: 1},
+			},
+		},
+	}
+
+	_, err := collectImportAliases(file)
+	if err == nil {
+		t.Fatalf("expected import path required error")
+	}
+	if !strings.Contains(err.Error(), "app/main.tetra:2:1: import path required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestCheckWorldRejectsDuplicateInterfaceFunctionParams(t *testing.T) {
+	iface, err := frontend.ParseFile([]byte(`module lib.api
+
+pub func dup(x: Int, x: Int) -> Int:
+    return x
+`), "lib/api.t4i")
+	if err != nil {
+		t.Fatalf("ParseFile iface: %v", err)
+	}
+
+	_, err = CheckWorldOpt(&module.World{
+		EntryModule:      "lib.api",
+		Files:            []*frontend.FileAST{iface},
+		InterfaceModules: map[string]bool{"lib.api": true},
+		ByModule: map[string]*frontend.FileAST{
+			"lib.api": iface,
+		},
+	}, CheckOptions{RequireMain: false})
+	if err == nil {
+		t.Fatalf("expected duplicate parameter error")
+	}
+	if !strings.Contains(err.Error(), "duplicate parameter 'x'") {
 		t.Fatalf("error = %v", err)
 	}
 }

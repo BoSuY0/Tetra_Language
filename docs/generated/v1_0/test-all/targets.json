@@ -19,6 +19,7 @@
       "format": "elf",
       "exe_ext": "",
       "build_only": false,
+      "run_mode": "host_native",
       "run_supported": true,
       "supports_debug_info": true,
       "supports_release_optimize": true
@@ -32,7 +33,9 @@
       "format": "pe",
       "exe_ext": ".exe",
       "build_only": false,
+      "run_mode": "host_native",
       "run_supported": false,
+      "run_unsupported_reason": "windows-x64 cannot run on host linux/amd64",
       "supports_debug_info": true,
       "supports_release_optimize": true
     },
@@ -45,7 +48,9 @@
       "format": "macho",
       "exe_ext": "",
       "build_only": false,
+      "run_mode": "host_native",
       "run_supported": false,
+      "run_unsupported_reason": "macos-x64 cannot run on host linux/amd64",
       "supports_debug_info": true,
       "supports_release_optimize": true
     },
@@ -58,7 +63,9 @@
       "format": "wasm",
       "exe_ext": ".wasm",
       "build_only": true,
-      "run_supported": false,
+      "run_mode": "wasi_runner",
+      "run_runner": "node-wasi",
+      "run_supported": true,
       "supports_debug_info": false,
       "supports_release_optimize": true
     },
@@ -71,7 +78,9 @@
       "format": "wasm",
       "exe_ext": ".wasm",
       "build_only": true,
+      "run_mode": "browser_smoke",
       "run_supported": false,
+      "run_unsupported_reason": "wasm32-web has browser smoke runtime evidence only; tetra run does not provide a production web runner",
       "supports_debug_info": false,
       "supports_release_optimize": true
     }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"tetra_language/compiler/internal/testkit"
 	"tetra_language/compiler/target"
 )
 
@@ -84,7 +85,61 @@ pub func add(a: Int, b: Int) -> Int:
 	if _, err := os.Stat(outPath); err != nil {
 		t.Fatalf("missing output: %v", err)
 	}
-	assertModules(t, stats.InterfaceModules, []string{"math.core"})
+	testkit.AssertModules(t, stats.InterfaceModules, []string{"math.core"})
+}
+
+func TestBuildLinksGeneratedInterfaceExtensionWithMatchingImplementationObject(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	src := []byte(`module engine.vec
+
+pub struct Vec2:
+    x: Int
+    y: Int
+
+pub extension Vec2:
+    func sum(self: Vec2) -> Int:
+        return self.x + self.y
+`)
+	libSrc := filepath.Join(tmp, filepath.FromSlash("lib/engine/vec.t4"))
+	libObj := filepath.Join(tmp, "vec.tobj")
+	if err := writeFile(libSrc, string(src)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildFileWithStatsOpt(libSrc, libObj, tgt.Triple, BuildOptions{Emit: EmitLibrary}); err != nil {
+		t.Fatalf("build library: %v", err)
+	}
+	iface, err := GenerateInterfaceFromSource(src, libSrc)
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/app/main.t4"))
+	if err := writeFile(appSrc, `module app.main
+import engine.vec as vec
+
+func main() -> Int:
+    let v: vec.Vec2 = vec.Vec2(x: 40, y: 2)
+    return vec.Vec2.sum(v)
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("app/engine/vec.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	outPath := filepath.Join(tmp, "app-bin"+tgt.ExeExt)
+	stats, err := BuildFileWithStatsOpt(appSrc, outPath, tgt.Triple, BuildOptions{LinkObjectPaths: []string{libObj}})
+	if err != nil {
+		t.Fatalf("build generated .t4i extension with matching .tobj: %v\ninterface:\n%s", err, iface)
+	}
+	if _, err := os.Stat(outPath); err != nil {
+		t.Fatalf("missing output: %v", err)
+	}
+	testkit.AssertModules(t, stats.InterfaceModules, []string{"engine.vec"})
 }
 
 func TestBuildRejectsInterfaceDependencyWithoutImplementationObject(t *testing.T) {
@@ -250,11 +305,164 @@ pub func add(a: Int, b: Int) -> Int:
 		t.Fatal(err)
 	}
 
-	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app"+tgt.ExeExt), tgt.Triple, BuildOptions{LinkObjectPaths: []string{objPath}})
+	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app-bin"+tgt.ExeExt), tgt.Triple, BuildOptions{LinkObjectPaths: []string{objPath}})
 	if err == nil {
 		t.Fatalf("expected missing implementation symbol error")
 	}
 	if !strings.Contains(err.Error(), "implementation object for interface module 'math.core' missing exported symbol 'math.core.add'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildRejectsInterfaceImplementationSignatureMismatch(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	src := []byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	apiHash, err := InterfaceFingerprintFromSource(src, filepath.Join(tmp, filepath.FromSlash("math/core.t4")))
+	if err != nil {
+		t.Fatalf("InterfaceFingerprintFromSource: %v", err)
+	}
+	objPath := filepath.Join(tmp, "math-wrong-abi.tobj")
+	if err := WriteObject(objPath, &Object{
+		Target:          tgt.Triple,
+		Module:          "math.core",
+		CompilerVersion: Version(),
+		PublicAPIHash:   apiHash,
+		Code:            []byte{0xC3},
+		Symbols: []Symbol{{
+			Name:         "math.core.add",
+			Offset:       0,
+			HasSignature: true,
+			ParamSlots:   1,
+			ReturnSlots:  1,
+		}},
+	}); err != nil {
+		t.Fatalf("write object: %v", err)
+	}
+	iface, err := GenerateInterfaceFromSource(src, filepath.Join(tmp, filepath.FromSlash("app/math/core.t4")))
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/app/main.t4"))
+	if err := writeFile(appSrc, "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("app/math/core.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app-bin"+tgt.ExeExt), tgt.Triple, BuildOptions{LinkObjectPaths: []string{objPath}})
+	if err == nil {
+		t.Fatalf("expected implementation signature mismatch error")
+	}
+	if !strings.Contains(err.Error(), "implementation object for interface module 'math.core' symbol 'math.core.add' signature mismatch") ||
+		!strings.Contains(err.Error(), "params=1 want=2") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildRejectsInterfaceImplementationMissingSignatureMetadata(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	src := []byte(`module math.core
+
+pub func add(a: Int, b: Int) -> Int:
+    return a + b
+`)
+	apiHash, err := InterfaceFingerprintFromSource(src, filepath.Join(tmp, filepath.FromSlash("math/core.t4")))
+	if err != nil {
+		t.Fatalf("InterfaceFingerprintFromSource: %v", err)
+	}
+	objPath := filepath.Join(tmp, "math-nosig.tobj")
+	if err := WriteObject(objPath, &Object{
+		Target:          tgt.Triple,
+		Module:          "math.core",
+		CompilerVersion: Version(),
+		PublicAPIHash:   apiHash,
+		Code:            []byte{0xC3},
+		Symbols: []Symbol{{
+			Name:   "math.core.add",
+			Offset: 0,
+		}},
+	}); err != nil {
+		t.Fatalf("write object: %v", err)
+	}
+	iface, err := GenerateInterfaceFromSource(src, filepath.Join(tmp, filepath.FromSlash("app/math/core.t4")))
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/app/main.t4"))
+	if err := writeFile(appSrc, "module app.main\nimport math.core as math\nfunc main() -> Int:\n    return math.add(40, 2)\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("app/math/core.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app-bin"+tgt.ExeExt), tgt.Triple, BuildOptions{LinkObjectPaths: []string{objPath}})
+	if err == nil {
+		t.Fatalf("expected missing implementation signature metadata error")
+	}
+	if !strings.Contains(err.Error(), "implementation object for interface module 'math.core' symbol 'math.core.add' missing signature metadata") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildRejectsInterfaceImplementationGenericExport(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmp := t.TempDir()
+	src := []byte(`module lib.generic
+
+pub func id<T>(x: T) -> T:
+    return x
+`)
+	apiHash, err := InterfaceFingerprintFromSource(src, filepath.Join(tmp, filepath.FromSlash("lib/generic.t4")))
+	if err != nil {
+		t.Fatalf("InterfaceFingerprintFromSource: %v", err)
+	}
+	objPath := filepath.Join(tmp, "generic.tobj")
+	if err := WriteObject(objPath, &Object{
+		Target:          tgt.Triple,
+		Module:          "lib.generic",
+		CompilerVersion: Version(),
+		PublicAPIHash:   apiHash,
+		Code:            []byte{0xC3},
+	}); err != nil {
+		t.Fatalf("write object: %v", err)
+	}
+	iface, err := GenerateInterfaceFromSource(src, filepath.Join(tmp, filepath.FromSlash("app/lib/generic.t4")))
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	appSrc := filepath.Join(tmp, filepath.FromSlash("app/app/main.t4"))
+	if err := writeFile(appSrc, "module app.main\nimport lib.generic as generic\nfunc main() -> Int:\n    return 0\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(tmp, filepath.FromSlash("app/lib/generic.t4i")), string(iface)); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = BuildFileWithStatsOpt(appSrc, filepath.Join(tmp, "app-bin"+tgt.ExeExt), tgt.Triple, BuildOptions{LinkObjectPaths: []string{objPath}})
+	if err == nil {
+		t.Fatalf("expected unsupported generic export error")
+	}
+	if !strings.Contains(err.Error(), "implementation object for interface module 'lib.generic' cannot satisfy generic export 'lib.generic.id'") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

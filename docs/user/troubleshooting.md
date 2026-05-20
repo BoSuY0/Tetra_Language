@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Status: user guide for common command failures in the current `v0.2.0` profile
+Status: user guide for common command failures in the current `v0.3.0` profile
 and future v1.0 preparation.
 
 Use the exact command that matches the failing workflow, then apply the fix
@@ -21,8 +21,8 @@ unsupported target
 ```
 
 Fix: choose one of the release targets from `./tetra targets`. Native build
-targets are `linux-x64`, `macos-x64`, and `windows-x64`; WASM build-only
-targets are `wasm32-wasi` and `wasm32-web`.
+targets are `linux-x64`, `macos-x64`, and `windows-x64`; WASM runner-gated
+runtime targets are `wasm32-wasi` and `wasm32-web`.
 
 ## Missing Import
 
@@ -63,7 +63,7 @@ then rerun the `--check` command.
 Command:
 
 ```sh
-./tetra check examples/typed_errors_smoke.tetra
+./tetra check path/to/non-release-covered-preview-feature.tetra
 ```
 
 Typical diagnostic:
@@ -72,15 +72,17 @@ Typical diagnostic:
 planned feature
 ```
 
-Fix: confirm the feature is in `docs/spec/v1_scope.md`. Features listed under
-post-v1 scope need the promotion checklist before implementation.
+Fix: confirm the feature status in `compiler/features.go` and
+`docs/spec/current_supported_surface.md`. Features listed as `experimental`,
+`planned`, or `post-v1` need a promotion checklist before being treated as
+current support.
 
 ## Web Smoke Blocked
 
 Command:
 
 ```sh
-bash scripts/release_v1_0_web_smoke.sh --report reports/web-ui-smoke.json
+bash scripts/release/v1_0/web-smoke.sh --report reports/web-ui-smoke.json
 ```
 
 Typical diagnostic:
@@ -91,14 +93,15 @@ browser automation unavailable
 
 Fix: keep the generated blocked report as evidence, install the documented
 browser automation dependency for the release environment, then rerun the same
-command.
+command. These `release_v1_0_*` helpers are future-release maintainer tooling;
+they are not current `v0.3.0` runtime support by themselves.
 
 ## WASI Runner Missing
 
 Command:
 
 ```sh
-bash scripts/release_v1_0_wasi_smoke.sh --report reports/wasi-smoke.json
+bash scripts/release/v1_0/wasi-smoke.sh --report reports/wasi-smoke.json
 ```
 
 Typical diagnostic:
@@ -107,9 +110,10 @@ Typical diagnostic:
 wasmtime
 ```
 
-Fix: install `wasmtime` or keep the build-only report when runner evidence is
-not available on the current host. Do not treat build-only output as runtime
-isolation evidence.
+Fix: install `wasmtime` or keep the artifact/import preflight report when
+runner evidence is not available on the current host. Do not treat
+artifact/import output as runtime isolation evidence, and do not treat the
+`release_v1_0_*` helper name as a `v0.3.0` runtime support claim.
 
 ## Eco Lock Mismatch
 

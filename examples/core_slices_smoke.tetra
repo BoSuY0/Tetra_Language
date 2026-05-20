@@ -11,6 +11,12 @@ uses alloc, islands, mem:
         xs[1] = 20
         xs[2] = 10
         let sum: Int = slices.sum_i32(xs)
-        if sum == 42:
+        let weighted: Int = slices.weighted_sum_i32(xs)
+        var bytes: []u8 = core.island_make_u8(isl, 3)
+        bytes[0] = 5
+        bytes[1] = 7
+        bytes[2] = 30
+        let byte_sum: Int = slices.sum_u8(bytes)
+        if sum == 42 && weighted == 82 && byte_sum == 42:
             return 42
     return 1

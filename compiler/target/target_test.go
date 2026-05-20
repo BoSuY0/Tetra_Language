@@ -14,21 +14,30 @@ func TestParse(t *testing.T) {
 		if triple == "windows-x64" && tgt.ExeExt != ".exe" {
 			t.Fatalf("windows exe ext mismatch: %q", tgt.ExeExt)
 		}
+		if triple == "wasm32-wasi" || triple == "wasm32-web" {
+			if tgt.ExeExt != ".wasm" {
+				t.Fatalf("wasm exe ext mismatch: %q", tgt.ExeExt)
+			}
+			continue
+		}
 		if triple != "windows-x64" && tgt.ExeExt != "" {
-			t.Fatalf("non-windows exe ext mismatch: %q", tgt.ExeExt)
+			t.Fatalf("native non-windows exe ext mismatch: %q", tgt.ExeExt)
 		}
 	}
 }
 
 func TestTargetListsAreStable(t *testing.T) {
-	if got := SupportedTriples(); len(got) != 3 || got[0] != "linux-x64" || got[1] != "windows-x64" || got[2] != "macos-x64" {
+	if got := SupportedTriples(); len(got) != 5 || got[0] != "linux-x64" || got[1] != "windows-x64" || got[2] != "macos-x64" || got[3] != "wasm32-wasi" || got[4] != "wasm32-web" {
 		t.Fatalf("supported triples = %#v", got)
 	}
-	if got := BuildOnlyTriples(); len(got) != 2 || got[0] != "wasm32-wasi" || got[1] != "wasm32-web" {
+	if got := BuildOnlyTriples(); len(got) != 0 {
 		t.Fatalf("build-only triples = %#v", got)
 	}
 	if got := PlannedTriples(); len(got) != 0 {
 		t.Fatalf("planned triples = %#v", got)
+	}
+	if got := ActorRuntimeTriples(); len(got) != 3 || got[0] != "linux-x64" || got[1] != "macos-x64" || got[2] != "windows-x64" {
+		t.Fatalf("actor runtime triples = %#v", got)
 	}
 }
 
@@ -40,8 +49,8 @@ func TestTargetStatusValues(t *testing.T) {
 		{"linux-x64", StatusSupported},
 		{"windows-x64", StatusSupported},
 		{"macos-x64", StatusSupported},
-		{"wasm32-wasi", StatusBuildOnly},
-		{"wasm32-web", StatusBuildOnly},
+		{"wasm32-wasi", StatusSupported},
+		{"wasm32-web", StatusSupported},
 	}
 	for _, tc := range cases {
 		tgt, err := Parse(tc.triple)
@@ -55,6 +64,9 @@ func TestTargetStatusValues(t *testing.T) {
 	if StatusSupported.String() != "supported" || StatusBuildOnly.String() != "build_only" || StatusPlanned.String() != "planned" {
 		t.Fatalf("unexpected status strings: %q %q %q", StatusSupported, StatusBuildOnly, StatusPlanned)
 	}
+	if RunModeHostNative.String() != "host_native" || RunModeWASIRunner.String() != "wasi_runner" || RunModeWebRunner.String() != "web_runner" {
+		t.Fatalf("unexpected run mode strings: %q %q %q", RunModeHostNative, RunModeWASIRunner, RunModeWebRunner)
+	}
 }
 
 func TestParseRejectsUnknown(t *testing.T) {
@@ -63,7 +75,7 @@ func TestParseRejectsUnknown(t *testing.T) {
 	}
 }
 
-func TestParseAcceptsWASMBuildOnlyTarget(t *testing.T) {
+func TestParseAcceptsWASIRuntimeTarget(t *testing.T) {
 	tgt, err := Parse("wasm32-wasi")
 	if err != nil {
 		t.Fatalf("Parse(wasm32-wasi): %v", err)
@@ -71,15 +83,15 @@ func TestParseAcceptsWASMBuildOnlyTarget(t *testing.T) {
 	if tgt.Triple != "wasm32-wasi" || tgt.ExeExt != ".wasm" {
 		t.Fatalf("wasm32-wasi target = %#v", tgt)
 	}
-	if !IsBuildOnlyTarget("wasm32-wasi") {
-		t.Fatalf("IsBuildOnlyTarget(wasm32-wasi) = false")
+	if IsBuildOnlyTarget("wasm32-wasi") {
+		t.Fatalf("IsBuildOnlyTarget(wasm32-wasi) = true")
 	}
 	if IsPlannedTarget("wasm32-wasi") {
 		t.Fatalf("IsPlannedTarget(wasm32-wasi) = true")
 	}
 }
 
-func TestParseAcceptsWASMWebBuildOnlyTarget(t *testing.T) {
+func TestParseAcceptsWASMWebRuntimeTarget(t *testing.T) {
 	tgt, err := Parse("wasm32-web")
 	if err != nil {
 		t.Fatalf("Parse(wasm32-web): %v", err)
@@ -87,8 +99,8 @@ func TestParseAcceptsWASMWebBuildOnlyTarget(t *testing.T) {
 	if tgt.Triple != "wasm32-web" || tgt.ExeExt != ".wasm" {
 		t.Fatalf("wasm32-web target = %#v", tgt)
 	}
-	if !IsBuildOnlyTarget("wasm32-web") {
-		t.Fatalf("IsBuildOnlyTarget(wasm32-web) = false")
+	if IsBuildOnlyTarget("wasm32-web") {
+		t.Fatalf("IsBuildOnlyTarget(wasm32-web) = true")
 	}
 	if IsPlannedTarget("wasm32-web") {
 		t.Fatalf("IsPlannedTarget(wasm32-web) = true")
@@ -141,14 +153,14 @@ func TestTargetCapabilitiesForDebugInfoAndReleaseOptimize(t *testing.T) {
 	}
 }
 
-func TestCurrentTargetContractHasNoPlannedOrRunnableWASMTargets(t *testing.T) {
+func TestCurrentTargetContractIncludesRunnableWASMTargets(t *testing.T) {
 	all := All()
 	if len(all) != len(SupportedTriples()) {
-		t.Fatalf("All() = %#v, want only supported native triples %#v", all, SupportedTriples())
+		t.Fatalf("All() = %#v, want supported triples %#v", all, SupportedTriples())
 	}
 	for _, tgt := range all {
 		if tgt.Status != StatusSupported || IsBuildOnlyTarget(tgt.Triple) || IsPlannedTarget(tgt.Triple) {
-			t.Fatalf("All() included non-supported runnable target: %#v", tgt)
+			t.Fatalf("All() included non-supported target: %#v", tgt)
 		}
 	}
 	for _, triple := range WASMTriples() {
@@ -156,11 +168,17 @@ func TestCurrentTargetContractHasNoPlannedOrRunnableWASMTargets(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Parse(%q): %v", triple, err)
 		}
-		if tgt.Status != StatusBuildOnly || !IsBuildOnlyTarget(triple) || IsPlannedTarget(triple) {
+		if tgt.Status != StatusSupported || IsBuildOnlyTarget(triple) || IsPlannedTarget(triple) {
 			t.Fatalf("WASM target %s contract drifted: %#v", triple, tgt)
 		}
 		if tgt.Arch != ArchWASM32 || tgt.Format != FormatWASM || tgt.ExeExt != ".wasm" || tgt.SupportsDebugInfo {
 			t.Fatalf("WASM target %s metadata drifted: %#v", triple, tgt)
+		}
+		if triple == "wasm32-wasi" && (tgt.RunMode != RunModeWASIRunner || tgt.RunRunner != "wasmtime") {
+			t.Fatalf("WASM target %s runner metadata drifted: %#v", triple, tgt)
+		}
+		if triple == "wasm32-web" && (tgt.RunMode != RunModeWebRunner || tgt.RunRunner != "") {
+			t.Fatalf("WASM target %s runner metadata drifted: %#v", triple, tgt)
 		}
 	}
 }

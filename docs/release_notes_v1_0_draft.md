@@ -1,7 +1,8 @@
 # Tetra v1.0 Production Release Notes Draft
 
-This draft tracks the release-note shape for Tetra v1.0. The authoritative
-current release scope is `docs/spec/v1_scope.md`.
+This draft tracks the release-note shape for Tetra v1.0. The current public
+release line remains `v0.3.0`; the authoritative future v1.0 scope contract is
+`docs/spec/v1_scope.md`.
 
 Canonical scope and release process:
 

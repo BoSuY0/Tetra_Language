@@ -33,7 +33,7 @@ type dumpOptions struct {
 	writeSummary    bool
 }
 
-const dumpArtifact = "tetra.release.v0_2_0.project-dump.v1"
+const dumpArtifact = "tetra.release.v0_3_0.project-dump.v1"
 
 type multiValue []string
 

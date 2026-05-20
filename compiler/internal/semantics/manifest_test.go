@@ -1,6 +1,11 @@
 package semantics
 
-import "testing"
+import (
+	"reflect"
+	"sort"
+	"strings"
+	"testing"
+)
 
 func TestManifestDescribeBuiltinsSortedAndAliasStable(t *testing.T) {
 	got, err := DescribeBuiltins()
@@ -116,5 +121,117 @@ func TestManifestValidationAcceptsWellFormedEntry(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("validateBuiltinManifestEntry: %v", err)
+	}
+}
+
+func TestManifestDescribeBuiltinsIncludesFilesystemExists(t *testing.T) {
+	got, err := DescribeBuiltins()
+	if err != nil {
+		t.Fatalf("DescribeBuiltins: %v", err)
+	}
+	for _, entry := range got {
+		if entry.Name != "core.fs_exists" {
+			continue
+		}
+		if !reflect.DeepEqual(entry.ParamTypes, []string{"str", "cap.io"}) {
+			t.Fatalf("core.fs_exists param types = %#v, want str, cap.io", entry.ParamTypes)
+		}
+		if entry.ReturnType != "bool" {
+			t.Fatalf("core.fs_exists return type = %q, want bool", entry.ReturnType)
+		}
+		if strings.Join(entry.Effects, ",") != "io" {
+			t.Fatalf("core.fs_exists effects = %q, want io", strings.Join(entry.Effects, ","))
+		}
+		if entry.UnsafePolicy != "never" {
+			t.Fatalf("core.fs_exists unsafe policy = %q, want never", entry.UnsafePolicy)
+		}
+		return
+	}
+	t.Fatalf("manifest missing core.fs_exists")
+}
+
+func TestManifestDriftProofAgainstBuiltinPolicySources(t *testing.T) {
+	got, err := DescribeBuiltins()
+	if err != nil {
+		t.Fatalf("DescribeBuiltins: %v", err)
+	}
+
+	types := baseTypes()
+	sigs, err := builtinFuncSigs(types)
+	if err != nil {
+		t.Fatalf("builtinFuncSigs: %v", err)
+	}
+
+	if len(got) != len(sigs) {
+		t.Fatalf("manifest size = %d, builtin signatures = %d", len(got), len(sigs))
+	}
+
+	entriesByName := make(map[string]BuiltinManifest, len(got))
+	for _, entry := range got {
+		entriesByName[entry.Name] = entry
+	}
+
+	expectedAliasesByTarget := make(map[string][]string, len(sigs))
+	for target := range sigs {
+		short := strings.TrimPrefix(target, "core.")
+		if resolved, ok := ResolveBuiltinAlias(short); ok {
+			if resolved != target {
+				t.Fatalf("ResolveBuiltinAlias(%q) = %q, want %q", short, resolved, target)
+			}
+			expectedAliasesByTarget[target] = append(expectedAliasesByTarget[target], short)
+		}
+	}
+	for target, aliases := range expectedAliasesByTarget {
+		sort.Strings(aliases)
+		expectedAliasesByTarget[target] = aliases
+	}
+
+	for name, sig := range sigs {
+		entry, ok := entriesByName[name]
+		if !ok {
+			t.Fatalf("manifest missing builtin %q", name)
+		}
+		if !reflect.DeepEqual(entry.ParamTypes, sig.ParamTypes) {
+			t.Fatalf("%s param types = %#v, want %#v", name, entry.ParamTypes, sig.ParamTypes)
+		}
+		if entry.ReturnType != sig.ReturnType {
+			t.Fatalf("%s return type = %q, want %q", name, entry.ReturnType, sig.ReturnType)
+		}
+
+		wantEffects := builtinEffects(name)
+		if !reflect.DeepEqual(entry.Effects, wantEffects) {
+			t.Fatalf("%s effects = %#v, want %#v", name, entry.Effects, wantEffects)
+		}
+
+		wantPolicy, wantDetails := expectedBuiltinUnsafePolicy(name)
+		if entry.UnsafePolicy != wantPolicy {
+			t.Fatalf("%s unsafe policy = %q, want %q", name, entry.UnsafePolicy, wantPolicy)
+		}
+		if entry.UnsafeDetails != wantDetails {
+			t.Fatalf("%s unsafe details = %q, want %q", name, entry.UnsafeDetails, wantDetails)
+		}
+
+		wantAliases := expectedAliasesByTarget[name]
+		if !reflect.DeepEqual(entry.Aliases, wantAliases) {
+			t.Fatalf("%s aliases = %#v, want %#v", name, entry.Aliases, wantAliases)
+		}
+		for _, alias := range entry.Aliases {
+			resolved, ok := ResolveBuiltinAlias(alias)
+			if !ok || resolved != name {
+				t.Fatalf("%s alias %q resolves to (%q, %v), want (%q, true)", name, alias, resolved, ok, name)
+			}
+		}
+	}
+}
+
+func expectedBuiltinUnsafePolicy(name string) (policy string, details string) {
+	switch name {
+	case "core.island_make_u8", "core.island_make_u16", "core.island_make_i32", "core.island_make_bool":
+		return "conditional", "requires unsafe when the island argument is not a scoped island variable"
+	default:
+		if builtinNeedsUnsafe(name, nil) {
+			return "always", ""
+		}
+		return "never", ""
 	}
 }

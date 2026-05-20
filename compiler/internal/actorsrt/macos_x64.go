@@ -8,5 +8,5 @@ import (
 func BuildMacOSX64(entries []string) (*tobj.Object, error) {
 	abi := x64abi.MacSysV()
 	const macMapPrivateAnon = 0x1002
-	return buildSysVUnixX64(entries, abi.SysMmap, macMapPrivateAnon)
+	return buildSysVUnixX64(entries, abi.SysMmap, macMapPrivateAnon, false)
 }

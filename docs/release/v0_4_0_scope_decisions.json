@@ -1,0 +1,550 @@
+{
+  "schema": "tetra.release.v0_4_0.scope-decisions.v1",
+  "release_version": "v0.4.0",
+  "status": "linux-x64-production-scope-selected",
+  "source_matrix": "docs/release/v0_4_0_prod_gap_matrix.json",
+  "completion_rule": "Every implemented Linux-x64 v0.4.0 production-scope decision must have implementation, tests, docs, and release-gate evidence, and the canonical gate must produce memory, parallelism, and compiler production-core artifacts. EcoNet, non-Linux target runtimes, WASM target runtimes, and future v1 guarantees are excluded from this v0.4.0 production claim.",
+  "decisions": [
+    {
+      "kind": "feature",
+      "id": "language.callable-level1",
+      "name": "Callable Level 1 non-capturing expansion",
+      "current_status": "current",
+      "decision": "implement",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "compiler/internal/frontend/parser.go",
+          "compiler/internal/semantics/checker.go",
+          "compiler/internal/semantics/exprs.go",
+          "compiler/internal/lower/lower.go"
+        ],
+        "tests": [
+          "go test ./compiler -run 'TestBuildFunctionTypedGlobalClosureLiteralSmoke|TestBuildFunctionTypedMutableGlobalClosureLiteralInitializerSmoke|TestBuildFunctionTypedImportedGlobalDirectCallSmoke|TestBuildFunctionTypedImportedGlobalLocalAndCallbackSmoke|TestBuildFunctionTypedImportedGlobalDirectCallbackSmoke|TestBuildFunctionTypedImportedGlobalMutableLocalReassignmentSmoke|TestBuildFunctionTypedImportedGlobalStructFieldReassignmentSmoke|TestBuildFunctionTypedSelectiveImportedGlobalDirectCallSmoke|TestBuildFunctionTypedSelectiveImportedGlobalLocalAndCallbackSmoke|TestBuildFunctionTypedSelectiveImportedGlobalMutableLocalReassignmentSmoke|TestBuildFunctionTypedSelectiveImportedGlobalStructFieldReassignmentSmoke' -count=1",
+          "go test ./compiler/internal/semantics -run 'TestCheckWorldAliasesImportedPublicFunctionTypedGlobals' -count=1",
+          "go test ./compiler/internal/deps -run 'ImportedFunctionTypedGlobalBackingSymbol|ImportedFunctionFieldAccess' -count=1",
+          "go test ./compiler ./compiler/internal/lower -run 'FunctionTyped|Callable' -count=1",
+          "go test ./compiler -run 'Closure|Callable|FunctionType|Effects|Epic06OwnershipFunctionTypeCallbackSignatures' -count=1",
+          "go test ./compiler ./cli/cmd/tetra ./tools/cmd/validate-manifest ./tools/cmd/verify-docs -run 'TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries|TestFeatures|TestValidateFeatures|TestVerifyFeatureRegistry' -count=1"
+        ],
+        "docs": [
+          "docs/spec/current_supported_surface.md",
+          "docs/spec/flow_syntax_v1.md",
+          "docs/spec/v1_feature_status.md",
+          "docs/release/v0_4_0_callable_evidence_map.md"
+        ],
+        "release_gate_evidence": [
+          "docs/checklists/v0_4_0_release_gate.md",
+          "reports/v0.4.0/features.json"
+        ]
+      },
+      "notes": "promoted as the v0.4.0 production non-capturing symbol-backed callable Level 1 slice, including non-capturing closure-literal function-typed globals and namespace/selective imported public immutable function-typed global direct calls, local initialization, mutable local reassignment, local struct-field reassignment, and synchronous callback arguments; captured closure escape and full first-class function values remain out of scope",
+      "scope_note": "Required for the Linux-x64 v0.4.0 production objective; implementation, tests, docs, and release-gate evidence buckets are populated for this feature."
+    },
+    {
+      "kind": "feature",
+      "id": "language.callable-level2",
+      "name": "Callable Level 2 captured closure fnptr values",
+      "current_status": "current",
+      "decision": "implement",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "compiler/internal/semantics/checker.go",
+          "compiler/internal/semantics/exprs.go",
+          "compiler/internal/lower/lower.go"
+        ],
+        "tests": [
+          "compiler/tests/callables/function_typed_callable_test.go",
+          "compiler/tests/semantics/closures_semantic_clauses_test.go"
+        ],
+        "docs": [
+          "docs/spec/current_supported_surface.md",
+          "docs/spec/flow_syntax_v1.md",
+          "docs/spec/v1_feature_status.md",
+          "docs/release/v0_4_0_callable_evidence_map.md"
+        ],
+        "release_gate_evidence": [
+          "docs/checklists/v0_4_0_release_gate.md",
+          "reports/v0.4.0/features.json"
+        ]
+      },
+      "notes": "promoted as the v0.4.0 constrained captured-closure fnptr slice for function-typed locals, direct calls, direct synchronous callback arguments, function-typed returns, and supported local/cross-module struct-field or enum-payload paths; arbitrary captured callback passing, heap/thread escape, complete capture matrix, and full first-class callable semantics remain out of scope",
+      "scope_note": "Required for the Linux-x64 v0.4.0 production objective; implementation, tests, docs, and release-gate evidence buckets are populated for this feature."
+    },
+    {
+      "kind": "feature",
+      "id": "language.lifetime-ssa",
+      "name": "Lifetime SSA local join solver",
+      "current_status": "current",
+      "decision": "implement",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "compiler/internal/semantics/region.go",
+          "compiler/internal/semantics/checker.go",
+          "compiler/internal/semantics/exprs.go"
+        ],
+        "tests": [
+          "compiler/tests/ownership/ownership_test.go",
+          "compiler/tests/runtime/resource_finalization_test.go",
+          "compiler/tests/safety/plan250_safety_runtime_test.go",
+          "compiler/tests/ownership/actor_task_ownership_test.go"
+        ],
+        "docs": [
+          "docs/spec/current_supported_surface.md",
+          "docs/spec/ownership_v1.md",
+          "docs/spec/v1_scope.md"
+        ],
+        "release_gate_evidence": [
+          "docs/checklists/v0_4_0_release_gate.md",
+          "reports/v0.4.0/features.json"
+        ]
+      },
+      "notes": "promoted as the v0.4.0 SSA-like local lifetime join solver for ownership/resource branch, match, and loop flows; richer interprocedural proofs remain under full-v1 scope",
+      "scope_note": "Required for the Linux-x64 v0.4.0 production objective; implementation, tests, docs, and release-gate evidence buckets are populated for this feature."
+    },
+    {
+      "kind": "feature",
+      "id": "stdlib.experimental-mirrors",
+      "name": "Standard-library compatibility mirrors",
+      "current_status": "current",
+      "decision": "implement",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "lib/experimental/async.tetra",
+          "lib/experimental/collections.tetra",
+          "lib/experimental/crypto.tetra",
+          "lib/experimental/filesystem.tetra",
+          "lib/experimental/io.tetra",
+          "lib/experimental/math.tetra",
+          "lib/experimental/memory.tetra",
+          "lib/experimental/networking.tetra",
+          "lib/experimental/serialization.tetra",
+          "lib/experimental/slices.tetra",
+          "lib/experimental/strings.tetra",
+          "lib/experimental/sync.tetra",
+          "lib/experimental/testing.tetra",
+          "lib/experimental/time.tetra"
+        ],
+        "tests": [
+          "go test ./compiler -run 'TestExampleExperimentalMath|TestExampleExperimentalMemcpy' -count=1",
+          "go test ./compiler ./cli/cmd/tetra ./tools/cmd/validate-manifest ./tools/cmd/verify-docs -run 'TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries|TestFeatures|TestValidateFeatures|TestVerifyFeatureRegistry' -count=1",
+          "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json"
+        ],
+        "docs": [
+          "docs/spec/stdlib.md",
+          "docs/spec/stdlib_naming_versioning.md",
+          "docs/user/standard_library_guide.md"
+        ],
+        "release_gate_evidence": [
+          "docs/checklists/v0_4_0_release_gate.md",
+          "reports/v0.4.0/features.json"
+        ]
+      },
+      "notes": "promoted as production compatibility mirrors that forward to lib.core.*; stable callers should import lib.core.* directly",
+      "scope_note": "Required for the Linux-x64 v0.4.0 production objective; implementation, tests, docs, and release-gate evidence buckets are populated for this feature."
+    },
+    {
+      "kind": "feature",
+      "id": "ui.metadata-v1",
+      "name": "UI metadata v1 surface",
+      "current_status": "current",
+      "decision": "implement",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "compiler/internal/frontend/parser.go",
+          "compiler/internal/lower/lower.go",
+          "compiler/internal/backend/wasm32_web/ui.go",
+          "compiler/internal/backend/native_shell/codegen.go",
+          "docs/schemas/tetra.ui.v1.schema.json",
+          "examples/ui_web_smoke.tetra",
+          "examples/ui_native_shell_smoke.tetra",
+          "examples/projects/dogfood_web_ui/src/main.tetra"
+        ],
+        "tests": [
+          "go test ./compiler/internal/backend/native_shell ./compiler -run 'TestRenderJSONIncludesDispatchTrace|TestBuildNativeUIWritesShellSidecar|TestNativeShellUIExampleWritesMetadataPreviewSidecar' -count=1",
+          "go test ./compiler -run TestWebUIDogfoodBuildWritesSchemaCheckedArtifacts -count=1",
+          "go test ./compiler/internal/backend/wasm32_web ./compiler/internal/backend/native_shell ./compiler ./tools/cmd/validate-web-ui-smoke -run 'UI|WebUI|NativeUI|ValidateWebUISmoke' -count=1",
+          "go test ./compiler ./cli/cmd/tetra ./tools/cmd/validate-manifest ./tools/cmd/verify-docs -run 'TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries|TestFeatures|TestValidateFeatures|TestVerifyFeatureRegistry' -count=1",
+          "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json"
+        ],
+        "docs": [
+          "docs/spec/ui_v1.md",
+          "docs/spec/current_supported_surface.md",
+          "docs/user/wasm_ui_guide.md",
+          "docs/schemas/tetra.ui.v1.schema.json"
+        ],
+        "release_gate_evidence": [
+          "docs/checklists/v0_4_0_release_gate.md",
+          "reports/v0.4.0/features.json",
+          "reports/v0.4.0/native-ui-linux-x64.json"
+        ]
+      },
+      "notes": "promoted as a production UI metadata contract for tetra.ui.v1 JSON plus native shell command-dispatch sidecars with deterministic widget-tree artifacts; Linux-x64 executable native runtime proof is tracked by ui.native-runtime; wasm32-web production runtime is outside this Linux-x64-only v0.4.0 claim",
+      "scope_note": "Required for the Linux-x64 v0.4.0 production objective; implementation, tests, docs, and release-gate evidence buckets are populated for the metadata contract."
+    },
+    {
+      "kind": "feature",
+      "id": "wasm.runtime-execution",
+      "name": "WASM runtime execution",
+      "current_status": "current",
+      "decision": "exclude-from-v0.4.0-prod",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "notes": "excluded from the Linux-x64-only v0.4.0 production claim; existing WASI/Web runner support remains outside this release objective",
+      "scope_note": "Excluded by the Linux-x64-only v0.4.0 objective; not required for production-final readiness in this scoped release."
+    },
+    {
+      "kind": "feature",
+      "id": "language.full-v1-guarantees",
+      "name": "Full v1.0 language guarantees",
+      "current_status": "planned",
+      "decision": "exclude-from-v0.4.0-prod",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "notes": "future v1.0 release-contract label; excluded from the v0.4.0 Linux-x64 production claim",
+      "scope_note": "Excluded because v0.4.0 is not a full v1.0 language-guarantee release."
+    },
+    {
+      "kind": "feature",
+      "id": "language.full-first-class-callables",
+      "name": "Full first-class callable/function-value semantics",
+      "current_status": "current",
+      "decision": "implement",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "compiler/internal/semantics/callable_escape.go",
+          "compiler/internal/semantics/closure_captures.go",
+          "compiler/internal/semantics/checker.go",
+          "compiler/internal/semantics/function_types.go",
+          "compiler/internal/semantics/exprs.go",
+          "compiler/internal/lower/callables.go",
+          "compiler/internal/lower/lower.go",
+          "compiler/interface.go"
+        ],
+        "tests": [
+          "go test ./compiler -run 'FullCallable|Callable|Closure|FunctionType|Interface' -count=1",
+          "go test ./compiler/internal/semantics -run 'Callable|Closure|FunctionType' -count=1",
+          "go test ./compiler/internal/lower -run 'Callable|FunctionType' -count=1",
+          "go test ./compiler/internal/backend/... -run 'Callable|Closure|FunctionType|ABI' -count=1"
+        ],
+        "docs": [
+          "docs/spec/current_supported_surface.md",
+          "docs/spec/v1_feature_status.md",
+          "docs/release/v0_4_0_callable_evidence_map.md",
+          "docs/release/v0_4_0_completion_audit.md"
+        ],
+        "release_gate_evidence": [
+          "docs/checklists/v0_4_0_release_gate.md",
+          "reports/v0.4.0/features.json"
+        ]
+      },
+      "notes": "promoted as the v0.4.0 safe first-class callable model: bounded fnptr fast path plus fixed 4-slot handle for larger immutable by-value captures, aliases, storage, returns, callback passing, cross-module returned values, and generated interface metadata; mutable by-reference, pointer/resource, and thread-boundary escapes retain stable diagnostics",
+      "scope_note": "Required for the Linux-x64 v0.4.0 production objective; implementation, tests, docs, and release-gate evidence buckets are populated for this feature."
+    },
+    {
+      "kind": "feature",
+      "id": "eco.distributed-network",
+      "name": "Distributed EcoNet and production publishing",
+      "current_status": "post-v1",
+      "decision": "exclude-from-v0.4.0-prod",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "notes": "explicitly excluded from the v0.4.0 production claim; local Eco/package behavior remains separate from distributed EcoNet/TetraHub production networking",
+      "scope_note": "Excluded by user objective: no EcoNet in the initial Linux-x64 v0.4.0 production scope."
+    },
+    {
+      "kind": "feature",
+      "id": "actors.distributed-runtime",
+      "name": "Distributed actor runtime for Linux x64",
+      "current_status": "current",
+      "decision": "implement",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "compiler/internal/actorsrt/linux_x64_emit.go",
+          "compiler/internal/actorsrt/linux_x64.go",
+          "compiler/actorwire/frame.go",
+          "cli/internal/actornet/broker.go",
+          "cli/cmd/tetra/actor_net.go",
+          "tools/validators/actordist/report.go",
+          "tools/cmd/distributed-actor-runtime-smoke/main.go"
+        ],
+        "tests": [
+          "go test ./compiler ./compiler/internal/actorsrt ./cli/internal/actornet ./cli/cmd/tetra ./tools/validators/actordist ./tools/cmd/validate-distributed-actor-runtime ./tools/cmd/validate-v0-4-readiness ./tools/scriptstest -run 'DistributedActor|ActorNet|Actornet|ActorDistributed|ReleaseV040Distributed' -count=1",
+          "bash scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh"
+        ],
+        "docs": [
+          "docs/spec/current_supported_surface.md",
+          "docs/spec/actors.md",
+          "docs/user/async_actors_guide.md",
+          "docs/spec/cli_contracts.md"
+        ],
+        "release_gate_evidence": [
+          "reports/v0.4.0/distributed-actors-linux-x64.json"
+        ]
+      },
+      "notes": "implemented for the Linux-x64 production runtime path; non-Linux-x64 distributed actor targets and broader structured-concurrency guarantees remain outside this claim",
+      "scope_note": "Required for the Linux-x64 v0.4.0 production objective; implementation, tests, docs, and executable Linux-x64 release evidence are populated for this feature."
+    },
+    {
+      "kind": "feature",
+      "id": "ui.native-runtime",
+      "name": "Linux-x64 native UI runtime",
+      "current_status": "current",
+      "decision": "implement",
+      "allowed_decisions": [
+        "implement",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "implementation",
+        "tests",
+        "docs",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "tools/cmd/native-ui-runtime-smoke/main.go",
+          "tools/cmd/validate-native-ui-runtime/main.go",
+          "tools/validators/nativeui/report.go",
+          "compiler/internal/backend/native_shell/codegen.go"
+        ],
+        "tests": [
+          "go test ./tools/validators/nativeui ./tools/cmd/validate-native-ui-runtime ./tools/cmd/native-ui-runtime-smoke -count=1",
+          "bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh",
+          "go run ./tools/cmd/validate-native-ui-runtime --report reports/v0.4.0/native-ui-linux-x64.json",
+          "go test ./tools/cmd/validate-v0-4-readiness ./tools/scriptstest -run 'NativeUI|V040NativeUI|Readiness' -count=1"
+        ],
+        "docs": [
+          "docs/spec/current_supported_surface.md",
+          "docs/spec/ui_v1.md",
+          "docs/user/wasm_ui_guide.md"
+        ],
+        "release_gate_evidence": [
+          "reports/v0.4.0/native-ui-linux-x64.json"
+        ]
+      },
+      "notes": "implemented for the Linux-x64 production native UI runtime path with executable tetra.ui.native-runtime.v1 smoke evidence; macOS/Windows, GTK/Qt/OS toolkit backends, broad input/change/focus behavior, and platform accessibility integration remain outside this claim",
+      "scope_note": "Required for the Linux-x64 v0.4.0 production objective; implementation, tests, docs, and executable Linux-x64 release evidence are populated for this feature."
+    },
+    {
+      "kind": "target-runtime",
+      "id": "linux-x64",
+      "name": "linux-x64",
+      "current_status": "supported",
+      "decision": "implement-production-runtime",
+      "allowed_decisions": [
+        "implement-production-runtime",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "runtime-smoke",
+        "target-validator",
+        "release-gate-evidence"
+      ],
+      "evidence": {
+        "implementation": [
+          "compiler/target/target.go",
+          "compiler/internal/backend/linux_x64/codegen.go",
+          "compiler/internal/backend/x64/emitter.go",
+          "compiler/internal/backend/x64abi/sysv_unix.go"
+        ],
+        "tests": [
+          "go run ./cli/cmd/tetra smoke --target linux-x64 --run=true --report reports/v0.4.0/linux-host-smoke.json",
+          "go test ./compiler/target ./compiler/internal/backend/linux_x64 ./compiler/internal/backend/x64 ./compiler/internal/backend/x64abi ./compiler/internal/backend/x64core ./compiler/internal/backend/x64obj -count=1"
+        ],
+        "docs": [
+          "docs/spec/current_supported_surface.md",
+          "docs/spec/cli_contracts.md"
+        ],
+        "release_gate_evidence": [
+          "reports/v0.4.0/linux-host-smoke.json",
+          "reports/v0.4.0/targets.json"
+        ]
+      },
+      "notes": "implemented as the sole v0.4.0 production runtime target; fresh host-native smoke evidence is reports/v0.4.0/linux-host-smoke.json",
+      "scope_note": "Required for the Linux-x64-only v0.4.0 production objective."
+    },
+    {
+      "kind": "target-runtime",
+      "id": "windows-x64",
+      "name": "windows-x64",
+      "current_status": "supported",
+      "decision": "exclude-from-v0.4.0-prod",
+      "allowed_decisions": [
+        "implement-production-runtime",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "runtime-smoke",
+        "target-validator",
+        "release-gate-evidence"
+      ],
+      "notes": "windows-x64 is outside the Linux-x64-only v0.4.0 production claim",
+      "scope_note": "Excluded by the Linux-x64-only v0.4.0 production objective."
+    },
+    {
+      "kind": "target-runtime",
+      "id": "macos-x64",
+      "name": "macos-x64",
+      "current_status": "supported",
+      "decision": "exclude-from-v0.4.0-prod",
+      "allowed_decisions": [
+        "implement-production-runtime",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "runtime-smoke",
+        "target-validator",
+        "release-gate-evidence"
+      ],
+      "notes": "macos-x64 is outside the Linux-x64-only v0.4.0 production claim",
+      "scope_note": "Excluded by the Linux-x64-only v0.4.0 production objective."
+    },
+    {
+      "kind": "target-runtime",
+      "id": "wasm32-wasi",
+      "name": "wasm32-wasi",
+      "current_status": "supported",
+      "decision": "exclude-from-v0.4.0-prod",
+      "allowed_decisions": [
+        "implement-production-runtime",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "runtime-smoke",
+        "target-validator",
+        "release-gate-evidence"
+      ],
+      "notes": "wasm32-wasi is outside the Linux-x64-only v0.4.0 production claim",
+      "scope_note": "Excluded by the Linux-x64-only v0.4.0 production objective."
+    },
+    {
+      "kind": "target-runtime",
+      "id": "wasm32-web",
+      "name": "wasm32-web",
+      "current_status": "supported",
+      "decision": "exclude-from-v0.4.0-prod",
+      "allowed_decisions": [
+        "implement-production-runtime",
+        "exclude-from-v0.4.0-prod",
+        "defer-after-v0.4.0"
+      ],
+      "evidence_required_if_implemented": [
+        "runtime-smoke",
+        "target-validator",
+        "release-gate-evidence"
+      ],
+      "notes": "wasm32-web is outside the Linux-x64-only v0.4.0 production claim",
+      "scope_note": "Excluded by the Linux-x64-only v0.4.0 production objective."
+    }
+  ],
+  "decision_basis": "User objective narrowed v0.4.0 to a Linux-x64-only production release and explicitly excluded EcoNet; non-Linux target runtimes, WASM target runtimes, and future v1 guarantees are therefore outside the v0.4.0 production claim."
+}

@@ -1,10 +1,491 @@
 {
-  "total": 4,
+  "target": "linux-x64",
+  "build_only": false,
+  "run_supported": true,
+  "total": 62,
   "islands_debug": false,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","expected_exit":0},
-    {"name":"flow_struct_smoke","src_path":"examples/flow_struct_smoke.tetra","expected_exit":42},
-    {"name":"flow_islands_smoke","src_path":"examples/flow_islands_smoke.tetra","expected_exit":0},
-    {"name":"flow_unsafe_cap_mem_smoke","src_path":"examples/flow_unsafe_cap_mem_smoke.tetra","expected_exit":42}
+    {
+      "name": "islands_hello",
+      "src_path": "examples/islands_hello.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "islands_i32",
+      "src_path": "examples/islands_i32.tetra",
+      "target_group": "native",
+      "expected_exit": 55
+    },
+    {
+      "name": "islands_overflow",
+      "src_path": "examples/islands_overflow.tetra",
+      "target_group": "native",
+      "expected_exit": 1
+    },
+    {
+      "name": "mmio_smoke",
+      "src_path": "examples/mmio_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 123
+    },
+    {
+      "name": "cap_mem_smoke",
+      "src_path": "examples/cap_mem_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 77
+    },
+    {
+      "name": "memset_smoke",
+      "src_path": "examples/memset_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 88
+    },
+    {
+      "name": "actors_pingpong",
+      "src_path": "examples/actors_pingpong.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "actor_sleep_pingpong",
+      "src_path": "examples/actor_sleep_pingpong.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "flow_hello",
+      "src_path": "examples/flow_hello.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "flow_struct_smoke",
+      "src_path": "examples/flow_struct_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "flow_islands_smoke",
+      "src_path": "examples/flow_islands_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "flow_unsafe_cap_mem_smoke",
+      "src_path": "examples/flow_unsafe_cap_mem_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "ui_native_shell_smoke",
+      "src_path": "examples/ui_native_shell_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "bool_smoke",
+      "src_path": "examples/bool_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "for_range_smoke",
+      "src_path": "examples/for_range_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 55
+    },
+    {
+      "name": "for_collection_smoke",
+      "src_path": "examples/for_collection_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "for_collection_u8_smoke",
+      "src_path": "examples/for_collection_u8_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "loop_control_smoke",
+      "src_path": "examples/loop_control_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "complex_control_flow_smoke",
+      "src_path": "examples/complex_control_flow_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "unary_not_smoke",
+      "src_path": "examples/unary_not_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "const_smoke",
+      "src_path": "examples/const_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "const_bool_smoke",
+      "src_path": "examples/const_bool_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "local_const_smoke",
+      "src_path": "examples/local_const_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "compound_assignment_smoke",
+      "src_path": "examples/compound_assignment_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "else_if_smoke",
+      "src_path": "examples/else_if_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "enum_match_smoke",
+      "src_path": "examples/enum_match_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "enum_exhaustive_match_smoke",
+      "src_path": "examples/enum_exhaustive_match_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects_io_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "effects_mem_smoke",
+      "src_path": "examples/effects_mem_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 17
+    },
+    {
+      "name": "effects_actors_smoke",
+      "src_path": "examples/effects_actors_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "optional_smoke",
+      "src_path": "examples/optional_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "optional_match_smoke",
+      "src_path": "examples/optional_match_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "optional_match_some_smoke",
+      "src_path": "examples/optional_match_some_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "ownership_smoke",
+      "src_path": "examples/ownership_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "typed_errors_smoke",
+      "src_path": "examples/typed_errors_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "async_smoke",
+      "src_path": "examples/async_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "task_smoke",
+      "src_path": "examples/task_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "time_sleep_smoke",
+      "src_path": "examples/time_sleep_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "task_sleep_deadline_smoke",
+      "src_path": "examples/task_sleep_deadline_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "task_join_wait_smoke",
+      "src_path": "examples/task_join_wait_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 5
+    },
+    {
+      "name": "deadline_aware_waits_smoke",
+      "src_path": "examples/deadline_aware_waits_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "wait_composition_smoke",
+      "src_path": "examples/wait_composition_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "core_math_smoke",
+      "src_path": "examples/core_math_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_memory_smoke",
+      "src_path": "examples/core_memory_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_strings_smoke",
+      "src_path": "examples/core_strings_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_slices_smoke",
+      "src_path": "examples/core_slices_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_io_smoke",
+      "src_path": "examples/core_io_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_testing_smoke",
+      "src_path": "examples/core_testing_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_collections_smoke",
+      "src_path": "examples/core_collections_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_serialization_smoke",
+      "src_path": "examples/core_serialization_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_filesystem_smoke",
+      "src_path": "examples/core_filesystem_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_networking_smoke",
+      "src_path": "examples/core_networking_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_async_smoke",
+      "src_path": "examples/core_async_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_sync_smoke",
+      "src_path": "examples/core_sync_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_time_smoke",
+      "src_path": "examples/core_time_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_crypto_smoke",
+      "src_path": "examples/core_crypto_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "core_capability_smoke",
+      "src_path": "examples/core_capability_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "extension_smoke",
+      "src_path": "examples/extension_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "generic_smoke",
+      "src_path": "examples/generic_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "protocol_impl_smoke",
+      "src_path": "examples/protocol_impl_smoke.tetra",
+      "target_group": "native",
+      "expected_exit": 42
+    },
+    {
+      "name": "dogfood_cli",
+      "src_path": "examples/projects/dogfood_cli/src/main.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    },
+    {
+      "name": "dogfood_actor_task",
+      "src_path": "examples/projects/dogfood_actor_task/src/main.tetra",
+      "target_group": "native",
+      "expected_exit": 0
+    }
+  ],
+  "excluded_examples": [
+    {
+      "src_path": "examples/actors_decl_spawn.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/actors_tagged_stress.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/cap_mem_ptr_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/ctx_switch_sysv_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/ctx_switch_win64_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/enum_payload_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/experimental_math_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/experimental_memcpy_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/flow_grammar_surface_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/generic_struct_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/globals_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/hello.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/islands_double_free.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/projects/dogfood_wasi/src/main.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/projects/dogfood_web_ui/src/main.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/projects/eco_dogfood/src/main.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/projects/hello_t4/Capsule.t4",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/projects/hello_t4/src/main.t4",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/projects/hello_t4/tests/main_test.t4",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/struct_ctor_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/task_bounded_stress.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/tooling_tests.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/ui_web_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/wasm_globals_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/wasm_multi_return_2_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/wasm_multi_return_3_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    },
+    {
+      "src_path": "examples/wasm_multi_return_4_smoke.tetra",
+      "reason": "not part of linux-x64 smoke profile"
+    }
   ]
 }

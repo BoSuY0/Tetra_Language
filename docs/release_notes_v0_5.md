@@ -46,5 +46,5 @@ post-v0.5 work.
 The canonical release verification command is:
 
 ```bash
-bash scripts/release_v0_5_gate.sh
+bash scripts/release/v0_5/gate.sh
 ```

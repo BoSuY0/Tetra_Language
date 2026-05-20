@@ -25,6 +25,7 @@ import (
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/runtimeabi"
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/version"
 	ctarget "tetra_language/compiler/target"
@@ -109,11 +110,12 @@ type moduleBuildJob struct {
 }
 
 type moduleBuildPlan struct {
-	modules         []string
-	publicAPIHashes map[string]string
-	buildTag        string
-	objectsByModule map[string]*Object
-	toCompile       []moduleBuildJob
+	modules           []string
+	publicAPIHashes   map[string]string
+	buildTag          string
+	objectsByModule   map[string]*Object
+	objectlessModules map[string]bool
+	toCompile         []moduleBuildJob
 }
 
 func BuildFileWithStats(inputPath, outputPath, target string) (*BuildStats, error) {
@@ -136,7 +138,7 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	if opt.InterfaceOnly {
 		return interfaceOnlyBuildStats(build.world), nil
 	}
-	linkedObjects, err := prepareLinkedObjects(build.world, opt.LinkObjectPaths, native.triple)
+	linkedObjects, err := prepareLinkedObjects(build.world, build.checked, opt.LinkObjectPaths, native.triple)
 	if err != nil {
 		return nil, err
 	}
@@ -303,12 +305,12 @@ func loadCheckedBuildWorld(inputPath string, opt BuildOptions, requireMain bool)
 	return checkedBuildWorld{world: world, checked: checked}, nil
 }
 
-func prepareLinkedObjects(world *World, paths []string, target string) ([]linkedObject, error) {
+func prepareLinkedObjects(world *World, checked *semantics.CheckedProgram, paths []string, target string) ([]linkedObject, error) {
 	linkedObjects, err := readLinkObjects(paths, target)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateInterfaceImplementationProviders(world, linkedObjects); err != nil {
+	if err := validateInterfaceImplementationProviders(world, checked, linkedObjects); err != nil {
 		return nil, err
 	}
 	return linkedObjects, nil
@@ -382,11 +384,12 @@ func planNativeModuleBuild(world *World, checked *semantics.CheckedProgram, targ
 	}
 
 	return moduleBuildPlan{
-		modules:         modules,
-		publicAPIHashes: publicAPIHashes,
-		buildTag:        buildTag,
-		objectsByModule: objectsByModule,
-		toCompile:       toCompile,
+		modules:           modules,
+		publicAPIHashes:   publicAPIHashes,
+		buildTag:          buildTag,
+		objectsByModule:   objectsByModule,
+		objectlessModules: make(map[string]bool),
+		toCompile:         toCompile,
 	}, stats, nil
 }
 
@@ -445,6 +448,12 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 			mu.Unlock()
 
 			dataPrefix := checked.GlobalDataByModule[job.module]
+			if len(funcs) == 0 {
+				mu.Lock()
+				plan.objectlessModules[job.module] = true
+				mu.Unlock()
+				continue
+			}
 			obj, err := native.codegen(funcs, dataPrefix)
 			if err != nil {
 				setErr(err)
@@ -497,6 +506,9 @@ func objectsFromModulePlan(plan moduleBuildPlan) ([]*Object, error) {
 	for _, module := range plan.modules {
 		obj := plan.objectsByModule[module]
 		if obj == nil {
+			if plan.objectlessModules[module] {
+				continue
+			}
 			return nil, fmt.Errorf("missing object for module '%s'", module)
 		}
 		objects = append(objects, obj)
@@ -514,22 +526,32 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 	taskGroupsUsed := collectTaskGroupRuntimeUsage(checked)
 	typedTasksUsed, typedTaskMaxSlots := collectTypedTaskRuntimeUsage(checked)
 	timeRuntimeUsed := collectTimeRuntimeUsage(checked)
-	runtimeUsed := actorsUsed || actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed
+	filesystemRuntimeUsed, filesystemRuntimePos := collectFilesystemRuntimeUsagePosition(checked)
+	distributedActorsUsed, distributedActorsPos := collectDistributedActorRuntimeUsagePosition(checked)
+	if filesystemRuntimeUsed && native.triple != "linux-x64" {
+		return targetRuntimeDiagnostic(filesystemRuntimePos, native.triple, "filesystem")
+	}
+	if distributedActorsUsed && native.triple != "linux-x64" {
+		return targetRuntimeDiagnostic(distributedActorsPos, native.triple, "distributed actors")
+	}
+	runtimeUsed := actorsUsed || actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed || filesystemRuntimeUsed || distributedActorsUsed
 	if runtimeUsed && len(actorEntries) == 0 {
 		actorEntries = []string{checked.MainName}
 	}
 	mainName := checked.MainName
 	if opt.RuntimeObjectPath != "" && !runtimeUsed {
-		return fmt.Errorf("runtime object override requires runtime usage (no actor/task/time builtins found)")
+		return fmt.Errorf("runtime object override requires runtime usage (no actor/task/time/filesystem/distributed actor builtins found)")
 	}
 	if runtimeUsed {
 		runtimeMode, err := selectRuntimeMode(opt.Runtime, runtimeUsageProfile{
-			actorStateUsed:    actorStateUsed,
-			tasksUsed:         tasksUsed,
-			taskGroupsUsed:    taskGroupsUsed,
-			typedTasksUsed:    typedTasksUsed,
-			typedTaskMaxSlots: typedTaskMaxSlots,
-			timeRuntimeUsed:   timeRuntimeUsed,
+			actorStateUsed:        actorStateUsed,
+			tasksUsed:             tasksUsed,
+			taskGroupsUsed:        taskGroupsUsed,
+			typedTasksUsed:        typedTasksUsed,
+			typedTaskMaxSlots:     typedTaskMaxSlots,
+			timeRuntimeUsed:       timeRuntimeUsed,
+			filesystemUsed:        filesystemRuntimeUsed,
+			distributedActorsUsed: distributedActorsUsed,
 		})
 		if err != nil {
 			return err
@@ -561,6 +583,7 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 			if err != nil {
 				return err
 			}
+			annotateRuntimeObjectSignatures(rt)
 		}
 		if err := validateActorRuntimeObject(rt); err != nil {
 			return err
@@ -590,6 +613,16 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 				return err
 			}
 		}
+		if filesystemRuntimeUsed {
+			if err := validateFilesystemRuntimeObject(rt); err != nil {
+				return err
+			}
+		}
+		if distributedActorsUsed {
+			if err := validateDistributedActorRuntimeObject(rt); err != nil {
+				return err
+			}
+		}
 
 		for _, sym := range rt.Symbols {
 			if sym.Name == "__tetra_actor_dispatch" {
@@ -615,6 +648,9 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 					return err
 				}
 				glueFuncs = append(glueFuncs, mainIDFn)
+			}
+			if err := verifyIRFuncs(glueFuncs); err != nil {
+				return fmt.Errorf("generated actor glue verifier: %w", err)
 			}
 			glueObj, err := native.codegen(glueFuncs, nil)
 			if err != nil {
@@ -648,23 +684,28 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 }
 
 type runtimeUsageProfile struct {
-	actorStateUsed    bool
-	tasksUsed         bool
-	taskGroupsUsed    bool
-	typedTasksUsed    bool
-	typedTaskMaxSlots int
-	timeRuntimeUsed   bool
+	actorStateUsed        bool
+	tasksUsed             bool
+	taskGroupsUsed        bool
+	typedTasksUsed        bool
+	typedTaskMaxSlots     int
+	timeRuntimeUsed       bool
+	filesystemUsed        bool
+	distributedActorsUsed bool
 }
 
 func selectRuntimeMode(requested RuntimeMode, usage runtimeUsageProfile) (RuntimeMode, error) {
 	switch requested {
 	case RuntimeAuto:
 		// Default to self-host runtime when its ABI can express the program surface.
-		if usage.actorStateUsed || usage.tasksUsed || usage.taskGroupsUsed || usage.typedTasksUsed || usage.timeRuntimeUsed || usage.typedTaskMaxSlots > 4 {
+		if usage.actorStateUsed || usage.tasksUsed || usage.taskGroupsUsed || usage.typedTasksUsed || usage.timeRuntimeUsed || usage.filesystemUsed || usage.distributedActorsUsed || usage.typedTaskMaxSlots > 4 {
 			return RuntimeBuiltin, nil
 		}
 		return RuntimeSelfHost, nil
 	case RuntimeSelfHost:
+		if usage.distributedActorsUsed {
+			return 0, fmt.Errorf("self-host runtime does not support distributed actors; use runtime=auto or runtime=builtin")
+		}
 		if usage.typedTasksUsed {
 			return 0, fmt.Errorf("self-host runtime does not support typed task handles; use runtime=auto or runtime=builtin")
 		}
@@ -677,182 +718,129 @@ func selectRuntimeMode(requested RuntimeMode, usage runtimeUsageProfile) (Runtim
 }
 
 func requiredActorRuntimeSymbols() []string {
-	return []string{
-		"__tetra_entry",
-		"__tetra_actor_spawn",
-		"__tetra_actor_send",
-		"__tetra_actor_send_msg",
-		"__tetra_actor_send_begin",
-		"__tetra_actor_send_slot",
-		"__tetra_actor_send_commit",
-		"__tetra_actor_recv",
-		"__tetra_actor_recv_msg",
-		"__tetra_actor_recv_poll",
-		"__tetra_actor_recv_until",
-		"__tetra_actor_recv_msg_until",
-		"__tetra_actor_recv_begin",
-		"__tetra_actor_recv_slot",
-		"__tetra_actor_recv_count",
-		"__tetra_actor_self",
-		"__tetra_actor_sender",
-		"__tetra_actor_yield_now",
-	}
+	return runtimeabi.RequiredActorSymbols()
 }
 
 func requiredActorStateRuntimeSymbols() []string {
-	return []string{
-		"__tetra_actor_state_load",
-		"__tetra_actor_state_store",
-	}
+	return runtimeabi.RequiredActorStateSymbols()
+}
+
+func requiredDistributedActorRuntimeSymbols() []string {
+	return runtimeabi.RequiredDistributedActorSymbols()
 }
 
 func requiredTaskRuntimeSymbols() []string {
-	return []string{
-		"__tetra_task_spawn_i32",
-		"__tetra_task_join_i32",
-		"__tetra_task_join_result_i32",
-		"__tetra_task_join_until_i32",
-		"__tetra_task_poll_i32",
-		"__tetra_task_is_canceled",
-		"__tetra_task_checkpoint",
-	}
+	return runtimeabi.RequiredTaskSymbols()
 }
 
 func requiredTaskGroupRuntimeSymbols() []string {
-	return []string{
-		"__tetra_task_group_open",
-		"__tetra_task_group_close",
-		"__tetra_task_group_cancel",
-		"__tetra_task_group_current",
-		"__tetra_task_group_status",
-		"__tetra_task_spawn_group_i32",
-	}
+	return runtimeabi.RequiredTaskGroupSymbols()
 }
 
 func requiredTypedTaskRuntimeSymbols(maxSlots int) []string {
-	if maxSlots < 2 {
-		maxSlots = 2
-	}
-	if maxSlots > 8 {
-		maxSlots = 8
-	}
-	symbols := []string{
-		"__tetra_task_result_begin",
-		"__tetra_task_result_slot",
-	}
-	if maxSlots > 4 {
-		symbols = append(symbols, "__tetra_task_result_get")
-	}
-	for slots := 2; slots <= maxSlots; slots++ {
-		symbols = append(symbols, fmt.Sprintf("__tetra_task_join_typed_%d", slots))
-	}
-	return symbols
+	return runtimeabi.RequiredTypedTaskSymbols(maxSlots)
 }
 
 func requiredTimeRuntimeSymbols() []string {
-	return []string{
-		"__tetra_time_now_ms",
-		"__tetra_sleep_ms",
-		"__tetra_sleep_until_ms",
-		"__tetra_deadline_ms",
-		"__tetra_timer_ready_ms",
+	return runtimeabi.RequiredTimeSymbols()
+}
+
+func requiredFilesystemRuntimeSymbols() []string {
+	return runtimeabi.RequiredFilesystemSymbols()
+}
+
+type runtimeObjectSlotSignature struct {
+	paramSlots  int
+	returnSlots int
+}
+
+func runtimeObjectSignature(name string) (runtimeObjectSlotSignature, bool) {
+	sig, ok := runtimeabi.SignatureForSymbol(name)
+	if !ok {
+		return runtimeObjectSlotSignature{}, false
 	}
+	return runtimeObjectSlotSignature{paramSlots: sig.ParamSlots, returnSlots: sig.ReturnSlots}, true
+}
+
+func annotateRuntimeObjectSignatures(rt *Object) {
+	if rt == nil {
+		return
+	}
+	for i := range rt.Symbols {
+		if rt.Symbols[i].HasSignature {
+			continue
+		}
+		sig, ok := runtimeObjectSignature(rt.Symbols[i].Name)
+		if !ok {
+			continue
+		}
+		rt.Symbols[i].HasSignature = true
+		rt.Symbols[i].ParamSlots = sig.paramSlots
+		rt.Symbols[i].ReturnSlots = sig.returnSlots
+	}
+}
+
+func validateRuntimeObjectSymbols(rt *Object, missingObject string, required []string) error {
+	if rt == nil {
+		return fmt.Errorf("%s", missingObject)
+	}
+	symbols := make(map[string]Symbol, len(rt.Symbols))
+	for _, sym := range rt.Symbols {
+		symbols[sym.Name] = sym
+	}
+	for _, name := range required {
+		sym, ok := symbols[name]
+		if !ok {
+			return fmt.Errorf("runtime object missing required symbol '%s'", name)
+		}
+		expected, ok := runtimeObjectSignature(name)
+		if !ok || !sym.HasSignature {
+			continue
+		}
+		if sym.ParamSlots != expected.paramSlots || sym.ReturnSlots != expected.returnSlots {
+			return fmt.Errorf(
+				"runtime object symbol '%s' signature mismatch: params=%d want=%d returns=%d want=%d",
+				name,
+				sym.ParamSlots,
+				expected.paramSlots,
+				sym.ReturnSlots,
+				expected.returnSlots,
+			)
+		}
+	}
+	return nil
 }
 
 func validateActorRuntimeObject(rt *Object) error {
-	if rt == nil {
-		return fmt.Errorf("missing actors runtime object")
-	}
-	symbols := make(map[string]struct{}, len(rt.Symbols))
-	for _, sym := range rt.Symbols {
-		symbols[sym.Name] = struct{}{}
-	}
-	for _, name := range requiredActorRuntimeSymbols() {
-		if _, ok := symbols[name]; !ok {
-			return fmt.Errorf("runtime object missing required symbol '%s'", name)
-		}
-	}
-	return nil
+	return validateRuntimeObjectSymbols(rt, "missing actors runtime object", requiredActorRuntimeSymbols())
 }
 
 func validateActorStateRuntimeObject(rt *Object) error {
-	if rt == nil {
-		return fmt.Errorf("missing actors runtime object")
-	}
-	symbols := make(map[string]struct{}, len(rt.Symbols))
-	for _, sym := range rt.Symbols {
-		symbols[sym.Name] = struct{}{}
-	}
-	for _, name := range requiredActorStateRuntimeSymbols() {
-		if _, ok := symbols[name]; !ok {
-			return fmt.Errorf("runtime object missing required symbol '%s'", name)
-		}
-	}
-	return nil
+	return validateRuntimeObjectSymbols(rt, "missing actors runtime object", requiredActorStateRuntimeSymbols())
+}
+
+func validateDistributedActorRuntimeObject(rt *Object) error {
+	return validateRuntimeObjectSymbols(rt, "missing distributed actors runtime object", requiredDistributedActorRuntimeSymbols())
 }
 
 func validateTimeRuntimeObject(rt *Object) error {
-	if rt == nil {
-		return fmt.Errorf("missing time runtime object")
-	}
-	symbols := make(map[string]struct{}, len(rt.Symbols))
-	for _, sym := range rt.Symbols {
-		symbols[sym.Name] = struct{}{}
-	}
-	for _, name := range requiredTimeRuntimeSymbols() {
-		if _, ok := symbols[name]; !ok {
-			return fmt.Errorf("runtime object missing required symbol '%s'", name)
-		}
-	}
-	return nil
+	return validateRuntimeObjectSymbols(rt, "missing time runtime object", requiredTimeRuntimeSymbols())
+}
+
+func validateFilesystemRuntimeObject(rt *Object) error {
+	return validateRuntimeObjectSymbols(rt, "missing filesystem runtime object", requiredFilesystemRuntimeSymbols())
 }
 
 func validateTypedTaskRuntimeObject(rt *Object, maxSlots int) error {
-	if rt == nil {
-		return fmt.Errorf("missing typed task runtime object")
-	}
-	symbols := make(map[string]struct{}, len(rt.Symbols))
-	for _, sym := range rt.Symbols {
-		symbols[sym.Name] = struct{}{}
-	}
-	for _, name := range requiredTypedTaskRuntimeSymbols(maxSlots) {
-		if _, ok := symbols[name]; !ok {
-			return fmt.Errorf("runtime object missing required symbol '%s'", name)
-		}
-	}
-	return nil
+	return validateRuntimeObjectSymbols(rt, "missing typed task runtime object", requiredTypedTaskRuntimeSymbols(maxSlots))
 }
 
 func validateTaskRuntimeObject(rt *Object) error {
-	if rt == nil {
-		return fmt.Errorf("missing task runtime object")
-	}
-	symbols := make(map[string]struct{}, len(rt.Symbols))
-	for _, sym := range rt.Symbols {
-		symbols[sym.Name] = struct{}{}
-	}
-	for _, name := range requiredTaskRuntimeSymbols() {
-		if _, ok := symbols[name]; !ok {
-			return fmt.Errorf("runtime object missing required symbol '%s'", name)
-		}
-	}
-	return nil
+	return validateRuntimeObjectSymbols(rt, "missing task runtime object", requiredTaskRuntimeSymbols())
 }
 
 func validateTaskGroupRuntimeObject(rt *Object) error {
-	if rt == nil {
-		return fmt.Errorf("missing task group runtime object")
-	}
-	symbols := make(map[string]struct{}, len(rt.Symbols))
-	for _, sym := range rt.Symbols {
-		symbols[sym.Name] = struct{}{}
-	}
-	for _, name := range requiredTaskGroupRuntimeSymbols() {
-		if _, ok := symbols[name]; !ok {
-			return fmt.Errorf("runtime object missing required symbol '%s'", name)
-		}
-	}
-	return nil
+	return validateRuntimeObjectSymbols(rt, "missing task group runtime object", requiredTaskGroupRuntimeSymbols())
 }
 
 func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target, opt BuildOptions) (*BuildStats, error) {
@@ -962,6 +950,8 @@ func buildWASM32WASIWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 	sort.Strings(modules)
 
 	var funcs []IRFunc
+	var dataPrefix [][]byte
+	globalOffset := 0
 	stats := &BuildStats{
 		CompiledModules: make([]string, 0, len(modules)),
 		LoweredModules:  make([]string, 0, len(modules)),
@@ -973,10 +963,19 @@ func buildWASM32WASIWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 		}
 		stats.LoweredModules = append(stats.LoweredModules, module)
 		stats.CompiledModules = append(stats.CompiledModules, module)
-		funcs = append(funcs, moduleFuncs...)
+		funcs = append(funcs, relocateWASMGlobalSlots(moduleFuncs, globalOffset)...)
+		moduleData := checked.GlobalDataByModule[module]
+		dataPrefix = append(dataPrefix, moduleData...)
+		globalOffset += len(moduleData)
+	}
+	if err := validateWASMIRPolicy(tgt.Triple, funcs); err != nil {
+		return nil, err
+	}
+	if err := rejectUnsupportedWASMRuntimeBuiltins(funcs, tgt.Triple); err != nil {
+		return nil, err
 	}
 
-	obj, err := wasm32_wasi.CodegenObject(funcs, checked.MainName)
+	obj, err := wasm32_wasi.CodegenObjectWithDataPrefix(funcs, checked.MainName, dataPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -1029,6 +1028,8 @@ func buildWASM32WEBWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target
 	sort.Strings(modules)
 
 	var funcs []IRFunc
+	var dataPrefix [][]byte
+	globalOffset := 0
 	stats := &BuildStats{
 		CompiledModules: make([]string, 0, len(modules)),
 		LoweredModules:  make([]string, 0, len(modules)),
@@ -1040,10 +1041,19 @@ func buildWASM32WEBWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target
 		}
 		stats.LoweredModules = append(stats.LoweredModules, module)
 		stats.CompiledModules = append(stats.CompiledModules, module)
-		funcs = append(funcs, moduleFuncs...)
+		funcs = append(funcs, relocateWASMGlobalSlots(moduleFuncs, globalOffset)...)
+		moduleData := checked.GlobalDataByModule[module]
+		dataPrefix = append(dataPrefix, moduleData...)
+		globalOffset += len(moduleData)
+	}
+	if err := validateWASMIRPolicy(tgt.Triple, funcs); err != nil {
+		return nil, err
+	}
+	if err := rejectUnsupportedWASMRuntimeBuiltins(funcs, tgt.Triple); err != nil {
+		return nil, err
 	}
 
-	obj, err := wasm32_web.CodegenObject(funcs, checked.MainName)
+	obj, err := wasm32_web.CodegenObjectWithDataPrefix(funcs, checked.MainName, dataPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -1072,6 +1082,152 @@ func wasmWebLoaderPath(outputPath string) string {
 		return strings.TrimSuffix(outputPath, ext) + ".mjs"
 	}
 	return outputPath + ".mjs"
+}
+
+func relocateWASMGlobalSlots(funcs []IRFunc, offset int) []IRFunc {
+	if offset == 0 {
+		return funcs
+	}
+	out := make([]IRFunc, len(funcs))
+	for i, fn := range funcs {
+		out[i] = fn
+		if len(fn.Instrs) == 0 {
+			continue
+		}
+		out[i].Instrs = append([]ir.IRInstr(nil), fn.Instrs...)
+		for j := range out[i].Instrs {
+			switch out[i].Instrs[j].Kind {
+			case ir.IRLoadGlobal, ir.IRStoreGlobal:
+				out[i].Instrs[j].Local += offset
+			}
+		}
+	}
+	return out
+}
+
+func rejectUnsupportedWASMRuntimeBuiltins(funcs []IRFunc, target string) error {
+	for _, fn := range funcs {
+		for _, instr := range fn.Instrs {
+			if instr.Kind != ir.IRCall {
+				continue
+			}
+			runtimeName, ok := wasmRuntimeNameForBuiltin(instr.Name)
+			if !ok {
+				continue
+			}
+			return targetRuntimeDiagnostic(instr.Pos, target, runtimeName)
+		}
+	}
+	return nil
+}
+
+func wasmRuntimeNameForBuiltin(name string) (string, bool) {
+	switch {
+	case strings.HasPrefix(name, "__tetra_actor_"):
+		return "actors", true
+	case strings.HasPrefix(name, "__tetra_task_"):
+		return "task", true
+	case strings.HasPrefix(name, "__tetra_fs_"):
+		return "filesystem", true
+	case strings.HasPrefix(name, "__tetra_time_"), name == "__tetra_sleep_ms", name == "__tetra_sleep_until_ms", name == "__tetra_deadline_ms", name == "__tetra_timer_ready_ms":
+		return "time", true
+	default:
+		return "", false
+	}
+}
+
+func targetRuntimeDiagnostic(pos frontend.Position, target string, runtimeName string) error {
+	hint := "Build this source for a native x64 target or remove the runtime builtin for this WASM target."
+	if !strings.HasPrefix(target, "wasm32-") {
+		hint = fmt.Sprintf("Build this source for linux-x64 or remove the %s runtime builtin for this target.", runtimeName)
+	}
+	return &frontend.DiagnosticError{Info: frontend.Diagnostic{
+		Code:     DiagnosticCodeTargetRuntime,
+		Message:  fmt.Sprintf("%s runtime not supported on %s", runtimeName, target),
+		File:     pos.File,
+		Line:     pos.Line,
+		Column:   pos.Col,
+		Severity: "error",
+		Hint:     hint,
+	}}
+}
+
+type wasmIRPolicy struct {
+	builtin  string
+	category string
+}
+
+func validateWASMIRPolicy(target string, funcs []IRFunc) error {
+	if !strings.HasPrefix(target, "wasm32-") {
+		return nil
+	}
+	for _, fn := range funcs {
+		for _, instr := range fn.Instrs {
+			policy, blocked := blockedWASMIRPolicy(instr.Kind)
+			if !blocked {
+				continue
+			}
+			return targetWASMPolicyDiagnostic(instr.Pos, target, policy)
+		}
+	}
+	return nil
+}
+
+func blockedWASMIRPolicy(kind ir.IRInstrKind) (wasmIRPolicy, bool) {
+	switch kind {
+	case ir.IRAllocBytes:
+		return wasmIRPolicy{builtin: "core.alloc_bytes", category: "raw memory allocation"}, true
+	case ir.IRCapIO:
+		return wasmIRPolicy{builtin: "core.cap_io", category: "capability token construction"}, true
+	case ir.IRCapMem:
+		return wasmIRPolicy{builtin: "core.cap_mem", category: "capability token construction"}, true
+	case ir.IRMemReadI32:
+		return wasmIRPolicy{builtin: "core.load_i32", category: "raw memory access"}, true
+	case ir.IRMemWriteI32:
+		return wasmIRPolicy{builtin: "core.store_i32", category: "raw memory access"}, true
+	case ir.IRMemReadU8:
+		return wasmIRPolicy{builtin: "core.load_u8", category: "raw memory access"}, true
+	case ir.IRMemWriteU8:
+		return wasmIRPolicy{builtin: "core.store_u8", category: "raw memory access"}, true
+	case ir.IRMemReadPtr:
+		return wasmIRPolicy{builtin: "core.load_ptr", category: "raw pointer memory access"}, true
+	case ir.IRMemWritePtr:
+		return wasmIRPolicy{builtin: "core.store_ptr", category: "raw pointer memory access"}, true
+	case ir.IRMemReadI32Offset:
+		return wasmIRPolicy{builtin: "core.load_i32", category: "raw memory access"}, true
+	case ir.IRMemWriteI32Offset:
+		return wasmIRPolicy{builtin: "core.store_i32", category: "raw memory access"}, true
+	case ir.IRMemReadU8Offset:
+		return wasmIRPolicy{builtin: "core.load_u8", category: "raw memory access"}, true
+	case ir.IRMemWriteU8Offset:
+		return wasmIRPolicy{builtin: "core.store_u8", category: "raw memory access"}, true
+	case ir.IRMemReadPtrOffset:
+		return wasmIRPolicy{builtin: "core.load_ptr", category: "raw pointer memory access"}, true
+	case ir.IRMemWritePtrOffset:
+		return wasmIRPolicy{builtin: "core.store_ptr", category: "raw pointer memory access"}, true
+	case ir.IRPtrAdd:
+		return wasmIRPolicy{builtin: "core.ptr_add", category: "raw pointer arithmetic"}, true
+	case ir.IRMmioReadI32:
+		return wasmIRPolicy{builtin: "core.mmio_read_i32", category: "MMIO"}, true
+	case ir.IRMmioWriteI32:
+		return wasmIRPolicy{builtin: "core.mmio_write_i32", category: "MMIO"}, true
+	case ir.IRCtxSwitch:
+		return wasmIRPolicy{builtin: "core.ctx_switch", category: "context switching"}, true
+	default:
+		return wasmIRPolicy{}, false
+	}
+}
+
+func targetWASMPolicyDiagnostic(pos frontend.Position, target string, policy wasmIRPolicy) error {
+	return &frontend.DiagnosticError{Info: frontend.Diagnostic{
+		Code:     DiagnosticCodeTargetRuntime,
+		Message:  fmt.Sprintf("%s target does not support %s (%s); unsupported on WASM targets by policy", target, policy.builtin, policy.category),
+		File:     pos.File,
+		Line:     pos.Line,
+		Column:   pos.Col,
+		Severity: "error",
+		Hint:     "Build this unsafe/capability memory path for a native x64 target, or replace it with the supported WASM-safe slice/island surface.",
+	}}
 }
 
 func emitUIArtifacts(outputPath string, target string, checked *semantics.CheckedProgram) error {
@@ -1110,6 +1266,10 @@ func emitUIArtifacts(outputPath string, target string, checked *semantics.Checke
 	}
 	shellPath := base + ".ui.shell.txt"
 	if err := os.WriteFile(shellPath, native_shell.Render(bundle), 0o644); err != nil {
+		return err
+	}
+	shellJSONPath := base + ".ui.shell.json"
+	if err := os.WriteFile(shellJSONPath, native_shell.RenderJSON(bundle), 0o644); err != nil {
 		return err
 	}
 	return nil
@@ -1215,7 +1375,7 @@ func validateLinkedObjectSymbols(current linkedObject, seen map[string]linkedObj
 	return nil
 }
 
-func validateInterfaceImplementationProviders(world *World, linked []linkedObject) error {
+func validateInterfaceImplementationProviders(world *World, checked *semantics.CheckedProgram, linked []linkedObject) error {
 	modules := sortedInterfaceModules(world)
 	if len(modules) == 0 {
 		return nil
@@ -1246,7 +1406,7 @@ func validateInterfaceImplementationProviders(world *World, linked []linkedObjec
 		if obj.PublicAPIHash != want {
 			return fmt.Errorf("public API hash mismatch for interface module '%s': object %s, interface %s (%s)", obj.Module, obj.PublicAPIHash, want, linked.path)
 		}
-		if err := validateInterfaceImplementationSymbols(world, obj.Module, obj, linked.path); err != nil {
+		if err := validateInterfaceImplementationSymbols(world, checked, obj.Module, obj, linked.path); err != nil {
 			return err
 		}
 		providers[obj.Module] = linked
@@ -1259,17 +1419,66 @@ func validateInterfaceImplementationProviders(world *World, linked []linkedObjec
 	return nil
 }
 
-func validateInterfaceImplementationSymbols(world *World, module string, obj *Object, path string) error {
-	symbols := make(map[string]struct{}, len(obj.Symbols))
+func validateInterfaceImplementationSymbols(world *World, checked *semantics.CheckedProgram, module string, obj *Object, path string) error {
+	symbols := make(map[string]Symbol, len(obj.Symbols))
 	for _, sym := range obj.Symbols {
-		symbols[sym.Name] = struct{}{}
+		symbols[sym.Name] = sym
+	}
+	for _, name := range unsupportedInterfaceModuleGenericSymbols(world, module) {
+		return fmt.Errorf("implementation object for interface module '%s' cannot satisfy generic export '%s'; precompiled link objects require monomorphic exported functions (%s)", module, name, path)
 	}
 	for _, name := range expectedInterfaceModuleSymbols(world, module) {
-		if _, ok := symbols[name]; !ok {
+		sym, ok := symbols[name]
+		if !ok {
 			return fmt.Errorf("implementation object for interface module '%s' missing exported symbol '%s' (%s)", module, name, path)
+		}
+		if !sym.HasSignature {
+			return fmt.Errorf("implementation object for interface module '%s' symbol '%s' missing signature metadata (%s)", module, name, path)
+		}
+		if checked == nil || checked.FuncSigs == nil {
+			continue
+		}
+		want, ok := checked.FuncSigs[name]
+		if !ok {
+			continue
+		}
+		if sym.ParamSlots != want.ParamSlots || sym.ReturnSlots != want.ReturnSlots {
+			return fmt.Errorf(
+				"implementation object for interface module '%s' symbol '%s' signature mismatch: params=%d want=%d returns=%d want=%d (%s)",
+				module,
+				name,
+				sym.ParamSlots,
+				want.ParamSlots,
+				sym.ReturnSlots,
+				want.ReturnSlots,
+				path,
+			)
 		}
 	}
 	return nil
+}
+
+func unsupportedInterfaceModuleGenericSymbols(world *World, module string) []string {
+	if world == nil || world.ByModule == nil {
+		return nil
+	}
+	file := world.ByModule[module]
+	if file == nil {
+		return nil
+	}
+	var symbols []string
+	for _, fn := range file.Funcs {
+		if fn == nil || fn.Synthetic || len(fn.TypeParams) == 0 {
+			continue
+		}
+		name := fn.Name
+		if fn.ExtensionOf == "" {
+			name = qualifyObjectSymbol(module, fn.Name)
+		}
+		symbols = append(symbols, name)
+	}
+	sort.Strings(symbols)
+	return symbols
 }
 
 func expectedInterfaceModuleSymbols(world *World, module string) []string {
@@ -1282,7 +1491,7 @@ func expectedInterfaceModuleSymbols(world *World, module string) []string {
 	}
 	var symbols []string
 	for _, fn := range file.Funcs {
-		if fn == nil || fn.Synthetic {
+		if fn == nil || fn.Synthetic || len(fn.TypeParams) > 0 {
 			continue
 		}
 		name := fn.Name
@@ -1375,6 +1584,18 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 						}
 					}
 				}
+			case "core.spawn_remote":
+				used = true
+				if len(e.Args) == 2 {
+					if lit, ok := e.Args[1].(*frontend.StringLitExpr); ok {
+						name := string(lit.Value)
+						if name != "" {
+							targets[name] = struct{}{}
+						}
+					}
+				}
+			case "core.actor_node_connect", "core.actor_node_status":
+				used = true
 			case "core.task_spawn_i32":
 				used = true
 				if len(e.Args) == 1 {
@@ -1977,6 +2198,132 @@ func collectTypedTaskRuntimeUsage(checked *semantics.CheckedProgram) (bool, int)
 	return used, maxSlots
 }
 
+func collectDistributedActorRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
+	if checked == nil {
+		return false, frontend.Position{}
+	}
+	var used bool
+	var first frontend.Position
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	mark := func(pos frontend.Position) {
+		if !used {
+			used = true
+			first = pos
+		}
+	}
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
+			case "core.actor_node_connect", "core.spawn_remote", "core.actor_node_status":
+				mark(e.At)
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return used, first
+}
+
 func collectTimeRuntimeUsage(checked *semantics.CheckedProgram) bool {
 	if checked == nil {
 		return false
@@ -2095,6 +2442,132 @@ func collectTimeRuntimeUsage(checked *semantics.CheckedProgram) bool {
 	return used
 }
 
+func collectFilesystemRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	used, _ := collectFilesystemRuntimeUsagePosition(checked)
+	return used
+}
+
+func collectFilesystemRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
+	if checked == nil {
+		return false, frontend.Position{}
+	}
+	var used bool
+	var pos frontend.Position
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			if name == "core.fs_exists" {
+				used = true
+				if pos.Line == 0 && pos.Col == 0 {
+					pos = e.At
+				}
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return used, pos
+}
+
 func fnv1a32(s string) uint32 {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(s))
@@ -2140,6 +2613,10 @@ func buildActorDispatchFunc(entries []string, checked *semantics.CheckedProgram)
 	}
 
 	var instrs []ir.IRInstr
+	localSlots := 1
+	if len(initByEntry) > 0 {
+		localSlots = 2
+	}
 	nextLabel := 1
 	for _, name := range entries {
 		id := int32(fnv1a32(name))
@@ -2157,7 +2634,8 @@ func buildActorDispatchFunc(entries []string, checked *semantics.CheckedProgram)
 				instrs = append(instrs,
 					ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(field.Slot)},
 					ir.IRInstr{Kind: ir.IRConstI32, Imm: field.Init},
-					ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_state_store", ArgSlots: 2, RetSlots: 0},
+					ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_state_store", ArgSlots: 2, RetSlots: 1},
+					ir.IRInstr{Kind: ir.IRStoreLocal, Local: 1},
 				)
 			}
 		}
@@ -2176,7 +2654,7 @@ func buildActorDispatchFunc(entries []string, checked *semantics.CheckedProgram)
 	return IRFunc{
 		Name:        "__tetra_actor_dispatch",
 		ParamSlots:  1,
-		LocalSlots:  1,
+		LocalSlots:  localSlots,
 		ReturnSlots: 1,
 		Instrs:      instrs,
 	}, nil

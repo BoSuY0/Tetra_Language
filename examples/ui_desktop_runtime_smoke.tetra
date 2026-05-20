@@ -1,0 +1,27 @@
+state DesktopState:
+    var saves: Int = 0
+    var title: String = "Ready"
+    var name: String = "tetra"
+    var selected: String = "item-1"
+
+view DesktopView(state: DesktopState):
+    bind titleText: String = state.title
+    bind nameText: String = state.name
+    bind selectedText: String = state.selected
+    event rename -> rename
+    event select -> selectSecond
+    event save -> save
+    command rename:
+        state.name = "tetra-lang"
+    command selectSecond:
+        state.selected = "item-2"
+    command save:
+        state.saves = state.saves + 1
+        state.title = "Saved"
+    style width: Int = 640
+    style height: Int = 480
+    accessibility role: String = "application"
+    accessibility description: String = "Desktop runtime production smoke"
+
+func main() -> Int:
+    return 0

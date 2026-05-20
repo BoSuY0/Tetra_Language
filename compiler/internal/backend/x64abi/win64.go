@@ -45,8 +45,14 @@ func (a *Win64) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, call
 	if stackDepth == nil || callPatches == nil {
 		return fmt.Errorf("internal error: missing stackDepth/callPatches")
 	}
-	if instr.ArgSlots < 0 {
-		return fmt.Errorf("invalid argument count")
+	if instr.Name == "" {
+		return fmt.Errorf("call is missing target name")
+	}
+	if instr.ArgSlots < 0 || instr.RetSlots < 0 {
+		return fmt.Errorf("call %q has negative ABI slots args=%d rets=%d", instr.Name, instr.ArgSlots, instr.RetSlots)
+	}
+	if instr.RetSlots > maxCallReturnSlots {
+		return fmt.Errorf("call %q has unsupported return slots %d (max=%d)", instr.Name, instr.RetSlots, maxCallReturnSlots)
 	}
 	if *stackDepth < instr.ArgSlots {
 		return fmt.Errorf("stack underflow in function '%s'", instr.Name)
@@ -108,6 +114,30 @@ func (a *Win64) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, call
 	}
 	if instr.RetSlots > 3 {
 		e.PushR9()
+		*stackDepth++
+	}
+	if instr.RetSlots > 4 {
+		e.PushR10()
+		*stackDepth++
+	}
+	if instr.RetSlots > 5 {
+		e.PushR11()
+		*stackDepth++
+	}
+	if instr.RetSlots > 6 {
+		e.PushR12()
+		*stackDepth++
+	}
+	if instr.RetSlots > 7 {
+		e.PushR13()
+		*stackDepth++
+	}
+	if instr.RetSlots > 8 {
+		e.PushR14()
+		*stackDepth++
+	}
+	if instr.RetSlots > 9 {
+		e.PushR15()
 		*stackDepth++
 	}
 	return nil

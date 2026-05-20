@@ -1,9 +1,9 @@
 # Roadmap v0.6 -> v1.0 (Maximal Production Release)
 
 Status: historical roadmap. The current release truth is
-`docs/spec/current_supported_surface.md`; the future v1 scope is
-`docs/spec/v1_scope.md`; the active TODO is
-`docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+`docs/spec/current_supported_surface.md`; the future v1 scope and gate evidence
+are tracked in `docs/spec/v1_scope.md` and
+`docs/checklists/v1_0_release_gate.md`.
 
 Tetra 1.0 is the production line for the final platform profile: Flow-only
 syntax, stable compiler/tooling, Rust-grade ownership safety, no data races in
@@ -25,10 +25,10 @@ Eco/Todex, and beta network publishing.
 
 - Keep the current-version stabilization gate green while new 1.0 work lands
   behind focused tests.
-- Maintain `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`,
-  `docs/checklists/v1_0_release_gate.md`, and the draft release notes as the
+- Maintain `docs/spec/v1_scope.md`, `docs/checklists/v1_0_release_gate.md`,
+  and the draft release notes as the
   source of truth for 1.0 readiness.
-- Keep `scripts/release_v1_0_gate.sh` intentionally failing until the release
+- Keep `scripts/release/v1_0/gate.sh` intentionally failing until the release
   version and all mandatory capability checks are implemented.
 
 ## Wave 1: Flow-Only Frontend
@@ -120,8 +120,8 @@ Eco/Todex, and beta network publishing.
 Tetra 1.0 cannot be labeled until:
 
 ```sh
-bash scripts/test_all.sh --full
-bash scripts/release_v1_0_gate.sh
+bash scripts/ci/test-all.sh --full
+bash scripts/release/v1_0/gate.sh
 ```
 
 both pass on the release branch, and the generated docs manifest, release

@@ -17,8 +17,8 @@ LSP basics, and local Eco packaging.
   initialize/shutdown, didOpen diagnostics, document symbols, and hover.
 - `tetra eco pack --project` creates a local project bundle and preserves the
   existing single-manifest pack behavior.
-- `scripts/release_v0_6_gate.sh` is the canonical final verification command.
-- `scripts/test_all.sh` adds a v0.6.x stabilization wrapper with quick/full
+- `scripts/release/v0_6/gate.sh` is the canonical final verification command.
+- `scripts/ci/test-all.sh` adds a v0.6.x stabilization wrapper with quick/full
   modes, per-step logs, and Markdown/JSON summaries.
 - `docs/roadmap_0_6_x_stabilization.md` records the 0.6.x stabilization line:
   test envelope hardening, negative coverage, and cross-platform confidence.
@@ -56,7 +56,7 @@ LSP basics, and local Eco packaging.
 - `tools/cmd/validate-flow-only` now rejects tabs and standalone legacy brace
   tokens while ignoring those characters inside line comments and string
   literals.
-- `scripts/test_all.sh` keeps summary validation strict on passing runs, while
+- `scripts/ci/test-all.sh` keeps summary validation strict on passing runs, while
   preserving the original failure summary if the validator itself is
   unavailable on a failing run.
 - `tools/cmd/validate-manifest` validates generated docs manifest structure,
@@ -76,7 +76,7 @@ LSP basics, and local Eco packaging.
   test suites instead of `null`.
 - `tools/cmd/validate-test-report` validates `tetra test --report=json` shape
   aggregate counts, non-negative durations, and duplicate test names per file;
-  `test_all --full` and `release_v0_6_gate.sh` use it.
+  `test_all --full` and `release/v0_6/gate.sh` use it.
 - `tools/cmd/validate-diagnostic` validates the machine-readable JSON
   diagnostic object shape used by CLI/LSP tooling gates.
 - `tools/cmd/validate-flow-only` now scans examples, libraries, and runtime
@@ -86,7 +86,7 @@ LSP basics, and local Eco packaging.
   remains on the v1.0 track.
 - `tetra targets` reports supported and planned targets in text or JSON, and
   release gates validate the JSON shape through `tools/cmd/validate-targets`.
-- `scripts/test_all.sh` and `scripts/release_v0_6_gate.sh` verify that the
+- `scripts/ci/test-all.sh` and `scripts/release/v0_6/gate.sh` verify that the
   short `./t` alias built by bootstrap reports the same version as `./tetra`.
 - `tetra doctor` provides a local toolchain health check in text or JSON,
   including generated manifest target/runtime ABI surface validation; release

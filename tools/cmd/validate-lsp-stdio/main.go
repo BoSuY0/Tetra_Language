@@ -12,13 +12,56 @@ import (
 	"strings"
 )
 
+const maxLSPFrameContentLength = 4 * 1024 * 1024
+
 type lspMessage struct {
 	JSONRPC string          `json:"jsonrpc"`
-	ID      *int            `json:"id,omitempty"`
+	ID      *lspID          `json:"id,omitempty"`
 	Method  string          `json:"method,omitempty"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	Error   json.RawMessage `json:"error,omitempty"`
+}
+
+type lspID struct {
+	key       string
+	display   string
+	number    int
+	hasNumber bool
+}
+
+func (id *lspID) UnmarshalJSON(raw []byte) error {
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		id.key = "string:" + text
+		id.display = strconv.Quote(text)
+		return nil
+	}
+	var number json.Number
+	if err := json.Unmarshal(raw, &number); err == nil {
+		value, err := number.Int64()
+		if err != nil || int64(int(value)) != value {
+			return fmt.Errorf("invalid JSON-RPC id number %q", number.String())
+		}
+		id.key = "number:" + number.String()
+		id.display = number.String()
+		id.number = int(value)
+		id.hasNumber = true
+		return nil
+	}
+	return fmt.Errorf("invalid JSON-RPC id: must be string or number")
+}
+
+func (id lspID) keyString() string {
+	return id.key
+}
+
+func (id lspID) displayString() string {
+	return id.display
+}
+
+func (id lspID) numericValue() (int, bool) {
+	return id.number, id.hasNumber
 }
 
 func main() {
@@ -51,7 +94,12 @@ func validateLSPTranscript(raw []byte) error {
 	}
 	sawInitialize := false
 	sawDiagnostics := false
+	sawDidChange := false
+	awaitingDidChangeDiagnostics := false
 	sawShutdown := false
+	requestMethods := map[string]string{}
+	requestIDDisplays := map[string]string{}
+	editorResponsesByMethod := map[string]json.RawMessage{}
 	editorResponses := map[int]json.RawMessage{}
 	for _, msg := range messages {
 		if msg.JSONRPC != "2.0" {
@@ -60,7 +108,20 @@ func validateLSPTranscript(raw []byte) error {
 		if len(msg.Error) > 0 && !bytes.Equal(bytes.TrimSpace(msg.Error), []byte("null")) {
 			return fmt.Errorf("LSP error response present: %s", string(msg.Error))
 		}
-		if msg.ID != nil && *msg.ID == 1 {
+		if msg.ID != nil && msg.Method != "" {
+			if err := validateRequestMethod(*msg.ID, msg.Method); err != nil {
+				return err
+			}
+			requestMethods[msg.ID.keyString()] = msg.Method
+			requestIDDisplays[msg.ID.keyString()] = msg.ID.displayString()
+			continue
+		}
+		if msg.Method == "textDocument/didChange" {
+			sawDidChange = true
+			awaitingDidChangeDiagnostics = true
+		}
+		responseMethod, hasCorrelatedResponse := correlatedResponseMethod(msg, requestMethods)
+		if isInitializeResponse(msg, responseMethod, hasCorrelatedResponse) {
 			capabilities, ok := jsonObjectField(msg.Result, "capabilities")
 			if !ok {
 				return fmt.Errorf("initialize response missing capabilities")
@@ -92,11 +153,16 @@ func validateLSPTranscript(raw []byte) error {
 			sawInitialize = true
 		}
 		if msg.ID != nil {
-			if *msg.ID >= 2 && *msg.ID <= 9 {
-				if _, exists := editorResponses[*msg.ID]; exists {
-					return fmt.Errorf("duplicate %s response", editorResponseName(*msg.ID))
+			if id, ok := editorResponseID(responseMethod, hasCorrelatedResponse); ok {
+				if _, exists := editorResponsesByMethod[responseMethod]; exists {
+					return fmt.Errorf("duplicate %s response", editorResponseName(id))
 				}
-				editorResponses[*msg.ID] = msg.Result
+				editorResponsesByMethod[responseMethod] = msg.Result
+			} else if id, ok := numericID(*msg.ID); ok && id >= 2 && id <= 9 {
+				if _, exists := editorResponses[id]; exists {
+					return fmt.Errorf("duplicate %s response", editorResponseName(id))
+				}
+				editorResponses[id] = msg.Result
 			}
 		}
 		if msg.Method == "textDocument/publishDiagnostics" {
@@ -110,8 +176,11 @@ func validateLSPTranscript(raw []byte) error {
 				return err
 			}
 			sawDiagnostics = true
+			if awaitingDidChangeDiagnostics {
+				awaitingDidChangeDiagnostics = false
+			}
 		}
-		if msg.ID != nil && *msg.ID == 10 {
+		if isShutdownResponse(msg, responseMethod, hasCorrelatedResponse) {
 			if sawShutdown {
 				return fmt.Errorf("duplicate shutdown response")
 			}
@@ -121,8 +190,14 @@ func validateLSPTranscript(raw []byte) error {
 	if !sawInitialize {
 		return fmt.Errorf("missing initialize response")
 	}
+	if err := validateRequestResponseCorrelation(requestMethods, requestIDDisplays); err != nil {
+		return err
+	}
 	if !sawDiagnostics {
 		return fmt.Errorf("missing textDocument/publishDiagnostics notification")
+	}
+	if sawDidChange && awaitingDidChangeDiagnostics {
+		return fmt.Errorf("missing textDocument/publishDiagnostics notification after textDocument/didChange")
 	}
 	for _, expected := range []struct {
 		id   int
@@ -137,7 +212,11 @@ func validateLSPTranscript(raw []byte) error {
 		{8, "formatting"},
 		{9, "codeAction"},
 	} {
-		raw, ok := editorResponses[expected.id]
+		method, _ := expectedRequestMethod(expected.id)
+		raw, ok := editorResponsesByMethod[method]
+		if !ok {
+			raw, ok = editorResponses[expected.id]
+		}
 		if !ok {
 			return fmt.Errorf("missing %s response", expected.name)
 		}
@@ -149,6 +228,121 @@ func validateLSPTranscript(raw []byte) error {
 		return fmt.Errorf("missing shutdown response")
 	}
 	return nil
+}
+
+func validateRequestMethod(id lspID, method string) error {
+	if numericID, hasNumericID := id.numericValue(); hasNumericID {
+		if expected, ok := expectedRequestMethod(numericID); ok && method != expected {
+			return fmt.Errorf("request id %s method %s, expected %s", id.displayString(), method, expected)
+		}
+	}
+	return nil
+}
+
+func validateRequestResponseCorrelation(requestMethods map[string]string, requestIDDisplays map[string]string) error {
+	if len(requestMethods) == 0 {
+		return nil
+	}
+	methodIDs := map[string]string{}
+	for key, method := range requestMethods {
+		if _, ok := expectedRequestID(method); !ok {
+			continue
+		}
+		if previousID, exists := methodIDs[method]; exists {
+			return fmt.Errorf("duplicate %s request ids %s and %s", method, previousID, requestIDDisplays[key])
+		}
+		methodIDs[method] = requestIDDisplays[key]
+	}
+	for _, id := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10} {
+		expected, _ := expectedRequestMethod(id)
+		if _, ok := methodIDs[expected]; !ok {
+			return fmt.Errorf("missing %s request", expected)
+		}
+	}
+	return nil
+}
+
+func correlatedResponseMethod(msg lspMessage, requestMethods map[string]string) (string, bool) {
+	if msg.ID == nil || msg.Method != "" {
+		return "", false
+	}
+	method, ok := requestMethods[msg.ID.keyString()]
+	return method, ok
+}
+
+func isInitializeResponse(msg lspMessage, responseMethod string, hasCorrelatedResponse bool) bool {
+	if hasCorrelatedResponse {
+		return responseMethod == "initialize"
+	}
+	id, ok := numericIDFromMessage(msg)
+	return ok && id == 1
+}
+
+func isShutdownResponse(msg lspMessage, responseMethod string, hasCorrelatedResponse bool) bool {
+	if hasCorrelatedResponse {
+		return responseMethod == "shutdown"
+	}
+	id, ok := numericIDFromMessage(msg)
+	return ok && id == 10
+}
+
+func numericIDFromMessage(msg lspMessage) (int, bool) {
+	if msg.ID == nil {
+		return 0, false
+	}
+	return numericID(*msg.ID)
+}
+
+func numericID(id lspID) (int, bool) {
+	return id.numericValue()
+}
+
+func editorResponseID(method string, hasCorrelatedResponse bool) (int, bool) {
+	if !hasCorrelatedResponse {
+		return 0, false
+	}
+	id, ok := expectedRequestID(method)
+	if !ok || id < 2 || id > 9 {
+		return 0, false
+	}
+	return id, true
+}
+
+func expectedRequestID(method string) (int, bool) {
+	for _, id := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10} {
+		expected, _ := expectedRequestMethod(id)
+		if method == expected {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
+func expectedRequestMethod(id int) (string, bool) {
+	switch id {
+	case 1:
+		return "initialize", true
+	case 2:
+		return "textDocument/documentSymbol", true
+	case 3:
+		return "textDocument/hover", true
+	case 4:
+		return "textDocument/completion", true
+	case 5:
+		return "textDocument/definition", true
+	case 6:
+		return "textDocument/references", true
+	case 7:
+		return "textDocument/rename", true
+	case 8:
+		return "textDocument/formatting", true
+	case 9:
+		return "textDocument/codeAction", true
+	case 10:
+		return "shutdown", true
+	default:
+		return "", false
+	}
 }
 
 func editorResponseName(id int) string {
@@ -262,6 +456,9 @@ func parseLSPTranscript(raw []byte) ([]lspMessage, error) {
 		}
 		if err != nil {
 			return nil, err
+		}
+		if length > maxLSPFrameContentLength {
+			return nil, fmt.Errorf("Content-Length %d too large (max %d)", length, maxLSPFrameContentLength)
 		}
 		body := make([]byte, length)
 		if _, err := io.ReadFull(reader, body); err != nil {

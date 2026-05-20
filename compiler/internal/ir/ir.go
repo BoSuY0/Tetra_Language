@@ -14,7 +14,17 @@ type IRFunc struct {
 	ParamSlots  int
 	LocalSlots  int
 	ReturnSlots int
+	Policy      IRPolicy
 	Instrs      []IRInstr
+}
+
+type IRPolicy struct {
+	HasBudget    bool
+	Budget       int32
+	BudgetLocal  int
+	HasConsent   bool
+	ConsentLocal int
+	FailLabel    int
 }
 
 type IRInstrKind int
@@ -69,11 +79,19 @@ const (
 	IRMemWriteU8
 	IRMemReadPtr
 	IRMemWritePtr
+	IRMemReadI32Offset
+	IRMemWriteI32Offset
+	IRMemReadU8Offset
+	IRMemWriteU8Offset
+	IRMemReadPtrOffset
+	IRMemWritePtrOffset
 	IRPtrAdd
 	IRMmioReadI32
 	IRMmioWriteI32
 	IRSymAddr
 	IRCtxSwitch
+	// IRInstrKindCount is a sentinel for exhaustive IR kind coverage checks.
+	IRInstrKindCount
 )
 
 // Stack effects:
@@ -102,6 +120,12 @@ const (
 // MEM_WRITE_U8 -> pop3 push1
 // MEM_READ_PTR -> pop2 push1
 // MEM_WRITE_PTR -> pop3 push1
+// MEM_READ_I32_OFFSET -> pop3 push1
+// MEM_WRITE_I32_OFFSET -> pop4 push1
+// MEM_READ_U8_OFFSET -> pop3 push1
+// MEM_WRITE_U8_OFFSET -> pop4 push1
+// MEM_READ_PTR_OFFSET -> pop3 push1
+// MEM_WRITE_PTR_OFFSET -> pop4 push1
 // PTR_ADD -> pop3 push1
 // MMIO_READ -> pop2 push1
 // MMIO_WRITE -> pop3 push1

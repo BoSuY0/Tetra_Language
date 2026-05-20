@@ -4,4 +4,7 @@ module examples.core_math_smoke
 import lib.core.math as math
 
 func main() -> Int:
-    return math.add_i32(40, 2)
+    let base: Int = math.min_i32(40, 99)
+    let bonus: Int = math.max_i32(1, 2)
+    let bounded: Int = math.clamp_i32(base, 0, 40)
+    return math.add_i32(bounded, bonus)

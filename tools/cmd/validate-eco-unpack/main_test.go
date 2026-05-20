@@ -32,6 +32,24 @@ func TestValidateEcoUnpackAcceptsT4CapsuleProjectBundle(t *testing.T) {
 	}
 }
 
+func TestValidateEcoUnpackAcceptsManifestV1SourcesTargetsProjectBundle(t *testing.T) {
+	root := makeUnpackedProjectWithFiles(t, "Capsule.t4", "app/main.t4", `manifest "tetra.capsule.v1"
+capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    entry "app/main.t4"
+    sources:
+        app
+    targets:
+        linux-x64
+        wasm32-wasi
+`, "func main() -> Int:\n    return 0\n")
+	out, err := runUnpackValidator(t, root)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
 func TestValidateEcoUnpackAcceptsFormatterStyleIndentedManifest(t *testing.T) {
 	root := makeUnpackedProjectWithManifest(t, `capsule App:
     id "tetra://app"
@@ -139,6 +157,36 @@ func TestValidateEcoUnpackRejectsMetadataHashMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateEcoUnpackRejectsSymlinkSourceFile(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "outside.tetra")
+	if err := os.WriteFile(outside, []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "Capsule.t4"), []byte(`capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    target "linux-x64"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "src", "main.tetra")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	writeUnpackMetadataFixture(t, root)
+
+	out, err := runUnpackValidator(t, root)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "symlink") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func TestValidateEcoUnpackAcceptsReproducibleMetadataFields(t *testing.T) {
 	root := makeUnpackedProject(t, true, true)
 	raw, err := os.ReadFile(filepath.Join(root, "tetra.package.json"))
@@ -241,21 +289,34 @@ type unpackPackageFileMeta struct {
 func writeUnpackMetadataFixture(t *testing.T, root string) {
 	t.Helper()
 	var files []unpackPackageFileMeta
-	for _, rel := range []string{"Capsule.t4", "Tetra.capsule", "src/main.t4", "src/main.tetra"} {
-		abs := filepath.Join(root, rel)
+	if err := filepath.WalkDir(root, func(abs string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, abs)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "tetra.package.json" {
+			return nil
+		}
 		raw, err := os.ReadFile(abs)
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			t.Fatal(err)
+			return err
 		}
 		sum := sha256.Sum256(raw)
 		files = append(files, unpackPackageFileMeta{
-			Path:   filepath.ToSlash(rel),
+			Path:   rel,
 			SHA256: "sha256:" + hex.EncodeToString(sum[:]),
 			Size:   int64(len(raw)),
 		})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].Path < files[j].Path

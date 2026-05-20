@@ -13,6 +13,9 @@ func collectImportAliases(file *frontend.FileAST) (map[string]string, error) {
 	aliases := make(map[string]string)
 	topLevel := topLevelDeclarationNames(file)
 	for _, imp := range file.Imports {
+		if imp.Path == "" {
+			return nil, fmt.Errorf("%s: import path required", frontend.FormatPos(imp.At))
+		}
 		if len(imp.Items) > 0 {
 			for _, item := range imp.Items {
 				if item == "" {
@@ -168,11 +171,17 @@ func resolveTypeName(ref *frontend.TypeRef, module string, imports map[string]st
 			return "", err
 		}
 		ref.Return.Name = retName
+		if ref.Throws != nil {
+			throwsName, err := resolveTypeName(ref.Throws, module, imports)
+			if err != nil {
+				return "", err
+			}
+			ref.Throws.Name = throwsName
+		}
 		if _, err := normalizeEffects(ref.Uses, ref.At); err != nil {
 			return "", err
 		}
-		// MVP: function-typed values lower through the existing ptr-sized value path.
-		return "ptr", nil
+		return "fnptr", nil
 	default:
 		return "", fmt.Errorf("%s: unsupported type reference kind %d", frontend.FormatPos(ref.At), ref.Kind)
 	}
@@ -206,24 +215,25 @@ func resolveEnumCaseExpr(expr frontend.Expr, locals map[string]LocalInfo, global
 	if !ok {
 		return "", EnumCaseInfo{}, false, nil
 	}
-	base, ok := field.Base.(*frontend.IdentExpr)
+	baseName, fields, pos, ok := splitFieldPath(field.Base)
 	if !ok {
 		return "", EnumCaseInfo{}, false, nil
 	}
-	if _, exists := locals[base.Name]; exists {
+	if _, exists := locals[baseName]; exists {
 		return "", EnumCaseInfo{}, false, nil
 	}
-	if _, exists := globals[base.Name]; exists {
+	if _, exists := globals[baseName]; exists {
 		return "", EnumCaseInfo{}, false, nil
 	}
-	ref := frontend.TypeRef{At: base.At, Kind: frontend.TypeRefNamed, Name: base.Name}
+	parts := append([]string{baseName}, fields...)
+	ref := frontend.TypeRef{At: pos, Kind: frontend.TypeRefNamed, Name: strings.Join(parts, ".")}
 	typeName, err := resolveTypeName(&ref, module, imports)
 	if err != nil {
 		return "", EnumCaseInfo{}, false, err
 	}
 	info, ok := types[typeName]
 	if !ok || info.Kind != TypeEnum {
-		if altName, altInfo, found := findUniqueEnumByShortName(base.Name, types); found {
+		if altName, altInfo, found := findUniqueEnumByShortName(ref.Name, types); found {
 			typeName = altName
 			info = altInfo
 		} else {
@@ -384,20 +394,35 @@ type assignTargetInfo struct {
 	ActorFieldSlot int
 }
 
-func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, types map[string]*TypeInfo) (assignTargetInfo, string, error) {
+func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, types map[string]*TypeInfo) (assignTargetInfo, string, error) {
 	if idx, ok := expr.(*frontend.IndexExpr); ok {
 		baseName, fields, pos, ok := splitFieldPath(idx.Base)
 		if !ok {
 			return assignTargetInfo{}, "", fmt.Errorf("%s: invalid assignment target", frontend.FormatPos(pos))
 		}
-		baseInfo, ok := locals[baseName]
-		if !ok {
+		baseType := ""
+		baseOffset := 0
+		mutable := false
+		constant := false
+		global := false
+		if baseInfo, ok := locals[baseName]; ok {
+			baseType = baseInfo.TypeName
+			baseOffset = baseInfo.Base
+			mutable = baseInfo.Mutable
+			constant = baseInfo.Const
+		} else if globalInfo, ok := globals[baseName]; ok {
+			baseType = globalInfo.TypeName
+			baseOffset = globalInfo.DataIndex
+			mutable = globalInfo.Mutable
+			constant = globalInfo.Const
+			global = true
+		} else {
 			return assignTargetInfo{}, "", fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(pos), baseName)
 		}
-		if _, err := ensureTypeInfo(baseInfo.TypeName, types); err != nil {
+		if _, err := ensureTypeInfo(baseType, types); err != nil {
 			return assignTargetInfo{}, "", err
 		}
-		baseType, _, _, err := resolveFieldChain(baseInfo.TypeName, baseInfo.Base, fields, types, pos)
+		baseType, _, _, err := resolveFieldChain(baseType, baseOffset, fields, types, pos)
 		if err != nil {
 			return assignTargetInfo{}, "", err
 		}
@@ -411,7 +436,7 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, types 
 		if info.Kind != TypeSlice && info.Kind != TypeArray {
 			return assignTargetInfo{}, "", fmt.Errorf("%s: cannot index '%s'", frontend.FormatPos(pos), baseType)
 		}
-		return assignTargetInfo{Name: baseName, Mutable: baseInfo.Mutable, Const: baseInfo.Const, TypeName: info.ElemType}, info.ElemType, nil
+		return assignTargetInfo{Name: baseName, Mutable: mutable, Const: constant, TypeName: info.ElemType, Global: global}, info.ElemType, nil
 	}
 
 	baseName, fields, pos, ok := splitFieldPath(expr)
@@ -420,6 +445,19 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, types 
 	}
 	info, ok := locals[baseName]
 	if !ok {
+		if globalInfo, ok := globals[baseName]; ok {
+			if _, err := ensureTypeInfo(globalInfo.TypeName, types); err != nil {
+				return assignTargetInfo{}, "", err
+			}
+			targetType, _, offset, err := resolveFieldChain(globalInfo.TypeName, globalInfo.DataIndex, fields, types, pos)
+			if err != nil {
+				return assignTargetInfo{}, "", err
+			}
+			if err := rejectCollectionInternalAssignment(globalInfo.TypeName, fields, types, pos); err != nil {
+				return assignTargetInfo{}, "", err
+			}
+			return assignTargetInfo{Name: baseName, Mutable: globalInfo.Mutable, Const: globalInfo.Const, TypeName: targetType, Offset: offset, Global: true}, targetType, nil
+		}
 		return assignTargetInfo{}, "", fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(pos), baseName)
 	}
 	if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
@@ -442,13 +480,13 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, types 
 	if err != nil {
 		return assignTargetInfo{}, "", err
 	}
-	if err := rejectFixedArrayInternalAssignment(info.TypeName, fields, types, pos); err != nil {
+	if err := rejectCollectionInternalAssignment(info.TypeName, fields, types, pos); err != nil {
 		return assignTargetInfo{}, "", err
 	}
 	return assignTargetInfo{Name: baseName, Mutable: info.Mutable, Const: info.Const, TypeName: targetType, Offset: offset}, targetType, nil
 }
 
-func rejectFixedArrayInternalAssignment(typeName string, fields []string, types map[string]*TypeInfo, pos frontend.Position) error {
+func rejectCollectionInternalAssignment(typeName string, fields []string, types map[string]*TypeInfo, pos frontend.Position) error {
 	current := typeName
 	for _, field := range fields {
 		info, ok := types[current]
@@ -457,6 +495,12 @@ func rejectFixedArrayInternalAssignment(typeName string, fields []string, types 
 		}
 		if info.Kind == TypeArray && (field == "ptr" || field == "len") {
 			return fmt.Errorf("%s: cannot assign to fixed-array internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
+		}
+		if info.Kind == TypeSlice && (field == "ptr" || field == "len") {
+			return fmt.Errorf("%s: cannot assign to slice internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
+		}
+		if info.Kind == TypeStr && (field == "ptr" || field == "len") {
+			return fmt.Errorf("%s: cannot assign to string internals ('ptr'/'len')", frontend.FormatPos(pos))
 		}
 		fieldInfo, ok := info.FieldMap[field]
 		if !ok {

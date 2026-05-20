@@ -1,604 +1,123 @@
-# Tetra Language (v0.2.0)
+# Tetra Language (v0.4.0)
 
-A systems programming language with region-based memory management (Islands).
+Tetra is a systems programming language with region-based memory management
+through Islands. This repository is the working local compiler/toolchain, not
+the full future Tetra platform.
 
-This repository is the working Tetra compiler/toolchain. It is not yet the full
-future Tetra platform described by the final language concept; instead it is a
-staged profile that grows through small, verifiable slices.
+The current public profile is **v0.4.0**. It keeps the verified local compiler,
+tooling, T4 source format, interface, runtime, validator, release-gate
+foundation, and the promoted v0.4 language/tooling slices. Older v0.5/v0.6
+labels are historical checkpoints, and `v1.0.0` is a future release label.
 
-The public profile for this repository is **v0.2.0**. It keeps the verified
-local compiler/tooling implementation and promotes the T4 source-format,
-interface, runtime, validator, and release-gate foundation. Older v0.5/v0.6
-labels are historical checkpoints, not release-truth labels for this branch.
+## Current Truth
 
-The current supported surface is `docs/spec/current_supported_surface.md`.
-The current minor scope contract is `docs/spec/v0_2_scope.md`.
-The active long-range production TODO is `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
-The canonical future v1.0 scope contract is `docs/spec/v1_scope.md`.
-`docs/checklists/v0_2_0_release_gate.md` and `scripts/release_v0_2_0_gate.sh`
-track the current `v0.2.0` release bar. The gate is the source of truth for
-final release evidence across Flow syntax, ownership safety, x64+WASM targets,
-UI smoke, and local Eco workflows. The older `v1_0` gate/checklist filenames
-are compatibility aliases and placeholders, not a claim that Tetra is ready for
-the `v1.0.0` label.
-Release maintainers use `docs/release/v0_2_0_release_cut_guide.md` for the
-current minor line and `docs/release/v1_0_release_cut_guide.md` for the future
-major line. Artifact retention and integrity rules live in
-`docs/release/artifact_policy.md`.
+- Current supported surface: `docs/spec/current_supported_surface.md`
+- Previous minor scope: `docs/spec/v0_3_scope.md`
+- Current minor scope: `docs/spec/v0_4_scope.md`
+- Future v1 contract: `docs/spec/v1_scope.md`
+- Current release checklist: `docs/checklists/v0_4_0_release_gate.md`
+- Current release gate: `scripts/release/v0_4_0/gate.sh`
+- Current release handoff: `docs/release/v0_4_0_final_handoff.md`
 
-## Build
+Do not treat future or compatibility `v1_0` filenames as proof that this branch
+is ready for the `v1.0.0` label.
 
-```
-bash scripts/bootstrap.sh
+## Quick Start
+
+```sh
+bash scripts/dev/bootstrap.sh
+./tetra version
+./t version
+./tetra check examples/flow_hello.tetra
+./tetra run examples/flow_hello.tetra
 ```
 
 Bootstrap writes both local entrypoints: `./tetra` and the short alias `./t`.
 
-## Tests
+## Common Commands
 
-```
-bash scripts/test.sh
-bash scripts/test_all.sh --quick
-bash scripts/test_all.sh --full
-bash scripts/test_all.sh --full --keep-going
-bash scripts/test_all.sh --full --json-only
-```
-
-`scripts/test_all.sh` is the v0.2.0 stabilization wrapper. It runs the quick or
-full gate, writes per-step logs, and emits both `summary.md` and `summary.json`
-under `reports/` by default. Each JSON step records its command, exit code,
-status, duration, and log path. `--keep-going` records all selected failures
-before exiting, and `--json-only` prints the summary JSON for CI/editor tooling.
-
-## Smoke
-
-```
-./tetra smoke
+```sh
+./tetra fmt --check examples lib __rt compiler/selfhostrt
+./tetra test examples
+./tetra targets --format=json
+./tetra doctor --format=json
+./tetra smoke --target linux-x64 --run=true --report reports/smoke-linux.json
 ```
 
-With `--report <path>`, smoke writes JSON containing target/version metadata,
-aggregate `total`/`passed`/`failed` counts, and per-case build/run results.
+For a compact user reference, see `docs/user/cli_cheatsheet.md`. The normative
+command, exit-code, diagnostics, and JSON report contract is
+`docs/spec/cli_contracts.md`.
 
-## Project Dump (for agents)
+## Project Workflow
 
-Creates a single text file with a curated view of the repository (by default excludes caches/artifacts and focuses on source+docs):
+New source files should use the T4 source format (`.t4`). Legacy `.tetra` files
+remain accepted for existing examples and smoke coverage.
 
+```sh
+./tetra new app --lock DemoApp
+./tetra project sync --check DemoApp
+./tetra check DemoApp
+./tetra build DemoApp
+./tetra run DemoApp
+./tetra test DemoApp
 ```
+
+Project roots use `Capsule.t4`. Generated interface files use `.t4i` and carry a
+public API hash validated by interface, check, build, and graph-loading paths.
+
+## Verification
+
+Fast local checks:
+
+```sh
+bash scripts/ci/test.sh
+bash scripts/ci/test-all.sh --quick
+```
+
+Broader stabilization checks:
+
+```sh
+bash scripts/ci/test-all.sh --full --keep-going
+bash scripts/ci/test-all.sh --stabilization --keep-going
+bash scripts/dev/fuzz-nightly.sh --short --out-dir reports/fuzz-nightly-smoke
+```
+
+Docs and manifest checks:
+
+```sh
+go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
+```
+
+`scripts/ci/test.sh` is a non-mutating Go test and formatting gate. Use explicit
+formatting commands when you intend to rewrite files.
+
+## Documentation Map
+
+- Getting started: `docs/user/getting_started.md`
+- Current status: `docs/user/status.md`
+- v0.3 preview boundaries: `docs/user/v0_3_preview.md`
+- Tutorial path: `docs/user/tutorial_path.md`
+- CLI cheatsheet: `docs/user/cli_cheatsheet.md`
+- Troubleshooting: `docs/user/troubleshooting.md`
+- Examples index: `docs/user/examples_index.md`
+- Language tour: `docs/user/language_tour.md`
+- Standard library guide: `docs/user/standard_library_guide.md`
+- Standard library spec: `docs/spec/stdlib.md`
+- Flow syntax: `docs/spec/flow_syntax_v1.md`
+- Ownership and effects: `docs/user/ownership_effects_guide.md`
+- Async and actors: `docs/user/async_actors_guide.md`
+- WASM/UI guide: `docs/user/wasm_ui_guide.md`
+- Eco package guide: `docs/user/eco_package_guide.md`
+- Compiler pipeline map: `docs/contributing/compiler_pipeline.md`
+
+## Developer Utilities
+
+Create a curated repository dump for agents:
+
+```sh
 go run ./tools/cmd/dump-project
 ```
 
-Useful flags:
-- `--all` (dump everything, still excluding common caches/artifacts)
-- `--only <prefix>` (repeatable)
-- `--exclude-prefix <prefix>` (repeatable)
-
-## Usage
-
-```
-./tetra build --target linux-x64 -o app examples/hello.tetra
-./app
-```
-
-The short alias is equivalent after bootstrap:
-
-```
-./t check examples/flow_hello.tetra
-```
-
-Check without emitting an executable:
-
-```
-./tetra check examples/flow_hello.tetra
-```
-
-Run (build + execute):
-
-```
-./tetra run --target linux-x64 examples/hello.tetra
-```
-
-Windows:
-
-```
-./tetra build --target windows-x64 -o app.exe examples/hello.tetra
-```
-
-macOS:
-
-```
-./tetra build --target macos-x64 -o app examples/hello.tetra
-```
-
-If no input file is provided, `tetra` looks for `main.t4` first and falls back
-to legacy `main.tetra` in the current directory.
-
-For project-first workflows, create or enter a directory with `Capsule.t4`:
-
-```
-./tetra new app --lock DemoApp
-cd DemoApp
-../tetra project sync --check .
-../tetra project deps list .
-../tetra workspace init ..
-../tetra workspace add DemoApp --workspace ..
-../tetra workspace check ..
-../tetra check .
-../tetra build .
-../tetra run .
-../tetra test .
-../tetra project info --format=json .
-../tetra doctor --format=json .
-```
-
-Source files use the T4 Source Format (`.t4`). The legacy `.tetra` extension is
-still accepted for existing projects.
-Generated interface files use `.t4i` and carry a public API hash validated by
-`tetra interface --check`, `check --interface-only`, and build graph loading.
-
-Useful flags:
-
-- `--target linux-x64|windows-x64|macos-x64`
-- `-o <path>`
-- `--islands-debug`
-- `--runtime auto|selfhost|builtin`
-- `--runtime-object <path.tobj>`
-- `--emit exe|object|library`
-- `--link-object <path.tobj>` (repeatable)
-- `--jobs <n>`
-- `--interface-only` on `check` and `build`
-- `--diagnostics text|json` on build/run/fmt/test paths
-
-Runtime and library object notes:
-
-```
-./tetra build --runtime=selfhost -o actors examples/actors_pingpong.tetra
-./tetra build --runtime=builtin -o actors_builtin examples/actors_pingpong.tetra
-./tetra build --emit=library -o lib.tobj lib.tetra
-./tetra build --link-object lib.tobj -o app app.tetra
-```
-
-`--runtime=auto` selects the embedded self-host runtime for actor-only programs
-and uses the built-in runtime when task or time builtins are present. `--runtime-object` must point to a target-matching runtime
-object that exports the required `__tetra_*` actor symbols. `--link-object` may
-be repeated for additional target-matching TOBJ libraries. A `.t4i`
-interface-only dependency can be used in a regular native build when a linked
-TOBJ object provides the same module and public API hash.
-
-Developer tooling alpha:
-
-```
-./tetra fmt examples/flow_hello.tetra
-./tetra fmt --check examples/flow_hello.tetra
-./tetra fmt --write examples/flow_hello.tetra
-./tetra fmt --check examples lib __rt compiler/selfhostrt
-go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
-./tetra targets
-./tetra targets --format=json
-./tetra doctor
-./tetra doctor --format=json
-./tetra doctor --format=json examples/projects/hello_t4
-./tetra new app DemoApp
-./tetra new app --lock DemoApp
-./tetra project info --format=json examples/projects/hello_t4
-./tetra project deps list examples/projects/hello_t4
-./tetra project deps check examples/projects/hello_t4
-./tetra project sync examples/projects/hello_t4
-./tetra project sync --check examples/projects/hello_t4
-./tetra workspace init examples/projects
-./tetra workspace add hello_t4 --workspace examples/projects
-./tetra workspace list examples/projects --format=json
-./tetra workspace check examples/projects
-./tetra workspace graph examples/projects --format=json
-./tetra workspace sync examples/projects
-./tetra workspace build --target linux-x64 examples/projects
-./tetra workspace test --target linux-x64 examples/projects
-./tetra workspace run hello_t4 --workspace examples/projects
-./t version
-./tetra check examples/flow_hello.tetra
-./tetra check examples/projects/hello_t4
-./tetra build examples/projects/hello_t4
-./tetra run examples/projects/hello_t4
-./tetra test examples/projects/hello_t4
-./tetra check --interface-only examples/flow_hello.tetra
-./tetra build --interface-only examples/flow_hello.tetra
-./tetra smoke --list
-./tetra smoke --list --format=json
-./tetra test examples
-./tetra test --report=json examples
-./tetra build --diagnostics=json examples/hello.tetra
-./tetra doc examples
-./tetra doc -o docs/api.md examples
-./tetra interface -o examples/flow_hello.t4i examples/flow_hello.tetra
-./tetra interface --check -o examples/flow_hello.t4i examples/flow_hello.tetra
-./tetra lsp --stdio-smoke examples/flow_hello.tetra
-./tetra lsp --stdio
-go run ./tools/cmd/gen-docs examples
-```
-
-The stable command, exit-code, diagnostics, and JSON report contract is tracked
-in `docs/spec/cli_contracts.md`.
-Common command failures and fixes are collected in
-`docs/user/troubleshooting.md`.
-Release-covered examples are indexed in `docs/user/examples_index.md`.
-Release evidence validators for that matrix:
-
-```
-go run ./tools/cmd/validate-smoke-list --report reports/smoke-list-linux-x64.json --examples-root examples
-go run ./tools/cmd/validate-test-report --report reports/examples-test-report.json
-go run ./tools/cmd/validate-example-index --smoke-list reports/smoke-list-linux-x64.json --index docs/user/examples_index.md
-```
-
-`tetra fmt` emits canonical Flow-style formatting for the supported profile.
-In the v0.2.0 profile, all `examples`, `lib`, `__rt`, and `compiler/selfhostrt` sources are
-part of formatter release coverage, and the stabilization gates also scan those
-trees for accidental legacy syntax drift. `tetra test` discovers top-level
-`test "name":` blocks and runs them on the matching host target.
-`--report=json` emits a structured per-test report for editor/CI tooling with
-aggregate totals, per-file totals, per-test results, and `duration_ms` timing
-fields.
-
-`--diagnostics` strictly accepts `text` or `json`. `--diagnostics=json` emits
-one diagnostic object per failing command path with `code`, `message`, `file`,
-`line`, `column`, `severity`, and optional `hint`. Parser/frontend diagnostics
-use `TETRA0001`; positioned semantic/compiler diagnostics use `TETRA2001`;
-IR verifier failures use `TETRA3001`; unsupported lowering paths use
-`TETRA3002`; formatter check mismatches use `TETRA_FMT002`. Text diagnostics keep the
-traditional `file:line:column: message` shape.
-
-`tetra targets` prints the current target surface. In v0.2.0, the supported build
-targets are `linux-x64`, `windows-x64`, and `macos-x64`; `wasm32-wasi` and
-`wasm32-web` are build-only targets with release smoke coverage, while
-cross-host execution remains disabled unless a dedicated runner supports it.
-`tetra smoke --list --format=json` emits the canonical smoke matrix without
-building, so CI can validate smoke coverage before the slower build/run stage.
-`tetra doctor --format=json` reports version, target metadata, manifest
-consistency, smoke source coverage, runtime exports, and the stable tooling
-command surface; `tools/cmd/validate-doctor` enforces that schema for gates.
-
-`tetra lsp --stdio-smoke <file>` emits a one-shot LSP-basic analysis.
-`tetra lsp --stdio` runs the current JSON-RPC loop for initialize,
-didOpen/didChange/didClose diagnostics, document symbols, hover, completion,
-definition, references, rename, formatting, code actions, shutdown, and exit.
-LSP diagnostics include parser/frontend errors and single-file semantic
-diagnostics; library-style files are checked without requiring `main`. Unsaved
-stdio documents with imports currently keep parser/symbol/hover coverage but
-skip semantic checks to avoid false unresolved-import noise. On-disk
-`--stdio-smoke <file>` analysis loads the module graph and reports
-imported-module semantic diagnostics.
-`tools/cmd/gen-docs` generates Markdown API docs from modules, functions,
-structs, enums, effects, and tests.
-
-Stable core stdlib modules:
-
-```
-import lib.core.math as math
-import lib.core.capability as cap
-import lib.core.memory as mem
-import lib.core.io as io
-import lib.core.testing as testing
-```
-
-`lib.core.math` provides small `i32` helpers. `lib.core.capability` and
-`lib.core.memory` wrap the current explicit capability/memory builtins; callers
-still declare matching `uses` effects and raw memory remains unsafe.
-`lib.core.io` wraps capability-gated MMIO helpers and `lib.core.testing` offers
-small assertion/status combinators for smoke/test-style flows.
-
-Local Eco/Capsule alpha commands:
-
-```
-./tetra formats
-./tetra project deps list
-./tetra project deps add --path ../Math
-./tetra project deps check
-./tetra project deps remove --id tetra://math
-./tetra project sync
-./tetra project sync --check
-./tetra project sync --target linux-x64
-./tetra project sync --all-targets
-./tetra workspace init
-./tetra workspace add App
-./tetra workspace add Math
-./tetra workspace check
-./tetra workspace graph --format=json
-./tetra workspace sync
-./tetra workspace build --target linux-x64
-./tetra workspace test --target linux-x64
-./tetra workspace run App
-./tetra eco verify Capsule.t4
-./tetra eco verify --lock Tetra.lock Capsule.t4
-./tetra eco verify --target linux-x64 --lock Tetra.lock App.t4 Core.t4
-./tetra eco artifacts build --target linux-x64 --lock Tetra.lock Capsule.t4
-./tetra eco artifacts build --check --target linux-x64 --lock Tetra.lock Capsule.t4
-./tetra eco artifacts build --all-targets --lock Tetra.lock Capsule.t4
-./tetra eco artifacts check --target linux-x64 --lock Tetra.lock Capsule.t4
-./tetra build --artifacts=auto
-./tetra eco seed export --out tetra-core.t4s App.t4 Core.t4
-./tetra eco seed import --seed tetra-core.t4s --lock Tetra.lock
-./tetra eco needmap --lock Tetra.lock -o missing.tneed
-./tetra eco pack Capsule.t4 -o app.tdx
-./tetra eco pack --project Capsule.t4 -o app.tdx
-./tetra eco unpack app.tdx -C out
-./tetra eco vault add --store .tetra/todex-vault --kind source examples/flow_hello.tetra
-./tetra eco vault list --store .tetra/todex-vault
-./tetra eco vault verify --store .tetra/todex-vault
-./tetra eco trust snapshot --lock Tetra.lock --store .tetra/todex-vault -o trust.snapshot.json
-./tetra eco materialize app.tdx --target linux-x64 --trust trust.snapshot.json -C out
-./tetra eco publish --package app.tdx --registry .tetra/registry-beta --target linux-x64 --trust trust.snapshot.json
-./tetra eco download --id tetra://app --version 0.1.0 --target linux-x64 --registry .tetra/registry-beta -o app.tdx
-./tetra eco tetrahub publish --package app.tdx --store .tetra/tetrahub-beta --target linux-x64 --trust trust.snapshot.json
-./tetra eco tetrahub download --id tetra://app --version 0.1.0 --target linux-x64 --store .tetra/tetrahub-beta -o app.tdx
-```
-
-`project deps` is the project-first editor/checker for local path dependencies:
-use `project deps add --path ../Math`, `project deps check`, then
-`project sync`. `project sync` discovers `Capsule.t4`, writes or refreshes
-`Tetra.lock`, generates `.t4i`, `.tobj`, and `.t4s` artifacts for local path
-dependencies, and supports `--check` as a dry-run. The lower-level `eco verify`
-and `eco artifacts` commands remain available for explicit capsule graph work.
-For multi-capsule repositories, `workspace init/add/check/graph/sync/build/test/run`
-manages a local `Tetra.workspace` member list, runs project sync across members
-in dependency order, builds/tests all members, and runs a selected member from
-the workspace root.
-
-`eco verify` accepts local dependency graphs in alpha manifests with
-`target`, `effect`, `dependency "<id>" "<version>"`, and `artifacts:` entries.
-It validates duplicate capsule IDs, missing dependencies, dependency version
-mismatches, artifact paths, and optional target compatibility; `--lock` writes a
-local JSON provenance file. For a project `Capsule.t4`, local path dependencies
-are expanded into `Tetra.lock`. When `Tetra.lock` is present beside
-`Capsule.t4`, `check`, `build`, and `run` validate it before compiling.
-`eco artifacts build` turns local path dependencies into `.t4i`, target-aware
-`.tobj`, and `.t4s` project artifacts, updates the `artifacts:` block, and
-refreshes `Tetra.lock`. Use `eco artifacts check` or
-`eco artifacts build --check` before committing to detect missing/stale
-interfaces, target-mismatched objects, source-hash changes, stale seeds, and
-stale locks. Use `eco artifacts build --all-targets` to generate objects for
-every native target listed in `Capsule.t4`; build-only WASM targets are skipped
-for `.tobj` generation. `tetra build --artifacts=auto` repairs project
-artifacts before compiling, while the default strict mode reports stale
-artifacts with a repair command.
-`eco pack --project` creates a local project bundle rooted at the capsule file's
-directory while preserving the single-manifest `eco pack` behavior.
-`eco vault` is a local-only Todex prototype: it stores source/interface/build/test
-records by SHA-256 content address and verifies the local object store.
-`eco publish`/`eco download` and `eco tetrahub` are local beta metadata/store
-workflows; they are not a production network publishing claim.
-
-## Language Features
-
-### Staged Profile Surface
-
-Tetra currently exposes a staged alpha surface. Older brace syntax, the Flow
-bridge, Core MVP constructs, checked `uses` effects, runtime/object-linking
-workflows, and developer tooling are the v0.14-v0.18 baseline. v0.5 adds
-optionals, typed errors, ownership markers, simple generics, protocol
-conformance checks, extensions, async/task MVP, stable `lib/core` helpers,
-local Capsule/Todex graphing, docs generation, and LSP basics. v0.6 hardens
-that surface for daily local use.
-
-- Multiple functions: `fun main(): i32 { ... }` (legacy `fn main() -> i32` is still accepted)
-- v0.14 Flow bridge: `func main() -> Int:` with indentation blocks is accepted and lowered into the existing AST/IR path
-- Flow structs: `struct Vec2:` with indented fields
-- v0.15 Core MVP: real `bool`, `true`/`false`, range `for`, no-payload `enum`, and statement-level `match`
-- v0.16 runtime/toolchain stabilization: runtime mode selection, self-host actors runtime embedding, `--emit=library`, and repeatable `--link-object`
-- v0.17 effects MVP: checked `uses` declarations for observable effects
-- v0.18 tooling alpha: `tetra fmt`, `tetra test`, JSON diagnostics, and docs doctests
-- `main` must exist and has no parameters
-- Statements:
-  - `print("...");` (string literal or `[]u8`)
-  - `var x: i32 = <expr>` (mutable)
-  - `val x: i32 = <expr>` (immutable)
-  - Top-level `const name: i32 = <constant-expr>` / `const name = <constant-expr>` immutable globals
-  - Top-level `var name: Int = <constant-expr>` / `var name: Bool = <constant-expr>` is supported for compile-time constant expressions only; non-constant initializers and unsupported global types remain diagnostics
-  - Local `const name: Type = <expr>` immutable bindings
-  - `let x: i32 = <expr>` (legacy alias of `var`)
-  - In Flow syntax, `let` is immutable and is normalized to MVP `val`
-  - `x = <expr>`
-  - `x += <expr>`, `x -= <expr>`, `x *= <expr>`, `x /= <expr>`, `x %= <expr>` as assignment sugar
-  - `if (<expr>) { ... } else { ... }`
-  - Flow form: `if expr:` / `else if expr:` / `else:`
-  - `while (<expr>) { ... }`
-  - Flow form: `while expr:`
-  - Flow form: `for i in start..<end:` (exclusive upper bound, integer ranges only)
-  - Flow form: `for value in collection:` for `String`, `[]u8`, `[]u16`, and `[]i32`
-  - `break` and `continue` inside `while`, range `for`, and collection `for`
-  - Flow form: `match value:` with `case Enum.value:` / `case 1:` / `case none:` / `case some(x):` / `case _:`
-  - `island(<size>) as <name> { ... }` (scoped island, auto-free)
-  - Flow form: `island(<size>) as <name>:`
-  - `unsafe { ... }` (enables unsafe operations)
-  - Flow form: `unsafe:`
-  - `free(<island>)` (allowed only in `unsafe` blocks)
-  - `;` (empty statement / no-op)
-  - `return <expr>`
-- v0.17 effects: function signatures use `uses ...` to declare observable effects such as `io`, `mem`, `alloc`, `capability`, `islands`, `mmio`, `link`, `control`, `runtime`, and `actors`
-- v0.18 tests: top-level `test "name":` blocks support `expect <bool>` and are ignored by normal app builds
-- v0.5/v0.7 optionals MVP: `T?`, `none`, implicit one-slot `some` values, `value == none`, Flow `if let name = value:`, and statement `match` with `case none:` / `case some(x):`
-- v0.5 typed errors MVP: `throws ErrorType`, `throw value`, and `try callee()` for one-slot success/error values inside throwing functions
-- v0.5 ownership markers MVP: `borrow`, `inout`, and `consume` parameter markers with local mutation/consume diagnostics
-- v0.5 async/task MVP: `async func` and `await callee()` are checked and lowered through the current synchronous call path; `core.task_spawn_i32("fn")`, `core.task_join_i32(task)`, `core.task_join_until_i32(task, deadline)`, `core.sleep_until(deadline)`, and `core.recv_until(deadline)` provide cooperative deadline-aware runtime waits gated by `uses runtime` / `uses actors`
-- v0.5 protocols MVP: `protocol Name:` declarations plus `impl Type: Protocol` conformance checks against extension/static methods, including minimal generic protocol requirements (`func req<T>(...) -> ...`) with signature-shape checks only (no new runtime dispatch model)
-- v0.5 extensions MVP: `extension Type:` methods lower to namespaced static functions such as `Type.method(value)`
-- v0.5 generics MVP: simple same-module generic functions such as `func id<T>(x: T) -> T` are monomorphized at call sites
-- Typed task handles are currently bounded to explicit 2..8 slot runtime wrappers; layouts above `8` are rejected during checking
-- v0.6 tooling hardening: formatter coverage for examples/libs, LSP stdio MVP, and Eco project bundle mode
-- Expressions: integer literals, `true`/`false`, string literals, identifiers, enum cases (`Color.red`), calls `foo(1, 2)`, field/index access, `+`, `-`, `*`, `/`, `%`, comparisons, `&&`, `||`, unary `-`, unary `!`, and parentheses
-- Semicolons are optional after statements
-- Every function must end with `return`
-- Calls support `i32` arguments (first 6 in registers, 7+ on the stack)
-
-See `docs/spec/flow_syntax_mvp.md` for the supported Flow/Core profile surface.
-
-Planned beyond v0.7 hardening: enum payloads, general iterator protocols,
-closures/comprehensions, full Rust-grade ownership, full structured concurrency,
-UI DSL and UI backends, richer effect polymorphism/inference, package
-publishing, proof-carrying capsules, and the complete EcoNet/Todex ecosystem.
-
-### Types
-
-- `i32` - 32-bit signed integer
-- `u8` - 8-bit unsigned byte (currently treated as “int32-like” in expressions; implicitly compatible with `i32`)
-- `u16` - 16-bit unsigned value (currently treated as “int32-like” in expressions; implicitly compatible with `i32`)
-- `Int` - alias of `i32`
-- `UInt8` / `Byte` - aliases of `u8`
-- `UInt16` - alias of `u16`
-- `Bool` / `bool` - real boolean type; `true`/`false` lower to the existing single-slot backend representation
-- `ptr` - raw pointer
-- `str` - string literal (ptr + len)
-- `String` - alias of `str`
-- `[]u8`, `[]u16`, `[]i32` - slices
-- `island` - (**NEW**) region memory handle
-- User-defined structs
-- User-defined no-payload enums
-- One-slot optionals: `Int?`, `Bool?`, enum optionals, and `none`
-
-### Islands Memory Model
-
-Islands are Tetra's region-based memory management system. An island is a contiguous memory region with bump allocation.
-
-**Builtin functions (unsafe):**
-
-```tetra
-fun main(): i32 uses alloc, capability, islands, mem {
-  unsafe {
-    // Create a new island with capacity for `size` bytes
-    let isl: island = core.island_new(1024)
-
-    // Allocate a []u8 slice from the island
-    var buf: []u8 = core.island_make_u8(isl, 64)
-
-    // Allocate a []u16 slice from the island
-    var half: []u16 = core.island_make_u16(isl, 32)
-
-    // Allocate a []i32 slice from the island
-    var arr: []i32 = core.island_make_i32(isl, 100)
-
-    // Free the entire island
-    free(isl)
-  }
-  return 0
-}
-```
-
-**Scoped islands (auto-free):**
-
-```tetra
-island(1024) as isl {
-    var buf: []u8 = core.island_make_u8(isl, 64)
-    // use buf
-}
-```
-
-**Properties:**
-- O(1) bump allocation
-- Bulk deallocation (entire island freed at once)
-- Overflow protection (exit code 1 if allocation exceeds capacity)
-
-See `docs/spec/islands.md` for the full specification.
-
-## Notes
-
-- Targets supported: `linux-x64`, `windows-x64`, `macos-x64`.
-- Unsafe/capability model: see `docs/spec/unsafe.md` and `docs/spec/capabilities.md`.
-- Actors alpha uses `i32` messages and a single-thread cooperative scheduler; the default CLI runtime mode is `--runtime=auto`, which selects the embedded self-host runtime for actor-only programs and the built-in runtime when task or time builtins are present.
-- v0.2.0 is a coherent local compiler/tooling profile. It does not imply the full future language, package ecosystem, UI stack, or distributed runtime is complete.
-- Build flag: `--islands-debug` (double-free detection and UAF traps for islands).
-- Linux output is a native ELF file without a custom extension.
-  - Default output name is `app` (use `-o` to override).
-- Windows output is a PE32+ `.exe`.
-  - Default output name is `app.exe`.
-- macOS output is a Mach-O 64-bit executable.
-- Windows PE uses `.text`, `.rdata`, `.idata`, `.reloc` sections.
-- WinAPI imports are referenced as `dll.Symbol` (for example: `kernel32.ExitProcess`).
-- Linux calls follow System V x86_64: first 6 params in registers, remaining params on the stack.
-
-## Verification (Linux)
-
-```
-go test ./compiler/...
-go test ./cli/...
-go test ./tools/...
-```
-
-Quick smoke (builds examples; runs them when target matches host):
-
-```
-./tetra smoke --target linux-x64
-```
-
-Version:
-
-```
-./tetra version
-```
-
-Manual checks:
-
-```
-./tetra build --target linux-x64 -o app examples/hello.tetra
-file ./app
-./app
-echo $?
-readelf -h ./app
-```
-
-Maintenance:
-
-```
-./tetra clean
-```
-
-## Examples
-
-### Hello with Islands
-
-```tetra
-fun main(): i32 uses alloc, islands, io, mem {
-    island(64) as isl {
-        var msg: []u8 = core.island_make_u8(isl, 6)
-        msg[0] = 72   // 'H'
-        msg[1] = 101  // 'e'
-        msg[2] = 108  // 'l'
-        msg[3] = 108  // 'l'
-        msg[4] = 111  // 'o'
-        msg[5] = 10   // '\n'
-        print(msg)
-    }
-    return 0
-}
-```
-
-### Flow Hello
-
-```tetra
-func main() -> Int
-uses io:
-    let msg: String = "Hello from Flow!\n"
-    print(msg)
-    return 0
-```
-
-### Sum of Array
-
-```tetra
-fun main(): i32 uses alloc, islands, mem {
-    var sum: i32 = 0
-    island(4096) as isl {
-        let n: i32 = 10
-        var arr: []i32 = core.island_make_i32(isl, n)
-        
-        var i: i32 = 0
-        while (i < n) {
-            arr[i] = i + 1
-            i = i + 1
-        }
-        
-        i = 0
-        while (i < n) {
-            sum = sum + arr[i]
-            i = i + 1
-        }
-    }
-    return sum  // Returns 55
-}
-```
+Useful flags include `--all`, `--only <prefix>`, and
+`--exclude-prefix <prefix>`.

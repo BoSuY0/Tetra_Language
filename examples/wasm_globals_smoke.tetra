@@ -1,0 +1,10 @@
+// WASM globals smoke: top-level immutable and mutable string globals.
+val greeting: String = "hello"
+var title: String = "hi"
+const base: Int = 34
+
+func main() -> Int:
+    title = "world"
+    if greeting.len + title.len + base + 3 == 47:
+        return 0
+    return 1

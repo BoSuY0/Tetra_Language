@@ -1,0 +1,22 @@
+// Stable core capability token acquisition smoke.
+// This keeps the capability boundary local: tokens are acquired in one unsafe
+// block, then used only with caller-owned heap memory and local MMIO storage.
+module examples.core_capability_smoke
+
+import lib.core.capability as capability
+
+func main() -> Int
+uses alloc, capability, io, mem, mmio:
+    var out: Int = 1
+    unsafe:
+        let mem_cap: cap.mem = capability.mem()
+        let io_cap: cap.io = capability.io()
+        let mem_ptr: ptr = core.alloc_bytes(4)
+        let io_ptr: ptr = core.alloc_bytes(4)
+        let stored: UInt8 = core.store_u8(mem_ptr, 17, mem_cap)
+        let written: Int = core.mmio_write_i32(io_ptr, 25, io_cap)
+        let memory_value: UInt8 = core.load_u8(mem_ptr, mem_cap)
+        let io_value: Int = core.mmio_read_i32(io_ptr, io_cap)
+        if stored == 17 && written == 25 && memory_value == 17 && io_value == 25:
+            out = 42
+    return out

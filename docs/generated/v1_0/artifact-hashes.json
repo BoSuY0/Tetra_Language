@@ -31,8 +31,8 @@
     },
     {
       "path": "host-smoke.json",
-      "sha256": "sha256:e67bd1b57d225e8204244d8f36e0172505d02547118003241c8fcd00fc8eeade",
-      "size": 11310
+      "sha256": "sha256:e1a7fbb77b610fe8e57ab23504d1274b413c4ade553c74189efb061909b09a4a",
+      "size": 16351
     },
     {
       "path": "invalid-diagnostic.json",
@@ -46,18 +46,18 @@
     },
     {
       "path": "linux-smoke.json",
-      "sha256": "sha256:4e6def27ce1173574162afc19f1fd41b0a3c16d14c20a470b023687290305b6c",
-      "size": 10287
+      "sha256": "sha256:ad492fa9219a63822b8e829b7daeae9aa05032039b6bdca53297bdc492c146db",
+      "size": 14878
     },
     {
       "path": "macos-smoke.json",
-      "sha256": "sha256:6837984a92d2a2b73949bd97c2c29a384e9c0a2c51e6c364f2b72933ba2da933",
-      "size": 10287
+      "sha256": "sha256:48129634bec8e29545d039ba82219ae93d0b04bacbff26f4a1f417a1046bda13",
+      "size": 14878
     },
     {
       "path": "manifest.json",
-      "sha256": "sha256:7538be30022854dceace78d4a1010e1c1d05ed08374d79a6e29a1083e6ff99d0",
-      "size": 10451
+      "sha256": "sha256:abb26d6949d713f1c2dfb490bdd503c96e477b2493609b50ae15a748c2bd8d39",
+      "size": 39392
     },
     {
       "path": "missing-effect-diagnostic.json",
@@ -82,14 +82,14 @@
     },
     {
       "path": "release-state.json",
-      "sha256": "sha256:77f06bf700e40e84a19d25d9e885e063afa9ee3413334b79b9740931c95bd89e",
-      "size": 38124,
+      "sha256": "sha256:afba425e7b979326ae5d63fe85f67a66c99e7c6b99c91eb949982bcd63daed4f",
+      "size": 46364,
       "schema": "tetra.release-state.v1alpha1"
     },
     {
       "path": "release-state.txt",
-      "sha256": "sha256:8f68d2b9d4bc7bfda7e48056fa98afe08029c27b13a021ac06296de36bbbe199",
-      "size": 382
+      "sha256": "sha256:f085de3bac347ef6b6552d8dd99556e11b14f354543b0a04bd89e73961fc7c38",
+      "size": 1922
     },
     {
       "path": "release_gate_summary.json",
@@ -103,14 +103,14 @@
     },
     {
       "path": "reproducible-build.json",
-      "sha256": "sha256:e4775527f39ba461aa8ed2a2a0596a06200cc8fe4709a65b0d498343a3f4cc6f",
-      "size": 2199,
+      "sha256": "sha256:dfcb0a62c2caedb64ba62e9f9876944e980de843eaa30858868503c83671021e",
+      "size": 4183,
       "schema": "tetra.reproducible-build-proof.v1alpha1"
     },
     {
       "path": "smoke-list.json",
-      "sha256": "sha256:88caa81fde1ecff16a76715b61fbe702d85f64b93f6dcdcff0228b7847920d2f",
-      "size": 10598
+      "sha256": "sha256:ee52b4d1669971dc9662df6584e7f30f7ea301fc1f3ac16f50847001a0732e84",
+      "size": 13518
     },
     {
       "path": "tabs-diagnostic.json",
@@ -119,8 +119,8 @@
     },
     {
       "path": "targets.json",
-      "sha256": "sha256:1dff63dde697dfa3fd55bbb37f8758ac13c5f9196db4f78ef0d3f665c35e1827",
-      "size": 1750
+      "sha256": "sha256:641d8d5a46e4abe2344a68b9c34979894c4049b696e9ca989e8d0e6d61090d25",
+      "size": 2241
     },
     {
       "path": "test-all/api-docs.md",
@@ -134,8 +134,8 @@
     },
     {
       "path": "test-all/host-smoke.json",
-      "sha256": "sha256:cc720d7d595c25133ebe9aa895a5ce2df97a089451e45f14c27110608a8483f8",
-      "size": 784
+      "sha256": "sha256:7a51423138eb084d2bc5215182a48f375f5f82c7a119e29768fcc89347b1b172",
+      "size": 16289
     },
     {
       "path": "test-all/invalid-diagnostic.json",
@@ -274,8 +274,8 @@
     },
     {
       "path": "test-all/smoke-list.json",
-      "sha256": "sha256:2801b1f65469d82f348206bee0b52691c840010eb651b3ba636e22b1469bddad",
-      "size": 458
+      "sha256": "sha256:ee52b4d1669971dc9662df6584e7f30f7ea301fc1f3ac16f50847001a0732e84",
+      "size": 13518
     },
     {
       "path": "test-all/summary.json",
@@ -294,8 +294,8 @@
     },
     {
       "path": "test-all/targets.json",
-      "sha256": "sha256:1dff63dde697dfa3fd55bbb37f8758ac13c5f9196db4f78ef0d3f665c35e1827",
-      "size": 1750
+      "sha256": "sha256:641d8d5a46e4abe2344a68b9c34979894c4049b696e9ca989e8d0e6d61090d25",
+      "size": 2241
     },
     {
       "path": "test-all/tetra-docs.md",
@@ -333,45 +333,212 @@
       "size": 1279
     },
     {
+      "path": "wasi-smoke-artifacts/dogfood_wasi.wasm",
+      "sha256": "sha256:50095c23cbb528b0a6d7f7e506caa993d9c0c9cf07331f0959dfbad4e663c0d1",
+      "size": 231
+    },
+    {
+      "path": "wasi-smoke-artifacts/dogfood_web_ui.ui.json",
+      "sha256": "sha256:77bf8a782d1ed2ebc789395920612827b993e8833c64696faa00cf42c4a89140",
+      "size": 1515,
+      "schema": "tetra.ui.v1"
+    },
+    {
+      "path": "wasi-smoke-artifacts/dogfood_web_ui.wasm",
+      "sha256": "sha256:549715c4f50f27af5a5553649b2da3a01cc73e7318b2c715bdf3bd8492da5011",
+      "size": 167
+    },
+    {
+      "path": "wasi-smoke-artifacts/effects_io_smoke.wasm",
+      "sha256": "sha256:b67a6463b9b91911d9111fd3d6bea6166e262b6574fe7fe632446eca8a9ed307",
+      "size": 225
+    },
+    {
+      "path": "wasi-smoke-artifacts/legacy_hello.wasm",
+      "sha256": "sha256:14129aa90ed745cf14920ee42056a4e4fad4a5bf133264a2d7be7c86392298d6",
+      "size": 232
+    },
+    {
+      "path": "wasi-smoke-artifacts/ui_web_smoke.ui.json",
+      "sha256": "sha256:00077bcf2dc625618af9e7f6779bf53c94dfbe8bcd881aacb2dea5099ab3fbea",
+      "size": 1508,
+      "schema": "tetra.ui.v1"
+    },
+    {
+      "path": "wasi-smoke-artifacts/ui_web_smoke.wasm",
+      "sha256": "sha256:549715c4f50f27af5a5553649b2da3a01cc73e7318b2c715bdf3bd8492da5011",
+      "size": 167
+    },
+    {
       "path": "wasi-smoke.build-only.json",
-      "sha256": "sha256:6229964921f702bce22c52909c70142271e818f1be3e083a2340bcf3f36be17f",
-      "size": 1417
+      "sha256": "sha256:232acbd8f2914c9208069c4016a84d35bbe6c870f468a4d90288c26664ac433a",
+      "size": 1541
     },
     {
       "path": "wasi-smoke.json",
-      "sha256": "sha256:9e2af1da765d1aa3e958c565008d7275fe68679daf9a9b34b82c02a15106946b",
-      "size": 1591
+      "sha256": "sha256:b7471ff6d24fd015403101cb74079084acdcddb6bb234ae866b6c8ffd59664e0",
+      "size": 1621
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-wasi/dogfood_wasi.wasm",
+      "sha256": "sha256:6356ce4f93c4ba76f07f7e8ebdc866fe6822a63f76137cea9224184932139e9a",
+      "size": 231
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-wasi/dogfood_web_ui.ui.json",
+      "sha256": "sha256:77bf8a782d1ed2ebc789395920612827b993e8833c64696faa00cf42c4a89140",
+      "size": 1515,
+      "schema": "tetra.ui.v1"
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-wasi/dogfood_web_ui.wasm",
+      "sha256": "sha256:549715c4f50f27af5a5553649b2da3a01cc73e7318b2c715bdf3bd8492da5011",
+      "size": 167
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-wasi/effects_io_smoke.wasm",
+      "sha256": "sha256:c6c12edf38f064b9b38d9891acdf14ca6d4463e10acdaa366d5f7aa4b07c91b6",
+      "size": 225
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-wasi/legacy_hello.wasm",
+      "sha256": "sha256:f477a089e989e9e108e90cbf423a878c8fd042c3564a6478be8edf3f3be05341",
+      "size": 232
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-wasi/ui_web_smoke.ui.json",
+      "sha256": "sha256:00077bcf2dc625618af9e7f6779bf53c94dfbe8bcd881aacb2dea5099ab3fbea",
+      "size": 1508,
+      "schema": "tetra.ui.v1"
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-wasi/ui_web_smoke.wasm",
+      "sha256": "sha256:549715c4f50f27af5a5553649b2da3a01cc73e7318b2c715bdf3bd8492da5011",
+      "size": 167
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/dogfood_wasi.mjs",
+      "sha256": "sha256:919e3df5807976319119eb7180bb1223c364a5f9892c276561d188cd68826e94",
+      "size": 1863
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/dogfood_wasi.wasm",
+      "sha256": "sha256:8a4dda65cbcc4b422f329bcb50b55368c2457c437f9ee89fa166f7c044a5addf",
+      "size": 164
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/dogfood_web_ui.mjs",
+      "sha256": "sha256:9dea9222fa78cbb08a7f179b8b1dcefc8303a0639e2dfe7cf74fad4132d967b8",
+      "size": 1865
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/dogfood_web_ui.ui.html",
+      "sha256": "sha256:b87603a61688b371a270bad8949406b00ce74a545232d11eeb3686eef31727da",
+      "size": 777
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/dogfood_web_ui.ui.json",
+      "sha256": "sha256:77bf8a782d1ed2ebc789395920612827b993e8833c64696faa00cf42c4a89140",
+      "size": 1515,
+      "schema": "tetra.ui.v1"
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/dogfood_web_ui.ui.web.mjs",
+      "sha256": "sha256:b78f5507b60f5b0f98afab9e0b49ada3db36e739aa283f40652258356648d5b2",
+      "size": 1265
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/dogfood_web_ui.wasm",
+      "sha256": "sha256:e01486958c6c3aa50eb59499fca472703deb1b6e2c7cc0769ddeba60122e0258",
+      "size": 131
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/effects_io_smoke.mjs",
+      "sha256": "sha256:f90a0870081e0b11c3c3f2f92181dd35e80b759d4983e8f1fa6a7f1ee3f55f5b",
+      "size": 1867
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/effects_io_smoke.wasm",
+      "sha256": "sha256:642da2d96c9e1957fbcc02bb47624e605c639224696c09f1895e63356f8aea68",
+      "size": 158
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/legacy_hello.mjs",
+      "sha256": "sha256:b8ef860f77f0e56a97e5aa2aa3a5895528171c383ed984a8b748f50648d9fd33",
+      "size": 1863
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/legacy_hello.wasm",
+      "sha256": "sha256:4d24a96423f0c867350eefd0f476e1b5752840cbe912151c897dd822439dde75",
+      "size": 165
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/ui_web_smoke.mjs",
+      "sha256": "sha256:efed338fc03f322a00ec61b8cc0b8d310968038ccedb324bbacd5f2fa47041aa",
+      "size": 1863
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/ui_web_smoke.ui.html",
+      "sha256": "sha256:dd53c80e05597cf6ae25d8489d852e4f80aae80bb4d5d6b2a3a077af5405e134",
+      "size": 771
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/ui_web_smoke.ui.json",
+      "sha256": "sha256:00077bcf2dc625618af9e7f6779bf53c94dfbe8bcd881aacb2dea5099ab3fbea",
+      "size": 1508,
+      "schema": "tetra.ui.v1"
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/ui_web_smoke.ui.web.mjs",
+      "sha256": "sha256:420e7f9373c33e2268e446caba681bf1c0198acf00130cc45c243746314f7b7a",
+      "size": 1263
+    },
+    {
+      "path": "wasm-smoke-artifacts/wasm32-web/ui_web_smoke.wasm",
+      "sha256": "sha256:e01486958c6c3aa50eb59499fca472703deb1b6e2c7cc0769ddeba60122e0258",
+      "size": 131
     },
     {
       "path": "wasm32-wasi-smoke.json",
-      "sha256": "sha256:17e9a44f6b63265ece0804daf10de7e6bf968ab95adacc8ccd340862b45862e8",
-      "size": 1417
+      "sha256": "sha256:609201fab422faad04a494b4a6fae80d9f376532f2c1c30e3a8c378ee8a1c806",
+      "size": 1541
     },
     {
       "path": "wasm32-web-smoke.json",
-      "sha256": "sha256:b1b578a0548b6e91a7447312ba00c28a1295eff27705d21ac0a39bf156fcd718",
-      "size": 1416
+      "sha256": "sha256:2fa365aa3c1b2c5d358ac4f2a2a046f5575db2a709c824ea5c0024dfaffd49e4",
+      "size": 1535
     },
     {
       "path": "web-ui-smoke.chromium.err",
-      "sha256": "sha256:44fe7d061b4c60771ddac9fd44ccb2f99e072f95f700c46ac1f93ead6384cfde",
-      "size": 118
+      "sha256": "sha256:6ff57b689199015457e15f5581638bac13d4a2b748ef1b6f5a40e694c3dfd02f",
+      "size": 438
     },
     {
       "path": "web-ui-smoke.dom.html",
-      "sha256": "sha256:8019f1a8c07d52966303f0b2e3669750a596bdfbd3fdfb50379574b853aae7b6",
-      "size": 405
+      "sha256": "sha256:f4f11f002e75eb11c99fad8fee1f172418689e7daac7f6ee53e2024763b102d4",
+      "size": 3475
     },
     {
       "path": "web-ui-smoke.json",
-      "sha256": "sha256:e05df5a0e2491d41554c73600bc62709eb3992d950dd3c7907d8896128e9653e",
-      "size": 553,
+      "sha256": "sha256:2640b81de7827d04f927ee99f82c1af50a84be94c2b85b7460a1226f3f9c9de5",
+      "size": 829,
       "schema": "tetra.web-ui-smoke.v1alpha1"
     },
     {
+      "path": "web-ui-smoke.ui.json",
+      "sha256": "sha256:793b222d9af053db6d709e5f645dc68dcc38e934f4a3996a53bb364b42ad44db",
+      "size": 1683,
+      "schema": "tetra.ui.v1"
+    },
+    {
+      "path": "web-ui-smoke.ui.web.mjs",
+      "sha256": "sha256:d6e1376bfcb527d0aebc7212f32bff23cf980fb3c3bb5a4a1ab3213bc860cab9",
+      "size": 3930
+    },
+    {
       "path": "windows-smoke.json",
-      "sha256": "sha256:8b0d20166f78ce84c76ba3ce20a78e7af78cea2b08d057c6c2ef286f2b37da5c",
-      "size": 10418
+      "sha256": "sha256:d19835fd28746e95d8f22a0bfce63a2784f5672c1d6f84e6277a627d67cb5e83",
+      "size": 15128
     }
   ]
 }

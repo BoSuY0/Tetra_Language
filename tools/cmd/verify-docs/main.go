@@ -143,6 +143,9 @@ func main() {
 	if err := verifyWASMBackendPlan("docs/backend/wasm_backend_plan.md", ctarget.WASMTriples()); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifyMemoryProductionContractDocs(defaultMemoryProductionContractDocPaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
 
 	if len(errs) > 0 {
 		for _, e := range errs {
@@ -159,14 +162,14 @@ func verifyWASMBackendPlan(path string, plannedTargets []string) error {
 	}
 	text := string(raw)
 	required := []string{
-		"Status: planned",
+		"Status: current",
 		"Phase 0: Target contract",
 		"Phase 1: WASM IR emitter",
 		"Phase 2: WASI runner",
 		"Phase 3: Web runtime",
 		"Phase 4: v1.0 release gate",
 		"go run ./tools/cmd/validate-targets",
-		"bash scripts/release_v1_0_gate.sh",
+		"bash scripts/release/v1_0/gate.sh",
 		"wasmtime",
 		"browser automation",
 	}
@@ -182,6 +185,162 @@ func verifyWASMBackendPlan(path string, plannedTargets []string) error {
 	return nil
 }
 
+type memoryProductionContractDocPaths struct {
+	RuntimeABI   string
+	Ownership    string
+	Unsafe       string
+	Capabilities string
+	Stdlib       string
+	StdlibGuide  string
+	CoreMemory   string
+}
+
+type memoryProductionContractRequirement struct {
+	Name     string
+	Path     string
+	Required []string
+}
+
+func defaultMemoryProductionContractDocPaths() memoryProductionContractDocPaths {
+	return memoryProductionContractDocPaths{
+		RuntimeABI:   filepath.FromSlash("docs/spec/runtime_abi.md"),
+		Ownership:    filepath.FromSlash("docs/spec/ownership_v1.md"),
+		Unsafe:       filepath.FromSlash("docs/spec/unsafe.md"),
+		Capabilities: filepath.FromSlash("docs/spec/capabilities.md"),
+		Stdlib:       filepath.FromSlash("docs/spec/stdlib.md"),
+		StdlibGuide:  filepath.FromSlash("docs/user/standard_library_guide.md"),
+		CoreMemory:   filepath.FromSlash("lib/core/memory.tetra"),
+	}
+}
+
+func memoryProductionContractRequirements(paths memoryProductionContractDocPaths) []memoryProductionContractRequirement {
+	return []memoryProductionContractRequirement{
+		{
+			Name: "runtime ABI",
+			Path: paths.RuntimeABI,
+			Required: []string{
+				"Linux-x64 Memory Production ABI",
+				"`core.alloc_bytes(size: i32) -> ptr`",
+				"`core.cap_mem() -> cap.mem`",
+				"`core.ptr_add(ptr, offset: i32, mem: cap.mem) -> ptr`",
+				"`core.load_u8(ptr, mem: cap.mem) -> u8`",
+				"`core.store_u8(ptr, value: u8, mem: cap.mem) -> u8`",
+				"invalid allocation sizes",
+				"allocator failure semantics",
+				"runtime bounds diagnostics",
+				"negative `core.ptr_add` offsets",
+				"allocation-base `core.ptr_add` upper bounds",
+				"allocation-base `core.store_i32` width bounds",
+				"allocation-base `core.store_ptr` width bounds",
+				"negative `memcpy_u8` and `memset_u8` lengths",
+				"no cross-target memory production claim",
+			},
+		},
+		{
+			Name: "ownership",
+			Path: paths.Ownership,
+			Required: []string{
+				"Memory Production Extension",
+				"heap, slices, structs, closures",
+				"borrow escape",
+				"actor/task transfer",
+				"conservative rejection",
+				"`TETRA2101`",
+				"`TETRA2102`",
+			},
+		},
+		{
+			Name: "unsafe",
+			Path: paths.Unsafe,
+			Required: []string{
+				"Memory Production Contract Boundary",
+				"`cap.mem` authorizes the raw operation",
+				"does not prove pointer validity or bounds",
+				"runtime bounds diagnostics",
+				"negative `core.ptr_add` offsets",
+				"allocation-base `core.ptr_add` upper bounds",
+				"allocation-base `core.store_i32` width bounds",
+				"allocation-base `core.store_ptr` width bounds",
+				"`memcpy_u8`",
+				"`memset_u8`",
+				"negative `memcpy_u8` and `memset_u8` lengths",
+				"invalid allocation sizes",
+			},
+		},
+		{
+			Name: "capabilities",
+			Path: paths.Capabilities,
+			Required: []string{
+				"Memory Production Boundary",
+				"`cap.mem` is permission, not provenance",
+				"raw memory access",
+				"runtime bounds diagnostics",
+				"pointer validity",
+			},
+		},
+		{
+			Name: "stdlib",
+			Path: paths.Stdlib,
+			Required: []string{
+				"`lib.core.memory` Production Boundary",
+				"`memcpy_u8`",
+				"`memset_u8`",
+				"does not allocate",
+				"does not perform bounds checks",
+				"Memory Production Core",
+			},
+		},
+		{
+			Name: "stdlib guide",
+			Path: paths.StdlibGuide,
+			Required: []string{
+				"Writing Raw Memory Safely",
+				"`cap.mem` is not ownership",
+				"check sizes before calling",
+				"Memory Production Core",
+				"runtime bounds diagnostics",
+				"negative `core.ptr_add` offsets",
+				"allocation-base `core.ptr_add` upper bounds",
+				"allocation-base `core.store_i32` width bounds",
+				"allocation-base `core.store_ptr` width bounds",
+				"negative `memcpy_u8` and `memset_u8` lengths",
+			},
+		},
+		{
+			Name: "core memory module",
+			Path: paths.CoreMemory,
+			Required: []string{
+				"Memory Production Core boundary",
+				"`cap.mem` authorizes raw byte access",
+				"caller owns pointer validity and bounds",
+				"func memset_u8",
+				"func memcpy_u8",
+			},
+		},
+	}
+}
+
+func verifyMemoryProductionContractDocs(paths memoryProductionContractDocPaths) error {
+	var errs []string
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		raw, err := os.ReadFile(requirement.Path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", requirement.Path, err))
+			continue
+		}
+		text := string(raw)
+		for _, want := range requirement.Required {
+			if !strings.Contains(text, want) {
+				errs = append(errs, fmt.Sprintf("%s: missing %q for %s memory production contract", requirement.Path, want, requirement.Name))
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
 func verifyFeatureRegistry(features []featureManifest) error {
 	if len(features) == 0 {
 		return fmt.Errorf("feature registry is required in generated manifest")
@@ -193,30 +352,33 @@ func verifyFeatureRegistry(features []featureManifest) error {
 		"post-v1":      true,
 	}
 	requiredStatus := map[string]bool{
-		"current":      false,
-		"experimental": false,
-		"planned":      false,
-		"post-v1":      false,
+		"current": false,
+		"planned": false,
+		"post-v1": false,
 	}
 	requiredIDs := map[string]string{
-		"cli.core":                            "current",
-		"language.flow":                       "current",
-		"language.generics-mvp":               "current",
-		"language.protocol-conformance-mvp":   "current",
-		"language.callable-mvp":               "current",
-		"language.callable-level1":            "experimental",
-		"targets.wasm-build-only":             "current",
-		"stdlib.experimental-mirrors":         "experimental",
-		"language.enum-payload-match":         "experimental",
-		"language.ownership-markers-mvp":      "current",
-		"language.resource-lifetime-mvp":      "current",
-		"actors.task-transfer-safety":         "current",
-		"language.lifetime-ssa":               "planned",
-		"language.callable-level2":            "planned",
-		"wasm.runtime-execution":              "planned",
-		"language.full-v1-guarantees":         "planned",
-		"eco.distributed-network":             "post-v1",
-		"language.full-first-class-callables": "post-v1",
+		"cli.core":                                "current",
+		"language.flow":                           "current",
+		"language.generics-mvp":                   "current",
+		"language.protocol-conformance-mvp":       "current",
+		"language.callable-mvp":                   "current",
+		"language.callable-level1":                "current",
+		"targets.wasm-artifact-preflight":         "current",
+		"stdlib.experimental-mirrors":             "current",
+		"language.enum-payload-match":             "current",
+		"language.protocol-bound-generics-static": "current",
+		"language.ownership-markers-mvp":          "current",
+		"language.resource-lifetime-mvp":          "current",
+		"actors.task-transfer-safety":             "current",
+		"language.lifetime-ssa":                   "current",
+		"language.callable-level2":                "current",
+		"ui.metadata-v1":                          "current",
+		"wasm.runtime-execution":                  "current",
+		"actors.distributed-runtime":              "current",
+		"ui.native-runtime":                       "current",
+		"language.full-v1-guarantees":             "planned",
+		"eco.distributed-network":                 "post-v1",
+		"language.full-first-class-callables":     "current",
 	}
 	seen := map[string]string{}
 	featureByID := map[string]featureManifest{}
@@ -319,19 +481,48 @@ func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"distributed actors",
 		},
 		"language.lifetime-ssa": {
-			"planned full SSA lifetime analysis",
-			"precise merge reasoning",
-			"no current v0.2.0 support guarantee",
-			"conservative ownership/resource MVP",
+			"production SSA-like local lifetime join analysis",
+			"ownership consume state",
+			"resource finalization state",
+			"maybe-consumed diagnostics",
+			"richer interprocedural lifetime proofs",
+		},
+		"language.enum-payload-match": {
+			"positional enum payload constructors",
+			"match/catch/if-let",
+			"exhaustive unguarded enum match/catch",
+			"nested destructuring patterns",
+			"guard expansion remain future/post-v1",
+		},
+		"language.protocol-bound-generics-static": {
+			"validated statically during monomorphization",
+			"same-module and cross-module impl conformance",
+			"visibility diagnostics",
+			"calling protocol requirements through generic bounds",
+			"dynamic dispatch remain unsupported",
+		},
+		"ui.native-runtime": {
+			"production Linux-x64 native UI runtime path",
+			"native runtime widget instances",
+			"click/activate events",
+			"state and widget updates",
+			"tetra.ui.native-runtime.v1 smoke evidence",
+			"metadata-only",
+			"web-only",
+			"native-shell sidecar-only",
+			"macOS/Windows",
 		},
 	}
 	docChecks := map[string][]string{
-		"language.generics-mvp":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
-		"language.protocol-conformance-mvp": {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
-		"language.ownership-markers-mvp":    {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"language.resource-lifetime-mvp":    {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"actors.task-transfer-safety":       {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"language.lifetime-ssa":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.generics-mvp":                   {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
+		"language.protocol-conformance-mvp":       {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
+		"language.ownership-markers-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.resource-lifetime-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"actors.task-transfer-safety":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.lifetime-ssa":                   {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
+		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
+		"ui.native-runtime":                       {"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
 	}
 	for id, required := range checks {
 		feature, ok := features[id]

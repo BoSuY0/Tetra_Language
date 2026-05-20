@@ -14,14 +14,17 @@ import (
 )
 
 type smokeCaseReport struct {
-	Name         string `json:"name"`
-	SrcPath      string `json:"src_path"`
-	OutPath      string `json:"out_path,omitempty"`
-	ExpectedExit int    `json:"expected_exit"`
-	ActualExit   *int   `json:"actual_exit,omitempty"`
-	Ran          bool   `json:"ran"`
-	Pass         bool   `json:"pass"`
-	Error        string `json:"error,omitempty"`
+	Name               string `json:"name"`
+	SrcPath            string `json:"src_path"`
+	OutPath            string `json:"out_path,omitempty"`
+	ExpectedExit       int    `json:"expected_exit"`
+	Unsupported        bool   `json:"unsupported,omitempty"`
+	ExpectedDiagnostic string `json:"expected_diagnostic,omitempty"`
+	Diagnostic         string `json:"diagnostic,omitempty"`
+	ActualExit         *int   `json:"actual_exit,omitempty"`
+	Ran                bool   `json:"ran"`
+	Pass               bool   `json:"pass"`
+	Error              string `json:"error,omitempty"`
 }
 
 type smokeReport struct {
@@ -251,6 +254,28 @@ func validateSmokeReport(report *smokeReport) error {
 		if c.ExpectedExit < 0 || c.ExpectedExit > 255 {
 			return fmt.Errorf("smoke report case %s expected_exit = %d, want 0..255", c.Name, c.ExpectedExit)
 		}
+		if c.Unsupported {
+			if c.ExpectedDiagnostic == "" {
+				return fmt.Errorf("unsupported smoke report case %s missing expected_diagnostic", c.Name)
+			}
+			if c.Diagnostic == "" {
+				return fmt.Errorf("unsupported smoke report case %s missing diagnostic", c.Name)
+			}
+			if !strings.Contains(c.Diagnostic, c.ExpectedDiagnostic) {
+				return fmt.Errorf("unsupported smoke report case %s diagnostic = %q, want containing %q", c.Name, c.Diagnostic, c.ExpectedDiagnostic)
+			}
+			if c.Ran {
+				return fmt.Errorf("unsupported smoke report case %s ran unexpectedly", c.Name)
+			}
+			if c.ActualExit != nil {
+				return fmt.Errorf("unsupported smoke report case %s cannot include actual_exit", c.Name)
+			}
+			if c.OutPath != "" {
+				return fmt.Errorf("unsupported smoke report case %s cannot include out_path", c.Name)
+			}
+		} else if c.ExpectedDiagnostic != "" || c.Diagnostic != "" {
+			return fmt.Errorf("smoke report case %s has diagnostic metadata but is not marked unsupported", c.Name)
+		}
 		if c.Ran && c.ActualExit == nil {
 			return fmt.Errorf("smoke report case %s ran without actual_exit", c.Name)
 		}
@@ -276,7 +301,27 @@ func validateSmokeReport(report *smokeReport) error {
 func validateRequiredSmokeCases(target string, seen map[string]bool) error {
 	switch target {
 	case "linux-x64", "windows-x64", "macos-x64":
-		required := []string{"flow_hello", "flow_struct_smoke", "flow_islands_smoke", "flow_unsafe_cap_mem_smoke"}
+		required := []string{
+			"flow_hello",
+			"flow_struct_smoke",
+			"flow_islands_smoke",
+			"flow_unsafe_cap_mem_smoke",
+			"core_async_smoke",
+			"core_capability_smoke",
+			"core_collections_smoke",
+			"core_crypto_smoke",
+			"core_filesystem_smoke",
+			"core_io_smoke",
+			"core_math_smoke",
+			"core_memory_smoke",
+			"core_networking_smoke",
+			"core_serialization_smoke",
+			"core_slices_smoke",
+			"core_strings_smoke",
+			"core_sync_smoke",
+			"core_testing_smoke",
+			"core_time_smoke",
+		}
 		for _, name := range required {
 			if !seen[name] {
 				return fmt.Errorf("smoke report missing required smoke case %s for target %s", name, target)

@@ -20,6 +20,7 @@ func TestParserFixtureCorpus(t *testing.T) {
 		"protocols",
 		"extensions",
 		"async",
+		"declarations",
 		"tests",
 		"ui",
 	}
@@ -383,6 +384,58 @@ func TestParsePlannedFeatureMatrixFromFlowSyntaxV1(t *testing.T) {
 	}
 }
 
+func TestParseTopLevelPlannedFeatureDiagnostics(t *testing.T) {
+	src := []byte(`class Box:
+    value: Int
+
+trait Renderable:
+    func draw() -> Int
+
+interface Renderable:
+    func draw() -> Int
+
+typealias UserID = Int
+macro trace:
+    return 0
+
+capsule App:
+    id: "tetra://planned"
+
+func main() -> Int:
+    return 0
+`)
+	file, diagnostics := ParseFileDiagnostics(src, "planned_forms.tetra")
+	if file == nil {
+		t.Fatalf("expected recovered file")
+	}
+	if len(file.Capsules) != 1 || file.Capsules[0].Name != "App" {
+		t.Fatalf("capsules = %#v, want one capsule App", file.Capsules)
+	}
+	if len(file.Funcs) != 1 || file.Funcs[0].Name != "main" {
+		t.Fatalf("funcs = %#v, want main", file.Funcs)
+	}
+
+	want := []struct {
+		line    int
+		message string
+	}{
+		{1, "planned feature 'class declarations' is not implemented in the Tetra v1.0 profile"},
+		{4, "planned feature 'trait declarations' is not implemented in the Tetra v1.0 profile"},
+		{7, "planned feature 'interface declarations' is not implemented in the Tetra v1.0 profile"},
+		{10, "planned feature 'type alias declarations' is not implemented in the Tetra v1.0 profile"},
+		{11, "planned feature 'macro declarations' is not implemented in the Tetra v1.0 profile"},
+	}
+	if len(diagnostics) != len(want) {
+		t.Fatalf("diagnostic count = %d, want %d: %#v", len(diagnostics), len(want), diagnostics)
+	}
+	for i, wantDiag := range want {
+		diag := diagnostics[i]
+		if diag.File != "planned_forms.tetra" || diag.Line != wantDiag.line || diag.Column != 1 || diag.Message != wantDiag.message {
+			t.Fatalf("diagnostic[%d] = %#v, want planned_forms.tetra:%d:1 %q", i, diag, wantDiag.line, wantDiag.message)
+		}
+	}
+}
+
 func TestParseOwnershipParamSyntaxMatrix(t *testing.T) {
 	src := `
 protocol BufferOps:
@@ -489,12 +542,13 @@ func apply(cb: fn(Int, Bool) -> UInt8, value: Int, flag: Bool) -> UInt8:
 
 func TestParseFunctionTypeSyntaxMatrix(t *testing.T) {
 	tests := []struct {
-		name      string
-		typeSrc   string
-		wantParms []string
-		wantRet   string
-		wantUses  string
-		wantKind  TypeRefKind
+		name       string
+		typeSrc    string
+		wantParms  []string
+		wantRet    string
+		wantThrows string
+		wantUses   string
+		wantKind   TypeRefKind
 	}{
 		{
 			name:      "zero params",
@@ -520,6 +574,21 @@ func TestParseFunctionTypeSyntaxMatrix(t *testing.T) {
 			wantParms: []string{"Int"},
 			wantRet:   "Int",
 			wantUses:  "io,privacy",
+		},
+		{
+			name:       "throws error",
+			typeSrc:    "fn(Int) -> Int throws Boom",
+			wantParms:  []string{"Int"},
+			wantRet:    "Int",
+			wantThrows: "Boom",
+		},
+		{
+			name:       "throws error with uses effects",
+			typeSrc:    "fn(Int) -> Int throws Boom uses io, privacy",
+			wantParms:  []string{"Int"},
+			wantRet:    "Int",
+			wantThrows: "Boom",
+			wantUses:   "io,privacy",
 		},
 		{
 			name:      "optional return",
@@ -573,6 +642,13 @@ func TestParseFunctionTypeSyntaxMatrix(t *testing.T) {
 			if got := strings.Join(cb.Uses, ","); got != tt.wantUses {
 				t.Fatalf("uses = %q, want %q", got, tt.wantUses)
 			}
+			if tt.wantThrows == "" {
+				if cb.Throws != nil {
+					t.Fatalf("throws = %#v, want nil", cb.Throws)
+				}
+			} else if cb.Throws == nil || cb.Throws.Kind != TypeRefNamed || cb.Throws.Name != tt.wantThrows {
+				t.Fatalf("throws = %#v, want named %s", cb.Throws, tt.wantThrows)
+			}
 		})
 	}
 }
@@ -594,11 +670,6 @@ func TestParseFunctionTypeSyntaxDiagnostics(t *testing.T) {
 			want: "expected ->, got identifier",
 		},
 		{
-			name: "throws unsupported in function type",
-			src:  "func apply(cb: fn(Int) -> Int throws Boom) -> Int:\n    return 0\n",
-			want: "expected ), got throws",
-		},
-		{
 			name: "semantic clauses unsupported in function type",
 			src:  "func apply(cb: fn(Int) -> Int nothrow) -> Int:\n    return 0\n",
 			want: "semantic clauses are not allowed in function types",
@@ -607,6 +678,285 @@ func TestParseFunctionTypeSyntaxDiagnostics(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := Parse([]byte(tt.src))
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlan250ParserReleaseDeclarationFormsPositive(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "capsule and globals",
+			src: `module plan.frontend
+pub import core.math as math
+
+capsule App:
+    id: "tetra://plan/frontend"
+    version: "1.0.0"
+
+pub const answer: Int = 42
+property title: String = "Plan"
+
+func main() -> Int:
+    return answer
+`,
+		},
+		{
+			name: "types protocols and impls",
+			src: `module plan.protocols
+
+pub struct Vec2:
+    x: Int
+
+pub enum Mode:
+    case fast
+    case slow
+
+pub protocol Drawable:
+    func draw(self: Vec2) -> Int
+
+pub extension Vec2:
+    func draw(self: Vec2) -> Int:
+        return self.x
+
+impl Vec2: Drawable
+`,
+		},
+		{
+			name: "actor and test declarations",
+			src: `module plan.actors
+
+actor Worker:
+    var count: Int = 0
+    func run() -> Int:
+        return count
+
+test "worker":
+    expect 1 == 1
+`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := ParseFile([]byte(tt.src), tt.name+".tetra"); err != nil {
+				t.Fatalf("ParseFile: %v", err)
+			}
+		})
+	}
+}
+
+func TestPlan250ParserInvalidDeclarationDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "module after declaration",
+			src: `func main() -> Int:
+    return 0
+module late.name
+`,
+			want: "module must appear before declarations",
+		},
+		{
+			name: "import after capsule",
+			src: `capsule App:
+    id: "tetra://app"
+import core.math as math
+`,
+			want: "import must appear before declarations",
+		},
+		{
+			name: "pub impl rejected",
+			src: `struct Vec2:
+    x: Int
+pub impl Vec2: Drawable
+`,
+			want: "pub cannot apply to impl declarations",
+		},
+		{
+			name: "duplicate capsule metadata",
+			src: `capsule App:
+    id: "tetra://app"
+    id: "tetra://other"
+`,
+			want: "duplicate capsule metadata key 'id'",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), tt.name+".tetra")
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlan250ParserCapsuleMetadataShapeDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		file string
+		line int
+		col  int
+		want string
+	}{
+		{
+			name: "duplicate dotted key",
+			src: `capsule App:
+    flags.enabled: true
+    flags.enabled: false
+`,
+			file: "capsule_duplicate.tetra",
+			line: 3,
+			col:  5,
+			want: "duplicate capsule metadata key 'flags.enabled'",
+		},
+		{
+			name: "missing metadata value",
+			src: `capsule App:
+    target:
+`,
+			file: "capsule_shape.tetra",
+			line: 3,
+			col:  1,
+			want: "expected indented block after ':'",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), tt.file)
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			diag, ok := DiagnosticForError(err)
+			if !ok {
+				t.Fatalf("expected structured diagnostic: %T %v", err, err)
+			}
+			if diag.File != tt.file || diag.Line != tt.line || diag.Column != tt.col || diag.Message != tt.want {
+				t.Fatalf("diagnostic = %#v, want %s:%d:%d %q", diag, tt.file, tt.line, tt.col, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlan250ParserIndentationAndElseIfDiagnostics(t *testing.T) {
+	tests := []struct {
+		name   string
+		src    string
+		line   int
+		column int
+		want   string
+	}{
+		{
+			name: "comment then eof after block header",
+			src: `func main() -> Int:
+    if true:
+        // placeholder
+`,
+			line:   4,
+			column: 1,
+			want:   "expected indented block after ':'",
+		},
+		{
+			name: "dedented else-if body",
+			src: `func main() -> Int:
+    if false:
+        return 0
+    else if true:
+    return 1
+`,
+			line:   5,
+			column: 1,
+			want:   "expected indented block after ':'",
+		},
+		{
+			name: "malformed else-if condition",
+			src: `func main() -> Int:
+    if false:
+        return 0
+    else if:
+        return 1
+`,
+			line:   4,
+			column: 15,
+			want:   "expected expression, got {",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), tt.name+".tetra")
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			diag, ok := DiagnosticForError(err)
+			if !ok {
+				t.Fatalf("expected structured diagnostic: %T %v", err, err)
+			}
+			if diag.Line != tt.line || diag.Column != tt.column || diag.Message != tt.want {
+				t.Fatalf("diagnostic = %#v, want %d:%d %q", diag, tt.line, tt.column, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlan250ParserCallableUnsupportedAndPlannedDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "named closure literal rejected",
+			src: `func main() -> Int:
+    let f: fn(Int) -> Int = fn add1(x: Int) -> Int:
+        return x + 1
+    return f(0)
+`,
+			want: "closure literals cannot have names; use top-level closure declarations for named callables",
+		},
+		{
+			name: "class planned",
+			src:  "class Box:\n    value: Int\n",
+			want: "planned feature 'class declarations' is not implemented in the Tetra v1.0 profile",
+		},
+		{
+			name: "trait planned",
+			src:  "trait Renderable:\n    func draw() -> Int\n",
+			want: "planned feature 'trait declarations' is not implemented in the Tetra v1.0 profile",
+		},
+		{
+			name: "interface planned",
+			src:  "interface Renderable:\n    func draw() -> Int\n",
+			want: "planned feature 'interface declarations' is not implemented in the Tetra v1.0 profile",
+		},
+		{
+			name: "typealias planned",
+			src:  "typealias UserID = Int\n",
+			want: "planned feature 'type alias declarations' is not implemented in the Tetra v1.0 profile",
+		},
+		{
+			name: "macro planned",
+			src:  "macro trace:\n    return 0\n",
+			want: "planned feature 'macro declarations' is not implemented in the Tetra v1.0 profile",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), tt.name+".tetra")
 			if err == nil {
 				t.Fatalf("expected diagnostic")
 			}
@@ -2664,6 +3014,64 @@ func TestParseUnaryMinus(t *testing.T) {
 	}
 	if num.Value != 42 {
 		t.Errorf("value = %d, want 42", num.Value)
+	}
+}
+
+func TestParseIntegerLiteralRange(t *testing.T) {
+	t.Run("i32 max", func(t *testing.T) {
+		expr, err := parseExpr("2147483647")
+		if err != nil {
+			t.Fatalf("parseExpr: %v", err)
+		}
+		num, ok := expr.(*NumberExpr)
+		if !ok {
+			t.Fatalf("expr = %T, want NumberExpr", expr)
+		}
+		if num.Value != 2147483647 {
+			t.Fatalf("value = %d, want 2147483647", num.Value)
+		}
+	})
+	t.Run("i32 min", func(t *testing.T) {
+		expr, err := parseExpr("-2147483648")
+		if err != nil {
+			t.Fatalf("parseExpr: %v", err)
+		}
+		num, ok := expr.(*NumberExpr)
+		if !ok {
+			t.Fatalf("expr = %T, want NumberExpr", expr)
+		}
+		if num.Value != -2147483648 {
+			t.Fatalf("value = %d, want -2147483648", num.Value)
+		}
+	})
+
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "local int overflow",
+			src:  "func main() -> Int:\n    let x: Int = 2147483648\n    return x\n",
+		},
+		{
+			name: "global const overflow",
+			src:  "const wrapped: Int = 4294967295\nfunc main() -> Int:\n    return wrapped\n",
+		},
+		{
+			name: "budget overflow",
+			src:  "func main() -> Int budget(4294967296):\n    return 0\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseFile([]byte(tt.src), tt.name+".tetra")
+			if err == nil {
+				t.Fatalf("expected integer literal range diagnostic")
+			}
+			if !strings.Contains(err.Error(), "integer literal") || !strings.Contains(err.Error(), "exceeds i32 range") {
+				t.Fatalf("error = %v, want integer literal range diagnostic", err)
+			}
+		})
 	}
 }
 

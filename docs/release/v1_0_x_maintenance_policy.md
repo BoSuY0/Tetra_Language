@@ -14,7 +14,7 @@ backward compatible unless a security fix requires a documented exception.
   documentation error.
 - Includes a regression test or documented verification command.
 - Does not expand the v1.0 feature scope.
-- Keeps `bash scripts/test_all.sh --full --keep-going` green.
+- Keeps `bash scripts/ci/test-all.sh --full --keep-going` green.
 
 ## Security Patch Process
 
@@ -39,7 +39,7 @@ Nightly or maintenance-branch automation should run:
 
 ```sh
 go test ./compiler/... ./cli/... ./tools/... -count=1
-bash scripts/test_all.sh --full --keep-going
+bash scripts/ci/test-all.sh --full --keep-going
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 ```
 

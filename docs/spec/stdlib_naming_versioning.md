@@ -80,3 +80,11 @@ rg -n '^module lib\.core\.[a-z][a-z0-9_]*$' lib/core/*.tetra
 rg -n '^module lib\.experimental\.[a-z][a-z0-9_]*$' lib/experimental/*.tetra
 ! rg -n '^module lib\.core\..*(v[0-9]+|_[vV][0-9]+)' lib/core/*.tetra
 ```
+
+Generated API docs must be produced from the same branch state before this
+policy is used as release evidence:
+
+```sh
+./tetra doc examples > REPORT_DIR/artifacts/tetra-docs.md
+go run ./tools/cmd/validate-api-docs --docs REPORT_DIR/artifacts/tetra-docs.md
+```

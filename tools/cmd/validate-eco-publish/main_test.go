@@ -19,6 +19,25 @@ func TestValidateEcoPublishAcceptsValidMetadata(t *testing.T) {
 	}
 }
 
+func TestValidateEcoPublishAcceptsStableMetadata(t *testing.T) {
+	root, id, version, target := makePublishFixture(t)
+	metaPath := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "metadata.json")
+	raw, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ReplaceAll(string(raw), `"tetra.eco.publish.v1beta"`, `"tetra.eco.publish.v1"`)
+	text = strings.ReplaceAll(text, `"channel": "beta"`, `"channel": "stable"`)
+	text = strings.ReplaceAll(text, `"hub": "local-beta"`, `"hub": "production"`)
+	if err := os.WriteFile(metaPath, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runPublishValidatorWithChannel(t, root, id, version, target, "stable")
+	if err != nil {
+		t.Fatalf("stable validator failed: %v\n%s", err, out)
+	}
+}
+
 func TestValidateEcoPublishRejectsHashMismatch(t *testing.T) {
 	root, id, version, target := makePublishFixture(t)
 	path := filepath.Join(root, "packages", capsuleIDDirectory(id), version, target, "package.todex")
@@ -186,7 +205,12 @@ func makePublishFixture(t *testing.T) (root string, id string, version string, t
 
 func runPublishValidator(t *testing.T, registry string, id string, version string, target string) ([]byte, error) {
 	t.Helper()
-	cmd := exec.Command("go", "run", ".", "--registry", registry, "--id", id, "--version", version, "--target", target)
+	return runPublishValidatorWithChannel(t, registry, id, version, target, "beta")
+}
+
+func runPublishValidatorWithChannel(t *testing.T, registry string, id string, version string, target string, channel string) ([]byte, error) {
+	t.Helper()
+	cmd := exec.Command("go", "run", ".", "--registry", registry, "--id", id, "--version", version, "--target", target, "--channel", channel)
 	cmd.Dir = "."
 	return cmd.CombinedOutput()
 }

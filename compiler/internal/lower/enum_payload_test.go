@@ -91,6 +91,29 @@ func main() -> Int:
 	}
 }
 
+func TestLowerIfLetEnumPayloadPatternIR(t *testing.T) {
+	fn := lowerMainForEnumPayloadTest(t, `
+enum Result:
+    case ok(Int, String)
+    case err(Int)
+
+func main() -> Int:
+    let result: Result = Result.ok(40, "xy")
+    if let Result.ok(code, text) = result:
+        return code + text.len
+    else:
+        return 0
+`)
+
+	if !hasInstructionPair(fn.Instrs, ir.IRCmpEqI32, ir.IRJmpIfZero) {
+		t.Fatalf("if-let enum pattern IR lacks compare/branch discriminator checks: %#v", fn.Instrs)
+	}
+	firstBindingLoad, secondBindingLoad := findFirstTwoPayloadBindingLoads(t, fn.Instrs)
+	if secondBindingLoad.Local != firstBindingLoad.Local+1 {
+		t.Fatalf("if-let payload binding loads not contiguous/in declaration order: first=%#v second=%#v", firstBindingLoad, secondBindingLoad)
+	}
+}
+
 func lowerMainForEnumPayloadTest(t *testing.T, src string) ir.IRFunc {
 	t.Helper()
 	prog, err := frontend.Parse([]byte(src))

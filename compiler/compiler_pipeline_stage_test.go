@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"tetra_language/compiler/internal/testkit"
 	ctarget "tetra_language/compiler/target"
 )
 
@@ -217,7 +218,7 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("plan first build: %v", err)
 	}
-	assertModules(t, plan1.modules, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, plan1.modules, []string{"app.game", "engine.render"})
 	if len(plan1.toCompile) != 2 {
 		t.Fatalf("first plan toCompile = %#v, want two modules", plan1.toCompile)
 	}
@@ -227,8 +228,8 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	if err := compileNativeModulePlan(build.world, build.checked, native, opt, plan1, stats1); err != nil {
 		t.Fatalf("compile first plan: %v", err)
 	}
-	assertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
-	assertModules(t, stats1.LoweredModules, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats1.CompiledModules, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats1.LoweredModules, []string{"app.game", "engine.render"})
 	objects, err := objectsFromModulePlan(plan1)
 	if err != nil {
 		t.Fatalf("objects from first plan: %v", err)
@@ -244,7 +245,7 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	if len(plan2.toCompile) != 0 {
 		t.Fatalf("cached plan toCompile = %#v, want none", plan2.toCompile)
 	}
-	assertModules(t, stats2.CacheHits, []string{"app.game", "engine.render"})
+	testkit.AssertModules(t, stats2.CacheHits, []string{"app.game", "engine.render"})
 	if err := compileNativeModulePlan(build.world, build.checked, native, opt, plan2, stats2); err != nil {
 		t.Fatalf("compile cached plan: %v", err)
 	}

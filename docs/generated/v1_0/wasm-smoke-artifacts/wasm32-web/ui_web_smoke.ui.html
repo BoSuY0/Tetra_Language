@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tetra UI Preview</title>
+</head>
+<body>
+  <main id="app">Loading...</main>
+  <script type="module">
+    import { runTetra } from "./ui_web_smoke.mjs";
+    import { mountTetraUI } from "./ui_web_smoke.ui.web.mjs";
+    const root = document.getElementById("app");
+    try {
+      await mountTetraUI(root);
+      const exitCode = await runTetra(new URL("./ui_web_smoke.wasm", import.meta.url));
+      const done = document.createElement("div");
+      done.textContent = "tetra_main exit=" + (exitCode | 0);
+      root.appendChild(done);
+    } catch (err) {
+      root.textContent = String(err);
+    }
+  </script>
+</body>
+</html>

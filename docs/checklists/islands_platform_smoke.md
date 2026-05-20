@@ -8,7 +8,7 @@ Compiler version (compilerVersion): v0.6.0
 ## Prereqs
 
 - Go 1.20+
-- `tetra` built: `bash scripts/bootstrap.sh`
+- `tetra` built: `bash scripts/dev/bootstrap.sh`
 - Record versions:
   - `./tetra version` (or `./tetra.exe version` on Windows)
 

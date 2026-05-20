@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"tetra_language/compiler/internal/frontend"
+	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/target"
 )
 
@@ -133,6 +136,206 @@ func TestActorsTaggedStressBuildAndRunWithBothRuntimes(t *testing.T) {
 				t.Fatalf("exit code mismatch: %d", exitCode)
 			}
 		})
+	}
+}
+
+func TestActorRuntimeBuiltinCapacityLimitReturnsNoExtraActor(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+func worker() -> Int
+uses actors:
+    let _sent: Int = core.send(core.sender(), 1)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    var spawned: Int = 0
+    while spawned < 128:
+        let _peer: actor = core.spawn("worker")
+        spawned = spawned + 1
+
+    var received: Int = 0
+    while received < 128:
+        let msg: actor.recv_result_i32 = core.recv_until(core.deadline_ms(1))
+        if msg.error == 2:
+            return received
+        if msg.error != 0:
+            return 200 + msg.error
+        received = received + msg.value
+    return 250
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 127 {
+		t.Fatalf("exit code = %d, want 127 successful child actors before builtin capacity failure", exitCode)
+	}
+}
+
+func TestActorStateSlotLimitRejectsMoreThanEightBeforeRuntime(t *testing.T) {
+	requireCheckFileErrorContains(t, `
+actor Slots:
+    var s0: Int = 1
+    var s1: Int = 2
+    var s2: Int = 3
+    var s3: Int = 4
+    var s4: Int = 5
+    var s5: Int = 6
+    var s6: Int = 7
+    var s7: Int = 8
+    var s8: Int = 9
+    func run() -> Int
+    uses actors:
+        return s8
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Slots.run")
+    return 0
+`, "actor 'Slots' state supports at most 8 slots, got 9")
+
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if runtime.GOARCH != "amd64" {
+		t.Skip("amd64 only")
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "actor_state_too_many_slots.tetra")
+	if err := os.WriteFile(srcPath, []byte(`
+actor Slots:
+    var s0: Int = 1
+    var s1: Int = 2
+    var s2: Int = 3
+    var s3: Int = 4
+    var s4: Int = 5
+    var s5: Int = 6
+    var s6: Int = 7
+    var s7: Int = 8
+    var s8: Int = 9
+    func run() -> Int
+    uses actors:
+        return s8
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Slots.run")
+    return 0
+`), 0644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	outPath := filepath.Join(tmp, "actor_state_too_many_slots"+tgt.ExeExt)
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, BuildOptions{Runtime: RuntimeBuiltin})
+	if err == nil {
+		t.Fatalf("expected build to fail before runtime for actor state slot limit")
+	}
+	if !strings.Contains(err.Error(), "actor 'Slots' state supports at most 8 slots, got 9") {
+		t.Fatalf("error = %v", err)
+	}
+	if _, statErr := os.Stat(outPath); statErr == nil {
+		t.Fatalf("unexpected output binary after semantic actor-state slot failure: %s", outPath)
+	} else if !os.IsNotExist(statErr) {
+		t.Fatalf("stat output: %v", statErr)
+	}
+}
+
+func TestActorStateSlotLimitAllowsEightSlots(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+actor Slots:
+    var s0: Int = 1
+    var s1: Int = 2
+    var s2: Int = 3
+    var s3: Int = 4
+    var s4: Int = 5
+    var s5: Int = 6
+    var s6: Int = 7
+    var s7: Int = 8
+    func run() -> Int
+    uses actors:
+        let total: Int = s0 + s1 + s2 + s3 + s4 + s5 + s6 + s7
+        let _sent: Int = core.send(core.sender(), total)
+        return 0
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Slots.run")
+    return core.recv()
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 36 {
+		t.Fatalf("exit code = %d, want eight actor state slots to sum to 36", exitCode)
+	}
+}
+
+func TestActorMessagePoolBudgetAtDocumentedCapacityBuildAndRun(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+val MESSAGE_POOL_SAFE_MESSAGES: i32 = 1170
+
+func main() -> Int
+uses actors:
+    let me: actor = core.self()
+    var sent: Int = 0
+    while sent < MESSAGE_POOL_SAFE_MESSAGES:
+        let _sent: Int = core.send(me, sent)
+        sent = sent + 1
+
+    var received: Int = 0
+    var drift: Int = 0
+    while received < MESSAGE_POOL_SAFE_MESSAGES:
+        let msg: Int = core.recv()
+        drift = drift + (msg - received)
+        received = received + 1
+
+    if drift != 0:
+        return 31
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want documented message pool budget smoke to complete", exitCode)
+	}
+}
+
+func TestActorRuntimeCapacityLimitsDocumented(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "docs", "spec", "actors.md"))
+	if err != nil {
+		t.Fatalf("read actors spec: %v", err)
+	}
+	doc := string(raw)
+	for _, want := range []string{
+		"## Runtime Capacity Limits",
+		"`maxActors = 128`",
+		"127 child actors",
+		"64 KiB",
+		"1170",
+		"single-slot messages",
+		"8 state slots",
+		"rejects programs that require more than 8 actor-state slots before lowering",
+		"pool overflow is not a checked runtime error",
+	} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("actors spec missing capacity-limit text %q", want)
+		}
 	}
 }
 
@@ -323,6 +526,40 @@ uses actors:
 	}
 	if exitCode != 42 {
 		t.Fatalf("exit code = %d, want 42", exitCode)
+	}
+}
+
+func TestDocumentedActorStateRuntimeBoundaryAndDiagnostics(t *testing.T) {
+	mode, err := selectRuntimeMode(RuntimeAuto, runtimeUsageProfile{actorStateUsed: true})
+	if err != nil {
+		t.Fatalf("selectRuntimeMode: %v", err)
+	}
+	if mode != RuntimeBuiltin {
+		t.Fatalf("actor-state auto runtime = %v, want builtin", mode)
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "main")
+	if err := os.WriteFile(srcPath, []byte(`
+actor Worker:
+    val title: String = "worker"
+    func run() -> Int:
+        return 0
+
+func main() -> Int
+uses actors:
+    let _peer: actor = core.spawn("Worker.run")
+    return 0
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	_, err = BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", BuildOptions{Runtime: RuntimeSelfHost})
+	if err == nil {
+		t.Fatalf("expected actor-state unsupported type diagnostic")
+	}
+	if !strings.Contains(err.Error(), "actor state field 'title' type 'str' is not supported in this MVP") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
@@ -1121,6 +1358,85 @@ func TestActorGlueExportsProgramRuntimeSymbols(t *testing.T) {
 		t.Fatalf("codegen glue object: %v", err)
 	}
 	assertObjectHasSymbols(t, obj, "__tetra_actor_dispatch", "__tetra_actor_main_entry_id")
+}
+
+func TestActorDispatchStateInitializationMatchesRuntimeStoreABI(t *testing.T) {
+	checked := &semantics.CheckedProgram{
+		Funcs: []semantics.CheckedFunc{
+			{
+				Name: "Counter.run",
+				ActorState: map[string]semantics.ActorStateField{
+					"count": {Name: "count", Slot: 0, TypeName: "Int", Mutable: true, Init: 7},
+				},
+			},
+		},
+	}
+	dispatchFn, err := buildActorDispatchFunc([]string{"Counter.run"}, checked)
+	if err != nil {
+		t.Fatalf("build dispatch: %v", err)
+	}
+	if err := lower.VerifyFunc(dispatchFn); err != nil {
+		t.Fatalf("dispatch verifier: %v", err)
+	}
+
+	for _, instr := range dispatchFn.Instrs {
+		if instr.Kind == ir.IRCall && instr.Name == "__tetra_actor_state_store" {
+			if instr.ArgSlots != 2 || instr.RetSlots != 1 {
+				t.Fatalf("state store ABI = args %d rets %d, want args 2 rets 1", instr.ArgSlots, instr.RetSlots)
+			}
+			return
+		}
+	}
+	t.Fatalf("dispatch missing __tetra_actor_state_store call: %#v", dispatchFn.Instrs)
+}
+
+func TestGeneratedActorGlueIsVerifiedBeforeNativeCodegen(t *testing.T) {
+	checked := &semantics.CheckedProgram{
+		Funcs: []semantics.CheckedFunc{
+			{
+				Name: "stateful",
+				ActorState: map[string]semantics.ActorStateField{
+					"count": {Name: "count", Slot: 0, TypeName: "Int", Mutable: true, Init: 1},
+				},
+			},
+		},
+	}
+
+	codegenCalled := false
+	native := nativeBuildTarget{
+		triple: "linux-x64",
+		backend: nativeExecutableBackend{
+			actorRuntime: func(actorEntries []string) (*Object, error) {
+				symbolNames := append([]string{}, requiredActorRuntimeSymbols()...)
+				symbolNames = append(symbolNames, requiredActorStateRuntimeSymbols()...)
+				symbolNames = append(symbolNames, "__tetra_actor_main_entry_id")
+				symbols := make([]Symbol, 0, len(symbolNames))
+				for _, name := range symbolNames {
+					symbols = append(symbols, Symbol{Name: name})
+				}
+				return &Object{Symbols: symbols}, nil
+			},
+			link: func(outputPath string, objects []*Object, mainName string) error {
+				return nil
+			},
+		},
+		codegen: func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+			for _, fn := range funcs {
+				if fn.Name == "__tetra_actor_dispatch" {
+					codegenCalled = true
+				}
+			}
+			return &Object{}, nil
+		},
+	}
+
+	err := linkNativeExecutable(filepath.Join(t.TempDir(), "out"), native, BuildOptions{}, checked, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), `call is missing target name`) {
+		t.Fatalf("linkNativeExecutable error = %v, want generated IR verifier error", err)
+	}
+	if codegenCalled {
+		t.Fatalf("generated actor glue reached native codegen before verifier")
+	}
 }
 
 func assertObjectHasSymbols(t *testing.T, obj *Object, names ...string) {

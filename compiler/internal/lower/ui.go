@@ -2,6 +2,7 @@ package lower
 
 import (
 	"fmt"
+	"strings"
 
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/semantics"
@@ -50,8 +51,15 @@ type UILoweredEvent struct {
 }
 
 type UILoweredCommand struct {
-	Name           string `json:"name"`
-	StatementCount int    `json:"statement_count"`
+	Name           string                      `json:"name"`
+	StatementCount int                         `json:"statement_count"`
+	Operations     []UILoweredCommandOperation `json:"operations,omitempty"`
+}
+
+type UILoweredCommandOperation struct {
+	Kind   string `json:"kind"`
+	Target string `json:"target"`
+	Value  string `json:"value,omitempty"`
 }
 
 type UILoweredStyle struct {
@@ -126,6 +134,7 @@ func LowerUI(checked *semantics.CheckedProgram) (*UILoweredBundle, error) {
 			entry.Commands = append(entry.Commands, UILoweredCommand{
 				Name:           command.Name,
 				StatementCount: len(command.Body),
+				Operations:     uiCommandOperations(command.Body),
 			})
 		}
 		for _, style := range view.Decl.Styles {
@@ -145,6 +154,81 @@ func LowerUI(checked *semantics.CheckedProgram) (*UILoweredBundle, error) {
 		out.Views = append(out.Views, entry)
 	}
 	return out, nil
+}
+
+func uiCommandOperations(stmts []frontend.Stmt) []UILoweredCommandOperation {
+	ops := make([]UILoweredCommandOperation, 0, len(stmts))
+	for _, stmt := range stmts {
+		assign, ok := stmt.(*frontend.AssignStmt)
+		if !ok {
+			continue
+		}
+		target := uiExprSummary(assign.Target)
+		if !strings.HasPrefix(target, "state.") {
+			continue
+		}
+		if delta, ok := uiCompoundStateDeltaOperation(target, assign); ok {
+			ops = append(ops, delta)
+			continue
+		}
+		if delta, ok := uiStateDeltaOperation(target, assign.Value); ok && assign.Op == 0 {
+			ops = append(ops, delta)
+			continue
+		}
+		ops = append(ops, UILoweredCommandOperation{
+			Kind:   "state_set",
+			Target: target,
+			Value:  uiExprSummary(assign.Value),
+		})
+	}
+	return ops
+}
+
+func uiCompoundStateDeltaOperation(target string, assign *frontend.AssignStmt) (UILoweredCommandOperation, bool) {
+	if assign == nil || assign.CompoundValue == nil {
+		return UILoweredCommandOperation{}, false
+	}
+	kind := ""
+	switch assign.Op {
+	case frontend.TokenPlus:
+		kind = "state_add"
+	case frontend.TokenMinus:
+		kind = "state_sub"
+	default:
+		return UILoweredCommandOperation{}, false
+	}
+	number, ok := assign.CompoundValue.(*frontend.NumberExpr)
+	if !ok {
+		return UILoweredCommandOperation{}, false
+	}
+	return UILoweredCommandOperation{
+		Kind:   kind,
+		Target: target,
+		Value:  fmt.Sprintf("%d", number.Value),
+	}, true
+}
+
+func uiStateDeltaOperation(target string, expr frontend.Expr) (UILoweredCommandOperation, bool) {
+	binary, ok := expr.(*frontend.BinaryExpr)
+	if !ok || (binary.Op != frontend.TokenPlus && binary.Op != frontend.TokenMinus) {
+		return UILoweredCommandOperation{}, false
+	}
+	if uiExprSummary(binary.Left) != target {
+		return UILoweredCommandOperation{}, false
+	}
+	number, ok := binary.Right.(*frontend.NumberExpr)
+	if !ok {
+		return UILoweredCommandOperation{}, false
+	}
+	kind := "state_add"
+	if binary.Op == frontend.TokenMinus {
+		kind = "state_sub"
+	}
+	return UILoweredCommandOperation{
+		Kind:   kind,
+		Target: target,
+		Value:  fmt.Sprintf("%d", number.Value),
+	}, true
 }
 
 func uiExprSummary(expr frontend.Expr) string {

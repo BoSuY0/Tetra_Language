@@ -26,7 +26,7 @@ Actors are supported on x64 targets:
 
 - Multi-threaded scheduling.
 - Zero-copy message passing of region-backed data.
-- Generic/typed messages beyond `i32`.
+- Arbitrary generic actor mailboxes or reference-carrying typed messages.
 - Shared mutable actor state across OS threads.
 
 ## Model
@@ -66,6 +66,8 @@ Current actor-state field constraints:
 - supported scalar field types are `Int`, `Bool`, `UInt8`, `UInt16`, and
   `task.error`;
 - field initializers are required and must be compile-time constants;
+- each actor supports at most 8 state slots; the checker rejects actor
+  declarations that exceed this budget before lowering or runtime execution;
 - pointer/resource/aggregate actor-state field types are rejected in this MVP.
 
 ## Core builtins (MVP)
@@ -134,6 +136,62 @@ result shape and timeout code. Tagged timed receive is available through
 `core.recv_msg_until(deadline)`, which returns
 `actor.recv_msg_result { value, tag, error }`.
 
+Typed actor messages are supported as an enum-only MVP:
+
+- `core.send_typed(to, msg)` sends an enum message value to another actor and
+  returns `i32`.
+- `core.recv_typed<MessageEnum>()` receives the next typed enum message from
+  the current actor mailbox.
+- `send_typed` does not take explicit type arguments; `recv_typed` requires
+  exactly one explicit enum type argument.
+- The message type must be an enum. The enum payload is limited to value-only
+  data that the checker can lower into actor message slots: current scalar
+  payloads such as `Int`, `Bool`, and `UInt8`, nested structs/enums built only
+  from supported value-only payloads, and checked `island` transfer payloads.
+- Typed actor message payloads support at most 8 value slots. The enum tag is
+  carried separately from those payload slots.
+- Reference-shaped payloads such as `String`, pointer payloads, and unrelated
+  runtime handles are rejected by the current value-only payload rule.
+- `island` payload transfer is the only checked ownership-transfer path in this
+  typed actor payload MVP. Sending an `island` payload is validated as a move
+  and consumes the sent source (including nested struct/enum construction
+  sources).
+- Actor/task handle transfer in typed actor payloads is outside the current
+  transfer contract and remains a stable rejection boundary under the same
+  value-only payload rule.
+
+Typed actor messages currently provide blocking send/receive only. There is no
+typed equivalent of `recv_poll`, `recv_until`, or `recv_msg_until`, and there is
+no per-actor generic mailbox type beyond the enum message type used at each
+`send_typed`/`recv_typed` call site.
+
+## Runtime Capacity Limits
+
+The current actor runtime has fixed local capacities. These are implementation
+limits for the v1 local runtime, not distributed scheduling or resource
+isolation guarantees.
+
+- Built-in x64 runtime actor table: `maxActors = 128`, including the main
+  actor. This leaves capacity for 127 child actors. When the table is full,
+  `__tetra_actor_spawn` returns the raw handle value `-1` and does not create a
+  runnable actor. The public `actor` type is still opaque; sending to an
+  invalid handle is outside the current guarantee.
+- Built-in x64 runtime message pool: 64 KiB, bump-allocated, with no message
+  reclamation during a run. The current message node size is 56 bytes, so 1170
+  single-slot messages fit in the pool. The same node shape is used for tagged
+  and typed messages, with typed payloads still capped at 8 value slots by the
+  checker. Message pool overflow is not a checked runtime error in the current
+  built-in runtime; behavior after the bump pointer passes the pool is
+  unspecified and must not be treated as a recoverable capacity signal.
+- Built-in x64 runtime actor state: 8 state slots per actor, each one `i32`
+  storage cell. The checker enforces this limit for actor declarations and
+  rejects programs that require more than 8 actor-state slots before lowering
+  or runtime execution.
+- The self-host actor runtime is a compatibility/smoke path for the current
+  self-hosted ABI surface. It uses a smaller fixed actor/mailbox model and a
+  different actor-state backing store, so the built-in x64 capacities above are
+  the release evidence for capacity-sensitive behavior.
+
 ## Runtime sources
 
 The canonical self-host runtime sources live under `__rt/actors_sysv.tetra` and
@@ -150,15 +208,59 @@ compatibility references.
 
 Future extensions (post-MVP):
 - Copy-based passing of `[]u8` into a receiver-owned island.
-- Ownership transfer of message islands (move/consume semantics).
-- Distributed actors and network mailboxes.
+- Typed nonblocking/timed receive helpers if promoted by a future runtime
+  profile.
+- Generic actor mailbox APIs beyond the current enum-only message calls.
 - Cancellation or structured-concurrency guarantees beyond the current
   cooperative task group handles.
+- Non-Linux-x64 distributed actor runtime targets, multi-threaded actor
+  scheduling, and production broker deployments beyond the current loopback TCP
+  smoke envelope.
+
+## Distributed Runtime Promotion Surface
+
+`actors.distributed-runtime` is current for Linux-x64. The supported production
+slice uses the builtin Linux-x64 actor runtime plus `actornet` loopback TCP
+broker to exercise distributed node identity, remote actor handles, network
+mailbox send/receive for i32, tagged, and typed messages, missing-node
+failure/status propagation, and compatibility with existing cooperative task
+cancel/join handles.
+
+Promotion evidence is executable, not report-only:
+`scripts/release/v0_4_0/distributed-actors-linux-x64-smoke.sh` builds a fresh
+CLI, starts `tetra actor-net`, compiles Linux-x64 actor nodes, runs cross-node
+send/receive and failure cases over TCP, writes
+`tetra.actors.distributed-runtime.v1`, and validates it through
+`tools/cmd/validate-distributed-actor-runtime`. Negative evidence rejects
+transport-only, fake, incomplete, and docs-only reports.
+
+The current claim is deliberately platform-bounded. Non-Linux-x64 distributed
+actor runtimes, multi-threaded actor scheduling, and broader structured
+concurrency guarantees beyond the current cooperative task group handles require
+separate promotion evidence.
+
+## Transport Evidence Contract
+
+`tools/cmd/validate-actor-transport` validates the current
+`tetra.actors.transport.v1` JSON evidence contract for future distributed actor
+runtime work. The report records a single message envelope, a deterministic
+`message_sha256`, source/destination node names, a transport label, and an
+ordered trace that must contain a source `send` followed by a destination
+`receive` for the same message id.
+
+This validator is release-gate evidence for transport artifact shape and
+integrity only. It is not a distributed runtime implementation, network mailbox
+ABI, retry protocol, ordering guarantee beyond the single recorded envelope, or
+cluster membership protocol.
 
 ## Runtime ABI surface (internal)
 
 Actors are implemented by linking a runtime object that exports a small set of
 reserved symbols (e.g. `__tetra_entry`, `__tetra_actor_*`). Tagged message
 builtins are part of that ABI through `__tetra_actor_send_msg` and
-`__tetra_actor_recv_msg`. The exact symbol list and calling conventions are
+`__tetra_actor_recv_msg`. Typed message builtins lower to the multi-slot actor
+message transaction ABI (`__tetra_actor_send_begin`,
+`__tetra_actor_send_slot`, `__tetra_actor_send_commit`,
+`__tetra_actor_recv_begin`, `__tetra_actor_recv_slot`, and
+`__tetra_actor_recv_count`). The exact symbol list and calling conventions are
 documented in `docs/spec/runtime_abi.md`.

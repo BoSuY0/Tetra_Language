@@ -84,6 +84,8 @@ func inferExprTypeForDecl(
 			return "u8", nil
 		case TypeSlice:
 			return info.ElemType, nil
+		case TypeArray:
+			return info.ElemType, nil
 		default:
 			return "", fmt.Errorf("cannot index '%s'", baseType)
 		}
@@ -140,9 +142,9 @@ func inferExprTypeForDecl(
 		}
 		resolved := ""
 		if local, ok := locals[e.Name]; ok {
-			if local.FunctionValue == "" {
+			if local.FunctionValue == "" || (local.FunctionTypeValue && len(local.FunctionCaptures) == 0 && local.SlotCount == FnPtrSlotCount) {
 				if !local.FunctionTypeValue {
-					return "", fmt.Errorf("function value '%s' is not callable in this MVP; only local closure literals are supported", e.Name)
+					return "", fmt.Errorf("%s", unsupportedFunctionValueCallMessage(e.Name))
 				}
 				if len(local.FunctionCaptures) > 0 {
 					return "", fmt.Errorf("function-typed callback '%s' captures local values; captured function values cannot be called through function type in this MVP", e.Name)
@@ -153,7 +155,7 @@ func inferExprTypeForDecl(
 				return local.FunctionReturnType, nil
 			}
 			if local.GenericFunctionValue {
-				return "", fmt.Errorf("generic closure '%s' is only supported for let-bound direct local calls with inferable concrete arguments in this MVP", e.Name)
+				return "", fmt.Errorf("%s", genericClosureDirectCallRequirementMessage(e.Name))
 			}
 			if err := appendClosureCaptureArgs(e, local); err != nil {
 				return "", err

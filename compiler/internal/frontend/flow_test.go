@@ -95,3 +95,29 @@ func TestNormalizeFlowForMigrationSpanCRLFUnicode(t *testing.T) {
 		t.Fatalf("message = %q", diag.Message)
 	}
 }
+
+func TestParseFileWithMigrationNormalizationParsesAndPreservesRawSource(t *testing.T) {
+	src := []byte(`func main() -> Int:
+    let x: Int = 1
+    if x > 0:
+        return x
+    return 0
+`)
+
+	file, err := ParseFileWithMigrationNormalization(src, "migration/main.tetra")
+	if err != nil {
+		t.Fatalf("ParseFileWithMigrationNormalization: %v", err)
+	}
+	if file.Path != "migration/main.tetra" || string(file.Src) != string(src) {
+		t.Fatalf("file metadata = path %q src %q, want raw migration input", file.Path, string(file.Src))
+	}
+	if len(file.Funcs) != 1 || file.Funcs[0].Name != "main" {
+		t.Fatalf("funcs = %#v, want one main func", file.Funcs)
+	}
+	if len(file.Funcs[0].Body) != 3 {
+		t.Fatalf("main body length = %d, want 3", len(file.Funcs[0].Body))
+	}
+	if _, ok := file.Funcs[0].Body[1].(*IfStmt); !ok {
+		t.Fatalf("body[1] = %T, want *IfStmt after migration normalization", file.Funcs[0].Body[1])
+	}
+}

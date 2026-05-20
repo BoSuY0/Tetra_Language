@@ -326,6 +326,111 @@ func TestLexInvalidUTF8Diagnostic(t *testing.T) {
 	}
 }
 
+func TestPlan250LexMixedNewlinesEOFAndDocComments(t *testing.T) {
+	src := "/// module docs\r\nfunc main() -> Int:\n    /// return docs\r\n    return 0"
+	tokens, err := collectTokensFrom(src, "doc_comments.tetra")
+	if err != nil {
+		t.Fatalf("collectTokens: %v", err)
+	}
+	want := []struct {
+		typ  TokenType
+		line int
+		col  int
+	}{
+		{TokenFun, 2, 1},
+		{TokenIdent, 2, 6},
+		{TokenLParen, 2, 10},
+		{TokenRParen, 2, 11},
+		{TokenArrow, 2, 13},
+		{TokenIdent, 2, 16},
+		{TokenColon, 2, 19},
+		{TokenReturn, 4, 5},
+		{TokenNumber, 4, 12},
+		{TokenEOF, 4, 13},
+	}
+	if len(tokens) != len(want) {
+		t.Fatalf("tokens len = %d, want %d: %#v", len(tokens), len(want), tokens)
+	}
+	for i, exp := range want {
+		if tokens[i].typ != exp.typ || tokens[i].pos.Line != exp.line || tokens[i].pos.Col != exp.col {
+			t.Fatalf("token[%d] = %s at %d:%d, want %s at %d:%d", i, TokenName(tokens[i].typ), tokens[i].pos.Line, tokens[i].pos.Col, TokenName(exp.typ), exp.line, exp.col)
+		}
+	}
+}
+
+func TestPlan250LexInvalidUTF8PositionIsDeterministic(t *testing.T) {
+	_, err := collectTokensFrom(string([]byte{'o', 'k', '\r', '\n', 0xff}), "bad_utf8.tetra")
+	if err == nil {
+		t.Fatalf("expected invalid UTF-8 diagnostic")
+	}
+	diag, ok := DiagnosticForError(err)
+	if !ok {
+		t.Fatalf("expected structured diagnostic: %T %v", err, err)
+	}
+	if diag.File != "bad_utf8.tetra" || diag.Line != 2 || diag.Column != 1 || diag.Message != "invalid UTF-8 encoding" {
+		t.Fatalf("diagnostic = %#v, want bad_utf8.tetra:2:1 invalid UTF-8 encoding", diag)
+	}
+}
+
+func TestPlan250LexStringEscapeCornerPositions(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		lit  string
+		want string
+		col  int
+	}{
+		{name: "valid escaped quote and slash", src: `"a\"\\b"`, lit: "a\"\\b"},
+		{name: "valid carriage return escape", src: `"a\rb"`, lit: "a\rb"},
+		{name: "unsupported escape", src: `"bad\q"`, want: "unsupported escape: \\q", col: 1},
+		{name: "unterminated escape", src: `"bad\`, want: "unterminated escape sequence", col: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokens, err := collectTokensFrom(tt.src, tt.name+".tetra")
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("collectTokens: %v", err)
+				}
+				if tokens[0].typ != TokenString || tokens[0].lit != tt.lit {
+					t.Fatalf("token = %#v, want string %q", tokens[0], tt.lit)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected diagnostic")
+			}
+			diag, ok := DiagnosticForError(err)
+			if !ok {
+				t.Fatalf("expected structured diagnostic: %T %v", err, err)
+			}
+			if diag.Line != 1 || diag.Column != tt.col || diag.Message != tt.want {
+				t.Fatalf("diagnostic = %#v, want 1:%d %q", diag, tt.col, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlan250LexDocCommentsRemainTrivia(t *testing.T) {
+	src := "/// file docs\r\n/// more docs\nfunc main() -> Int:\n    /// return docs\n    return 0\n"
+	tokens, err := collectTokensFrom(src, "doc_trivia.tetra")
+	if err != nil {
+		t.Fatalf("collectTokens: %v", err)
+	}
+	if len(tokens) != 10 {
+		t.Fatalf("tokens len = %d, want 10: %#v", len(tokens), tokens)
+	}
+	if tokens[0].typ != TokenFun || tokens[0].pos.Line != 3 || tokens[0].pos.Col != 1 {
+		t.Fatalf("first token = %s at %d:%d, want func at 3:1", TokenName(tokens[0].typ), tokens[0].pos.Line, tokens[0].pos.Col)
+	}
+	if tokens[7].typ != TokenReturn || tokens[7].pos.Line != 5 || tokens[7].pos.Col != 5 {
+		t.Fatalf("return token = %s at %d:%d, want return at 5:5", TokenName(tokens[7].typ), tokens[7].pos.Line, tokens[7].pos.Col)
+	}
+	if tokens[9].typ != TokenEOF || tokens[9].pos.Line != 6 || tokens[9].pos.Col != 1 {
+		t.Fatalf("EOF token = %s at %d:%d, want EOF at 6:1", TokenName(tokens[9].typ), tokens[9].pos.Line, tokens[9].pos.Col)
+	}
+}
+
 func TestLexLineCommentsDoNotNest(t *testing.T) {
 	tokens, err := collectTokens("// looks like /* nested */ comment\n42")
 	if err != nil {

@@ -284,6 +284,229 @@ func TestABIDiagnosticEmitSharedRejectsMissingInputs(t *testing.T) {
 	}
 }
 
+func TestABIDiagnosticEmitSharedRejectsInvalidFrameSlots(t *testing.T) {
+	cases := []struct {
+		name string
+		abi  x64abi.ABI
+	}{
+		{name: "sysv", abi: x64abi.LinuxSysV()},
+		{name: "win64", abi: x64abi.NewWin64()},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			emitFn := NewEmitFunc(tc.abi)
+			e := &x64.Emitter{}
+			var dataBlobs [][]byte
+			var leaPatches []x64obj.LeaPatch
+			var callPatches []x64obj.CallPatch
+			var importPatches []x64obj.ImportPatch
+			err := emitFn(e, ir.IRFunc{
+				Name:        "__test_invalid_frame_slots",
+				ParamSlots:  2,
+				LocalSlots:  1,
+				ReturnSlots: 0,
+			}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+			if err == nil {
+				t.Fatalf("expected invalid frame slot diagnostic")
+			}
+			if !strings.Contains(err.Error(), "function '__test_invalid_frame_slots' has invalid slots") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(e.Buf) != 0 {
+				t.Fatalf("emitted %d bytes before rejecting invalid slots", len(e.Buf))
+			}
+		})
+	}
+}
+
+func TestABIDiagnosticEmitSharedRejectsLocalSlotOutOfBounds(t *testing.T) {
+	cases := []struct {
+		name  string
+		instr []ir.IRInstr
+		want  string
+	}{
+		{
+			name: "load_negative",
+			instr: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: -1},
+			},
+			want: "local slot -1 out of bounds",
+		},
+		{
+			name: "load_past_end",
+			instr: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: 1},
+			},
+			want: "local slot 1 out of bounds",
+		},
+		{
+			name: "store_negative",
+			instr: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 7},
+				{Kind: ir.IRStoreLocal, Local: -1},
+			},
+			want: "local slot -1 out of bounds",
+		},
+		{
+			name: "store_past_end",
+			instr: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 7},
+				{Kind: ir.IRStoreLocal, Local: 1},
+			},
+			want: "local slot 1 out of bounds",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			emitFn := NewEmitFunc(x64abi.LinuxSysV())
+			e := &x64.Emitter{}
+			var dataBlobs [][]byte
+			var leaPatches []x64obj.LeaPatch
+			var callPatches []x64obj.CallPatch
+			var importPatches []x64obj.ImportPatch
+			err := emitFn(e, ir.IRFunc{
+				Name:        "__test_bad_local",
+				ParamSlots:  0,
+				LocalSlots:  1,
+				ReturnSlots: 0,
+				Instrs:      tc.instr,
+			}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+			if err == nil {
+				t.Fatalf("expected local slot diagnostic")
+			}
+			for _, want := range []string{tc.want, "function '__test_bad_local'", "locals=1"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("error = %v, want substring %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestABIDiagnosticEmitSharedRejectsNegativeGlobalSlots(t *testing.T) {
+	cases := []struct {
+		name  string
+		instr []ir.IRInstr
+	}{
+		{
+			name: "load_global",
+			instr: []ir.IRInstr{
+				{Kind: ir.IRLoadGlobal, Local: -1},
+			},
+		},
+		{
+			name: "store_global",
+			instr: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 7},
+				{Kind: ir.IRStoreGlobal, Local: -1},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			emitFn := NewEmitFunc(x64abi.LinuxSysV())
+			e := &x64.Emitter{}
+			var dataBlobs [][]byte
+			var leaPatches []x64obj.LeaPatch
+			var callPatches []x64obj.CallPatch
+			var importPatches []x64obj.ImportPatch
+			err := emitFn(e, ir.IRFunc{
+				Name:        "__test_bad_global",
+				ParamSlots:  0,
+				LocalSlots:  0,
+				ReturnSlots: 0,
+				Instrs:      tc.instr,
+			}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+			if err == nil {
+				t.Fatalf("expected global slot diagnostic")
+			}
+			if !strings.Contains(err.Error(), "global slot -1 out of bounds in function '__test_bad_global'") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestABIDiagnosticEmitSharedRejectsDuplicateLabels(t *testing.T) {
+	emitFn := NewEmitFunc(x64abi.LinuxSysV())
+	e := &x64.Emitter{}
+	var dataBlobs [][]byte
+	var leaPatches []x64obj.LeaPatch
+	var callPatches []x64obj.CallPatch
+	var importPatches []x64obj.ImportPatch
+	err := emitFn(e, ir.IRFunc{
+		Name:        "__test_duplicate_label",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 0,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLabel, Label: 7},
+			{Kind: ir.IRLabel, Label: 7},
+		},
+	}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+	if err == nil {
+		t.Fatalf("expected duplicate label diagnostic")
+	}
+	if !strings.Contains(err.Error(), "duplicate label 7 in function '__test_duplicate_label'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestABIDiagnosticEmitSharedRejectsNegativeBranchLabels(t *testing.T) {
+	emitFn := NewEmitFunc(x64abi.LinuxSysV())
+	e := &x64.Emitter{}
+	var dataBlobs [][]byte
+	var leaPatches []x64obj.LeaPatch
+	var callPatches []x64obj.CallPatch
+	var importPatches []x64obj.ImportPatch
+	err := emitFn(e, ir.IRFunc{
+		Name:        "__test_negative_label",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRJmp, Label: -1},
+			{Kind: ir.IRLabel, Label: -1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+	if err == nil {
+		t.Fatalf("expected negative label diagnostic")
+	}
+	if !strings.Contains(err.Error(), "negative label -1 in function '__test_negative_label'") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestABIDiagnosticEmitSharedRejectsMissingSymAddrName(t *testing.T) {
+	emitFn := NewEmitFunc(x64abi.LinuxSysV())
+	e := &x64.Emitter{}
+	var dataBlobs [][]byte
+	var leaPatches []x64obj.LeaPatch
+	var callPatches []x64obj.CallPatch
+	var importPatches []x64obj.ImportPatch
+	err := emitFn(e, ir.IRFunc{
+		Name:        "__test_missing_symbol_name",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRSymAddr},
+			{Kind: ir.IRReturn},
+		},
+	}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})
+	if err == nil {
+		t.Fatalf("expected missing symbol address name diagnostic")
+	}
+	if !strings.Contains(err.Error(), "symbol address is missing name") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestABIDiagnosticEmitSharedRejectsUnsupportedReturnSlots(t *testing.T) {
 	emitFn := NewEmitFunc(x64abi.LinuxSysV())
 	e := &x64.Emitter{}
@@ -295,13 +518,19 @@ func TestABIDiagnosticEmitSharedRejectsUnsupportedReturnSlots(t *testing.T) {
 		Name:        "__test_bad_return_slots",
 		ParamSlots:  0,
 		LocalSlots:  0,
-		ReturnSlots: 5,
+		ReturnSlots: 11,
 		Instrs: []ir.IRInstr{
 			{Kind: ir.IRConstI32, Imm: 1},
 			{Kind: ir.IRConstI32, Imm: 2},
 			{Kind: ir.IRConstI32, Imm: 3},
 			{Kind: ir.IRConstI32, Imm: 4},
 			{Kind: ir.IRConstI32, Imm: 5},
+			{Kind: ir.IRConstI32, Imm: 6},
+			{Kind: ir.IRConstI32, Imm: 7},
+			{Kind: ir.IRConstI32, Imm: 8},
+			{Kind: ir.IRConstI32, Imm: 9},
+			{Kind: ir.IRConstI32, Imm: 10},
+			{Kind: ir.IRConstI32, Imm: 11},
 			{Kind: ir.IRReturn},
 		},
 	}, &dataBlobs, &leaPatches, &callPatches, &importPatches, x64.CodegenOptions{})

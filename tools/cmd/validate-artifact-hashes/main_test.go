@@ -67,6 +67,37 @@ func TestArtifactHashManifestRejectsModifiedArtifact(t *testing.T) {
 	}
 }
 
+func TestArtifactHashManifestRejectsUnlistedArtifact(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "known_issues.md")
+	if err := os.WriteFile(path, []byte("# Known Issues\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := buildHashManifest(root, "artifact-hashes.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(root, "artifact-hashes.json")
+	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "new-evidence.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err = validateHashManifest(manifestPath)
+	if err == nil {
+		t.Fatalf("expected unlisted artifact failure")
+	}
+	if !strings.Contains(err.Error(), "unlisted artifact new-evidence.json") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestArtifactHashManifestRejectsUnsortedPaths(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "a.json"), []byte("{}\n"), 0o644); err != nil {

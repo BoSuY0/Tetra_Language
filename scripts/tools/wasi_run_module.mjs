@@ -26,8 +26,8 @@ try {
     console.error('wasi module missing _start export');
     process.exit(1);
   }
-  wasi.start(instance);
-  process.exit(0);
+  const exitCode = wasi.start(instance);
+  process.exit((Number(exitCode) || 0) & 0xff);
 } catch (err) {
   if (err && typeof err === 'object' && typeof err.code === 'number') {
     const exitCode = Number(err.code) & 0xff;

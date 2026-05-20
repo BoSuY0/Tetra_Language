@@ -1,17 +1,18 @@
-# v0.1.3 Release Evidence Snapshot (2026-04-27)
+# v1.0 Generated Evidence Workspace
 
-This directory contains reviewed generated artifacts used to document the
-current `v0.1.3` release-prep state. The directory name is retained for
-compatibility with older validators and planning documents that still refer to
-the future `v1.0` artifact set.
+This directory is a tracked compatibility workspace for generated artifacts
+that older validators and planning documents still locate under the future
+`v1_0` artifact set. It is not a final `v1.0.0` release archive.
 
-The canonical exact-commit release archive is the report directory produced by
-`scripts/release_v0_1_3_gate.sh`. Treat this tree as a tracked compatibility
-snapshot, not as a substitute for rerunning the release gate on the commit being
-tagged.
+Release truth comes from each artifact's embedded schema, version, and status:
+`manifest.json` currently records the `v0.4.0` profile, while the checked-in
+`release-state.*` files remain historical failing `v0.3.0` evidence until a
+real `scripts/release/v1_0/gate.sh` run refreshes them on a promoted `v1.0.x`
+branch. Treat this tree as a mixed generated workspace, not as a substitute for
+rerunning the release gate on the commit being tagged.
 
 - `release_gate_summary.json` / `release_gate_summary.md`: output from
-  a reviewed `scripts/release_v0_1_3_gate.sh` run.
+  a historical reviewed release gate run.
 - `test_all_full_summary.json` / `test_all_full_summary.md`: output from
   the release gate's nested full stabilization run.
 - `api-diff/`: generated API docs candidate and API diff report.

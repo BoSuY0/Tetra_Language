@@ -5,10 +5,13 @@ from the repository root.
 
 ## Bootstrap
 
+If you are new to this repository, first read `docs/user/status.md` and follow
+the ordered path in `docs/user/tutorial_path.md`.
+
 Build the CLI pair:
 
 ```sh
-bash scripts/bootstrap.sh
+bash scripts/dev/bootstrap.sh
 ```
 
 Check the active version:
@@ -36,6 +39,8 @@ also want host execution.
 
 ## Daily Commands
 
+For a compact command reference, see `docs/user/cli_cheatsheet.md`.
+
 ```sh
 ./tetra fmt --check examples lib __rt compiler/selfhostrt
 ./tetra test examples
@@ -46,7 +51,7 @@ also want host execution.
 For repository-level confidence, use:
 
 ```sh
-bash scripts/test_all.sh --full --keep-going
+bash scripts/ci/test-all.sh --full --keep-going
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 ```
 
@@ -161,8 +166,8 @@ tetra build --artifacts=auto
 
 `check` validates freshness and prints repair commands. `build --check` is a
 dry-run and writes nothing. `--all-targets` generates native object artifacts
-for every native target in `Capsule.t4`, skipping build-only WASM object
-targets. `build --artifacts=auto` repairs project artifacts before compiling;
+for every native target in `Capsule.t4`, skipping WASM object targets.
+`build --artifacts=auto` repairs project artifacts before compiling;
 plain `build` remains strict and reports stale declared artifacts.
 
 ```tetra

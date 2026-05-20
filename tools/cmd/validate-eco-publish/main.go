@@ -55,23 +55,28 @@ func main() {
 	var id string
 	var version string
 	var target string
+	var channel string
 	flag.StringVar(&registry, "registry", "", "path to beta registry root")
 	flag.StringVar(&id, "id", "", "capsule id")
 	flag.StringVar(&version, "version", "", "capsule version")
 	flag.StringVar(&target, "target", "", "target triple")
+	flag.StringVar(&channel, "channel", "beta", "publish channel: beta or stable")
 	flag.Parse()
 
 	if registry == "" || id == "" || version == "" {
 		fmt.Fprintln(os.Stderr, "error: --registry, --id, and --version are required")
 		os.Exit(2)
 	}
-	if err := validatePublishedPackage(registry, id, version, target); err != nil {
+	if err := validatePublishedPackage(registry, id, version, target, channel); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func validatePublishedPackage(registry string, id string, version string, target string) error {
+func validatePublishedPackage(registry string, id string, version string, target string, channel string) error {
+	if !isSupportedPublishChannel(channel) {
+		return fmt.Errorf("unsupported channel %q", channel)
+	}
 	base := filepath.Join(registry, "packages", capsuleIDDirectory(id), version)
 	if target == "" {
 		entries, err := os.ReadDir(base)
@@ -101,10 +106,10 @@ func validatePublishedPackage(registry string, id string, version string, target
 	if err := decoder.Decode(&meta); err != nil {
 		return err
 	}
-	if meta.Schema != "tetra.eco.publish.v1beta" {
+	if meta.Schema != publishSchemaForChannel(channel) {
 		return fmt.Errorf("unsupported schema %q", meta.Schema)
 	}
-	if meta.Channel != "beta" {
+	if meta.Channel != channel {
 		return fmt.Errorf("unsupported channel %q", meta.Channel)
 	}
 	if meta.Hub == "" {
@@ -187,6 +192,22 @@ func validatePublishedPackage(registry string, id string, version string, target
 		return fmt.Errorf("package hash mismatch for %s", pkgPath)
 	}
 	return nil
+}
+
+func isSupportedPublishChannel(channel string) bool {
+	switch channel {
+	case "beta", "stable":
+		return true
+	default:
+		return false
+	}
+}
+
+func publishSchemaForChannel(channel string) string {
+	if channel == "stable" {
+		return "tetra.eco.publish.v1"
+	}
+	return "tetra.eco.publish.v1beta"
 }
 
 func validateRelativeMetadataPath(path string, label string) error {

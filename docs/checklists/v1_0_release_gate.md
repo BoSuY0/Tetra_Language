@@ -3,7 +3,7 @@
 Status: active release-gate scaffold for the future `v1.0.0` release line.
 This checklist is not release proof until every unchecked row cites fresh
 evidence from the exact release branch state. The current public release line
-remains `v0.2.0`; `scripts/release_v1_0_gate.sh` must block at version
+remains `v0.3.0`; `scripts/release/v1_0/gate.sh` must block at version
 preflight until freshly bootstrapped `./tetra version` reports `v1.0.0`.
 
 Scope contract: `docs/spec/v1_scope.md`.
@@ -14,14 +14,19 @@ Final handoff template: `docs/release/v1_0_final_handoff.md`.
 
 ## Hard Blockers
 
-- [ ] Version preflight: `bash scripts/bootstrap.sh`, `./tetra version`, and
+- [ ] Version preflight: `bash scripts/dev/bootstrap.sh`, `./tetra version`, and
       `./t version` prove the exact intended `v1.0.0` candidate. Any `v0.x`
       output blocks before mandatory checks run.
-- [ ] Final v1 gate: `bash scripts/release_v1_0_gate.sh --report-dir <report-dir>`
+- [ ] Final v1 gate: `bash scripts/release/v1_0/gate.sh --report-dir <report-dir>`
       completes with `status: pass`, `failed_count: 0`, and artifact id
       `tetra.release.v1_0.gate-report.v1`.
 - [ ] Scope closure: every mandatory row in `docs/spec/v1_scope.md` has same
       branch evidence for implementation, tests, docs, and artifacts.
+- [ ] Safety evidence closure: ownership, lifetime, resource, actor/task,
+      unsafe, capability, effect, privacy, consent, budget, MMIO, and memory
+      checks cite the aggregate compiler command, docs verifier, and concrete
+      `<report-dir>/logs/*safety*` and `<report-dir>/logs/*docs*` paths from
+      this exact branch state.
 - [ ] No post-v1 leakage: features listed under `Explicitly Post-v1 Unless
       Promoted By Review` remain blocked, deferred, or have approved promotion
       evidence in `docs/release/post_v1_promotion_checklist.md`.
@@ -31,21 +36,25 @@ Final handoff template: `docs/release/v1_0_final_handoff.md`.
 - [ ] Release notes and handoff: `docs/release-notes/v1_0.md` and
       `docs/release/v1_0_final_handoff.md` cite the final report directory and
       do not reuse stale evidence from another commit, branch, or version.
+- [ ] Evidence freshness: every checked row cites command output from the same
+      commit, branch, version, and report directory as the final gate.
+- [ ] Handoff/signoff lint: `docs/release/v1_0_final_handoff.md` and the final
+      security signoff have no unresolved `TODO`, `TBD`, or template placeholder
+      text.
 
 ## Required Commands
 
 Each command must be run against the final `v1.0.0` candidate unless the final
 v1 gate summary cites the same command as a passing gate step.
 
-- [ ] `bash scripts/release_v1_0_gate.sh --report-dir <report-dir>`
-- [ ] `bash scripts/bootstrap.sh`
+- [ ] `bash scripts/release/v1_0/gate.sh --report-dir <report-dir>`
+- [ ] `bash scripts/dev/bootstrap.sh`
 - [ ] `./tetra version`
 - [ ] `./t version`
 - [ ] `go test ./compiler/internal/frontend/... -count=1`
 - [ ] `go test ./compiler/... -run 'Closure|FunctionType|Callable|Capsule|Property' -count=1`
 - [ ] `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module' -count=1`
-- [ ] `go test ./compiler/... -run 'Ownership|Borrow|Lifetime|Island|Actor|Task' -count=1`
-- [ ] `go test ./compiler/... -run 'Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`
+- [ ] `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`
 - [ ] `go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1`
 - [ ] `go test ./compiler/... -run 'Async|Await|Task|TypedError' -count=1`
 - [ ] `go test ./compiler/... -run 'Task|Runtime|Async|Stress' -count=1`
@@ -54,7 +63,7 @@ v1 gate summary cites the same command as a passing gate step.
 - [ ] `go test ./compiler/... -run 'UI|View|State|Style|Accessibility|NativeShell' -count=1`
 - [ ] `go test ./cli/... -count=1`
 - [ ] `go test ./tools/... -count=1`
-- [ ] `bash scripts/test_all.sh --full --keep-going --report-dir <report-dir>/artifacts/test-all`
+- [ ] `bash scripts/ci/test-all.sh --full --keep-going --report-dir <report-dir>/artifacts/test-all`
 - [ ] `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt`
 - [ ] `./tetra fmt --check examples lib __rt compiler/selfhostrt`
 - [ ] `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
@@ -66,13 +75,15 @@ v1 gate summary cites the same command as a passing gate step.
 - [ ] `./tetra smoke --target windows-x64 --run=false --report <report-dir>/artifacts/windows-smoke.json`
 - [ ] `./tetra smoke --target wasm32-wasi --run=false --report <report-dir>/artifacts/wasm32-wasi-smoke.json`
 - [ ] `./tetra smoke --target wasm32-web --run=false --report <report-dir>/artifacts/wasm32-web-smoke.json`
-- [ ] `bash scripts/release_v1_0_wasi_smoke.sh --report <report-dir>/artifacts/wasi-smoke.json`
-- [ ] `bash scripts/release_v1_0_web_smoke.sh --report <report-dir>/artifacts/web-ui-smoke.json`
-- [ ] `bash scripts/release_v1_0_security_review.sh --signoff <report-dir>/artifacts/security-review.md`
-- [ ] `bash scripts/release_v1_0_binary_size.sh --report <report-dir>/artifacts/binary-size-thresholds.json`
-- [ ] `bash scripts/release_v1_0_repro.sh --report <report-dir>/artifacts/reproducible-build.json`
+- [ ] `bash scripts/release/v1_0/wasi-smoke.sh --report <report-dir>/artifacts/wasi-smoke.json`
+- [ ] `bash scripts/release/v1_0/web-smoke.sh --report <report-dir>/artifacts/web-ui-smoke.json`
+- [ ] `bash scripts/release/v1_0/security-review.sh --signoff <report-dir>/artifacts/security-review.md`
+- [ ] `bash scripts/release/v1_0/binary-size.sh --report <report-dir>/artifacts/binary-size-thresholds.json`
+- [ ] `bash scripts/release/v1_0/reproducible-build.sh --report <report-dir>/artifacts/reproducible-build.json`
 - [ ] `go run ./tools/cmd/validate-release-state --expected-version v1.0.0 --format=text --report-dir <report-dir>`
 - [ ] `go run ./tools/cmd/validate-artifact-hashes --manifest <report-dir>/artifacts/artifact-hashes.json`
+- [ ] `! rg -n 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' docs/release/v1_0_final_handoff.md <report-dir>/artifacts/security-review.md`
+- [ ] Cross-reference audit: `docs/spec/v1_scope.md`, `docs/checklists/v1_0_release_gate.md`, and `docs/release/v1_0_final_handoff.md` all cite each other and the same final `<report-dir>`.
 - [ ] `git diff --check`
 
 ## Required Artifacts
@@ -117,8 +128,7 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 | Function-type/callable MVP boundaries | Compiler tests prove supported direct-local callable subset and stable diagnostics for unsupported callable forms | compiler callable/closure test log | blocked until fresh v1 evidence |
 | Capsule metadata declaration MVP | Frontend + compiler tests prove metadata-only capsule acceptance and validation without runtime coupling | frontend/compiler capsule test logs | blocked until fresh v1 evidence |
 | Stable type and module contracts | Compiler tests for type, inference, enum, optional, protocol, extension, and module behavior | compiler test log | blocked until fresh v1 evidence |
-| Ownership, lifetimes, islands, actors, and tasks | Negative and transfer/race-safety tests | compiler safety test log | blocked until fresh v1 evidence |
-| Effects, capabilities, unsafe, privacy, consent, and budgets | Compiler tests, docs verification, and diagnostic shape tests | compiler safety log; docs verifier log; diagnostic log | blocked until fresh v1 evidence |
+| Safety closure: ownership, lifetimes, resources, islands, actors/tasks, unsafe, capabilities, effects, privacy, consent, budgets, MMIO, and memory | Aggregate compiler safety command plus docs verification and diagnostic shape tests from the same branch state | `<report-dir>/logs/*safety*`; `<report-dir>/logs/*docs*`; diagnostic log | blocked until fresh v1 evidence |
 | Async, task runtime, and actor runtime MVP | Async/task/actor/runtime tests plus target smoke evidence | runtime test logs; smoke artifacts | blocked until fresh v1 evidence |
 | Runtime ABI and TOBJ linking | Runtime ABI, object, link, override, and mismatch tests | runtime ABI test log | blocked until fresh v1 evidence |
 | UI metadata surface | UI compiler tests, `docs/spec/ui_v1.md`, native shell smoke, and web smoke | UI test log; web smoke artifact; target smoke artifact | blocked until fresh v1 evidence |
@@ -133,7 +143,7 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 - [ ] No checkbox is marked complete without a command result and artifact path.
 - [ ] No generated artifact, smoke report, signoff, or summary is reused from a
       different commit, branch, version, or report directory.
-- [ ] Version metadata is not promoted from `v0.2.0` until the mandatory v1
+- [ ] Version metadata is not promoted from `v0.3.0` until the mandatory v1
       scope evidence is ready.
 - [ ] The final handoff records command exit codes, changed release files,
       known issues, residual risks, and release decision.

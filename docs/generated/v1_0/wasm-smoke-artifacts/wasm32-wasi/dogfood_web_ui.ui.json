@@ -1,0 +1,80 @@
+{
+  "schema": "tetra.ui.v1",
+  "states": [
+    {
+      "name": "TodoState",
+      "module": "",
+      "fields": [
+        {
+          "name": "count",
+          "type": "i32",
+          "mutable": true,
+          "const": false,
+          "init": "0"
+        },
+        {
+          "name": "title",
+          "type": "str",
+          "mutable": false,
+          "const": false,
+          "init": "\"Dogfood Web UI\""
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "TodoView",
+      "module": "",
+      "state_type": "TodoState",
+      "bindings": [
+        {
+          "name": "countValue",
+          "type": "i32",
+          "source": "state.count"
+        },
+        {
+          "name": "titleText",
+          "type": "str",
+          "source": "state.title"
+        }
+      ],
+      "events": [
+        {
+          "name": "click",
+          "command": "increment"
+        }
+      ],
+      "commands": [
+        {
+          "name": "increment",
+          "statement_count": 1
+        }
+      ],
+      "styles": [
+        {
+          "name": "width",
+          "type": "i32",
+          "value": "360"
+        },
+        {
+          "name": "theme",
+          "type": "str",
+          "value": "\"release\""
+        }
+      ],
+      "accessibility": [
+        {
+          "name": "role",
+          "type": "str",
+          "value": "\"button\""
+        },
+        {
+          "name": "label",
+          "type": "str",
+          "value": "\"Increment dogfood counter\""
+        }
+      ]
+    }
+  ]
+}

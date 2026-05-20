@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -95,5 +98,49 @@ func TestValidateExampleIndexAcceptsExcludedExamples(t *testing.T) {
 	}, "\n")
 	if err := validateExampleIndex(smoke, index); err != nil {
 		t.Fatalf("validateExampleIndex with exclusion: %v", err)
+	}
+}
+
+func TestValidateExampleDocsAcceptsT4ProjectEntry(t *testing.T) {
+	index := strings.Join([]string{
+		"| Example | Purpose | Target group | Expected behavior |",
+		"| --- | --- | --- | --- |",
+		"| `examples/projects/hello_t4/src/main.t4` | Minimal project-first app. | native | exits 0 |",
+	}, "\n")
+	if err := validateExampleDocs(index); err != nil {
+		t.Fatalf("validateExampleDocs: %v", err)
+	}
+}
+
+func TestValidateExampleDocsRejectsUnsupportedExtension(t *testing.T) {
+	index := strings.Join([]string{
+		"| Example | Purpose | Target group | Expected behavior |",
+		"| --- | --- | --- | --- |",
+		"| `examples/not_an_example.txt` | Invalid extension. | native | exits 0 |",
+	}, "\n")
+	err := validateExampleDocs(index)
+	if err == nil {
+		t.Fatalf("expected unsupported extension failure")
+	}
+	if !strings.Contains(err.Error(), "must point to a .tetra or .t4 file") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunAcceptsDocsFlagWithoutSmokeList(t *testing.T) {
+	index := strings.Join([]string{
+		"| Example | Purpose | Target group | Expected behavior |",
+		"| --- | --- | --- | --- |",
+		"| `examples/projects/hello_t4/src/main.t4` | Minimal project-first app. | native | exits 0 |",
+	}, "\n")
+	docsPath := t.TempDir() + "/examples_index.md"
+	if err := os.WriteFile(docsPath, []byte(index), 0o644); err != nil {
+		t.Fatalf("write docs fixture: %v", err)
+	}
+
+	var stderr bytes.Buffer
+	exitCode := runValidateExampleIndex([]string{"--docs", docsPath}, io.Discard, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("runValidateExampleIndex exit = %d, stderr = %q", exitCode, stderr.String())
 	}
 }

@@ -229,7 +229,7 @@ func interfaceArtifactSourceRoot(root string, relPath string) (string, error) {
 	if moduleName == "" {
 		return "", fmt.Errorf("artifact interface %s: missing module declaration", relPath)
 	}
-	moduleRel := filepath.ToSlash(filepath.Join(strings.Split(moduleName, ".")...)) + compiler.T4InterfaceExtension
+	moduleRel := filepath.ToSlash(moduleRelPathWithExtension(moduleName, compiler.T4InterfaceExtension))
 	cleanRel := filepath.ToSlash(filepath.Clean(relPath))
 	if cleanRel != moduleRel && !strings.HasSuffix(cleanRel, "/"+moduleRel) {
 		return "", fmt.Errorf("artifact interface %s: module '%s' must be in %s", relPath, moduleName, moduleRel)

@@ -1,7 +1,8 @@
 # Tetra Language v1.0 Implementation Roadmap (Real Delivery)
 
 > Historical checkpoint. This roadmap was produced against an older v0.6 baseline
-> and is superseded by `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+> and is superseded by `docs/spec/v1_scope.md` and
+> `docs/checklists/v1_0_release_gate.md`.
 > The current public version is `v0.1.2`.
 
 **Date:** 2026-04-26  
@@ -13,15 +14,15 @@ passes without scope-freeze exceptions.
 
 - [x] A TODO is considered closed only when implementation + tests + release gates pass.
 - [x] `deferred-post-v1`, `blocked-by-prerequisite`, and `scope-freeze` notes do not count as v1.0 completion.
-- [x] Keep `bash scripts/test_all.sh --full` green after every merge batch.
+- [x] Keep `bash scripts/ci/test-all.sh --full` green after every merge batch.
 - [x] No version bump to `v1.0.x` until all mandatory v1.0 checks are green.
 
 ## Baseline Commands (Must Stay Green)
 
 - [x] `go test ./compiler/... ./cli/... ./tools/... -count=1`
-- [x] `bash scripts/test_all.sh --quick`
-- [x] `bash scripts/test_all.sh --full`
-- [x] `bash scripts/release_v0_6_gate.sh`
+- [x] `bash scripts/ci/test-all.sh --quick`
+- [x] `bash scripts/ci/test-all.sh --full`
+- [x] `bash scripts/release/v0_6/gate.sh`
 - [x] `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 
 ---
@@ -273,8 +274,8 @@ go test ./compiler/... ./cli/... ./tools/...
 **Verification**
 
 ```sh
-bash scripts/test_all.sh --full
-bash scripts/release_v1_0_gate.sh
+bash scripts/ci/test-all.sh --full
+bash scripts/release/v1_0/gate.sh
 ```
 
 ---
@@ -329,14 +330,14 @@ go test ./cli/... ./tools/... -run 'Eco|Vault|Capsule|Lock|API'
 ### Mandatory Final Gate
 
 - [x] `go test ./compiler/... ./cli/... ./tools/...`
-- [x] `bash scripts/test_all.sh --full`
-- [x] `bash scripts/release_v1_0_gate.sh` (must pass fully)
+- [x] `bash scripts/ci/test-all.sh --full`
+- [x] `bash scripts/release/v1_0/gate.sh` (must pass fully)
 
 ---
 
 ## Definition Of Done (v1.0)
 
 - [x] `./tetra version` returns `v1.0.x` on release branch.
-- [x] `scripts/release_v1_0_gate.sh` passes end-to-end.
+- [x] `scripts/release/v1_0/gate.sh` passes end-to-end.
 - [x] No mandatory v1 TODO in this roadmap remains open.
 - [x] All generated release artifacts (docs/manifest/release notes/api diff proofs) are current and verified.

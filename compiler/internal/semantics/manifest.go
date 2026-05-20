@@ -167,6 +167,8 @@ func builtinEffects(name string) []string {
 		effects = []string{"mem"}
 	case "core.mmio_read_i32", "core.mmio_write_i32":
 		effects = []string{"io", "mmio"}
+	case "core.fs_exists":
+		effects = []string{"io"}
 	case "core.sym_addr":
 		effects = []string{"link"}
 	case "core.ctx_switch":
@@ -188,6 +190,8 @@ func builtinEffects(name string) []string {
 	case "core.actor_dispatch", "core.actor_main_entry_id",
 		"core.spawn", "core.send", "core.send_msg", "core.recv", "core.recv_msg", "core.send_typed", "core.recv_typed", "core.self", "core.sender":
 		effects = []string{"actors"}
+	case "core.actor_node_connect", "core.actor_node_status", "core.spawn_remote":
+		effects = []string{"actors", "runtime"}
 	case "core.consent_token", "core.secret_seal_i32", "core.secret_unseal_i32":
 		effects = []string{"privacy"}
 	}

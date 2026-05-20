@@ -7,23 +7,29 @@ import (
 	"tetra_language/compiler/internal/frontend"
 )
 
-var knownEffects = map[string]string{
-	"actors":      "actors",
-	"alloc":       "alloc",
-	"budget":      "budget",
-	"cap.io":      "io",
-	"cap.mem":     "mem",
-	"capability":  "capability",
-	"capsule.io":  "capsule.io",
-	"capsule.mem": "capsule.mem",
-	"control":     "control",
-	"io":          "io",
-	"islands":     "islands",
-	"link":        "link",
-	"mem":         "mem",
-	"mmio":        "mmio",
-	"privacy":     "privacy",
-	"runtime":     "runtime",
+var canonicalEffects = map[string]struct{}{
+	"actors":     {},
+	"alloc":      {},
+	"budget":     {},
+	"capability": {},
+	"control":    {},
+	"io":         {},
+	"islands":    {},
+	"link":       {},
+	"mem":        {},
+	"mmio":       {},
+	"privacy":    {},
+	"runtime":    {},
+}
+
+var effectAliases = map[string]string{
+	"cap.io":  "io",
+	"cap.mem": "mem",
+}
+
+var permissionMarkerEffects = map[string]struct{}{
+	"capsule.io":  {},
+	"capsule.mem": {},
 }
 
 var effectGroups = map[string][]string{
@@ -45,6 +51,7 @@ type effectContext struct {
 	funcName         string
 	declared         map[string]struct{}
 	explicitDeclared map[string]struct{}
+	capsulePerms     map[string]struct{}
 	allowMissing     bool
 	hasCapGroup      bool
 }
@@ -53,6 +60,19 @@ type normalizedEffects struct {
 	declared    map[string]struct{}
 	explicit    map[string]struct{}
 	hasCapGroup bool
+}
+
+func canonicalizeEffectName(name string) (string, bool) {
+	if canonical, ok := effectAliases[name]; ok {
+		return canonical, true
+	}
+	if _, ok := permissionMarkerEffects[name]; ok {
+		return name, true
+	}
+	if _, ok := canonicalEffects[name]; ok {
+		return name, true
+	}
+	return "", false
 }
 
 func normalizeEffects(raw []string, pos frontend.Position) ([]string, error) {
@@ -68,7 +88,7 @@ func normalizeEffectDecl(raw []string, pos frontend.Position) (normalizedEffects
 	explicit := make(map[string]struct{}, len(raw))
 	hasCapGroup := false
 	for _, name := range raw {
-		canonical, ok := knownEffects[name]
+		canonical, ok := canonicalizeEffectName(name)
 		if ok {
 			declared[canonical] = struct{}{}
 			explicit[canonical] = struct{}{}
@@ -76,7 +96,7 @@ func normalizeEffectDecl(raw []string, pos frontend.Position) (normalizedEffects
 		}
 		members, groupOK := effectGroups[name]
 		if !groupOK {
-			return normalizedEffects{}, fmt.Errorf("%s: unknown effect '%s'", frontend.FormatPos(pos), name)
+			return normalizedEffects{}, effectDiagnosticf(pos, "unknown effect '%s'", name)
 		}
 		if _, ok := capabilityAttenuationGroups[name]; ok {
 			hasCapGroup = true
@@ -94,7 +114,7 @@ func normalizeEffectDecl(raw []string, pos frontend.Position) (normalizedEffects
 
 func expandEffectGroup(name string, members []string, out map[string]struct{}, visiting map[string]struct{}) error {
 	for _, member := range members {
-		if canonical, ok := knownEffects[member]; ok {
+		if canonical, ok := canonicalizeEffectName(member); ok {
 			out[canonical] = struct{}{}
 			continue
 		}
@@ -158,7 +178,7 @@ func (ctx *effectContext) require(pos frontend.Position, effect string) error {
 	if _, ok := ctx.declared[effect]; ok {
 		return nil
 	}
-	return fmt.Errorf("%s: function '%s' uses effect '%s' but does not declare it", frontend.FormatPos(pos), ctx.funcName, effect)
+	return effectDiagnosticf(pos, "function '%s' uses effect '%s' but does not declare it", ctx.funcName, effect)
 }
 
 func (ctx *effectContext) requireAll(pos frontend.Position, effects []string) error {
@@ -180,8 +200,8 @@ func (ctx *effectContext) requireCapsulePermission(pos frontend.Position, permis
 	if _, ok := ctx.explicitDeclared[attenuatedEffect]; ok {
 		return nil
 	}
-	if _, ok := ctx.declared[permission]; ok {
+	if _, ok := ctx.capsulePerms[permission]; ok {
 		return nil
 	}
-	return fmt.Errorf("%s: function '%s' requires capsule permission '%s' for attenuated effect '%s'", frontend.FormatPos(pos), ctx.funcName, permission, attenuatedEffect)
+	return effectDiagnosticf(pos, "function '%s' requires capsule permission '%s' for attenuated effect '%s'", ctx.funcName, permission, attenuatedEffect)
 }

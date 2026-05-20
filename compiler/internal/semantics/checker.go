@@ -3,6 +3,7 @@ package semantics
 import (
 	"encoding/binary"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"tetra_language/compiler/internal/frontend"
@@ -37,6 +38,39 @@ func Check(prog *frontend.Program) (*CheckedProgram, error) {
 
 type CheckOptions struct {
 	RequireMain bool
+}
+
+func worldFilesImportsFirst(world *module.World) []*frontend.FileAST {
+	if world == nil || len(world.Files) == 0 {
+		return nil
+	}
+	if len(world.ByModule) == 0 {
+		return append([]*frontend.FileAST(nil), world.Files...)
+	}
+	out := make([]*frontend.FileAST, 0, len(world.Files))
+	seen := map[string]bool{}
+	var visit func(*frontend.FileAST)
+	visit = func(file *frontend.FileAST) {
+		if file == nil {
+			return
+		}
+		key := file.Module
+		if key == "" {
+			key = file.Path
+		}
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		for _, imp := range file.Imports {
+			visit(world.ByModule[imp.Path])
+		}
+		out = append(out, file)
+	}
+	for _, file := range world.Files {
+		visit(file)
+	}
+	return out
 }
 
 func clearMatchPayloadExhaustivenessMarkers(world *module.World) {
@@ -363,7 +397,12 @@ func validateGlobalConstExpr(expr frontend.Expr, values map[string]globalConstVa
 			return fmt.Errorf("%s: unknown constant '%s' in global const expression", frontend.FormatPos(e.At), e.Name)
 		}
 	case *frontend.UnaryExpr:
-		return validateGlobalConstExpr(e.X, values)
+		if err := validateGlobalConstExpr(e.X, values); err != nil {
+			return err
+		}
+		if _, ok, overflow := evalGlobalConstI32Wide(e, values); ok && overflow {
+			return fmt.Errorf("%s: overflow in global const expression", frontend.FormatPos(e.At))
+		}
 	case *frontend.BinaryExpr:
 		if err := validateGlobalConstExpr(e.Left, values); err != nil {
 			return err
@@ -381,66 +420,181 @@ func validateGlobalConstExpr(expr frontend.Expr, values map[string]globalConstVa
 				return fmt.Errorf("%s: modulo by zero in global const expression", frontend.FormatPos(e.At))
 			}
 		}
+		if _, ok, overflow := evalGlobalConstI32Wide(e, values); ok && overflow {
+			return fmt.Errorf("%s: overflow in global const expression", frontend.FormatPos(e.At))
+		}
 	}
 	return nil
 }
 
 func evalGlobalConstI32(expr frontend.Expr, values map[string]globalConstValue) (int32, bool) {
+	v, ok, overflow := evalGlobalConstI32Wide(expr, values)
+	if !ok || overflow {
+		return 0, false
+	}
+	return int32(v), true
+}
+
+func evalGlobalConstI32Wide(expr frontend.Expr, values map[string]globalConstValue) (int64, bool, bool) {
 	switch e := expr.(type) {
 	case *frontend.NumberExpr:
-		return e.Value, true
+		return int64(e.Value), true, false
 	case *frontend.IdentExpr:
 		v, ok := values[e.Name]
 		if !ok || !isGlobalIntLikeType(v.TypeName) {
-			return 0, false
+			return 0, false, false
 		}
-		return v.I32, true
+		return int64(v.I32), true, false
 	case *frontend.UnaryExpr:
 		if e.Op != frontend.TokenMinus {
-			return 0, false
+			return 0, false, false
 		}
-		v, ok := evalGlobalConstI32(e.X, values)
-		if !ok {
-			return 0, false
+		v, ok, overflow := evalGlobalConstI32Wide(e.X, values)
+		if !ok || overflow {
+			return 0, ok, overflow
 		}
-		return -v, true
+		return checkedConstI32(-v)
 	case *frontend.BinaryExpr:
-		left, ok := evalGlobalConstI32(e.Left, values)
-		if !ok {
-			return 0, false
+		left, ok, overflow := evalGlobalConstI32Wide(e.Left, values)
+		if !ok || overflow {
+			return 0, ok, overflow
 		}
-		right, ok := evalGlobalConstI32(e.Right, values)
-		if !ok {
-			return 0, false
+		right, ok, overflow := evalGlobalConstI32Wide(e.Right, values)
+		if !ok || overflow {
+			return 0, ok, overflow
 		}
 		switch e.Op {
 		case frontend.TokenPlus:
-			return left + right, true
+			return checkedConstI32(left + right)
 		case frontend.TokenMinus:
-			return left - right, true
+			return checkedConstI32(left - right)
 		case frontend.TokenStar:
-			return left * right, true
+			return checkedConstI32(left * right)
 		case frontend.TokenSlash:
 			if right == 0 {
-				return 0, false
+				return 0, false, false
 			}
-			return left / right, true
+			return checkedConstI32(left / right)
 		case frontend.TokenPercent:
 			if right == 0 {
-				return 0, false
+				return 0, false, false
 			}
-			return left % right, true
+			return checkedConstI32(left % right)
 		default:
-			return 0, false
+			return 0, false, false
 		}
 	default:
-		return 0, false
+		return 0, false, false
 	}
 }
 
 func isSupportedGlobalScalarType(name string) bool {
 	switch name {
-	case "i32", "bool", "ptr", "str", "u8", "u16", "task.error":
+	case "i32", "bool", "ptr", "fnptr", "str", "u8", "u16", "task.error":
+		return true
+	default:
+		return isSupportedSliceGlobalType(name) || isSupportedOptionalPtrGlobalType(name) || isSupportedOptionalSliceGlobalType(name)
+	}
+}
+
+func isSupportedGlobalType(name string, types map[string]*TypeInfo) bool {
+	if isSupportedGlobalScalarType(name) {
+		return true
+	}
+	if isSupportedOptionalAggregateGlobalType(name, types) {
+		return true
+	}
+	return isSupportedZeroedAggregateGlobalType(name, types, map[string]bool{})
+}
+
+func isSupportedOptionalAggregateGlobalType(name string, types map[string]*TypeInfo) bool {
+	elem, ok := optionalElemName(name)
+	if !ok {
+		return false
+	}
+	if isSupportedGlobalScalarType(elem) {
+		return false
+	}
+	return isSupportedZeroedAggregateGlobalType(elem, types, map[string]bool{})
+}
+
+func isSupportedZeroedAggregateGlobalType(name string, types map[string]*TypeInfo, visiting map[string]bool) bool {
+	if _, elem, ok := parseArrayTypeName(name); ok {
+		return isSupportedGlobalScalarType(elem)
+	}
+	if visiting[name] {
+		return false
+	}
+	info, ok := types[name]
+	if !ok {
+		return false
+	}
+	visiting[name] = true
+	defer delete(visiting, name)
+	switch info.Kind {
+	case TypeArray:
+		return isSupportedGlobalScalarType(info.ElemType)
+	case TypeStruct:
+		for _, field := range info.Fields {
+			if field.FunctionTypeValue {
+				return false
+			}
+			if isSupportedGlobalScalarType(field.TypeName) {
+				continue
+			}
+			if !isSupportedZeroedAggregateGlobalType(field.TypeName, types, visiting) {
+				return false
+			}
+		}
+		return true
+	case TypeEnum:
+		for _, enumCase := range info.EnumCases {
+			for i, payloadType := range enumCase.PayloadTypes {
+				if i < len(enumCase.PayloadFunctionTypes) && enumCase.PayloadFunctionTypes[i] {
+					return false
+				}
+				if isSupportedGlobalScalarType(payloadType) {
+					continue
+				}
+				if !isSupportedZeroedAggregateGlobalType(payloadType, types, visiting) {
+					return false
+				}
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedOptionalSliceGlobalType(name string) bool {
+	elem, ok := optionalElemName(name)
+	if !ok {
+		return false
+	}
+	sliceElem, ok := sliceElemName(elem)
+	if !ok {
+		return false
+	}
+	return isSupportedGlobalSliceElemType(sliceElem)
+}
+
+func isSupportedOptionalPtrGlobalType(name string) bool {
+	elem, ok := optionalElemName(name)
+	return ok && elem == "ptr"
+}
+
+func isSupportedSliceGlobalType(name string) bool {
+	sliceElem, ok := sliceElemName(name)
+	if !ok {
+		return false
+	}
+	return isSupportedGlobalSliceElemType(sliceElem)
+}
+
+func isSupportedGlobalSliceElemType(sliceElem string) bool {
+	switch sliceElem {
+	case "i32", "u8", "u16", "bool":
 		return true
 	default:
 		return false
@@ -625,6 +779,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		GlobalsByModule:    make(map[string]map[string]GlobalInfo),
 		GlobalDataByModule: make(map[string][][]byte),
 	}
+	capsulePermissionsByModule := collectCapsulePermissionsByModule(world)
 	exportedSymbols := make(map[string]string)
 
 	seenImpls := map[string]frontend.Position{}
@@ -754,7 +909,11 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if isArrayTypeName(elem) {
 				return nil, fmt.Errorf("array element types are not supported yet")
 			}
-			if elem != "i32" && elem != "u8" && elem != "u16" && elem != "bool" {
+			elemInfo, err := buildType(elem)
+			if err != nil {
+				return nil, err
+			}
+			if !isSupportedCollectionElemType(elemInfo) {
 				return nil, fmt.Errorf("slice element type '%s' is not supported", elem)
 			}
 			info := makeSliceTypeInfo(name, elem)
@@ -765,7 +924,11 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if n <= 0 {
 				return nil, fmt.Errorf("array size must be positive constant")
 			}
-			if !isSupportedArrayElemType(elem) {
+			elemInfo, err := buildType(elem)
+			if err != nil {
+				return nil, err
+			}
+			if !isSupportedCollectionElemType(elemInfo) {
 				return nil, fmt.Errorf("array element type '%s' is not supported", elem)
 			}
 			info := makeArrayTypeInfo(name, elem, n)
@@ -794,9 +957,6 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		slotCount := 0
 		for i := range ctx.decl.Fields {
 			field := &ctx.decl.Fields[i]
-			if field.Type.Kind == frontend.TypeRefFunction {
-				return nil, fmt.Errorf("%s: struct field '%s.%s' uses function type; storing function-typed values in structs is not supported in this MVP", frontend.FormatPos(field.At), displayTypeName(name, ctx.module), field.Name)
-			}
 			if _, exists := fieldMap[field.Name]; exists {
 				return nil, fmt.Errorf("%s: duplicate field '%s'", frontend.FormatPos(field.At), field.Name)
 			}
@@ -812,11 +972,34 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if err := ensureTypeVisible(resolved, fieldType, ctx.module, field.At); err != nil {
 				return nil, err
 			}
+			functionParamTypes := []string(nil)
+			functionParamOwnership := []string(nil)
+			functionReturnType := ""
+			functionThrowsType := ""
+			functionEffects := []string(nil)
+			if field.Type.Kind == frontend.TypeRefFunction {
+				functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(field.Type, ctx.module, ctx.imports)
+				if err != nil {
+					return nil, err
+				}
+				functionParamOwnership = functionTypeRefParamOwnership(field.Type)
+				functionThrowsType, err = functionTypeRefThrowsType(field.Type, ctx.module, ctx.imports)
+				if err != nil {
+					return nil, err
+				}
+			}
 			info := FieldInfo{
-				Name:      field.Name,
-				TypeName:  resolved,
-				Offset:    slotCount,
-				SlotCount: fieldType.SlotCount,
+				Name:                   field.Name,
+				TypeName:               resolved,
+				Offset:                 slotCount,
+				SlotCount:              fieldType.SlotCount,
+				FunctionTypeValue:      field.Type.Kind == frontend.TypeRefFunction,
+				FunctionTypeRef:        field.Type,
+				FunctionParamTypes:     functionParamTypes,
+				FunctionParamOwnership: functionParamOwnership,
+				FunctionReturnType:     functionReturnType,
+				FunctionThrowsType:     functionThrowsType,
+				FunctionEffects:        functionEffects,
 			}
 			fieldMap[field.Name] = info
 			fields = append(fields, info)
@@ -861,6 +1044,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if !isSupportedActorStateScalarType(resolved) {
 				return nil, fmt.Errorf("%s: actor state field '%s' type '%s' is not supported in this MVP (supported: Int/Bool/UInt8/UInt16/task.error)", frontend.FormatPos(field.At), field.Name, resolved)
 			}
+			fieldSlots := fieldType.SlotCount
+			if fieldSlots <= 0 {
+				fieldSlots = 1
+			}
+			if slot+fieldSlots > MaxActorStateSlots {
+				return nil, fmt.Errorf("%s: actor '%s' state supports at most %d slots, got %d", frontend.FormatPos(field.At), displayTypeName(actorName, ctx.module), MaxActorStateSlots, slot+fieldSlots)
+			}
 			if field.Init == nil {
 				return nil, fmt.Errorf("%s: actor state field '%s' requires a compile-time constant initializer", frontend.FormatPos(field.At), field.Name)
 			}
@@ -885,14 +1075,20 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					fields[field.Name] = stateField
 				}
 			}
-			slot++
+			slot += fieldSlots
 		}
 	}
 
+	enumPayloadEdges := map[string]map[string]frontend.Position{}
+	enumModules := map[string]string{}
 	for name, ctx := range enums {
 		info := types[name]
 		if info == nil || info.Kind != TypeEnum {
 			return nil, fmt.Errorf("internal error: enum '%s' has no type info", name)
+		}
+		enumModules[name] = ctx.module
+		if _, ok := enumPayloadEdges[name]; !ok {
+			enumPayloadEdges[name] = map[string]frontend.Position{}
 		}
 		maxPayloadSlots := 0
 		for i := range ctx.decl.Cases {
@@ -900,11 +1096,33 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			caseInfo := info.EnumCases[i]
 			caseInfo.PayloadTypes = caseInfo.PayloadTypes[:0]
 			caseInfo.PayloadSlots = caseInfo.PayloadSlots[:0]
+			caseInfo.PayloadFunctionTypes = caseInfo.PayloadFunctionTypes[:0]
+			caseInfo.PayloadFunctionRefs = caseInfo.PayloadFunctionRefs[:0]
+			caseInfo.PayloadFunctionParams = caseInfo.PayloadFunctionParams[:0]
+			caseInfo.PayloadFunctionOwns = caseInfo.PayloadFunctionOwns[:0]
+			caseInfo.PayloadFunctionReturns = caseInfo.PayloadFunctionReturns[:0]
+			caseInfo.PayloadFunctionThrows = caseInfo.PayloadFunctionThrows[:0]
+			caseInfo.PayloadFunctionEffects = caseInfo.PayloadFunctionEffects[:0]
 			totalPayloadSlots := 0
 			for j := range declCase.Payload {
 				payload := &declCase.Payload[j]
-				if payload.Kind == frontend.TypeRefFunction {
-					return nil, fmt.Errorf("%s: enum case '%s.%s' uses function type payload; storing function-typed values in enum payloads is not supported in this MVP", frontend.FormatPos(payload.At), displayTypeName(name, ctx.module), declCase.Name)
+				functionTypeValue := payload.Kind == frontend.TypeRefFunction
+				functionParamTypes := []string(nil)
+				functionParamOwnership := []string(nil)
+				functionReturnType := ""
+				functionThrowsType := ""
+				functionEffects := []string(nil)
+				if functionTypeValue {
+					var err error
+					functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(*payload, ctx.module, ctx.imports)
+					if err != nil {
+						return nil, err
+					}
+					functionParamOwnership = functionTypeRefParamOwnership(*payload)
+					functionThrowsType, err = functionTypeRefThrowsType(*payload, ctx.module, ctx.imports)
+					if err != nil {
+						return nil, err
+					}
 				}
 				resolved, err := resolveTypeName(payload, ctx.module, ctx.imports)
 				if err != nil {
@@ -921,8 +1139,18 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if err := ensureTypeVisible(resolved, payloadInfo, ctx.module, payload.At); err != nil {
 					return nil, err
 				}
+				if payloadInfo.Kind == TypeEnum {
+					enumPayloadEdges[name][resolved] = payload.At
+				}
 				caseInfo.PayloadTypes = append(caseInfo.PayloadTypes, resolved)
 				caseInfo.PayloadSlots = append(caseInfo.PayloadSlots, payloadInfo.SlotCount)
+				caseInfo.PayloadFunctionTypes = append(caseInfo.PayloadFunctionTypes, functionTypeValue)
+				caseInfo.PayloadFunctionRefs = append(caseInfo.PayloadFunctionRefs, *payload)
+				caseInfo.PayloadFunctionParams = append(caseInfo.PayloadFunctionParams, functionParamTypes)
+				caseInfo.PayloadFunctionOwns = append(caseInfo.PayloadFunctionOwns, functionParamOwnership)
+				caseInfo.PayloadFunctionReturns = append(caseInfo.PayloadFunctionReturns, functionReturnType)
+				caseInfo.PayloadFunctionThrows = append(caseInfo.PayloadFunctionThrows, functionThrowsType)
+				caseInfo.PayloadFunctionEffects = append(caseInfo.PayloadFunctionEffects, functionEffects)
 				totalPayloadSlots += payloadInfo.SlotCount
 			}
 			caseInfo.SlotCount = totalPayloadSlots
@@ -933,6 +1161,12 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			}
 		}
 		info.SlotCount = 1 + maxPayloadSlots
+	}
+	if err := validateEnumPayloadCycles(enumPayloadEdges, enumModules); err != nil {
+		return nil, err
+	}
+	if err := refreshCompositeSlotLayouts(types); err != nil {
+		return nil, err
 	}
 
 	for name, ctx := range protocols {
@@ -1037,8 +1271,25 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			}
 
 			resolved := ""
-			if glob.Type.Name != "" || glob.Type.Elem != nil {
+			functionTypeValue := glob.Type.Kind == frontend.TypeRefFunction
+			functionParamTypes := []string(nil)
+			functionParamOwnership := []string(nil)
+			functionReturnType := ""
+			functionThrowsType := ""
+			functionEffects := []string(nil)
+			if glob.Type.Name != "" || glob.Type.Elem != nil || functionTypeValue {
 				var err error
+				if functionTypeValue {
+					functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(glob.Type, module, imports)
+					if err != nil {
+						return nil, err
+					}
+					functionParamOwnership = functionTypeRefParamOwnership(glob.Type)
+					functionThrowsType, err = functionTypeRefThrowsType(glob.Type, module, imports)
+					if err != nil {
+						return nil, err
+					}
+				}
 				resolved, err = resolveTypeName(&glob.Type, module, imports)
 				if err != nil {
 					return nil, err
@@ -1061,12 +1312,44 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				resolved = inferred
 			}
 			glob.Type.Name = resolved
-			if !isSupportedGlobalScalarType(resolved) {
+			if !isSupportedGlobalType(resolved, types) {
 				return nil, fmt.Errorf("%s: global '%s' has unsupported type '%s' (allowed: i32, bool, ptr, str, u8, u16, task.error)", frontend.FormatPos(glob.At), glob.Name, resolved)
 			}
 			typeInfo, err := ensureTypeInfo(resolved, types)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %v", frontend.FormatPos(glob.At), err)
+			}
+			functionValue := ""
+			if functionTypeValue {
+				switch init := glob.Init.(type) {
+				case *frontend.IdentExpr:
+					if _, ok := fnNames[init.Name]; !ok {
+						return nil, unsupportedFunctionTypedGlobalSameModuleInitializerError(init.At, glob.Name)
+					}
+					functionValue = qualifyName(module, init.Name)
+				case *frontend.FieldAccessExpr:
+					resolved, targetSig, ok, err := resolveImportedFunctionGlobalInitializer(init, world, module, imports, types)
+					if err != nil {
+						return nil, err
+					}
+					if !ok {
+						return nil, unsupportedFunctionTypedGlobalImportedInitializerError(init.At, glob.Name)
+					}
+					if targetSig.Generic {
+						return nil, unsupportedGenericFunctionTypedGlobalInitializerError(init.At, callbackArgumentName(init), glob.Name)
+					}
+					if err := validateFunctionTypeSymbolSignature(glob.Name, glob.Type, targetSig, module, imports, init.At); err != nil {
+						return nil, err
+					}
+					functionValue = resolved
+				case *frontend.ClosureExpr:
+					if err := validateFunctionTypeLiteralBinding(glob.Name, glob.Type, init, nil, module, imports); err != nil {
+						return nil, err
+					}
+					functionValue = qualifyName(module, init.Name)
+				default:
+					return nil, unsupportedFunctionTypedGlobalInitializerSourceError(glob.At, glob.Name)
+				}
 			}
 			stringInit := []byte(nil)
 			hasStringInit := false
@@ -1092,12 +1375,20 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 
 			dataIndex := len(dataBlobs)
 			globals[glob.Name] = GlobalInfo{
-				DataIndex:            dataIndex,
-				TypeName:             resolved,
-				Mutable:              glob.Mutable,
-				Const:                glob.Const,
-				HasStringLiteralInit: hasStringInit,
-				StringLiteralInit:    stringInit,
+				DataIndex:              dataIndex,
+				TypeName:               resolved,
+				Mutable:                glob.Mutable,
+				Const:                  glob.Const,
+				Public:                 declarationIsPublic(file, glob.Public),
+				FunctionValue:          functionValue,
+				FunctionTypeValue:      functionTypeValue,
+				FunctionParamTypes:     functionParamTypes,
+				FunctionParamOwnership: functionParamOwnership,
+				FunctionReturnType:     functionReturnType,
+				FunctionThrowsType:     functionThrowsType,
+				FunctionEffects:        functionEffects,
+				HasStringLiteralInit:   hasStringInit,
+				StringLiteralInit:      stringInit,
 			}
 
 			slots := typeInfo.SlotCount
@@ -1152,7 +1443,37 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					case "str":
 						binary.LittleEndian.PutUint64(slotData[0], 0)
 						binary.LittleEndian.PutUint64(slotData[1], uint64(len(stringInit)))
+					case "fnptr":
+						// Function-typed mutable globals are lazily initialized by lowering
+						// because function symbol addresses are not static data constants.
 					default:
+						if isSupportedSliceGlobalType(resolved) {
+							return nil, fmt.Errorf("%s: global var '%s' initializer for type %s must be omitted", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+						}
+						if isSupportedOptionalPtrGlobalType(resolved) {
+							if _, ok := glob.Init.(*frontend.NoneLitExpr); ok {
+								break
+							}
+							return nil, fmt.Errorf("%s: global var '%s' initializer for type %s must be none", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+						}
+						if isSupportedOptionalSliceGlobalType(resolved) {
+							if glob.Init == nil {
+								break
+							}
+							if _, ok := glob.Init.(*frontend.NoneLitExpr); ok {
+								break
+							}
+							return nil, fmt.Errorf("%s: global var '%s' initializer for type %s must be none", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+						}
+						if isSupportedOptionalAggregateGlobalType(resolved, types) {
+							if _, ok := glob.Init.(*frontend.NoneLitExpr); ok {
+								break
+							}
+							return nil, fmt.Errorf("%s: global var '%s' initializer for type %s must be none", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+						}
+						if isSupportedZeroedAggregateGlobalType(resolved, types, map[string]bool{}) {
+							return nil, fmt.Errorf("%s: global var '%s' initializer for type %s must be omitted", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+						}
 						return nil, fmt.Errorf("%s: unsupported global type '%s'", frontend.FormatPos(glob.At), resolved)
 					}
 				}
@@ -1173,12 +1494,35 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					binary.LittleEndian.PutUint64(slotData[0], 0)
 					binary.LittleEndian.PutUint64(slotData[1], 0)
 				default:
+					if isSupportedSliceGlobalType(resolved) {
+						dataBlobs = append(dataBlobs, slotData...)
+						continue
+					}
+					if isSupportedOptionalPtrGlobalType(resolved) {
+						dataBlobs = append(dataBlobs, slotData...)
+						continue
+					}
+					if isSupportedOptionalSliceGlobalType(resolved) {
+						dataBlobs = append(dataBlobs, slotData...)
+						continue
+					}
+					if isSupportedOptionalAggregateGlobalType(resolved, types) {
+						dataBlobs = append(dataBlobs, slotData...)
+						continue
+					}
+					if isSupportedZeroedAggregateGlobalType(resolved, types, map[string]bool{}) {
+						dataBlobs = append(dataBlobs, slotData...)
+						continue
+					}
 					return nil, fmt.Errorf("%s: unsupported global type '%s'", frontend.FormatPos(glob.At), resolved)
 				}
 				dataBlobs = append(dataBlobs, slotData...)
 				continue
 			}
 			switch resolved {
+			case "fnptr":
+				// Function-typed globals carry symbol metadata in GlobalInfo; data slots
+				// stay zeroed because this MVP only permits immutable direct symbols.
 			case "ptr":
 				if !isNullPtrLiteral(glob.Init) {
 					return nil, fmt.Errorf("%s: global val '%s' of type ptr only supports initializer 0", frontend.FormatPos(glob.Init.Pos()), glob.Name)
@@ -1215,6 +1559,33 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				binary.LittleEndian.PutUint64(slotData[0], 0)
 				binary.LittleEndian.PutUint64(slotData[1], uint64(len(stringInit)))
 			default:
+				if isSupportedSliceGlobalType(resolved) {
+					return nil, fmt.Errorf("%s: global val '%s' initializer for type %s must be omitted", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+				}
+				if isSupportedOptionalPtrGlobalType(resolved) {
+					if _, ok := glob.Init.(*frontend.NoneLitExpr); ok {
+						dataBlobs = append(dataBlobs, slotData...)
+						continue
+					}
+					return nil, fmt.Errorf("%s: global val '%s' initializer for type %s must be none", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+				}
+				if isSupportedOptionalSliceGlobalType(resolved) {
+					if _, ok := glob.Init.(*frontend.NoneLitExpr); ok {
+						dataBlobs = append(dataBlobs, slotData...)
+						continue
+					}
+					return nil, fmt.Errorf("%s: global val '%s' initializer for type %s must be none", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+				}
+				if isSupportedOptionalAggregateGlobalType(resolved, types) {
+					if _, ok := glob.Init.(*frontend.NoneLitExpr); ok {
+						dataBlobs = append(dataBlobs, slotData...)
+						continue
+					}
+					return nil, fmt.Errorf("%s: global val '%s' initializer for type %s must be none", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+				}
+				if isSupportedZeroedAggregateGlobalType(resolved, types, map[string]bool{}) {
+					return nil, fmt.Errorf("%s: global val '%s' initializer for type %s must be omitted", frontend.FormatPos(glob.Init.Pos()), glob.Name, resolved)
+				}
 				return nil, fmt.Errorf("%s: unsupported global type '%s'", frontend.FormatPos(glob.At), resolved)
 			}
 			dataBlobs = append(dataBlobs, slotData...)
@@ -1222,6 +1593,10 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 
 		checked.GlobalsByModule[module] = globals
 		checked.GlobalDataByModule[module] = dataBlobs
+	}
+
+	if err := addImportedFunctionTypedGlobalAliases(world, checked.GlobalsByModule); err != nil {
+		return nil, err
 	}
 
 	for _, file := range world.Files {
@@ -1253,9 +1628,15 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if err := validateSemanticClauses(fn); err != nil {
 				return nil, err
 			}
+			if err := validateFunctionParamNames(fn); err != nil {
+				return nil, err
+			}
 			if len(fn.TypeParams) > 0 {
 				if err := validateGenericFuncDecl(fn, module, imports, collectGenericProtocolInfos(world), types); err != nil {
 					return nil, err
+				}
+				if fn.ExportName != "" {
+					return nil, fmt.Errorf("%s: generic function '%s' cannot be exported; export a concrete monomorphic wrapper", frontend.FormatPos(fn.Pos), fn.Name)
 				}
 				effects, err := normalizeEffects(fn.Uses, fn.Pos)
 				if err != nil {
@@ -1270,7 +1651,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if fn.HasThrows {
 					throwsType = genericTypeName(fn.Throws)
 				}
-				if err := validateFunctionPolicyClauses(fn, effects, genericParamTypes, returnType, throwsType); err != nil {
+				if err := validateExportedOpaqueABISignature(module, fn, genericParamTypes, returnType, types); err != nil {
+					return nil, err
+				}
+				if err := validateFunctionPolicyClauses(fn, effects, genericParamTypes, returnType, throwsType, types); err != nil {
+					return nil, err
+				}
+				if err := validateExportedConsentTokenABISignature(module, fn, genericParamTypes, returnType, types); err != nil {
 					return nil, err
 				}
 				policy, err := parseFunctionClausePolicy(fn)
@@ -1278,27 +1665,31 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					return nil, err
 				}
 				checked.FuncSigs[fullName] = FuncSig{
-					Generic:              true,
-					Public:               declarationIsPublic(file, fn.Public),
-					HasNoAlloc:           policy.hasNoAlloc,
-					HasNoBlock:           policy.hasNoBlock,
-					HasRealtime:          policy.hasRealtime,
-					ParamNames:           genericParamNames(fn.Params),
-					ParamTypes:           genericParamTypeNames(fn.Params),
-					ParamFunctionTypes:   genericParamFunctionKinds(fn.Params),
-					ParamFunctionParams:  genericParamFunctionParamTypes(fn.Params),
-					ParamFunctionReturns: genericParamFunctionReturnTypes(fn.Params),
-					ParamFunctionEffects: genericParamFunctionEffectTypes(fn.Params),
-					ParamOwnership:       genericParamOwnership(fn.Params),
-					ParamSlots:           0,
-					ReturnType:           fn.ReturnType.Name,
-					ThrowsType:           fn.Throws.Name,
-					Async:                fn.Async,
-					ReturnSlots:          0,
-					ReturnRegionParam:    regionNone,
-					ReturnResourceParam:  regionNone,
-					ReturnResourcePath:   "",
-					Effects:              effects,
+					Generic:                true,
+					Public:                 declarationIsPublic(file, fn.Public),
+					HasNoAlloc:             policy.hasNoAlloc,
+					HasNoBlock:             policy.hasNoBlock,
+					HasRealtime:            policy.hasRealtime,
+					HasBudget:              policy.hasBudget,
+					Budget:                 policy.budget,
+					ParamNames:             genericParamNames(fn.Params),
+					ParamTypes:             genericParamTypeNames(fn.Params),
+					ParamFunctionTypes:     genericParamFunctionKinds(fn.Params),
+					ParamFunctionParams:    genericParamFunctionParamTypes(fn.Params),
+					ParamFunctionOwnership: genericParamFunctionOwnership(fn.Params),
+					ParamFunctionReturns:   genericParamFunctionReturnTypes(fn.Params),
+					ParamFunctionThrows:    genericParamFunctionThrowsTypes(fn.Params),
+					ParamFunctionEffects:   genericParamFunctionEffectTypes(fn.Params),
+					ParamOwnership:         genericParamOwnership(fn.Params),
+					ParamSlots:             0,
+					ReturnType:             fn.ReturnType.Name,
+					ThrowsType:             fn.Throws.Name,
+					Async:                  fn.Async,
+					ReturnSlots:            0,
+					ReturnRegionParam:      regionNone,
+					ReturnResourceParam:    regionNone,
+					ReturnResourcePath:     "",
+					Effects:                effects,
 				}
 				continue
 			}
@@ -1308,10 +1699,17 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			}
 			returnFunctionType := fn.ReturnType.Kind == frontend.TypeRefFunction
 			returnFunctionParams := []string(nil)
+			returnFunctionParamOwnership := []string(nil)
 			returnFunctionReturn := ""
+			returnFunctionThrows := ""
 			returnFunctionEffects := []string(nil)
 			if returnFunctionType {
 				returnFunctionParams, returnFunctionReturn, returnFunctionEffects, err = functionTypeRefSignatureAndEffects(fn.ReturnType, module, imports)
+				if err != nil {
+					return nil, err
+				}
+				returnFunctionParamOwnership = functionTypeRefParamOwnership(fn.ReturnType)
+				returnFunctionThrows, err = functionTypeRefThrowsType(fn.ReturnType, module, imports)
 				if err != nil {
 					return nil, err
 				}
@@ -1373,7 +1771,10 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			for i, name := range paramNames {
 				paramTypeByName[name] = paramTypes[i]
 			}
-			if err := validateFunctionPolicyClauses(fn, effects, paramTypeByName, retName, throwsType); err != nil {
+			if err := validateExportedOpaqueABISignature(module, fn, paramTypeByName, retName, types); err != nil {
+				return nil, err
+			}
+			if err := validateFunctionPolicyClauses(fn, effects, paramTypeByName, retName, throwsType, types); err != nil {
 				return nil, err
 			}
 			policy, err := parseFunctionClausePolicy(fn)
@@ -1381,30 +1782,36 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				return nil, err
 			}
 			checked.FuncSigs[fullName] = FuncSig{
-				Public:                declarationIsPublic(file, fn.Public),
-				HasNoAlloc:            policy.hasNoAlloc,
-				HasNoBlock:            policy.hasNoBlock,
-				HasRealtime:           policy.hasRealtime,
-				ParamNames:            paramNames,
-				ParamTypes:            paramTypes,
-				ParamFunctionTypes:    paramFunctionKinds(fn.Params),
-				ParamFunctionParams:   paramFunctionParamTypes(fn.Params),
-				ParamFunctionReturns:  paramFunctionReturnTypes(fn.Params),
-				ParamFunctionEffects:  paramFunctionEffectTypes(fn.Params),
-				ParamOwnership:        paramOwnership,
-				ParamSlots:            paramSlots,
-				ReturnType:            retName,
-				ReturnFunctionType:    returnFunctionType,
-				ReturnFunctionParams:  returnFunctionParams,
-				ReturnFunctionReturn:  returnFunctionReturn,
-				ReturnFunctionEffects: returnFunctionEffects,
-				ThrowsType:            throwsType,
-				Async:                 fn.Async,
-				ReturnSlots:           returnSlots,
-				ReturnRegionParam:     regionNone,
-				ReturnResourceParam:   initialReturnResourceParam(retName, types),
-				ReturnResourcePath:    "",
-				Effects:               effects,
+				Public:                       declarationIsPublic(file, fn.Public),
+				HasNoAlloc:                   policy.hasNoAlloc,
+				HasNoBlock:                   policy.hasNoBlock,
+				HasRealtime:                  policy.hasRealtime,
+				HasBudget:                    policy.hasBudget,
+				Budget:                       policy.budget,
+				ParamNames:                   paramNames,
+				ParamTypes:                   paramTypes,
+				ParamFunctionTypes:           paramFunctionKinds(fn.Params),
+				ParamFunctionParams:          paramFunctionParamTypes(fn.Params),
+				ParamFunctionOwnership:       paramFunctionOwnership(fn.Params),
+				ParamFunctionReturns:         paramFunctionReturnTypes(fn.Params),
+				ParamFunctionThrows:          paramFunctionThrowsTypes(fn.Params, module, imports),
+				ParamFunctionEffects:         paramFunctionEffectTypes(fn.Params),
+				ParamOwnership:               paramOwnership,
+				ParamSlots:                   paramSlots,
+				ReturnType:                   retName,
+				ReturnFunctionType:           returnFunctionType,
+				ReturnFunctionParams:         returnFunctionParams,
+				ReturnFunctionParamOwnership: returnFunctionParamOwnership,
+				ReturnFunctionReturn:         returnFunctionReturn,
+				ReturnFunctionThrows:         returnFunctionThrows,
+				ReturnFunctionEffects:        returnFunctionEffects,
+				ThrowsType:                   throwsType,
+				Async:                        fn.Async,
+				ReturnSlots:                  returnSlots,
+				ReturnRegionParam:            regionNone,
+				ReturnResourceParam:          initialReturnResourceParam(retName, types),
+				ReturnResourcePath:           "",
+				Effects:                      effects,
 			}
 		}
 	}
@@ -1454,11 +1861,14 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			}
 			for _, req := range proto.decl.Requirements {
 				methodName := typeName + "." + req.Name
-				method := findFuncDecl(world, methodName)
+				method, methodModule, methodImports, err := findFuncDecl(world, methodName)
+				if err != nil {
+					return nil, err
+				}
 				if method == nil {
 					return nil, fmt.Errorf("%s: type '%s' is missing protocol requirement '%s'", frontend.FormatPos(impl.At), typeName, req.Name)
 				}
-				if err := compareProtocolRequirement(typeName, protoName, req, method); err != nil {
+				if err := compareProtocolRequirement(typeName, protoName, req, method, methodModule, methodImports); err != nil {
 					return nil, err
 				}
 			}
@@ -1482,9 +1892,12 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		funcCount += len(file.Funcs)
 	}
 	maxIter := funcCount + 1
+	analysisFiles := worldFilesImportsFirst(world)
+	functionReturnSecretTaint := make(map[string]bool)
+	functionParamSecretTaint := make(map[string]map[string]bool)
 	for iter := 0; iter < maxIter; iter++ {
 		changed := false
-		for _, file := range world.Files {
+		for _, file := range analysisFiles {
 			module := file.Module
 			interfaceModule := world.InterfaceModules[module]
 			imports, err := collectImportAliases(file)
@@ -1495,6 +1908,15 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			for _, fn := range file.Funcs {
 				fullName := checkedFuncFullName(module, fn)
 				if interfaceModule {
+					sig := checked.FuncSigs[fullName]
+					updated, err := applyInterfaceFunctionReturnMetadata(&sig, fn, globals, checked.FuncSigs, types, module, imports)
+					if err != nil {
+						return nil, err
+					}
+					if updated {
+						checked.FuncSigs[fullName] = sig
+						changed = true
+					}
 					continue
 				}
 				if len(fn.TypeParams) > 0 {
@@ -1511,29 +1933,47 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					if _, exists := locals[param.Name]; exists {
 						return nil, fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(param.At), param.Name)
 					}
-					info, err := buildType(param.Type.Name)
+					paramTypeName, err := resolveTypeName(&param.Type, module, imports)
+					if err != nil {
+						return nil, err
+					}
+					param.Type.Name = paramTypeName
+					info, err := buildType(paramTypeName)
 					if err != nil {
 						return nil, err
 					}
 					functionTypeValue := param.Type.Kind == frontend.TypeRefFunction
 					functionParamTypes := []string(nil)
+					functionParamOwnership := []string(nil)
 					functionReturnType := ""
+					functionThrowsType := ""
 					functionEffects := []string(nil)
 					if functionTypeValue {
 						functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(param.Type, module, imports)
 						if err != nil {
 							return nil, err
 						}
+						functionParamOwnership = functionTypeRefParamOwnership(param.Type)
+						functionThrowsType, err = functionTypeRefThrowsType(param.Type, module, imports)
+						if err != nil {
+							return nil, err
+						}
 					}
 					locals[param.Name] = LocalInfo{
-						Base:               slotIndex,
-						SlotCount:          info.SlotCount,
-						TypeName:           param.Type.Name,
-						Mutable:            param.Ownership == "inout",
-						FunctionTypeValue:  functionTypeValue,
-						FunctionParamTypes: functionParamTypes,
-						FunctionReturnType: functionReturnType,
-						FunctionEffects:    functionEffects,
+						Base:                   slotIndex,
+						SlotCount:              info.SlotCount,
+						TypeName:               paramTypeName,
+						Mutable:                param.Ownership == "inout",
+						FunctionTypeValue:      functionTypeValue,
+						FunctionParamName:      functionParamNameForParam(param.Name, functionTypeValue),
+						FunctionParamTypes:     functionParamTypes,
+						FunctionParamOwnership: functionParamOwnership,
+						FunctionReturnType:     functionReturnType,
+						FunctionThrowsType:     functionThrowsType,
+						FunctionEffects:        functionEffects,
+						FunctionFields:         functionFieldsForStructParameter(param.Name, paramTypeName, types),
+						EnumPayloadFunctions:   enumPayloadFunctionsForEnumParameter(param.Name, paramTypeName, types),
+						EnumPayloadFields:      enumPayloadFieldsForStructParameter(param.Name, paramTypeName, types),
 					}
 					scopeInfo.localScopes[param.Name] = regionNone
 					slotIndex += info.SlotCount
@@ -1564,6 +2004,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				state.throwType = sig.ThrowsType
 				state.async = sig.Async
 				effects := newEffectContext(fullName, sig.Effects, fn.Uses, strings.HasPrefix(module, "__"))
+				effects.capsulePerms = capsulePermissionsByModule[module]
 				borrowedParams := make(map[string]struct{})
 				inoutParams := make(map[string]struct{})
 				for _, param := range fn.Params {
@@ -1573,34 +2014,68 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 						inoutParams[param.Name] = struct{}{}
 					}
 				}
-				analysis := &functionAnalysisState{}
+				policy, err := parseFunctionClausePolicy(fn)
+				if err != nil {
+					return nil, err
+				}
+				analysis := newFunctionAnalysisState(fn, policy, fullName, functionReturnSecretTaint, functionParamSecretTaint, types)
 				if err := checkStmts(fn.Body, locals, globals, checked.FuncSigs, types, module, imports, sig.ReturnType, borrowedParams, inoutParams, state, effects, analysis); err != nil {
 					return nil, err
 				}
 				newReturnParam := regionNone
-				if state.returnRegionSet && state.returnRegion < regionNone {
+				newReturnRegionSummary := ReturnRegionSummary(nil)
+				if len(state.returnRegionSummary) > 0 {
+					newReturnRegionSummary = cloneReturnRegionSummary(state.returnRegionSummary)
+					commonParam := regionNone
+					for _, paramIndex := range newReturnRegionSummary {
+						if commonParam == regionNone {
+							commonParam = paramIndex
+							continue
+						}
+						if commonParam != paramIndex {
+							commonParam = regionUnknown
+							break
+						}
+					}
+					if commonParam >= 0 {
+						newReturnParam = commonParam
+					}
+				} else if state.returnRegionSet && state.returnRegion < regionNone {
 					idx, ok := state.paramRegionIndex[state.returnRegion]
 					if !ok {
 						return nil, fmt.Errorf("%s: return region does not match parameter", frontend.FormatPos(fn.Pos))
 					}
 					newReturnParam = idx
 				}
-				if sig.ReturnRegionParam != newReturnParam {
+				if sig.ReturnRegionParam != newReturnParam || !returnRegionSummariesEqual(sig.ReturnRegionSummary, newReturnRegionSummary) {
 					sig.ReturnRegionParam = newReturnParam
+					sig.ReturnRegionSummary = newReturnRegionSummary
 					checked.FuncSigs[fullName] = sig
 					changed = true
 				}
 				newReturnResourceParam := regionNone
 				newReturnResourcePath := ""
+				newReturnResourceSummary := ReturnResourceSummary(nil)
 				if typeContainsResourceHandle(sig.ReturnType, types) && state.returnResourceSet {
 					newReturnResourceParam = state.returnResourceParam
 					newReturnResourcePath = state.returnResourcePath
+					newReturnResourceSummary = cloneReturnResourceSummary(state.returnResourceSummary)
 				} else if typeContainsResourceHandle(sig.ReturnType, types) && state.returnResourceUnknown {
 					newReturnResourceParam = regionUnknown
 				}
-				if sig.ReturnResourceParam != newReturnResourceParam || sig.ReturnResourcePath != newReturnResourcePath {
+				if sig.ReturnResourceParam != newReturnResourceParam || sig.ReturnResourcePath != newReturnResourcePath || !returnResourceSummariesEqual(sig.ReturnResourceSummary, newReturnResourceSummary) {
 					sig.ReturnResourceParam = newReturnResourceParam
 					sig.ReturnResourcePath = newReturnResourcePath
+					sig.ReturnResourceSummary = newReturnResourceSummary
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				newThrowResourceSummary := ReturnResourceSummary(nil)
+				if typeContainsResourceHandle(sig.ThrowsType, types) && len(state.throwResourceSummary) > 0 {
+					newThrowResourceSummary = cloneReturnResourceSummary(state.throwResourceSummary)
+				}
+				if !returnResourceSummariesEqual(sig.ThrowResourceSummary, newThrowResourceSummary) {
+					sig.ThrowResourceSummary = newThrowResourceSummary
 					checked.FuncSigs[fullName] = sig
 					changed = true
 				}
@@ -1614,6 +2089,62 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					checked.FuncSigs[fullName] = sig
 					changed = true
 				}
+				if sig.ReturnFunctionParamName != analysis.returnFunctionParamName {
+					sig.ReturnFunctionParamName = analysis.returnFunctionParamName
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if !closureCapturesEqual(sig.ReturnFunctionCaptures, analysis.returnFunctionCaptures) {
+					sig.ReturnFunctionCaptures = append([]frontend.ClosureCapture(nil), analysis.returnFunctionCaptures...)
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if sig.ReturnFunctionEscapeKind != analysis.returnFunctionEscapeKind {
+					sig.ReturnFunctionEscapeKind = analysis.returnFunctionEscapeKind
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if sig.ReturnFunctionHandleValue != analysis.returnFunctionHandleValue {
+					sig.ReturnFunctionHandleValue = analysis.returnFunctionHandleValue
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				desiredReturnSlots := sig.ReturnSlots
+				if sig.ReturnFunctionHandleValue {
+					desiredReturnSlots = CallableHandleSlotCount
+				}
+				if sig.ReturnSlots != desiredReturnSlots {
+					sig.ReturnSlots = desiredReturnSlots
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if sig.ReturnFunctionTouchesMutableGlobals != analysis.returnFunctionTouchesMutableGlobals {
+					sig.ReturnFunctionTouchesMutableGlobals = analysis.returnFunctionTouchesMutableGlobals
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if !functionFieldMapsEqual(sig.ReturnFunctionFields, analysis.returnFunctionFields) {
+					sig.ReturnFunctionFields = cloneFunctionFieldMap(analysis.returnFunctionFields)
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if !functionFieldMapsEqual(sig.ReturnEnumPayloadFunctions, analysis.returnEnumPayloadFunctions) {
+					sig.ReturnEnumPayloadFunctions = cloneFunctionFieldMap(analysis.returnEnumPayloadFunctions)
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if !functionFieldMapsEqual(sig.ReturnEnumPayloadFields, analysis.returnEnumPayloadFields) {
+					sig.ReturnEnumPayloadFields = cloneFunctionFieldMap(analysis.returnEnumPayloadFields)
+					checked.FuncSigs[fullName] = sig
+					changed = true
+				}
+				if functionReturnSecretTaint[fullName] != analysis.returnSecretTaint {
+					functionReturnSecretTaint[fullName] = analysis.returnSecretTaint
+					changed = true
+				}
+				if analysis.discoveredParamTaint {
+					changed = true
+				}
 			}
 		}
 		if !changed {
@@ -1624,12 +2155,38 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		}
 	}
 	for name, sig := range checked.FuncSigs {
-		if typeContainsResourceHandle(sig.ReturnType, types) && sig.ReturnResourceParam == regionUnknown {
+		if typeContainsResourceHandle(sig.ReturnType, types) && sig.ReturnResourceParam == regionUnknown && len(sig.ReturnResourceSummary) == 0 {
 			return nil, fmt.Errorf("resource return provenance could not be inferred for function '%s'", name)
 		}
 	}
+	for _, file := range analysisFiles {
+		module := file.Module
+		if world.InterfaceModules[module] {
+			continue
+		}
+		for _, fn := range file.Funcs {
+			if len(fn.TypeParams) > 0 {
+				continue
+			}
+			fullName := checkedFuncFullName(module, fn)
+			paramTypeByName := make(map[string]string, len(fn.Params))
+			for _, param := range fn.Params {
+				paramTypeByName[param.Name] = param.Type.Name
+			}
+			if err := validateExportedConsentTokenABISignature(module, fn, paramTypeByName, fn.ReturnType.Name, types); err != nil {
+				return nil, err
+			}
+			sig := checked.FuncSigs[fullName]
+			if err := validateExportedThrowingABISignature(module, fn, sig.ThrowsType); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := validateBudgetContexts(world, checked.FuncSigs); err != nil {
+		return nil, err
+	}
 
-	for _, file := range world.Files {
+	for _, file := range analysisFiles {
 		module := file.Module
 		interfaceModule := world.InterfaceModules[module]
 		imports, err := collectImportAliases(file)
@@ -1671,29 +2228,46 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if _, exists := locals[param.Name]; exists {
 					return nil, fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(param.At), param.Name)
 				}
-				info, err := buildType(param.Type.Name)
+				paramTypeName, err := resolveTypeName(&param.Type, module, imports)
+				if err != nil {
+					return nil, err
+				}
+				param.Type.Name = paramTypeName
+				info, err := buildType(paramTypeName)
 				if err != nil {
 					return nil, err
 				}
 				functionTypeValue := param.Type.Kind == frontend.TypeRefFunction
 				functionParamTypes := []string(nil)
+				functionParamOwnership := []string(nil)
 				functionReturnType := ""
+				functionThrowsType := ""
 				functionEffects := []string(nil)
 				if functionTypeValue {
 					functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(param.Type, module, imports)
 					if err != nil {
 						return nil, err
 					}
+					functionParamOwnership = functionTypeRefParamOwnership(param.Type)
+					functionThrowsType, err = functionTypeRefThrowsType(param.Type, module, imports)
+					if err != nil {
+						return nil, err
+					}
 				}
 				locals[param.Name] = LocalInfo{
-					Base:               slotIndex,
-					SlotCount:          info.SlotCount,
-					TypeName:           param.Type.Name,
-					Mutable:            false,
-					FunctionTypeValue:  functionTypeValue,
-					FunctionParamTypes: functionParamTypes,
-					FunctionReturnType: functionReturnType,
-					FunctionEffects:    functionEffects,
+					Base:                   slotIndex,
+					SlotCount:              info.SlotCount,
+					TypeName:               paramTypeName,
+					Mutable:                false,
+					FunctionTypeValue:      functionTypeValue,
+					FunctionParamTypes:     functionParamTypes,
+					FunctionParamOwnership: functionParamOwnership,
+					FunctionReturnType:     functionReturnType,
+					FunctionThrowsType:     functionThrowsType,
+					FunctionEffects:        functionEffects,
+					FunctionFields:         functionFieldsForStructParameter(param.Name, paramTypeName, types),
+					EnumPayloadFunctions:   enumPayloadFunctionsForEnumParameter(param.Name, paramTypeName, types),
+					EnumPayloadFields:      enumPayloadFieldsForStructParameter(param.Name, paramTypeName, types),
 				}
 				scopeInfo.localScopes[param.Name] = regionNone
 				slotIndex += info.SlotCount
@@ -1726,6 +2300,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				Name:        fullName,
 				Module:      module,
 				Decl:        fn,
+				Imports:     cloneStringMap(imports),
 				Locals:      locals,
 				ActorState:  actorState,
 				LocalSlots:  localSlots,
@@ -1770,6 +2345,202 @@ func validateCapsuleDecls(file *frontend.FileAST) error {
 		}
 	}
 	return nil
+}
+
+func validateEnumPayloadCycles(edges map[string]map[string]frontend.Position, enumModules map[string]string) error {
+	const (
+		enumVisitNew = iota
+		enumVisitActive
+		enumVisitDone
+	)
+	visitState := map[string]int{}
+	var dfs func(string) error
+	dfs = func(name string) error {
+		visitState[name] = enumVisitActive
+		for target, at := range edges[name] {
+			if _, ok := enumModules[target]; !ok {
+				continue
+			}
+			switch visitState[target] {
+			case enumVisitActive:
+				moduleName := enumModules[name]
+				if tgt, ok := enumModules[target]; ok {
+					moduleName = tgt
+				}
+				return fmt.Errorf("%s: recursive enum payload '%s'", frontend.FormatPos(at), displayTypeName(target, moduleName))
+			case enumVisitDone:
+				continue
+			default:
+				if err := dfs(target); err != nil {
+					return err
+				}
+			}
+		}
+		visitState[name] = enumVisitDone
+		return nil
+	}
+	for name := range edges {
+		if visitState[name] == enumVisitNew {
+			if err := dfs(name); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func refreshCompositeSlotLayouts(types map[string]*TypeInfo) error {
+	if len(types) == 0 {
+		return nil
+	}
+	maxPasses := len(types) + 1
+	for pass := 0; pass < maxPasses; pass++ {
+		changed := false
+		for _, info := range types {
+			if info == nil {
+				continue
+			}
+			switch info.Kind {
+			case TypeOptional:
+				elemInfo, ok := types[info.ElemType]
+				if !ok {
+					continue
+				}
+				slotCount := elemInfo.SlotCount + 1
+				if info.SlotCount != slotCount {
+					info.SlotCount = slotCount
+					changed = true
+				}
+			case TypeStruct:
+				if len(info.Fields) == 0 {
+					continue
+				}
+				offset := 0
+				fieldMap := make(map[string]FieldInfo, len(info.Fields))
+				fields := make([]FieldInfo, len(info.Fields))
+				for i, field := range info.Fields {
+					slotCount := field.SlotCount
+					if fieldInfo, ok := types[field.TypeName]; ok {
+						slotCount = fieldInfo.SlotCount
+					}
+					if slotCount <= 0 {
+						slotCount = 1
+					}
+					field.Offset = offset
+					field.SlotCount = slotCount
+					fields[i] = field
+					fieldMap[field.Name] = field
+					offset += slotCount
+				}
+				if info.SlotCount != offset || !fieldLayoutsEqual(info.Fields, fields) {
+					info.SlotCount = offset
+					info.Fields = fields
+					info.FieldMap = fieldMap
+					changed = true
+				}
+			case TypeEnum:
+				maxPayloadSlots := 0
+				for i, caseInfo := range info.EnumCases {
+					totalPayloadSlots := 0
+					for j, payloadType := range caseInfo.PayloadTypes {
+						slotCount := 1
+						if payloadInfo, ok := types[payloadType]; ok {
+							slotCount = payloadInfo.SlotCount
+						}
+						if slotCount <= 0 {
+							slotCount = 1
+						}
+						if j < len(caseInfo.PayloadSlots) && caseInfo.PayloadSlots[j] != slotCount {
+							caseInfo.PayloadSlots[j] = slotCount
+							changed = true
+						}
+						totalPayloadSlots += slotCount
+					}
+					if caseInfo.SlotCount != totalPayloadSlots {
+						caseInfo.SlotCount = totalPayloadSlots
+						changed = true
+					}
+					info.EnumCases[i] = caseInfo
+					info.CaseMap[caseInfo.Name] = caseInfo
+					if totalPayloadSlots > maxPayloadSlots {
+						maxPayloadSlots = totalPayloadSlots
+					}
+				}
+				slotCount := 1 + maxPayloadSlots
+				if info.SlotCount != slotCount {
+					info.SlotCount = slotCount
+					changed = true
+				}
+			}
+		}
+		if !changed {
+			return nil
+		}
+	}
+	return fmt.Errorf("recursive composite type layout is not supported")
+}
+
+func fieldLayoutsEqual(a, b []FieldInfo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !reflect.DeepEqual(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func collectCapsulePermissionsByModule(world *module.World) map[string]map[string]struct{} {
+	out := map[string]map[string]struct{}{}
+	if world == nil {
+		return out
+	}
+	for _, file := range world.Files {
+		if file == nil {
+			continue
+		}
+		moduleName := file.Module
+		if _, ok := out[moduleName]; !ok {
+			out[moduleName] = map[string]struct{}{}
+		}
+		for _, capsule := range file.Capsules {
+			if capsule == nil {
+				continue
+			}
+			for _, entry := range capsule.Entries {
+				if granted, ok := capsulePermissionEntry(entry); ok && granted {
+					out[moduleName][capsulePermissionFromEntryKey(entry.Key)] = struct{}{}
+				}
+			}
+		}
+	}
+	return out
+}
+
+func capsulePermissionEntry(entry frontend.CapsuleEntryDecl) (bool, bool) {
+	switch entry.Key {
+	case "permissions.io", "permissions.mem":
+		b, ok := entry.Value.(*frontend.BoolLitExpr)
+		if !ok {
+			return false, true
+		}
+		return b.Value, true
+	default:
+		return false, false
+	}
+}
+
+func capsulePermissionFromEntryKey(key string) string {
+	switch key {
+	case "permissions.io":
+		return "capsule.io"
+	case "permissions.mem":
+		return "capsule.mem"
+	default:
+		return ""
+	}
 }
 
 func isCapsuleMetadataLiteral(expr frontend.Expr) bool {
@@ -1884,6 +2655,20 @@ func checkedFuncFullName(module string, fn *frontend.FuncDecl) string {
 	return qualifyName(module, fn.Name)
 }
 
+func validateFunctionParamNames(fn *frontend.FuncDecl) error {
+	seen := make(map[string]struct{}, len(fn.Params))
+	for _, param := range fn.Params {
+		if param.Name == "" {
+			return fmt.Errorf("%s: parameter name required", frontend.FormatPos(param.At))
+		}
+		if _, exists := seen[param.Name]; exists {
+			return fmt.Errorf("%s: duplicate parameter '%s'", frontend.FormatPos(param.At), param.Name)
+		}
+		seen[param.Name] = struct{}{}
+	}
+	return nil
+}
+
 func addPublicImportFunctionAliases(world *module.World, funcs map[string]FuncSig) error {
 	for _, file := range world.Files {
 		for _, imp := range file.Imports {
@@ -1911,11 +2696,116 @@ func addPublicImportFunctionAliases(world *module.World, funcs map[string]FuncSi
 	return nil
 }
 
+func addImportedFunctionTypedGlobalAliases(world *module.World, globalsByModule map[string]map[string]GlobalInfo) error {
+	if world == nil {
+		return nil
+	}
+	for _, file := range world.Files {
+		if file == nil {
+			continue
+		}
+		globals := globalsByModule[file.Module]
+		if globals == nil {
+			globals = make(map[string]GlobalInfo)
+			globalsByModule[file.Module] = globals
+		}
+		imports, err := collectImportAliases(file)
+		if err != nil {
+			return err
+		}
+		for alias, target := range imports {
+			if symbol, isSymbol := importSymbolTarget(target); isSymbol {
+				dot := strings.LastIndex(symbol, ".")
+				if dot < 0 || dot == 0 || dot == len(symbol)-1 {
+					continue
+				}
+				moduleName := symbol[:dot]
+				globalName := symbol[dot+1:]
+				global, ok := globalsByModule[moduleName][globalName]
+				if !ok || !global.Public || !global.FunctionTypeValue || global.FunctionValue == "" {
+					continue
+				}
+				if global.Mutable {
+					global.FunctionValue = ""
+				}
+				globals[alias] = global
+				globals[symbol] = global
+				continue
+			}
+			importedGlobals := globalsByModule[target]
+			for name, global := range importedGlobals {
+				if !global.Public || !global.FunctionTypeValue || global.FunctionValue == "" {
+					continue
+				}
+				if global.Mutable {
+					global.FunctionValue = ""
+				}
+				globals[alias+"."+name] = global
+				globals[target+"."+name] = global
+			}
+		}
+	}
+	return nil
+}
+
 func initialReturnResourceParam(returnType string, types map[string]*TypeInfo) int {
 	if typeContainsResourceHandle(returnType, types) {
 		return regionUnknown
 	}
 	return regionNone
+}
+
+func cloneReturnRegionSummary(in ReturnRegionSummary) ReturnRegionSummary {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(ReturnRegionSummary, len(in))
+	for path, paramIndex := range in {
+		out[path] = paramIndex
+	}
+	return out
+}
+
+func returnRegionSummariesEqual(a, b ReturnRegionSummary) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for path, left := range a {
+		right, ok := b[path]
+		if !ok || left != right {
+			return false
+		}
+	}
+	return true
+}
+
+func cloneReturnResourceSummary(in ReturnResourceSummary) ReturnResourceSummary {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(ReturnResourceSummary, len(in))
+	for path, provenances := range in {
+		out[path] = append([]ResourceProvenance(nil), provenances...)
+	}
+	return out
+}
+
+func returnResourceSummariesEqual(a, b ReturnResourceSummary) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for path, left := range a {
+		right, ok := b[path]
+		if !ok || len(left) != len(right) {
+			return false
+		}
+		for i := range left {
+			if left[i] != right[i] {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func stmtListEndsWithReturnTyped(
@@ -2772,13 +3662,20 @@ func validateSemanticClauses(fn *frontend.FuncDecl) error {
 	seen := map[string]frontend.Position{}
 	for _, clause := range fn.SemanticClauses {
 		if first, exists := seen[clause.Name]; exists {
+			if clause.Name == "privacy" || clause.Name == "consent" {
+				return privacyDiagnosticf(clause.At, "duplicate semantic clause '%s' (first at %s)", clause.Name, frontend.FormatPos(first))
+			}
 			return fmt.Errorf("%s: duplicate semantic clause '%s' (first at %s)", frontend.FormatPos(clause.At), clause.Name, frontend.FormatPos(first))
 		}
 		seen[clause.Name] = clause.At
 		switch clause.Name {
-		case "noalloc", "noblock", "realtime", "privacy":
+		case "noalloc", "noblock", "realtime":
 			if clause.Value != nil {
 				return fmt.Errorf("%s: semantic clause '%s' does not take arguments", frontend.FormatPos(clause.At), clause.Name)
+			}
+		case "privacy":
+			if clause.Value != nil {
+				return privacyDiagnosticf(clause.At, "semantic clause 'privacy' does not take arguments")
 			}
 		case "nothrow":
 			if clause.Value != nil {
@@ -2789,25 +3686,307 @@ func validateSemanticClauses(fn *frontend.FuncDecl) error {
 			}
 		case "budget":
 			if clause.Value == nil {
-				return fmt.Errorf("%s: semantic clause 'budget' requires an integer argument", frontend.FormatPos(clause.At))
+				return budgetDiagnosticf(clause.At, "semantic clause 'budget' requires an integer argument")
 			}
 			v, ok := constI32(clause.Value)
 			if !ok {
-				return fmt.Errorf("%s: semantic clause 'budget' expects an integer constant argument", frontend.FormatPos(clause.Value.Pos()))
+				return budgetDiagnosticf(clause.Value.Pos(), "semantic clause 'budget' expects an integer constant argument")
 			}
 			if v < 0 {
-				return fmt.Errorf("%s: semantic clause 'budget' requires a non-negative value", frontend.FormatPos(clause.Value.Pos()))
+				return budgetDiagnosticf(clause.Value.Pos(), "semantic clause 'budget' requires a non-negative value")
 			}
 		case "consent":
 			if clause.Value == nil {
-				return fmt.Errorf("%s: semantic clause 'consent' requires a token parameter name", frontend.FormatPos(clause.At))
+				return privacyDiagnosticf(clause.At, "semantic clause 'consent' requires a token parameter name")
 			}
 			if _, ok := clause.Value.(*frontend.IdentExpr); !ok {
-				return fmt.Errorf("%s: semantic clause 'consent' expects an identifier argument", frontend.FormatPos(clause.Value.Pos()))
+				return privacyDiagnosticf(clause.Value.Pos(), "semantic clause 'consent' expects an identifier argument")
 			}
 		default:
 			return fmt.Errorf("%s: unknown semantic clause '%s'", frontend.FormatPos(clause.At), clause.Name)
 		}
+	}
+	return nil
+}
+
+func validateBudgetContexts(world *module.World, funcs map[string]FuncSig) error {
+	if world == nil {
+		return nil
+	}
+	for _, file := range world.Files {
+		if file == nil || world.InterfaceModules[file.Module] {
+			continue
+		}
+		imports, err := collectImportAliases(file)
+		if err != nil {
+			return err
+		}
+		for _, fn := range file.Funcs {
+			if fn == nil || len(fn.TypeParams) > 0 {
+				continue
+			}
+			callerName := checkedFuncFullName(file.Module, fn)
+			callerSig, ok := funcs[callerName]
+			if !ok {
+				continue
+			}
+			if err := validateBudgetContextsInStmts(fn.Body, callerName, callerSig, funcs, file.Module, imports); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateBudgetContextsInStmts(stmts []frontend.Stmt, callerName string, callerSig FuncSig, funcs map[string]FuncSig, module string, imports map[string]string) error {
+	for _, stmt := range stmts {
+		switch s := stmt.(type) {
+		case *frontend.LetStmt:
+			if err := validateBudgetContextsInExpr(s.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.AssignStmt:
+			if err := validateBudgetContextsInExpr(s.Target, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInExpr(s.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.ExprStmt:
+			if err := validateBudgetContextsInExpr(s.Expr, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.ReturnStmt:
+			if err := validateBudgetContextsInExpr(s.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.ThrowStmt:
+			if err := validateBudgetContextsInExpr(s.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.PrintStmt:
+			if err := validateBudgetContextsInExpr(s.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.ExpectStmt:
+			if err := validateBudgetContextsInExpr(s.Cond, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.FreeStmt:
+			if err := validateBudgetContextsInExpr(s.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.IfStmt:
+			if err := validateBudgetContextsInExpr(s.Cond, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInStmts(s.Then, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInStmts(s.Else, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.IfLetStmt:
+			if err := validateBudgetContextsInExpr(s.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInStmts(s.Then, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInStmts(s.Else, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.WhileStmt:
+			if err := validateBudgetContextsInExpr(s.Cond, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInStmts(s.Body, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				if err := validateBudgetContextsInExpr(s.Iterable, callerName, callerSig, funcs, module, imports); err != nil {
+					return err
+				}
+			} else {
+				if err := validateBudgetContextsInExpr(s.Start, callerName, callerSig, funcs, module, imports); err != nil {
+					return err
+				}
+				if err := validateBudgetContextsInExpr(s.End, callerName, callerSig, funcs, module, imports); err != nil {
+					return err
+				}
+			}
+			if err := validateBudgetContextsInStmts(s.Body, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.MatchStmt:
+			if err := validateBudgetContextsInExpr(s.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			for _, c := range s.Cases {
+				if !c.Default {
+					if err := validateBudgetContextsInExpr(c.Pattern, callerName, callerSig, funcs, module, imports); err != nil {
+						return err
+					}
+				}
+				if err := validateBudgetContextsInExpr(c.Guard, callerName, callerSig, funcs, module, imports); err != nil {
+					return err
+				}
+				if err := validateBudgetContextsInStmts(c.Body, callerName, callerSig, funcs, module, imports); err != nil {
+					return err
+				}
+			}
+		case *frontend.UnsafeStmt:
+			if err := validateBudgetContextsInStmts(s.Body, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.DeferStmt:
+			if err := validateBudgetContextsInStmts(s.Body, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		case *frontend.IslandStmt:
+			if err := validateBudgetContextsInExpr(s.Size, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInStmts(s.Body, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateBudgetContextsInExpr(expr frontend.Expr, callerName string, callerSig FuncSig, funcs map[string]FuncSig, module string, imports map[string]string) error {
+	if expr == nil {
+		return nil
+	}
+	switch e := expr.(type) {
+	case *frontend.CallExpr:
+		resolved := e.Name
+		if builtin, ok := ResolveBuiltinAlias(resolved); ok {
+			resolved = builtin
+		}
+		if err := validateBudgetSpawnContext(e, resolved, callerName, callerSig, funcs, module, imports); err != nil {
+			return err
+		}
+		if targetSig, ok := funcs[resolved]; ok {
+			if err := validateBudgetContextEdge(e.At, callerName, callerSig, "call to '"+resolved+"'", targetSig); err != nil {
+				return err
+			}
+		}
+		for _, arg := range e.Args {
+			if err := validateBudgetContextsInExpr(arg, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		}
+	case *frontend.FieldAccessExpr:
+		return validateBudgetContextsInExpr(e.Base, callerName, callerSig, funcs, module, imports)
+	case *frontend.IndexExpr:
+		if err := validateBudgetContextsInExpr(e.Base, callerName, callerSig, funcs, module, imports); err != nil {
+			return err
+		}
+		return validateBudgetContextsInExpr(e.Index, callerName, callerSig, funcs, module, imports)
+	case *frontend.BinaryExpr:
+		if err := validateBudgetContextsInExpr(e.Left, callerName, callerSig, funcs, module, imports); err != nil {
+			return err
+		}
+		return validateBudgetContextsInExpr(e.Right, callerName, callerSig, funcs, module, imports)
+	case *frontend.UnaryExpr:
+		return validateBudgetContextsInExpr(e.X, callerName, callerSig, funcs, module, imports)
+	case *frontend.TryExpr:
+		return validateBudgetContextsInExpr(e.X, callerName, callerSig, funcs, module, imports)
+	case *frontend.AwaitExpr:
+		return validateBudgetContextsInExpr(e.X, callerName, callerSig, funcs, module, imports)
+	case *frontend.StructLitExpr:
+		for _, field := range e.Fields {
+			if err := validateBudgetContextsInExpr(field.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		}
+	case *frontend.MatchExpr:
+		if err := validateBudgetContextsInExpr(e.Value, callerName, callerSig, funcs, module, imports); err != nil {
+			return err
+		}
+		for _, c := range e.Cases {
+			if err := validateBudgetContextsInExpr(c.Pattern, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInExpr(c.Guard, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInExpr(c.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		}
+	case *frontend.CatchExpr:
+		if err := validateBudgetContextsInExpr(e.Call, callerName, callerSig, funcs, module, imports); err != nil {
+			return err
+		}
+		for _, c := range e.Cases {
+			if err := validateBudgetContextsInExpr(c.Pattern, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInExpr(c.Guard, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+			if err := validateBudgetContextsInExpr(c.Value, callerName, callerSig, funcs, module, imports); err != nil {
+				return err
+			}
+		}
+	case *frontend.ClosureExpr:
+		// Closure declarations are validated as synthetic functions in file.Funcs.
+		// Re-validating here under the outer caller budget creates false positives
+		// for closures that declare their own budget context.
+		return nil
+	}
+	return nil
+}
+
+func validateBudgetSpawnContext(call *frontend.CallExpr, resolved string, callerName string, callerSig FuncSig, funcs map[string]FuncSig, module string, imports map[string]string) error {
+	workerArg := -1
+	contextName := ""
+	switch resolved {
+	case "core.spawn":
+		workerArg = 0
+		contextName = "spawn target"
+	case "core.spawn_remote":
+		workerArg = 1
+		contextName = "spawn_remote target"
+	case "core.task_spawn_i32", "core.task_spawn_i32_typed":
+		workerArg = 0
+		contextName = strings.TrimPrefix(resolved, "core.") + " target"
+	case "core.task_spawn_group_i32", "core.task_spawn_group_i32_typed":
+		workerArg = 1
+		contextName = strings.TrimPrefix(resolved, "core.") + " target"
+	}
+	if workerArg < 0 || workerArg >= len(call.Args) {
+		return nil
+	}
+	lit, ok := call.Args[workerArg].(*frontend.StringLitExpr)
+	if !ok || len(lit.Value) == 0 {
+		return nil
+	}
+	target, err := resolveCallName(string(lit.Value), module, imports, call.At)
+	if err != nil {
+		return err
+	}
+	targetSig, ok := funcs[target]
+	if !ok {
+		return nil
+	}
+	return validateBudgetContextEdge(call.At, callerName, callerSig, contextName+" '"+target+"'", targetSig)
+}
+
+func validateBudgetContextEdge(pos frontend.Position, callerName string, callerSig FuncSig, context string, targetSig FuncSig) error {
+	if !targetSig.HasBudget {
+		return nil
+	}
+	required := targetSig.Budget
+	if !callerSig.HasBudget {
+		return budgetDiagnosticf(pos, "budget context for %s requires caller '%s' to declare budget at least %d", context, callerName, required)
+	}
+	if callerSig.Budget < required {
+		return budgetDiagnosticf(pos, "budget context for %s requires caller budget at least %d, got %d", context, required, callerSig.Budget)
 	}
 	return nil
 }
@@ -2817,6 +3996,7 @@ type functionClausePolicy struct {
 	hasNoBlock   bool
 	hasRealtime  bool
 	hasBudget    bool
+	budget       int32
 	hasPrivacy   bool
 	consentParam string
 }
@@ -2833,12 +4013,15 @@ func parseFunctionClausePolicy(fn *frontend.FuncDecl) (functionClausePolicy, err
 			policy.hasRealtime = true
 		case "budget":
 			policy.hasBudget = true
+			if v, ok := constI32(clause.Value); ok {
+				policy.budget = v
+			}
 		case "privacy":
 			policy.hasPrivacy = true
 		case "consent":
 			ident, ok := clause.Value.(*frontend.IdentExpr)
 			if !ok {
-				return functionClausePolicy{}, fmt.Errorf("%s: semantic clause 'consent' expects an identifier argument", frontend.FormatPos(clause.At))
+				return functionClausePolicy{}, privacyDiagnosticf(clause.At, "semantic clause 'consent' expects an identifier argument")
 			}
 			policy.consentParam = ident.Name
 		}
@@ -2852,6 +4035,7 @@ func validateFunctionPolicyClauses(
 	paramTypes map[string]string,
 	returnType string,
 	throwsType string,
+	types map[string]*TypeInfo,
 ) error {
 	policy, err := parseFunctionClausePolicy(fn)
 	if err != nil {
@@ -2864,62 +4048,470 @@ func validateFunctionPolicyClauses(
 	}
 
 	if hasEffect("budget") && !policy.hasBudget {
-		return fmt.Errorf("%s: uses effect 'budget' requires semantic clause 'budget'", frontend.FormatPos(fn.Pos))
+		return budgetDiagnosticf(fn.Pos, "uses effect 'budget' requires semantic clause 'budget'")
 	}
 	if policy.hasBudget && !hasEffect("budget") {
-		return fmt.Errorf("%s: semantic clause 'budget' requires function '%s' to declare uses effect 'budget'", frontend.FormatPos(fn.Pos), fn.Name)
+		return budgetDiagnosticf(fn.Pos, "semantic clause 'budget' requires function '%s' to declare uses effect 'budget'", fn.Name)
 	}
 	if policy.hasNoAlloc && hasEffect("alloc") {
-		return fmt.Errorf("%s: semantic clause 'noalloc' conflicts with declared effect 'alloc'", frontend.FormatPos(fn.Pos))
+		return effectDiagnosticf(fn.Pos, "semantic clause 'noalloc' conflicts with declared effect 'alloc'")
 	}
 	if policy.hasNoBlock {
 		if blocked := firstForbiddenEffect(declaredEffects, []string{"actors", "control", "io", "link", "mmio", "runtime"}); blocked != "" {
-			return fmt.Errorf("%s: semantic clause 'noblock' conflicts with declared effect '%s'", frontend.FormatPos(fn.Pos), blocked)
+			return effectDiagnosticf(fn.Pos, "semantic clause 'noblock' conflicts with declared effect '%s'", blocked)
 		}
 	}
 	if policy.hasRealtime {
 		if !policy.hasNoAlloc {
-			return fmt.Errorf("%s: semantic clause 'realtime' requires semantic clause 'noalloc'", frontend.FormatPos(fn.Pos))
+			return effectDiagnosticf(fn.Pos, "semantic clause 'realtime' requires semantic clause 'noalloc'")
 		}
 		if !policy.hasNoBlock {
-			return fmt.Errorf("%s: semantic clause 'realtime' requires semantic clause 'noblock'", frontend.FormatPos(fn.Pos))
+			return effectDiagnosticf(fn.Pos, "semantic clause 'realtime' requires semantic clause 'noblock'")
 		}
 		if blocked := firstForbiddenEffect(declaredEffects, []string{"actors", "alloc", "control", "io", "link", "mmio", "runtime"}); blocked != "" {
-			return fmt.Errorf("%s: semantic clause 'realtime' conflicts with declared effect '%s'", frontend.FormatPos(fn.Pos), blocked)
+			return effectDiagnosticf(fn.Pos, "semantic clause 'realtime' conflicts with declared effect '%s'", blocked)
 		}
 	}
 	if policy.hasPrivacy && !hasEffect("privacy") {
-		return fmt.Errorf("%s: semantic clause 'privacy' requires function '%s' to declare uses effect 'privacy'", frontend.FormatPos(fn.Pos), fn.Name)
+		return privacyDiagnosticf(fn.Pos, "semantic clause 'privacy' requires function '%s' to declare uses effect 'privacy'", fn.Name)
 	}
 	if hasEffect("privacy") && !policy.hasPrivacy {
-		return fmt.Errorf("%s: uses effect 'privacy' requires semantic clause 'privacy'", frontend.FormatPos(fn.Pos))
+		return privacyDiagnosticf(fn.Pos, "uses effect 'privacy' requires semantic clause 'privacy'")
 	}
 
-	signatureHasSecret := typeUsesSecret(returnType) || typeUsesSecret(throwsType)
+	signatureHasSecret := typeUsesSecret(returnType, types) || typeUsesSecret(throwsType, types)
 	for _, paramType := range paramTypes {
-		if typeUsesSecret(paramType) {
+		if typeUsesSecret(paramType, types) {
 			signatureHasSecret = true
 		}
 	}
+	if functionDeclSignatureUsesSecret(fn, types) {
+		signatureHasSecret = true
+	}
 	if signatureHasSecret && !policy.hasPrivacy {
-		return fmt.Errorf("%s: secret types in function signature require semantic clause 'privacy'", frontend.FormatPos(fn.Pos))
+		return privacyDiagnosticf(fn.Pos, "secret types in function signature require semantic clause 'privacy'")
 	}
 	if signatureHasSecret && policy.consentParam == "" {
-		return fmt.Errorf("%s: secret types in function signature require semantic clause consent(<token>)", frontend.FormatPos(fn.Pos))
+		return privacyDiagnosticf(fn.Pos, "secret types in function signature require semantic clause consent(<token>)")
 	}
 	if policy.consentParam != "" {
 		if !policy.hasPrivacy {
-			return fmt.Errorf("%s: semantic clause 'consent' requires semantic clause 'privacy'", frontend.FormatPos(fn.Pos))
+			return privacyDiagnosticf(fn.Pos, "semantic clause 'consent' requires semantic clause 'privacy'")
 		}
 		paramType, ok := paramTypes[policy.consentParam]
 		if !ok {
-			return fmt.Errorf("%s: semantic clause 'consent' references unknown parameter '%s'", frontend.FormatPos(fn.Pos), policy.consentParam)
+			return privacyDiagnosticf(fn.Pos, "semantic clause 'consent' references unknown parameter '%s'", policy.consentParam)
 		}
 		if paramType != "consent.token" {
-			return fmt.Errorf("%s: semantic clause 'consent' parameter '%s' must have type consent.token", frontend.FormatPos(fn.Pos), policy.consentParam)
+			return privacyDiagnosticf(fn.Pos, "semantic clause 'consent' parameter '%s' must have type consent.token", policy.consentParam)
 		}
 	}
 	return nil
+}
+
+func validateExportedOpaqueABISignature(module string, fn *frontend.FuncDecl, paramTypes map[string]string, returnType string, types map[string]*TypeInfo) error {
+	if fn == nil || fn.ExportName == "" {
+		return nil
+	}
+	allowRuntimeHandles := isInternalRuntimeABIExport(module, fn)
+	for _, param := range fn.Params {
+		paramType := paramTypes[param.Name]
+		if param.Ownership != "" {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose ownership marker '%s' on parameter '%s'; export a plain FFI-safe wrapper",
+				fn.Name,
+				param.Ownership,
+				param.Name,
+			)
+		}
+		if isOpaqueCapabilityTokenType(paramType) {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose opaque capability token '%s' in parameter '%s'",
+				fn.Name,
+				paramType,
+				param.Name,
+			)
+		}
+		if isOpaqueIslandHandleType(paramType) {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose opaque island handle '%s' in parameter '%s'",
+				fn.Name,
+				paramType,
+				param.Name,
+			)
+		}
+		if isFunctionTypedABIValueType(paramType) {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose function-typed value '%s' in parameter '%s'",
+				fn.Name,
+				paramType,
+				param.Name,
+			)
+		}
+		if !allowRuntimeHandles {
+			if exposure, ok := exportedBoolABIExposureForType(paramType, types); ok {
+				return effectDiagnosticf(
+					param.At,
+					"exported function '%s' cannot expose %s '%s' in parameter '%s'",
+					fn.Name,
+					exposure.Kind,
+					exposure.TypeName,
+					param.Name,
+				)
+			}
+		}
+		if exposure, ok := exportedRawViewABIExposureForType(paramType, types); ok {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose %s '%s' in parameter '%s'",
+				fn.Name,
+				exposure.Kind,
+				exposure.TypeName,
+				param.Name,
+			)
+		}
+		if !allowRuntimeHandles && isOpaqueRuntimeHandleType(paramType) {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose opaque runtime handle '%s' in parameter '%s'",
+				fn.Name,
+				paramType,
+				param.Name,
+			)
+		}
+		if exposure, ok := exportedOpaqueABIExposureForType(paramType, types, allowRuntimeHandles); ok {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose %s '%s' through parameter '%s' type '%s'",
+				fn.Name,
+				exposure.Kind,
+				exposure.TypeName,
+				param.Name,
+				paramType,
+			)
+		}
+	}
+	if isOpaqueCapabilityTokenType(returnType) {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' cannot expose opaque capability token '%s' in return type",
+			fn.Name,
+			returnType,
+		)
+	}
+	if isOpaqueIslandHandleType(returnType) {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' cannot expose opaque island handle '%s' in return type",
+			fn.Name,
+			returnType,
+		)
+	}
+	if isFunctionTypedABIValueType(returnType) {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' cannot expose function-typed value '%s' in return type",
+			fn.Name,
+			returnType,
+		)
+	}
+	if !allowRuntimeHandles {
+		if exposure, ok := exportedBoolABIExposureForType(returnType, types); ok {
+			return effectDiagnosticf(
+				fn.ReturnType.At,
+				"exported function '%s' cannot expose %s '%s' in return type",
+				fn.Name,
+				exposure.Kind,
+				exposure.TypeName,
+			)
+		}
+	}
+	if exposure, ok := exportedRawViewABIExposureForType(returnType, types); ok {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' cannot expose %s '%s' in return type",
+			fn.Name,
+			exposure.Kind,
+			exposure.TypeName,
+		)
+	}
+	if !allowRuntimeHandles && isOpaqueRuntimeHandleType(returnType) {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' cannot expose opaque runtime handle '%s' in return type",
+			fn.Name,
+			returnType,
+		)
+	}
+	if exposure, ok := exportedOpaqueABIExposureForType(returnType, types, allowRuntimeHandles); ok {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' cannot expose %s '%s' through return type '%s'",
+			fn.Name,
+			exposure.Kind,
+			exposure.TypeName,
+			returnType,
+		)
+	}
+	return nil
+}
+
+func validateExportedConsentTokenABISignature(_ string, fn *frontend.FuncDecl, paramTypes map[string]string, returnType string, types map[string]*TypeInfo) error {
+	if fn == nil || fn.ExportName == "" {
+		return nil
+	}
+	for _, param := range fn.Params {
+		paramType := paramTypes[param.Name]
+		if isForgeableConsentTokenType(paramType) {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose forgeable consent token '%s' in parameter '%s'",
+				fn.Name,
+				paramType,
+				param.Name,
+			)
+		}
+		if exposure, ok := exportedConsentTokenABIExposureForType(paramType, types); ok {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' cannot expose %s '%s' through parameter '%s' type '%s'",
+				fn.Name,
+				exposure.Kind,
+				exposure.TypeName,
+				param.Name,
+				paramType,
+			)
+		}
+	}
+	if isForgeableConsentTokenType(returnType) {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' cannot expose forgeable consent token '%s' in return type",
+			fn.Name,
+			returnType,
+		)
+	}
+	if exposure, ok := exportedConsentTokenABIExposureForType(returnType, types); ok {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' cannot expose %s '%s' through return type '%s'",
+			fn.Name,
+			exposure.Kind,
+			exposure.TypeName,
+			returnType,
+		)
+	}
+	return nil
+}
+
+func validateExportedThrowingABISignature(_ string, fn *frontend.FuncDecl, throwsType string) error {
+	if fn == nil || fn.ExportName == "" || strings.TrimSpace(throwsType) == "" {
+		return nil
+	}
+	return effectDiagnosticf(
+		fn.Throws.At,
+		"exported function '%s' cannot throw typed error '%s'; export a non-throwing wrapper with an explicit result type",
+		fn.Name,
+		throwsType,
+	)
+}
+
+func exportedConsentTokenABIExposureForType(typeName string, types map[string]*TypeInfo) (exportedOpaqueABIExposure, bool) {
+	return exportedConsentTokenABIExposureForTypeVisiting(strings.TrimSpace(typeName), types, map[string]bool{})
+}
+
+func exportedConsentTokenABIExposureForTypeVisiting(typeName string, types map[string]*TypeInfo, visiting map[string]bool) (exportedOpaqueABIExposure, bool) {
+	typeName = strings.TrimSpace(typeName)
+	if isForgeableConsentTokenType(typeName) {
+		return exportedOpaqueABIExposure{Kind: "forgeable consent token", TypeName: typeName}, true
+	}
+	if elem, ok := optionalElemName(typeName); ok {
+		return exportedConsentTokenABIExposureForTypeVisiting(elem, types, visiting)
+	}
+	if _, elem, ok := parseArrayTypeName(typeName); ok {
+		return exportedConsentTokenABIExposureForTypeVisiting(elem, types, visiting)
+	}
+	info, ok := types[typeName]
+	if !ok {
+		return exportedOpaqueABIExposure{}, false
+	}
+	switch info.Kind {
+	case TypeStruct:
+		if visiting[typeName] {
+			return exportedOpaqueABIExposure{}, false
+		}
+		visiting[typeName] = true
+		defer delete(visiting, typeName)
+		for _, field := range info.Fields {
+			if exposure, ok := exportedConsentTokenABIExposureForTypeVisiting(field.TypeName, types, visiting); ok {
+				return exposure, true
+			}
+		}
+	case TypeEnum:
+		if visiting[typeName] {
+			return exportedOpaqueABIExposure{}, false
+		}
+		visiting[typeName] = true
+		defer delete(visiting, typeName)
+		for _, enumCase := range info.EnumCases {
+			for _, payload := range enumCase.PayloadTypes {
+				if exposure, ok := exportedConsentTokenABIExposureForTypeVisiting(payload, types, visiting); ok {
+					return exposure, true
+				}
+			}
+		}
+	case TypeArray, TypeOptional:
+		return exportedConsentTokenABIExposureForTypeVisiting(info.ElemType, types, visiting)
+	}
+	return exportedOpaqueABIExposure{}, false
+}
+
+func isInternalRuntimeABIExport(module string, fn *frontend.FuncDecl) bool {
+	if fn == nil || !strings.HasPrefix(fn.ExportName, "__tetra_") {
+		return false
+	}
+	return module == "__rt" || strings.HasPrefix(module, "__rt.")
+}
+
+type exportedOpaqueABIExposure struct {
+	Kind     string
+	TypeName string
+}
+
+func exportedOpaqueABIExposureForType(typeName string, types map[string]*TypeInfo, allowRuntimeHandles bool) (exportedOpaqueABIExposure, bool) {
+	return exportedOpaqueABIExposureForTypeVisiting(strings.TrimSpace(typeName), types, allowRuntimeHandles, map[string]bool{})
+}
+
+func exportedOpaqueABIExposureForTypeVisiting(typeName string, types map[string]*TypeInfo, allowRuntimeHandles bool, visiting map[string]bool) (exportedOpaqueABIExposure, bool) {
+	if isOpaqueCapabilityTokenType(typeName) {
+		return exportedOpaqueABIExposure{Kind: "opaque capability token", TypeName: typeName}, true
+	}
+	if isOpaqueIslandHandleType(typeName) {
+		return exportedOpaqueABIExposure{Kind: "opaque island handle", TypeName: typeName}, true
+	}
+	if isFunctionTypedABIValueType(typeName) {
+		return exportedOpaqueABIExposure{Kind: "function-typed value", TypeName: typeName}, true
+	}
+	if exposure, ok := exportedRawViewABIExposureForType(typeName, types); ok {
+		return exposure, true
+	}
+	if !allowRuntimeHandles {
+		if exposure, ok := exportedBoolABIExposureForType(typeName, types); ok {
+			return exposure, true
+		}
+	}
+	if !allowRuntimeHandles && isOpaqueRuntimeHandleType(typeName) {
+		return exportedOpaqueABIExposure{Kind: "opaque runtime handle", TypeName: typeName}, true
+	}
+	if elem, ok := optionalElemName(typeName); ok {
+		if exposure, ok := exportedOpaqueABIExposureForTypeVisiting(elem, types, allowRuntimeHandles, visiting); ok {
+			return exposure, true
+		}
+		return exportedOpaqueABIExposure{Kind: "forgeable optional presence tag", TypeName: typeName}, true
+	}
+	if _, elem, ok := parseArrayTypeName(typeName); ok {
+		return exportedOpaqueABIExposureForTypeVisiting(elem, types, allowRuntimeHandles, visiting)
+	}
+	info, ok := types[typeName]
+	if !ok {
+		return exportedOpaqueABIExposure{}, false
+	}
+	switch info.Kind {
+	case TypeStruct:
+		if visiting[typeName] {
+			return exportedOpaqueABIExposure{}, false
+		}
+		visiting[typeName] = true
+		defer delete(visiting, typeName)
+		for _, field := range info.Fields {
+			if exposure, ok := exportedOpaqueABIExposureForTypeVisiting(field.TypeName, types, allowRuntimeHandles, visiting); ok {
+				return exposure, true
+			}
+		}
+	case TypeEnum:
+		if visiting[typeName] {
+			return exportedOpaqueABIExposure{}, false
+		}
+		visiting[typeName] = true
+		defer delete(visiting, typeName)
+		for _, enumCase := range info.EnumCases {
+			for _, payload := range enumCase.PayloadTypes {
+				if exposure, ok := exportedOpaqueABIExposureForTypeVisiting(payload, types, allowRuntimeHandles, visiting); ok {
+					return exposure, true
+				}
+			}
+		}
+		return exportedOpaqueABIExposure{Kind: "forgeable enum discriminant", TypeName: info.Name}, true
+	case TypeArray:
+		return exportedOpaqueABIExposureForTypeVisiting(info.ElemType, types, allowRuntimeHandles, visiting)
+	case TypeOptional:
+		if exposure, ok := exportedOpaqueABIExposureForTypeVisiting(info.ElemType, types, allowRuntimeHandles, visiting); ok {
+			return exposure, true
+		}
+		return exportedOpaqueABIExposure{Kind: "forgeable optional presence tag", TypeName: info.Name}, true
+	}
+	return exportedOpaqueABIExposure{}, false
+}
+
+func isOpaqueIslandHandleType(typeName string) bool {
+	return strings.TrimSpace(typeName) == "island"
+}
+
+func isForgeableConsentTokenType(typeName string) bool {
+	return strings.TrimSpace(typeName) == "consent.token"
+}
+
+func isFunctionTypedABIValueType(typeName string) bool {
+	return strings.TrimSpace(typeName) == "fnptr"
+}
+
+func exportedBoolABIExposureForType(typeName string, types map[string]*TypeInfo) (exportedOpaqueABIExposure, bool) {
+	typeName = strings.TrimSpace(typeName)
+	info, ok := types[typeName]
+	if !ok || info.Kind != TypeBool {
+		return exportedOpaqueABIExposure{}, false
+	}
+	return exportedOpaqueABIExposure{Kind: "unnormalized bool", TypeName: info.Name}, true
+}
+
+func exportedRawViewABIExposureForType(typeName string, types map[string]*TypeInfo) (exportedOpaqueABIExposure, bool) {
+	typeName = strings.TrimSpace(typeName)
+	info, ok := types[typeName]
+	if !ok {
+		return exportedOpaqueABIExposure{}, false
+	}
+	switch info.Kind {
+	case TypeStr:
+		return exportedOpaqueABIExposure{Kind: "raw string view", TypeName: info.Name}, true
+	case TypeSlice:
+		return exportedOpaqueABIExposure{Kind: "raw slice view", TypeName: info.Name}, true
+	case TypeArray:
+		return exportedOpaqueABIExposure{Kind: "raw fixed-array view", TypeName: info.Name}, true
+	default:
+		return exportedOpaqueABIExposure{}, false
+	}
+}
+
+func isOpaqueCapabilityTokenType(typeName string) bool {
+	switch strings.TrimSpace(typeName) {
+	case "cap.io", "cap.mem":
+		return true
+	default:
+		return false
+	}
+}
+
+func isOpaqueRuntimeHandleType(typeName string) bool {
+	switch strings.TrimSpace(typeName) {
+	case "actor", "task.group", "task.i32":
+		return true
+	default:
+		return false
+	}
 }
 
 func firstForbiddenEffect(have map[string]struct{}, forbidden []string) string {
@@ -2931,41 +4523,467 @@ func firstForbiddenEffect(have map[string]struct{}, forbidden []string) string {
 	return ""
 }
 
-func typeUsesSecret(typeName string) bool {
-	typeName = strings.TrimSpace(typeName)
+func typeUsesSecret(typeName string, types map[string]*TypeInfo) bool {
+	return typeUsesSecretVisited(strings.TrimSpace(typeName), types, map[string]struct{}{})
+}
+
+func functionDeclSignatureUsesSecret(fn *frontend.FuncDecl, types map[string]*TypeInfo) bool {
+	if fn == nil {
+		return false
+	}
+	if typeRefUsesSecret(fn.ReturnType, types) {
+		return true
+	}
+	if fn.HasThrows && typeRefUsesSecret(fn.Throws, types) {
+		return true
+	}
+	for _, param := range fn.Params {
+		if typeRefUsesSecret(param.Type, types) {
+			return true
+		}
+	}
+	return false
+}
+
+func typeRefUsesSecret(ref frontend.TypeRef, types map[string]*TypeInfo) bool {
+	return typeRefUsesSecretVisited(ref, types, map[string]struct{}{})
+}
+
+func typeRefUsesSecretVisited(ref frontend.TypeRef, types map[string]*TypeInfo, visiting map[string]struct{}) bool {
+	switch ref.Kind {
+	case frontend.TypeRefFunction:
+		for _, param := range ref.Params {
+			if typeRefUsesSecretVisited(param, types, visiting) {
+				return true
+			}
+		}
+		if ref.Return != nil && typeRefUsesSecretVisited(*ref.Return, types, visiting) {
+			return true
+		}
+		return ref.Throws != nil && typeRefUsesSecretVisited(*ref.Throws, types, visiting)
+	case frontend.TypeRefSlice, frontend.TypeRefArray, frontend.TypeRefOptional:
+		if ref.Elem != nil {
+			return typeRefUsesSecretVisited(*ref.Elem, types, visiting)
+		}
+	}
+	return typeUsesSecretVisited(strings.TrimSpace(ref.Name), types, visiting)
+}
+
+func functionSignatureUsesSecretVisited(paramTypes []string, returnType string, throwsType string, types map[string]*TypeInfo, visiting map[string]struct{}) bool {
+	for _, paramType := range paramTypes {
+		if typeUsesSecretVisited(paramType, types, visiting) {
+			return true
+		}
+	}
+	return typeUsesSecretVisited(returnType, types, visiting) || typeUsesSecretVisited(throwsType, types, visiting)
+}
+
+func functionTypedFieldUsesSecret(field FieldInfo, types map[string]*TypeInfo, visiting map[string]struct{}) bool {
+	return field.FunctionTypeValue &&
+		functionSignatureUsesSecretVisited(field.FunctionParamTypes, field.FunctionReturnType, field.FunctionThrowsType, types, visiting)
+}
+
+func enumPayloadFunctionUsesSecret(enumCase EnumCaseInfo, index int, types map[string]*TypeInfo, visiting map[string]struct{}) bool {
+	if index < 0 || index >= len(enumCase.PayloadFunctionTypes) || !enumCase.PayloadFunctionTypes[index] {
+		return false
+	}
+	return functionSignatureUsesSecretVisited(
+		functionPayloadParamsAt(enumCase, index),
+		functionPayloadReturnAt(enumCase, index),
+		functionPayloadThrowsAt(enumCase, index),
+		types,
+		visiting,
+	)
+}
+
+func functionPayloadParamsAt(enumCase EnumCaseInfo, index int) []string {
+	if index >= 0 && index < len(enumCase.PayloadFunctionParams) {
+		return enumCase.PayloadFunctionParams[index]
+	}
+	return nil
+}
+
+func functionPayloadReturnAt(enumCase EnumCaseInfo, index int) string {
+	if index >= 0 && index < len(enumCase.PayloadFunctionReturns) {
+		return enumCase.PayloadFunctionReturns[index]
+	}
+	return ""
+}
+
+func functionPayloadThrowsAt(enumCase EnumCaseInfo, index int) string {
+	if index >= 0 && index < len(enumCase.PayloadFunctionThrows) {
+		return enumCase.PayloadFunctionThrows[index]
+	}
+	return ""
+}
+
+func exprSecretTainted(
+	expr frontend.Expr,
+	exprType string,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	analysis *functionAnalysisState,
+) (bool, error) {
+	if expr == nil {
+		return false, nil
+	}
+	if typeUsesSecret(exprType, types) {
+		return true, nil
+	}
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		if analysis.localSecretTainted(e.Name) {
+			return true, nil
+		}
+		if g, ok := globals[e.Name]; ok {
+			return typeUsesSecret(g.TypeName, types), nil
+		}
+		return false, nil
+	case *frontend.ClosureExpr:
+		for _, capture := range e.Captures {
+			if analysis.localSecretTainted(capture.Name) {
+				return true, nil
+			}
+			if local, ok := locals[capture.Name]; ok && typeUsesSecret(local.TypeName, types) {
+				return true, nil
+			}
+		}
+		if len(e.Captures) == 0 && e.Decl != nil {
+			for name := range collectClosureCaptures(e.Decl, locals) {
+				if analysis.localSecretTainted(name) {
+					return true, nil
+				}
+				if local, ok := locals[name]; ok && typeUsesSecret(local.TypeName, types) {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	case *frontend.FieldAccessExpr:
+		baseType := ""
+		if targetInfo, _, err := ResolveFieldAccessType(e, locals, globals, types); err == nil {
+			baseType = targetInfo.TypeName
+		}
+		return exprSecretTainted(e.Base, baseType, locals, globals, funcs, types, module, imports, analysis)
+	case *frontend.IndexExpr:
+		baseTainted, err := exprSecretTainted(e.Base, "", locals, globals, funcs, types, module, imports, analysis)
+		if err != nil || baseTainted {
+			return baseTainted, err
+		}
+		return exprSecretTainted(e.Index, "", locals, globals, funcs, types, module, imports, analysis)
+	case *frontend.CallExpr:
+		if e.Name == "core.secret_unseal_i32" || e.Name == "secret_unseal_i32" {
+			return true, nil
+		}
+		if local, ok := locals[e.Name]; ok && local.FunctionTypeValue && analysis.localSecretTainted(e.Name) {
+			return true, nil
+		}
+		if enumType, _, ok, err := resolveEnumCaseConstructorCall(e, types, module, imports); ok || err != nil {
+			if err != nil {
+				return false, err
+			}
+			if typeUsesSecret(enumType, types) {
+				return true, nil
+			}
+			for _, arg := range e.Args {
+				tainted, err := exprSecretTainted(arg, "", locals, globals, funcs, types, module, imports, analysis)
+				if err != nil || tainted {
+					return tainted, err
+				}
+			}
+			return false, nil
+		}
+		if info, ok := types[exprType]; ok && info.Kind == TypeStruct && e.Name == exprType {
+			for _, arg := range e.Args {
+				tainted, err := exprSecretTainted(arg, "", locals, globals, funcs, types, module, imports, analysis)
+				if err != nil || tainted {
+					return tainted, err
+				}
+			}
+			return false, nil
+		}
+		resolved, err := resolveCheckedCallName(e.Name, funcs, module, imports, e.At)
+		if err != nil {
+			for _, arg := range e.Args {
+				tainted, taintErr := exprSecretTainted(arg, "", locals, globals, funcs, types, module, imports, analysis)
+				if taintErr != nil {
+					return false, taintErr
+				}
+				if tainted {
+					return false, privacyDiagnosticf(e.At, "secret-tainted value cannot be passed through unknown callback target '%s'", e.Name)
+				}
+			}
+			return false, nil
+		}
+		if resolved == "core.secret_unseal_i32" {
+			return true, nil
+		}
+		taintedArgIndexes := make([]int, 0, len(e.Args))
+		for idx, arg := range e.Args {
+			tainted, err := exprSecretTainted(arg, "", locals, globals, funcs, types, module, imports, analysis)
+			if err != nil {
+				return false, err
+			}
+			if tainted {
+				taintedArgIndexes = append(taintedArgIndexes, idx)
+			}
+		}
+		if len(taintedArgIndexes) > 0 {
+			if actorMailboxSendHasSecretPayload(resolved, taintedArgIndexes) {
+				return false, privacyDiagnosticf(e.At, "secret-tainted value cannot be sent through actor mailbox")
+			}
+			if rawMemoryStoreHasSecretPayload(resolved, taintedArgIndexes) {
+				return false, privacyDiagnosticf(e.At, "secret-tainted value cannot be stored through raw memory")
+			}
+			if runtimeTimeControlHasSecretPayload(resolved, taintedArgIndexes) {
+				return false, privacyDiagnosticf(e.At, "secret-tainted value cannot control runtime time")
+			}
+			if mmioWriteHasSecretPayload(resolved, taintedArgIndexes) {
+				return false, privacyDiagnosticf(e.At, "secret-tainted value cannot be written through MMIO")
+			}
+			if strings.HasPrefix(resolved, "core.") {
+				return true, nil
+			}
+			sig, ok := funcs[resolved]
+			if !ok {
+				return false, privacyDiagnosticf(e.At, "secret-tainted value cannot be passed through unknown callback target '%s'", e.Name)
+			}
+			if analysis != nil {
+				for _, idx := range taintedArgIndexes {
+					if idx >= 0 && idx < len(sig.ParamNames) {
+						analysis.markFunctionParamSecretTaint(resolved, sig.ParamNames[idx])
+					}
+				}
+			}
+			return true, nil
+		}
+		if analysis != nil && analysis.funcReturnSecretTaint != nil && analysis.funcReturnSecretTaint[resolved] {
+			return true, nil
+		}
+		return false, nil
+	case *frontend.StructLitExpr:
+		for _, field := range e.Fields {
+			tainted, err := exprSecretTainted(field.Value, "", locals, globals, funcs, types, module, imports, analysis)
+			if err != nil || tainted {
+				return tainted, err
+			}
+		}
+		return false, nil
+	case *frontend.UnaryExpr:
+		return exprSecretTainted(e.X, "", locals, globals, funcs, types, module, imports, analysis)
+	case *frontend.BinaryExpr:
+		left, err := exprSecretTainted(e.Left, "", locals, globals, funcs, types, module, imports, analysis)
+		if err != nil || left {
+			return left, err
+		}
+		return exprSecretTainted(e.Right, "", locals, globals, funcs, types, module, imports, analysis)
+	case *frontend.TryExpr:
+		return exprSecretTainted(e.X, exprType, locals, globals, funcs, types, module, imports, analysis)
+	case *frontend.AwaitExpr:
+		return exprSecretTainted(e.X, exprType, locals, globals, funcs, types, module, imports, analysis)
+	case *frontend.MatchExpr:
+		scrutTainted, err := exprSecretTainted(e.Value, "", locals, globals, funcs, types, module, imports, analysis)
+		if err != nil || scrutTainted {
+			return scrutTainted, err
+		}
+		for _, c := range e.Cases {
+			if c.Guard != nil {
+				guardTainted, err := exprSecretTainted(c.Guard, "", locals, globals, funcs, types, module, imports, analysis)
+				if err != nil || guardTainted {
+					return guardTainted, err
+				}
+			}
+			tainted, err := exprSecretTainted(c.Value, exprType, locals, globals, funcs, types, module, imports, analysis)
+			if err != nil || tainted {
+				return tainted, err
+			}
+		}
+	case *frontend.CatchExpr:
+		callTainted, err := exprSecretTainted(e.Call, exprType, locals, globals, funcs, types, module, imports, analysis)
+		if err != nil || callTainted {
+			return callTainted, err
+		}
+		for _, c := range e.Cases {
+			tainted, err := exprSecretTainted(c.Value, exprType, locals, globals, funcs, types, module, imports, analysis)
+			if err != nil || tainted {
+				return tainted, err
+			}
+		}
+	}
+	return false, nil
+}
+
+func actorMailboxSendHasSecretPayload(resolved string, taintedArgIndexes []int) bool {
+	for _, idx := range taintedArgIndexes {
+		switch resolved {
+		case "core.send", "core.send_typed":
+			if idx == 1 {
+				return true
+			}
+		case "core.send_msg":
+			if idx == 1 || idx == 2 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func rawMemoryStoreHasSecretPayload(resolved string, taintedArgIndexes []int) bool {
+	switch resolved {
+	case "core.store_i32", "core.store_u8", "core.store_ptr":
+	default:
+		return false
+	}
+	for _, idx := range taintedArgIndexes {
+		if idx == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func runtimeTimeControlHasSecretPayload(resolved string, taintedArgIndexes []int) bool {
+	switch resolved {
+	case "core.sleep_ms", "core.sleep_until":
+	default:
+		return false
+	}
+	for _, idx := range taintedArgIndexes {
+		if idx == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func mmioWriteHasSecretPayload(resolved string, taintedArgIndexes []int) bool {
+	if resolved != "core.mmio_write_i32" {
+		return false
+	}
+	for _, idx := range taintedArgIndexes {
+		if idx == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func bindPatternSecretTaintLocals(pattern frontend.Expr, fallbackName string, tainted bool, analysis *functionAnalysisState) {
+	if !tainted || analysis == nil {
+		return
+	}
+	if fallbackName != "" {
+		analysis.setLocalSecretTaint(fallbackName, true)
+	}
+	switch p := pattern.(type) {
+	case *frontend.IdentExpr:
+		analysis.setLocalSecretTaint(p.Name, true)
+	case *frontend.SomePatternExpr:
+		analysis.setLocalSecretTaint(p.Name, true)
+	case *frontend.EnumCasePatternExpr:
+		for _, binding := range p.Bindings {
+			analysis.setLocalSecretTaint(binding, true)
+		}
+	}
+}
+
+func typeUsesSecretVisited(typeName string, types map[string]*TypeInfo, visiting map[string]struct{}) bool {
 	if typeName == "" {
 		return false
 	}
 	if strings.HasPrefix(typeName, "secret.") {
 		return true
 	}
+	if _, seen := visiting[typeName]; seen {
+		return false
+	}
+	visiting[typeName] = struct{}{}
+	defer delete(visiting, typeName)
+
+	if info, ok := types[typeName]; ok {
+		switch info.Kind {
+		case TypeStruct:
+			for _, field := range info.Fields {
+				if functionTypedFieldUsesSecret(field, types, visiting) || typeUsesSecretVisited(field.TypeName, types, visiting) {
+					return true
+				}
+			}
+		case TypeEnum:
+			for _, enumCase := range info.EnumCases {
+				for index, payloadType := range enumCase.PayloadTypes {
+					if enumPayloadFunctionUsesSecret(enumCase, index, types, visiting) ||
+						typeUsesSecretVisited(payloadType, types, visiting) {
+						return true
+					}
+				}
+			}
+		case TypeArray, TypeOptional, TypeSlice:
+			return typeUsesSecretVisited(info.ElemType, types, visiting)
+		}
+	}
 	if strings.HasSuffix(typeName, "?") {
-		return typeUsesSecret(strings.TrimSuffix(typeName, "?"))
+		return typeUsesSecretVisited(strings.TrimSuffix(typeName, "?"), types, visiting)
 	}
 	if strings.HasPrefix(typeName, "[]") {
-		return typeUsesSecret(strings.TrimPrefix(typeName, "[]"))
+		return typeUsesSecretVisited(strings.TrimPrefix(typeName, "[]"), types, visiting)
+	}
+	if _, elem, ok := parseArrayTypeName(typeName); ok {
+		return typeUsesSecretVisited(elem, types, visiting)
 	}
 	return false
 }
 
-func findFuncDecl(world *module.World, name string) *frontend.FuncDecl {
+func findFuncDecl(world *module.World, name string) (*frontend.FuncDecl, string, map[string]string, error) {
 	for _, file := range world.Files {
 		for _, fn := range file.Funcs {
 			if qualifyName(file.Module, fn.Name) == name || fn.Name == name {
-				return fn
+				imports, err := collectImportAliases(file)
+				if err != nil {
+					return nil, "", nil, err
+				}
+				return fn, file.Module, imports, nil
 			}
 		}
 	}
-	return nil
+	return nil, "", nil, nil
 }
 
-func compareProtocolRequirement(typeName, protoName string, req frontend.FuncSigDecl, method *frontend.FuncDecl) error {
+func compareProtocolRequirement(typeName, protoName string, req frontend.FuncSigDecl, method *frontend.FuncDecl, methodModule string, methodImports map[string]string) error {
 	if len(req.TypeParams) != len(method.TypeParams) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': generic parameter count differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
 	typeParamMap := make(map[string]string, len(req.TypeParams))
 	for i := range req.TypeParams {
 		typeParamMap[req.TypeParams[i]] = method.TypeParams[i]
+	}
+	methodTypeParams := make(map[string]struct{}, len(method.TypeParams))
+	for _, name := range method.TypeParams {
+		methodTypeParams[name] = struct{}{}
+	}
+	methodParamTypes := make([]frontend.TypeRef, len(method.Params))
+	for i := range method.Params {
+		normalized, err := normalizeProtocolComparisonTypeRef(method.Params[i].Type, methodModule, methodImports, methodTypeParams)
+		if err != nil {
+			return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': parameter %d type differs: %v", frontend.FormatPos(method.Params[i].At), method.Name, protoName, req.Name, i+1, err)
+		}
+		methodParamTypes[i] = normalized
+	}
+	methodReturnType, err := normalizeProtocolComparisonTypeRef(method.ReturnType, methodModule, methodImports, methodTypeParams)
+	if err != nil {
+		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': return type differs: %v", frontend.FormatPos(method.ReturnType.At), method.Name, protoName, req.Name, err)
+	}
+	methodThrows := method.Throws
+	if method.HasThrows {
+		normalized, err := normalizeProtocolComparisonTypeRef(method.Throws, methodModule, methodImports, methodTypeParams)
+		if err != nil {
+			return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': throws type differs: %v", frontend.FormatPos(method.Throws.At), method.Name, protoName, req.Name, err)
+		}
+		methodThrows = normalized
 	}
 	if len(req.Params) != len(method.Params) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': parameter count differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
@@ -2982,21 +5000,24 @@ func compareProtocolRequirement(typeName, protoName string, req frontend.FuncSig
 	if genericTypeName(req.Params[0].Type) != typeName {
 		return fmt.Errorf("%s: protocol '%s' requirement '%s': self parameter type must be '%s'", frontend.FormatPos(req.Params[0].At), protoName, req.Name, typeName)
 	}
-	if genericTypeName(method.Params[0].Type) != typeName {
+	if genericTypeName(methodParamTypes[0]) != typeName {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': self parameter type must be '%s'", frontend.FormatPos(method.Params[0].At), method.Name, protoName, req.Name, typeName)
 	}
 	for i := range req.Params {
-		if !protocolTypeRefsEquivalent(req.Params[i].Type, method.Params[i].Type, typeParamMap) {
+		if req.Params[i].Ownership != method.Params[i].Ownership {
+			return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': parameter %d ownership differs: expected '%s', got '%s'", frontend.FormatPos(method.Params[i].At), method.Name, protoName, req.Name, i+1, ownershipDisplay(req.Params[i].Ownership), ownershipDisplay(method.Params[i].Ownership))
+		}
+		if !protocolTypeRefsEquivalent(req.Params[i].Type, methodParamTypes[i], typeParamMap) {
 			return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': parameter %d type differs", frontend.FormatPos(method.Params[i].At), method.Name, protoName, req.Name, i+1)
 		}
 	}
-	if !protocolTypeRefsEquivalent(req.ReturnType, method.ReturnType, typeParamMap) {
+	if !protocolTypeRefsEquivalent(req.ReturnType, methodReturnType, typeParamMap) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': return type differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
 	if req.Async != method.Async {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': async marker differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
-	if req.HasThrows != method.HasThrows || !protocolTypeRefsEquivalent(req.Throws, method.Throws, typeParamMap) {
+	if req.HasThrows != method.HasThrows || !protocolTypeRefsEquivalent(req.Throws, methodThrows, typeParamMap) {
 		return fmt.Errorf("%s: method '%s' does not match protocol '%s' requirement '%s': throws type differs", frontend.FormatPos(method.Pos), method.Name, protoName, req.Name)
 	}
 	reqEffects, err := normalizeEffects(req.Uses, req.At)
@@ -3012,6 +5033,16 @@ func compareProtocolRequirement(typeName, protoName string, req frontend.FuncSig
 		return fmt.Errorf("%s: method '%s' for type '%s' does not match protocol '%s' requirement '%s': missing required effects %s", frontend.FormatPos(method.Pos), method.Name, typeName, protoName, req.Name, strings.Join(missing, ", "))
 	}
 	return nil
+}
+
+func normalizeProtocolComparisonTypeRef(ref frontend.TypeRef, module string, imports map[string]string, typeParams map[string]struct{}) (frontend.TypeRef, error) {
+	normalized := ref
+	name, _, err := resolveProtocolRequirementTypeRef(&normalized, module, imports, typeParams)
+	if err != nil {
+		return normalized, err
+	}
+	normalized.Name = name
+	return normalized, nil
 }
 
 func protocolTypeRefsEquivalent(req frontend.TypeRef, method frontend.TypeRef, typeParamMap map[string]string) bool {
@@ -3053,6 +5084,11 @@ func protocolTypeRefsEquivalent(req frontend.TypeRef, method frontend.TypeRef, t
 	case frontend.TypeRefFunction:
 		if len(req.Params) != len(method.Params) {
 			return false
+		}
+		for i := range req.Params {
+			if ownershipAt(req.ParamOwnership, i) != ownershipAt(method.ParamOwnership, i) {
+				return false
+			}
 		}
 		for i := range req.Params {
 			if !protocolTypeRefsEquivalent(req.Params[i], method.Params[i], typeParamMap) {
@@ -3260,6 +5296,18 @@ func genericParamFunctionParamTypes(params []frontend.ParamDecl) [][]string {
 	return out
 }
 
+func genericParamFunctionOwnership(params []frontend.ParamDecl) [][]string {
+	out := make([][]string, 0, len(params))
+	for _, param := range params {
+		if param.Type.Kind != frontend.TypeRefFunction {
+			out = append(out, nil)
+			continue
+		}
+		out = append(out, functionTypeRefParamOwnership(param.Type))
+	}
+	return out
+}
+
 func genericParamFunctionReturnTypes(params []frontend.ParamDecl) []string {
 	out := make([]string, 0, len(params))
 	for _, param := range params {
@@ -3268,6 +5316,18 @@ func genericParamFunctionReturnTypes(params []frontend.ParamDecl) []string {
 			continue
 		}
 		out = append(out, formatGenericTypeRef(*param.Type.Return))
+	}
+	return out
+}
+
+func genericParamFunctionThrowsTypes(params []frontend.ParamDecl) []string {
+	out := make([]string, 0, len(params))
+	for _, param := range params {
+		if param.Type.Kind != frontend.TypeRefFunction || param.Type.Throws == nil {
+			out = append(out, "")
+			continue
+		}
+		out = append(out, formatGenericTypeRef(*param.Type.Throws))
 	}
 	return out
 }
@@ -3313,6 +5373,18 @@ func paramFunctionParamTypes(params []frontend.ParamDecl) [][]string {
 	return out
 }
 
+func paramFunctionOwnership(params []frontend.ParamDecl) [][]string {
+	out := make([][]string, 0, len(params))
+	for _, param := range params {
+		if param.Type.Kind != frontend.TypeRefFunction {
+			out = append(out, nil)
+			continue
+		}
+		out = append(out, functionTypeRefParamOwnership(param.Type))
+	}
+	return out
+}
+
 func paramFunctionReturnTypes(params []frontend.ParamDecl) []string {
 	out := make([]string, 0, len(params))
 	for _, param := range params {
@@ -3321,6 +5393,19 @@ func paramFunctionReturnTypes(params []frontend.ParamDecl) []string {
 			continue
 		}
 		out = append(out, param.Type.Return.Name)
+	}
+	return out
+}
+
+func paramFunctionThrowsTypes(params []frontend.ParamDecl, module string, imports map[string]string) []string {
+	out := make([]string, 0, len(params))
+	for _, param := range params {
+		throwsType, err := functionTypeRefThrowsType(param.Type, module, imports)
+		if err != nil {
+			out = append(out, "")
+			continue
+		}
+		out = append(out, throwsType)
 	}
 	return out
 }
@@ -3376,14 +5461,21 @@ func formatGenericTypeRef(ref frontend.TypeRef) string {
 		return formatGenericTypeRef(*ref.Elem) + "?"
 	case frontend.TypeRefFunction:
 		parts := make([]string, 0, len(ref.Params))
-		for _, param := range ref.Params {
-			parts = append(parts, formatGenericTypeRef(param))
+		for i, param := range ref.Params {
+			formatted := formatGenericTypeRef(param)
+			if i < len(ref.ParamOwnership) && ref.ParamOwnership[i] != "" {
+				formatted = ref.ParamOwnership[i] + " " + formatted
+			}
+			parts = append(parts, formatted)
 		}
 		ret := "?"
 		if ref.Return != nil {
 			ret = formatGenericTypeRef(*ref.Return)
 		}
 		out := "fn(" + strings.Join(parts, ", ") + ") -> " + ret
+		if ref.Throws != nil {
+			out += " throws " + formatGenericTypeRef(*ref.Throws)
+		}
 		if len(ref.Uses) > 0 {
 			out += " uses " + strings.Join(ref.Uses, ", ")
 		}
@@ -3401,8 +5493,587 @@ func formatGenericTypeRef(ref frontend.TypeRef) string {
 }
 
 type functionAnalysisState struct {
-	touchesMutableGlobals bool
-	returnFunctionSymbol  string
+	touchesMutableGlobals               bool
+	returnFunctionSymbol                string
+	returnFunctionParamName             string
+	returnFunctionCaptures              []frontend.ClosureCapture
+	returnFunctionTouchesMutableGlobals bool
+	returnFunctionEscapeKind            CallableEscapeKind
+	returnFunctionHandleValue           bool
+	returnFunctionFields                map[string]FunctionFieldInfo
+	returnEnumPayloadFunctions          map[string]FunctionFieldInfo
+	returnEnumPayloadFields             map[string]FunctionFieldInfo
+	secretTaint                         map[string]bool
+	currentFuncName                     string
+	funcReturnSecretTaint               map[string]bool
+	funcParamSecretTaint                map[string]map[string]bool
+	discoveredParamTaint                bool
+	allowSecretReturn                   bool
+	rejectSecretReturn                  bool
+	exportedFuncName                    string
+	returnSecretTaint                   bool
+	secretControlDepth                  int
+}
+
+func newFunctionAnalysisState(
+	fn *frontend.FuncDecl,
+	policy functionClausePolicy,
+	fullName string,
+	returnSecretTaint map[string]bool,
+	paramSecretTaint map[string]map[string]bool,
+	types map[string]*TypeInfo,
+) *functionAnalysisState {
+	analysis := &functionAnalysisState{
+		secretTaint:           make(map[string]bool),
+		currentFuncName:       fullName,
+		funcReturnSecretTaint: returnSecretTaint,
+		funcParamSecretTaint:  paramSecretTaint,
+		allowSecretReturn:     policy.hasPrivacy,
+		rejectSecretReturn:    fn.ExportName != "",
+		exportedFuncName:      fn.Name,
+	}
+	for _, param := range fn.Params {
+		if typeUsesSecret(param.Type.Name, types) {
+			analysis.secretTaint[param.Name] = true
+		}
+	}
+	if inbound := paramSecretTaint[fullName]; len(inbound) > 0 {
+		for name, tainted := range inbound {
+			if tainted {
+				analysis.secretTaint[name] = true
+			}
+		}
+	}
+	return analysis
+}
+
+func recordReturnFunctionCaptures(analysis *functionAnalysisState, captures []frontend.ClosureCapture) {
+	if analysis == nil || len(captures) == 0 || len(analysis.returnFunctionCaptures) > 0 {
+		return
+	}
+	analysis.returnFunctionCaptures = append([]frontend.ClosureCapture(nil), captures...)
+}
+
+func recordReturnFunctionTargetMutableGlobalUse(analysis *functionAnalysisState, sig FuncSig) {
+	if analysis != nil && sig.TouchesMutableGlobals {
+		analysis.returnFunctionTouchesMutableGlobals = true
+	}
+}
+
+func applyInterfaceFunctionReturnMetadata(
+	sig *FuncSig,
+	fn *frontend.FuncDecl,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (bool, error) {
+	if sig == nil || fn == nil {
+		return false, nil
+	}
+	changed := false
+	for _, stmt := range fn.Body {
+		if throwStmt, ok := stmt.(*frontend.ThrowStmt); ok {
+			if typeContainsResourceHandle(sig.ThrowsType, types) {
+				state := newRegionState(nil)
+				initParamRegions(fn.Params, state, types)
+				summary, unknown, err := returnResourceSummaryForExpr(throwStmt.Value, sig.ThrowsType, funcs, types, module, imports, state)
+				if err != nil {
+					return false, err
+				}
+				if !unknown && !returnResourceSummariesEqual(sig.ThrowResourceSummary, summary) {
+					sig.ThrowResourceSummary = cloneReturnResourceSummary(summary)
+					changed = true
+				}
+			}
+			continue
+		}
+		if sig.ReturnFunctionType {
+			nestedChanged, err := applyInterfaceFunctionReturnParamMetadataFromNestedStmt(sig, stmt, types, module, imports)
+			if err != nil {
+				return false, err
+			}
+			if nestedChanged {
+				changed = true
+			}
+		}
+		ret, ok := stmt.(*frontend.ReturnStmt)
+		if !ok {
+			continue
+		}
+		if typeContainsResourceHandle(sig.ThrowsType, types) {
+			if tryExpr, ok := ret.Value.(*frontend.TryExpr); ok {
+				if call, ok := tryExpr.X.(*frontend.CallExpr); ok {
+					resolved := call.Name
+					calleeSig, ok := funcs[resolved]
+					if !ok {
+						var err error
+						resolved, err = resolveCallName(call.Name, module, imports, call.At)
+						if err != nil {
+							return false, err
+						}
+						calleeSig, ok = funcs[resolved]
+					}
+					if ok && calleeSig.ThrowsType != "" {
+						state := newRegionState(nil)
+						initParamRegions(fn.Params, state, types)
+						if err := recordTryCallThrowResourceSummary(call, calleeSig, funcs, types, module, imports, state); err != nil {
+							return false, err
+						}
+						if len(state.throwResourceSummary) > 0 && !returnResourceSummariesEqual(sig.ThrowResourceSummary, state.throwResourceSummary) {
+							sig.ThrowResourceSummary = cloneReturnResourceSummary(state.throwResourceSummary)
+							changed = true
+						}
+					}
+				}
+			}
+		}
+		if typeContainsResourceHandle(sig.ReturnType, types) {
+			state := newRegionState(nil)
+			initParamRegions(fn.Params, state, types)
+			summary, unknown, err := returnResourceSummaryForExpr(ret.Value, sig.ReturnType, funcs, types, module, imports, state)
+			if err != nil {
+				return false, err
+			}
+			newReturnResourceParam := regionNone
+			newReturnResourcePath := ""
+			newReturnResourceSummary := ReturnResourceSummary(nil)
+			if unknown {
+				newReturnResourceParam = regionUnknown
+			} else if len(summary) > 0 {
+				newReturnResourceSummary = cloneReturnResourceSummary(summary)
+				if provenances := summary[""]; len(provenances) == 1 {
+					newReturnResourceParam = provenances[0].ParamIndex
+					newReturnResourcePath = provenances[0].ParamPath
+				}
+			}
+			if sig.ReturnResourceParam != newReturnResourceParam || sig.ReturnResourcePath != newReturnResourcePath || !returnResourceSummariesEqual(sig.ReturnResourceSummary, newReturnResourceSummary) {
+				sig.ReturnResourceParam = newReturnResourceParam
+				sig.ReturnResourcePath = newReturnResourcePath
+				sig.ReturnResourceSummary = newReturnResourceSummary
+				changed = true
+			}
+		}
+		if typeMayContainRegion(sig.ReturnType, types) && !typeContainsResourceHandle(sig.ReturnType, types) {
+			summary, err := returnRegionSummaryForInterfaceExpr(ret.Value, sig.ReturnType, sig.Effects, fn, globals, funcs, types, module, imports)
+			if err != nil {
+				return false, err
+			}
+			newReturnRegionParam := regionNone
+			if len(summary) > 0 {
+				commonParam := regionNone
+				for _, paramIndex := range summary {
+					if commonParam == regionNone {
+						commonParam = paramIndex
+						continue
+					}
+					if commonParam != paramIndex {
+						commonParam = regionUnknown
+						break
+					}
+				}
+				if commonParam >= 0 {
+					newReturnRegionParam = commonParam
+				}
+			}
+			if sig.ReturnRegionParam != newReturnRegionParam || !returnRegionSummariesEqual(sig.ReturnRegionSummary, summary) {
+				sig.ReturnRegionParam = newReturnRegionParam
+				sig.ReturnRegionSummary = cloneReturnRegionSummary(summary)
+				changed = true
+			}
+		}
+		if sig.ReturnFunctionType {
+			if closure, ok := ret.Value.(*frontend.ClosureExpr); ok {
+				locals, err := interfaceFunctionReturnStubLocals(fn.Body, ret, types, module, imports)
+				if err != nil {
+					return false, err
+				}
+				if err := configureClosureCaptures(closure, locals, funcs, types, module, true, "interface function-typed return"); err != nil {
+					return false, err
+				}
+				if len(closure.Captures) > 0 {
+					target := closureFunctionValueName(closure, funcs, module)
+					if sig.ReturnFunctionSymbol != target {
+						sig.ReturnFunctionSymbol = target
+						changed = true
+					}
+					if !closureCapturesEqual(sig.ReturnFunctionCaptures, closure.Captures) {
+						sig.ReturnFunctionCaptures = append([]frontend.ClosureCapture(nil), closure.Captures...)
+						changed = true
+					}
+					captureSlots, err := functionCaptureSlotCount(closure.Captures, types)
+					if err != nil {
+						return false, err
+					}
+					escapeKind := CallableEscapeKind("")
+					handleValue := false
+					if captureSlots > FnPtrEnvSlotCount {
+						escapeKind, handleValue, err = classifyCallableEscape(callableBoundaryReturn, closure.Captures, types)
+						if err != nil {
+							return false, err
+						}
+					}
+					if sig.ReturnFunctionEscapeKind != escapeKind {
+						sig.ReturnFunctionEscapeKind = escapeKind
+						changed = true
+					}
+					if sig.ReturnFunctionHandleValue != handleValue {
+						sig.ReturnFunctionHandleValue = handleValue
+						changed = true
+					}
+					desiredReturnSlots := sig.ReturnSlots
+					if handleValue {
+						desiredReturnSlots = CallableHandleSlotCount
+					}
+					if sig.ReturnSlots != desiredReturnSlots {
+						sig.ReturnSlots = desiredReturnSlots
+						changed = true
+					}
+				}
+				continue
+			}
+			if id, ok := ret.Value.(*frontend.IdentExpr); ok {
+				for i, name := range sig.ParamNames {
+					if name != id.Name || i >= len(sig.ParamFunctionTypes) || !sig.ParamFunctionTypes[i] {
+						continue
+					}
+					if sig.ReturnFunctionParamName != name {
+						sig.ReturnFunctionParamName = name
+						changed = true
+					}
+				}
+				continue
+			}
+			fieldPath := callbackArgumentName(ret.Value)
+			if fieldPath != "" {
+				for _, name := range sig.ParamNames {
+					if !strings.HasPrefix(fieldPath, name+".") {
+						continue
+					}
+					if sig.ReturnFunctionParamName != fieldPath {
+						sig.ReturnFunctionParamName = fieldPath
+						changed = true
+					}
+				}
+			}
+		}
+		returnFields, err := functionFieldsFromReturnedStructExpr(sig.ReturnType, ret.Value, nil, globals, funcs, types, module, imports)
+		if err != nil {
+			return false, err
+		}
+		if !functionFieldMapsEqual(sig.ReturnFunctionFields, returnFields) {
+			sig.ReturnFunctionFields = cloneFunctionFieldMap(returnFields)
+			changed = true
+		}
+		returnPayloadFields, err := enumPayloadFieldsFromReturnedStructExpr(sig.ReturnType, ret.Value, nil, globals, funcs, types, module, imports)
+		if err != nil {
+			return false, err
+		}
+		if !functionFieldMapsEqual(sig.ReturnEnumPayloadFields, returnPayloadFields) {
+			sig.ReturnEnumPayloadFields = cloneFunctionFieldMap(returnPayloadFields)
+			changed = true
+		}
+		returnPayloads, err := enumPayloadFunctionsFromReturnedEnumExpr(sig.ReturnType, ret.Value, nil, globals, funcs, types, module, imports)
+		if err != nil {
+			return false, err
+		}
+		if !functionFieldMapsEqual(sig.ReturnEnumPayloadFunctions, returnPayloads) {
+			sig.ReturnEnumPayloadFunctions = cloneFunctionFieldMap(returnPayloads)
+			changed = true
+		}
+	}
+	return changed, nil
+}
+
+func returnRegionSummaryForInterfaceExpr(
+	expr frontend.Expr,
+	returnType string,
+	effectNames []string,
+	fn *frontend.FuncDecl,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (ReturnRegionSummary, error) {
+	if expr == nil || fn == nil || !typeMayContainRegion(returnType, types) {
+		return nil, nil
+	}
+	state := newRegionState(nil)
+	initParamRegions(fn.Params, state, types)
+	locals, err := interfaceParamRegionLocals(fn.Params, types, module, imports)
+	if err != nil {
+		return nil, err
+	}
+	effects := newEffectContext(module+"."+fn.Name, effectNames, fn.Uses, strings.HasPrefix(module, "__"))
+	tname, regionID, err := checkExprWithEffects(expr, locals, globals, funcs, types, module, imports, state, effects, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !typesCompatibleWithNullPtr(returnType, tname, expr) {
+		return nil, fmt.Errorf("%s: type mismatch: expected '%s', got '%s'", frontend.FormatPos(expr.Pos()), returnType, tname)
+	}
+	tree := regionTreeForExpr(returnType, expr, regionID, types, state)
+	if len(tree) == 0 {
+		return nil, nil
+	}
+	if err := state.recordReturnRegionSummary(tree, expr.Pos()); err != nil {
+		return nil, err
+	}
+	return cloneReturnRegionSummary(state.returnRegionSummary), nil
+}
+
+func interfaceParamRegionLocals(params []frontend.ParamDecl, types map[string]*TypeInfo, module string, imports map[string]string) (map[string]LocalInfo, error) {
+	locals := make(map[string]LocalInfo, len(params))
+	slotIndex := 0
+	for _, param := range params {
+		paramTypeName, err := resolveTypeName(&param.Type, module, imports)
+		if err != nil {
+			return nil, err
+		}
+		info, err := ensureTypeInfo(paramTypeName, types)
+		if err != nil {
+			return nil, err
+		}
+		locals[param.Name] = LocalInfo{
+			Base:      slotIndex,
+			SlotCount: info.SlotCount,
+			TypeName:  paramTypeName,
+			Mutable:   param.Ownership == "inout",
+		}
+		slotIndex += info.SlotCount
+	}
+	return locals, nil
+}
+
+func applyInterfaceFunctionReturnParamMetadataFromNestedStmt(
+	sig *FuncSig,
+	stmt frontend.Stmt,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (bool, error) {
+	match, ok := stmt.(*frontend.MatchStmt)
+	if !ok {
+		return false, nil
+	}
+	payloadBindings, err := interfaceMatchFunctionPayloadBindings(*sig, match, types, module, imports)
+	if err != nil {
+		return false, err
+	}
+	changed := false
+	for _, c := range match.Cases {
+		for _, caseStmt := range c.Body {
+			ret, ok := caseStmt.(*frontend.ReturnStmt)
+			if !ok {
+				continue
+			}
+			paramRef := interfaceFunctionReturnParamRef(*sig, ret.Value, payloadBindings)
+			if paramRef == "" || sig.ReturnFunctionParamName == paramRef {
+				continue
+			}
+			sig.ReturnFunctionParamName = paramRef
+			changed = true
+		}
+	}
+	return changed, nil
+}
+
+func interfaceFunctionReturnParamRef(sig FuncSig, expr frontend.Expr, payloadBindings map[string]string) string {
+	if id, ok := expr.(*frontend.IdentExpr); ok {
+		if payloadRef := payloadBindings[id.Name]; payloadRef != "" {
+			return payloadRef
+		}
+		for i, name := range sig.ParamNames {
+			if name == id.Name && i < len(sig.ParamFunctionTypes) && sig.ParamFunctionTypes[i] {
+				return name
+			}
+		}
+	}
+	fieldPath := callbackArgumentName(expr)
+	if fieldPath == "" {
+		return ""
+	}
+	for _, name := range sig.ParamNames {
+		if strings.HasPrefix(fieldPath, name+".") {
+			return fieldPath
+		}
+	}
+	return ""
+}
+
+func interfaceMatchFunctionPayloadBindings(
+	sig FuncSig,
+	match *frontend.MatchStmt,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (map[string]string, error) {
+	id, ok := match.Value.(*frontend.IdentExpr)
+	if !ok {
+		return nil, nil
+	}
+	paramIndex := -1
+	for i, name := range sig.ParamNames {
+		if name == id.Name {
+			paramIndex = i
+			break
+		}
+	}
+	if paramIndex < 0 || paramIndex >= len(sig.ParamTypes) {
+		return nil, nil
+	}
+	scrutType := sig.ParamTypes[paramIndex]
+	bindings := map[string]string{}
+	for _, c := range match.Cases {
+		enumPat, ok := c.Pattern.(*frontend.EnumCasePatternExpr)
+		if !ok {
+			continue
+		}
+		caseType, caseInfo, found, err := resolveEnumCasePattern(enumPat, types, module, imports)
+		if err != nil {
+			return nil, err
+		}
+		if !found || caseType != scrutType {
+			continue
+		}
+		for i, binding := range enumPat.Bindings {
+			if i >= len(caseInfo.PayloadFunctionTypes) || !caseInfo.PayloadFunctionTypes[i] {
+				continue
+			}
+			bindings[binding] = id.Name + "#" + enumPayloadFunctionKey(caseInfo.Ordinal, i)
+		}
+	}
+	return bindings, nil
+}
+
+func interfaceFunctionReturnStubLocals(
+	body []frontend.Stmt,
+	stop *frontend.ReturnStmt,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (map[string]LocalInfo, error) {
+	locals := map[string]LocalInfo{}
+	slot := 0
+	for _, stmt := range body {
+		if stmt == stop {
+			break
+		}
+		let, ok := stmt.(*frontend.LetStmt)
+		if !ok {
+			continue
+		}
+		typeName, err := resolveTypeName(&let.Type, module, imports)
+		if err != nil {
+			return nil, err
+		}
+		info, ok := types[typeName]
+		if !ok {
+			return nil, fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(let.At), typeName)
+		}
+		locals[let.Name] = LocalInfo{
+			Base:      slot,
+			SlotCount: info.SlotCount,
+			TypeName:  typeName,
+			Mutable:   let.Mutable,
+			Const:     let.Const,
+		}
+		slot += info.SlotCount
+	}
+	return locals, nil
+}
+
+func (analysis *functionAnalysisState) localSecretTainted(name string) bool {
+	return analysis != nil && analysis.secretTaint != nil && analysis.secretTaint[name]
+}
+
+func (analysis *functionAnalysisState) setLocalSecretTaint(name string, tainted bool) {
+	if analysis == nil || name == "" {
+		return
+	}
+	if analysis.secretTaint == nil {
+		analysis.secretTaint = make(map[string]bool)
+	}
+	if tainted {
+		analysis.secretTaint[name] = true
+		return
+	}
+	delete(analysis.secretTaint, name)
+}
+
+func (analysis *functionAnalysisState) underSecretControl() bool {
+	return analysis != nil && analysis.secretControlDepth > 0
+}
+
+func (analysis *functionAnalysisState) withSecretControl(tainted bool, fn func() error) error {
+	if analysis == nil || !tainted {
+		return fn()
+	}
+	analysis.secretControlDepth++
+	defer func() {
+		analysis.secretControlDepth--
+	}()
+	return fn()
+}
+
+func (analysis *functionAnalysisState) markFunctionParamSecretTaint(funcName, paramName string) {
+	if analysis == nil || funcName == "" || paramName == "" || analysis.funcParamSecretTaint == nil {
+		return
+	}
+	params := analysis.funcParamSecretTaint[funcName]
+	if params == nil {
+		params = make(map[string]bool)
+		analysis.funcParamSecretTaint[funcName] = params
+	}
+	if !params[paramName] {
+		params[paramName] = true
+		analysis.discoveredParamTaint = true
+	}
+}
+
+func (analysis *functionAnalysisState) copySecretTaint() map[string]bool {
+	if analysis == nil || len(analysis.secretTaint) == 0 {
+		return make(map[string]bool)
+	}
+	out := make(map[string]bool, len(analysis.secretTaint))
+	for name, tainted := range analysis.secretTaint {
+		if tainted {
+			out[name] = true
+		}
+	}
+	return out
+}
+
+func (analysis *functionAnalysisState) restoreSecretTaint(snapshot map[string]bool) {
+	if analysis == nil {
+		return
+	}
+	analysis.secretTaint = copySecretTaintMap(snapshot)
+}
+
+func copySecretTaintMap(src map[string]bool) map[string]bool {
+	if len(src) == 0 {
+		return make(map[string]bool)
+	}
+	dst := make(map[string]bool, len(src))
+	for name, tainted := range src {
+		if tainted {
+			dst[name] = true
+		}
+	}
+	return dst
+}
+
+func mergeSecretTaintMaps(a, b map[string]bool) map[string]bool {
+	merged := copySecretTaintMap(a)
+	for name, tainted := range b {
+		if tainted {
+			merged[name] = true
+		}
+	}
+	return merged
 }
 
 func validateDeferBodyControl(stmts []frontend.Stmt, loopDepth int) error {
@@ -3481,14 +6152,20 @@ func checkDeferBody(
 	savedRegionVars := copyRegionVars(state.regionVars)
 	savedUnknownVars := copyBoolMap(state.unknownVars)
 	savedUnknownConflicts := copyRegionConflictMap(state.unknownConflicts)
+	savedReachable := state.reachable
 	savedConsumedVars := copyConsumedVars(state.consumedVars)
+	savedMaybeConsumedVars := copyOwnershipJoinConflicts(state.maybeConsumedVars)
+	savedOwnershipAliases := copyStringMap(state.ownershipAliases)
+	savedBorrowedPtrAliases := copyStringMap(state.borrowedPtrAliases)
 	savedConsumedResources := copyConsumedResources(state.consumedResources)
 	savedResourceVars := copyResourceVars(state.resourceVars)
 	savedUnknownResources := copyUnknownResources(state.unknownResources)
 	savedFinalizedResources := copyFinalizedResources(state.finalizedResources)
+	savedSecretTaint := analysis.copySecretTaint()
 	savedNextResourceID := state.nextResourceID
 	savedReturnRegion := state.returnRegion
 	savedReturnRegionSet := state.returnRegionSet
+	savedReturnRegionSummary := cloneReturnRegionSummary(state.returnRegionSummary)
 	savedLoopDepth := state.loopDepth
 	savedUnsafeDepth := state.unsafeDepth
 	savedAllowThrowDepth := state.allowThrowDepth
@@ -3501,14 +6178,20 @@ func checkDeferBody(
 		state.regionVars = savedRegionVars
 		state.unknownVars = savedUnknownVars
 		state.unknownConflicts = savedUnknownConflicts
+		state.reachable = savedReachable
 		state.consumedVars = savedConsumedVars
+		state.maybeConsumedVars = savedMaybeConsumedVars
+		state.ownershipAliases = savedOwnershipAliases
+		state.borrowedPtrAliases = savedBorrowedPtrAliases
 		state.consumedResources = savedConsumedResources
 		state.resourceVars = savedResourceVars
 		state.unknownResources = savedUnknownResources
 		state.finalizedResources = savedFinalizedResources
+		analysis.restoreSecretTaint(savedSecretTaint)
 		state.nextResourceID = savedNextResourceID
 		state.returnRegion = savedReturnRegion
 		state.returnRegionSet = savedReturnRegionSet
+		state.returnRegionSummary = savedReturnRegionSummary
 		state.loopDepth = savedLoopDepth
 		state.unsafeDepth = savedUnsafeDepth
 		state.allowThrowDepth = savedAllowThrowDepth
@@ -3533,6 +6216,59 @@ func copyBoolMap(src map[string]bool) map[string]bool {
 	return dst
 }
 
+func copyStringMap(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return make(map[string]string)
+	}
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func mergeBorrowedPtrAliases(a, b map[string]string) map[string]string {
+	if len(a) == 0 && len(b) == 0 {
+		return make(map[string]string)
+	}
+	merged := make(map[string]string)
+	for name, owner := range a {
+		if owner == "" {
+			continue
+		}
+		merged[name] = owner
+	}
+	for name, owner := range b {
+		if owner == "" {
+			continue
+		}
+		if existing, exists := merged[name]; exists {
+			if owner < existing {
+				merged[name] = owner
+			}
+			continue
+		}
+		merged[name] = owner
+	}
+	return merged
+}
+
+func mergeOwnershipAliases(a, b map[string]string) map[string]string {
+	if len(a) == 0 && len(b) == 0 {
+		return make(map[string]string)
+	}
+	merged := make(map[string]string)
+	for name, source := range a {
+		if source == "" {
+			continue
+		}
+		if rightSource, ok := b[name]; ok && rightSource == source {
+			merged[name] = source
+		}
+	}
+	return merged
+}
+
 func copyRegionConflictMap(src map[string]regionConflict) map[string]regionConflict {
 	if len(src) == 0 {
 		return make(map[string]regionConflict)
@@ -3549,6 +6285,17 @@ func copyConsumedVars(src map[string]frontend.Position) map[string]frontend.Posi
 		return make(map[string]frontend.Position)
 	}
 	dst := make(map[string]frontend.Position, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func copyOwnershipJoinConflicts(src map[string]ownershipJoinConflict) map[string]ownershipJoinConflict {
+	if len(src) == 0 {
+		return make(map[string]ownershipJoinConflict)
+	}
+	dst := make(map[string]ownershipJoinConflict, len(src))
 	for k, v := range src {
 		dst[k] = v
 	}
@@ -3594,7 +6341,18 @@ func copyFinalizedResources(src map[int]resourceFinalization) map[int]resourceFi
 	}
 	dst := make(map[int]resourceFinalization, len(src))
 	for k, v := range src {
-		dst[k] = v
+		dst[k] = copyResourceFinalization(v)
+	}
+	return dst
+}
+
+func copyResourceFinalization(src resourceFinalization) resourceFinalization {
+	dst := src
+	if len(src.states) > 0 {
+		dst.states = make(map[string]frontend.Position, len(src.states))
+		for state, pos := range src.states {
+			dst.states[state] = pos
+		}
 	}
 	return dst
 }
@@ -3619,6 +6377,75 @@ func mergeConsumedVars(a, b map[string]frontend.Position) map[string]frontend.Po
 	return merged
 }
 
+func mergeMaybeConsumedVars(a, b flowSnapshot, leftLabel, rightLabel string) map[string]ownershipJoinConflict {
+	// SAFE-003 incremental subset: model local consume states as SSA-like edge
+	// joins. A value consumed on only some incoming edges remains unusable, but
+	// diagnostics now distinguish maybe-consumed joins from linear local flow.
+	merged := make(map[string]ownershipJoinConflict)
+	names := make(map[string]struct{})
+	for name := range a.consumedVars {
+		names[name] = struct{}{}
+	}
+	for name := range b.consumedVars {
+		names[name] = struct{}{}
+	}
+	for name := range a.maybeConsumedVars {
+		names[name] = struct{}{}
+	}
+	for name := range b.maybeConsumedVars {
+		names[name] = struct{}{}
+	}
+	for name := range names {
+		leftConsumed, leftMaybe, leftPos, leftConflict := ownershipSnapshotConsumed(a, name)
+		rightConsumed, rightMaybe, rightPos, rightConflict := ownershipSnapshotConsumed(b, name)
+		if !leftConsumed && !rightConsumed {
+			continue
+		}
+		if leftConsumed && rightConsumed && !leftMaybe && !rightMaybe {
+			continue
+		}
+		conflict := ownershipJoinConflict{
+			leftLabel:     leftLabel,
+			leftConsumed:  leftConsumed,
+			leftPos:       leftPos,
+			rightLabel:    rightLabel,
+			rightConsumed: rightConsumed,
+			rightPos:      rightPos,
+		}
+		if leftMaybe {
+			conflict.leftConsumed = true
+			conflict.leftPos = ownershipJoinConflictPosition(leftConflict)
+		}
+		if rightMaybe {
+			conflict.rightConsumed = true
+			conflict.rightPos = ownershipJoinConflictPosition(rightConflict)
+		}
+		merged[name] = conflict
+	}
+	return merged
+}
+
+func ownershipSnapshotConsumed(snap flowSnapshot, name string) (bool, bool, frontend.Position, ownershipJoinConflict) {
+	if conflict, ok := snap.maybeConsumedVars[name]; ok {
+		return true, true, ownershipJoinConflictPosition(conflict), conflict
+	}
+	pos, ok := snap.consumedVars[name]
+	return ok, false, pos, ownershipJoinConflict{}
+}
+
+func ownershipJoinConflictPosition(conflict ownershipJoinConflict) frontend.Position {
+	switch {
+	case conflict.leftConsumed && conflict.rightConsumed:
+		return earliestPosition(conflict.leftPos, conflict.rightPos)
+	case conflict.leftConsumed:
+		return conflict.leftPos
+	case conflict.rightConsumed:
+		return conflict.rightPos
+	default:
+		return frontend.Position{}
+	}
+}
+
 func mergeConsumedResources(a, b map[int]frontend.Position) map[int]frontend.Position {
 	if len(a) == 0 && len(b) == 0 {
 		return make(map[int]frontend.Position)
@@ -3639,26 +6466,85 @@ func mergeConsumedResources(a, b map[int]frontend.Position) map[int]frontend.Pos
 	return merged
 }
 
-func mergeFinalizedResources(a, b map[int]resourceFinalization) map[int]resourceFinalization {
+func mergeFinalizedResources(a, b map[int]resourceFinalization, leftLabel, rightLabel string) map[int]resourceFinalization {
 	if len(a) == 0 && len(b) == 0 {
 		return make(map[int]resourceFinalization)
 	}
 	merged := make(map[int]resourceFinalization)
-	for id, left := range a {
-		if right, ok := b[id]; ok {
-			if left.state == right.state {
-				merged[id] = earliestFinalization(left, right)
-				continue
-			}
-		}
-		merged[id] = left
+	ids := make(map[int]struct{})
+	for id := range a {
+		ids[id] = struct{}{}
 	}
-	for id, right := range b {
-		if _, exists := merged[id]; !exists {
-			merged[id] = right
+	for id := range b {
+		ids[id] = struct{}{}
+	}
+	for id := range ids {
+		left, leftOK := a[id]
+		right, rightOK := b[id]
+		if final, ok := mergeResourceFinalizationValues(left, leftOK, right, rightOK, leftLabel, rightLabel); ok {
+			merged[id] = final
 		}
 	}
 	return merged
+}
+
+func mergeResourceFinalizationValues(left resourceFinalization, leftOK bool, right resourceFinalization, rightOK bool, leftLabel, rightLabel string) (resourceFinalization, bool) {
+	if !leftOK && !rightOK {
+		return resourceFinalization{}, false
+	}
+	states := make(map[string]frontend.Position)
+	mayBeAvailable := !leftOK || !rightOK
+	addFinalizationStates(states, left)
+	addFinalizationStates(states, right)
+	if leftOK && left.mayBeAvailable {
+		mayBeAvailable = true
+	}
+	if rightOK && right.mayBeAvailable {
+		mayBeAvailable = true
+	}
+	if len(states) == 0 {
+		return resourceFinalization{}, false
+	}
+	if len(states) == 1 && !mayBeAvailable && !left.maybe && !right.maybe {
+		for state, pos := range states {
+			return resourceFinalization{state: state, pos: pos}, true
+		}
+	}
+	return resourceFinalization{
+		state:          firstResourceFinalizationState(states),
+		pos:            earliestResourceFinalizationPosition(states),
+		maybe:          true,
+		mayBeAvailable: mayBeAvailable,
+		states:         states,
+	}, true
+}
+
+func addFinalizationStates(dst map[string]frontend.Position, final resourceFinalization) {
+	for state, pos := range resourceFinalizationStatePositions(final) {
+		if existing, ok := dst[state]; ok {
+			dst[state] = earliestPosition(existing, pos)
+			continue
+		}
+		dst[state] = pos
+	}
+}
+
+func firstResourceFinalizationState(states map[string]frontend.Position) string {
+	first := ""
+	for state := range states {
+		if first == "" || state < first {
+			first = state
+		}
+	}
+	return first
+}
+
+func earliestResourceFinalizationPosition(states map[string]frontend.Position) frontend.Position {
+	var earliest frontend.Position
+	for _, pos := range states {
+		earliest = earliestPosition(earliest, pos)
+	}
+	return earliest
 }
 
 func mergeUnknownResources(a, b map[int]bool) map[int]bool {
@@ -3679,7 +6565,7 @@ func mergeUnknownResources(a, b map[int]bool) map[int]bool {
 	return merged
 }
 
-func mergeResourceVars(state *regionState, a, b map[string]int, consumed map[int]frontend.Position, finalized map[int]resourceFinalization, unknown map[int]bool) map[string]int {
+func mergeResourceVars(state *regionState, a, b map[string]int, consumed map[int]frontend.Position, finalized map[int]resourceFinalization, unknown map[int]bool, leftLabel, rightLabel string) map[string]int {
 	if len(a) == 0 && len(b) == 0 {
 		return make(map[string]int)
 	}
@@ -3694,7 +6580,7 @@ func mergeResourceVars(state *regionState, a, b map[string]int, consumed map[int
 			merged[name] = left
 			continue
 		}
-		merged[name] = mergeResourceIDs(state, left, right, consumed, finalized, unknown)
+		merged[name] = mergeResourceIDs(state, left, right, consumed, finalized, unknown, leftLabel, rightLabel)
 	}
 	for name, right := range b {
 		if _, exists := merged[name]; !exists {
@@ -3704,7 +6590,7 @@ func mergeResourceVars(state *regionState, a, b map[string]int, consumed map[int
 	return merged
 }
 
-func mergeResourceIDs(state *regionState, left int, right int, consumed map[int]frontend.Position, finalized map[int]resourceFinalization, unknown map[int]bool) int {
+func mergeResourceIDs(state *regionState, left int, right int, consumed map[int]frontend.Position, finalized map[int]resourceFinalization, unknown map[int]bool, leftLabel, rightLabel string) int {
 	if state == nil {
 		return left
 	}
@@ -3733,17 +6619,8 @@ func mergeResourceIDs(state *regionState, left int, right int, consumed map[int]
 	}
 	leftFinal, leftFinalOK := finalized[left]
 	rightFinal, rightFinalOK := finalized[right]
-	switch {
-	case leftFinalOK && rightFinalOK:
-		if leftFinal.state == rightFinal.state {
-			finalized[merged] = earliestFinalization(leftFinal, rightFinal)
-		} else {
-			finalized[merged] = leftFinal
-		}
-	case leftFinalOK:
-		finalized[merged] = leftFinal
-	case rightFinalOK:
-		finalized[merged] = rightFinal
+	if final, ok := mergeResourceFinalizationValues(leftFinal, leftFinalOK, rightFinal, rightFinalOK, leftLabel, rightLabel); ok {
+		finalized[merged] = final
 	}
 	return merged
 }
@@ -3769,16 +6646,36 @@ func earliestFinalization(a, b resourceFinalization) resourceFinalization {
 }
 
 type flowSnapshot struct {
+	reachable          bool
 	consumedVars       map[string]frontend.Position
+	maybeConsumedVars  map[string]ownershipJoinConflict
+	ownershipAliases   map[string]string
+	borrowedPtrAliases map[string]string
 	consumedResources  map[int]frontend.Position
 	resourceVars       map[string]int
 	unknownResources   map[int]bool
 	finalizedResources map[int]resourceFinalization
 }
 
+type loopFlowExit struct {
+	label string
+	vars  map[string]int
+	flow  flowSnapshot
+	taint map[string]bool
+}
+
+type loopFlowFrame struct {
+	breaks    []loopFlowExit
+	continues []loopFlowExit
+}
+
 func snapshotFlow(state *regionState) flowSnapshot {
 	return flowSnapshot{
+		reachable:          state.reachable,
 		consumedVars:       copyConsumedVars(state.consumedVars),
+		maybeConsumedVars:  copyOwnershipJoinConflicts(state.maybeConsumedVars),
+		ownershipAliases:   copyStringMap(state.ownershipAliases),
+		borrowedPtrAliases: copyStringMap(state.borrowedPtrAliases),
 		consumedResources:  copyConsumedResources(state.consumedResources),
 		resourceVars:       copyResourceVars(state.resourceVars),
 		unknownResources:   copyUnknownResources(state.unknownResources),
@@ -3787,7 +6684,11 @@ func snapshotFlow(state *regionState) flowSnapshot {
 }
 
 func restoreFlow(state *regionState, snap flowSnapshot) {
+	state.reachable = snap.reachable
 	state.consumedVars = copyConsumedVars(snap.consumedVars)
+	state.maybeConsumedVars = copyOwnershipJoinConflicts(snap.maybeConsumedVars)
+	state.ownershipAliases = copyStringMap(snap.ownershipAliases)
+	state.borrowedPtrAliases = copyStringMap(snap.borrowedPtrAliases)
 	state.consumedResources = copyConsumedResources(snap.consumedResources)
 	state.resourceVars = copyResourceVars(snap.resourceVars)
 	state.unknownResources = copyUnknownResources(snap.unknownResources)
@@ -3795,14 +6696,130 @@ func restoreFlow(state *regionState, snap flowSnapshot) {
 }
 
 func mergeFlow(state *regionState, a, b flowSnapshot) {
+	mergeFlowWithLabels(state, a, b, "left", "right")
+}
+
+func mergeFlowWithLabels(state *regionState, a, b flowSnapshot, leftLabel, rightLabel string) {
+	if !a.reachable && !b.reachable {
+		restoreFlow(state, a)
+		state.reachable = false
+		return
+	}
+	if !a.reachable {
+		restoreFlow(state, b)
+		return
+	}
+	if !b.reachable {
+		restoreFlow(state, a)
+		return
+	}
 	consumedResources := mergeConsumedResources(a.consumedResources, b.consumedResources)
-	finalizedResources := mergeFinalizedResources(a.finalizedResources, b.finalizedResources)
+	finalizedResources := mergeFinalizedResources(a.finalizedResources, b.finalizedResources, leftLabel, rightLabel)
 	unknownResources := mergeUnknownResources(a.unknownResources, b.unknownResources)
+	state.reachable = true
 	state.consumedVars = mergeConsumedVars(a.consumedVars, b.consumedVars)
+	state.maybeConsumedVars = mergeMaybeConsumedVars(a, b, leftLabel, rightLabel)
+	state.ownershipAliases = mergeOwnershipAliases(a.ownershipAliases, b.ownershipAliases)
+	state.borrowedPtrAliases = mergeBorrowedPtrAliases(a.borrowedPtrAliases, b.borrowedPtrAliases)
 	state.consumedResources = consumedResources
 	state.unknownResources = unknownResources
 	state.finalizedResources = finalizedResources
-	state.resourceVars = mergeResourceVars(state, a.resourceVars, b.resourceVars, consumedResources, finalizedResources, unknownResources)
+	state.resourceVars = mergeResourceVars(state, a.resourceVars, b.resourceVars, consumedResources, finalizedResources, unknownResources, leftLabel, rightLabel)
+}
+
+func pushLoopFlowFrame(state *regionState) {
+	if state == nil {
+		return
+	}
+	state.loopFlowFrames = append(state.loopFlowFrames, loopFlowFrame{})
+}
+
+func popLoopFlowFrame(state *regionState) loopFlowFrame {
+	if state == nil || len(state.loopFlowFrames) == 0 {
+		return loopFlowFrame{}
+	}
+	frame := state.loopFlowFrames[len(state.loopFlowFrames)-1]
+	state.loopFlowFrames = state.loopFlowFrames[:len(state.loopFlowFrames)-1]
+	return frame
+}
+
+func recordLoopFlowExit(state *regionState, label string, analysis *functionAnalysisState) {
+	if state == nil || len(state.loopFlowFrames) == 0 {
+		return
+	}
+	exit := loopFlowExit{
+		label: label,
+		vars:  copyRegionVars(state.regionVars),
+		flow:  snapshotFlow(state),
+	}
+	if analysis != nil {
+		exit.taint = analysis.copySecretTaint()
+	}
+	frame := &state.loopFlowFrames[len(state.loopFlowFrames)-1]
+	if label == "break" {
+		frame.breaks = append(frame.breaks, exit)
+		return
+	}
+	frame.continues = append(frame.continues, exit)
+}
+
+func mergeLoopFlowExits(state *regionState, analysis *functionAnalysisState, exits []loopFlowExit) {
+	if len(exits) == 0 {
+		return
+	}
+	mergedVars := copyRegionVars(exits[0].vars)
+	mergedFlow := exits[0].flow
+	mergedTaint := cloneBoolMap(exits[0].taint)
+	labels := []string{exits[0].label}
+	for _, exit := range exits[1:] {
+		leftLabel := strings.Join(labels, "/")
+		mergeControlFlowWithLabels(state, analysis, mergedVars, mergedFlow, mergedTaint, exit.vars, exit.flow, exit.taint, leftLabel, exit.label)
+		mergedVars = copyRegionVars(state.regionVars)
+		mergedFlow = snapshotFlow(state)
+		if analysis != nil {
+			mergedTaint = analysis.copySecretTaint()
+		}
+		labels = append(labels, exit.label)
+	}
+	state.regionVars = mergedVars
+	restoreFlow(state, mergedFlow)
+	if analysis != nil {
+		analysis.restoreSecretTaint(mergedTaint)
+	}
+}
+
+func mergeControlFlowWithLabels(
+	state *regionState,
+	analysis *functionAnalysisState,
+	leftVars map[string]int,
+	leftFlow flowSnapshot,
+	leftTaint map[string]bool,
+	rightVars map[string]int,
+	rightFlow flowSnapshot,
+	rightTaint map[string]bool,
+	leftLabel string,
+	rightLabel string,
+) {
+	switch {
+	case !leftFlow.reachable && !rightFlow.reachable:
+		state.regionVars = copyRegionVars(leftVars)
+		restoreFlow(state, leftFlow)
+		state.reachable = false
+		analysis.restoreSecretTaint(mergeSecretTaintMaps(leftTaint, rightTaint))
+	case !leftFlow.reachable:
+		state.regionVars = copyRegionVars(rightVars)
+		restoreFlow(state, rightFlow)
+		analysis.restoreSecretTaint(rightTaint)
+	case !rightFlow.reachable:
+		state.regionVars = copyRegionVars(leftVars)
+		restoreFlow(state, leftFlow)
+		analysis.restoreSecretTaint(leftTaint)
+	default:
+		state.regionVars = mergeRegionVars(leftVars, rightVars)
+		mergeFlowWithLabels(state, leftFlow, rightFlow, leftLabel, rightLabel)
+		analysis.restoreSecretTaint(mergeSecretTaintMaps(leftTaint, rightTaint))
+		recordMergeConflicts(state, leftVars, rightVars, leftLabel, rightLabel)
+	}
 }
 
 type resourceSourceResult struct {
@@ -3830,7 +6847,7 @@ func bindResourceFromExpr(
 		return err
 	}
 	if source.ambiguous {
-		return fmt.Errorf("%s: resource expression mixes resource provenance", frontend.FormatPos(expr.Pos()))
+		return ownershipDiagnosticf(expr.Pos(), "resource expression mixes resource provenance")
 	}
 	if source.unknown {
 		state.bindUnknownResource(name)
@@ -3868,6 +6885,12 @@ func bindResourceTreeFromExpr(
 	}
 	if isResourceHandleType(typeName) {
 		return bindResourceFromExpr(name, typeName, expr, funcs, module, imports, state)
+	}
+	if info, ok := types[typeName]; ok && info.Kind == TypeOptional {
+		if sourcePrefix, ok := resourcePathForExpr(expr); ok && resourceTreeHasPath(sourcePrefix, info.ElemType, types, state) {
+			copyResourceTreeFromPath(resourceFieldPath(name, "$elem"), sourcePrefix, info.ElemType, types, state)
+			return nil
+		}
 	}
 	if sourcePrefix, ok := resourcePathForExpr(expr); ok {
 		copyResourceTreeFromPath(name, sourcePrefix, typeName, types, state)
@@ -3934,9 +6957,58 @@ func bindResourceTreeFromExpr(
 			}
 			return nil
 		}
+		sig, ok := funcs[resolved]
+		if !ok {
+			return nil
+		}
+		if handled, err := bindResourceTreeFromCallSummary(name, typeName, e, sig, funcs, types, module, imports, state); handled || err != nil {
+			return err
+		}
 	}
 	markResourceTreeUnknown(name, typeName, types, state)
 	return nil
+}
+
+func bindResourceTreeFromCallSummary(
+	name string,
+	typeName string,
+	call *frontend.CallExpr,
+	sig FuncSig,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) (bool, error) {
+	if len(sig.ReturnResourceSummary) == 0 {
+		return false, nil
+	}
+	for _, leaf := range resourceLeafPaths(typeName, types, "") {
+		dstLeaf := joinResourcePath(name, leaf)
+		provenances := sig.ReturnResourceSummary[leaf]
+		if len(provenances) == 0 {
+			state.bindResource(dstLeaf, "", true)
+			continue
+		}
+		if len(provenances) > 1 {
+			state.bindUnknownResource(dstLeaf)
+			continue
+		}
+		source, err := resourceSourceForCallProvenance(call.Args, sig, provenances[0], funcs, types, module, imports, state, call.At)
+		if err != nil {
+			return true, err
+		}
+		if source.ambiguous || source.unknown || !source.known {
+			state.bindUnknownResource(dstLeaf)
+			continue
+		}
+		if _, consumed := state.consumedAt(source.name); consumed {
+			state.bindTransferredResource(dstLeaf, source.name)
+			continue
+		}
+		state.bindResource(dstLeaf, source.name, true)
+	}
+	return true, nil
 }
 
 func bindResourceTreeFromPathOrUnknown(dst string, src string, typeName string, types map[string]*TypeInfo, state *regionState) {
@@ -3995,6 +7067,161 @@ func bindPatternResourceLocals(
 	return nil
 }
 
+func bindPatternOwnershipAliases(
+	pattern frontend.Expr,
+	fallbackName string,
+	scrutineePath string,
+	scrutType string,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) error {
+	if state == nil || scrutineePath == "" {
+		return nil
+	}
+	info, ok := types[scrutType]
+	if !ok {
+		return nil
+	}
+	if pattern == nil {
+		if fallbackName == "" || info.Kind != TypeOptional {
+			return nil
+		}
+		state.bindOwnershipAlias(fallbackName, resourceFieldPath(scrutineePath, "$elem"))
+		return nil
+	}
+	switch p := pattern.(type) {
+	case *frontend.SomePatternExpr:
+		if info.Kind == TypeOptional {
+			state.bindOwnershipAlias(p.Name, resourceFieldPath(scrutineePath, "$elem"))
+		}
+	case *frontend.EnumCasePatternExpr:
+		caseType, caseInfo, found, err := resolveEnumCasePattern(p, types, module, imports)
+		if err != nil {
+			return err
+		}
+		if !found || caseType != scrutType {
+			return nil
+		}
+		for i, binding := range p.Bindings {
+			if i >= len(caseInfo.PayloadTypes) {
+				break
+			}
+			state.bindOwnershipAlias(binding, resourceEnumPayloadPath(scrutineePath, caseInfo.Ordinal, i))
+		}
+	}
+	return nil
+}
+
+func bindPatternBorrowedPtrAliases(
+	pattern frontend.Expr,
+	fallbackName string,
+	scrutineePath string,
+	scrutType string,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) error {
+	if state == nil || scrutineePath == "" {
+		return nil
+	}
+	info, ok := types[scrutType]
+	if !ok {
+		return nil
+	}
+	if pattern == nil {
+		if fallbackName == "" || info.Kind != TypeOptional {
+			return nil
+		}
+		copyBorrowedPtrAliasesFromPath(fallbackName, resourceFieldPath(scrutineePath, "$elem"), info.ElemType, types, state)
+		return nil
+	}
+	switch p := pattern.(type) {
+	case *frontend.SomePatternExpr:
+		if info.Kind == TypeOptional {
+			copyBorrowedPtrAliasesFromPath(p.Name, resourceFieldPath(scrutineePath, "$elem"), info.ElemType, types, state)
+		}
+	case *frontend.EnumCasePatternExpr:
+		caseType, caseInfo, found, err := resolveEnumCasePattern(p, types, module, imports)
+		if err != nil {
+			return err
+		}
+		if !found || caseType != scrutType {
+			return nil
+		}
+		for i, binding := range p.Bindings {
+			if i >= len(caseInfo.PayloadTypes) {
+				break
+			}
+			copyBorrowedPtrAliasesFromPath(binding, resourceEnumPayloadPath(scrutineePath, caseInfo.Ordinal, i), caseInfo.PayloadTypes[i], types, state)
+		}
+	}
+	return nil
+}
+
+func copyBorrowedPtrAliasesFromPath(dst string, src string, typeName string, types map[string]*TypeInfo, state *regionState) {
+	if state == nil || dst == "" || src == "" || !typeMayContainPtr(typeName, types) {
+		return
+	}
+	state.clearBorrowedPtrAliasTree(dst)
+	for _, leaf := range ptrLeafPaths(typeName, types, "") {
+		srcLeaf := joinResourcePath(src, leaf)
+		if owner, borrowed := state.borrowedPtrAliasOwner(srcLeaf); borrowed {
+			state.bindBorrowedPtrAlias(joinResourcePath(dst, leaf), owner)
+		}
+	}
+}
+
+func bindPatternRegionLocals(
+	pattern frontend.Expr,
+	fallbackName string,
+	scrutineePath string,
+	scrutType string,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) error {
+	if state == nil || scrutineePath == "" || !typeMayContainRegion(scrutType, types) {
+		return nil
+	}
+	info, ok := types[scrutType]
+	if !ok {
+		return nil
+	}
+	if pattern == nil {
+		if fallbackName == "" || info.Kind != TypeOptional {
+			return nil
+		}
+		copyRegionTreeFromPath(fallbackName, resourceFieldPath(scrutineePath, "$elem"), info.ElemType, types, state)
+		return nil
+	}
+	switch p := pattern.(type) {
+	case *frontend.SomePatternExpr:
+		if info.Kind != TypeOptional {
+			return nil
+		}
+		copyRegionTreeFromPath(p.Name, resourceFieldPath(scrutineePath, "$elem"), info.ElemType, types, state)
+	case *frontend.EnumCasePatternExpr:
+		caseType, caseInfo, found, err := resolveEnumCasePattern(p, types, module, imports)
+		if err != nil {
+			return err
+		}
+		if !found || caseType != scrutType {
+			return nil
+		}
+		for i, binding := range p.Bindings {
+			if i >= len(caseInfo.PayloadTypes) {
+				break
+			}
+			copyRegionTreeFromPath(binding, resourceEnumPayloadPath(scrutineePath, caseInfo.Ordinal, i), caseInfo.PayloadTypes[i], types, state)
+		}
+	}
+	return nil
+}
+
 func copyResourceTreeFromPath(dst string, src string, typeName string, types map[string]*TypeInfo, state *regionState) {
 	for _, leaf := range resourceLeafPaths(typeName, types, "") {
 		dstLeaf := joinResourcePath(dst, leaf)
@@ -4011,6 +7238,18 @@ func copyResourceTreeFromPath(dst string, src string, typeName string, types map
 	}
 }
 
+func resourceTreeHasPath(prefix string, typeName string, types map[string]*TypeInfo, state *regionState) bool {
+	if state == nil || prefix == "" {
+		return false
+	}
+	for _, leaf := range resourceLeafPaths(typeName, types, "") {
+		if _, ok := state.resourceID(joinResourcePath(prefix, leaf)); ok {
+			return true
+		}
+	}
+	return false
+}
+
 func markResourceTreeUnknown(prefix string, typeName string, types map[string]*TypeInfo, state *regionState) {
 	for _, leaf := range resourceLeafPaths(typeName, types, "") {
 		state.bindUnknownResource(joinResourcePath(prefix, leaf))
@@ -4025,6 +7264,10 @@ func bindFreshResourceTree(prefix string, typeName string, types map[string]*Typ
 
 func resourceLeafPaths(typeName string, types map[string]*TypeInfo, prefix string) []string {
 	return resourceLeafPathsVisiting(typeName, types, prefix, map[string]bool{})
+}
+
+func ptrLeafPaths(typeName string, types map[string]*TypeInfo, prefix string) []string {
+	return ptrLeafPathsVisiting(typeName, types, prefix, map[string]bool{})
 }
 
 func resourceLeafPathsVisiting(typeName string, types map[string]*TypeInfo, prefix string, visiting map[string]bool) []string {
@@ -4059,6 +7302,42 @@ func resourceLeafPathsVisiting(typeName string, types map[string]*TypeInfo, pref
 		}
 	case TypeArray, TypeOptional:
 		out = append(out, resourceLeafPathsVisiting(info.ElemType, types, resourceFieldPath(prefix, "$elem"), visiting)...)
+	}
+	return out
+}
+
+func ptrLeafPathsVisiting(typeName string, types map[string]*TypeInfo, prefix string, visiting map[string]bool) []string {
+	if typeName == "ptr" {
+		return []string{prefix}
+	}
+	info, ok := types[typeName]
+	if !ok {
+		return nil
+	}
+	var out []string
+	switch info.Kind {
+	case TypeStruct:
+		if visiting[typeName] {
+			return nil
+		}
+		visiting[typeName] = true
+		defer delete(visiting, typeName)
+		for _, field := range info.Fields {
+			out = append(out, ptrLeafPathsVisiting(field.TypeName, types, resourceFieldPath(prefix, field.Name), visiting)...)
+		}
+	case TypeEnum:
+		if visiting[typeName] {
+			return nil
+		}
+		visiting[typeName] = true
+		defer delete(visiting, typeName)
+		for _, c := range info.EnumCases {
+			for i, payload := range c.PayloadTypes {
+				out = append(out, ptrLeafPathsVisiting(payload, types, resourceEnumPayloadPath(prefix, c.Ordinal, i), visiting)...)
+			}
+		}
+	case TypeArray, TypeOptional:
+		out = append(out, ptrLeafPathsVisiting(info.ElemType, types, resourceFieldPath(prefix, "$elem"), visiting)...)
 	}
 	return out
 }
@@ -4107,6 +7386,379 @@ func resourceSourceForPath(path string, state *regionState) resourceSourceResult
 		return resourceSourceResult{unknown: true}
 	}
 	return resourceSourceResult{name: path, known: true}
+}
+
+func returnResourceSummaryForExpr(
+	expr frontend.Expr,
+	typeName string,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) (ReturnResourceSummary, bool, error) {
+	if state == nil || !typeContainsResourceHandle(typeName, types) {
+		return nil, false, nil
+	}
+	summary := ReturnResourceSummary{}
+	for _, leaf := range resourceLeafPaths(typeName, types, "") {
+		source, err := resourceSourceForExprLeaf(expr, typeName, leaf, funcs, types, module, imports, state)
+		if err != nil {
+			return nil, false, err
+		}
+		if source.ambiguous {
+			return nil, false, ownershipDiagnosticf(expr.Pos(), "resource expression mixes resource provenance")
+		}
+		if source.unknown {
+			return nil, true, nil
+		}
+		if !source.known {
+			continue
+		}
+		paramIndex, paramPath, ok := state.resourceParamOwner(source.name)
+		if !ok {
+			continue
+		}
+		summary[leaf] = appendResourceProvenance(summary[leaf], ResourceProvenance{
+			ParamIndex: paramIndex,
+			ParamPath:  paramPath,
+		})
+	}
+	if len(summary) == 0 {
+		return nil, false, nil
+	}
+	return summary, false, nil
+}
+
+func appendResourceProvenance(in []ResourceProvenance, provenance ResourceProvenance) []ResourceProvenance {
+	for _, existing := range in {
+		if existing == provenance {
+			return in
+		}
+	}
+	return append(in, provenance)
+}
+
+func bindCatchErrorResourceSummary(
+	errorLocal string,
+	call *frontend.CallExpr,
+	sig FuncSig,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) error {
+	if state == nil || errorLocal == "" || call == nil || len(sig.ThrowResourceSummary) == 0 {
+		return nil
+	}
+	state.clearResourceTree(errorLocal)
+	for leaf, provenances := range sig.ThrowResourceSummary {
+		var merged resourceSourceResult
+		set := false
+		for _, provenance := range provenances {
+			source, err := resourceSourceForCallProvenance(call.Args, sig, provenance, funcs, types, module, imports, state, call.At)
+			if err != nil {
+				return err
+			}
+			if !set {
+				merged = source
+				set = true
+				continue
+			}
+			merged = mergeResourceSourceResults(merged, source)
+		}
+		dst := joinResourcePath(errorLocal, leaf)
+		if !set || merged.unknown {
+			state.bindUnknownResource(dst)
+			continue
+		}
+		if merged.ambiguous {
+			return ownershipDiagnosticf(call.At, "resource expression mixes resource provenance")
+		}
+		if !merged.known {
+			continue
+		}
+		if _, consumed := state.consumedAt(merged.name); consumed {
+			state.bindTransferredResource(dst, merged.name)
+			continue
+		}
+		state.bindResource(dst, merged.name, true)
+	}
+	return nil
+}
+
+func recordTryCallThrowResourceSummary(
+	call *frontend.CallExpr,
+	sig FuncSig,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) error {
+	if state == nil || call == nil || len(sig.ThrowResourceSummary) == 0 || !typeContainsResourceHandle(sig.ThrowsType, types) {
+		return nil
+	}
+	summary := ReturnResourceSummary{}
+	for leaf, provenances := range sig.ThrowResourceSummary {
+		for _, provenance := range provenances {
+			source, err := resourceSourceForCallProvenance(call.Args, sig, provenance, funcs, types, module, imports, state, call.At)
+			if err != nil {
+				return err
+			}
+			if source.ambiguous {
+				return ownershipDiagnosticf(call.At, "resource expression mixes resource provenance")
+			}
+			if source.unknown || !source.known {
+				continue
+			}
+			paramIndex, paramPath, ok := state.resourceParamOwner(source.name)
+			if !ok {
+				continue
+			}
+			summary[leaf] = appendResourceProvenance(summary[leaf], ResourceProvenance{
+				ParamIndex: paramIndex,
+				ParamPath:  paramPath,
+			})
+		}
+	}
+	if len(summary) == 0 {
+		return nil
+	}
+	return state.recordThrowResourceSummary(summary, call.At)
+}
+
+func resourceSourceForExprLeaf(
+	expr frontend.Expr,
+	typeName string,
+	leaf string,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) (resourceSourceResult, error) {
+	if leaf == "" {
+		return resourceSourceForExpr(expr, funcs, module, imports, state)
+	}
+	if sourcePrefix, ok := resourcePathForExpr(expr); ok {
+		source := resourceSourceForPath(joinResourcePath(sourcePrefix, leaf), state)
+		if !source.known && !source.unknown {
+			if wrapped, handled, err := resourceSourceForOptionalWrappedLeaf(expr, typeName, leaf, funcs, types, module, imports, state); handled || err != nil {
+				return wrapped, err
+			}
+			return resourceSourceResult{unknown: true}, nil
+		}
+		return source, nil
+	}
+	switch e := expr.(type) {
+	case *frontend.TryExpr:
+		return resourceSourceForExprLeaf(e.X, typeName, leaf, funcs, types, module, imports, state)
+	case *frontend.AwaitExpr:
+		return resourceSourceForExprLeaf(e.X, typeName, leaf, funcs, types, module, imports, state)
+	case *frontend.StructLitExpr:
+		return resourceSourceForStructFieldLeaf(e.Fields, typeName, leaf, funcs, types, module, imports, state)
+	case *frontend.CallExpr:
+		if info, ok := types[typeName]; ok && info.Kind == TypeStruct && e.Name == typeName {
+			fields := make([]frontend.StructFieldInit, 0, len(info.Fields))
+			for i, field := range info.Fields {
+				if i >= len(e.Args) {
+					break
+				}
+				fields = append(fields, frontend.StructFieldInit{Name: field.Name, Value: e.Args[i]})
+			}
+			return resourceSourceForStructFieldLeaf(fields, typeName, leaf, funcs, types, module, imports, state)
+		}
+		if source, handled, err := resourceSourceForEnumConstructorLeaf(e, typeName, leaf, funcs, types, module, imports, state); handled || err != nil {
+			return source, err
+		}
+		resolved, err := resolveCheckedCallName(e.Name, funcs, module, imports, e.At)
+		if err != nil {
+			return resourceSourceResult{}, err
+		}
+		sig, ok := funcs[resolved]
+		if !ok {
+			return resourceSourceResult{}, nil
+		}
+		if sig.ReturnResourceParam == regionUnknown && len(sig.ReturnResourceSummary) == 0 {
+			return resourceSourceResult{unknown: true}, nil
+		}
+		provenances := sig.ReturnResourceSummary[leaf]
+		if len(provenances) == 0 {
+			return resourceSourceResult{}, nil
+		}
+		var merged resourceSourceResult
+		for i, provenance := range provenances {
+			source, err := resourceSourceForCallProvenance(e.Args, sig, provenance, funcs, types, module, imports, state, e.At)
+			if err != nil {
+				return resourceSourceResult{}, err
+			}
+			if i == 0 {
+				merged = source
+				continue
+			}
+			merged = mergeResourceSourceResults(merged, source)
+		}
+		return merged, nil
+	case *frontend.MatchExpr:
+		var merged resourceSourceResult
+		set := false
+		for _, c := range e.Cases {
+			source, err := resourceSourceForExprLeaf(c.Value, typeName, leaf, funcs, types, module, imports, state)
+			if err != nil {
+				return resourceSourceResult{}, err
+			}
+			if !set {
+				merged = source
+				set = true
+				continue
+			}
+			merged = mergeResourceSourceResults(merged, source)
+		}
+		return merged, nil
+	case *frontend.CatchExpr:
+		merged, err := resourceSourceForExprLeaf(e.Call, typeName, leaf, funcs, types, module, imports, state)
+		if err != nil {
+			return resourceSourceResult{}, err
+		}
+		for _, c := range e.Cases {
+			source, err := resourceSourceForExprLeaf(c.Value, typeName, leaf, funcs, types, module, imports, state)
+			if err != nil {
+				return resourceSourceResult{}, err
+			}
+			merged = mergeResourceSourceResults(merged, source)
+		}
+		return merged, nil
+	default:
+		return resourceSourceResult{}, nil
+	}
+}
+
+func resourceSourceForOptionalWrappedLeaf(
+	expr frontend.Expr,
+	typeName string,
+	leaf string,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) (resourceSourceResult, bool, error) {
+	info, ok := types[typeName]
+	if !ok || info.Kind != TypeOptional {
+		return resourceSourceResult{}, false, nil
+	}
+	tail, ok := resourceLeafTail(leaf, "$elem")
+	if !ok {
+		return resourceSourceResult{}, false, nil
+	}
+	source, err := resourceSourceForExprLeaf(expr, info.ElemType, tail, funcs, types, module, imports, state)
+	if err != nil {
+		return resourceSourceResult{}, true, err
+	}
+	if source.known || source.unknown || source.ambiguous {
+		return source, true, nil
+	}
+	return resourceSourceResult{}, false, nil
+}
+
+func resourceSourceForStructFieldLeaf(
+	fields []frontend.StructFieldInit,
+	typeName string,
+	leaf string,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) (resourceSourceResult, error) {
+	info, ok := types[typeName]
+	if !ok || info.Kind != TypeStruct {
+		return resourceSourceResult{}, nil
+	}
+	byName := make(map[string]frontend.Expr, len(fields))
+	for _, field := range fields {
+		byName[field.Name] = field.Value
+	}
+	for _, field := range info.Fields {
+		tail, ok := resourceLeafTail(leaf, field.Name)
+		if !ok {
+			continue
+		}
+		value := byName[field.Name]
+		if value == nil {
+			return resourceSourceResult{}, nil
+		}
+		return resourceSourceForExprLeaf(value, field.TypeName, tail, funcs, types, module, imports, state)
+	}
+	return resourceSourceResult{}, nil
+}
+
+func resourceSourceForEnumConstructorLeaf(
+	call *frontend.CallExpr,
+	typeName string,
+	leaf string,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) (resourceSourceResult, bool, error) {
+	info, ok := types[typeName]
+	if !ok || info.Kind != TypeEnum {
+		return resourceSourceResult{}, false, nil
+	}
+	caseType, caseInfo, found, err := resolveEnumCaseConstructorCall(call, types, module, imports)
+	if err != nil {
+		return resourceSourceResult{}, true, err
+	}
+	if !found || caseType != typeName {
+		return resourceSourceResult{}, false, nil
+	}
+	for i, payloadType := range caseInfo.PayloadTypes {
+		if i >= len(call.Args) {
+			break
+		}
+		tail, ok := resourceLeafTail(leaf, resourceEnumPayloadPath("", caseInfo.Ordinal, i))
+		if !ok {
+			continue
+		}
+		source, err := resourceSourceForExprLeaf(call.Args[i], payloadType, tail, funcs, types, module, imports, state)
+		return source, true, err
+	}
+	return resourceSourceResult{}, true, nil
+}
+
+func resourceLeafTail(leaf string, head string) (string, bool) {
+	if leaf == head {
+		return "", true
+	}
+	prefix := head + "."
+	if strings.HasPrefix(leaf, prefix) {
+		return strings.TrimPrefix(leaf, prefix), true
+	}
+	return "", false
+}
+
+func resourceSourceForCallProvenance(
+	args []frontend.Expr,
+	sig FuncSig,
+	provenance ResourceProvenance,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+	pos frontend.Position,
+) (resourceSourceResult, error) {
+	if provenance.ParamIndex < 0 || provenance.ParamIndex >= len(args) || provenance.ParamIndex >= len(sig.ParamTypes) {
+		return resourceSourceResult{}, fmt.Errorf("%s: invalid resource signature", frontend.FormatPos(pos))
+	}
+	if provenance.ParamPath == "" {
+		return resourceSourceForExpr(args[provenance.ParamIndex], funcs, module, imports, state)
+	}
+	return resourceSourceForExprLeaf(args[provenance.ParamIndex], sig.ParamTypes[provenance.ParamIndex], provenance.ParamPath, funcs, types, module, imports, state)
 }
 
 func resourceSourceForExpr(
@@ -4231,96 +7883,12 @@ func resolveCheckedCallName(name string, funcs map[string]FuncSig, module string
 	return resolveCallName(name, module, imports, pos)
 }
 
-func collectDeferCaptures(stmts []frontend.Stmt, locals map[string]LocalInfo) map[string]frontend.Position {
-	captures := make(map[string]frontend.Position)
-	collectStmtCaptures(stmts, locals, map[string]bool{}, captures)
-	return captures
-}
-
-func collectClosureCaptures(fn *frontend.FuncDecl, locals map[string]LocalInfo) map[string]frontend.Position {
-	captures := make(map[string]frontend.Position)
-	bound := make(map[string]bool, len(fn.Params))
-	for _, param := range fn.Params {
-		bound[param.Name] = true
+func paramDeclOwnership(params []frontend.ParamDecl) []string {
+	out := make([]string, 0, len(params))
+	for _, param := range params {
+		out = append(out, param.Ownership)
 	}
-	collectStmtCaptures(fn.Body, locals, bound, captures)
-	return captures
-}
-
-func validateFunctionTypeLiteralBinding(
-	name string,
-	declared frontend.TypeRef,
-	closure *frontend.ClosureExpr,
-	locals map[string]LocalInfo,
-	module string,
-	imports map[string]string,
-) error {
-	if declared.Kind != frontend.TypeRefFunction {
-		return nil
-	}
-	if closure == nil || closure.Decl == nil {
-		return fmt.Errorf("%s: function-typed local '%s' must be initialized with a non-capturing closure literal in this MVP", frontend.FormatPos(declared.At), name)
-	}
-	if len(closure.Decl.TypeParams) > 0 {
-		return fmt.Errorf("%s: generic closure literals are not supported for function-typed local '%s' in this MVP", frontend.FormatPos(closure.At), name)
-	}
-	if closure.Decl.HasThrows {
-		return fmt.Errorf("%s: throwing closure literals are not supported for function-typed local '%s' in this MVP", frontend.FormatPos(closure.At), name)
-	}
-	declaredEffects, err := functionTypeRefEffects(declared, declared.At)
-	if err != nil {
-		return err
-	}
-	closureEffects, err := normalizeEffects(closure.Decl.Uses, closure.Decl.Pos)
-	if err != nil {
-		return err
-	}
-	if err := validateFunctionTypeCallableEffects(declaredEffects, closureEffects, closure.At, "function-typed local", name); err != nil {
-		return err
-	}
-	if captured, pos, ok := firstCapture(collectClosureCaptures(closure.Decl, locals)); ok {
-		return unsupportedFunctionTypedCaptureError(pos, name, captured)
-	}
-	if len(declared.Params) != len(closure.Decl.Params) {
-		return fmt.Errorf("%s: function-typed local '%s' parameter count mismatch: expected %d, got %d", frontend.FormatPos(closure.At), name, len(declared.Params), len(closure.Decl.Params))
-	}
-	for i := range declared.Params {
-		want, err := resolveTypeName(&declared.Params[i], module, imports)
-		if err != nil {
-			return err
-		}
-		got, err := resolveTypeName(&closure.Decl.Params[i].Type, module, imports)
-		if err != nil {
-			return err
-		}
-		if want != got {
-			return fmt.Errorf("%s: function-typed local '%s' parameter %d type mismatch: expected '%s', got '%s'", frontend.FormatPos(closure.Decl.Params[i].At), name, i+1, want, got)
-		}
-	}
-	if declared.Return == nil {
-		return fmt.Errorf("%s: missing function return type", frontend.FormatPos(declared.At))
-	}
-	wantRet, err := resolveTypeName(declared.Return, module, imports)
-	if err != nil {
-		return err
-	}
-	gotRet, err := resolveTypeName(&closure.Decl.ReturnType, module, imports)
-	if err != nil {
-		return err
-	}
-	if wantRet != gotRet {
-		return fmt.Errorf("%s: function-typed local '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(closure.At), name, wantRet, gotRet)
-	}
-	return nil
-}
-
-func unsupportedFunctionTypedCaptureError(pos frontend.Position, localName, captured string) error {
-	return fmt.Errorf(
-		"%s: function-typed local '%s' captures '%s'; captures are not supported for function-typed values in this MVP (use a let-bound ptr closure and call it directly, or pass a non-capturing named function/closure symbol)",
-		frontend.FormatPos(pos),
-		localName,
-		captured,
-	)
+	return out
 }
 
 func validateFunctionTypeNamedSymbolBinding(
@@ -4330,61 +7898,1503 @@ func validateFunctionTypeNamedSymbolBinding(
 	locals map[string]LocalInfo,
 	globals map[string]GlobalInfo,
 	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
 	module string,
 	imports map[string]string,
+	allowCapturedAlias bool,
+	genericErrorOverride ...func(frontend.Position, string, string) error,
 ) (string, error) {
+	genericError := unsupportedGenericFunctionTypedLocalInitializerError
+	if len(genericErrorOverride) > 0 && genericErrorOverride[0] != nil {
+		genericError = genericErrorOverride[0]
+	}
 	if declared.Kind != frontend.TypeRefFunction {
 		return "", nil
 	}
 	if init == nil {
-		return "", fmt.Errorf("%s: function-typed local '%s' must be initialized with a named function/closure symbol in this MVP", frontend.FormatPos(declared.At), name)
+		return "", unsupportedFunctionTypedLocalInitializerSourceError(declared.At, name)
 	}
 	if localInfo, ok := locals[init.Name]; ok {
-		if !localInfo.FunctionTypeValue || localInfo.FunctionValue == "" || localInfo.Mutable {
-			return "", fmt.Errorf("%s: function-typed local '%s' must be initialized with an immutable symbol-backed function value or direct named function/closure symbol in this MVP", frontend.FormatPos(init.At), name)
+		if !localInfo.FunctionTypeValue && localInfo.FunctionValue != "" {
+			return validateFunctionTypeClosurePointerBinding(name, declared, init, localInfo, funcs, types, module, imports, genericError)
 		}
 		if len(localInfo.FunctionCaptures) > 0 {
-			return "", fmt.Errorf("%s: function-typed local '%s' aliases capturing function value '%s'; captures are not supported for function-typed values in this MVP", frontend.FormatPos(init.At), name, init.Name)
+			if !allowCapturedAlias {
+				return "", unsupportedFunctionTypedCaptureAliasError(init.At, name, init.Name)
+			}
+			captureSlots, err := functionCaptureSlotCount(localInfo.FunctionCaptures, types)
+			if err != nil {
+				return "", err
+			}
+			if captureSlots < 1 {
+				return "", unsupportedFunctionTypedStorageCaptureError(init.At, name, captureSlots)
+			}
+			if captureSlots > FnPtrEnvSlotCount && !localInfo.FunctionHandleValue {
+				if _, _, err := classifyCallableEscape(callableBoundaryLocal, localInfo.FunctionCaptures, types); err != nil {
+					return "", err
+				}
+			}
+			if !localInfo.FunctionTypeValue {
+				return "", unsupportedFunctionTypedCaptureAliasError(init.At, name, init.Name)
+			}
+		}
+		if !localInfo.FunctionTypeValue {
+			return "", unsupportedFunctionTypedLocalInitializerSourceError(init.At, name)
+		}
+		if localInfo.FunctionValue == "" {
+			validationSig := FuncSig{
+				ParamTypes:     append([]string(nil), localInfo.FunctionParamTypes...),
+				ParamOwnership: append([]string(nil), localInfo.FunctionParamOwnership...),
+				ReturnType:     localInfo.FunctionReturnType,
+				ThrowsType:     localInfo.FunctionThrowsType,
+				Effects:        append([]string(nil), localInfo.FunctionEffects...),
+			}
+			if err := validateFunctionTypeSymbolSignature(name, declared, validationSig, module, imports, init.At); err != nil {
+				return "", err
+			}
+			return "", nil
 		}
 		sig, ok := funcs[localInfo.FunctionValue]
 		if !ok {
 			return "", fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(init.At), localInfo.FunctionValue)
 		}
 		if localInfo.GenericFunctionValue || sig.Generic {
-			return "", fmt.Errorf("%s: generic function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), init.Name, name)
+			return "", genericError(init.At, init.Name, name)
 		}
-		if sig.ThrowsType != "" {
-			return "", fmt.Errorf("%s: throwing function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), init.Name, name)
+		if sig.ThrowsType != "" && localInfo.FunctionReturnType != "" && declared.Throws == nil {
+			return "", unsupportedThrowingFunctionTypedLocalInitializerError(init.At, init.Name, name)
+		}
+		validationSig := sig
+		if localInfo.FunctionReturnType != "" {
+			explicitSlots, err := functionParamSlotCount(localInfo.FunctionParamTypes, types)
+			if err != nil {
+				return "", err
+			}
+			hiddenSlots := sig.ParamSlots - explicitSlots
+			if hiddenSlots < 0 || (hiddenSlots > FnPtrEnvSlotCount && !localInfo.FunctionHandleValue) {
+				return "", unsupportedFunctionTypedCaptureAliasError(init.At, name, init.Name)
+			}
+			if hiddenSlots > 0 && !allowCapturedAlias {
+				return "", unsupportedFunctionTypedCaptureAliasError(init.At, name, init.Name)
+			}
+			validationSig.ParamTypes = append([]string(nil), localInfo.FunctionParamTypes...)
+			validationSig.ParamOwnership = append([]string(nil), localInfo.FunctionParamOwnership...)
+			validationSig.ReturnType = localInfo.FunctionReturnType
+		}
+		if err := validateFunctionTypeSymbolSignature(name, declared, validationSig, module, imports, init.At); err != nil {
+			return "", err
+		}
+		if localInfo.Mutable {
+			return "", nil
+		}
+		return localInfo.FunctionValue, nil
+	}
+	if globalInfo, ok := globals[init.Name]; ok {
+		if !globalInfo.FunctionTypeValue || globalInfo.FunctionValue == "" {
+			return "", unsupportedFunctionTypedLocalInitializerSourceError(init.At, name)
+		}
+		sig, ok := funcs[globalInfo.FunctionValue]
+		if !ok {
+			return "", fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(init.At), globalInfo.FunctionValue)
+		}
+		if sig.Generic {
+			return "", genericError(init.At, init.Name, name)
+		}
+		if sig.ThrowsType != "" && declared.Throws == nil {
+			return "", unsupportedThrowingFunctionTypedLocalInitializerError(init.At, init.Name, name)
 		}
 		if err := validateFunctionTypeSymbolSignature(name, declared, sig, module, imports, init.At); err != nil {
 			return "", err
 		}
-		return localInfo.FunctionValue, nil
-	}
-	if _, ok := globals[init.Name]; ok {
-		return "", fmt.Errorf("%s: function-typed local '%s' must be initialized with a named function/closure symbol in this MVP", frontend.FormatPos(init.At), name)
+		if globalInfo.Mutable {
+			return "", nil
+		}
+		return globalInfo.FunctionValue, nil
 	}
 	resolved, err := resolveCheckedCallName(init.Name, funcs, module, imports, init.At)
 	if err != nil {
-		return "", fmt.Errorf("%s: function-typed local '%s' must be initialized with a named function/closure symbol in this MVP", frontend.FormatPos(init.At), name)
+		return "", unsupportedFunctionTypedLocalInitializerSourceError(init.At, name)
 	}
 	sig, ok := funcs[resolved]
 	if !ok {
-		return "", fmt.Errorf("%s: function-typed local '%s' must be initialized with a named function/closure symbol in this MVP", frontend.FormatPos(init.At), name)
+		return "", unsupportedFunctionTypedLocalInitializerSourceError(init.At, name)
 	}
 	if err := ensureFuncVisible(resolved, sig, module, init.At); err != nil {
 		return "", err
 	}
 	if sig.Generic {
-		return "", fmt.Errorf("%s: generic function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), init.Name, name)
+		return "", genericError(init.At, init.Name, name)
 	}
-	if sig.ThrowsType != "" {
-		return "", fmt.Errorf("%s: throwing function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), init.Name, name)
+	if sig.ThrowsType != "" && declared.Throws == nil {
+		return "", unsupportedThrowingFunctionTypedLocalInitializerError(init.At, init.Name, name)
 	}
 	if err := validateFunctionTypeSymbolSignature(name, declared, sig, module, imports, init.At); err != nil {
 		return "", err
 	}
 	return resolved, nil
+}
+
+func validateFunctionTypeClosurePointerBinding(
+	name string,
+	declared frontend.TypeRef,
+	init *frontend.IdentExpr,
+	localInfo LocalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	genericError func(frontend.Position, string, string) error,
+) (string, error) {
+	if genericError == nil {
+		genericError = unsupportedGenericFunctionTypedLocalInitializerError
+	}
+	sig, ok := funcs[localInfo.FunctionValue]
+	if !ok {
+		return "", fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(init.At), localInfo.FunctionValue)
+	}
+	if localInfo.GenericFunctionValue || sig.Generic {
+		return "", genericError(init.At, init.Name, name)
+	}
+	if sig.ThrowsType != "" {
+		return "", unsupportedThrowingFunctionTypedLocalInitializerError(init.At, init.Name, name)
+	}
+	visibleSig := sig
+	if len(localInfo.FunctionCaptures) > 0 {
+		captureSlots, err := functionCaptureSlotCount(localInfo.FunctionCaptures, types)
+		if err != nil {
+			return "", err
+		}
+		if captureSlots < 1 {
+			return "", unsupportedFunctionTypedStorageCaptureError(init.At, name, captureSlots)
+		}
+		if captureSlots > FnPtrEnvSlotCount {
+			if _, _, err := classifyCallableEscape(callableBoundaryLocal, localInfo.FunctionCaptures, types); err != nil {
+				return "", err
+			}
+		}
+		paramTypes, returnType, _, err := functionTypeRefSignatureAndEffects(declared, module, imports)
+		if err != nil {
+			return "", err
+		}
+		explicitSlots, err := functionParamSlotCount(paramTypes, types)
+		if err != nil {
+			return "", err
+		}
+		if sig.ParamSlots-explicitSlots != captureSlots {
+			return "", unsupportedFunctionTypedCaptureAliasError(init.At, name, init.Name)
+		}
+		visibleSig.ParamTypes = paramTypes
+		visibleSig.ParamOwnership = functionTypeRefParamOwnership(declared)
+		visibleSig.ParamSlots = explicitSlots
+		visibleSig.ReturnType = returnType
+	}
+	if err := validateFunctionTypeSymbolSignature(name, declared, visibleSig, module, imports, init.At); err != nil {
+		return "", err
+	}
+	return localInfo.FunctionValue, nil
+}
+
+func validateFunctionTypeClosurePointerAssignment(
+	targetName string,
+	targetInfo LocalInfo,
+	init *frontend.IdentExpr,
+	sourceInfo LocalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	boundary callableEscapeBoundary,
+) (string, error) {
+	sig, ok := funcs[sourceInfo.FunctionValue]
+	if !ok {
+		return "", fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(init.At), sourceInfo.FunctionValue)
+	}
+	if sourceInfo.GenericFunctionValue || sig.Generic {
+		return "", unsupportedGenericFunctionTypedAssignmentError(init.At, init.Name, targetName)
+	}
+	if sig.ThrowsType != "" {
+		return "", unsupportedThrowingFunctionTypedAssignmentError(init.At, init.Name, targetName)
+	}
+	visibleSig := sig
+	if len(sourceInfo.FunctionCaptures) > 0 {
+		captureSlots, err := functionCaptureSlotCount(sourceInfo.FunctionCaptures, types)
+		if err != nil {
+			return "", err
+		}
+		if captureSlots < 1 {
+			return "", unsupportedFunctionTypedStorageCaptureError(init.At, targetName, captureSlots)
+		}
+		if captureSlots > FnPtrEnvSlotCount {
+			if _, _, err := classifyCallableEscape(boundary, sourceInfo.FunctionCaptures, types); err != nil {
+				return "", err
+			}
+		}
+		explicitSlots, err := functionParamSlotCount(targetInfo.FunctionParamTypes, types)
+		if err != nil {
+			return "", err
+		}
+		if sig.ParamSlots-explicitSlots != captureSlots {
+			return "", unsupportedFunctionTypedCaptureAliasError(init.At, targetName, init.Name)
+		}
+		visibleSig.ParamTypes = append([]string(nil), targetInfo.FunctionParamTypes...)
+		visibleSig.ParamOwnership = append([]string(nil), targetInfo.FunctionParamOwnership...)
+		visibleSig.ParamSlots = explicitSlots
+		visibleSig.ReturnType = targetInfo.FunctionReturnType
+	}
+	if err := validateFunctionInfoAssignable(targetName, targetInfo, visibleSig, init.At); err != nil {
+		return "", err
+	}
+	return sourceInfo.FunctionValue, nil
+}
+
+func validateFunctionTypedAssignmentValue(
+	targetName string,
+	targetInfo LocalInfo,
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	pos frontend.Position,
+	allowCapturedLocalStorage bool,
+	boundary callableEscapeBoundary,
+) error {
+	switch v := value.(type) {
+	case *frontend.ClosureExpr:
+		if err := validateFunctionTypedClosureAssignment(targetName, targetInfo, v, locals, funcs, types, module, imports, pos); err != nil {
+			return err
+		}
+		if allowCapturedLocalStorage && len(v.Captures) > 0 {
+			captureSlots, err := functionCaptureSlotCount(v.Captures, types)
+			if err != nil {
+				return err
+			}
+			if captureSlots > FnPtrEnvSlotCount {
+				if _, _, err := classifyCallableEscape(boundary, v.Captures, types); err != nil {
+					return err
+				}
+				return nil
+			}
+		}
+		if !allowCapturedLocalStorage && len(v.Captures) > 0 {
+			return unsupportedGlobalFunctionCaptureStorageError(v.At, targetName)
+		}
+		return nil
+	case *frontend.CallExpr:
+		return validateFunctionTypedReturnCallAssignment(targetName, targetInfo, v, locals, globals, funcs, types, module, imports, allowCapturedLocalStorage)
+	case *frontend.FieldAccessExpr:
+		fieldInfo, ok, err := resolveFunctionFieldArgument(v, locals)
+		if err != nil {
+			return err
+		}
+		if ok && !allowCapturedLocalStorage && (len(fieldInfo.FunctionCaptures) > 0 || len(fieldInfo.FunctionEscapeCaptures) > 0) {
+			return unsupportedGlobalFunctionCaptureStorageError(v.At, targetName)
+		}
+		if ok && !allowCapturedLocalStorage && fieldInfo.FunctionValue == "" && functionFieldInfoHasTargetSet(fieldInfo) {
+			if fieldInfo.FunctionParamName != "" {
+				return unsupportedGlobalFunctionParameterStorageError(v.At, targetName, fieldInfo.FunctionParamName)
+			}
+			return unsupportedGlobalFunctionCaptureStorageError(v.At, targetName)
+		}
+		if ok && fieldInfo.FunctionValue == "" && functionFieldInfoHasTargetSet(fieldInfo) && allowCapturedLocalStorage {
+			return validateFunctionInfoAssignable(targetName, targetInfo, functionFieldInfoSig(fieldInfo), v.At)
+		}
+		if !ok || fieldInfo.FunctionValue == "" {
+			if _, globalSig, globalOK, err := resolveFunctionTypedGlobalFieldAccess(v, globals, funcs); err != nil {
+				return err
+			} else if globalOK {
+				return validateFunctionInfoAssignable(targetName, targetInfo, globalSig, v.At)
+			}
+			return unsupportedFunctionTypedAssignmentSourceError(v.At, targetName)
+		}
+		fieldSig := FuncSig{
+			ParamTypes:     append([]string(nil), fieldInfo.FunctionParamTypes...),
+			ParamOwnership: append([]string(nil), fieldInfo.FunctionParamOwnership...),
+			ReturnType:     fieldInfo.FunctionReturnType,
+			ThrowsType:     fieldInfo.FunctionThrowsType,
+			Effects:        append([]string(nil), fieldInfo.FunctionEffects...),
+		}
+		return validateFunctionInfoAssignable(targetName, targetInfo, fieldSig, v.At)
+	}
+	id, ok := value.(*frontend.IdentExpr)
+	if !ok {
+		return unsupportedFunctionTypedAssignmentSourceError(value.Pos(), targetName)
+	}
+	if sourceInfo, ok := locals[id.Name]; ok {
+		if !allowCapturedLocalStorage && (len(sourceInfo.FunctionCaptures) > 0 || len(sourceInfo.FunctionEscapeCaptures) > 0) {
+			return unsupportedGlobalFunctionCaptureStorageError(id.At, targetName)
+		}
+		if !allowCapturedLocalStorage && sourceInfo.FunctionTypeValue && sourceInfo.FunctionValue == "" {
+			paramName := sourceInfo.FunctionParamName
+			if paramName == "" {
+				paramName = id.Name
+			}
+			return unsupportedGlobalFunctionParameterStorageError(id.At, targetName, paramName)
+		}
+		if !sourceInfo.FunctionTypeValue && sourceInfo.FunctionValue != "" {
+			if _, err := validateFunctionTypeClosurePointerAssignment(targetName, targetInfo, id, sourceInfo, funcs, types, boundary); err != nil {
+				return err
+			}
+			return nil
+		}
+		if sourceInfo.FunctionTypeValue && sourceInfo.FunctionValue == "" && allowCapturedLocalStorage {
+			sourceSig := FuncSig{
+				ParamTypes:     append([]string(nil), sourceInfo.FunctionParamTypes...),
+				ParamOwnership: append([]string(nil), sourceInfo.FunctionParamOwnership...),
+				ReturnType:     sourceInfo.FunctionReturnType,
+				ThrowsType:     sourceInfo.FunctionThrowsType,
+				Effects:        append([]string(nil), sourceInfo.FunctionEffects...),
+			}
+			return validateFunctionInfoAssignable(targetName, targetInfo, sourceSig, id.At)
+		}
+		if !sourceInfo.FunctionTypeValue || sourceInfo.FunctionValue == "" {
+			return unsupportedFunctionTypedAssignmentSourceError(id.At, targetName)
+		}
+		sourceSig := FuncSig{
+			ParamTypes:     append([]string(nil), sourceInfo.FunctionParamTypes...),
+			ParamOwnership: append([]string(nil), sourceInfo.FunctionParamOwnership...),
+			ReturnType:     sourceInfo.FunctionReturnType,
+			ThrowsType:     sourceInfo.FunctionThrowsType,
+			Effects:        append([]string(nil), sourceInfo.FunctionEffects...),
+		}
+		return validateFunctionInfoAssignable(targetName, targetInfo, sourceSig, id.At)
+	}
+	if globalInfo, ok := globals[id.Name]; ok {
+		if !globalInfo.FunctionTypeValue || globalInfo.FunctionValue == "" {
+			return unsupportedFunctionTypedAssignmentSourceError(id.At, targetName)
+		}
+		sig, ok := funcs[globalInfo.FunctionValue]
+		if !ok {
+			return fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(id.At), globalInfo.FunctionValue)
+		}
+		if sig.Generic {
+			return unsupportedGenericFunctionTypedAssignmentError(pos, id.Name, targetName)
+		}
+		return validateFunctionInfoAssignable(targetName, targetInfo, sig, id.At)
+	}
+	resolved, err := resolveCheckedCallName(id.Name, funcs, module, imports, id.At)
+	if err != nil {
+		return unsupportedFunctionTypedAssignmentSourceError(id.At, targetName)
+	}
+	sig, ok := funcs[resolved]
+	if !ok {
+		return unsupportedFunctionTypedAssignmentSourceError(id.At, targetName)
+	}
+	if err := ensureFuncVisible(resolved, sig, module, id.At); err != nil {
+		return err
+	}
+	if sig.Generic {
+		return unsupportedGenericFunctionTypedAssignmentError(pos, id.Name, targetName)
+	}
+	if err := validateFunctionInfoAssignable(targetName, targetInfo, sig, id.At); err != nil {
+		return err
+	}
+	id.Name = resolved
+	return nil
+}
+
+func allowCapturedGlobalFunctionSnapshot(value frontend.Expr, locals map[string]LocalInfo, types map[string]*TypeInfo) (bool, error) {
+	if closure, ok := value.(*frontend.ClosureExpr); ok {
+		if err := rejectMutableGlobalFunctionCaptures(closure.Captures, locals); err != nil {
+			return false, err
+		}
+		if _, _, err := classifyCallableEscape(callableBoundaryGlobal, closure.Captures, types); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if field, ok := value.(*frontend.FieldAccessExpr); ok {
+		fieldInfo, found, err := resolveFunctionFieldArgument(field, locals)
+		if err != nil || !found {
+			return false, err
+		}
+		return allowFunctionFieldGlobalSnapshot(fieldInfo, value.Pos(), locals, types)
+	}
+	id, ok := value.(*frontend.IdentExpr)
+	if !ok {
+		return false, nil
+	}
+	source, ok := locals[id.Name]
+	if !ok {
+		return false, nil
+	}
+	if source.FunctionParamName != "" || source.FunctionValue == "" {
+		return false, nil
+	}
+	if !source.FunctionTypeValue &&
+		len(source.FunctionCaptures) > 0 &&
+		len(source.FunctionEscapeCaptures) == 0 {
+		if err := rejectMutableGlobalFunctionCaptures(source.FunctionCaptures, locals); err != nil {
+			return false, err
+		}
+		captureSlots, err := functionCaptureSlotCount(source.FunctionCaptures, types)
+		if err != nil {
+			return false, err
+		}
+		if captureSlots < 1 {
+			return false, nil
+		}
+		if captureSlots > FnPtrEnvSlotCount {
+			if _, _, err := classifyCallableEscape(callableBoundaryGlobal, source.FunctionCaptures, types); err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	}
+	if source.FunctionTypeValue &&
+		source.FunctionDirectSnapshotAlias &&
+		len(source.FunctionCaptures) > 0 &&
+		len(source.FunctionEscapeCaptures) == 0 {
+		if err := rejectMutableGlobalFunctionCaptures(source.FunctionCaptures, locals); err != nil {
+			return false, err
+		}
+		captureSlots, err := functionCaptureSlotCount(source.FunctionCaptures, types)
+		if err != nil {
+			return false, err
+		}
+		if captureSlots < 1 {
+			return false, nil
+		}
+		if captureSlots > FnPtrEnvSlotCount {
+			if _, _, err := classifyCallableEscape(callableBoundaryGlobal, source.FunctionCaptures, types); err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	}
+	if source.FunctionTypeValue &&
+		source.FunctionReturnSnapshotAlias &&
+		len(source.FunctionCaptures) == 0 &&
+		len(source.FunctionEscapeCaptures) > 0 {
+		if err := rejectMutableGlobalFunctionCaptures(source.FunctionEscapeCaptures, locals); err != nil {
+			return false, err
+		}
+		captureSlots, err := functionCaptureSlotCount(source.FunctionEscapeCaptures, types)
+		if err != nil {
+			return false, err
+		}
+		if captureSlots < 1 {
+			return false, nil
+		}
+		if captureSlots > FnPtrEnvSlotCount {
+			if _, _, err := classifyCallableEscape(callableBoundaryGlobal, source.FunctionEscapeCaptures, types); err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func rejectMutableGlobalFunctionCaptures(captures []frontend.ClosureCapture, locals map[string]LocalInfo) error {
+	for _, capture := range captures {
+		if capture.Mutable {
+			return unsupportedGlobalFunctionMutableCaptureStorageError(capture.At, capture.Name)
+		}
+		if local, ok := locals[capture.Name]; ok && local.Mutable {
+			return unsupportedGlobalFunctionMutableCaptureStorageError(capture.At, capture.Name)
+		}
+	}
+	return nil
+}
+
+func allowFunctionFieldGlobalSnapshot(info FunctionFieldInfo, pos frontend.Position, locals map[string]LocalInfo, types map[string]*TypeInfo) (bool, error) {
+	if info.FunctionParamName != "" || info.FunctionValue == "" {
+		return false, nil
+	}
+	captures := info.FunctionEscapeCaptures
+	if !info.FunctionReturnSnapshotAlias && info.FunctionDirectSnapshotAlias {
+		captures = info.FunctionCaptures
+	}
+	if !info.FunctionReturnSnapshotAlias && !info.FunctionDirectSnapshotAlias {
+		return false, nil
+	}
+	if len(captures) == 0 {
+		return false, nil
+	}
+	if info.FunctionReturnSnapshotAlias && len(info.FunctionCaptures) != 0 {
+		return false, nil
+	}
+	if !info.FunctionReturnSnapshotAlias && len(info.FunctionEscapeCaptures) != 0 {
+		return false, nil
+	}
+	if err := rejectMutableGlobalFunctionCaptures(captures, locals); err != nil {
+		return false, err
+	}
+	captureSlots, err := functionCaptureSlotCount(captures, types)
+	if err != nil {
+		return false, err
+	}
+	if captureSlots < 1 {
+		return false, nil
+	}
+	if captureSlots > FnPtrEnvSlotCount {
+		if _, _, err := classifyCallableEscape(callableBoundaryGlobal, captures, types); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func unsupportedGlobalFunctionCaptureStorageError(pos frontend.Position, targetName string) error {
+	return lifetimeDiagnosticf(pos, "captured function value cannot be stored in global function-typed value '%s'; global escape requires a direct fnptr snapshot with known captures and bounded environment slots", targetName)
+}
+
+func unsupportedGlobalFunctionMutableCaptureStorageError(pos frontend.Position, captureName string) error {
+	return lifetimeDiagnosticf(pos, "global-escaped function value captures mutable local '%s'; mutable by-reference captures require a proven lifetime and synchronization model", captureName)
+}
+
+func unsupportedGlobalFunctionParameterStorageError(pos frontend.Position, targetName, paramName string) error {
+	return lifetimeDiagnosticf(pos, "function-typed parameter '%s' cannot be stored in global function-typed value '%s'; global escape requires a direct fnptr snapshot with known captures and bounded environment slots", paramName, targetName)
+}
+
+func functionParamNameForParam(name string, functionTypeValue bool) string {
+	if functionTypeValue {
+		return name
+	}
+	return ""
+}
+
+func functionAssignmentMetadata(
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	module string,
+	imports map[string]string,
+) (string, []frontend.ClosureCapture, []frontend.ClosureCapture, string) {
+	switch v := value.(type) {
+	case *frontend.ClosureExpr:
+		return closureFunctionValueName(v, funcs, module), append([]frontend.ClosureCapture(nil), v.Captures...), nil, ""
+	case *frontend.CallExpr:
+		if callSig, ok := funcs[v.Name]; ok {
+			return callSig.ReturnFunctionSymbol, nil, append([]frontend.ClosureCapture(nil), callSig.ReturnFunctionCaptures...), callSig.ReturnFunctionParamName
+		}
+	case *frontend.FieldAccessExpr:
+		if fieldInfo, ok, err := resolveFunctionFieldArgument(v, locals); err == nil && ok {
+			return fieldInfo.FunctionValue, append([]frontend.ClosureCapture(nil), fieldInfo.FunctionCaptures...), append([]frontend.ClosureCapture(nil), fieldInfo.FunctionEscapeCaptures...), fieldInfo.FunctionParamName
+		}
+		if globalInfo, _, ok, err := resolveFunctionTypedGlobalFieldAccess(v, globals, funcs); err == nil && ok {
+			return globalInfo.FunctionValue, nil, nil, ""
+		}
+	case *frontend.IdentExpr:
+		if sourceInfo, ok := locals[v.Name]; ok {
+			paramName := sourceInfo.FunctionParamName
+			if paramName == "" && sourceInfo.FunctionTypeValue && sourceInfo.FunctionValue == "" {
+				paramName = v.Name
+			}
+			return sourceInfo.FunctionValue, append([]frontend.ClosureCapture(nil), sourceInfo.FunctionCaptures...), append([]frontend.ClosureCapture(nil), sourceInfo.FunctionEscapeCaptures...), paramName
+		}
+		if globalInfo, ok := globals[v.Name]; ok {
+			return globalInfo.FunctionValue, nil, nil, ""
+		}
+		if resolved, err := resolveCheckedCallName(v.Name, funcs, module, imports, v.At); err == nil {
+			return resolved, nil, nil, ""
+		}
+	}
+	return "", nil, nil, ""
+}
+
+func functionDirectSnapshotAliasForExpr(value frontend.Expr, locals map[string]LocalInfo) bool {
+	switch v := value.(type) {
+	case *frontend.ClosureExpr:
+		return len(v.Captures) > 0
+	case *frontend.IdentExpr:
+		source, ok := locals[v.Name]
+		return ok && source.FunctionDirectSnapshotAlias
+	case *frontend.FieldAccessExpr:
+		fieldInfo, ok, err := resolveFunctionFieldArgument(v, locals)
+		return err == nil && ok && fieldInfo.FunctionDirectSnapshotAlias
+	default:
+		return false
+	}
+}
+
+func functionSymbolTouchesMutableGlobals(name string, funcs map[string]FuncSig) bool {
+	if name == "" {
+		return false
+	}
+	if sig, ok := funcs[name]; ok {
+		return sig.TouchesMutableGlobals
+	}
+	return false
+}
+
+func functionFieldInfoTouchesMutableGlobals(info FunctionFieldInfo, funcs map[string]FuncSig) bool {
+	return info.FunctionTouchesMutableGlobals || functionSymbolTouchesMutableGlobals(info.FunctionValue, funcs)
+}
+
+func functionAssignmentValueTouchesMutableGlobals(
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (bool, error) {
+	switch v := value.(type) {
+	case *frontend.ClosureExpr:
+		return functionSymbolTouchesMutableGlobals(closureFunctionValueName(v, funcs, module), funcs), nil
+	case *frontend.CallExpr:
+		if resolved, err := resolveCheckedCallName(v.Name, funcs, module, imports, v.At); err == nil {
+			v.Name = resolved
+		}
+		callSig, ok := funcs[v.Name]
+		if !ok || !callSig.ReturnFunctionType {
+			return false, nil
+		}
+		if callSig.ReturnFunctionTouchesMutableGlobals || functionSymbolTouchesMutableGlobals(callSig.ReturnFunctionSymbol, funcs) {
+			return true, nil
+		}
+		if callSig.ReturnFunctionParamName == "" {
+			return false, nil
+		}
+		returnInfo, found, err := functionTypedReturnParamRefMetadata(callSig, callSig.ReturnFunctionParamName, v, locals, globals, funcs, types, module, imports)
+		if err != nil || !found {
+			return false, err
+		}
+		return functionFieldInfoTouchesMutableGlobals(returnInfo, funcs), nil
+	case *frontend.FieldAccessExpr:
+		if fieldInfo, ok, err := resolveFunctionFieldArgument(v, locals); err != nil {
+			return false, err
+		} else if ok {
+			return functionFieldInfoTouchesMutableGlobals(fieldInfo, funcs), nil
+		}
+		if globalInfo, _, ok, err := resolveFunctionTypedGlobalFieldAccess(v, globals, funcs); err != nil {
+			return false, err
+		} else if ok {
+			return functionSymbolTouchesMutableGlobals(globalInfo.FunctionValue, funcs), nil
+		}
+	case *frontend.IdentExpr:
+		if sourceInfo, ok := locals[v.Name]; ok {
+			return sourceInfo.FunctionTouchesMutableGlobals || functionSymbolTouchesMutableGlobals(sourceInfo.FunctionValue, funcs), nil
+		}
+		if globalInfo, ok := globals[v.Name]; ok {
+			return functionSymbolTouchesMutableGlobals(globalInfo.FunctionValue, funcs), nil
+		}
+		if resolved, err := resolveCheckedCallName(v.Name, funcs, module, imports, v.At); err == nil {
+			return functionSymbolTouchesMutableGlobals(resolved, funcs), nil
+		}
+	}
+	return false, nil
+}
+
+func functionAssignmentMetadataWithReturnParamRefs(
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (string, []frontend.ClosureCapture, []frontend.ClosureCapture, string, error) {
+	functionValue, captures, escapeCaptures, functionParamName := functionAssignmentMetadata(value, locals, globals, funcs, module, imports)
+	call, ok := value.(*frontend.CallExpr)
+	if !ok {
+		return functionValue, captures, escapeCaptures, functionParamName, nil
+	}
+	if resolved, err := resolveCheckedCallName(call.Name, funcs, module, imports, call.At); err == nil {
+		call.Name = resolved
+	}
+	callSig, ok := funcs[call.Name]
+	if !ok || callSig.ReturnFunctionParamName == "" {
+		if ok && callSig.ReturnFunctionType && callSig.ReturnFunctionSymbol == "" {
+			fallbackValue, fallbackCaptures, fallbackEscapeCaptures, fallbackParamName, err := functionTypedReturnUnknownParamCaptureMetadata(callSig, call, locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return functionValue, captures, escapeCaptures, functionParamName, err
+			}
+			if len(fallbackCaptures) > 0 || len(fallbackEscapeCaptures) > 0 {
+				if fallbackValue != "" {
+					functionValue = fallbackValue
+				}
+				captures = append([]frontend.ClosureCapture(nil), fallbackCaptures...)
+				escapeCaptures = append(escapeCaptures, fallbackEscapeCaptures...)
+				functionParamName = fallbackParamName
+			}
+		}
+		return functionValue, captures, escapeCaptures, functionParamName, nil
+	}
+	returnInfo, found, err := functionTypedReturnParamRefMetadata(callSig, callSig.ReturnFunctionParamName, call, locals, globals, funcs, types, module, imports)
+	if err != nil || !found {
+		return functionValue, captures, escapeCaptures, functionParamName, err
+	}
+	if returnInfo.FunctionValue != "" {
+		functionValue = returnInfo.FunctionValue
+	}
+	functionParamName = returnInfo.FunctionParamName
+	captures = append([]frontend.ClosureCapture(nil), returnInfo.FunctionCaptures...)
+	escapeCaptures = append(escapeCaptures, returnInfo.FunctionEscapeCaptures...)
+	return functionValue, captures, escapeCaptures, functionParamName, nil
+}
+
+func functionTypedReturnUnknownParamCaptureMetadata(
+	callSig FuncSig,
+	call *frontend.CallExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (string, []frontend.ClosureCapture, []frontend.ClosureCapture, string, error) {
+	functionValue := ""
+	var captures []frontend.ClosureCapture
+	var escapeCaptures []frontend.ClosureCapture
+	functionParamName := ""
+	for i, functionParam := range callSig.ParamFunctionTypes {
+		if !functionParam || i >= len(call.Args) {
+			continue
+		}
+		argCaptures, argEscapeCaptures, err := functionTypedCallArgumentCaptureMetadata(callSig, i, call.Args[i], locals, globals, funcs, types, module, imports)
+		if err != nil {
+			return "", nil, nil, "", err
+		}
+		if len(argCaptures) == 0 && len(argEscapeCaptures) == 0 {
+			continue
+		}
+		argValue, _, _, argParamName := functionAssignmentMetadata(call.Args[i], locals, globals, funcs, module, imports)
+		if functionValue == "" {
+			functionValue = argValue
+		}
+		if functionParamName == "" {
+			functionParamName = argParamName
+		}
+		captures = append(captures, argCaptures...)
+		escapeCaptures = append(escapeCaptures, argEscapeCaptures...)
+	}
+	return functionValue, captures, escapeCaptures, functionParamName, nil
+}
+
+func updateFunctionTypedLocalAssignmentMetadata(
+	name string,
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) error {
+	localInfo, ok := locals[name]
+	if !ok {
+		return nil
+	}
+	functionValue, captures, escapeCaptures, functionParamName, err := functionAssignmentMetadataWithReturnParamRefs(value, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return err
+	}
+	escapeKind, handleValue, err := functionAssignmentEscapeMetadata(value, locals, funcs, types, module, imports, callableBoundaryLocal)
+	if err != nil {
+		return err
+	}
+	touchesMutableGlobals, err := functionAssignmentValueTouchesMutableGlobals(value, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return err
+	}
+	localInfo.FunctionValue = functionValue
+	localInfo.FunctionParamName = functionParamName
+	localInfo.FunctionCaptures = captures
+	localInfo.FunctionEscapeCaptures = escapeCaptures
+	localInfo.FunctionTouchesMutableGlobals = touchesMutableGlobals
+	localInfo.FunctionReturnSnapshotAlias = isFunctionReturnSnapshotAlias(value, funcs, captures, escapeCaptures, functionParamName)
+	localInfo.FunctionDirectSnapshotAlias = functionDirectSnapshotAliasForExpr(value, locals)
+	localInfo.FunctionEscapeKind = escapeKind
+	localInfo.FunctionHandleValue = handleValue
+	locals[name] = localInfo
+	return nil
+}
+
+func functionAssignmentEscapeMetadata(
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	boundary callableEscapeBoundary,
+) (CallableEscapeKind, bool, error) {
+	switch v := value.(type) {
+	case *frontend.ClosureExpr:
+		if len(v.Captures) == 0 {
+			return "", false, nil
+		}
+		captureSlots, err := functionCaptureSlotCount(v.Captures, types)
+		if err != nil {
+			return "", false, err
+		}
+		if captureSlots > FnPtrEnvSlotCount {
+			return classifyCallableEscape(boundary, v.Captures, types)
+		}
+	case *frontend.IdentExpr:
+		if source, ok := locals[v.Name]; ok {
+			return source.FunctionEscapeKind, source.FunctionHandleValue, nil
+		}
+	case *frontend.FieldAccessExpr:
+		fieldInfo, ok, err := resolveFunctionFieldArgument(v, locals)
+		if err != nil {
+			return "", false, err
+		}
+		if ok {
+			return fieldInfo.FunctionEscapeKind, fieldInfo.FunctionHandleValue, nil
+		}
+	case *frontend.CallExpr:
+		resolved, err := resolveCheckedCallName(v.Name, funcs, module, imports, v.At)
+		if err != nil {
+			return "", false, nil
+		}
+		if callSig, ok := funcs[resolved]; ok && callSig.ReturnFunctionHandleValue {
+			return callSig.ReturnFunctionEscapeKind, callSig.ReturnFunctionHandleValue, nil
+		}
+	}
+	return "", false, nil
+}
+
+func isFunctionReturnSnapshotAlias(
+	value frontend.Expr,
+	funcs map[string]FuncSig,
+	captures []frontend.ClosureCapture,
+	escapeCaptures []frontend.ClosureCapture,
+	functionParamName string,
+) bool {
+	call, ok := value.(*frontend.CallExpr)
+	if !ok {
+		return false
+	}
+	callSig, ok := funcs[call.Name]
+	return ok &&
+		callSig.ReturnFunctionType &&
+		callSig.ReturnFunctionParamName == "" &&
+		len(captures) == 0 &&
+		len(escapeCaptures) > 0 &&
+		functionParamName == ""
+}
+
+func updateFunctionTypedFieldAssignmentMetadata(
+	targetName string,
+	targetInfo LocalInfo,
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) error {
+	parts := strings.Split(targetName, ".")
+	if len(parts) < 2 {
+		return nil
+	}
+	base := parts[0]
+	fieldPath := strings.Join(parts[1:], ".")
+	localInfo, ok := locals[base]
+	if !ok {
+		return nil
+	}
+	if localInfo.FunctionFields == nil {
+		localInfo.FunctionFields = map[string]FunctionFieldInfo{}
+	}
+	functionValue, captures, escapeCaptures, functionParamName, err := functionAssignmentMetadataWithReturnParamRefs(value, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return err
+	}
+	escapeKind, handleValue, err := functionAssignmentEscapeMetadata(value, locals, funcs, types, module, imports, callableBoundaryStructField)
+	if err != nil {
+		return err
+	}
+	touchesMutableGlobals, err := functionAssignmentValueTouchesMutableGlobals(value, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return err
+	}
+	localInfo.FunctionFields[fieldPath] = FunctionFieldInfo{
+		FunctionValue:                 functionValue,
+		FunctionParamName:             functionParamName,
+		FunctionCaptures:              captures,
+		FunctionEscapeCaptures:        escapeCaptures,
+		FunctionTouchesMutableGlobals: touchesMutableGlobals,
+		FunctionReturnSnapshotAlias:   isFunctionReturnSnapshotAlias(value, funcs, captures, escapeCaptures, functionParamName),
+		FunctionDirectSnapshotAlias:   functionDirectSnapshotAliasForExpr(value, locals),
+		FunctionEscapeKind:            escapeKind,
+		FunctionHandleValue:           handleValue,
+		FunctionParamTypes:            append([]string(nil), targetInfo.FunctionParamTypes...),
+		FunctionParamOwnership:        append([]string(nil), targetInfo.FunctionParamOwnership...),
+		FunctionReturnType:            targetInfo.FunctionReturnType,
+		FunctionThrowsType:            targetInfo.FunctionThrowsType,
+		FunctionEffects:               append([]string(nil), targetInfo.FunctionEffects...),
+	}
+	locals[base] = localInfo
+	return nil
+}
+
+func updateFunctionTypedStructFieldAssignmentMetadata(
+	target frontend.Expr,
+	targetType string,
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) error {
+	base, fields, _, ok := splitFieldPath(target)
+	if !ok || len(fields) == 0 {
+		return nil
+	}
+	localInfo, ok := locals[base]
+	if !ok || !localInfo.Mutable {
+		return nil
+	}
+	fieldsForValue, err := functionFieldsFromReturnedStructExpr(targetType, value, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return err
+	}
+	prefix := strings.Join(fields, ".")
+	prefixWithDot := prefix + "."
+	hadExisting := false
+	for fieldName := range localInfo.FunctionFields {
+		if fieldName == prefix || strings.HasPrefix(fieldName, prefixWithDot) {
+			hadExisting = true
+			break
+		}
+	}
+	if len(fieldsForValue) == 0 && !hadExisting {
+		return nil
+	}
+	updated := cloneFunctionFieldMap(localInfo.FunctionFields)
+	if updated == nil {
+		updated = map[string]FunctionFieldInfo{}
+	}
+	for fieldName := range updated {
+		if fieldName == prefix || strings.HasPrefix(fieldName, prefixWithDot) {
+			delete(updated, fieldName)
+		}
+	}
+	for fieldName, fieldInfo := range fieldsForValue {
+		updated[prefixWithDot+fieldName] = cloneFunctionFieldInfo(fieldInfo)
+	}
+	localInfo.FunctionFields = updated
+	locals[base] = localInfo
+	return nil
+}
+
+func updateEnumPayloadStructFieldAssignmentMetadata(
+	target frontend.Expr,
+	targetType string,
+	value frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) error {
+	base, fields, _, ok := splitFieldPath(target)
+	if !ok || len(fields) == 0 {
+		return nil
+	}
+	localInfo, ok := locals[base]
+	if !ok || !localInfo.Mutable {
+		return nil
+	}
+	info, ok := types[targetType]
+	if !ok {
+		return nil
+	}
+	prefix := strings.Join(fields, ".")
+	updates := map[string]FunctionFieldInfo{}
+	switch info.Kind {
+	case TypeEnum:
+		payloads, err := enumPayloadFunctionsFromConstructor(info, value, locals, globals, funcs, types, module, imports)
+		if err != nil {
+			return err
+		}
+		if len(payloads) == 0 {
+			payloads = enumPayloadFunctionsFromAlias(value, locals)
+		}
+		if len(payloads) == 0 {
+			var err error
+			payloads, err = enumPayloadFunctionsFromReturnCall(value, locals, globals, funcs, types, module, imports, targetType)
+			if err != nil {
+				return err
+			}
+		}
+		for payloadKey, payload := range payloads {
+			updates[enumPayloadFieldKey(prefix, payloadKey)] = cloneFunctionFieldInfo(payload)
+		}
+	case TypeStruct:
+		fieldsForValue, err := enumPayloadFieldsFromReturnedStructExpr(targetType, value, locals, globals, funcs, types, module, imports)
+		if err != nil {
+			return err
+		}
+		for fieldName, fieldInfo := range fieldsForValue {
+			updates[prefix+"."+fieldName] = cloneFunctionFieldInfo(fieldInfo)
+		}
+	default:
+		return nil
+	}
+	hadExisting := false
+	for fieldName := range localInfo.EnumPayloadFields {
+		if enumPayloadFieldMatchesPrefix(fieldName, prefix) {
+			hadExisting = true
+			break
+		}
+	}
+	if len(updates) == 0 && !hadExisting {
+		return nil
+	}
+	updated := cloneFunctionFieldMap(localInfo.EnumPayloadFields)
+	if updated == nil {
+		updated = map[string]FunctionFieldInfo{}
+	}
+	for fieldName := range updated {
+		if enumPayloadFieldMatchesPrefix(fieldName, prefix) {
+			delete(updated, fieldName)
+		}
+	}
+	for fieldName, fieldInfo := range updates {
+		updated[fieldName] = cloneFunctionFieldInfo(fieldInfo)
+	}
+	localInfo.EnumPayloadFields = updated
+	locals[base] = localInfo
+	return nil
+}
+
+func validateFunctionTypedClosureAssignment(
+	targetName string,
+	targetInfo LocalInfo,
+	closure *frontend.ClosureExpr,
+	locals map[string]LocalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	pos frontend.Position,
+	contextOverride ...string,
+) error {
+	context := "function-typed assignment"
+	if len(contextOverride) > 0 && contextOverride[0] != "" {
+		context = contextOverride[0]
+	}
+	targetPhrase := functionTypedClosureAssignmentTargetPhrase(context, targetName)
+	if closure == nil || closure.Decl == nil {
+		return fmt.Errorf("%s: %s must use a closure literal with a body", frontend.FormatPos(pos), targetPhrase)
+	}
+	if len(closure.Decl.TypeParams) > 0 {
+		return fmt.Errorf("%s: generic closure literals are not supported for %s in this MVP", frontend.FormatPos(closure.At), targetPhrase)
+	}
+	explicitParams := explicitClosureParams(closure)
+	if len(explicitParams) != len(targetInfo.FunctionParamTypes) {
+		return fmt.Errorf("%s: %s parameter count mismatch: expected %d, got %d", frontend.FormatPos(closure.At), targetPhrase, len(targetInfo.FunctionParamTypes), len(explicitParams))
+	}
+	closureSig := FuncSig{
+		ParamTypes:     make([]string, 0, len(explicitParams)),
+		ParamOwnership: paramDeclOwnership(explicitParams),
+		ReturnType:     "",
+	}
+	for _, param := range explicitParams {
+		typeName, err := resolveTypeName(&param.Type, module, imports)
+		if err != nil {
+			return err
+		}
+		closureSig.ParamTypes = append(closureSig.ParamTypes, typeName)
+	}
+	returnType, err := resolveTypeName(&closure.Decl.ReturnType, module, imports)
+	if err != nil {
+		return err
+	}
+	closureSig.ReturnType = returnType
+	if closure.Decl.HasThrows {
+		throwsType, err := resolveTypeName(&closure.Decl.Throws, module, imports)
+		if err != nil {
+			return err
+		}
+		closureSig.ThrowsType = throwsType
+	}
+	closureEffects, err := normalizeEffects(closure.Decl.Uses, closure.Decl.Pos)
+	if err != nil {
+		return err
+	}
+	closureSig.Effects = closureEffects
+	if err := validateFunctionInfoAssignableWithContext(targetName, targetInfo, closureSig, closure.At, context); err != nil {
+		return err
+	}
+	return configureClosureCaptures(closure, locals, funcs, types, module, true, functionTypedClosureCaptureBoundaryPhrase(context, targetName))
+}
+
+func functionTypedClosureAssignmentTargetPhrase(context, targetName string) string {
+	if context == "" || context == "function-typed assignment" {
+		return fmt.Sprintf("function-typed assignment to '%s'", targetName)
+	}
+	return fmt.Sprintf("%s '%s'", context, targetName)
+}
+
+func functionTypedClosureCaptureBoundaryPhrase(context, targetName string) string {
+	if context == "callback argument" {
+		return fmt.Sprintf("callback argument '%s'", targetName)
+	}
+	if targetName == "return" {
+		return "function-typed return 'closure literal'"
+	}
+	if context == "" || context == "function-typed assignment" {
+		return fmt.Sprintf("function-typed storage '%s'", targetName)
+	}
+	return fmt.Sprintf("%s '%s'", context, targetName)
+}
+
+func validateFunctionTypedReturnCallAssignment(
+	targetName string,
+	targetInfo LocalInfo,
+	call *frontend.CallExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	allowCapturedLocalStorage bool,
+) error {
+	resolvedCall, err := resolveCheckedCallName(call.Name, funcs, module, imports, call.At)
+	if err != nil {
+		return unsupportedFunctionTypedAssignmentReturnCallSourceError(call.At, targetName, call.Name)
+	}
+	call.Name = resolvedCall
+	callSig, ok := funcs[resolvedCall]
+	if !ok || !callSig.ReturnFunctionType {
+		return unsupportedFunctionTypedAssignmentReturnCallSourceError(call.At, targetName, call.Name)
+	}
+	if callSig.ReturnFunctionSymbol != "" {
+		targetSig, ok := funcs[callSig.ReturnFunctionSymbol]
+		if !ok {
+			return fmt.Errorf("%s: unknown returned function symbol '%s'", frontend.FormatPos(call.At), callSig.ReturnFunctionSymbol)
+		}
+		if targetSig.Generic {
+			return unsupportedGenericFunctionTypedAssignmentError(call.At, callSig.ReturnFunctionSymbol, targetName)
+		}
+	}
+	if !allowCapturedLocalStorage && len(callSig.ReturnFunctionCaptures) > 0 {
+		if err := rejectMutableGlobalFunctionCaptures(callSig.ReturnFunctionCaptures, nil); err != nil {
+			return err
+		}
+		captureSlots, err := functionCaptureSlotCount(callSig.ReturnFunctionCaptures, types)
+		if err != nil {
+			return err
+		}
+		if captureSlots < 1 || captureSlots > FnPtrEnvSlotCount {
+			return unsupportedFunctionTypedStorageCaptureError(call.At, targetName, captureSlots)
+		}
+	}
+	if !allowCapturedLocalStorage && callSig.ReturnFunctionParamName != "" {
+		returnInfo, found, err := functionTypedReturnParamRefMetadata(callSig, callSig.ReturnFunctionParamName, call, locals, globals, funcs, types, module, imports)
+		if err != nil || !found {
+			return err
+		}
+		if returnInfo.FunctionParamName != "" {
+			return unsupportedGlobalFunctionParameterStorageError(call.At, targetName, returnInfo.FunctionParamName)
+		}
+		if len(returnInfo.FunctionCaptures) > 0 || len(returnInfo.FunctionEscapeCaptures) > 0 {
+			return unsupportedGlobalFunctionCaptureStorageError(call.At, targetName)
+		}
+		if returnInfo.FunctionValue == "" && strings.Contains(callSig.ReturnFunctionParamName, "#") {
+			return unsupportedGlobalFunctionParameterStorageError(call.At, targetName, callSig.ReturnFunctionParamName)
+		}
+	}
+	if !allowCapturedLocalStorage && callSig.ReturnFunctionSymbol == "" && callSig.ReturnFunctionParamName == "" {
+		for i, functionParam := range callSig.ParamFunctionTypes {
+			if !functionParam || i >= len(call.Args) {
+				continue
+			}
+			captured, err := functionTypedCallArgumentHasCaptures(callSig, i, call.Args[i], locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return err
+			}
+			if captured {
+				return unsupportedGlobalFunctionCaptureStorageError(call.At, targetName)
+			}
+		}
+	}
+	returnedSig := FuncSig{
+		ParamTypes:     append([]string(nil), callSig.ReturnFunctionParams...),
+		ParamOwnership: append([]string(nil), callSig.ReturnFunctionParamOwnership...),
+		ReturnType:     callSig.ReturnFunctionReturn,
+		ThrowsType:     callSig.ReturnFunctionThrows,
+		Effects:        append([]string(nil), callSig.ReturnFunctionEffects...),
+	}
+	return validateFunctionInfoAssignable(targetName, targetInfo, returnedSig, call.At)
+}
+
+func functionTypedCallArgumentHasCaptures(
+	callSig FuncSig,
+	index int,
+	arg frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (bool, error) {
+	captures, escapeCaptures, err := functionTypedCallArgumentCaptureMetadata(callSig, index, arg, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return false, err
+	}
+	return len(captures) > 0 || len(escapeCaptures) > 0, nil
+}
+
+func functionTypedReturnParamRefHasCaptures(
+	callSig FuncSig,
+	paramRef string,
+	call *frontend.CallExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (bool, error) {
+	captures, escapeCaptures, err := functionTypedReturnParamRefCaptureMetadata(callSig, paramRef, call, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return false, err
+	}
+	return len(captures) > 0 || len(escapeCaptures) > 0, nil
+}
+
+func functionTypedReturnParamRefCaptureMetadata(
+	callSig FuncSig,
+	paramRef string,
+	call *frontend.CallExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) ([]frontend.ClosureCapture, []frontend.ClosureCapture, error) {
+	info, ok, err := functionTypedReturnParamRefMetadata(callSig, paramRef, call, locals, globals, funcs, types, module, imports)
+	if err != nil || !ok {
+		return nil, nil, err
+	}
+	return append([]frontend.ClosureCapture(nil), info.FunctionCaptures...), append([]frontend.ClosureCapture(nil), info.FunctionEscapeCaptures...), nil
+}
+
+func functionTypedReturnParamRefMetadata(
+	callSig FuncSig,
+	paramRef string,
+	call *frontend.CallExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (FunctionFieldInfo, bool, error) {
+	if paramRef == "" {
+		return FunctionFieldInfo{}, false, nil
+	}
+	for i, name := range callSig.ParamNames {
+		if i >= len(call.Args) {
+			continue
+		}
+		if name == paramRef {
+			captures, escapeCaptures, err := functionTypedCallArgumentCaptureMetadata(callSig, i, call.Args[i], locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return FunctionFieldInfo{}, false, err
+			}
+			functionValue, _, _, functionParamName := functionAssignmentMetadata(call.Args[i], locals, globals, funcs, module, imports)
+			if functionValue == "" {
+				metadataValue, _, _, metadataParamName, err := functionAssignmentMetadataWithReturnParamRefs(call.Args[i], locals, globals, funcs, types, module, imports)
+				if err != nil {
+					return FunctionFieldInfo{}, false, err
+				}
+				functionValue = metadataValue
+				if functionParamName == "" {
+					functionParamName = metadataParamName
+				}
+			}
+			touchesMutableGlobals, err := functionAssignmentValueTouchesMutableGlobals(call.Args[i], locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return FunctionFieldInfo{}, false, err
+			}
+			return FunctionFieldInfo{
+				FunctionValue:                 functionValue,
+				FunctionParamName:             functionParamName,
+				FunctionCaptures:              captures,
+				FunctionEscapeCaptures:        escapeCaptures,
+				FunctionTouchesMutableGlobals: touchesMutableGlobals,
+			}, true, nil
+		}
+		payloadPrefix := name + "#"
+		if strings.HasPrefix(paramRef, payloadPrefix) {
+			payloadKey := strings.TrimPrefix(paramRef, payloadPrefix)
+			payloadInfo, ok, err := functionEnumPayloadInfoFromCallArgument(payloadKey, callSig, i, call.Args[i], locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return FunctionFieldInfo{}, false, err
+			}
+			if !ok {
+				return FunctionFieldInfo{}, false, nil
+			}
+			return payloadInfo, true, nil
+		}
+		prefix := name + "."
+		if !strings.HasPrefix(paramRef, prefix) {
+			continue
+		}
+		fieldPath := strings.TrimPrefix(paramRef, prefix)
+		fieldInfo, ok, err := functionFieldInfoFromCallArgument(fieldPath, callSig, i, call.Args[i], locals, globals, funcs, types, module, imports)
+		if err != nil {
+			return FunctionFieldInfo{}, false, err
+		}
+		if !ok {
+			return FunctionFieldInfo{}, false, nil
+		}
+		return fieldInfo, true, nil
+	}
+	return FunctionFieldInfo{}, false, nil
+}
+
+func functionFieldInfoFromCallArgument(
+	fieldPath string,
+	callSig FuncSig,
+	index int,
+	arg frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (FunctionFieldInfo, bool, error) {
+	fields := functionFieldsFromStructAlias(arg, locals)
+	if len(fields) == 0 && index >= 0 && index < len(callSig.ParamTypes) {
+		if info, ok := types[callSig.ParamTypes[index]]; ok && info.Kind == TypeStruct {
+			var err error
+			fields, err = functionFieldsFromStructLiteral("<argument>", info, arg, locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return FunctionFieldInfo{}, false, err
+			}
+		}
+	}
+	if len(fields) == 0 && index >= 0 && index < len(callSig.ParamTypes) {
+		var err error
+		fields, err = functionFieldsFromReturnCall(arg, locals, globals, funcs, types, module, imports, callSig.ParamTypes[index])
+		if err != nil {
+			return FunctionFieldInfo{}, false, err
+		}
+	}
+	if len(fields) == 0 {
+		return FunctionFieldInfo{}, false, nil
+	}
+	fieldInfo, ok := fields[fieldPath]
+	if !ok {
+		return FunctionFieldInfo{}, false, nil
+	}
+	return fieldInfo, true, nil
+}
+
+func functionEnumPayloadInfoFromCallArgument(
+	payloadKey string,
+	callSig FuncSig,
+	index int,
+	arg frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) (FunctionFieldInfo, bool, error) {
+	payloads := enumPayloadFunctionsFromAlias(arg, locals)
+	if len(payloads) == 0 && index >= 0 && index < len(callSig.ParamTypes) {
+		info, ok := types[callSig.ParamTypes[index]]
+		if ok && info.Kind == TypeEnum {
+			var err error
+			payloads, err = enumPayloadFunctionsFromConstructor(info, arg, locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return FunctionFieldInfo{}, false, err
+			}
+		}
+	}
+	if len(payloads) == 0 && index >= 0 && index < len(callSig.ParamTypes) {
+		var err error
+		payloads, err = enumPayloadFunctionsFromReturnCall(arg, locals, globals, funcs, types, module, imports, callSig.ParamTypes[index])
+		if err != nil {
+			return FunctionFieldInfo{}, false, err
+		}
+	}
+	if len(payloads) == 0 {
+		return FunctionFieldInfo{}, false, nil
+	}
+	payloadInfo, ok := payloads[payloadKey]
+	if !ok {
+		return FunctionFieldInfo{}, false, nil
+	}
+	return payloadInfo, true, nil
+}
+
+func functionTypedCallArgumentCaptureMetadata(
+	callSig FuncSig,
+	index int,
+	arg frontend.Expr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+) ([]frontend.ClosureCapture, []frontend.ClosureCapture, error) {
+	if closure, ok := arg.(*frontend.ClosureExpr); ok {
+		paramInfo := functionParamLocalInfo(callSig, index)
+		if err := validateFunctionTypedClosureAssignment("closure literal", paramInfo, closure, locals, funcs, types, module, imports, closure.At, "callback argument"); err != nil {
+			return nil, nil, err
+		}
+	}
+	if call, ok := arg.(*frontend.CallExpr); ok {
+		if resolved, err := resolveCheckedCallName(call.Name, funcs, module, imports, call.At); err == nil {
+			call.Name = resolved
+		}
+	}
+	_, captures, escapeCaptures, _, err := functionAssignmentMetadataWithReturnParamRefs(arg, locals, globals, funcs, types, module, imports)
+	if err != nil {
+		return nil, nil, err
+	}
+	return captures, escapeCaptures, nil
+}
+
+func validateFunctionInfoAssignable(targetName string, targetInfo LocalInfo, sig FuncSig, pos frontend.Position) error {
+	return validateFunctionInfoAssignableWithContext(targetName, targetInfo, sig, pos, "function-typed assignment")
+}
+
+func validateFunctionInfoAssignableWithContext(targetName string, targetInfo LocalInfo, sig FuncSig, pos frontend.Position, context string) error {
+	if len(targetInfo.FunctionParamTypes) != len(sig.ParamTypes) {
+		if context == "function-typed assignment" {
+			return fmt.Errorf("%s: function-typed assignment to '%s' parameter count mismatch: expected %d, got %d", frontend.FormatPos(pos), targetName, len(targetInfo.FunctionParamTypes), len(sig.ParamTypes))
+		}
+		return fmt.Errorf("%s: %s '%s' parameter count mismatch: expected %d, got %d", frontend.FormatPos(pos), context, targetName, len(targetInfo.FunctionParamTypes), len(sig.ParamTypes))
+	}
+	if err := validateFunctionTypeParamOwnership(targetInfo.FunctionParamOwnership, sig.ParamOwnership, len(targetInfo.FunctionParamTypes), pos, context, targetName); err != nil {
+		return err
+	}
+	for i := range targetInfo.FunctionParamTypes {
+		if targetInfo.FunctionParamTypes[i] != sig.ParamTypes[i] {
+			if context == "function-typed assignment" {
+				return fmt.Errorf("%s: function-typed assignment to '%s' parameter %d type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), targetName, i+1, targetInfo.FunctionParamTypes[i], sig.ParamTypes[i])
+			}
+			return fmt.Errorf("%s: %s '%s' parameter %d type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), context, targetName, i+1, targetInfo.FunctionParamTypes[i], sig.ParamTypes[i])
+		}
+	}
+	if targetInfo.FunctionReturnType != sig.ReturnType {
+		if context == "function-typed assignment" {
+			return fmt.Errorf("%s: function-typed assignment to '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), targetName, targetInfo.FunctionReturnType, sig.ReturnType)
+		}
+		return fmt.Errorf("%s: %s '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), context, targetName, targetInfo.FunctionReturnType, sig.ReturnType)
+	}
+	if targetInfo.FunctionThrowsType != sig.ThrowsType {
+		if context == "function-typed assignment" {
+			return fmt.Errorf("%s: function-typed assignment to '%s' throws type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), targetName, targetInfo.FunctionThrowsType, sig.ThrowsType)
+		}
+		return fmt.Errorf("%s: %s '%s' throws type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), context, targetName, targetInfo.FunctionThrowsType, sig.ThrowsType)
+	}
+	return validateFunctionTypeCallableEffects(targetInfo.FunctionEffects, sig.Effects, pos, context, targetName)
 }
 
 func validateFunctionTypeCallableEffects(declaredEffects []string, targetEffects []string, pos frontend.Position, context, rawName string) error {
@@ -4393,6 +9403,31 @@ func validateFunctionTypeCallableEffects(declaredEffects []string, targetEffects
 		return fmt.Errorf("%s: %s '%s' requires effects %s but function type does not declare them", frontend.FormatPos(pos), context, rawName, strings.Join(missing, ", "))
 	}
 	return nil
+}
+
+func validateFunctionTypeParamOwnership(expected []string, actual []string, count int, pos frontend.Position, context, rawName string) error {
+	for i := 0; i < count; i++ {
+		want := ownershipAt(expected, i)
+		got := ownershipAt(actual, i)
+		if want != got {
+			return ownershipDiagnosticf(pos, "%s '%s' parameter %d ownership mismatch: expected '%s', got '%s'", context, rawName, i+1, ownershipDisplay(want), ownershipDisplay(got))
+		}
+	}
+	return nil
+}
+
+func ownershipAt(ownership []string, index int) string {
+	if index < 0 || index >= len(ownership) {
+		return ""
+	}
+	return ownership[index]
+}
+
+func ownershipDisplay(ownership string) string {
+	if ownership == "" {
+		return "owned"
+	}
+	return ownership
 }
 
 func validateFunctionTypeSymbolSignature(
@@ -4405,6 +9440,9 @@ func validateFunctionTypeSymbolSignature(
 ) error {
 	if len(declared.Params) != len(sig.ParamTypes) {
 		return fmt.Errorf("%s: function-typed local '%s' parameter count mismatch: expected %d, got %d", frontend.FormatPos(pos), localName, len(declared.Params), len(sig.ParamTypes))
+	}
+	if err := validateFunctionTypeParamOwnership(functionTypeRefParamOwnership(declared), sig.ParamOwnership, len(declared.Params), pos, "function-typed local", localName); err != nil {
+		return err
 	}
 	for i := range declared.Params {
 		want, err := resolveTypeName(&declared.Params[i], module, imports)
@@ -4425,6 +9463,16 @@ func validateFunctionTypeSymbolSignature(
 	}
 	if wantRet != sig.ReturnType {
 		return fmt.Errorf("%s: function-typed local '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), localName, wantRet, sig.ReturnType)
+	}
+	wantThrows := ""
+	if declared.Throws != nil {
+		wantThrows, err = resolveTypeName(declared.Throws, module, imports)
+		if err != nil {
+			return err
+		}
+	}
+	if wantThrows != sig.ThrowsType {
+		return fmt.Errorf("%s: function-typed local '%s' throws type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), localName, wantThrows, sig.ThrowsType)
 	}
 	declaredEffects, err := functionTypeRefEffects(declared, declared.At)
 	if err != nil {
@@ -4448,6 +9496,9 @@ func validateReturnedFunctionSignature(
 	if len(callerSig.ReturnFunctionParams) != len(returnedSig.ParamTypes) {
 		return fmt.Errorf("%s: returned function symbol '%s' has incompatible parameter count: expected %d, got %d", frontend.FormatPos(pos), rawName, len(callerSig.ReturnFunctionParams), len(returnedSig.ParamTypes))
 	}
+	if err := validateFunctionTypeParamOwnership(callerSig.ReturnFunctionParamOwnership, returnedSig.ParamOwnership, len(callerSig.ReturnFunctionParams), pos, "returned function symbol", rawName); err != nil {
+		return err
+	}
 	for i := range callerSig.ReturnFunctionParams {
 		if callerSig.ReturnFunctionParams[i] != returnedSig.ParamTypes[i] {
 			return fmt.Errorf(
@@ -4467,6 +9518,15 @@ func validateReturnedFunctionSignature(
 			rawName,
 			callerSig.ReturnFunctionReturn,
 			returnedSig.ReturnType,
+		)
+	}
+	if callerSig.ReturnFunctionThrows != returnedSig.ThrowsType {
+		return fmt.Errorf(
+			"%s: returned function symbol '%s' throws type mismatch: expected '%s', got '%s'",
+			frontend.FormatPos(pos),
+			rawName,
+			callerSig.ReturnFunctionThrows,
+			returnedSig.ThrowsType,
 		)
 	}
 	if err := validateFunctionTypeCallableEffects(callerSig.ReturnFunctionEffects, returnedSig.Effects, pos, "returned function symbol", rawName); err != nil {
@@ -4497,6 +9557,15 @@ func functionTypeRefSignature(ref frontend.TypeRef, module string, imports map[s
 	return paramTypes, retType, nil
 }
 
+func functionTypeRefParamOwnership(ref frontend.TypeRef) []string {
+	if ref.Kind != frontend.TypeRefFunction {
+		return nil
+	}
+	out := make([]string, len(ref.Params))
+	copy(out, ref.ParamOwnership)
+	return out
+}
+
 func functionTypeRefEffects(ref frontend.TypeRef, pos frontend.Position) ([]string, error) {
 	if ref.Kind != frontend.TypeRefFunction {
 		return nil, nil
@@ -4516,261 +9585,11 @@ func functionTypeRefSignatureAndEffects(ref frontend.TypeRef, module string, imp
 	return params, ret, effects, nil
 }
 
-func configureClosureCaptures(
-	closure *frontend.ClosureExpr,
-	locals map[string]LocalInfo,
-	funcs map[string]FuncSig,
-	types map[string]*TypeInfo,
-	module string,
-) error {
-	if closure == nil || closure.Decl == nil || len(closure.Captures) > 0 {
-		return nil
+func functionTypeRefThrowsType(ref frontend.TypeRef, module string, imports map[string]string) (string, error) {
+	if ref.Kind != frontend.TypeRefFunction || ref.Throws == nil {
+		return "", nil
 	}
-	capturePositions := collectClosureCaptures(closure.Decl, locals)
-	if len(capturePositions) == 0 {
-		return nil
-	}
-	fullName := qualifyName(module, closure.Name)
-	sig, ok := funcs[fullName]
-	if !ok {
-		return fmt.Errorf("%s: internal error: closure function '%s' is missing from signature table", frontend.FormatPos(closure.At), fullName)
-	}
-	captures := make([]frontend.ClosureCapture, 0, len(capturePositions))
-	captureParamSlots := 0
-	for len(capturePositions) > 0 {
-		name, pos, _ := firstCapture(capturePositions)
-		delete(capturePositions, name)
-		info, ok := locals[name]
-		if !ok {
-			return fmt.Errorf("%s: internal error: closure capture '%s' is missing from locals", frontend.FormatPos(pos), name)
-		}
-		if info.Mutable {
-			return fmt.Errorf("%s: closure capture '%s' is mutable; %s", frontend.FormatPos(pos), name, closureCaptureSupportedSubsetText())
-		}
-		if !isClosureCaptureType(info.TypeName, types) {
-			return fmt.Errorf("%s: closure capture '%s' has unsupported type '%s'; %s", frontend.FormatPos(pos), name, info.TypeName, closureCaptureSupportedSubsetText())
-		}
-		typeRef := frontend.TypeRef{At: pos, Kind: frontend.TypeRefNamed, Name: info.TypeName}
-		captures = append(captures, frontend.ClosureCapture{At: pos, Name: name, Type: typeRef})
-		closure.Decl.Params = append(closure.Decl.Params, frontend.ParamDecl{At: pos, Name: name, Type: typeRef})
-		sig.ParamNames = append(sig.ParamNames, name)
-		sig.ParamTypes = append(sig.ParamTypes, info.TypeName)
-		sig.ParamOwnership = append(sig.ParamOwnership, "")
-		captureParamSlots += info.SlotCount
-	}
-	sig.ParamSlots += captureParamSlots
-	funcs[fullName] = sig
-	closure.Captures = captures
-	return nil
-}
-
-func closureCaptureSupportedSubsetText() string {
-	return "only immutable local Int/Bool/String and simple struct captures without ptr/resource fields are supported in this MVP"
-}
-
-func closureLiteralDirectCallCaptureText() string {
-	return "only local direct calls can capture immutable Int/Bool/String values and simple structs without ptr/resource fields in this MVP"
-}
-
-func isClosureCaptureType(typeName string, types map[string]*TypeInfo) bool {
-	return isClosureCaptureTypeVisiting(typeName, types, map[string]bool{})
-}
-
-func isClosureCaptureTypeVisiting(typeName string, types map[string]*TypeInfo, visiting map[string]bool) bool {
-	info, ok := types[typeName]
-	if !ok {
-		return false
-	}
-	switch info.Kind {
-	case TypeI32, TypeBool:
-		return info.SlotCount == 1
-	case TypeStr:
-		return true
-	case TypeStruct:
-		if visiting[typeName] {
-			return false
-		}
-		visiting[typeName] = true
-		defer delete(visiting, typeName)
-		for _, field := range info.Fields {
-			if field.TypeName == "ptr" || typeContainsResourceHandle(field.TypeName, types) {
-				return false
-			}
-			if !isClosureCaptureTypeVisiting(field.TypeName, types, visiting) {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
-	}
-}
-
-func appendClosureCaptureArgs(call *frontend.CallExpr, local LocalInfo) error {
-	if len(local.FunctionCaptures) == 0 {
-		return nil
-	}
-	if len(call.ArgLabels) > 0 {
-		return fmt.Errorf("%s: capturing closure '%s' calls do not support argument labels in this MVP", frontend.FormatPos(call.At), call.Name)
-	}
-	for _, capture := range local.FunctionCaptures {
-		call.Args = append(call.Args, &frontend.IdentExpr{At: capture.At, Name: capture.Name})
-	}
-	return nil
-}
-
-func firstCapture(captures map[string]frontend.Position) (string, frontend.Position, bool) {
-	firstName := ""
-	firstPos := frontend.Position{}
-	for name, pos := range captures {
-		if firstName == "" ||
-			pos.Line < firstPos.Line ||
-			(pos.Line == firstPos.Line && pos.Col < firstPos.Col) ||
-			(pos.Line == firstPos.Line && pos.Col == firstPos.Col && name < firstName) {
-			firstName = name
-			firstPos = pos
-		}
-	}
-	return firstName, firstPos, firstName != ""
-}
-
-func collectStmtCaptures(stmts []frontend.Stmt, locals map[string]LocalInfo, bound map[string]bool, captures map[string]frontend.Position) {
-	for _, stmt := range stmts {
-		switch s := stmt.(type) {
-		case *frontend.PrintStmt:
-			collectExprCaptures(s.Value, locals, bound, captures)
-		case *frontend.ExpectStmt:
-			collectExprCaptures(s.Cond, locals, bound, captures)
-		case *frontend.ReturnStmt:
-			collectExprCaptures(s.Value, locals, bound, captures)
-		case *frontend.ThrowStmt:
-			collectExprCaptures(s.Value, locals, bound, captures)
-		case *frontend.FreeStmt:
-			collectExprCaptures(s.Value, locals, bound, captures)
-		case *frontend.LetStmt:
-			collectExprCaptures(s.Value, locals, bound, captures)
-			bound[s.Name] = true
-		case *frontend.AssignStmt:
-			collectExprCaptures(s.Target, locals, bound, captures)
-			collectExprCaptures(s.Value, locals, bound, captures)
-		case *frontend.IfStmt:
-			collectExprCaptures(s.Cond, locals, bound, captures)
-			collectStmtCaptures(s.Then, locals, cloneBoolMap(bound), captures)
-			collectStmtCaptures(s.Else, locals, cloneBoolMap(bound), captures)
-		case *frontend.IfLetStmt:
-			collectExprCaptures(s.Value, locals, bound, captures)
-			thenBound := cloneBoolMap(bound)
-			addPatternCaptureBindings(s.Pattern, s.Name, thenBound)
-			collectStmtCaptures(s.Then, locals, thenBound, captures)
-			collectStmtCaptures(s.Else, locals, cloneBoolMap(bound), captures)
-		case *frontend.WhileStmt:
-			collectExprCaptures(s.Cond, locals, bound, captures)
-			collectStmtCaptures(s.Body, locals, cloneBoolMap(bound), captures)
-		case *frontend.ForRangeStmt:
-			if s.Iterable != nil {
-				collectExprCaptures(s.Iterable, locals, bound, captures)
-			} else {
-				collectExprCaptures(s.Start, locals, bound, captures)
-				collectExprCaptures(s.End, locals, bound, captures)
-			}
-			bodyBound := cloneBoolMap(bound)
-			bodyBound[s.Name] = true
-			collectStmtCaptures(s.Body, locals, bodyBound, captures)
-		case *frontend.MatchStmt:
-			collectExprCaptures(s.Value, locals, bound, captures)
-			for _, c := range s.Cases {
-				caseBound := cloneBoolMap(bound)
-				addPatternCaptureBindings(c.Pattern, "", caseBound)
-				if c.Guard != nil {
-					collectExprCaptures(c.Guard, locals, caseBound, captures)
-				}
-				collectStmtCaptures(c.Body, locals, caseBound, captures)
-			}
-		case *frontend.IslandStmt:
-			collectExprCaptures(s.Size, locals, bound, captures)
-			bodyBound := cloneBoolMap(bound)
-			bodyBound[s.Name] = true
-			collectStmtCaptures(s.Body, locals, bodyBound, captures)
-		case *frontend.UnsafeStmt:
-			collectStmtCaptures(s.Body, locals, cloneBoolMap(bound), captures)
-		case *frontend.DeferStmt:
-			collectStmtCaptures(s.Body, locals, cloneBoolMap(bound), captures)
-		case *frontend.ExprStmt:
-			collectExprCaptures(s.Expr, locals, bound, captures)
-		}
-	}
-}
-
-func collectExprCaptures(expr frontend.Expr, locals map[string]LocalInfo, bound map[string]bool, captures map[string]frontend.Position) {
-	if expr == nil {
-		return
-	}
-	switch e := expr.(type) {
-	case *frontend.IdentExpr:
-		if _, ok := locals[e.Name]; ok && !bound[e.Name] {
-			if _, exists := captures[e.Name]; !exists {
-				captures[e.Name] = e.At
-			}
-		}
-	case *frontend.FieldAccessExpr:
-		collectExprCaptures(e.Base, locals, bound, captures)
-	case *frontend.IndexExpr:
-		collectExprCaptures(e.Base, locals, bound, captures)
-		collectExprCaptures(e.Index, locals, bound, captures)
-	case *frontend.BinaryExpr:
-		collectExprCaptures(e.Left, locals, bound, captures)
-		collectExprCaptures(e.Right, locals, bound, captures)
-	case *frontend.UnaryExpr:
-		collectExprCaptures(e.X, locals, bound, captures)
-	case *frontend.TryExpr:
-		collectExprCaptures(e.X, locals, bound, captures)
-	case *frontend.AwaitExpr:
-		collectExprCaptures(e.X, locals, bound, captures)
-	case *frontend.CallExpr:
-		for _, arg := range e.Args {
-			collectExprCaptures(arg, locals, bound, captures)
-		}
-	case *frontend.StructLitExpr:
-		for _, field := range e.Fields {
-			collectExprCaptures(field.Value, locals, bound, captures)
-		}
-	case *frontend.MatchExpr:
-		collectExprCaptures(e.Value, locals, bound, captures)
-		for _, c := range e.Cases {
-			caseBound := cloneBoolMap(bound)
-			addPatternCaptureBindings(c.Pattern, "", caseBound)
-			if c.Guard != nil {
-				collectExprCaptures(c.Guard, locals, caseBound, captures)
-			}
-			collectExprCaptures(c.Value, locals, caseBound, captures)
-		}
-	case *frontend.CatchExpr:
-		collectExprCaptures(e.Call, locals, bound, captures)
-		for _, c := range e.Cases {
-			caseBound := cloneBoolMap(bound)
-			addPatternCaptureBindings(c.Pattern, "", caseBound)
-			if c.Guard != nil {
-				collectExprCaptures(c.Guard, locals, caseBound, captures)
-			}
-			collectExprCaptures(c.Value, locals, caseBound, captures)
-		}
-	}
-}
-
-func addPatternCaptureBindings(pattern frontend.Expr, name string, bound map[string]bool) {
-	if name != "" {
-		bound[name] = true
-	}
-	switch p := pattern.(type) {
-	case *frontend.IdentExpr:
-		bound[p.Name] = true
-	case *frontend.SomePatternExpr:
-		bound[p.Name] = true
-	case *frontend.EnumCasePatternExpr:
-		for _, binding := range p.Bindings {
-			bound[binding] = true
-		}
-	}
+	return resolveTypeName(ref.Throws, module, imports)
 }
 
 func cloneBoolMap(src map[string]bool) map[string]bool {
@@ -4782,6 +9601,176 @@ func cloneBoolMap(src map[string]bool) map[string]bool {
 		dst[k] = v
 	}
 	return dst
+}
+
+func borrowedPtrOwnerFromExpr(expr frontend.Expr, state *regionState, borrowedParams map[string]struct{}) (string, bool) {
+	id, ok := expr.(*frontend.IdentExpr)
+	if ok {
+		if _, borrowed := borrowedParams[id.Name]; borrowed {
+			return id.Name, true
+		}
+		if owner, borrowed := state.borrowedPtrAliasOwner(id.Name); borrowed {
+			return owner, true
+		}
+	}
+	if path, ok := resourcePathForExpr(expr); ok {
+		if owner, borrowed := state.borrowedPtrAliasOwnerInTree(path); borrowed {
+			return owner, true
+		}
+	}
+	if field, ok := expr.(*frontend.FieldAccessExpr); ok {
+		if owner, borrowed := borrowedPtrOwnerFromExpr(field.Base, state, borrowedParams); borrowed {
+			return owner, true
+		}
+	}
+	if index, ok := expr.(*frontend.IndexExpr); ok {
+		if owner, borrowed := borrowedPtrOwnerFromExpr(index.Base, state, borrowedParams); borrowed {
+			return owner, true
+		}
+		if source, ok := resourcePathForExpr(index.Base); ok {
+			if owner, borrowed := state.borrowedPtrAliasOwnerInTree(source); borrowed {
+				return owner, true
+			}
+		}
+	}
+	return "", false
+}
+
+func bindBorrowedPtrAliasFromExpr(name string, typeName string, expr frontend.Expr, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, borrowedParams map[string]struct{}) {
+	if state == nil || name == "" {
+		return
+	}
+	state.clearBorrowedPtrAliasTree(name)
+	if typeName == "ptr" {
+		if owner, borrowed := borrowedPtrOwnerFromExpr(expr, state, borrowedParams); borrowed {
+			state.bindBorrowedPtrAlias(name, owner)
+		}
+		return
+	}
+	if owner, borrowed := borrowedPtrOwnerFromExpr(expr, state, borrowedParams); borrowed {
+		if typeMayContainPtr(typeName, types) {
+			state.bindBorrowedPtrAlias(name, owner)
+		}
+	}
+	if !typeMayContainPtr(typeName, types) {
+		return
+	}
+	if info, ok := types[typeName]; ok && info.Kind == TypeOptional {
+		bindBorrowedPtrAliasFromExpr(resourceFieldPath(name, "$elem"), info.ElemType, expr, types, module, imports, state, borrowedParams)
+		return
+	}
+	if sourcePath, ok := resourcePathForExpr(expr); ok {
+		prefix := sourcePath + "."
+		for path, owner := range state.borrowedPtrAliases {
+			if owner == "" || !strings.HasPrefix(path, prefix) {
+				continue
+			}
+			suffix := strings.TrimPrefix(path, prefix)
+			state.bindBorrowedPtrAlias(joinResourcePath(name, suffix), owner)
+		}
+		return
+	}
+	info, ok := types[typeName]
+	if !ok {
+		return
+	}
+	if info.Kind == TypeEnum {
+		call, ok := expr.(*frontend.CallExpr)
+		if !ok {
+			return
+		}
+		enumType, caseInfo, found, err := resolveEnumCaseConstructorCall(call, types, module, imports)
+		if err != nil || !found || enumType != typeName {
+			return
+		}
+		for i, arg := range call.Args {
+			if i >= len(caseInfo.PayloadTypes) {
+				break
+			}
+			bindBorrowedPtrAliasFromExpr(resourceEnumPayloadPath(name, caseInfo.Ordinal, i), caseInfo.PayloadTypes[i], arg, types, module, imports, state, borrowedParams)
+		}
+		return
+	}
+	if info.Kind != TypeStruct {
+		return
+	}
+	fieldTypes := make(map[string]string, len(info.Fields))
+	for _, field := range info.Fields {
+		fieldTypes[field.Name] = field.TypeName
+	}
+	lit, ok := expr.(*frontend.StructLitExpr)
+	if lit != nil {
+		for _, field := range lit.Fields {
+			fieldType, ok := fieldTypes[field.Name]
+			if !ok {
+				continue
+			}
+			bindBorrowedPtrAliasFromExpr(joinResourcePath(name, field.Name), fieldType, field.Value, types, module, imports, state, borrowedParams)
+		}
+		return
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || len(call.Args) == 0 || len(call.ArgLabels) != len(call.Args) {
+		return
+	}
+	for i, arg := range call.Args {
+		label := call.ArgLabels[i]
+		if label == "" {
+			return
+		}
+		fieldType, ok := fieldTypes[label]
+		if !ok {
+			continue
+		}
+		bindBorrowedPtrAliasFromExpr(joinResourcePath(name, label), fieldType, arg, types, module, imports, state, borrowedParams)
+	}
+}
+
+func compoundIndexTargetHasSideEffects(expr frontend.Expr) bool {
+	switch e := expr.(type) {
+	case *frontend.IndexExpr:
+		return exprMayHaveRuntimeSideEffects(e.Base) || exprMayHaveRuntimeSideEffects(e.Index)
+	case *frontend.FieldAccessExpr:
+		return compoundIndexTargetHasSideEffects(e.Base)
+	default:
+		return false
+	}
+}
+
+func exprMayHaveRuntimeSideEffects(expr frontend.Expr) bool {
+	switch e := expr.(type) {
+	case nil:
+		return false
+	case *frontend.CallExpr, *frontend.TryExpr, *frontend.AwaitExpr, *frontend.CatchExpr:
+		return true
+	case *frontend.FieldAccessExpr:
+		return exprMayHaveRuntimeSideEffects(e.Base)
+	case *frontend.IndexExpr:
+		return exprMayHaveRuntimeSideEffects(e.Base) || exprMayHaveRuntimeSideEffects(e.Index)
+	case *frontend.UnaryExpr:
+		return exprMayHaveRuntimeSideEffects(e.X)
+	case *frontend.BinaryExpr:
+		return exprMayHaveRuntimeSideEffects(e.Left) || exprMayHaveRuntimeSideEffects(e.Right)
+	case *frontend.StructLitExpr:
+		for _, field := range e.Fields {
+			if exprMayHaveRuntimeSideEffects(field.Value) {
+				return true
+			}
+		}
+		return false
+	case *frontend.MatchExpr:
+		if exprMayHaveRuntimeSideEffects(e.Value) {
+			return true
+		}
+		for _, c := range e.Cases {
+			if exprMayHaveRuntimeSideEffects(c.Pattern) || exprMayHaveRuntimeSideEffects(c.Guard) || exprMayHaveRuntimeSideEffects(c.Value) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
 }
 
 func checkStmts(
@@ -4816,14 +9805,36 @@ func checkStmts(
 			if !isPrintableType(tname, types) {
 				return fmt.Errorf("%s: print expects str or []u8", frontend.FormatPos(s.At))
 			}
+			secretTainted, err := exprSecretTainted(s.Value, tname, locals, globals, funcs, types, module, imports, analysis)
+			if err != nil {
+				return err
+			}
+			if analysis.underSecretControl() {
+				secretTainted = true
+			}
+			if secretTainted {
+				return privacyDiagnosticf(s.At, "secret-tainted value cannot be printed")
+			}
 		case *frontend.BreakStmt:
 			if state.loopDepth == 0 {
 				return fmt.Errorf("%s: break outside loop", frontend.FormatPos(s.At))
 			}
+			recordLoopFlowExit(state, "break", analysis)
+			if err := state.checkPendingDeferCaptures(s.At); err != nil {
+				return err
+			}
+			state.reachable = false
+			return nil
 		case *frontend.ContinueStmt:
 			if state.loopDepth == 0 {
 				return fmt.Errorf("%s: continue outside loop", frontend.FormatPos(s.At))
 			}
+			recordLoopFlowExit(state, "continue", analysis)
+			if err := state.checkPendingDeferCaptures(s.At); err != nil {
+				return err
+			}
+			state.reachable = false
+			return nil
 		case *frontend.FreeStmt:
 			if err := effects.requireAll(s.At, []string{"islands", "mem"}); err != nil {
 				return err
@@ -4836,21 +9847,21 @@ func checkStmts(
 				return fmt.Errorf("%s: free expects island, got '%s'", frontend.FormatPos(s.At), tname)
 			}
 			if !s.Implicit && !state.inUnsafe() {
-				return fmt.Errorf("%s: free is only allowed in unsafe blocks", frontend.FormatPos(s.At))
+				return effectDiagnosticf(s.At, "free is only allowed in unsafe blocks")
 			}
 			source, err := resourceSourceForExpr(s.Value, funcs, module, imports, state)
 			if err != nil {
 				return err
 			}
 			if source.ambiguous {
-				return fmt.Errorf("%s: resource expression mixes resource provenance", frontend.FormatPos(s.Value.Pos()))
+				return ownershipDiagnosticf(s.Value.Pos(), "resource expression mixes resource provenance")
 			}
 			if source.unknown {
 				name, _ := resourcePathForExpr(s.Value)
 				if name == "" {
 					name = "<resource>"
 				}
-				return fmt.Errorf("%s: ambiguous resource provenance for '%s' after control-flow merge", frontend.FormatPos(s.Value.Pos()), name)
+				return ownershipDiagnosticf(s.Value.Pos(), "ambiguous resource provenance for '%s' after control-flow merge", name)
 			}
 			if source.known {
 				state.markResourceFinalized(source.name, "freed", s.Value.Pos())
@@ -4860,42 +9871,369 @@ func checkStmts(
 			regionID := regionNone
 			handledFunctionReturn := false
 			callerSig, callerSigOK := currentCallerSignature(effects, funcs)
+			if closure, ok := s.Value.(*frontend.ClosureExpr); ok {
+				if !callerSigOK || !callerSig.ReturnFunctionType {
+					return unsupportedFunctionValueEscapeError(s.At, callbackArgumentName(s.Value))
+				}
+				targetInfo := functionReturnLocalInfo(callerSig)
+				if err := validateFunctionTypedClosureAssignment("return", targetInfo, closure, locals, funcs, types, module, imports, closure.At); err != nil {
+					return err
+				}
+				closureSymbol := closure.Name
+				if _, ok := funcs[closureSymbol]; !ok && module != "" {
+					qualified := qualifyName(module, closure.Name)
+					if _, ok := funcs[qualified]; ok {
+						closureSymbol = qualified
+						closure.Name = qualified
+					}
+				}
+				targetSig, ok := funcs[closureSymbol]
+				if !ok {
+					return fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(s.At), closureSymbol)
+				}
+				validationSig := targetSig
+				if len(closure.Captures) > 0 {
+					captureSlots, err := functionCaptureSlotCount(closure.Captures, types)
+					if err != nil {
+						return err
+					}
+					if captureSlots < 1 || captureSlots > FnPtrEnvSlotCount {
+						if captureSlots < 1 {
+							return unsupportedFunctionTypedReturnCaptureError(s.At, "closure literal", captureSlots)
+						}
+						escapeKind, handleValue, err := classifyCallableEscape(callableBoundaryReturn, closure.Captures, types)
+						if err != nil {
+							return err
+						}
+						if analysis != nil {
+							analysis.returnFunctionEscapeKind = escapeKind
+							analysis.returnFunctionHandleValue = handleValue
+						}
+					}
+					validationSig.ParamTypes = append([]string(nil), callerSig.ReturnFunctionParams...)
+					validationSig.ParamOwnership = append([]string(nil), callerSig.ReturnFunctionParamOwnership...)
+				}
+				if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, callbackArgumentName(s.Value)); err != nil {
+					return err
+				}
+				if analysis != nil {
+					if analysis.returnFunctionSymbol == "" {
+						analysis.returnFunctionSymbol = closureSymbol
+					}
+					recordReturnFunctionTargetMutableGlobalUse(analysis, targetSig)
+					recordReturnFunctionCaptures(analysis, closure.Captures)
+				}
+				tname = returnType
+				regionID = regionNone
+				handledFunctionReturn = true
+			}
 			if id, ok := s.Value.(*frontend.IdentExpr); ok {
 				if localInfo, exists := locals[id.Name]; exists && localInfo.FunctionTypeValue {
 					if !callerSigOK || !callerSig.ReturnFunctionType {
-						return fmt.Errorf("%s: function value '%s' cannot escape as a first-class value in this MVP; only direct local calls are supported", frontend.FormatPos(s.At), id.Name)
+						return unsupportedFunctionValueEscapeError(s.At, id.Name)
 					}
 					if localInfo.FunctionValue == "" {
-						return fmt.Errorf("%s: returning function-typed value '%s' requires a symbol-backed non-capturing function value in this MVP", frontend.FormatPos(s.At), id.Name)
+						validationSig := FuncSig{
+							ParamTypes:     append([]string(nil), localInfo.FunctionParamTypes...),
+							ParamOwnership: append([]string(nil), localInfo.FunctionParamOwnership...),
+							ReturnType:     localInfo.FunctionReturnType,
+							ThrowsType:     localInfo.FunctionThrowsType,
+							Effects:        append([]string(nil), localInfo.FunctionEffects...),
+						}
+						if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, id.Name); err != nil {
+							return err
+						}
+						if analysis != nil {
+							analysis.returnFunctionParamName = localInfo.FunctionParamName
+							if analysis.returnFunctionParamName == "" {
+								analysis.returnFunctionParamName = id.Name
+							}
+							if localInfo.FunctionTouchesMutableGlobals {
+								analysis.returnFunctionTouchesMutableGlobals = true
+							}
+						}
+						tname = localInfo.TypeName
+						regionID = regionNone
+						handledFunctionReturn = true
+					} else {
+						if localInfo.GenericFunctionValue {
+							return unsupportedGenericFunctionTypedReturnError(s.At, id.Name)
+						}
+						targetSig, ok := funcs[localInfo.FunctionValue]
+						if !ok {
+							return fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(s.At), localInfo.FunctionValue)
+						}
+						if targetSig.Generic {
+							return unsupportedGenericFunctionTypedReturnError(s.At, id.Name)
+						}
+						validationSig := targetSig
+						if localInfo.FunctionReturnType != "" {
+							explicitSlots, err := functionParamSlotCount(localInfo.FunctionParamTypes, types)
+							if err != nil {
+								return err
+							}
+							hiddenSlots := targetSig.ParamSlots - explicitSlots
+							if hiddenSlots < 0 || (hiddenSlots > FnPtrEnvSlotCount && !localInfo.FunctionHandleValue) {
+								return unsupportedFunctionTypedReturnCaptureError(s.At, id.Name, hiddenSlots)
+							}
+							if hiddenSlots > FnPtrEnvSlotCount && analysis != nil {
+								analysis.returnFunctionEscapeKind = localInfo.FunctionEscapeKind
+								analysis.returnFunctionHandleValue = localInfo.FunctionHandleValue
+							}
+							validationSig.ParamTypes = append([]string(nil), localInfo.FunctionParamTypes...)
+							validationSig.ParamOwnership = append([]string(nil), localInfo.FunctionParamOwnership...)
+							validationSig.ParamSlots = explicitSlots
+							validationSig.ReturnType = localInfo.FunctionReturnType
+							validationSig.ThrowsType = localInfo.FunctionThrowsType
+							validationSig.Effects = append([]string(nil), localInfo.FunctionEffects...)
+						}
+						if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, id.Name); err != nil {
+							return err
+						}
+						if analysis != nil {
+							if analysis.returnFunctionSymbol == "" {
+								analysis.returnFunctionSymbol = localInfo.FunctionValue
+							}
+							if localInfo.FunctionTouchesMutableGlobals {
+								analysis.returnFunctionTouchesMutableGlobals = true
+							}
+							recordReturnFunctionTargetMutableGlobalUse(analysis, targetSig)
+							recordReturnFunctionCaptures(analysis, localInfo.FunctionCaptures)
+							recordReturnFunctionCaptures(analysis, localInfo.FunctionEscapeCaptures)
+						}
+						tname = localInfo.TypeName
+						regionID = regionNone
+						handledFunctionReturn = true
+					}
+				} else if localInfo, exists := locals[id.Name]; exists && localInfo.FunctionValue != "" {
+					if !callerSigOK || !callerSig.ReturnFunctionType {
+						return unsupportedFunctionValueEscapeError(s.At, id.Name)
 					}
 					if localInfo.GenericFunctionValue {
-						return fmt.Errorf("%s: generic function symbol '%s' is not supported for function return in this MVP", frontend.FormatPos(s.At), id.Name)
+						return unsupportedGenericFunctionTypedReturnError(s.At, id.Name)
 					}
 					targetSig, ok := funcs[localInfo.FunctionValue]
 					if !ok {
 						return fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(s.At), localInfo.FunctionValue)
 					}
 					if targetSig.Generic {
-						return fmt.Errorf("%s: generic function symbol '%s' is not supported for function return in this MVP", frontend.FormatPos(s.At), id.Name)
+						return unsupportedGenericFunctionTypedReturnError(s.At, id.Name)
 					}
-					if targetSig.ThrowsType != "" {
-						return fmt.Errorf("%s: throwing function symbol '%s' is not supported for function return in this MVP", frontend.FormatPos(s.At), id.Name)
-					}
+					validationSig := targetSig
 					if len(localInfo.FunctionCaptures) > 0 {
-						return fmt.Errorf("%s: returning function-typed value '%s' captures local values; captured function values cannot be returned in this MVP", frontend.FormatPos(s.At), id.Name)
+						captureSlots, err := functionCaptureSlotCount(localInfo.FunctionCaptures, types)
+						if err != nil {
+							return err
+						}
+						if captureSlots < 1 {
+							return unsupportedFunctionTypedReturnCaptureError(s.At, id.Name, captureSlots)
+						}
+						if captureSlots > FnPtrEnvSlotCount {
+							escapeKind, handleValue, err := classifyCallableEscape(callableBoundaryReturn, localInfo.FunctionCaptures, types)
+							if err != nil {
+								return err
+							}
+							if analysis != nil {
+								analysis.returnFunctionEscapeKind = escapeKind
+								analysis.returnFunctionHandleValue = handleValue
+							}
+						}
+						validationSig.ParamTypes = append([]string(nil), callerSig.ReturnFunctionParams...)
+						validationSig.ParamOwnership = append([]string(nil), callerSig.ReturnFunctionParamOwnership...)
 					}
-					if err := validateReturnedFunctionSignature(callerSig, targetSig, s.At, id.Name); err != nil {
+					if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, id.Name); err != nil {
 						return err
 					}
 					if analysis != nil {
-						if analysis.returnFunctionSymbol != "" && analysis.returnFunctionSymbol != localInfo.FunctionValue {
-							return fmt.Errorf("%s: function return symbol mismatch across return paths: '%s' vs '%s'", frontend.FormatPos(s.At), analysis.returnFunctionSymbol, localInfo.FunctionValue)
+						if analysis.returnFunctionSymbol == "" {
+							analysis.returnFunctionSymbol = localInfo.FunctionValue
 						}
-						analysis.returnFunctionSymbol = localInfo.FunctionValue
+						if localInfo.FunctionTouchesMutableGlobals {
+							analysis.returnFunctionTouchesMutableGlobals = true
+						}
+						recordReturnFunctionTargetMutableGlobalUse(analysis, targetSig)
+						recordReturnFunctionCaptures(analysis, localInfo.FunctionCaptures)
+						recordReturnFunctionCaptures(analysis, localInfo.FunctionEscapeCaptures)
 					}
-					tname = localInfo.TypeName
+					tname = returnType
 					regionID = regionNone
 					handledFunctionReturn = true
+				} else if globalInfo, exists := globals[id.Name]; exists && globalInfo.FunctionTypeValue {
+					if !callerSigOK || !callerSig.ReturnFunctionType {
+						return unsupportedFunctionValueEscapeError(s.At, id.Name)
+					}
+					markMutableFunctionTypedGlobalSource(s.Value, globals, analysis)
+					if globalInfo.FunctionValue == "" {
+						if globalInfo.Mutable {
+							return unsupportedImportedMutableFunctionTypedGlobalUseError(s.At, id.Name)
+						}
+						return unsupportedFunctionTypedGlobalTargetError(s.At, id.Name)
+					}
+					validationSig := FuncSig{
+						ParamTypes:     append([]string(nil), globalInfo.FunctionParamTypes...),
+						ParamOwnership: append([]string(nil), globalInfo.FunctionParamOwnership...),
+						ReturnType:     globalInfo.FunctionReturnType,
+						ThrowsType:     globalInfo.FunctionThrowsType,
+						Effects:        append([]string(nil), globalInfo.FunctionEffects...),
+					}
+					if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, id.Name); err != nil {
+						return err
+					}
+					if analysis != nil && !globalInfo.Mutable && analysis.returnFunctionSymbol == "" {
+						analysis.returnFunctionSymbol = globalInfo.FunctionValue
+					}
+					if analysis != nil && !globalInfo.Mutable {
+						if targetSig, ok := funcs[globalInfo.FunctionValue]; ok {
+							recordReturnFunctionTargetMutableGlobalUse(analysis, targetSig)
+						}
+					}
+					tname = globalInfo.TypeName
+					regionID = regionNone
+					handledFunctionReturn = true
+				}
+			}
+			if !handledFunctionReturn {
+				if id, ok := s.Value.(*frontend.IdentExpr); ok && callerSigOK && callerSig.ReturnFunctionType {
+					if _, exists := locals[id.Name]; exists {
+						// Local function-typed values and local closure pointers are handled by
+						// the local return path or by the normal expression checker.
+					} else if _, exists := globals[id.Name]; exists {
+						// Globals are ordinary values, not direct function symbols.
+					} else {
+						resolved, err := resolveCheckedCallName(id.Name, funcs, module, imports, id.At)
+						if err == nil {
+							targetSig, ok := funcs[resolved]
+							if !ok {
+								return fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(s.At), resolved)
+							}
+							if err := ensureFuncVisible(resolved, targetSig, module, id.At); err != nil {
+								return err
+							}
+							if targetSig.Generic {
+								return unsupportedGenericFunctionTypedReturnError(s.At, id.Name)
+							}
+							if err := validateReturnedFunctionSignature(callerSig, targetSig, s.At, id.Name); err != nil {
+								return err
+							}
+							if analysis != nil {
+								if analysis.returnFunctionSymbol == "" {
+									analysis.returnFunctionSymbol = resolved
+								}
+								recordReturnFunctionTargetMutableGlobalUse(analysis, targetSig)
+							}
+							id.Name = resolved
+							tname = returnType
+							regionID = regionNone
+							handledFunctionReturn = true
+						}
+					}
+				}
+			}
+			if !handledFunctionReturn {
+				if fieldInfo, ok, err := resolveFunctionFieldArgument(s.Value, locals); err != nil {
+					return err
+				} else if ok {
+					if !callerSigOK || !callerSig.ReturnFunctionType {
+						return unsupportedFunctionValueEscapeError(s.At, callbackArgumentName(s.Value))
+					}
+					if fieldInfo.FunctionValue == "" {
+						if !functionFieldInfoHasTargetSet(fieldInfo) {
+							return fmt.Errorf("%s: returning function-typed value '%s' requires a symbol-backed non-capturing function value in this MVP", frontend.FormatPos(s.At), callbackArgumentName(s.Value))
+						}
+						if err := validateReturnedFunctionSignature(callerSig, functionFieldInfoSig(fieldInfo), s.At, callbackArgumentName(s.Value)); err != nil {
+							return err
+						}
+						if analysis != nil {
+							analysis.returnFunctionParamName = fieldInfo.FunctionParamName
+							if fieldInfo.FunctionTouchesMutableGlobals {
+								analysis.returnFunctionTouchesMutableGlobals = true
+							}
+							recordReturnFunctionCaptures(analysis, fieldInfo.FunctionCaptures)
+							recordReturnFunctionCaptures(analysis, fieldInfo.FunctionEscapeCaptures)
+						}
+						tname = returnType
+						regionID = regionNone
+						handledFunctionReturn = true
+					} else {
+						targetSig, ok := funcs[fieldInfo.FunctionValue]
+						if !ok {
+							return fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(s.At), fieldInfo.FunctionValue)
+						}
+						if targetSig.Generic {
+							return unsupportedGenericFunctionTypedReturnError(s.At, callbackArgumentName(s.Value))
+						}
+						validationSig := targetSig
+						if fieldInfo.FunctionReturnType != "" {
+							explicitSlots, err := functionParamSlotCount(fieldInfo.FunctionParamTypes, types)
+							if err != nil {
+								return err
+							}
+							hiddenSlots := targetSig.ParamSlots - explicitSlots
+							if hiddenSlots < 0 || (hiddenSlots > FnPtrEnvSlotCount && !fieldInfo.FunctionHandleValue) {
+								return unsupportedFunctionTypedReturnCaptureError(s.At, callbackArgumentName(s.Value), hiddenSlots)
+							}
+							if hiddenSlots > FnPtrEnvSlotCount && analysis != nil {
+								analysis.returnFunctionEscapeKind = fieldInfo.FunctionEscapeKind
+								analysis.returnFunctionHandleValue = fieldInfo.FunctionHandleValue
+							}
+							validationSig.ParamTypes = append([]string(nil), fieldInfo.FunctionParamTypes...)
+							validationSig.ParamOwnership = append([]string(nil), fieldInfo.FunctionParamOwnership...)
+							validationSig.ParamSlots = explicitSlots
+							validationSig.ReturnType = fieldInfo.FunctionReturnType
+							validationSig.Effects = append([]string(nil), fieldInfo.FunctionEffects...)
+						}
+						if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, callbackArgumentName(s.Value)); err != nil {
+							return err
+						}
+						if analysis != nil {
+							if analysis.returnFunctionSymbol == "" {
+								analysis.returnFunctionSymbol = fieldInfo.FunctionValue
+							}
+							if fieldInfo.FunctionTouchesMutableGlobals {
+								analysis.returnFunctionTouchesMutableGlobals = true
+							}
+							recordReturnFunctionTargetMutableGlobalUse(analysis, targetSig)
+							recordReturnFunctionCaptures(analysis, fieldInfo.FunctionCaptures)
+							recordReturnFunctionCaptures(analysis, fieldInfo.FunctionEscapeCaptures)
+						}
+						tname = returnType
+						regionID = regionNone
+						handledFunctionReturn = true
+					}
+				} else if fieldAccess, fieldOK := s.Value.(*frontend.FieldAccessExpr); fieldOK && callerSigOK && callerSig.ReturnFunctionType {
+					if globalInfo, globalSig, globalOK, err := resolveFunctionTypedGlobalFieldAccess(fieldAccess, globals, funcs); err != nil {
+						return err
+					} else if globalOK {
+						if err := validateReturnedFunctionSignature(callerSig, globalSig, s.At, callbackArgumentName(s.Value)); err != nil {
+							return err
+						}
+						if analysis != nil {
+							if analysis.returnFunctionSymbol == "" {
+								analysis.returnFunctionSymbol = globalInfo.FunctionValue
+							}
+							recordReturnFunctionTargetMutableGlobalUse(analysis, globalSig)
+						}
+						tname = returnType
+						regionID = regionNone
+						handledFunctionReturn = true
+					} else if resolved, importedOK := resolveImportedFunctionFieldAccess(fieldAccess, funcs, module, imports); importedOK {
+						targetSig := funcs[resolved]
+						if targetSig.Generic {
+							return unsupportedGenericFunctionTypedReturnError(s.At, callbackArgumentName(s.Value))
+						}
+						if err := validateReturnedFunctionSignature(callerSig, targetSig, s.At, callbackArgumentName(s.Value)); err != nil {
+							return err
+						}
+						if analysis != nil {
+							if analysis.returnFunctionSymbol == "" {
+								analysis.returnFunctionSymbol = resolved
+							}
+							recordReturnFunctionTargetMutableGlobalUse(analysis, targetSig)
+						}
+						tname = returnType
+						regionID = regionNone
+						handledFunctionReturn = true
+					}
 				}
 			}
 			if !handledFunctionReturn {
@@ -4906,42 +10244,121 @@ func checkStmts(
 				}
 			}
 			if callerSigOK && callerSig.ReturnFunctionType && !handledFunctionReturn {
-				return fmt.Errorf("%s: returning function-typed value requires a symbol-backed non-generic non-throwing function value in this MVP", frontend.FormatPos(s.At))
+				return unsupportedFunctionTypedReturnSourceError(s.At)
 			}
-			if typeMayContainRegion(tname, types) {
+			if err := checkWholeOwnershipValueAvailable(s.Value, state); err != nil {
+				return err
+			}
+			if typeMayContainRegion(tname, types) || typeMayContainPtr(tname, types) {
 				if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
-					return fmt.Errorf("%s: borrowed local '%s' cannot escape via return", frontend.FormatPos(s.At), borrowedName)
+					return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via return", borrowedName)
 				}); err != nil {
 					return err
 				}
-				if id, ok := s.Value.(*frontend.IdentExpr); ok {
-					if _, borrowed := borrowedParams[id.Name]; borrowed {
-						return fmt.Errorf("%s: borrowed local '%s' cannot escape via return", frontend.FormatPos(s.At), id.Name)
-					}
-				}
 			}
-			if typeContainsResourceHandle(tname, types) {
-				source, err := resourceSourceForExpr(s.Value, funcs, module, imports, state)
-				if err != nil {
+			if typeMayContainRegion(tname, types) {
+				tree := regionTreeForExpr(tname, s.Value, regionID, types, state)
+				if err := checkRegionTreeWithinScope(tree, regionNone, s.At, state); err != nil {
 					return err
 				}
-				if source.ambiguous {
-					return fmt.Errorf("%s: resource expression mixes resource provenance", frontend.FormatPos(s.Value.Pos()))
-				}
-				if source.unknown {
-					state.recordUnknownReturnResource()
-				} else if paramIndex, path, ok := state.resourceParamOwner(source.name); ok {
-					if err := state.recordReturnResourceParam(paramIndex, path, s.At); err != nil {
+				if !typeContainsResourceHandle(tname, types) {
+					if err := state.recordReturnRegionSummary(tree, s.At); err != nil {
 						return err
 					}
 				}
+				regionID = commonRegionFromTree(tree)
+				if id, ok := s.Value.(*frontend.IdentExpr); ok {
+					if _, borrowed := borrowedParams[id.Name]; borrowed {
+						return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via return", id.Name)
+					}
+				}
 			}
-			if err := state.recordReturnRegion(regionID, s.At); err != nil {
+			if tname == "ptr" {
+				if borrowedName, borrowed := borrowedPtrOwnerFromExpr(s.Value, state, borrowedParams); borrowed {
+					return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via return", borrowedName)
+				}
+			}
+			resourceReturnType := tname
+			if typeContainsResourceHandle(returnType, types) {
+				resourceReturnType = returnType
+			}
+			if typeContainsResourceHandle(resourceReturnType, types) {
+				summary, unknown, err := returnResourceSummaryForExpr(s.Value, resourceReturnType, funcs, types, module, imports, state)
+				if err != nil {
+					return err
+				}
+				if unknown {
+					state.recordUnknownReturnResource()
+				} else if err := state.recordReturnResourceSummary(summary, s.At); err != nil {
+					return err
+				}
+			}
+			if len(state.returnRegionSummary) == 0 {
+				if err := state.recordReturnRegion(regionID, s.At); err != nil {
+					return err
+				}
+			}
+			secretTainted, err := exprSecretTainted(s.Value, tname, locals, globals, funcs, types, module, imports, analysis)
+			if err != nil {
 				return err
+			}
+			if analysis.underSecretControl() {
+				secretTainted = true
+			}
+			if secretTainted {
+				analysis.returnSecretTaint = true
+				if analysis.rejectSecretReturn {
+					return privacyDiagnosticf(s.At, "secret-tainted value cannot be returned from @export function '%s'", analysis.exportedFuncName)
+				}
+				if !analysis.allowSecretReturn {
+					return privacyDiagnosticf(s.At, "secret-tainted value requires semantic clause 'privacy' before return")
+				}
 			}
 			if !typesCompatibleWithNullPtr(returnType, tname, s.Value) {
 				return fmt.Errorf("%s: return type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), returnType, tname)
 			}
+			if analysis != nil {
+				returnFields, err := functionFieldsFromReturnedStructExpr(returnType, s.Value, locals, globals, funcs, types, module, imports)
+				if err != nil {
+					return err
+				}
+				if len(returnFields) > 0 || len(analysis.returnFunctionFields) > 0 {
+					if len(analysis.returnFunctionFields) == 0 {
+						analysis.returnFunctionFields = functionFieldReturnSnapshotMap(returnFields)
+					} else {
+						for fieldName, field := range returnFields {
+							mergeFunctionFieldInfoIntoMap(analysis.returnFunctionFields, fieldName, functionFieldInfoAsReturnSnapshot(field))
+						}
+					}
+				}
+				returnPayloadFields, err := enumPayloadFieldsFromReturnedStructExpr(returnType, s.Value, locals, globals, funcs, types, module, imports)
+				if err != nil {
+					return err
+				}
+				if len(returnPayloadFields) > 0 || len(analysis.returnEnumPayloadFields) > 0 {
+					if len(analysis.returnEnumPayloadFields) == 0 {
+						analysis.returnEnumPayloadFields = functionFieldReturnSnapshotMap(returnPayloadFields)
+					} else {
+						for fieldName, field := range returnPayloadFields {
+							mergeFunctionFieldInfoIntoMap(analysis.returnEnumPayloadFields, fieldName, functionFieldInfoAsReturnSnapshot(field))
+						}
+					}
+				}
+				returnPayloads, err := enumPayloadFunctionsFromReturnedEnumExpr(returnType, s.Value, locals, globals, funcs, types, module, imports)
+				if err != nil {
+					return err
+				}
+				if len(returnPayloads) > 0 || len(analysis.returnEnumPayloadFunctions) > 0 {
+					if len(analysis.returnEnumPayloadFunctions) == 0 {
+						analysis.returnEnumPayloadFunctions = functionFieldReturnSnapshotMap(returnPayloads)
+					} else {
+						for payloadKey, payload := range returnPayloads {
+							mergeFunctionFieldInfoIntoMap(analysis.returnEnumPayloadFunctions, payloadKey, functionFieldInfoAsReturnSnapshot(payload))
+						}
+					}
+				}
+			}
+			state.reachable = false
 		case *frontend.ThrowStmt:
 			if state.throwType == "" {
 				return fmt.Errorf("%s: throw is only allowed in throwing functions", frontend.FormatPos(s.At))
@@ -4953,6 +10370,45 @@ func checkStmts(
 			if !typesCompatibleWithNullPtr(state.throwType, tname, s.Value) {
 				return fmt.Errorf("%s: throw type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), state.throwType, tname)
 			}
+			if typeMayContainRegion(tname, types) || typeMayContainPtr(tname, types) || typeMayContainRegion(state.throwType, types) || typeMayContainPtr(state.throwType, types) {
+				if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+					return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via throw", borrowedName)
+				}); err != nil {
+					return err
+				}
+			}
+			if typeMayContainRegion(tname, types) || typeMayContainRegion(state.throwType, types) {
+				if err := checkRegionTreeWithinScope(regionTreeForExpr(tname, s.Value, regionNone, types, state), regionNone, s.At, state); err != nil {
+					return err
+				}
+			}
+			if typeContainsResourceHandle(state.throwType, types) {
+				summary, unknown, err := returnResourceSummaryForExpr(s.Value, state.throwType, funcs, types, module, imports, state)
+				if err != nil {
+					return err
+				}
+				if !unknown {
+					if err := state.recordThrowResourceSummary(summary, s.At); err != nil {
+						return err
+					}
+				}
+			}
+			secretTainted, err := exprSecretTainted(s.Value, tname, locals, globals, funcs, types, module, imports, analysis)
+			if err != nil {
+				return err
+			}
+			if analysis.underSecretControl() {
+				secretTainted = true
+			}
+			if secretTainted {
+				if analysis.rejectSecretReturn {
+					return privacyDiagnosticf(s.At, "secret-tainted value cannot be thrown from @export function '%s'", analysis.exportedFuncName)
+				}
+				if !analysis.allowSecretReturn {
+					return privacyDiagnosticf(s.At, "secret-tainted value requires semantic clause 'privacy' before throw")
+				}
+			}
+			state.reachable = false
 		case *frontend.DeferStmt:
 			if err := validateDeferBodyControl(s.Body, 0); err != nil {
 				return err
@@ -5003,14 +10459,25 @@ func checkStmts(
 			valRegion := regionNone
 			handledFunctionSymbol := false
 			if s.Type.Kind == frontend.TypeRefFunction {
-				if id, ok := s.Value.(*frontend.IdentExpr); ok {
-					if localInfo, exists := locals[id.Name]; exists && localInfo.FunctionTypeValue && localInfo.Mutable {
-						return fmt.Errorf("%s: function-typed local '%s' cannot be initialized from mutable function-typed local '%s'; only immutable symbol-backed aliases are supported in this MVP", frontend.FormatPos(s.At), s.Name, id.Name)
+				if _, ok := s.Value.(*frontend.ClosureExpr); ok {
+					if info, exists := locals[s.Name]; exists && info.FunctionTypeValue {
+						valType = resolved
+						valRegion = regionNone
+						handledFunctionSymbol = true
 					}
+				} else if id, ok := s.Value.(*frontend.IdentExpr); ok {
 					if info, exists := locals[s.Name]; exists && info.FunctionTypeValue {
 						if info.FunctionValue == "" {
-							return fmt.Errorf("%s: function-typed local '%s' must be initialized with a non-capturing closure literal or named function/closure symbol in this MVP", frontend.FormatPos(s.At), s.Name)
+							if sourceInfo, sourceExists := locals[id.Name]; !sourceExists || !sourceInfo.FunctionTypeValue {
+								return unsupportedFunctionTypedLocalInitializerSourceError(s.At, s.Name)
+							}
 						}
+						valType = resolved
+						valRegion = regionNone
+						handledFunctionSymbol = true
+					}
+				} else if _, ok := s.Value.(*frontend.FieldAccessExpr); ok {
+					if info, exists := locals[s.Name]; exists && info.FunctionTypeValue && info.FunctionValue != "" {
 						valType = resolved
 						valRegion = regionNone
 						handledFunctionSymbol = true
@@ -5027,32 +10494,36 @@ func checkStmts(
 			if !typesCompatibleWithNullPtr(resolved, valType, s.Value) {
 				return fmt.Errorf("%s: type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), resolved, valType)
 			}
-			if valRegion >= 0 {
-				scopeID := localScopeID(s.Name, state)
-				if !state.isScopeWithin(scopeID, valRegion) {
-					return fmt.Errorf(
-						"%s: slice from scoped island cannot escape to outer scope (value: %s, target: %s)",
-						frontend.FormatPos(s.At),
-						formatRegionID(state, valRegion),
-						formatScopeID(state, scopeID),
-					)
-				}
-				state.regionVars[s.Name] = valRegion
-				delete(state.unknownVars, s.Name)
-				delete(state.unknownConflicts, s.Name)
-			} else if valRegion < regionNone {
-				state.regionVars[s.Name] = valRegion
-				delete(state.unknownVars, s.Name)
-				delete(state.unknownConflicts, s.Name)
-			} else {
-				delete(state.regionVars, s.Name)
-				delete(state.unknownVars, s.Name)
-				delete(state.unknownConflicts, s.Name)
+			if err := checkWholeOwnershipValueAvailable(s.Value, state); err != nil {
+				return err
 			}
+			secretTainted, err := exprSecretTainted(s.Value, valType, locals, globals, funcs, types, module, imports, analysis)
+			if err != nil {
+				return err
+			}
+			if typeUsesSecret(resolved, types) {
+				secretTainted = true
+			}
+			if analysis.underSecretControl() {
+				secretTainted = true
+			}
+			analysis.setLocalSecretTaint(s.Name, secretTainted)
+			if typeMayContainRegion(resolved, types) {
+				scopeID := localScopeID(s.Name, state)
+				if err := checkRegionTreeWithinScope(regionTreeForExpr(resolved, s.Value, valRegion, types, state), scopeID, s.At, state); err != nil {
+					return err
+				}
+				bindRegionTreeFromExpr(s.Name, resolved, s.Value, valRegion, types, state)
+			}
+			state.bindRegion(s.Name, valRegion)
+			bindBorrowedPtrAliasFromExpr(s.Name, resolved, s.Value, types, module, imports, state, borrowedParams)
 			if err := bindResourceTreeFromExpr(s.Name, resolved, s.Value, funcs, types, module, imports, state); err != nil {
 				return err
 			}
 		case *frontend.AssignStmt:
+			if s.CompoundValue != nil && compoundIndexTargetHasSideEffects(s.Target) {
+				return fmt.Errorf("%s: compound index assignment target with side effects is not supported; use an explicit temporary index", frontend.FormatPos(s.At))
+			}
 			if idx, ok := s.Target.(*frontend.IndexExpr); ok {
 				indexType, _, err := checkExprWithEffects(idx.Index, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
@@ -5076,6 +10547,29 @@ func checkStmts(
 						}
 						return fmt.Errorf("%s: cannot assign to val '%s'", frontend.FormatPos(s.At), id.Name)
 					}
+					if g.FunctionTypeValue {
+						if analysis != nil {
+							analysis.touchesMutableGlobals = true
+						}
+						targetInfo := LocalInfo{
+							TypeName:               g.TypeName,
+							SlotCount:              FnPtrSlotCount,
+							FunctionTypeValue:      true,
+							FunctionParamTypes:     append([]string(nil), g.FunctionParamTypes...),
+							FunctionParamOwnership: append([]string(nil), g.FunctionParamOwnership...),
+							FunctionReturnType:     g.FunctionReturnType,
+							FunctionThrowsType:     g.FunctionThrowsType,
+							FunctionEffects:        append([]string(nil), g.FunctionEffects...),
+						}
+						allowCapturedGlobalSnapshot, err := allowCapturedGlobalFunctionSnapshot(s.Value, locals, types)
+						if err != nil {
+							return err
+						}
+						if err := validateFunctionTypedAssignmentValue(id.Name, targetInfo, s.Value, locals, globals, funcs, types, module, imports, s.At, allowCapturedGlobalSnapshot, callableBoundaryGlobal); err != nil {
+							return err
+						}
+						continue
+					}
 					valType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 					if err != nil {
 						return err
@@ -5083,15 +10577,43 @@ func checkStmts(
 					if !typesCompatibleWithNullPtr(g.TypeName, valType, s.Value) {
 						return fmt.Errorf("%s: type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), g.TypeName, valType)
 					}
+					if err := checkWholeOwnershipValueAvailable(s.Value, state); err != nil {
+						return err
+					}
+					if typeMayContainRegion(valType, types) || typeMayContainRegion(g.TypeName, types) ||
+						typeMayContainPtr(valType, types) || typeMayContainPtr(g.TypeName, types) {
+						if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+							return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via global assignment to '%s'", borrowedName, id.Name)
+						}); err != nil {
+							return err
+						}
+					}
+					if valType == "ptr" {
+						if borrowedName, borrowed := borrowedPtrOwnerFromExpr(s.Value, state, borrowedParams); borrowed {
+							return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via global assignment to '%s'", borrowedName, id.Name)
+						}
+					}
+					secretTainted, err := exprSecretTainted(s.Value, valType, locals, globals, funcs, types, module, imports, analysis)
+					if err != nil {
+						return err
+					}
+					if analysis.underSecretControl() {
+						secretTainted = true
+					}
+					if secretTainted {
+						return privacyDiagnosticf(s.At, "secret-tainted value cannot be stored in global '%s'", id.Name)
+					}
 					continue
 				}
 			}
-			targetInfo, targetType, err := resolveAssignTarget(s.Target, locals, types)
+			targetInfo, targetType, err := resolveAssignTarget(s.Target, locals, globals, types)
 			if err != nil {
 				return err
 			}
-			if err := checkLocalScope(targetInfo.Name, state, s.At); err != nil {
-				return err
+			if !targetInfo.Global {
+				if err := checkLocalScope(targetInfo.Name, state, s.At); err != nil {
+					return err
+				}
 			}
 			if !targetInfo.Mutable {
 				if targetInfo.Const {
@@ -5099,55 +10621,137 @@ func checkStmts(
 				}
 				return fmt.Errorf("%s: cannot assign to val '%s'", frontend.FormatPos(s.At), targetInfo.Name)
 			}
+			targetOwnershipPath := ""
+			if path, ok := canonicalOwnershipAccessPath(s.Target); ok {
+				if err := state.checkAssignableOwnershipPath(path, s.At); err != nil {
+					return err
+				}
+				targetOwnershipPath = path
+			}
+			handledFunctionAssignment := false
 			if id, ok := s.Target.(*frontend.IdentExpr); ok {
 				if localInfo, exists := locals[id.Name]; exists && localInfo.FunctionTypeValue {
-					return fmt.Errorf("%s: reassignment of function-typed local '%s' is not supported in this MVP", frontend.FormatPos(s.At), id.Name)
+					markMutableFunctionTypedGlobalSource(s.Value, globals, analysis)
+					if err := validateFunctionTypedAssignmentValue(id.Name, localInfo, s.Value, locals, globals, funcs, types, module, imports, s.At, true, callableBoundaryLocal); err != nil {
+						return err
+					}
+					if err := updateFunctionTypedLocalAssignmentMetadata(id.Name, s.Value, locals, globals, funcs, types, module, imports); err != nil {
+						return err
+					}
+					handledFunctionAssignment = true
 				}
-			}
-			valType, valRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
-			if err != nil {
+			} else if targetName, fieldInfo, ok, err := functionFieldLocalInfoFromExpr(s.Target, locals, types); err != nil {
 				return err
+			} else if ok {
+				markMutableFunctionTypedGlobalSource(s.Value, globals, analysis)
+				if err := validateFunctionTypedAssignmentValue(targetName, fieldInfo, s.Value, locals, globals, funcs, types, module, imports, s.At, true, callableBoundaryStructField); err != nil {
+					return err
+				}
+				if err := updateFunctionTypedFieldAssignmentMetadata(targetName, fieldInfo, s.Value, locals, globals, funcs, types, module, imports); err != nil {
+					return err
+				}
+				handledFunctionAssignment = true
+			}
+			valType := targetType
+			valRegion := regionNone
+			if !handledFunctionAssignment {
+				var err error
+				valType, valRegion, err = checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
+				if err != nil {
+					return err
+				}
 			}
 			if !typesCompatibleWithNullPtr(targetType, valType, s.Value) {
 				return fmt.Errorf("%s: type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), targetType, valType)
 			}
-			if valRegion < regionNone {
-				if _, outParam := inoutParams[targetInfo.Name]; outParam {
+			if err := checkWholeOwnershipValueAvailable(s.Value, state); err != nil {
+				return err
+			}
+			secretTainted := false
+			if !handledFunctionAssignment {
+				var err error
+				secretTainted, err = exprSecretTainted(s.Value, valType, locals, globals, funcs, types, module, imports, analysis)
+				if err != nil {
+					return err
+				}
+			}
+			if analysis.underSecretControl() {
+				secretTainted = true
+			}
+			if secretTainted && targetInfo.ActorField {
+				return privacyDiagnosticf(s.At, "secret-tainted value cannot be stored in actor state field '%s'", targetInfo.Name)
+			}
+			if targetInfo.Global {
+				if typeMayContainRegion(valType, types) || typeMayContainRegion(targetType, types) ||
+					typeMayContainPtr(valType, types) || typeMayContainPtr(targetType, types) {
+					if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+						return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via global assignment to '%s'", borrowedName, targetInfo.Name)
+					}); err != nil {
+						return err
+					}
+				}
+				if secretTainted {
+					return privacyDiagnosticf(s.At, "secret-tainted value cannot be stored in global '%s'", targetInfo.Name)
+				}
+				continue
+			}
+			if id, ok := s.Target.(*frontend.IdentExpr); ok {
+				analysis.setLocalSecretTaint(id.Name, secretTainted || typeUsesSecret(targetType, types))
+				if localInfo, exists := locals[id.Name]; exists && localInfo.Mutable {
+					if fields, err := functionFieldsFromReturnedStructExpr(targetType, s.Value, locals, globals, funcs, types, module, imports); err != nil {
+						return err
+					} else if len(fields) > 0 || len(localInfo.FunctionFields) > 0 {
+						localInfo.FunctionFields = cloneFunctionFieldMap(fields)
+						locals[id.Name] = localInfo
+					}
+					if payloadFields, err := enumPayloadFieldsFromReturnedStructExpr(targetType, s.Value, locals, globals, funcs, types, module, imports); err != nil {
+						return err
+					} else if len(payloadFields) > 0 || len(localInfo.EnumPayloadFields) > 0 {
+						localInfo.EnumPayloadFields = cloneFunctionFieldMap(payloadFields)
+						locals[id.Name] = localInfo
+					}
+				}
+			} else if info, ok := types[targetType]; ok && info.Kind == TypeStruct {
+				if err := updateFunctionTypedStructFieldAssignmentMetadata(s.Target, targetType, s.Value, locals, globals, funcs, types, module, imports); err != nil {
+					return err
+				}
+				if err := updateEnumPayloadStructFieldAssignmentMetadata(s.Target, targetType, s.Value, locals, globals, funcs, types, module, imports); err != nil {
+					return err
+				}
+			} else if info, ok := types[targetType]; ok && info.Kind == TypeEnum {
+				if err := updateEnumPayloadStructFieldAssignmentMetadata(s.Target, targetType, s.Value, locals, globals, funcs, types, module, imports); err != nil {
+					return err
+				}
+			} else if secretTainted {
+				analysis.setLocalSecretTaint(targetInfo.Name, true)
+			}
+			if _, outParam := inoutParams[targetInfo.Name]; outParam {
+				if valRegion < regionNone || typeMayContainPtr(targetType, types) || typeMayContainPtr(valType, types) {
 					if err := checkBorrowedInoutEscape(s.Value, targetInfo.Name, s.At, locals, globals, funcs, types, module, imports, state, effects, analysis); err != nil {
 						return err
 					}
 				}
 			}
 			if _, ok := s.Target.(*frontend.IndexExpr); !ok {
-				if valRegion >= 0 {
-					scopeID := localScopeID(targetInfo.Name, state)
-					if !state.isScopeWithin(scopeID, valRegion) {
-						return fmt.Errorf(
-							"%s: slice from scoped island cannot escape to outer scope (value: %s, target: %s)",
-							frontend.FormatPos(s.At),
-							formatRegionID(state, valRegion),
-							formatScopeID(state, scopeID),
-						)
-					}
-					state.regionVars[targetInfo.Name] = valRegion
-					delete(state.unknownVars, targetInfo.Name)
-					delete(state.unknownConflicts, targetInfo.Name)
-				} else if valRegion < regionNone {
-					state.regionVars[targetInfo.Name] = valRegion
-					delete(state.unknownVars, targetInfo.Name)
-					delete(state.unknownConflicts, targetInfo.Name)
-				} else {
-					delete(state.regionVars, targetInfo.Name)
-					delete(state.unknownVars, targetInfo.Name)
-					delete(state.unknownConflicts, targetInfo.Name)
-				}
 				targetResourceName := targetInfo.Name
 				if path, ok := resourcePathForExpr(s.Target); ok {
 					targetResourceName = path
 				}
+				if typeMayContainRegion(targetType, types) {
+					scopeID := localScopeID(targetInfo.Name, state)
+					if err := checkRegionTreeWithinScope(regionTreeForExpr(targetType, s.Value, valRegion, types, state), scopeID, s.At, state); err != nil {
+						return err
+					}
+					bindRegionTreeFromExpr(targetResourceName, targetType, s.Value, valRegion, types, state)
+				}
+				state.bindRegion(targetResourceName, valRegion)
+				bindBorrowedPtrAliasFromExpr(targetResourceName, targetType, s.Value, types, module, imports, state, borrowedParams)
 				if err := bindResourceTreeFromExpr(targetResourceName, targetType, s.Value, funcs, types, module, imports, state); err != nil {
 					return err
 				}
+			}
+			if targetOwnershipPath != "" {
+				state.clearConsumedTree(targetOwnershipPath)
 			}
 		case *frontend.IfStmt:
 			condType, _, err := checkExprWithEffects(s.Cond, locals, globals, funcs, types, module, imports, state, effects, analysis)
@@ -5157,43 +10761,60 @@ func checkStmts(
 			if !isConditionType(condType) {
 				return fmt.Errorf("%s: condition must be bool or i32/u8", frontend.FormatPos(s.At))
 			}
+			condSecretTainted, err := exprSecretTainted(s.Cond, condType, locals, globals, funcs, types, module, imports, analysis)
+			if err != nil {
+				return err
+			}
 			scopeIDs := branchScopeInfo{thenID: regionNone, elseID: regionNone}
 			if scoped, ok := state.ifScopes[s]; ok {
 				scopeIDs = scoped
 			}
 			before := copyRegionVars(state.regionVars)
 			beforeFlow := snapshotFlow(state)
+			beforeTaint := analysis.copySecretTaint()
 			state.regionVars = copyRegionVars(before)
 			restoreFlow(state, beforeFlow)
+			analysis.restoreSecretTaint(beforeTaint)
 			if err := withActiveScope(state, scopeIDs.thenID, func() error {
-				return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+				return analysis.withSecretControl(condSecretTainted, func() error {
+					return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+				})
 			}); err != nil {
 				return err
 			}
 			thenVars := copyRegionVars(state.regionVars)
 			thenFlow := snapshotFlow(state)
+			thenTaint := analysis.copySecretTaint()
 			var elseVars map[string]int
 			var elseFlow flowSnapshot
+			var elseTaint map[string]bool
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
 				restoreFlow(state, beforeFlow)
+				analysis.restoreSecretTaint(beforeTaint)
 				if err := withActiveScope(state, scopeIDs.elseID, func() error {
-					return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+					return analysis.withSecretControl(condSecretTainted, func() error {
+						return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+					})
 				}); err != nil {
 					return err
 				}
 				elseVars = copyRegionVars(state.regionVars)
 				elseFlow = snapshotFlow(state)
+				elseTaint = analysis.copySecretTaint()
 			} else {
 				elseVars = before
 				elseFlow = beforeFlow
+				elseTaint = beforeTaint
 			}
-			state.regionVars = mergeRegionVars(thenVars, elseVars)
-			mergeFlow(state, thenFlow, elseFlow)
-			recordMergeConflicts(state, thenVars, elseVars, "then", "else")
+			mergeControlFlowWithLabels(state, analysis, thenVars, thenFlow, thenTaint, elseVars, elseFlow, elseTaint, "then", "else")
 			markUnknownRegions(state)
 		case *frontend.IfLetStmt:
-			valueType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
+			valueType, valueRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
+			if err != nil {
+				return err
+			}
+			valueSecretTainted, err := exprSecretTainted(s.Value, valueType, locals, globals, funcs, types, module, imports, analysis)
 			if err != nil {
 				return err
 			}
@@ -5208,10 +10829,15 @@ func checkStmts(
 				return err
 			}
 			valueResourcePath := s.ValueLocal
+			valueOwnershipPath := valueResourcePath
+			if path, ok := resourcePathForExpr(s.Value); ok {
+				valueOwnershipPath = path
+			}
 			if valueResourcePath != "" {
 				if err := bindResourceTreeFromExpr(valueResourcePath, valueType, s.Value, funcs, types, module, imports, state); err != nil {
 					return err
 				}
+				bindRegionTreeFromExpr(valueResourcePath, valueType, s.Value, valueRegion, types, state)
 			} else if path, ok := resourcePathForExpr(s.Value); ok {
 				valueResourcePath = path
 			}
@@ -5221,37 +10847,58 @@ func checkStmts(
 			}
 			before := copyRegionVars(state.regionVars)
 			beforeFlow := snapshotFlow(state)
+			beforeTaint := analysis.copySecretTaint()
+			analysis.setLocalSecretTaint(s.ValueLocal, valueSecretTainted)
+			beforeTaint = mergeSecretTaintMaps(beforeTaint, analysis.copySecretTaint())
 			state.regionVars = copyRegionVars(before)
 			restoreFlow(state, beforeFlow)
+			analysis.restoreSecretTaint(beforeTaint)
 			if err := withActiveScope(state, scopeIDs.thenID, func() error {
+				if err := bindPatternOwnershipAliases(s.Pattern, s.Name, valueOwnershipPath, valueType, types, module, imports, state); err != nil {
+					return err
+				}
+				if err := bindPatternBorrowedPtrAliases(s.Pattern, s.Name, valueOwnershipPath, valueType, types, module, imports, state); err != nil {
+					return err
+				}
 				if err := bindPatternResourceLocals(s.Pattern, s.Name, valueResourcePath, valueType, types, module, imports, state); err != nil {
 					return err
 				}
-				return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+				if err := bindPatternRegionLocals(s.Pattern, s.Name, valueResourcePath, valueType, types, module, imports, state); err != nil {
+					return err
+				}
+				bindPatternSecretTaintLocals(s.Pattern, s.Name, valueSecretTainted, analysis)
+				return analysis.withSecretControl(valueSecretTainted, func() error {
+					return checkStmts(s.Then, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+				})
 			}); err != nil {
 				return err
 			}
 			thenVars := copyRegionVars(state.regionVars)
 			thenFlow := snapshotFlow(state)
+			thenTaint := analysis.copySecretTaint()
 			var elseVars map[string]int
 			var elseFlow flowSnapshot
+			var elseTaint map[string]bool
 			if len(s.Else) > 0 {
 				state.regionVars = copyRegionVars(before)
 				restoreFlow(state, beforeFlow)
+				analysis.restoreSecretTaint(beforeTaint)
 				if err := withActiveScope(state, scopeIDs.elseID, func() error {
-					return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+					return analysis.withSecretControl(valueSecretTainted, func() error {
+						return checkStmts(s.Else, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+					})
 				}); err != nil {
 					return err
 				}
 				elseVars = copyRegionVars(state.regionVars)
 				elseFlow = snapshotFlow(state)
+				elseTaint = analysis.copySecretTaint()
 			} else {
 				elseVars = before
 				elseFlow = beforeFlow
+				elseTaint = beforeTaint
 			}
-			state.regionVars = mergeRegionVars(thenVars, elseVars)
-			mergeFlow(state, thenFlow, elseFlow)
-			recordMergeConflicts(state, thenVars, elseVars, "then", "else")
+			mergeControlFlowWithLabels(state, analysis, thenVars, thenFlow, thenTaint, elseVars, elseFlow, elseTaint, "then", "else")
 			markUnknownRegions(state)
 		case *frontend.WhileStmt:
 			condType, _, err := checkExprWithEffects(s.Cond, locals, globals, funcs, types, module, imports, state, effects, analysis)
@@ -5261,27 +10908,43 @@ func checkStmts(
 			if !isConditionType(condType) {
 				return fmt.Errorf("%s: condition must be bool or i32/u8", frontend.FormatPos(s.At))
 			}
+			condSecretTainted, err := exprSecretTainted(s.Cond, condType, locals, globals, funcs, types, module, imports, analysis)
+			if err != nil {
+				return err
+			}
 			bodyScopeID := regionNone
 			if scoped, ok := state.whileScopes[s]; ok {
 				bodyScopeID = scoped
 			}
 			before := copyRegionVars(state.regionVars)
 			beforeFlow := snapshotFlow(state)
+			beforeTaint := analysis.copySecretTaint()
 			state.regionVars = copyRegionVars(before)
 			restoreFlow(state, beforeFlow)
+			analysis.restoreSecretTaint(beforeTaint)
 			state.loopDepth++
+			pushLoopFlowFrame(state)
 			if err := withActiveScope(state, bodyScopeID, func() error {
-				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+				return analysis.withSecretControl(condSecretTainted, func() error {
+					return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+				})
 			}); err != nil {
+				popLoopFlowFrame(state)
 				state.loopDepth--
 				return err
 			}
+			loopFrame := popLoopFlowFrame(state)
 			state.loopDepth--
 			bodyVars := copyRegionVars(state.regionVars)
 			bodyFlow := snapshotFlow(state)
-			state.regionVars = mergeRegionVars(before, bodyVars)
-			mergeFlow(state, beforeFlow, bodyFlow)
-			recordMergeConflicts(state, before, bodyVars, "before", "body")
+			bodyTaint := analysis.copySecretTaint()
+			exits := []loopFlowExit{{label: "before", vars: before, flow: beforeFlow, taint: beforeTaint}}
+			if bodyFlow.reachable {
+				exits = append(exits, loopFlowExit{label: "body", vars: bodyVars, flow: bodyFlow, taint: bodyTaint})
+			}
+			exits = append(exits, loopFrame.continues...)
+			exits = append(exits, loopFrame.breaks...)
+			mergeLoopFlowExits(state, analysis, exits)
 			markUnknownRegions(state)
 		case *frontend.ForRangeStmt:
 			if s.Iterable != nil {
@@ -5315,24 +10978,38 @@ func checkStmts(
 			}
 			before := copyRegionVars(state.regionVars)
 			beforeFlow := snapshotFlow(state)
+			beforeTaint := analysis.copySecretTaint()
 			state.regionVars = copyRegionVars(before)
 			restoreFlow(state, beforeFlow)
+			analysis.restoreSecretTaint(beforeTaint)
 			state.loopDepth++
+			pushLoopFlowFrame(state)
 			if err := withActiveScope(state, bodyScopeID, func() error {
 				return checkStmts(s.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
 			}); err != nil {
+				popLoopFlowFrame(state)
 				state.loopDepth--
 				return err
 			}
+			loopFrame := popLoopFlowFrame(state)
 			state.loopDepth--
 			bodyVars := copyRegionVars(state.regionVars)
 			bodyFlow := snapshotFlow(state)
-			state.regionVars = mergeRegionVars(before, bodyVars)
-			mergeFlow(state, beforeFlow, bodyFlow)
-			recordMergeConflicts(state, before, bodyVars, "before", "body")
+			bodyTaint := analysis.copySecretTaint()
+			exits := []loopFlowExit{{label: "before", vars: before, flow: beforeFlow, taint: beforeTaint}}
+			if bodyFlow.reachable {
+				exits = append(exits, loopFlowExit{label: "body", vars: bodyVars, flow: bodyFlow, taint: bodyTaint})
+			}
+			exits = append(exits, loopFrame.continues...)
+			exits = append(exits, loopFrame.breaks...)
+			mergeLoopFlowExits(state, analysis, exits)
 			markUnknownRegions(state)
 		case *frontend.MatchStmt:
-			scrutType, _, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
+			scrutType, scrutRegion, err := checkExprWithEffects(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
+			if err != nil {
+				return err
+			}
+			scrutSecretTainted, err := exprSecretTainted(s.Value, scrutType, locals, globals, funcs, types, module, imports, analysis)
 			if err != nil {
 				return err
 			}
@@ -5344,19 +11021,32 @@ func checkStmts(
 				}
 			}
 			scrutineeResourcePath := s.ScrutineeLocal
+			scrutineeOwnershipPath := scrutineeResourcePath
+			if path, ok := resourcePathForExpr(s.Value); ok {
+				scrutineeOwnershipPath = path
+			}
 			if scrutineeResourcePath != "" {
 				if err := bindResourceTreeFromExpr(scrutineeResourcePath, scrutType, s.Value, funcs, types, module, imports, state); err != nil {
 					return err
 				}
+				bindRegionTreeFromExpr(scrutineeResourcePath, scrutType, s.Value, scrutRegion, types, state)
 			} else if path, ok := resourcePathForExpr(s.Value); ok {
 				scrutineeResourcePath = path
 			}
 			seenDefault := false
 			seenPatterns := map[string]frontend.Position{}
+			scrutineeFunctionPayloads, err := enumPayloadFunctionValuesForMatchExpr(s.Value, locals, globals, funcs, types, module, imports, scrutType)
+			if err != nil {
+				return err
+			}
 			before := copyRegionVars(state.regionVars)
 			beforeFlow := snapshotFlow(state)
+			beforeTaint := analysis.copySecretTaint()
+			analysis.setLocalSecretTaint(s.ScrutineeLocal, scrutSecretTainted)
+			beforeTaint = mergeSecretTaintMaps(beforeTaint, analysis.copySecretTaint())
 			merged := copyRegionVars(before)
 			mergedFlow := beforeFlow
+			mergedTaint := beforeTaint
 			labels := []string{"fallthrough"}
 			caseScopes := state.matchCaseScopes[s]
 			for i, c := range s.Cases {
@@ -5408,14 +11098,29 @@ func checkStmts(
 				}
 				state.regionVars = copyRegionVars(before)
 				restoreFlow(state, beforeFlow)
+				analysis.restoreSecretTaint(beforeTaint)
 				caseScopeID := regionNone
 				if i < len(caseScopes) {
 					caseScopeID = caseScopes[i]
 				}
 				if err := withActiveScope(state, caseScopeID, func() error {
+					if err := bindEnumPatternFunctionPayloadLocals(c.Pattern, scrutineeFunctionPayloads, locals, types, module, imports); err != nil {
+						return err
+					}
+					if err := bindPatternOwnershipAliases(c.Pattern, "", scrutineeOwnershipPath, scrutType, types, module, imports, state); err != nil {
+						return err
+					}
+					if err := bindPatternBorrowedPtrAliases(c.Pattern, "", scrutineeOwnershipPath, scrutType, types, module, imports, state); err != nil {
+						return err
+					}
 					if err := bindPatternResourceLocals(c.Pattern, "", scrutineeResourcePath, scrutType, types, module, imports, state); err != nil {
 						return err
 					}
+					if err := bindPatternRegionLocals(c.Pattern, "", scrutineeResourcePath, scrutType, types, module, imports, state); err != nil {
+						return err
+					}
+					bindPatternSecretTaintLocals(c.Pattern, "", scrutSecretTainted, analysis)
+					caseControlSecretTainted := scrutSecretTainted
 					if c.Guard != nil {
 						guardType, _, err := checkExprWithEffects(c.Guard, locals, globals, funcs, types, module, imports, state, effects, analysis)
 						if err != nil {
@@ -5424,27 +11129,33 @@ func checkStmts(
 						if guardType != "bool" {
 							return fmt.Errorf("%s: match guard must be Bool", frontend.FormatPos(c.Guard.Pos()))
 						}
+						guardSecretTainted, err := exprSecretTainted(c.Guard, guardType, locals, globals, funcs, types, module, imports, analysis)
+						if err != nil {
+							return err
+						}
+						caseControlSecretTainted = caseControlSecretTainted || guardSecretTainted
 					}
-					return checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+					return analysis.withSecretControl(caseControlSecretTainted, func() error {
+						return checkStmts(c.Body, locals, globals, funcs, types, module, imports, returnType, borrowedParams, inoutParams, state, effects, analysis)
+					})
 				}); err != nil {
 					return err
 				}
 				caseVars := copyRegionVars(state.regionVars)
 				caseFlow := snapshotFlow(state)
-				state.regionVars = mergeRegionVars(merged, caseVars)
-				mergeFlow(state, mergedFlow, caseFlow)
-				recordMergeConflicts(state, merged, caseVars, strings.Join(labels, "/"), fmt.Sprintf("case %d", i+1))
+				caseTaint := analysis.copySecretTaint()
+				mergeControlFlowWithLabels(state, analysis, merged, mergedFlow, mergedTaint, caseVars, caseFlow, caseTaint, strings.Join(labels, "/"), fmt.Sprintf("case %d", i+1))
 				merged = copyRegionVars(state.regionVars)
 				mergedFlow = snapshotFlow(state)
+				mergedTaint = analysis.copySecretTaint()
 				labels = append(labels, fmt.Sprintf("case %d", i+1))
 			}
 			if seenDefault {
 				state.regionVars = merged
 				restoreFlow(state, mergedFlow)
+				analysis.restoreSecretTaint(mergedTaint)
 			} else {
-				state.regionVars = mergeRegionVars(before, merged)
-				mergeFlow(state, beforeFlow, mergedFlow)
-				recordMergeConflicts(state, before, merged, "before", "cases")
+				mergeControlFlowWithLabels(state, analysis, before, beforeFlow, beforeTaint, merged, mergedFlow, mergedTaint, "before", "cases")
 			}
 			markUnknownRegions(state)
 		case *frontend.UnsafeStmt:
@@ -5461,8 +11172,11 @@ func checkStmts(
 			}
 			state.exitUnsafe()
 		case *frontend.ExprStmt:
-			_, _, err := checkExprWithEffects(s.Expr, locals, globals, funcs, types, module, imports, state, effects, analysis)
+			tname, _, err := checkExprWithEffects(s.Expr, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
+				return err
+			}
+			if _, err := exprSecretTainted(s.Expr, tname, locals, globals, funcs, types, module, imports, analysis); err != nil {
 				return err
 			}
 		default:
@@ -5470,6 +11184,9 @@ func checkStmts(
 		}
 		if err := state.checkPendingDeferCaptures(stmt.Pos()); err != nil {
 			return err
+		}
+		if !state.reachable {
+			return nil
 		}
 	}
 	return nil
@@ -5743,12 +11460,82 @@ func collectExprLocals(
 		}
 		return collectExprLocals(e.Right, locals, slotIndex, funcs, types, module, imports, scopes, globals)
 	case *frontend.CallExpr:
+		if enumType, caseInfo, ok, err := resolveEnumCaseConstructorCall(e, types, module, imports); err != nil {
+			return err
+		} else if ok {
+			for i, arg := range e.Args {
+				if i >= len(caseInfo.PayloadFunctionTypes) || !caseInfo.PayloadFunctionTypes[i] {
+					continue
+				}
+				if closure, ok := arg.(*frontend.ClosureExpr); ok {
+					label := fmt.Sprintf("%s.%s[%d]", displayTypeName(enumType, module), caseInfo.Name, i+1)
+					if err := configureClosureCaptures(closure, locals, funcs, types, module, true, functionTypedClosureCaptureBoundaryPhrase("function-typed assignment", label)); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		if len(e.ArgLabels) == len(e.Args) {
+			allLabeled := len(e.Args) > 0
+			byLabel := make(map[string]frontend.Expr, len(e.Args))
+			for i, label := range e.ArgLabels {
+				if label == "" {
+					allLabeled = false
+					break
+				}
+				byLabel[label] = e.Args[i]
+			}
+			if allLabeled {
+				typeRef := frontend.TypeRef{At: e.At, Kind: frontend.TypeRefNamed, Name: e.Name}
+				if typeName, err := resolveTypeName(&typeRef, module, imports); err == nil {
+					if info, ok := types[typeName]; ok && info.Kind == TypeStruct {
+						for _, field := range info.Fields {
+							if !field.FunctionTypeValue {
+								continue
+							}
+							arg, ok := byLabel[field.Name]
+							if !ok {
+								continue
+							}
+							if closure, ok := arg.(*frontend.ClosureExpr); ok {
+								label := fmt.Sprintf("%s.%s", displayTypeName(typeName, module), field.Name)
+								if err := configureClosureCaptures(closure, locals, funcs, types, module, true, functionTypedClosureCaptureBoundaryPhrase("function-typed assignment", label)); err != nil {
+									return err
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 		for _, arg := range e.Args {
 			if err := collectExprLocals(arg, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
 			}
 		}
 	case *frontend.StructLitExpr:
+		typeName, err := resolveTypeName(&e.Type, module, imports)
+		if err != nil {
+			return err
+		}
+		if info, ok := types[typeName]; ok && info.Kind == TypeStruct {
+			fieldsByName := map[string]FieldInfo{}
+			for _, field := range info.Fields {
+				fieldsByName[field.Name] = field
+			}
+			for _, field := range e.Fields {
+				fieldInfo, ok := fieldsByName[field.Name]
+				if !ok || !fieldInfo.FunctionTypeValue {
+					continue
+				}
+				if closure, ok := field.Value.(*frontend.ClosureExpr); ok {
+					label := fmt.Sprintf("%s.%s", displayTypeName(typeName, module), fieldInfo.Name)
+					if err := configureClosureCaptures(closure, locals, funcs, types, module, true, functionTypedClosureCaptureBoundaryPhrase("function-typed assignment", label)); err != nil {
+						return err
+					}
+				}
+			}
+		}
 		for _, field := range e.Fields {
 			if err := collectExprLocals(field.Value, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
@@ -5824,7 +11611,14 @@ func collectPatternLocals(
 			if _, exists := locals[binding]; exists {
 				return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(pat.At), binding)
 			}
-			locals[binding] = LocalInfo{Base: *slotIndex, SlotCount: caseInfo.PayloadSlots[i], TypeName: caseInfo.PayloadTypes[i], Mutable: false}
+			localInfo := LocalInfo{Base: *slotIndex, SlotCount: caseInfo.PayloadSlots[i], TypeName: caseInfo.PayloadTypes[i], Mutable: false}
+			if i < len(caseInfo.PayloadFunctionTypes) && caseInfo.PayloadFunctionTypes[i] {
+				localInfo = functionLocalInfoForEnumPayload(caseInfo, i, FunctionFieldInfo{})
+				localInfo.Base = *slotIndex
+				localInfo.SlotCount = caseInfo.PayloadSlots[i]
+				localInfo.TypeName = caseInfo.PayloadTypes[i]
+			}
+			locals[binding] = localInfo
 			if scopes != nil {
 				scopes.localScopes[binding] = scopes.currentScopeID()
 			}
@@ -5877,15 +11671,74 @@ func collectLocals(
 			functionValue := ""
 			genericFunctionValue := false
 			var functionCaptures []frontend.ClosureCapture
+			var functionEscapeCaptures []frontend.ClosureCapture
+			functionTouchesMutableGlobals := false
+			functionReturnSnapshotAlias := false
+			functionDirectSnapshotAlias := false
+			functionEscapeKind := CallableEscapeKind("")
+			functionHandleValue := false
+			functionParamName := ""
 			functionTypeValue := s.Type.Kind == frontend.TypeRefFunction
 			functionParamTypes := []string(nil)
+			functionParamOwnership := []string(nil)
 			functionReturnType := ""
+			functionThrowsType := ""
 			functionEffects := []string(nil)
 			if functionTypeValue {
 				functionParamTypes, functionReturnType, functionEffects, err = functionTypeRefSignatureAndEffects(s.Type, module, imports)
 				if err != nil {
 					return err
 				}
+				functionParamOwnership = functionTypeRefParamOwnership(s.Type)
+				functionThrowsType, err = functionTypeRefThrowsType(s.Type, module, imports)
+				if err != nil {
+					return err
+				}
+			}
+			functionFields, err := functionFieldsFromStructLiteral(s.Name, info, s.Value, locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return err
+			}
+			if len(functionFields) == 0 {
+				functionFields = functionFieldsFromStructAlias(s.Value, locals)
+			}
+			if len(functionFields) == 0 {
+				functionFields, err = functionFieldsFromReturnCall(s.Value, locals, globals, funcs, types, module, imports, resolved)
+				if err != nil {
+					return err
+				}
+			}
+			if len(functionFields) == 0 {
+				functionFields = declaredFunctionFieldsForStructType(resolved, types)
+			}
+			enumPayloadFields, err := enumPayloadFieldsFromStructLiteral(info, s.Value, locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return err
+			}
+			if len(enumPayloadFields) == 0 {
+				enumPayloadFields = enumPayloadFieldsFromStructAlias(s.Value, locals)
+			}
+			if len(enumPayloadFields) == 0 {
+				enumPayloadFields, err = enumPayloadFieldsFromReturnCall(s.Value, locals, globals, funcs, types, module, imports, resolved)
+				if err != nil {
+					return err
+				}
+			}
+			enumPayloadFunctions, err := enumPayloadFunctionsFromConstructor(info, s.Value, locals, globals, funcs, types, module, imports)
+			if err != nil {
+				return err
+			}
+			if len(enumPayloadFunctions) == 0 {
+				enumPayloadFunctions = enumPayloadFunctionsFromAlias(s.Value, locals)
+			}
+			if len(enumPayloadFunctions) == 0 {
+				enumPayloadFunctions, err = enumPayloadFunctionsFromReturnCall(s.Value, locals, globals, funcs, types, module, imports, resolved)
+				if err != nil {
+					return err
+				}
+			}
+			if s.Mutable {
+				enumPayloadFunctions = nil
 			}
 			if closure, ok := s.Value.(*frontend.ClosureExpr); ok {
 				if functionTypeValue {
@@ -5893,71 +11746,186 @@ func collectLocals(
 						return err
 					}
 				}
-				if err := configureClosureCaptures(closure, locals, funcs, types, module); err != nil {
+				captureBoundary := ""
+				if functionTypeValue {
+					captureBoundary = functionTypedClosureCaptureBoundaryPhrase("function-typed assignment", s.Name)
+				}
+				if err := configureClosureCaptures(closure, locals, funcs, types, module, functionTypeValue, captureBoundary); err != nil {
 					return err
+				}
+				if functionTypeValue && len(closure.Captures) > 0 {
+					captureSlots, err := functionCaptureSlotCount(closure.Captures, types)
+					if err != nil {
+						return err
+					}
+					if captureSlots > FnPtrEnvSlotCount {
+						escapeKind, handleValue, err := classifyCallableEscape(callableBoundaryLocal, closure.Captures, types)
+						if err != nil {
+							return err
+						}
+						functionEscapeKind = escapeKind
+						functionHandleValue = handleValue
+					}
 				}
 				functionValue = qualifyName(module, closure.Name)
 				genericFunctionValue = len(closure.Decl.TypeParams) > 0
 				functionCaptures = append([]frontend.ClosureCapture(nil), closure.Captures...)
+				functionDirectSnapshotAlias = len(closure.Captures) > 0
 			} else if functionTypeValue {
 				switch init := s.Value.(type) {
 				case *frontend.IdentExpr:
-					resolved, err := validateFunctionTypeNamedSymbolBinding(s.Name, s.Type, init, locals, globals, funcs, module, imports)
+					resolved, err := validateFunctionTypeNamedSymbolBinding(s.Name, s.Type, init, locals, globals, funcs, types, module, imports, true)
 					if err != nil {
 						return err
 					}
 					functionValue = resolved
-				case *frontend.CallExpr:
-					resolvedCall, err := resolveCheckedCallName(init.Name, funcs, module, imports, init.At)
+					if source, ok := locals[init.Name]; ok {
+						if source.FunctionParamName != "" {
+							functionParamName = source.FunctionParamName
+						} else if source.FunctionTypeValue && source.FunctionValue == "" {
+							functionParamName = init.Name
+						}
+						if len(source.FunctionCaptures) > 0 || len(source.FunctionEscapeCaptures) > 0 {
+							functionCaptures = append([]frontend.ClosureCapture(nil), source.FunctionCaptures...)
+							functionEscapeCaptures = append([]frontend.ClosureCapture(nil), source.FunctionEscapeCaptures...)
+						}
+						functionDirectSnapshotAlias = source.FunctionDirectSnapshotAlias
+						functionEscapeKind = source.FunctionEscapeKind
+						functionHandleValue = source.FunctionHandleValue
+						if len(functionCaptures) > 0 && !functionHandleValue {
+							captureSlots, err := functionCaptureSlotCount(functionCaptures, types)
+							if err != nil {
+								return err
+							}
+							if captureSlots > FnPtrEnvSlotCount {
+								escapeKind, handleValue, err := classifyCallableEscape(callableBoundaryLocal, functionCaptures, types)
+								if err != nil {
+									return err
+								}
+								functionEscapeKind = escapeKind
+								functionHandleValue = handleValue
+							}
+						}
+					}
+				case *frontend.FieldAccessExpr:
+					fieldInfo, ok, err := resolveFunctionFieldArgument(init, locals)
 					if err != nil {
-						return fmt.Errorf("%s: function-typed local '%s' must be initialized with a non-capturing closure literal, immutable symbol-backed alias, function-typed return, or named function/closure symbol in this MVP", frontend.FormatPos(s.At), s.Name)
-					}
-					callSig, ok := funcs[resolvedCall]
-					if !ok {
-						return fmt.Errorf("%s: function-typed local '%s' must be initialized from a known function-typed return in this MVP", frontend.FormatPos(init.At), s.Name)
-					}
-					if !callSig.ReturnFunctionType {
-						return fmt.Errorf("%s: function-typed local '%s' initializer call '%s' does not return a function type", frontend.FormatPos(init.At), s.Name, init.Name)
-					}
-					if callSig.ReturnFunctionSymbol == "" {
-						return fmt.Errorf("%s: function-typed local '%s' initializer call '%s' has no stable function target in this MVP", frontend.FormatPos(init.At), s.Name, init.Name)
-					}
-					targetSig, ok := funcs[callSig.ReturnFunctionSymbol]
-					if !ok {
-						return fmt.Errorf("%s: unknown returned function symbol '%s'", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol)
-					}
-					if targetSig.Generic {
-						return fmt.Errorf("%s: generic function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol, s.Name)
-					}
-					if targetSig.ThrowsType != "" {
-						return fmt.Errorf("%s: throwing function symbol '%s' is not supported for function-typed local '%s' in this MVP", frontend.FormatPos(init.At), callSig.ReturnFunctionSymbol, s.Name)
-					}
-					if err := validateFunctionTypeSymbolSignature(s.Name, s.Type, targetSig, module, imports, init.At); err != nil {
 						return err
 					}
-					functionValue = callSig.ReturnFunctionSymbol
+					if ok && fieldInfo.FunctionValue == "" && functionFieldInfoHasTargetSet(fieldInfo) {
+						targetInfo := LocalInfo{
+							FunctionTypeValue:      true,
+							FunctionParamTypes:     append([]string(nil), functionParamTypes...),
+							FunctionParamOwnership: append([]string(nil), functionParamOwnership...),
+							FunctionReturnType:     functionReturnType,
+							FunctionThrowsType:     functionThrowsType,
+							FunctionEffects:        append([]string(nil), functionEffects...),
+						}
+						if err := validateFunctionInfoAssignable(s.Name, targetInfo, functionFieldInfoSig(fieldInfo), init.At); err != nil {
+							return err
+						}
+						functionParamName = fieldInfo.FunctionParamName
+						functionCaptures = append([]frontend.ClosureCapture(nil), fieldInfo.FunctionCaptures...)
+						functionEscapeCaptures = append([]frontend.ClosureCapture(nil), fieldInfo.FunctionEscapeCaptures...)
+						functionDirectSnapshotAlias = fieldInfo.FunctionDirectSnapshotAlias
+						break
+					}
+					if !ok || fieldInfo.FunctionValue == "" {
+						if globalInfo, globalSig, globalOK, err := resolveFunctionTypedGlobalFieldAccess(init, globals, funcs); err != nil {
+							return err
+						} else if globalOK {
+							if globalSig.Generic {
+								return unsupportedGenericFunctionTypedLocalInitializerError(init.At, callbackArgumentName(init), s.Name)
+							}
+							if err := validateFunctionTypeSymbolSignature(s.Name, s.Type, globalSig, module, imports, init.At); err != nil {
+								return err
+							}
+							functionValue = globalInfo.FunctionValue
+							break
+						}
+						return unsupportedFunctionTypedLocalInitializerSourceError(init.At, s.Name)
+					}
+					targetSig, ok := funcs[fieldInfo.FunctionValue]
+					if !ok {
+						return fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(init.At), fieldInfo.FunctionValue)
+					}
+					if targetSig.Generic {
+						return unsupportedGenericFunctionTypedLocalInitializerError(init.At, callbackArgumentName(init), s.Name)
+					}
+					if err := validateFunctionTypeSymbolSignature(s.Name, s.Type, functionFieldInfoSig(fieldInfo), module, imports, init.At); err != nil {
+						return err
+					}
+					functionValue = fieldInfo.FunctionValue
+					functionParamName = fieldInfo.FunctionParamName
+					functionCaptures = append([]frontend.ClosureCapture(nil), fieldInfo.FunctionCaptures...)
+					functionEscapeCaptures = append([]frontend.ClosureCapture(nil), fieldInfo.FunctionEscapeCaptures...)
+					functionDirectSnapshotAlias = fieldInfo.FunctionDirectSnapshotAlias
+					functionEscapeKind = fieldInfo.FunctionEscapeKind
+					functionHandleValue = fieldInfo.FunctionHandleValue
+				case *frontend.CallExpr:
+					resolved, err := validateFunctionTypeReturnCallBinding(s.Name, s.Type, init, funcs, module, imports)
+					if err != nil {
+						return err
+					}
+					functionValue = resolved
+					metadataValue, metadataCaptures, metadataEscapeCaptures, metadataParamName, err := functionAssignmentMetadataWithReturnParamRefs(init, locals, globals, funcs, types, module, imports)
+					if err != nil {
+						return err
+					}
+					if metadataValue != "" {
+						functionValue = metadataValue
+					}
+					functionParamName = metadataParamName
+					functionCaptures = append([]frontend.ClosureCapture(nil), metadataCaptures...)
+					functionEscapeCaptures = append([]frontend.ClosureCapture(nil), metadataEscapeCaptures...)
+					functionReturnSnapshotAlias = isFunctionReturnSnapshotAlias(init, funcs, metadataCaptures, metadataEscapeCaptures, metadataParamName)
+					functionDirectSnapshotAlias = false
+					if callSig, ok := funcs[init.Name]; ok && callSig.ReturnFunctionHandleValue {
+						functionEscapeKind = callSig.ReturnFunctionEscapeKind
+						functionHandleValue = callSig.ReturnFunctionHandleValue
+					}
 				default:
-					return fmt.Errorf("%s: function-typed local '%s' must be initialized with a non-capturing closure literal or named function/closure symbol in this MVP", frontend.FormatPos(s.At), s.Name)
+					return unsupportedFunctionTypedLocalInitializerSourceError(s.At, s.Name)
+				}
+				functionTouchesMutableGlobals, err = functionAssignmentValueTouchesMutableGlobals(s.Value, locals, globals, funcs, types, module, imports)
+				if err != nil {
+					return err
 				}
 			}
+			localSlotCount := info.SlotCount
+			if functionTypeValue && functionHandleValue {
+				localSlotCount = CallableHandleSlotCount
+			}
 			locals[s.Name] = LocalInfo{
-				Base:                 *slotIndex,
-				SlotCount:            info.SlotCount,
-				TypeName:             resolved,
-				Mutable:              s.Mutable,
-				Const:                s.Const,
-				FunctionValue:        functionValue,
-				GenericFunctionValue: genericFunctionValue,
-				FunctionCaptures:     functionCaptures,
-				FunctionTypeValue:    functionTypeValue,
-				FunctionParamTypes:   functionParamTypes,
-				FunctionReturnType:   functionReturnType,
-				FunctionEffects:      functionEffects,
+				Base:                          *slotIndex,
+				SlotCount:                     localSlotCount,
+				TypeName:                      resolved,
+				Mutable:                       s.Mutable,
+				Const:                         s.Const,
+				FunctionValue:                 functionValue,
+				FunctionParamName:             functionParamName,
+				GenericFunctionValue:          genericFunctionValue,
+				FunctionCaptures:              functionCaptures,
+				FunctionEscapeCaptures:        functionEscapeCaptures,
+				FunctionTouchesMutableGlobals: functionTouchesMutableGlobals,
+				FunctionReturnSnapshotAlias:   functionReturnSnapshotAlias,
+				FunctionDirectSnapshotAlias:   functionDirectSnapshotAlias,
+				FunctionEscapeKind:            functionEscapeKind,
+				FunctionHandleValue:           functionHandleValue,
+				FunctionTypeValue:             functionTypeValue,
+				FunctionParamTypes:            functionParamTypes,
+				FunctionParamOwnership:        functionParamOwnership,
+				FunctionReturnType:            functionReturnType,
+				FunctionThrowsType:            functionThrowsType,
+				FunctionEffects:               functionEffects,
+				FunctionFields:                functionFields,
+				EnumPayloadFunctions:          enumPayloadFunctions,
+				EnumPayloadFields:             enumPayloadFields,
 			}
 			if scopes != nil {
 				scopes.localScopes[s.Name] = scopes.currentScopeID()
 			}
-			*slotIndex += info.SlotCount
+			*slotIndex += localSlotCount
 			if err := collectExprLocals(s.Value, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
 			}
@@ -6239,6 +12207,10 @@ func collectLocals(
 			}
 			*slotIndex += info.SlotCount
 			caseScopeIDs := make([]int, len(s.Cases))
+			scrutineeFunctionPayloads, err := enumPayloadFunctionValuesForMatchExpr(s.Value, locals, globals, funcs, types, module, imports, scrutType)
+			if err != nil {
+				return err
+			}
 			for i, c := range s.Cases {
 				if scopes != nil {
 					caseScopeIDs[i] = scopes.enterScope()
@@ -6292,16 +12264,26 @@ func collectLocals(
 						if j < len(caseInfo.PayloadSlots) {
 							slots = caseInfo.PayloadSlots[j]
 						}
-						locals[binding] = LocalInfo{
+						localInfo := LocalInfo{
 							Base:      *slotIndex,
 							SlotCount: slots,
 							TypeName:  caseInfo.PayloadTypes[j],
 							Mutable:   false,
 						}
+						if j < len(caseInfo.PayloadFunctionTypes) && caseInfo.PayloadFunctionTypes[j] {
+							localInfo = functionLocalInfoForEnumPayload(caseInfo, j, FunctionFieldInfo{})
+							localInfo.Base = *slotIndex
+							localInfo.SlotCount = slots
+							localInfo.TypeName = caseInfo.PayloadTypes[j]
+						}
+						locals[binding] = localInfo
 						if scopes != nil {
 							scopes.localScopes[binding] = scopes.currentScopeID()
 						}
 						*slotIndex += slots
+					}
+					if err := bindEnumPatternFunctionPayloadLocals(enumPat, scrutineeFunctionPayloads, locals, types, module, imports); err != nil {
+						return err
 					}
 				}
 				if c.Guard != nil {
@@ -6369,6 +12351,61 @@ func collectLocals(
 			}
 			if err := collectExprLocals(s.Value, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
+			}
+			if id, ok := s.Target.(*frontend.IdentExpr); ok {
+				if local, exists := locals[id.Name]; exists && local.Mutable {
+					if local.FunctionTypeValue {
+						if _, ok := s.Value.(*frontend.ClosureExpr); ok {
+							_ = updateFunctionTypedLocalAssignmentMetadata(id.Name, s.Value, locals, globals, funcs, types, module, imports)
+							local = locals[id.Name]
+						}
+					}
+					info, infoOK := types[local.TypeName]
+					if infoOK && info.Kind == TypeEnum {
+						payloads, err := enumPayloadFunctionsFromConstructor(info, s.Value, locals, globals, funcs, types, module, imports)
+						if err != nil {
+							return err
+						}
+						if len(payloads) == 0 {
+							payloads = enumPayloadFunctionsFromAlias(s.Value, locals)
+						}
+						if len(payloads) == 0 {
+							payloads, err = enumPayloadFunctionsFromReturnCall(s.Value, locals, globals, funcs, types, module, imports, local.TypeName)
+							if err != nil {
+								return err
+							}
+						}
+						local.EnumPayloadFunctions = payloads
+						locals[id.Name] = local
+					}
+					if infoOK && info.Kind == TypeStruct {
+						payloadFields, err := enumPayloadFieldsFromReturnedStructExpr(local.TypeName, s.Value, locals, globals, funcs, types, module, imports)
+						if err != nil {
+							return err
+						}
+						if len(payloadFields) > 0 || len(local.EnumPayloadFields) > 0 {
+							local.EnumPayloadFields = cloneFunctionFieldMap(payloadFields)
+							locals[id.Name] = local
+						}
+					}
+				}
+			} else {
+				if targetName, fieldInfo, ok, err := functionFieldLocalInfoFromExpr(s.Target, locals, types); err != nil {
+					return err
+				} else if ok {
+					if _, closure := s.Value.(*frontend.ClosureExpr); closure {
+						_ = updateFunctionTypedFieldAssignmentMetadata(targetName, fieldInfo, s.Value, locals, globals, funcs, types, module, imports)
+					}
+				}
+				targetType, err := inferExprTypeForDecl(s.Target, locals, globals, funcs, types, module, imports)
+				if err != nil {
+					return err
+				}
+				if info, ok := types[targetType]; ok && (info.Kind == TypeEnum || info.Kind == TypeStruct) {
+					if err := updateEnumPayloadStructFieldAssignmentMetadata(s.Target, targetType, s.Value, locals, globals, funcs, types, module, imports); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}

@@ -154,7 +154,7 @@ func TestVerifyWASMBackendPlanRequiresConcreteGateCommands(t *testing.T) {
 	body := strings.Join([]string{
 		"# WASM Backend Plan",
 		"",
-		"Status: planned",
+		"Status: current",
 		"",
 		"## Targets",
 		"",
@@ -173,7 +173,7 @@ func TestVerifyWASMBackendPlanRequiresConcreteGateCommands(t *testing.T) {
 		"",
 		"- `go run ./tools/cmd/validate-targets`",
 		"- `./tetra smoke --target wasm32-wasi --run=false`",
-		"- `bash scripts/release_v1_0_gate.sh`",
+		"- `bash scripts/release/v1_0/gate.sh`",
 		"- wasmtime",
 		"- browser automation",
 	}, "\n")
@@ -190,6 +190,57 @@ func TestVerifyWASMBackendPlanRequiresConcreteGateCommands(t *testing.T) {
 	}
 }
 
+func TestVerifyMemoryProductionContractDocsRejectsIncompleteContract(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:   filepath.Join(dir, "runtime_abi.md"),
+		Ownership:    filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:       filepath.Join(dir, "unsafe.md"),
+		Capabilities: filepath.Join(dir, "capabilities.md"),
+		Stdlib:       filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:  filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:   filepath.Join(dir, "memory.tetra"),
+	}
+	for _, path := range []string{paths.RuntimeABI, paths.Ownership, paths.Unsafe, paths.Capabilities, paths.Stdlib, paths.StdlibGuide, paths.CoreMemory} {
+		if err := os.WriteFile(path, []byte("memory docs\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyMemoryProductionContractDocs(paths)
+	if err == nil {
+		t.Fatalf("expected incomplete memory production contract failure")
+	}
+	for _, want := range []string{"runtime_abi.md", "Linux-x64 Memory Production ABI", "runtime bounds diagnostics"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected %q in error, got %v", want, err)
+		}
+	}
+}
+
+func TestVerifyMemoryProductionContractDocsAcceptsRequiredContract(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:   filepath.Join(dir, "runtime_abi.md"),
+		Ownership:    filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:       filepath.Join(dir, "unsafe.md"),
+		Capabilities: filepath.Join(dir, "capabilities.md"),
+		Stdlib:       filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:  filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:   filepath.Join(dir, "memory.tetra"),
+	}
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		body := strings.Join(requirement.Required, "\n")
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := verifyMemoryProductionContractDocs(paths); err != nil {
+		t.Fatalf("verifyMemoryProductionContractDocs: %v", err)
+	}
+}
+
 func TestVerifyFeatureRegistryAcceptsRequiredStatuses(t *testing.T) {
 	features := []featureManifest{
 		{ID: "cli.core", Name: "CLI", Status: "current", Since: "v0.2.0", Scope: "core CLI", Stability: "supported", Docs: []string{"docs/spec/current_supported_surface.md"}},
@@ -197,19 +248,23 @@ func TestVerifyFeatureRegistryAcceptsRequiredStatuses(t *testing.T) {
 		{ID: "language.generics-mvp", Name: "Generics MVP", Status: "current", Since: "v0.2.0", Scope: "statically monomorphized generic functions with no runtime generic values or dynamic dispatch", Stability: "supported static MVP; generic structs remain future/post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.protocol-conformance-mvp", Name: "Protocol conformance MVP", Status: "current", Since: "v0.2.0", Scope: "checked statically with generic requirement signature shape and no witness tables", Stability: "dynamic dispatch remain post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.callable-mvp", Name: "Callable MVP", Status: "current", Since: "v0.2.0", Scope: "Level 0 callable surface", Stability: "current constrained MVP", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md"}},
-		{ID: "targets.wasm-build-only", Name: "WASM build-only", Status: "current", Since: "v0.2.0", Scope: "build-only smoke", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
-		{ID: "stdlib.experimental-mirrors", Name: "Experimental mirrors", Status: "experimental", Since: "v0.2.0", Scope: "stdlib mirrors", Stability: "experimental", Docs: []string{"docs/user/standard_library_guide.md"}},
-		{ID: "language.callable-level1", Name: "Callable Level 1", Status: "experimental", Scope: "non-capturing callable expansion", Stability: "experimental, not v0.2.0 stable", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "language.enum-payload-match", Name: "Enum payload", Status: "experimental", Scope: "positional enum payload constructors plus exhaustive enum match/catch", Stability: "experimental next-cycle slice, not v0.2.0 stable", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
+		{ID: "targets.wasm-artifact-preflight", Name: "WASM artifact/import preflight", Status: "current", Since: "v0.2.0", Scope: "artifact/import smoke", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "stdlib.experimental-mirrors", Name: "Standard-library compatibility mirrors", Status: "current", Since: "v0.4.0", Scope: "production compatibility mirrors forward to lib.core modules", Stability: "stable callers should import lib.core directly", Docs: []string{"docs/spec/stdlib.md", "docs/spec/stdlib_naming_versioning.md", "docs/user/standard_library_guide.md"}},
+		{ID: "language.callable-level1", Name: "Callable Level 1", Status: "current", Since: "v0.4.0", Scope: "production non-capturing symbol-backed callable Level 1 with function-typed locals, aliases, callbacks, and symbol-backed returns", Stability: "captured closure escape and full first-class function values remain out of scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_feature_status.md"}},
+		{ID: "language.enum-payload-match", Name: "Enum payload", Status: "current", Since: "v0.3.0", Scope: "positional enum payload constructors and payload bindings for match/catch/if-let, with exhaustive unguarded enum match/catch", Stability: "nested destructuring patterns and guard expansion remain future/post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"}},
+		{ID: "language.protocol-bound-generics-static", Name: "Static protocol-bound generics", Status: "current", Since: "v0.3.0", Scope: "validated statically during monomorphization with same-module and cross-module impl conformance plus visibility diagnostics", Stability: "calling protocol requirements through generic bounds and dynamic dispatch remain unsupported", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"}},
 		{ID: "language.ownership-markers-mvp", Name: "Ownership markers MVP", Status: "current", Since: "v0.2.0", Scope: "conservative borrow/inout/consume marker checks with use-after-consume and borrow escape diagnostics", Stability: "supported conservative MVP; not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.resource-lifetime-mvp", Name: "Resource lifetime MVP", Status: "current", Since: "v0.2.0", Scope: "conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them, including double-use and ambiguous provenance diagnostics", Stability: "supported conservative MVP; tracks common local scope and control-flow merge cases, but is not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "actors.task-transfer-safety", Name: "Actor/task transfer safety MVP", Status: "current", Since: "v0.2.0", Scope: "conservative actor/task ownership transfer checks for worker entrypoints and use-after-transfer diagnostics", Stability: "supported conservative local MVP; distributed actors remain outside current support", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "language.lifetime-ssa", Name: "Lifetime SSA solver", Status: "planned", Scope: "planned full SSA lifetime analysis with precise merge reasoning", Stability: "planned; no current v0.2.0 support guarantee and not required for the conservative ownership/resource MVP", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "language.callable-level2", Name: "Callable Level 2", Status: "planned", Scope: "captured closures and escape model", Stability: "planned", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "wasm.runtime-execution", Name: "WASM runtime", Status: "planned", Scope: "runner", Stability: "planned", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "language.lifetime-ssa", Name: "Lifetime SSA local join solver", Status: "current", Since: "v0.4.0", Scope: "production SSA-like local lifetime join analysis for ownership consume state, resource finalization state, branch/match/loop flow snapshots, and maybe-consumed diagnostics", Stability: "current local/control-flow solver; richer interprocedural lifetime proofs, broad alias modeling, race proofs, and full formal lifetime guarantees remain under full-v1 scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
+		{ID: "language.callable-level2", Name: "Callable Level 2", Status: "current", Since: "v0.4.0", Scope: "production captured closure Level 2 slice with function-typed locals called directly", Stability: "captured callback passing and full first-class callable semantics remain out of scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_feature_status.md"}},
+		{ID: "ui.metadata-v1", Name: "UI metadata v1", Status: "current", Since: "v0.4.0", Scope: "production UI metadata contract with deterministic tetra.ui.v1 JSON", Stability: "web command dispatch; native widgets remain post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"}},
+		{ID: "ui.native-runtime", Name: "Linux-x64 native UI runtime", Status: "current", Since: "v0.4.0", Scope: "production Linux-x64 native UI runtime path with native runtime widget instances, click/activate events, and state and widget updates", Stability: "tetra.ui.native-runtime.v1 smoke evidence rejects metadata-only, web-only, native-shell sidecar-only evidence; macOS/Windows remain outside this claim", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"}},
+		{ID: "wasm.runtime-execution", Name: "WASM runtime execution", Status: "current", Since: "v0.4.0", Scope: "production WASI runner and browser-backed wasm32-web execution", Stability: "supported with runner/browser availability diagnostics", Docs: []string{"docs/spec/current_supported_surface.md", "docs/backend/wasm_backend_plan.md", "docs/user/wasm_ui_guide.md"}},
+		{ID: "actors.distributed-runtime", Name: "Distributed actor runtime for Linux x64", Status: "current", Since: "v0.4.0", Scope: "production Linux-x64 distributed actor runtime path with actornet loopback TCP broker, distributed node identity, remote actor handles, and network mailbox send/receive", Stability: "current Linux-x64 runtime/lowering slice with executable tetra.actors.distributed-runtime.v1 smoke evidence; non-Linux-x64 targets remain outside this claim", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/actors.md", "docs/user/async_actors_guide.md"}},
 		{ID: "language.full-v1-guarantees", Name: "v1", Status: "planned", Scope: "v1", Stability: "planned", Docs: []string{"docs/spec/v1_scope.md"}},
 		{ID: "eco.distributed-network", Name: "EcoNet", Status: "post-v1", Scope: "network", Stability: "deferred", Docs: []string{"docs/release/post_v1_promotion_checklist.md"}},
-		{ID: "language.full-first-class-callables", Name: "Callables", Status: "post-v1", Scope: "callables", Stability: "deferred", Docs: []string{"docs/spec/v1_feature_status.md"}},
+		{ID: "language.full-first-class-callables", Name: "Callables", Status: "current", Since: "v0.4.0", Scope: "safe by-value first-class callable semantics", Stability: "current safe-capture model", Docs: []string{"docs/spec/v1_feature_status.md"}},
 	}
 	if err := verifyFeatureRegistry(features); err != nil {
 		t.Fatalf("verifyFeatureRegistry: %v", err)
@@ -223,25 +278,29 @@ func TestVerifyFeatureRegistryRejectsFutureMismatch(t *testing.T) {
 		{ID: "language.generics-mvp", Name: "Generics MVP", Status: "current", Since: "v0.2.0", Scope: "statically monomorphized generic functions with no runtime generic values or dynamic dispatch", Stability: "supported static MVP; generic structs remain future/post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.protocol-conformance-mvp", Name: "Protocol conformance MVP", Status: "current", Since: "v0.2.0", Scope: "checked statically with generic requirement signature shape and no witness tables", Stability: "dynamic dispatch remain post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.callable-mvp", Name: "Callable MVP", Status: "current", Since: "v0.2.0", Scope: "Level 0 callable surface", Stability: "current constrained MVP", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md"}},
-		{ID: "targets.wasm-build-only", Name: "WASM build-only", Status: "current", Since: "v0.2.0", Scope: "build-only smoke", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
-		{ID: "stdlib.experimental-mirrors", Name: "Experimental mirrors", Status: "experimental", Since: "v0.2.0", Scope: "stdlib mirrors", Stability: "experimental", Docs: []string{"docs/user/standard_library_guide.md"}},
-		{ID: "language.callable-level1", Name: "Callable Level 1", Status: "experimental", Scope: "non-capturing callable expansion", Stability: "experimental, not v0.2.0 stable", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "language.enum-payload-match", Name: "Enum payload", Status: "experimental", Scope: "positional enum payload constructors plus exhaustive enum match/catch", Stability: "experimental next-cycle slice, not v0.2.0 stable", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
+		{ID: "targets.wasm-artifact-preflight", Name: "WASM artifact/import preflight", Status: "current", Since: "v0.2.0", Scope: "artifact/import smoke", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "stdlib.experimental-mirrors", Name: "Standard-library compatibility mirrors", Status: "current", Since: "v0.4.0", Scope: "production compatibility mirrors forward to lib.core modules", Stability: "stable callers should import lib.core directly", Docs: []string{"docs/spec/stdlib.md", "docs/spec/stdlib_naming_versioning.md", "docs/user/standard_library_guide.md"}},
+		{ID: "language.callable-level1", Name: "Callable Level 1", Status: "current", Since: "v0.4.0", Scope: "production non-capturing symbol-backed callable Level 1 with function-typed locals, aliases, callbacks, and symbol-backed returns", Stability: "captured closure escape and full first-class function values remain out of scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_feature_status.md"}},
+		{ID: "language.enum-payload-match", Name: "Enum payload", Status: "current", Since: "v0.3.0", Scope: "positional enum payload constructors and payload bindings for match/catch/if-let, with exhaustive unguarded enum match/catch", Stability: "nested destructuring patterns and guard expansion remain future/post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"}},
+		{ID: "language.protocol-bound-generics-static", Name: "Static protocol-bound generics", Status: "current", Since: "v0.3.0", Scope: "validated statically during monomorphization with same-module and cross-module impl conformance plus visibility diagnostics", Stability: "calling protocol requirements through generic bounds and dynamic dispatch remain unsupported", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"}},
 		{ID: "language.ownership-markers-mvp", Name: "Ownership markers MVP", Status: "current", Since: "v0.2.0", Scope: "conservative borrow/inout/consume marker checks with use-after-consume and borrow escape diagnostics", Stability: "supported conservative MVP; not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.resource-lifetime-mvp", Name: "Resource lifetime MVP", Status: "current", Since: "v0.2.0", Scope: "conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them, including double-use and ambiguous provenance diagnostics", Stability: "supported conservative MVP; tracks common local scope and control-flow merge cases, but is not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "actors.task-transfer-safety", Name: "Actor/task transfer safety MVP", Status: "current", Since: "v0.2.0", Scope: "conservative actor/task ownership transfer checks for worker entrypoints and use-after-transfer diagnostics", Stability: "supported conservative local MVP; distributed actors remain outside current support", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "language.lifetime-ssa", Name: "Lifetime SSA solver", Status: "planned", Scope: "planned full SSA lifetime analysis with precise merge reasoning", Stability: "planned; no current v0.2.0 support guarantee and not required for the conservative ownership/resource MVP", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "language.callable-level2", Name: "Callable Level 2", Status: "planned", Scope: "captured closures and escape model", Stability: "planned", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "wasm.runtime-execution", Name: "WASM runtime", Status: "current", Since: "v0.2.0", Scope: "runner", Stability: "supported", Docs: []string{"docs/backend/wasm_backend_plan.md"}},
+		{ID: "language.lifetime-ssa", Name: "Lifetime SSA solver", Status: "planned", Scope: "stale planned lifetime solver fixture", Stability: "unsupported stale fixture", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
+		{ID: "language.callable-level2", Name: "Callable Level 2", Status: "current", Since: "v0.4.0", Scope: "production captured closure Level 2 slice with function-typed locals called directly", Stability: "captured callback passing and full first-class callable semantics remain out of scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_feature_status.md"}},
+		{ID: "ui.metadata-v1", Name: "UI metadata v1", Status: "current", Since: "v0.4.0", Scope: "production UI metadata contract with deterministic tetra.ui.v1 JSON", Stability: "web command dispatch; native widgets remain post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"}},
+		{ID: "ui.native-runtime", Name: "Linux-x64 native UI runtime", Status: "current", Since: "v0.4.0", Scope: "production Linux-x64 native UI runtime path with native runtime widget instances, click/activate events, and state and widget updates", Stability: "tetra.ui.native-runtime.v1 smoke evidence rejects metadata-only, web-only, native-shell sidecar-only evidence; macOS/Windows remain outside this claim", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"}},
+		{ID: "wasm.runtime-execution", Name: "WASM runtime execution", Status: "current", Since: "v0.4.0", Scope: "production WASI runner and browser-backed wasm32-web execution", Stability: "supported with runner/browser availability diagnostics", Docs: []string{"docs/spec/current_supported_surface.md", "docs/backend/wasm_backend_plan.md", "docs/user/wasm_ui_guide.md"}},
+		{ID: "actors.distributed-runtime", Name: "Distributed actor runtime for Linux x64", Status: "current", Since: "v0.4.0", Scope: "production Linux-x64 distributed actor runtime path with actornet loopback TCP broker, distributed node identity, remote actor handles, and network mailbox send/receive", Stability: "current Linux-x64 runtime/lowering slice with executable tetra.actors.distributed-runtime.v1 smoke evidence; non-Linux-x64 targets remain outside this claim", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/actors.md", "docs/user/async_actors_guide.md"}},
 		{ID: "language.full-v1-guarantees", Name: "v1", Status: "planned", Scope: "v1", Stability: "planned", Docs: []string{"docs/spec/v1_scope.md"}},
 		{ID: "eco.distributed-network", Name: "EcoNet", Status: "post-v1", Scope: "network", Stability: "deferred", Docs: []string{"docs/release/post_v1_promotion_checklist.md"}},
-		{ID: "language.full-first-class-callables", Name: "Callables", Status: "post-v1", Scope: "callables", Stability: "deferred", Docs: []string{"docs/spec/v1_feature_status.md"}},
+		{ID: "language.full-first-class-callables", Name: "Callables", Status: "current", Since: "v0.4.0", Scope: "safe by-value first-class callable semantics", Stability: "current safe-capture model", Docs: []string{"docs/spec/v1_feature_status.md"}},
 	}
 	err := verifyFeatureRegistry(features)
 	if err == nil {
 		t.Fatalf("expected future mismatch failure")
 	}
-	if !strings.Contains(err.Error(), "wasm.runtime-execution") || !strings.Contains(err.Error(), "want planned") {
+	if !strings.Contains(err.Error(), "language.lifetime-ssa") || !strings.Contains(err.Error(), "want current") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strings"
 	"testing"
 
 	"tetra_language/compiler/internal/format/tobj"
@@ -142,6 +143,42 @@ func TestLinkX64ObjectsRejectsMissingTarget(t *testing.T) {
 	}
 }
 
+func TestLinkX64ObjectsRejectsIncompatibleEntrySignature(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+	tests := []struct {
+		name string
+		sym  tobj.Symbol
+	}{
+		{
+			name: "entry_has_params",
+			sym:  tobj.Symbol{Name: "main", Offset: 0, HasSignature: true, ParamSlots: 1, ReturnSlots: 1},
+		},
+		{
+			name: "entry_has_two_returns",
+			sym:  tobj.Symbol{Name: "main", Offset: 0, HasSignature: true, ParamSlots: 0, ReturnSlots: 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := LinkX64Objects([]*tobj.Object{
+				{
+					Target:  "linux-x64",
+					Module:  "m",
+					Code:    []byte{0xC3},
+					Symbols: []tobj.Symbol{tt.sym},
+				},
+			}, "main", stub, stubCallAt, 0)
+			if err == nil {
+				t.Fatalf("expected incompatible entry signature error")
+			}
+			if !strings.Contains(err.Error(), "entry symbol 'main' has incompatible signature") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestLinkX64ObjectsRejectsMixedTargets(t *testing.T) {
 	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
 	stubCallAt := 1
@@ -151,6 +188,155 @@ func TestLinkX64ObjectsRejectsMixedTargets(t *testing.T) {
 	}, "main", stub, stubCallAt, 0)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
+	}
+}
+
+func TestLinkX64ObjectsRejectsSymbolOffsetOutOfRange(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+	for _, tc := range []struct {
+		name   string
+		offset uint32
+	}{
+		{name: "one_past_end", offset: 1},
+		{name: "past_end", offset: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LinkX64Objects([]*tobj.Object{
+				{
+					Target:  "linux-x64",
+					Module:  "m",
+					Code:    []byte{0xC3},
+					Symbols: []tobj.Symbol{{Name: "main", Offset: tc.offset}},
+				},
+			}, "main", stub, stubCallAt, 0)
+			if err == nil {
+				t.Fatalf("expected symbol offset error, got nil")
+			}
+			if !strings.Contains(err.Error(), "symbol offset out of range") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestLinkX64ObjectsRejectsEmptySymbolName(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+	_, err := LinkX64Objects([]*tobj.Object{
+		{
+			Target:  "linux-x64",
+			Module:  "m",
+			Code:    []byte{0xC3},
+			Symbols: []tobj.Symbol{{Name: "", Offset: 0}, {Name: "main", Offset: 0}},
+		},
+	}, "main", stub, stubCallAt, 0)
+	if err == nil {
+		t.Fatalf("expected empty symbol name error, got nil")
+	}
+	if !strings.Contains(err.Error(), "empty symbol name") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLinkX64ObjectsRejectsEmptyCallRelocName(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+	_, err := LinkX64Objects([]*tobj.Object{
+		{
+			Target:  "linux-x64",
+			Module:  "m",
+			Code:    []byte{0xE8, 0, 0, 0, 0, 0xC3},
+			Symbols: []tobj.Symbol{{Name: "main", Offset: 0}},
+			Relocs:  []tobj.Reloc{{Kind: tobj.RelocCallRel32, At: 1, Name: ""}},
+		},
+	}, "main", stub, stubCallAt, 0)
+	if err == nil {
+		t.Fatalf("expected empty call relocation symbol name error, got nil")
+	}
+	if !strings.Contains(err.Error(), "call relocation with empty symbol name") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLinkX64ObjectsRejectsEmptyIATRelocName(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+	_, err := LinkX64Objects([]*tobj.Object{
+		{
+			Target:  "windows-x64",
+			Module:  "m",
+			Code:    []byte{0xFF, 0x15, 0, 0, 0, 0, 0xC3},
+			Symbols: []tobj.Symbol{{Name: "main", Offset: 0}},
+			Relocs:  []tobj.Reloc{{Kind: tobj.RelocIATDisp32, At: 2, Name: ""}},
+		},
+	}, "main", stub, stubCallAt, 0)
+	if err == nil {
+		t.Fatalf("expected empty IAT relocation symbol name error, got nil")
+	}
+	if !strings.Contains(err.Error(), "IAT relocation with empty symbol name") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLinkX64ObjectsRejectsNonDataRelocationAddends(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+	tests := []struct {
+		name  string
+		reloc tobj.Reloc
+		want  string
+	}{
+		{
+			name:  "call",
+			reloc: tobj.Reloc{Kind: tobj.RelocCallRel32, At: 1, Name: "main", Addend: 7},
+			want:  "call relocation addend must be zero",
+		},
+		{
+			name:  "iat",
+			reloc: tobj.Reloc{Kind: tobj.RelocIATDisp32, At: 2, Name: "kernel32.VirtualAlloc", Addend: 7},
+			want:  "IAT relocation addend must be zero",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := LinkX64Objects([]*tobj.Object{
+				{
+					Target:  "linux-x64",
+					Module:  "m",
+					Code:    []byte{0xE8, 0, 0, 0, 0, 0xC3},
+					Symbols: []tobj.Symbol{{Name: "main", Offset: 0}},
+					Relocs:  []tobj.Reloc{tt.reloc},
+				},
+			}, "main", stub, stubCallAt, 0)
+			if err == nil {
+				t.Fatalf("expected non-data relocation addend error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestLinkX64ObjectsRejectsNamedDataRelocation(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+	_, err := LinkX64Objects([]*tobj.Object{
+		{
+			Target:  "linux-x64",
+			Module:  "m",
+			Code:    []byte{0, 0, 0, 0, 0xC3},
+			Data:    []byte("A"),
+			Symbols: []tobj.Symbol{{Name: "main", Offset: 0}},
+			Relocs:  []tobj.Reloc{{Kind: tobj.RelocDataDisp32, At: 0, Name: "data.symbol", Addend: 0}},
+		},
+	}, "main", stub, stubCallAt, 0)
+	if err == nil {
+		t.Fatalf("expected named data relocation error")
+	}
+	if !strings.Contains(err.Error(), "data relocation symbol name must be empty") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

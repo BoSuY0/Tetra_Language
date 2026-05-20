@@ -8,10 +8,10 @@ Version: `v0.1.2`
 
 - Stabilization backlog: no open checkboxes in
   `docs/plans/2026-04-27-tetra-real-stabilization-agent-backlog.md`.
-- v1.0 TODO plan: all top-level epics are marked complete in
-  `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`; the long-range
-  file still contains historical/internal unchecked subtasks that must not be
-  treated as closed without fresh per-item evidence.
+- v1.0 closure evidence: historical TODO planning has been retired; current
+  future-scope evidence lives in `docs/spec/v1_scope.md` and
+  `docs/checklists/v1_0_release_gate.md`, and must not be treated as closed
+  without fresh per-item evidence.
 - Release checklist: no open checkboxes in
   `docs/checklists/v0_1_2_release_gate.md`.
 - Canonical tracked evidence snapshot: `docs/generated/v1_0`, mirrored from
@@ -29,9 +29,9 @@ Version: `v0.1.2`
   pass.
 - `GOCACHE=/tmp/tetra-go-build go test ./compiler/... ./cli/... ./tools/... -count=1`:
   pass.
-- `GOCACHE=/tmp/tetra-go-build bash scripts/test_all.sh --full --keep-going --report-dir /tmp/tetra-v0_1_2-final-test-all-20260427`:
+- `GOCACHE=/tmp/tetra-go-build bash scripts/ci/test-all.sh --full --keep-going --report-dir /tmp/tetra-v0_1_2-final-test-all-20260427`:
   pass, 23 full checks.
-- `GOCACHE=/tmp/tetra-go-build TETRA_SECURITY_REVIEW_SIGNOFF=<external-security-review.md> bash scripts/release_v0_1_2_gate.sh --report-dir /tmp/tetra-v0_1_2-final-release-gate-20260427`:
+- `GOCACHE=/tmp/tetra-go-build TETRA_SECURITY_REVIEW_SIGNOFF=<external-security-review.md> bash scripts/release/v0_1_2/gate.sh --report-dir /tmp/tetra-v0_1_2-final-release-gate-20260427`:
   pass, 33 release-gate checks.
 - `GOCACHE=/tmp/tetra-go-build go run ./tools/cmd/validate-release-state --format=text --report-dir /tmp/tetra-v0_1_2-final-release-gate-20260427`:
   pass, `36` required artifacts, `0` missing artifacts, artifact hash manifest
@@ -40,7 +40,7 @@ Version: `v0.1.2`
 
 ## Integration Notes
 
-- `scripts/release_v0_1_2_gate.sh` now archives the external
+- `scripts/release/v0_1_2/gate.sh` now archives the external
   `security-review.md` signoff into the release evidence artifacts before
   hashing the archive.
 - `tools/cmd/validate-release-state` now rejects stale release summaries with
@@ -54,4 +54,4 @@ Version: `v0.1.2`
 
 The code and evidence are release-gate clean. Final tagging requires a fresh
 external security signoff for the committed SHA and a final
-`scripts/release_v0_1_2_gate.sh` run on the exact branch state being tagged.
+`scripts/release/v0_1_2/gate.sh` run on the exact branch state being tagged.

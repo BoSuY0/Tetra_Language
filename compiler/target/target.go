@@ -136,6 +136,28 @@ func (s Status) String() string {
 	}
 }
 
+type RunMode int
+
+const (
+	RunModeUnknown RunMode = iota
+	RunModeHostNative
+	RunModeWASIRunner
+	RunModeWebRunner
+)
+
+func (m RunMode) String() string {
+	switch m {
+	case RunModeHostNative:
+		return "host_native"
+	case RunModeWASIRunner:
+		return "wasi_runner"
+	case RunModeWebRunner:
+		return "web_runner"
+	default:
+		return "unknown"
+	}
+}
+
 type Target struct {
 	Triple                  string
 	Status                  Status
@@ -145,6 +167,8 @@ type Target struct {
 	Format                  Format
 	ExeExt                  string
 	CollectImports          bool
+	RunMode                 RunMode
+	RunRunner               string
 	SupportsDebugInfo       bool
 	SupportsReleaseOptimize bool
 }
@@ -160,12 +184,25 @@ func All() []Target {
 	return out
 }
 
+func AllBuildable() []Target {
+	triples := append([]string{}, SupportedTriples()...)
+	triples = append(triples, BuildOnlyTriples()...)
+	out := make([]Target, 0, len(triples))
+	for _, triple := range triples {
+		t, err := Parse(triple)
+		if err == nil {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 func SupportedTriples() []string {
-	return []string{"linux-x64", "windows-x64", "macos-x64"}
+	return []string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web"}
 }
 
 func BuildOnlyTriples() []string {
-	return []string{"wasm32-wasi", "wasm32-web"}
+	return []string{}
 }
 
 func PlannedTriples() []string {
@@ -174,6 +211,10 @@ func PlannedTriples() []string {
 
 func WASMTriples() []string {
 	return []string{"wasm32-wasi", "wasm32-web"}
+}
+
+func ActorRuntimeTriples() []string {
+	return []string{"linux-x64", "macos-x64", "windows-x64"}
 }
 
 func Parse(triple string) (Target, error) {
@@ -188,6 +229,7 @@ func Parse(triple string) (Target, error) {
 			Format:                  FormatELF,
 			ExeExt:                  "",
 			CollectImports:          false,
+			RunMode:                 RunModeHostNative,
 			SupportsDebugInfo:       true,
 			SupportsReleaseOptimize: true,
 		}, nil
@@ -201,6 +243,7 @@ func Parse(triple string) (Target, error) {
 			Format:                  FormatPE,
 			ExeExt:                  ".exe",
 			CollectImports:          true,
+			RunMode:                 RunModeHostNative,
 			SupportsDebugInfo:       true,
 			SupportsReleaseOptimize: true,
 		}, nil
@@ -214,32 +257,36 @@ func Parse(triple string) (Target, error) {
 			Format:                  FormatMachO,
 			ExeExt:                  "",
 			CollectImports:          false,
+			RunMode:                 RunModeHostNative,
 			SupportsDebugInfo:       true,
 			SupportsReleaseOptimize: true,
 		}, nil
 	case "wasm32-wasi":
 		return Target{
 			Triple:                  "wasm32-wasi",
-			Status:                  StatusBuildOnly,
+			Status:                  StatusSupported,
 			OS:                      OSWASI,
 			Arch:                    ArchWASM32,
 			ABI:                     ABIWASI,
 			Format:                  FormatWASM,
 			ExeExt:                  ".wasm",
 			CollectImports:          false,
+			RunMode:                 RunModeWASIRunner,
+			RunRunner:               "wasmtime",
 			SupportsDebugInfo:       false,
 			SupportsReleaseOptimize: true,
 		}, nil
 	case "wasm32-web":
 		return Target{
 			Triple:                  "wasm32-web",
-			Status:                  StatusBuildOnly,
+			Status:                  StatusSupported,
 			OS:                      OSWeb,
 			Arch:                    ArchWASM32,
 			ABI:                     ABIWeb,
 			Format:                  FormatWASM,
 			ExeExt:                  ".wasm",
 			CollectImports:          false,
+			RunMode:                 RunModeWebRunner,
 			SupportsDebugInfo:       false,
 			SupportsReleaseOptimize: true,
 		}, nil

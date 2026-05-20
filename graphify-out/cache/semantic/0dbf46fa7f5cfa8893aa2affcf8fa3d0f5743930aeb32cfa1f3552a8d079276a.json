@@ -1,0 +1,1 @@
+{"nodes": [{"id": "ui_v1_metadata_surface_spec", "label": "UI v1 Surface", "file_type": "document", "source_file": "docs/spec/ui_v1.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null, "rationale": "Scopes UI to metadata validation/lowering and preview artifacts, not runtime event dispatch."}], "edges": [], "hyperedges": []}

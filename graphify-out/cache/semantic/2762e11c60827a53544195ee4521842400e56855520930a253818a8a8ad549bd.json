@@ -1,0 +1,1 @@
+{"nodes": [{"id": "t4_formats_spec", "label": "T4 Formats", "file_type": "document", "source_file": "docs/spec/t4_formats.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null, "rationale": "Defines official file-format family around .t4 source and related artifacts."}], "edges": [], "hyperedges": []}

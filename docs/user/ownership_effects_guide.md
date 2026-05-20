@@ -1,16 +1,21 @@
 # Ownership And Effects Guide
 
-Status: user guide for the safety model required by the v1.0 scope.
+Status: user guide for the conservative safety MVP in the current profile.
+
+The current support boundary is `docs/spec/current_supported_surface.md`.
+`docs/spec/v1_scope.md` remains the future major-release contract and does not
+turn planned safety work into a user guarantee.
 
 ## Ownership
 
-The v1.0 release cannot claim safe-code memory safety until ownership and
-lifetime checks reject use-after-move, escaping borrows, invalid mutable
-aliasing, invalid island transfers, and actor/task race patterns.
+The current checker covers local `borrow`/`inout`/`consume` marker validation,
+same-call alias rejection, use-after-`consume`, borrow escape diagnostics, and
+conservative resource lifetime checks for task, island, region-backed slice, and
+containing-struct paths. It is not a full SSA lifetime solver.
 
 Use diagnostics from `./tetra check <file>` as the source of truth. If a rule is
 documented here but not covered by tests and release evidence, it remains a
-release blocker rather than a user guarantee.
+future blocker rather than a user guarantee.
 
 ## Effects And Capabilities
 

@@ -19,6 +19,7 @@ type testAllSummary struct {
 	EndedAt         string        `json:"ended_at"`
 	StepCount       int           `json:"step_count"`
 	FailedCount     int           `json:"failed_count"`
+	ReleaseVersion  string        `json:"release_version,omitempty"`
 	ReleaseArtifact string        `json:"release_artifact,omitempty"`
 	Steps           []testAllStep `json:"steps"`
 }
@@ -32,12 +33,10 @@ type testAllStep struct {
 	Log             string `json:"log"`
 }
 
-const testAllSummaryArtifact = "tetra.release.v0_2_0.test-all-summary.v1"
-
 func main() {
 	var summaryPath string
 	var reportDir string
-	flag.StringVar(&summaryPath, "summary", "", "path to scripts/test_all.sh summary.json")
+	flag.StringVar(&summaryPath, "summary", "", "path to scripts/ci/test-all.sh summary.json")
 	flag.StringVar(&reportDir, "report-dir", "", "report directory containing logs")
 	flag.Parse()
 
@@ -94,6 +93,9 @@ func validateTestAllSummary(raw []byte, reportDir string) error {
 	if summary.StepCount != len(summary.Steps) {
 		return fmt.Errorf("step_count mismatch: got %d, computed %d", summary.StepCount, len(summary.Steps))
 	}
+	if len(summary.Steps) == 0 {
+		return fmt.Errorf("summary must contain at least one step")
+	}
 	failed := 0
 	seenNames := make(map[string]bool, len(summary.Steps))
 	seenLogs := make(map[string]bool, len(summary.Steps))
@@ -122,10 +124,61 @@ func validateTestAllSummary(raw []byte, reportDir string) error {
 	if summary.Status == "fail" && failed == 0 {
 		return fmt.Errorf("fail summary contains no failing steps")
 	}
-	if summary.ReleaseArtifact != "" && summary.ReleaseArtifact != testAllSummaryArtifact {
-		return fmt.Errorf("release_artifact = %q, want %q", summary.ReleaseArtifact, testAllSummaryArtifact)
+	if summary.Status == "pass" {
+		if err := validateRequiredPassingSteps(summary.Mode, seenNames); err != nil {
+			return err
+		}
+	}
+	if summary.ReleaseVersion != "" && (!strings.HasPrefix(summary.ReleaseVersion, "v") || strings.ContainsAny(summary.ReleaseVersion, " \t\n\r")) {
+		return fmt.Errorf("invalid release_version %q", summary.ReleaseVersion)
+	}
+	expectedArtifact := expectedTestAllSummaryArtifact(summary.ReleaseVersion)
+	if summary.ReleaseArtifact != "" && summary.ReleaseArtifact != expectedArtifact {
+		return fmt.Errorf("release_artifact = %q, want %q", summary.ReleaseArtifact, expectedArtifact)
 	}
 	return nil
+}
+
+func validateRequiredPassingSteps(mode string, seen map[string]bool) error {
+	required := []string{
+		"go test all packages",
+		"json diagnostic shape",
+		"host smoke linux-x64",
+	}
+	if mode == "full" || mode == "stabilization" {
+		required = append(required,
+			"docs manifest diff",
+			"safety readiness evidence",
+			"ownership production audit",
+			"tooling summary aggregation",
+		)
+	}
+	if mode == "stabilization" {
+		required = append(required,
+			"frontend callable focused gate",
+			"safety runtime focused gate",
+			"lowering ir focused gate",
+			"wasi runner smoke",
+			"web runtime browser smoke",
+			"api diff no-change",
+			"working tree whitespace audit",
+		)
+	}
+	for _, step := range required {
+		if !seen[step] {
+			return fmt.Errorf("missing required step %q for %s pass summary", step, mode)
+		}
+	}
+	return nil
+}
+
+func expectedTestAllSummaryArtifact(version string) string {
+	if version == "" {
+		version = "v0.2.0"
+	}
+	slug := strings.TrimPrefix(version, "v")
+	slug = strings.ReplaceAll(slug, ".", "_")
+	return "tetra.release.v" + slug + ".test-all-summary.v1"
 }
 
 func decodeStrictJSON(raw []byte, out any) error {

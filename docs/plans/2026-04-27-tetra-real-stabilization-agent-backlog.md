@@ -20,10 +20,10 @@ Run focused verification for the task first. Run these after large batches or re
 
 - [x] `git diff --check`
 - [x] `GOCACHE=/tmp/tetra-go-build go test ./compiler/... ./cli/... ./tools/... -count=1`
-- [x] `GOCACHE=/tmp/tetra-go-build bash scripts/test_all.sh --full --keep-going --report-dir /tmp/tetra-real-stab-test-all`
+- [x] `GOCACHE=/tmp/tetra-go-build bash scripts/ci/test-all.sh --full --keep-going --report-dir /tmp/tetra-real-stab-test-all`
 - [x] `GOCACHE=/tmp/tetra-go-build go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - [x] `GOCACHE=/tmp/tetra-go-build go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json`
-- [x] `GOCACHE=/tmp/tetra-go-build TETRA_SECURITY_REVIEW_SIGNOFF=docs/generated/v1_0/security-review.md bash scripts/release_v1_0_gate.sh --report-dir /tmp/tetra-real-stab-release-gate`
+- [x] `GOCACHE=/tmp/tetra-go-build TETRA_SECURITY_REVIEW_SIGNOFF=docs/generated/v1_0/security-review.md bash scripts/release/v1_0/gate.sh --report-dir /tmp/tetra-real-stab-release-gate`
 
 ## Agent Wave A: Release Hygiene And Evidence
 
@@ -35,10 +35,10 @@ Run focused verification for the task first. Run these after large batches or re
   - **Done when:** the tool fails on missing required artifacts and passes with the current complete v1 evidence set.
 
 - [x] REAL-0002. Wire release-state audit into the v1 gate.
-  - **Goal:** make `scripts/release_v1_0_gate.sh` call the new release-state validator before final summary.
-  - **Files:** `scripts/release_v1_0_gate.sh`, `tools/scriptstest/release_v1_test.go`.
+  - **Goal:** make `scripts/release/v1_0/gate.sh` call the new release-state validator before final summary.
+  - **Files:** `scripts/release/v1_0/gate.sh`, `tools/scriptstest/release_v1_test.go`.
   - **Work:** add a gate step that archives release-state JSON and fails on stale or missing required evidence.
-  - **Verification:** `go test ./tools/scriptstest -run ReleaseV10 -count=1`; run `release_v1_0_gate.sh`.
+  - **Verification:** `go test ./tools/scriptstest -run ReleaseV10 -count=1`; run `scripts/release/v1_0/gate.sh`.
   - **Done when:** the gate records release-state evidence and script tests verify the step.
 
 - [x] REAL-0003. Replace checklist-only closure with evidence backlinks.
@@ -50,14 +50,14 @@ Run focused verification for the task first. Run these after large batches or re
 
 - [x] REAL-0004. Add release known-issues generation.
   - **Goal:** produce a current known-issues file from the release gate rather than leaving only a template.
-  - **Files:** `scripts/release_v1_0_gate.sh`, `docs/release/known_issues_template.md`, `docs/generated/v1_0`.
+  - **Files:** `scripts/release/v1_0/gate.sh`, `docs/release/known_issues_template.md`, `docs/generated/v1_0`.
   - **Work:** generate `known_issues.md` with version, branch, report dir, gate result, and empty issue table when no blockers exist.
   - **Verification:** run the gate and inspect generated known-issues artifact.
   - **Done when:** release artifacts include a concrete known-issues document.
 
 - [x] REAL-0005. Harden generated artifact churn checks.
   - **Goal:** fail if running the release gate changes tracked generated files unexpectedly.
-  - **Files:** `scripts/release_v1_0_gate.sh`, `tools/scriptstest/release_v1_test.go`.
+  - **Files:** `scripts/release/v1_0/gate.sh`, `tools/scriptstest/release_v1_test.go`.
   - **Work:** add a pre/post generated artifact diff check around docs/API/repro/smoke generation.
   - **Verification:** script tests plus `git diff --check`.
   - **Done when:** stale generated artifacts are detected before release approval.
@@ -71,7 +71,7 @@ Run focused verification for the task first. Run these after large batches or re
 
 - [x] REAL-0007. Add release evidence integrity hashes.
   - **Goal:** hash all release artifacts and store a manifest.
-  - **Files:** `scripts/release_v1_0_gate.sh`, add or extend a validator under `tools/cmd`.
+  - **Files:** `scripts/release/v1_0/gate.sh`, add or extend a validator under `tools/cmd`.
   - **Work:** generate `artifact-hashes.json` with path, sha256, size, and schema where applicable.
   - **Verification:** validator tests and a full gate run.
   - **Done when:** missing or modified artifacts are caught by the hash validator.
@@ -266,7 +266,7 @@ Run focused verification for the task first. Run these after large batches or re
 
 - [x] REAL-0306. Add wasm32-web loader contract tests.
   - **Goal:** verify generated JS loader imports, exports, panic path, console path, and deterministic package output.
-  - **Files:** `compiler/internal/backend/wasm32_web/codegen.go`, `compiler/internal/backend/wasm32_web/codegen_test.go`, `scripts/release_v1_0_web_smoke.sh`.
+  - **Files:** `compiler/internal/backend/wasm32_web/codegen.go`, `compiler/internal/backend/wasm32_web/codegen_test.go`, `scripts/release/v1_0/web-smoke.sh`.
   - **Work:** add loader snapshot tests and avoid brittle absolute paths.
   - **Verification:** web backend tests and web smoke.
   - **Done when:** web package changes are intentional.
@@ -287,7 +287,7 @@ Run focused verification for the task first. Run these after large batches or re
 
 - [x] REAL-0309. Add reproducible build comparison for every build-only target.
   - **Goal:** expand reproducibility beyond one native and one WASM target.
-  - **Files:** `scripts/release_v1_0_repro.sh`, `tools/scriptstest/release_repro_test.go`, `docs/generated/v1_0/reproducible-build.json`.
+  - **Files:** `scripts/release/v1_0/reproducible-build.sh`, `tools/scriptstest/release_repro_test.go`, `docs/generated/v1_0/reproducible-build.json`.
   - **Work:** include linux, macOS, Windows, WASI, and web build-only artifacts where feasible.
   - **Verification:** repro script tests and release gate.
   - **Done when:** reproducibility proof covers the full target matrix.
@@ -389,7 +389,7 @@ Run focused verification for the task first. Run these after large batches or re
 
 - [x] REAL-0503. Make security review signoff stricter.
   - **Goal:** require reviewer identity, commit, report dir, artifact hashes, accepted risks, and explicit approval.
-  - **Files:** `scripts/release_v1_0_security_review.sh`, `docs/checklists/security_review_gate.md`, `tools/scriptstest/security_review_test.go`.
+  - **Files:** `scripts/release/v1_0/security-review.sh`, `docs/checklists/security_review_gate.md`, `tools/scriptstest/security_review_test.go`.
   - **Work:** add validation for artifact hashes and reject stale placeholder text.
   - **Verification:** security review tests and signoff script.
   - **Done when:** incomplete signoff cannot pass.
@@ -431,7 +431,7 @@ Run focused verification for the task first. Run these after large batches or re
 
 - [x] REAL-0509. Add fuzz nightly command wrapper.
   - **Goal:** make fuzz/property/stress work reproducible for agents and CI.
-  - **Files:** `scripts/test_all.sh` or new `scripts/fuzz_nightly.sh`, `docs/testing/fuzz_property_stress.md`.
+  - **Files:** `scripts/ci/test-all.sh` or new `scripts/dev/fuzz-nightly.sh`, `docs/testing/fuzz_property_stress.md`.
   - **Work:** add bounded fuzz commands, output dir, crasher archive path, and summary.
   - **Verification:** run short bounded mode and script tests.
   - **Done when:** fuzz can be started with one documented command.

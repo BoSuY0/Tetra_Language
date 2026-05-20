@@ -1,1 +1,3 @@
-[2535379:2535379:0427/133235.375180:ERROR:base/memory/shared_memory_switch.cc:289] Failed global descriptor lookup: 7
+[1697126:1697126:0505/160733.849293:ERROR:base/memory/shared_memory_switch.cc:289] Failed global descriptor lookup: 7
+[1697069:1697069:0505/160733.975899:ERROR:mojo/public/cpp/bindings/lib/interface_endpoint_client.cc:748] Message 6 rejected by interface blink.mojom.WidgetHost
+[1697069:1697069:0505/160733.975920:ERROR:mojo/public/cpp/bindings/lib/interface_endpoint_client.cc:748] Message 7 rejected by interface blink.mojom.WidgetHost

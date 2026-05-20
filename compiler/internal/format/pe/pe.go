@@ -80,7 +80,7 @@ func WritePE64WindowsX64(path string, img *PEImage) error {
 		if !ok {
 			return fmt.Errorf("missing IAT entry for '%s'", reloc.Name)
 		}
-		if reloc.At < 0 || reloc.At+4 > len(textData) {
+		if !validDisp32PatchOffset(textData, reloc.At) {
 			return fmt.Errorf("IAT relocation out of range for '%s'", reloc.Name)
 		}
 		if err := patchRipDisp32(textData, reloc.At, uint32(textRVA), targetRVA); err != nil {
@@ -89,10 +89,13 @@ func WritePE64WindowsX64(path string, img *PEImage) error {
 	}
 
 	for _, reloc := range img.RDataRelocs {
-		targetRVA := uint32(rdataRVA) + reloc.TargetOff
-		if reloc.At < 0 || reloc.At+4 > len(textData) {
+		if !validDisp32PatchOffset(textData, reloc.At) {
 			return fmt.Errorf("rdata relocation out of range")
 		}
+		if reloc.TargetOff >= uint32(len(rdataData)) {
+			return fmt.Errorf("rdata relocation target out of range")
+		}
+		targetRVA := uint32(rdataRVA) + reloc.TargetOff
 		if err := patchRipDisp32(textData, reloc.At, uint32(textRVA), targetRVA); err != nil {
 			return err
 		}
@@ -446,6 +449,9 @@ func buildRelocSection() []byte {
 }
 
 func patchRipDisp32(code []byte, at int, srcRVA uint32, targetRVA uint32) error {
+	if !validDisp32PatchOffset(code, at) {
+		return fmt.Errorf("rel32 patch offset out of range")
+	}
 	next := srcRVA + uint32(at+4)
 	disp := int64(targetRVA) - int64(next)
 	if disp < -2147483648 || disp > 2147483647 {
@@ -453,6 +459,10 @@ func patchRipDisp32(code []byte, at int, srcRVA uint32, targetRVA uint32) error 
 	}
 	binary.LittleEndian.PutUint32(code[at:at+4], uint32(int32(disp)))
 	return nil
+}
+
+func validDisp32PatchOffset(code []byte, at int) bool {
+	return at >= 0 && at <= len(code)-4
 }
 
 func alignUp(v int, align int) int {

@@ -1,17 +1,19 @@
 # Tetra v0.2.0 Scope Contract
 
-Status: current minor scope. This document defines what must stay true for the
-repository to claim the `v0.2.0` profile.
+Status: archived minor scope. This document defines what had to stay true for
+the repository to claim the historical `v0.2.0` profile.
 
-Current public release truth is `v0.2.0` only when:
+The current public release truth is `docs/spec/current_supported_surface.md`.
+
+The archived `v0.2.0` release truth was valid only when:
 
 1. version metadata is intentionally promoted;
-2. `scripts/release_v0_2_0_gate.sh` is run with fresh evidence;
+2. `scripts/release/v0_2_0/gate.sh` is run with fresh evidence;
 3. `docs/checklists/v0_2_0_release_gate.md` is fully satisfied.
 
 ## Scope Goals
 
-- Keep the current `v0.2.0` profile stable while improving verification depth.
+- Keep the `v0.2.0` profile stable while improving verification depth.
 - Strengthen diagnostics, parser/formatter coverage, and validator quality.
 - Improve release process clarity for the next minor line.
 - Keep unsupported/post-v1 features explicitly deferred and documented.
@@ -37,6 +39,8 @@ Unsupported lowering paths must return named diagnostics before backend codegen.
 ## Non-Goals
 
 - Declaring `v1.0.0` readiness.
+- Treating `v0.3.0` promotion candidates as historical `v0.2.0` support; those
+  candidates are tracked separately in `docs/spec/v0_3_scope.md`.
 - Promoting distributed EcoNet/TetraHub production publishing.
 - Claiming full UI runtime event dispatch or full native widget rendering.
 - Claiming distributed actors or structured concurrency guarantees.
@@ -44,13 +48,13 @@ Unsupported lowering paths must return named diagnostics before backend codegen.
 ## Required Verification Envelope
 
 - `go test ./compiler/... ./cli/... ./tools/... -count=1`
-- `bash scripts/test_all.sh --quick`
+- `bash scripts/ci/test-all.sh --quick`
 - `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - `git diff --check`
 - Epic 08 focused gate:
   `go test ./compiler/internal/lower ./compiler -run "Lower|IR|Verify|Unsupported|Loop|Task|Actor|UI|Unsafe" -count=1`
 - final gate:
-  `TETRA_SECURITY_REVIEW_SIGNOFF=<path> bash scripts/release_v0_2_0_gate.sh --report-dir <dir>`
+  `TETRA_SECURITY_REVIEW_SIGNOFF=<path> bash scripts/release/v0_2_0/gate.sh --report-dir <dir>`
 
 ## Final Closure Matrix
 

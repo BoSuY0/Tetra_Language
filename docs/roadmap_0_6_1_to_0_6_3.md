@@ -7,7 +7,7 @@ diagnostic.
 
 ## 0.6.1: Test Envelope Hardening
 
-- `scripts/test_all.sh` supports quick/full gates, `--keep-going`, `--json-only`,
+- `scripts/ci/test-all.sh` supports quick/full gates, `--keep-going`, `--json-only`,
   stable exit codes, per-step logs, `summary.md`, and `summary.json`.
 - CLI tests cover the wrapper interface and a fake-repo keep-going failure path
   without recursively invoking the real repository tests.
@@ -36,8 +36,8 @@ diagnostic.
 Before a 0.6.x point release, run:
 
 ```sh
-bash scripts/test_all.sh --full
-bash scripts/release_v0_6_gate.sh
+bash scripts/ci/test-all.sh --full
+bash scripts/release/v0_6/gate.sh
 ```
 
 If the release version advances beyond `v0.6.0`, update the exact release gate

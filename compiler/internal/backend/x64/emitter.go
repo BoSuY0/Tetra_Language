@@ -529,6 +529,14 @@ func (e *Emitter) PushR9() {
 	e.Emit(0x41, 0x51)
 }
 
+func (e *Emitter) PushR10() {
+	e.Emit(0x41, 0x52)
+}
+
+func (e *Emitter) PushR11() {
+	e.Emit(0x41, 0x53)
+}
+
 func (e *Emitter) PushRsi() {
 	e.Emit(0x56)
 }
@@ -583,6 +591,14 @@ func (e *Emitter) PopR8() {
 
 func (e *Emitter) PopR9() {
 	e.Emit(0x41, 0x59)
+}
+
+func (e *Emitter) PopR10() {
+	e.Emit(0x41, 0x5A)
+}
+
+func (e *Emitter) PopR11() {
+	e.Emit(0x41, 0x5B)
 }
 
 func (e *Emitter) PopR12() {
@@ -876,6 +892,19 @@ func (e *Emitter) MovMem64RdiDispRax(disp int32) {
 	e.Emit(buf[:]...)
 }
 
+func (e *Emitter) MovMem64RdiDispR8(disp int32) {
+	if disp == 0 {
+		e.Emit(0x4C, 0x89, 0x07)
+	} else if disp >= -128 && disp <= 127 {
+		e.Emit(0x4C, 0x89, 0x47, byte(disp))
+	} else {
+		e.Emit(0x4C, 0x89, 0x87)
+		var buf [4]byte
+		binary.LittleEndian.PutUint32(buf[:], uint32(disp))
+		e.Emit(buf[:]...)
+	}
+}
+
 func (e *Emitter) MovMem64RdiDispRsp(disp int32) {
 	e.Emit(0x48, 0x89, 0xA7)
 	var buf [4]byte
@@ -942,6 +971,13 @@ func (e *Emitter) MovMem32RdiDispR8d(disp int32) {
 
 func (e *Emitter) CmpEaxImm32(v int32) {
 	e.Emit(0x3D)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(v))
+	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) CmpRaxImm32(v int32) {
+	e.Emit(0x48, 0x3D)
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], uint32(v))
 	e.Emit(buf[:]...)
@@ -1134,6 +1170,9 @@ func (e *Emitter) MovR9dFromRdiDisp(disp int32) {
 }
 
 func PatchRel32(code []byte, at int, target int) error {
+	if at < 0 || at > len(code)-4 {
+		return fmt.Errorf("rel32 patch offset out of range")
+	}
 	next := at + 4
 	disp := target - next
 	if disp < -2147483648 || disp > 2147483647 {

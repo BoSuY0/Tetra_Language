@@ -1,0 +1,119 @@
+{
+  "schema": "tetra.release.v0_4_0.prod-gap-matrix.v1",
+  "generated_from": {
+    "features_command": "./tetra features --format=json",
+    "targets_command": "./tetra targets --format=json",
+    "scope_decisions": "docs/release/v0_4_0_scope_decisions.json"
+  },
+  "current_version": "v0.4.0",
+  "desired_version": "v0.4.0",
+  "scope_status": "linux-x64-production-scope-selected",
+  "prod_ready_now": true,
+  "prod_ready_evidence": "/tmp/tetra-v0.4.0-final-production-gate/summary.json",
+  "selected_non_current_feature_count": 0,
+  "selected_target_runtime_gap_count": 0,
+  "selected_features": [
+    {
+      "id": "language.callable-level1",
+      "status": "current",
+      "decision": "implement"
+    },
+    {
+      "id": "language.callable-level2",
+      "status": "current",
+      "decision": "implement"
+    },
+    {
+      "id": "language.full-first-class-callables",
+      "status": "current",
+      "decision": "implement"
+    },
+    {
+      "id": "language.lifetime-ssa",
+      "status": "current",
+      "decision": "implement"
+    },
+    {
+      "id": "stdlib.experimental-mirrors",
+      "status": "current",
+      "decision": "implement"
+    },
+    {
+      "id": "ui.metadata-v1",
+      "status": "current",
+      "decision": "implement"
+    },
+    {
+      "id": "actors.distributed-runtime",
+      "status": "current",
+      "decision": "implement"
+    },
+    {
+      "id": "ui.native-runtime",
+      "status": "current",
+      "decision": "implement"
+    }
+  ],
+  "selected_target_runtimes": [
+    {
+      "triple": "linux-x64",
+      "status": "supported",
+      "build_only": false,
+      "run_supported": true,
+      "decision": "implement-production-runtime",
+      "evidence": "reports/v0.4.0/linux-host-smoke.json"
+    }
+  ],
+  "excluded_from_v0_4_0_prod": [
+    {
+      "kind": "feature",
+      "id": "eco.distributed-network",
+      "status": "post-v1",
+      "decision": "exclude-from-v0.4.0-prod",
+      "reason": "EcoNet explicitly excluded from the initial Linux-x64 production scope"
+    },
+    {
+      "kind": "feature",
+      "id": "language.full-v1-guarantees",
+      "status": "planned",
+      "decision": "exclude-from-v0.4.0-prod",
+      "reason": "future v1.0 release-contract label"
+    },
+    {
+      "kind": "feature",
+      "id": "wasm.runtime-execution",
+      "status": "current",
+      "decision": "exclude-from-v0.4.0-prod",
+      "reason": "WASI/Web runtime targets are outside the Linux-x64-only production claim"
+    },
+    {
+      "kind": "target-runtime",
+      "id": "windows-x64",
+      "status": "supported",
+      "decision": "exclude-from-v0.4.0-prod",
+      "reason": "non-Linux target outside the scoped release"
+    },
+    {
+      "kind": "target-runtime",
+      "id": "macos-x64",
+      "status": "supported",
+      "decision": "exclude-from-v0.4.0-prod",
+      "reason": "non-Linux target outside the scoped release"
+    },
+    {
+      "kind": "target-runtime",
+      "id": "wasm32-wasi",
+      "status": "supported",
+      "decision": "exclude-from-v0.4.0-prod",
+      "reason": "non-Linux runtime target outside the scoped release"
+    },
+    {
+      "kind": "target-runtime",
+      "id": "wasm32-web",
+      "status": "supported",
+      "decision": "exclude-from-v0.4.0-prod",
+      "reason": "non-Linux runtime target outside the scoped release"
+    }
+  ],
+  "completion_rule": "prod_ready_now is true because the Linux-x64 scoped gate, memory/parallel/compiler production artifacts, artifact hashes, and clean-worktree release-state evidence pass from the clean final candidate branch."
+}

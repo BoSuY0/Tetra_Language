@@ -1,8 +1,8 @@
 # v0.5 Integrated Alpha Release Gate
 
 > Historical checkpoint. This gate documented the v0.5 release branch only.
-> The current public baseline is `v0.2.0`; use
-> `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md` for active work.
+> The current public baseline is `v0.2.0`; future release scope lives in
+> `docs/spec/v1_scope.md` and `docs/checklists/v1_0_release_gate.md`.
 
 Use this checklist before labeling a build or branch as v0.5 Integrated Alpha.
 
@@ -24,7 +24,7 @@ Use this checklist before labeling a build or branch as v0.5 Integrated Alpha.
 - [x] `go test ./tools/...`
 - [x] `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
 - [x] `./tetra smoke --target linux-x64 --run=true` on Linux.
-- [x] Canonical gate: `bash scripts/release_v0_5_gate.sh`
+- [x] Canonical gate: `bash scripts/release/v0_5/gate.sh`
 
 ## Profile Smoke Coverage
 

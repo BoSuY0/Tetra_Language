@@ -27,6 +27,7 @@ type CheckedFunc struct {
 	Name        string
 	Module      string
 	Decl        *frontend.FuncDecl
+	Imports     map[string]string
 	Locals      map[string]LocalInfo
 	ActorState  map[string]ActorStateField
 	LocalSlots  int
@@ -47,61 +48,142 @@ type ActorStateField struct {
 }
 
 type LocalInfo struct {
-	Base                 int
-	SlotCount            int
-	TypeName             string
-	Mutable              bool
-	Const                bool
-	ActorField           bool
-	ActorFieldSlot       int
-	ActorFieldInit       int32
-	FunctionValue        string
-	GenericFunctionValue bool
-	FunctionCaptures     []frontend.ClosureCapture
-	FunctionTypeValue    bool
-	FunctionParamTypes   []string
-	FunctionReturnType   string
-	FunctionEffects      []string
+	Base                          int
+	SlotCount                     int
+	TypeName                      string
+	Mutable                       bool
+	Const                         bool
+	ActorField                    bool
+	ActorFieldSlot                int
+	ActorFieldInit                int32
+	FunctionValue                 string
+	FunctionParamName             string
+	GenericFunctionValue          bool
+	FunctionCaptures              []frontend.ClosureCapture
+	FunctionEscapeCaptures        []frontend.ClosureCapture
+	FunctionTouchesMutableGlobals bool
+	FunctionReturnSnapshotAlias   bool
+	FunctionDirectSnapshotAlias   bool
+	FunctionEscapeKind            CallableEscapeKind
+	FunctionHandleValue           bool
+	FunctionEnumPayload           bool
+	FunctionTypeValue             bool
+	FunctionParamTypes            []string
+	FunctionParamOwnership        []string
+	FunctionReturnType            string
+	FunctionThrowsType            string
+	FunctionEffects               []string
+	FunctionFields                map[string]FunctionFieldInfo
+	EnumPayloadFunctions          map[string]FunctionFieldInfo
+	EnumPayloadFields             map[string]FunctionFieldInfo
 }
 
+type FunctionFieldInfo struct {
+	FunctionValue                 string
+	FunctionParamName             string
+	FunctionCaptures              []frontend.ClosureCapture
+	FunctionEscapeCaptures        []frontend.ClosureCapture
+	FunctionTouchesMutableGlobals bool
+	FunctionReturnSnapshotAlias   bool
+	FunctionDirectSnapshotAlias   bool
+	FunctionEscapeKind            CallableEscapeKind
+	FunctionHandleValue           bool
+	FunctionParamTypes            []string
+	FunctionParamOwnership        []string
+	FunctionReturnType            string
+	FunctionThrowsType            string
+	FunctionEffects               []string
+}
+
+const (
+	FnPtrEnvSlotCount       = 8
+	FnPtrSlotCount          = 1 + FnPtrEnvSlotCount
+	CallableHandleSlotCount = 4
+)
+
+type CallableEscapeKind string
+
+const (
+	CallableEscapeLocalSnapshot CallableEscapeKind = "local-snapshot"
+	CallableEscapeHeap          CallableEscapeKind = "heap"
+	CallableEscapeGlobal        CallableEscapeKind = "global"
+	CallableEscapeThread        CallableEscapeKind = "thread"
+)
+
 type GlobalInfo struct {
-	DataIndex            int
-	TypeName             string
-	Mutable              bool
-	Const                bool
-	HasStringLiteralInit bool
-	StringLiteralInit    []byte
+	DataIndex              int
+	TypeName               string
+	Mutable                bool
+	Const                  bool
+	Public                 bool
+	FunctionValue          string
+	FunctionTypeValue      bool
+	FunctionParamTypes     []string
+	FunctionParamOwnership []string
+	FunctionReturnType     string
+	FunctionThrowsType     string
+	FunctionEffects        []string
+	FunctionEscapeKind     CallableEscapeKind
+	FunctionHandleValue    bool
+	HasStringLiteralInit   bool
+	StringLiteralInit      []byte
 }
 
 type FuncSig struct {
-	Generic               bool
-	Public                bool
-	HasNoAlloc            bool
-	HasNoBlock            bool
-	HasRealtime           bool
-	ParamNames            []string
-	ParamTypes            []string
-	ParamFunctionTypes    []bool
-	ParamFunctionParams   [][]string
-	ParamFunctionReturns  []string
-	ParamFunctionEffects  [][]string
-	ParamOwnership        []string
-	ParamSlots            int
-	ReturnType            string
-	ReturnFunctionType    bool
-	ReturnFunctionParams  []string
-	ReturnFunctionReturn  string
-	ReturnFunctionEffects []string
-	ReturnFunctionSymbol  string
-	ThrowsType            string
-	Async                 bool
-	ReturnSlots           int
-	ReturnRegionParam     int
-	ReturnResourceParam   int
-	ReturnResourcePath    string
-	Effects               []string
-	TouchesMutableGlobals bool
+	Generic                             bool
+	Public                              bool
+	HasNoAlloc                          bool
+	HasNoBlock                          bool
+	HasRealtime                         bool
+	HasBudget                           bool
+	Budget                              int32
+	ParamNames                          []string
+	ParamTypes                          []string
+	ParamFunctionTypes                  []bool
+	ParamFunctionParams                 [][]string
+	ParamFunctionOwnership              [][]string
+	ParamFunctionReturns                []string
+	ParamFunctionThrows                 []string
+	ParamFunctionEffects                [][]string
+	ParamOwnership                      []string
+	ParamSlots                          int
+	ReturnType                          string
+	ReturnFunctionType                  bool
+	ReturnFunctionParams                []string
+	ReturnFunctionParamOwnership        []string
+	ReturnFunctionReturn                string
+	ReturnFunctionThrows                string
+	ReturnFunctionEffects               []string
+	ReturnFunctionSymbol                string
+	ReturnFunctionParamName             string
+	ReturnFunctionCaptures              []frontend.ClosureCapture
+	ReturnFunctionTouchesMutableGlobals bool
+	ReturnFunctionEscapeKind            CallableEscapeKind
+	ReturnFunctionHandleValue           bool
+	ReturnFunctionFields                map[string]FunctionFieldInfo
+	ReturnEnumPayloadFunctions          map[string]FunctionFieldInfo
+	ReturnEnumPayloadFields             map[string]FunctionFieldInfo
+	ThrowsType                          string
+	Async                               bool
+	ReturnSlots                         int
+	ReturnRegionParam                   int
+	ReturnRegionSummary                 ReturnRegionSummary
+	ReturnResourceParam                 int
+	ReturnResourcePath                  string
+	ReturnResourceSummary               ReturnResourceSummary
+	ThrowResourceSummary                ReturnResourceSummary
+	Effects                             []string
+	TouchesMutableGlobals               bool
 }
+
+type ResourceProvenance struct {
+	ParamIndex int
+	ParamPath  string
+}
+
+type ReturnRegionSummary map[string]int
+
+type ReturnResourceSummary map[string][]ResourceProvenance
 
 type CheckedStruct struct {
 	Name   string
@@ -151,11 +233,20 @@ const (
 	TypeOptional
 )
 
+const MaxActorStateSlots = 8
+
 type FieldInfo struct {
-	Name      string
-	TypeName  string
-	Offset    int
-	SlotCount int
+	Name                   string
+	TypeName               string
+	Offset                 int
+	SlotCount              int
+	FunctionTypeValue      bool
+	FunctionTypeRef        frontend.TypeRef
+	FunctionParamTypes     []string
+	FunctionParamOwnership []string
+	FunctionReturnType     string
+	FunctionThrowsType     string
+	FunctionEffects        []string
 }
 
 type TypeInfo struct {
@@ -172,11 +263,18 @@ type TypeInfo struct {
 }
 
 type EnumCaseInfo struct {
-	Name         string
-	Ordinal      int32
-	PayloadTypes []string
-	PayloadSlots []int
-	SlotCount    int
+	Name                   string
+	Ordinal                int32
+	PayloadTypes           []string
+	PayloadSlots           []int
+	PayloadFunctionTypes   []bool
+	PayloadFunctionRefs    []frontend.TypeRef
+	PayloadFunctionParams  [][]string
+	PayloadFunctionOwns    [][]string
+	PayloadFunctionReturns []string
+	PayloadFunctionThrows  []string
+	PayloadFunctionEffects [][]string
+	SlotCount              int
 }
 
 func makeSliceTypeInfo(name, elem string) *TypeInfo {
@@ -256,6 +354,7 @@ func baseTypes() map[string]*TypeInfo {
 		"u16":           {Name: "u16", Kind: TypeU8, SlotCount: 1, Public: true},
 		"bool":          {Name: "bool", Kind: TypeBool, SlotCount: 1, Public: true},
 		"ptr":           {Name: "ptr", Kind: TypePtr, SlotCount: 1, Public: true},
+		"fnptr":         {Name: "fnptr", Kind: TypePtr, SlotCount: FnPtrSlotCount, Public: true},
 		"str":           makeStrTypeInfo(),
 		"actor":         {Name: "actor", Kind: TypeActor, SlotCount: 1, Public: true},
 		"task.error":    {Name: "task.error", Kind: TypeI32, SlotCount: 1, Public: true},
@@ -351,7 +450,8 @@ func ensureTypeInfo(name string, types map[string]*TypeInfo) (*TypeInfo, error) 
 		return info, nil
 	}
 	if elem, ok := sliceElemName(name); ok {
-		if elem != "i32" && elem != "u8" && elem != "u16" && elem != "bool" {
+		elemInfo, ok := types[elem]
+		if !ok || !isSupportedCollectionElemType(elemInfo) {
 			return nil, fmt.Errorf("slice element type '%s' is not supported", elem)
 		}
 		info := makeSliceTypeInfo(name, elem)
@@ -362,7 +462,8 @@ func ensureTypeInfo(name string, types map[string]*TypeInfo) (*TypeInfo, error) 
 		if n <= 0 {
 			return nil, fmt.Errorf("array size must be positive constant")
 		}
-		if !isSupportedArrayElemType(elem) {
+		elemInfo, ok := types[elem]
+		if !ok || !isSupportedCollectionElemType(elemInfo) {
 			return nil, fmt.Errorf("array element type '%s' is not supported", elem)
 		}
 		info := makeArrayTypeInfo(name, elem, n)
@@ -398,13 +499,52 @@ func typesCompatible(expected, actual string) bool {
 }
 
 func typesCompatibleWithNullPtr(expected, actual string, expr frontend.Expr) bool {
+	if !smallIntLiteralFits(expected, actual, expr) {
+		return false
+	}
 	if typesCompatible(expected, actual) {
 		return true
+	}
+	if expected == "ptr" && actual == "fnptr" {
+		_, ok := expr.(*frontend.ClosureExpr)
+		return ok
 	}
 	if expected == "ptr" && actual == "i32" && isNullPtrLiteral(expr) {
 		return true
 	}
 	return false
+}
+
+func smallIntLiteralFits(expected, actual string, expr frontend.Expr) bool {
+	if actual != "i32" {
+		return true
+	}
+	rangeType := expected
+	for {
+		elem, ok := optionalElemName(rangeType)
+		if !ok {
+			break
+		}
+		rangeType = elem
+	}
+	if rangeType != "u8" && rangeType != "u16" {
+		return true
+	}
+	v, ok, overflow := evalConstI32(expr)
+	if !ok {
+		return true
+	}
+	if overflow {
+		return false
+	}
+	switch rangeType {
+	case "u8":
+		return v >= 0 && v <= 255
+	case "u16":
+		return v >= 0 && v <= 65535
+	default:
+		return true
+	}
 }
 
 func isNullPtrLiteral(expr frontend.Expr) bool {
@@ -413,21 +553,70 @@ func isNullPtrLiteral(expr frontend.Expr) bool {
 }
 
 func constI32(expr frontend.Expr) (int32, bool) {
-	switch e := expr.(type) {
-	case *frontend.NumberExpr:
-		return e.Value, true
-	case *frontend.UnaryExpr:
-		if e.Op != frontend.TokenMinus {
-			return 0, false
-		}
-		v, ok := e.X.(*frontend.NumberExpr)
-		if !ok {
-			return 0, false
-		}
-		return -v.Value, true
-	default:
+	v, ok, overflow := evalConstI32(expr)
+	if !ok || overflow {
 		return 0, false
 	}
+	return int32(v), true
+}
+
+const (
+	minConstI32 int64 = -1 << 31
+	maxConstI32 int64 = 1<<31 - 1
+)
+
+func evalConstI32(expr frontend.Expr) (int64, bool, bool) {
+	switch e := expr.(type) {
+	case *frontend.NumberExpr:
+		return int64(e.Value), true, false
+	case *frontend.UnaryExpr:
+		if e.Op != frontend.TokenMinus {
+			return 0, false, false
+		}
+		v, ok, overflow := evalConstI32(e.X)
+		if !ok || overflow {
+			return 0, ok, overflow
+		}
+		return checkedConstI32(-v)
+	case *frontend.BinaryExpr:
+		left, ok, overflow := evalConstI32(e.Left)
+		if !ok || overflow {
+			return 0, ok, overflow
+		}
+		right, ok, overflow := evalConstI32(e.Right)
+		if !ok || overflow {
+			return 0, ok, overflow
+		}
+		switch e.Op {
+		case frontend.TokenPlus:
+			return checkedConstI32(left + right)
+		case frontend.TokenMinus:
+			return checkedConstI32(left - right)
+		case frontend.TokenStar:
+			return checkedConstI32(left * right)
+		case frontend.TokenSlash:
+			if right == 0 {
+				return 0, false, false
+			}
+			return checkedConstI32(left / right)
+		case frontend.TokenPercent:
+			if right == 0 {
+				return 0, false, false
+			}
+			return checkedConstI32(left % right)
+		default:
+			return 0, false, false
+		}
+	default:
+		return 0, false, false
+	}
+}
+
+func checkedConstI32(v int64) (int64, bool, bool) {
+	if v < minConstI32 || v > maxConstI32 {
+		return 0, true, true
+	}
+	return v, true, false
 }
 
 func isInt32Like(name string) bool {
@@ -440,7 +629,7 @@ func isConditionType(name string) bool {
 
 func isReservedTypeName(name string) bool {
 	switch name {
-	case "i32", "u8", "u16", "bool", "Bool", "ptr", "str", "String",
+	case "i32", "u8", "u16", "bool", "Bool", "ptr", "fnptr", "str", "String",
 		"actor", "actor.msg", "actor.recv_result_i32", "actor.recv_msg_result",
 		"task.error", "task.group", "task.i32", "task.result_i32",
 		"island", "cap.io", "cap.mem", "consent.token", "secret.i32":
@@ -505,8 +694,23 @@ func parseArrayTypeName(name string) (int, string, bool) {
 	return n, elem, true
 }
 
-func isSupportedArrayElemType(name string) bool {
-	return name == "i32" || name == "bool" || name == "u8" || name == "u16"
+func isSupportedArrayElemType(name string, types map[string]*TypeInfo) bool {
+	info, ok := types[name]
+	if !ok {
+		return false
+	}
+	return isSupportedCollectionElemType(info)
+}
+
+func isSupportedCollectionElemType(info *TypeInfo) bool {
+	if info == nil {
+		return false
+	}
+	switch info.Name {
+	case "i32", "u8", "u16", "bool":
+		return true
+	}
+	return info.Kind == TypeStruct && info.Name != "secret.i32" && info.SlotCount == 1
 }
 
 func isSupportedActorStateScalarType(name string) bool {
@@ -571,5 +775,40 @@ func typeActorTaskSendable(typeName string, types map[string]*TypeInfo, seen map
 		return true
 	default:
 		return false
+	}
+}
+
+func typeActorTaskSendabilityUnsafeReason(typeName string, types map[string]*TypeInfo, seen map[string]bool) string {
+	if seen[typeName] {
+		return ""
+	}
+	seen[typeName] = true
+	info, ok := types[typeName]
+	if !ok {
+		return fmt.Sprintf("unknown type '%s'", typeName)
+	}
+	switch info.Kind {
+	case TypeI32, TypeU8, TypeBool, TypeActor:
+		return ""
+	case TypeEnum:
+		for _, c := range info.EnumCases {
+			for _, payload := range c.PayloadTypes {
+				if reason := typeActorTaskSendabilityUnsafeReason(payload, types, seen); reason != "" {
+					return reason
+				}
+			}
+		}
+		return ""
+	case TypeOptional:
+		return typeActorTaskSendabilityUnsafeReason(info.ElemType, types, seen)
+	case TypeStruct:
+		for _, field := range info.Fields {
+			if reason := typeActorTaskSendabilityUnsafeReason(field.TypeName, types, seen); reason != "" {
+				return reason
+			}
+		}
+		return ""
+	default:
+		return fmt.Sprintf("type '%s' is not sendable", typeName)
 	}
 }

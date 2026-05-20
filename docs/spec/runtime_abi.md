@@ -15,14 +15,25 @@ Symbols starting with `__tetra_` are reserved for the toolchain/runtime.
 User code may only export reserved names from internal runtime modules (modules whose name starts with `__`) via
 `@export("...")`. See `@export` rules in the language semantics.
 
+The compiler rejects non-runtime modules that export a reserved `__tetra_*`
+name. Runtime override and link-object validation also treat TOBJ metadata as
+part of the ABI: target mismatches are hard errors, duplicate link object paths
+are hard errors, and link objects carrying a non-matching compiler version are
+rejected before linking.
+
 ## Calling convention per target
 
 - `linux-x64`, `macos-x64`: SysV AMD64 ABI (first args in `rdi, rsi, rdx, rcx, r8, r9`)
 - `windows-x64`: Windows x64 ABI (first args in `rcx, rdx, r8, r9`, plus 32-byte shadow space)
 
-All functions in this document return the first slot in `rax`/`eax`. Two-slot internal returns use `rax` for the
-low/first slot and `rdx` for the second slot. The backend spills incoming arguments into Tetra local slots in declaration
-order before lowering the function body.
+All functions in this document return the first slot in `rax`/`eax`. Native x64 internal returns currently support
+direct internal register returns with 0 through 10 slots: slot 1 in `rax`/`eax`, slot 2 in `rdx`/`edx`, slot 3 in `r8`/`r8d`,
+slot 4 in `r9`/`r9d`, slot 5 in `r10`/`r10d`, slot 6 in `r11`/`r11d`, slot 7 in `r12`/`r12d`, slot 8 in `r13`/`r13d`, slot 9 in `r14`/`r14d`, and slot 10 in `r15`/`r15d`. Runtime surfaces that need 3-slot returns, such as
+`actor.recv_msg_result`, use that same register order; 4-slot direct returns are supported for the current typed runtime
+envelopes, 9-slot direct returns support the current eight-environment-slot `fnptr` callable payload slice, and 10-slot direct returns
+support the current enum tag plus nine-slot `fnptr` callable payload slice. Wider
+runtime results continue to use an explicit staged buffer protocol instead of additional return registers. The backend spills incoming
+arguments into Tetra local slots in declaration order before lowering the function body.
 
 Stack arguments begin after the register argument window:
 
@@ -31,7 +42,7 @@ Stack arguments begin after the register argument window:
 
 Calls preserve the platform alignment contract. SysV calls align `rsp` to 16 bytes before `call`; Win64 calls reserve
 the mandatory 32-byte shadow space and aligns around additional stack arguments. Current ABI regression tests cover calls
-with 0 through 8 arguments and return layouts with 0, 1, and 2 slots.
+with 0 through 8 arguments and return layouts with 0 through 10 slots.
 
 Unsupported ABI/runtime combinations are hard errors. For example, `ctx_switch` currently supports only the SysV Unix and
 Win64 x64 ABIs; using another ABI for that instruction reports `ctx_switch: unsupported ABI`.
@@ -71,6 +82,103 @@ The Windows backend emits a PE32+ x86-64 executable:
 - PE output enables NX-compatible and dynamic-base characteristics and includes a relocation directory.
 - Cross-host execution is not attempted on non-Windows hosts; release evidence is build-only unless collected on Windows.
 
+## Linux-x64 Memory Production ABI
+
+This is the narrow memory contract for the post-`v0.4.0` Memory Production Core
+line. It applies only to native `linux-x64` promotion work. It is not a
+cross-target guarantee and makes no cross-target memory production claim for
+WASM, macOS, or Windows.
+
+The current compiler surface exposes these unsafe builtins:
+
+- `core.alloc_bytes(size: i32) -> ptr`
+- `core.cap_mem() -> cap.mem`
+- `core.ptr_add(ptr, offset: i32, mem: cap.mem) -> ptr`
+- `core.load_i32(ptr, mem: cap.mem) -> i32`
+- `core.store_i32(ptr, value: i32, mem: cap.mem) -> i32`
+- `core.load_u8(ptr, mem: cap.mem) -> u8`
+- `core.store_u8(ptr, value: u8, mem: cap.mem) -> u8`
+- `core.load_ptr(ptr, mem: cap.mem) -> ptr`
+- `core.store_ptr(ptr, value: ptr, mem: cap.mem) -> ptr`
+
+All of these operations remain gated by `unsafe` and the required `uses`
+effects documented in [unsafe.md](./unsafe.md). `core.cap_mem()` grants a
+capability token for raw memory operations; it is permission, not pointer
+provenance or bounds proof.
+
+Production promotion for this ABI requires allocator failure semantics to be
+deterministic on `linux-x64`. A production report must state whether
+`core.alloc_bytes` succeeded, failed with a stable diagnostic/status, or was
+blocked by a checked precondition. Silent wraparound, target-dependent crash
+behavior, and metadata-only "allocated" claims are not acceptable production
+evidence.
+
+The invalid allocation sizes are checked before the host allocation request. The
+current Linux-x64 slice rejects `core.alloc_bytes` sizes less than one with exit
+code `2`; a zero-size allocation is not treated as a successful allocation.
+
+The current native SysV allocator slice checks the Linux/macOS `mmap` error
+range after the syscall. Values in `[-4095, -1]` are treated as allocation
+failure and terminate with exit code `2` before the pointer is returned to Tetra
+code. This is allocator failure semantics evidence only; it is not a
+use-after-free, aliasing, or bounds proof.
+
+Production promotion also requires runtime bounds diagnostics for raw byte and
+word access. Until those diagnostics are implemented and covered by
+`tetra.memory.production.v1` evidence, the current raw load/store helpers are
+only capability-gated unsafe operations. They must not be described as a
+complete production memory runtime by themselves.
+
+The current raw pointer arithmetic slice rejects negative `core.ptr_add` offsets
+at runtime before the adjusted pointer is returned. The diagnostic path exits
+with code `2`, matching the allocator failure/precondition failure class. This
+is a lower-bound check for pointer arithmetic; upper-bound checks for arbitrary
+raw pointers still require allocation metadata and remain part of the unfinished
+Memory Production Core.
+
+The current allocator metadata slice stores the requested `core.alloc_bytes`
+size in a runtime header immediately before the pointer returned to Tetra code.
+For allocation-base pointers, allocation-base `core.ptr_add` upper bounds reject
+offsets greater than or equal to that requested size with exit code `2`. This is
+an allocation-base upper-bound check for helper loops and direct
+`core.load_*`/`core.store_*` calls whose address is a visible
+`core.ptr_add(base, offset, mem)`. It is not yet a complete derived-pointer
+provenance table or a general raw-pointer upper-bound proof.
+
+For pointers returned directly by `core.alloc_bytes`, allocation-base `core.store_i32` width bounds
+reject a 4-byte store when the requested allocation size is smaller than 4
+bytes, also with exit code `2`. The same allocation-base helper is shared by
+the current `core.load_i32` path. This is a word-access width check for
+allocation-base pointers only; derived-pointer width checks still require a
+complete provenance table unless the backend can see a direct base+offset raw
+access.
+
+For pointers returned directly by `core.alloc_bytes`, allocation-base `core.store_ptr` width bounds
+reject an 8-byte pointer store when the requested allocation size is smaller
+than 8 bytes. The same allocation-base helper is shared by the current
+`core.load_ptr` path. This is pointer-slot width evidence for allocation-base
+raw access only, not a complete derived-pointer or arbitrary-address proof.
+Direct `core.load_ptr`/`core.store_ptr` calls over a visible
+`core.ptr_add(base, offset, mem)` use the same allocation header with an
+offset+width check; stored arbitrary derived pointers still do not carry
+provenance.
+
+The stable `lib.core.memory` helper slice treats negative `memcpy_u8` and `memset_u8` lengths
+as invalid helper preconditions and returns status `2` before entering the raw
+byte loop. This is helper-level status evidence, not a process trap and not a
+replacement for runtime bounds diagnostics on each raw access.
+
+The Memory Production Core line must distinguish:
+
+- compile-time diagnostics: missing `unsafe`, missing `uses`, missing
+  `cap.mem`, borrow escape, use-after-consume/transfer, invalid actor/task
+  transfer, and other statically visible ownership violations;
+- runtime checked failures: allocator failure semantics, bounds diagnostics,
+  double-free/use-after-free checks where the runtime owns enough metadata to
+  detect them deterministically;
+- forbidden evidence: mock, placeholder, docs-only, metadata-only, build-only,
+  or sidecar-only reports.
+
 ## WASM target ABI contracts
 
 ### `wasm32-wasi`
@@ -82,8 +190,13 @@ The WASI backend emits a deterministic WebAssembly module with:
 - Exports: `memory` and `_start`.
 - Unsupported native runtime instructions are rejected at link/codegen time with an explicit `wasm backend` diagnostic.
 
-`tetra smoke --target wasm32-wasi --run=false` is build-only release evidence. Runner evidence is produced separately by
-`scripts/release_v1_0_wasi_smoke.sh`; when a runner fallback is used, the smoke report records that runner.
+`tetra smoke --target wasm32-wasi --run=false` is artifact/import preflight
+evidence, not runtime proof.
+`tetra run --target wasm32-wasi` is runtime-aware: it requires a discovered
+WASI runner (`wasmtime`, or the Node WASI fallback) and reports a missing-runner
+blocker when neither is available. Runner smoke evidence is also produced by
+`scripts/release/v1_0/wasi-smoke.sh`; when a runner fallback is used, the smoke
+report records that runner.
 
 ### `wasm32-web`
 
@@ -95,8 +208,13 @@ The web backend emits a deterministic WebAssembly module plus a JavaScript loade
   `instantiateTetra()` plus `runTetra()`.
 - Unsupported native runtime instructions are rejected at link/codegen time with an explicit `wasm backend` diagnostic.
 
-`tetra smoke --target wasm32-web --run=false` is build-only release evidence. Full browser automation evidence is produced
-by `scripts/release_v1_0_web_smoke.sh` and remains host/browser dependent.
+`tetra smoke --target wasm32-web --run=false` is artifact/import preflight
+evidence, not runtime proof.
+`tetra run --target wasm32-web` uses the generated loader and a discovered
+Chromium-compatible browser runner; `targets --format=json` reports
+`run_supported` according to browser discovery. Full browser automation evidence
+is produced by `scripts/release/v1_0/web-smoke.sh` and remains host/browser
+dependent.
 
 ## Actors runtime surface (MVP)
 
@@ -251,14 +369,20 @@ normal task value.
 uses the same runtime behavior as `__tetra_task_join_until_i32`: task completion
 wins with `error = 0`; the timer wins with `error = 2`.
 
-Typed task joins in the current MVP are emitted for slot counts `2..8`:
-direct ABI returns for `2..4` (`__tetra_task_join_typed_2..4`) and staged
-runtime-buffer joins for `5..8` (`__tetra_task_join_typed_5..8` plus
-`__tetra_task_result_get`). One-slot typed handles reuse the existing
-`task.i32` join path, and typed layouts above `8` are rejected during semantic
-checking. Worker targets remain zero-argument synchronous `i32` functions; for
-`2..4` they must throw the typed error enum, and for staged `5..8` they may be
-either non-throwing or throw the same typed error enum.
+Typed task joins in the current MVP are emitted for slot counts `2..8` on the
+builtin runtime path: direct ABI returns for `2..4`
+(`__tetra_task_join_typed_2..4`) and staged runtime-buffer joins for `5..8`
+(`__tetra_task_join_typed_5..8` plus `__tetra_task_result_get`). One-slot typed
+handles reuse the existing `task.i32` join path, and typed layouts above `8` are
+rejected during semantic checking. Worker targets remain zero-argument
+synchronous `i32` functions; for `2..4` they must throw the typed error enum,
+and for staged `5..8` they may be either non-throwing or throw the same typed
+error enum. `--runtime=selfhost` currently rejects programs that use typed task
+handles; use `--runtime=auto` or `--runtime=builtin` for this surface.
+
+The builtin x64 runtimes emit wrappers only for the supported `2..8` envelope.
+Tests cover both SysV and Win64 typed-join wrapper bounds, including rejection
+of slot counts below `2` and above `8`.
 
 ### `__tetra_task_join_until_i32(handle: i32, error: i32, deadline: i32) -> task.result_i32`
 
@@ -294,6 +418,11 @@ the logical clock to the nearest deadline and wakes every actor due at that
 time. Sleeping actors in a canceled task group become ready immediately so join
 can observe the cancellation result.
 
+The runtime smoke boundary is native-host execution for `linux-x64` and
+build-only evidence for non-host targets unless a platform runner is explicitly
+available. Distributed actors, networked mailboxes, and multi-process actor
+placement are post-v1 and not part of this ABI.
+
 ### `__tetra_time_now_ms() -> i32`
 
 Returns the current logical runtime time in milliseconds.
@@ -328,6 +457,23 @@ builtins:
 - `__tetra_sleep_until_ms`
 - `__tetra_deadline_ms`
 - `__tetra_timer_ready_ms`
+
+## Filesystem runtime ABI
+
+Filesystem host builtins use explicit `ptr,len` strings; runtime exports must
+not treat path arguments as NUL-terminated input.
+
+### `__tetra_fs_exists(path_ptr: ptr, path_len: i32, io_cap: cap.io) -> bool`
+
+Returns `1` when the host path exists and `0` when it does not exist. Invalid
+or unsupported paths return `0`. The third slot is the `cap.io` token required
+by the semantic builtin and is reserved for future runtime-side capability
+validation.
+
+The compiler validates these filesystem runtime exports when a program uses
+filesystem host builtins:
+
+- `__tetra_fs_exists`
 
 ## Program-provided symbols
 
@@ -381,16 +527,21 @@ used by the program: actor runtime symbols, actor-state symbols
 (`__tetra_actor_state_load`, `__tetra_actor_state_store`) when actor state is
 used, task/task-group/typed-task symbols when those builtins are used, and time
 runtime symbols when the program calls `core.time_now_ms`, `core.sleep_ms`,
-`core.sleep_until`, or `core.deadline_ms`. The compiler rejects missing
-targets, target mismatches, and missing runtime exports before platform linking.
+`core.sleep_until`, or `core.deadline_ms`, and filesystem runtime symbols when
+the program calls `core.fs_exists`. The compiler rejects missing targets,
+target mismatches, missing runtime exports, and runtime export signature
+metadata whose slot counts do not match the ABI before platform linking.
+Runtime objects without per-symbol signature metadata remain name-validated for
+compatibility with earlier TOBJ producers.
 
 `--runtime=auto` currently selects the embedded self-host runtime only for the
 mailbox-only actor surface, and switches to the built-in runtime when actor
-state, task/task-group, typed-task, or time builtins are used. This remains
-true even though self-host now exports parity symbols; auto mode is still
-conservative. `--runtime=selfhost` forces the self-host path, and
-`--runtime=builtin` keeps the Go-emitted runtime available as a compatibility
-fallback.
+state, task/task-group, typed-task, time, or filesystem builtins are used. For
+typed task handles specifically, `--runtime=selfhost` is an explicit build error
+(`self-host runtime does not support typed task handles`); `--runtime=auto` and
+`--runtime=builtin` select the Go-emitted builtin runtime for the supported
+`2..8` typed-task envelope. `--runtime=builtin` keeps the Go-emitted runtime
+available as a compatibility fallback.
 
 Native execution is only supported when `host == target`; cross-target builds are build-verified but not run on
 non-matching hosts.
@@ -402,17 +553,20 @@ document and metadata-stable for TOBJ files that declare one of the supported
 native triples. A compatible runtime object must:
 
 - use the target's platform calling convention exactly as listed above;
-- export all required actor runtime symbols, and any used time runtime symbols,
-  with the reserved `__tetra_` prefix;
+- export all required actor, actor-state, task, task-group, and typed-task
+  runtime symbols, plus any used time runtime symbols, with the reserved
+  `__tetra_` prefix;
 - set `target` to the final program target;
 - avoid redefining program glue symbols or user symbols from linked libraries;
 - preserve the meaning of actor handles, `i32` message values, and tagged
   `actor.msg` / `actor.recv_result_i32` two-slot returns.
 
 The compiler rejects runtime objects with missing targets, target mismatches, or
-missing required symbols before platform linking. It also build-verifies runtime
-override objects for `linux-x64`, `macos-x64`, and `windows-x64`; real execution
-evidence is only claimed on matching hosts.
+missing required symbols before platform linking. When TOBJ symbol metadata
+declares runtime export parameter and return slot counts, the compiler also
+rejects ABI signature mismatches before platform linking. It also
+build-verifies runtime override objects for `linux-x64`, `macos-x64`, and
+`windows-x64`; real execution evidence is only claimed on matching hosts.
 
 ## Additional linked objects
 
@@ -440,7 +594,9 @@ TOBJ objects carry enough metadata for target-safe linking:
   public surface.
 - `code`: raw text/code bytes for the target object fragment.
 - `data`: raw data bytes for globals and constants.
-- `symbols`: exported or internal symbol names with code/data offsets.
+- `symbols`: exported or internal symbol names with code/data offsets, and
+  optional per-function ABI slot metadata (`param_slots`, `return_slots`) for
+  producers that can provide it.
 - `relocs`: relocation records naming the target symbol and relocation kind.
 
 The linker accepts repeated `--link-object` flags when all objects match the

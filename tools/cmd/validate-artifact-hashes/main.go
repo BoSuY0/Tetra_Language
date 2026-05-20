@@ -134,7 +134,12 @@ func validateHashManifest(manifestPath string) error {
 	if len(manifest.Artifacts) == 0 {
 		return fmt.Errorf("artifacts must not be empty")
 	}
-	root := filepath.Dir(manifestPath)
+	root := filepath.Join(filepath.Dir(manifestPath), filepath.FromSlash(manifest.Root))
+	manifestRel, err := filepath.Rel(root, manifestPath)
+	if err != nil {
+		return err
+	}
+	manifestRel = filepath.ToSlash(manifestRel)
 	seen := map[string]bool{}
 	lastPath := ""
 	for _, expected := range manifest.Artifacts {
@@ -170,6 +175,15 @@ func validateHashManifest(manifestPath string) error {
 		}
 		if actual.Schema != expected.Schema {
 			return fmt.Errorf("schema mismatch for %s: got %q want %q", expected.Path, actual.Schema, expected.Schema)
+		}
+	}
+	actualPaths, err := listArtifactPaths(root, manifestRel)
+	if err != nil {
+		return err
+	}
+	for _, path := range actualPaths {
+		if !seen[path] {
+			return fmt.Errorf("unlisted artifact %s", path)
 		}
 	}
 	return nil
@@ -215,6 +229,33 @@ func hashFile(root string, rel string) (hashedArtifact, error) {
 		Size:   size,
 		Schema: detectJSONSchema(path),
 	}, nil
+}
+
+func listArtifactPaths(root string, manifestName string) ([]string, error) {
+	var paths []string
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == manifestName {
+			return nil
+		}
+		paths = append(paths, rel)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(paths)
+	return paths, nil
 }
 
 func detectJSONSchema(path string) string {

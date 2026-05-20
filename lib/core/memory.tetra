@@ -1,4 +1,7 @@
-// Stable v0.5 memory helpers built on explicit cap.mem values.
+// Stable memory helpers built on explicit cap.mem values.
+// Memory Production Core boundary: `cap.mem` authorizes raw byte access, but the
+// caller owns pointer validity and bounds for these thin helper loops until the
+// Linux-x64 memory production runtime proves checked bounds diagnostics.
 // Effects: mem
 // ```tetra doctest
 // func memory_doctest(dst: ptr, src: ptr, mem: cap.mem) -> Int
@@ -10,6 +13,8 @@ module lib.core.memory
 func memset_u8(dst: ptr, v: UInt8, n: Int, mem: cap.mem) -> Int
 uses mem:
     unsafe:
+        if n < 0:
+            return 2
         var i: Int = 0
         while i < n:
             let p: ptr = core.ptr_add(dst, i, mem)
@@ -21,6 +26,8 @@ uses mem:
 func memcpy_u8(dst: ptr, src: ptr, n: Int, mem: cap.mem) -> Int
 uses mem:
     unsafe:
+        if n < 0:
+            return 2
         var i: Int = 0
         while i < n:
             let sp: ptr = core.ptr_add(src, i, mem)

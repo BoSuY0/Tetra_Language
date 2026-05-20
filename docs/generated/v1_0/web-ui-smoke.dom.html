@@ -1,16 +1,64 @@
 <!DOCTYPE html>
 <html><head></head><body>
-    <pre id="result">ok:0</pre>
+    <pre id="result">ok:0:ui=1:runtime=ok</pre>
+    <pre id="runtime-trace">ui-event-dispatch:web-command-dispatch;main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;main-instantiation:ok</pre>
     <script type="module">
-      import { runTetra } from './web_smoke.mjs';
+      import { runTetra, instantiateTetra } from './web_smoke.mjs';
+      import { runTetra as runMainProbe } from './web_main_probe.mjs';
+      import { runTetra as runRuntimeProbe, instantiateTetra as instantiateRuntimeProbe } from './web_runtime_probe.mjs';
+      import { mountTetraUI } from './web_smoke.ui.web.mjs';
       const el = document.getElementById('result');
+      const traceEl = document.getElementById('runtime-trace');
+      const trace = [];
+      const logs = [];
+      const originalLog = console.log.bind(console);
+      console.log = (...args) => {
+        logs.push(args.map(String).join(' '));
+        originalLog(...args);
+      };
+      function mark(name, ok, detail = '') {
+        trace.push(`${name}:${ok ? 'ok' : `fail:${detail}`}`);
+        if (!ok) {
+          throw new Error(`runtime-${name}:${detail}`);
+        }
+      }
       try {
-        const code = await runTetra();
-        el.textContent = `ok:${code}`;
+        const bundle = await mountTetraUI(document.body);
+        if (!bundle || bundle.schema !== 'tetra.ui.v1') {
+          throw new Error(`ui-schema:${String(bundle && bundle.schema)}`);
+        }
+        trace.push('ui-event-dispatch:web-command-dispatch');
+        const code = await runMainProbe();
+        mark('main-exit', code === 0, `exit=${code}`);
+        const stdoutStart = logs.length;
+        const probeCode = await runRuntimeProbe();
+        mark('stdout', logs.slice(stdoutStart).some((line) => line.includes('web runtime smoke stdout')), 'missing console output');
+        mark('nonzero-exit', probeCode === 7, `exit=${probeCode}`);
+        try {
+          await runTetra(new URL('./missing-web-smoke.wasm', import.meta.url));
+          mark('failure-propagation', false, 'missing module resolved');
+        } catch (err) {
+          const message = String(err && err.message ? err.message : err);
+          mark('failure-propagation', message.includes('fetch failed') || message.includes('404'), message);
+        }
+        const firstProbe = await instantiateRuntimeProbe();
+        const secondProbe = await instantiateRuntimeProbe();
+        mark(
+          'repeated-instantiation',
+          firstProbe && secondProbe && firstProbe.instance && secondProbe.instance && firstProbe.instance !== secondProbe.instance,
+          'instances were not distinct',
+        );
+        const firstMain = await instantiateTetra();
+        mark('main-instantiation', firstMain && firstMain.instance && typeof firstMain.instance.exports.tetra_main === 'function', 'missing tetra_main');
+        const views = Array.isArray(bundle.views) ? bundle.views.length : 0;
+        el.textContent = `ok:${code}:ui=${views}:runtime=ok`;
       } catch (err) {
         el.textContent = `error:${String(err)}`;
+      } finally {
+        traceEl.textContent = trace.join(';');
+        console.log = originalLog;
       }
     </script>
   
 
-</body></html>
+<section data-tetra-ui="v1"><div>Tetra UI Shell</div><div>runtime: web command dispatch</div><div>view TodoView (state: TodoState)</div><div data-tetra-binding="countValue">  bind countValue: i32 = 0</div><div data-tetra-binding="titleText">  bind titleText: str = Dogfood Web UI</div><button type="button">event click -&gt; increment</button></section></body></html>

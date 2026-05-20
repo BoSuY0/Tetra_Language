@@ -22,11 +22,13 @@ type smokeListReport struct {
 }
 
 type smokeListCase struct {
-	Name         string `json:"name"`
-	SrcPath      string `json:"src_path"`
-	TargetGroup  string `json:"target_group"`
-	ExpectedExit int    `json:"expected_exit"`
-	DebugOnly    bool   `json:"debug_only,omitempty"`
+	Name               string `json:"name"`
+	SrcPath            string `json:"src_path"`
+	TargetGroup        string `json:"target_group"`
+	ExpectedExit       int    `json:"expected_exit"`
+	Unsupported        bool   `json:"unsupported,omitempty"`
+	ExpectedDiagnostic string `json:"expected_diagnostic,omitempty"`
+	DebugOnly          bool   `json:"debug_only,omitempty"`
 }
 
 type smokeExcludedExample struct {
@@ -105,6 +107,13 @@ func validateSmokeListWithExamplesRoot(raw []byte, examplesRoot string) error {
 		seenSources[c.SrcPath] = true
 		if c.ExpectedExit < 0 || c.ExpectedExit > 255 {
 			return fmt.Errorf("smoke case %s expected_exit = %d, want 0..255", c.Name, c.ExpectedExit)
+		}
+		if c.Unsupported {
+			if c.ExpectedDiagnostic == "" {
+				return fmt.Errorf("unsupported smoke case %s missing expected_diagnostic", c.Name)
+			}
+		} else if c.ExpectedDiagnostic != "" {
+			return fmt.Errorf("smoke case %s has expected_diagnostic but is not marked unsupported", c.Name)
 		}
 		if report.Target != "" {
 			switch c.TargetGroup {
@@ -189,21 +198,43 @@ func discoverExamples(examplesRoot string) ([]string, error) {
 func requiredCasesForReport(report smokeListReport) map[string]bool {
 	if report.BuildOnly || report.Target == "wasm32-wasi" || report.Target == "wasm32-web" {
 		return map[string]bool{
-			"legacy_hello":     false,
-			"effects_io_smoke": false,
-			"ui_web_smoke":     false,
-			"dogfood_wasi":     false,
-			"dogfood_web_ui":   false,
+			"legacy_hello":              false,
+			"effects_io_smoke":          false,
+			"ui_web_smoke":              false,
+			"core_slices_smoke":         false,
+			"wasm_globals_smoke":        false,
+			"wasm_multi_return_2_smoke": false,
+			"wasm_multi_return_3_smoke": false,
+			"wasm_multi_return_4_smoke": false,
+			"dogfood_wasi":              false,
+			"dogfood_web_ui":            false,
+			"time_sleep_smoke":          false,
+			"task_smoke":                false,
+			"actors_pingpong":           false,
 		}
 	}
 	return map[string]bool{
-		"flow_hello":           false,
-		"actors_pingpong":      false,
-		"enum_match_smoke":     false,
-		"effects_io_smoke":     false,
-		"typed_errors_smoke":   false,
-		"protocol_impl_smoke":  false,
-		"core_memory_smoke":    false,
-		"for_collection_smoke": false,
+		"flow_hello":               false,
+		"actors_pingpong":          false,
+		"enum_match_smoke":         false,
+		"effects_io_smoke":         false,
+		"typed_errors_smoke":       false,
+		"protocol_impl_smoke":      false,
+		"for_collection_smoke":     false,
+		"core_async_smoke":         false,
+		"core_capability_smoke":    false,
+		"core_collections_smoke":   false,
+		"core_crypto_smoke":        false,
+		"core_filesystem_smoke":    false,
+		"core_io_smoke":            false,
+		"core_math_smoke":          false,
+		"core_memory_smoke":        false,
+		"core_networking_smoke":    false,
+		"core_serialization_smoke": false,
+		"core_slices_smoke":        false,
+		"core_strings_smoke":       false,
+		"core_sync_smoke":          false,
+		"core_testing_smoke":       false,
+		"core_time_smoke":          false,
 	}
 }

@@ -17,11 +17,11 @@ Status: completed as of `v0.13` (2025-12-30). Next: `docs/roadmap_0_13_to_0_14.m
   - `./tetra version` prints `tetra_language <compilerVersion>` (and git HEAD when available).
 
 ### C) Scripts policy (bootstrap/test/dump)
-- Files: `scripts/bootstrap.sh`, `scripts/test.sh`, `scripts/dump.sh`
+- Files: `scripts/dev/bootstrap.sh`, `scripts/ci/test.sh`, `scripts/dev/dump-project.sh`
 - Acceptance:
-  - `./scripts/bootstrap.sh` produces `./tetra`.
-  - `./scripts/test.sh` runs `go test` for `./compiler/...`, `./cli/...`, `./tools/...`.
-  - `./scripts/dump.sh` produces a dump via `tools/cmd/dump-project`.
+  - `bash scripts/dev/bootstrap.sh` produces `./tetra`.
+  - `bash scripts/ci/test.sh` runs `go test` for `./compiler/...`, `./cli/...`, `./tools/...`.
+  - `bash scripts/dev/dump-project.sh` produces a dump via `tools/cmd/dump-project`.
 
 ### D) Automated smoke runner
 - Files: `cli/cmd/tetra/main.go`

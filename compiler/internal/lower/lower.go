@@ -17,6 +17,8 @@ type runtimePolicy struct {
 	consentParam string
 }
 
+const consentTokenRuntimeSentinel int32 = -0x43544f4b
+
 func runtimePolicyFromClauses(clauses []frontend.SemanticClause) runtimePolicy {
 	policy := runtimePolicy{}
 	for _, clause := range clauses {
@@ -53,21 +55,67 @@ func clauseConstI32(expr frontend.Expr) (int32, bool) {
 	}
 }
 
-func budgetChargedInstr(kind ir.IRInstrKind) bool {
-	switch kind {
-	case ir.IRWrite, ir.IRCall,
-		ir.IRAllocBytes, ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32,
-		ir.IRIslandNew, ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32, ir.IRIslandFree,
-		ir.IRCapIO, ir.IRCapMem,
-		ir.IRMemReadI32, ir.IRMemWriteI32,
-		ir.IRMemReadU8, ir.IRMemWriteU8,
-		ir.IRMemReadPtr, ir.IRMemWritePtr,
-		ir.IRPtrAdd, ir.IRMmioReadI32, ir.IRMmioWriteI32,
-		ir.IRSymAddr, ir.IRCtxSwitch:
-		return true
-	default:
-		return false
+type budgetCharge struct {
+	kind ir.IRInstrKind
+	cost int32
+}
+
+const (
+	policyFailureDefaultSlot int32 = 0
+	policyFailureStatusTrap  int32 = 1
+)
+
+var budgetChargeTable = []budgetCharge{
+	{kind: ir.IRWrite, cost: 1},
+	{kind: ir.IRCall, cost: 1},
+	{kind: ir.IRAllocBytes, cost: 1},
+	{kind: ir.IRMakeSliceU8, cost: 1},
+	{kind: ir.IRMakeSliceU16, cost: 1},
+	{kind: ir.IRMakeSliceI32, cost: 1},
+	{kind: ir.IRIndexLoadI32, cost: 1},
+	{kind: ir.IRIndexStoreI32, cost: 1},
+	{kind: ir.IRIndexLoadU8, cost: 1},
+	{kind: ir.IRIndexStoreU8, cost: 1},
+	{kind: ir.IRIndexLoadU16, cost: 1},
+	{kind: ir.IRIndexStoreU16, cost: 1},
+	{kind: ir.IRIslandNew, cost: 1},
+	{kind: ir.IRIslandMakeSliceU8, cost: 1},
+	{kind: ir.IRIslandMakeSliceU16, cost: 1},
+	{kind: ir.IRIslandMakeSliceI32, cost: 1},
+	{kind: ir.IRIslandFree, cost: 1},
+	{kind: ir.IRCapIO, cost: 1},
+	{kind: ir.IRCapMem, cost: 1},
+	{kind: ir.IRMemReadI32, cost: 1},
+	{kind: ir.IRMemWriteI32, cost: 1},
+	{kind: ir.IRMemReadU8, cost: 1},
+	{kind: ir.IRMemWriteU8, cost: 1},
+	{kind: ir.IRMemReadPtr, cost: 1},
+	{kind: ir.IRMemWritePtr, cost: 1},
+	{kind: ir.IRMemReadI32Offset, cost: 1},
+	{kind: ir.IRMemWriteI32Offset, cost: 1},
+	{kind: ir.IRMemReadU8Offset, cost: 1},
+	{kind: ir.IRMemWriteU8Offset, cost: 1},
+	{kind: ir.IRMemReadPtrOffset, cost: 1},
+	{kind: ir.IRMemWritePtrOffset, cost: 1},
+	{kind: ir.IRPtrAdd, cost: 1},
+	{kind: ir.IRMmioReadI32, cost: 1},
+	{kind: ir.IRMmioWriteI32, cost: 1},
+	{kind: ir.IRSymAddr, cost: 1},
+	{kind: ir.IRCtxSwitch, cost: 1},
+}
+
+func budgetChargeForInstr(kind ir.IRInstrKind) (int32, bool) {
+	for _, charge := range budgetChargeTable {
+		if charge.kind == kind {
+			return charge.cost, true
+		}
 	}
+	return 0, false
+}
+
+func budgetChargedInstr(kind ir.IRInstrKind) bool {
+	_, ok := budgetChargeForInstr(kind)
+	return ok
 }
 
 func Lower(checked *semantics.CheckedProgram) (*ir.IRProgram, error) {
@@ -206,6 +254,8 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 		globals:              globals,
 		types:                types,
 		funcs:                funcs,
+		imports:              fn.Imports,
+		module:               fn.Module,
 		localSlots:           localSlots,
 		returnType:           fn.ReturnType,
 		throwsType:           fn.ThrowsType,
@@ -221,6 +271,7 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 		budgetScratchBase:    -1,
 		stagedTaskTarget:     stagedTarget,
 		callableParamTargets: callableParamTargets,
+		rawPtrOffsetLocals:   map[int]rawPtrOffsetLocal{},
 	}
 	if policy.hasBudget || policy.consentParam != "" {
 		l.policyFailLabel = l.newLabel()
@@ -238,8 +289,8 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 			return ir.IRFunc{}, fmt.Errorf("%s: semantic clause 'consent' expects 1-slot token parameter '%s'", frontend.FormatPos(fn.Decl.Pos), policy.consentParam)
 		}
 		l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: info.Base, Pos: fn.Decl.Pos})
-		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: fn.Decl.Pos})
-		l.emitRaw(ir.IRInstr{Kind: ir.IRCmpNeI32, Pos: fn.Decl.Pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: consentTokenRuntimeSentinel, Pos: fn.Decl.Pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRCmpEqI32, Pos: fn.Decl.Pos})
 		l.emitRaw(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: l.policyFailLabel, Pos: fn.Decl.Pos})
 	}
 	if err := l.lowerBlock(fn.Decl.Body, fn.Decl.Pos); err != nil {
@@ -248,16 +299,31 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 	if l.policyFailLabel >= 0 {
 		l.emitPolicyFailureHandler(fn.Decl.Pos)
 	}
+	irPolicy := ir.IRPolicy{
+		HasBudget:    policy.hasBudget,
+		Budget:       policy.budget,
+		BudgetLocal:  budgetLocal,
+		HasConsent:   policy.consentParam != "",
+		ConsentLocal: -1,
+		FailLabel:    l.policyFailLabel,
+	}
+	if policy.consentParam != "" {
+		irPolicy.ConsentLocal = l.locals[policy.consentParam].Base
+	}
 	return ir.IRFunc{
 		Name:        fn.Name,
 		ExportName:  fn.Decl.ExportName,
 		ParamSlots:  fn.ParamSlots,
 		LocalSlots:  l.localSlots,
 		ReturnSlots: l.returnSlots,
+		Policy:      irPolicy,
 		Instrs:      l.instrs,
 	}, nil
 }
 
+// lowerer owns function-local IR emission state. stackHeight is emission-side
+// bookkeeping used to preserve local invariants while lowering; VerifyFunc is
+// still the final target-neutral check before codegen sees the function.
 type lowerer struct {
 	instrs               []ir.IRInstr
 	locals               map[string]semantics.LocalInfo
@@ -265,6 +331,8 @@ type lowerer struct {
 	globals              map[string]semantics.GlobalInfo
 	types                map[string]*semantics.TypeInfo
 	funcs                map[string]semantics.FuncSig
+	imports              map[string]string
+	module               string
 	localSlots           int
 	returnType           string
 	throwsType           string
@@ -281,12 +349,20 @@ type lowerer struct {
 	budgetScratchSlots   int
 	stagedTaskTarget     typedTaskStagedTarget
 	callableParamTargets map[string][]string
+	rawPtrOffsetLocals   map[int]rawPtrOffsetLocal
 	preparedStringFields map[string]bool
 	stackHeight          int
 	nextLabel            int
 	cleanupIslands       []int
 	deferFrames          []deferFrame
 	loopStack            []loopLabels
+}
+
+type rawPtrOffsetLocal struct {
+	BaseLocal    int
+	OffsetLocal  int
+	OffsetImm    int32
+	HasOffsetImm bool
 }
 
 type typedTaskWrapper struct {
@@ -397,8 +473,28 @@ func collectTypedTaskWrappers(checked *semantics.CheckedProgram, module string) 
 			walkExpr(e.X)
 		case *frontend.TryExpr:
 			walkExpr(e.X)
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if c.Pattern != nil {
+					walkExpr(c.Pattern)
+				}
+				if c.Guard != nil {
+					walkExpr(c.Guard)
+				}
+				walkExpr(c.Value)
+			}
 		case *frontend.CatchExpr:
 			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if c.Pattern != nil {
+					walkExpr(c.Pattern)
+				}
+				if c.Guard != nil {
+					walkExpr(c.Guard)
+				}
+				walkExpr(c.Value)
+			}
 		}
 	}
 
@@ -505,234 +601,6 @@ func collectStagedTypedTaskTargets(wrappers []typedTaskWrapper) map[string]typed
 	return out
 }
 
-func collectFunctionTypedParamTargets(checked *semantics.CheckedProgram, module string) map[string]map[string][]string {
-	if checked == nil {
-		return nil
-	}
-	funcsByName := make(map[string]semantics.CheckedFunc, len(checked.Funcs))
-	for _, fn := range checked.Funcs {
-		funcsByName[fn.Name] = fn
-	}
-	targetSets := map[string]map[string]map[string]bool{}
-	type callableTargetEdge struct {
-		callee      string
-		param       string
-		sourceFunc  string
-		sourceParam string
-	}
-	var edges []callableTargetEdge
-
-	addTarget := func(callee, paramName, targetSymbol string) bool {
-		if callee == "" || paramName == "" || targetSymbol == "" {
-			return false
-		}
-		if _, ok := targetSets[callee]; !ok {
-			targetSets[callee] = map[string]map[string]bool{}
-		}
-		if _, ok := targetSets[callee][paramName]; !ok {
-			targetSets[callee][paramName] = map[string]bool{}
-		}
-		if targetSets[callee][paramName][targetSymbol] {
-			return false
-		}
-		targetSets[callee][paramName][targetSymbol] = true
-		return true
-	}
-
-	var walkExpr func(frontend.Expr, semantics.CheckedFunc)
-	var walkStmt func(frontend.Stmt, semantics.CheckedFunc)
-
-	addCallTargets := func(call *frontend.CallExpr, caller semantics.CheckedFunc) {
-		resolved := call.Name
-		if builtin, ok := semantics.ResolveBuiltinAlias(resolved); ok {
-			resolved = builtin
-		}
-		calleeSig, ok := checked.FuncSigs[resolved]
-		if !ok || len(calleeSig.ParamFunctionTypes) == 0 {
-			return
-		}
-		callee, ok := funcsByName[resolved]
-		if !ok || len(callee.Decl.Params) == 0 {
-			return
-		}
-		for i, isFuncParam := range calleeSig.ParamFunctionTypes {
-			if !isFuncParam || i >= len(call.Args) || i >= len(callee.Decl.Params) {
-				continue
-			}
-			id, ok := call.Args[i].(*frontend.IdentExpr)
-			if !ok {
-				continue
-			}
-			paramName := callee.Decl.Params[i].Name
-			if paramName == "" {
-				continue
-			}
-			if local, ok := caller.Locals[id.Name]; ok {
-				if !local.FunctionTypeValue {
-					continue
-				}
-				if local.FunctionValue != "" {
-					addTarget(resolved, paramName, local.FunctionValue)
-					continue
-				}
-				edges = append(edges, callableTargetEdge{
-					callee:      resolved,
-					param:       paramName,
-					sourceFunc:  caller.Name,
-					sourceParam: id.Name,
-				})
-				continue
-			}
-			if _, ok := checked.FuncSigs[id.Name]; ok {
-				addTarget(resolved, paramName, id.Name)
-			}
-		}
-	}
-
-	walkExpr = func(expr frontend.Expr, caller semantics.CheckedFunc) {
-		switch e := expr.(type) {
-		case *frontend.CallExpr:
-			addCallTargets(e, caller)
-			for _, arg := range e.Args {
-				walkExpr(arg, caller)
-			}
-		case *frontend.StructLitExpr:
-			for _, field := range e.Fields {
-				walkExpr(field.Value, caller)
-			}
-		case *frontend.FieldAccessExpr:
-			walkExpr(e.Base, caller)
-		case *frontend.IndexExpr:
-			walkExpr(e.Base, caller)
-			walkExpr(e.Index, caller)
-		case *frontend.BinaryExpr:
-			walkExpr(e.Left, caller)
-			walkExpr(e.Right, caller)
-		case *frontend.UnaryExpr:
-			walkExpr(e.X, caller)
-		case *frontend.TryExpr:
-			walkExpr(e.X, caller)
-		case *frontend.CatchExpr:
-			walkExpr(e.Call, caller)
-		case *frontend.AwaitExpr:
-			walkExpr(e.X, caller)
-		}
-	}
-
-	walkStmt = func(stmt frontend.Stmt, caller semantics.CheckedFunc) {
-		switch s := stmt.(type) {
-		case *frontend.PrintStmt:
-			walkExpr(s.Value, caller)
-		case *frontend.ExpectStmt:
-			walkExpr(s.Cond, caller)
-		case *frontend.ReturnStmt:
-			walkExpr(s.Value, caller)
-		case *frontend.ThrowStmt:
-			walkExpr(s.Value, caller)
-		case *frontend.LetStmt:
-			walkExpr(s.Value, caller)
-		case *frontend.AssignStmt:
-			walkExpr(s.Target, caller)
-			walkExpr(s.Value, caller)
-		case *frontend.ExprStmt:
-			walkExpr(s.Expr, caller)
-		case *frontend.IfStmt:
-			walkExpr(s.Cond, caller)
-			for _, inner := range s.Then {
-				walkStmt(inner, caller)
-			}
-			for _, inner := range s.Else {
-				walkStmt(inner, caller)
-			}
-		case *frontend.IfLetStmt:
-			walkExpr(s.Value, caller)
-			for _, inner := range s.Then {
-				walkStmt(inner, caller)
-			}
-			for _, inner := range s.Else {
-				walkStmt(inner, caller)
-			}
-		case *frontend.WhileStmt:
-			walkExpr(s.Cond, caller)
-			for _, inner := range s.Body {
-				walkStmt(inner, caller)
-			}
-		case *frontend.ForRangeStmt:
-			if s.Iterable != nil {
-				walkExpr(s.Iterable, caller)
-			} else {
-				walkExpr(s.Start, caller)
-				walkExpr(s.End, caller)
-			}
-			for _, inner := range s.Body {
-				walkStmt(inner, caller)
-			}
-		case *frontend.MatchStmt:
-			walkExpr(s.Value, caller)
-			for _, c := range s.Cases {
-				if !c.Default {
-					walkExpr(c.Pattern, caller)
-				}
-				for _, inner := range c.Body {
-					walkStmt(inner, caller)
-				}
-			}
-		case *frontend.DeferStmt:
-			for _, inner := range s.Body {
-				walkStmt(inner, caller)
-			}
-		case *frontend.UnsafeStmt:
-			for _, inner := range s.Body {
-				walkStmt(inner, caller)
-			}
-		case *frontend.IslandStmt:
-			walkExpr(s.Size, caller)
-			for _, inner := range s.Body {
-				walkStmt(inner, caller)
-			}
-		case *frontend.FreeStmt:
-			walkExpr(s.Value, caller)
-		}
-	}
-
-	for _, fn := range checked.Funcs {
-		if module != "" && fn.Module != module {
-			continue
-		}
-		if fn.Decl == nil {
-			continue
-		}
-		for _, stmt := range fn.Decl.Body {
-			walkStmt(stmt, fn)
-		}
-	}
-
-	for changed := true; changed; {
-		changed = false
-		for _, edge := range edges {
-			for target := range targetSets[edge.sourceFunc][edge.sourceParam] {
-				if addTarget(edge.callee, edge.param, target) {
-					changed = true
-				}
-			}
-		}
-	}
-
-	out := map[string]map[string][]string{}
-	for funcName, params := range targetSets {
-		out[funcName] = map[string][]string{}
-		for paramName, symbols := range params {
-			list := make([]string, 0, len(symbols))
-			for symbol := range symbols {
-				list = append(list, symbol)
-			}
-			sort.Strings(list)
-			out[funcName][paramName] = list
-		}
-	}
-	return out
-}
-
 func lowerTypedTaskWrapper(wrapper typedTaskWrapper) (ir.IRFunc, error) {
 	if wrapper.SlotCount < 2 || wrapper.SlotCount > 8 {
 		return ir.IRFunc{}, lowerUnsupportedError(frontend.Position{}, "typed task wrapper %s has unsupported slot count %d", wrapper.Name, wrapper.SlotCount)
@@ -819,6 +687,8 @@ func lowerTypedTaskWrapper(wrapper typedTaskWrapper) (ir.IRFunc, error) {
 	}, nil
 }
 
+// throwingLayout computes the slot layout for typed-error returns. The compact
+// path is only valid when both success and error payloads fit in one slot.
 func throwingLayout(returnType, throwsType string, types map[string]*semantics.TypeInfo) (int, int, bool, error) {
 	if throwsType == "" {
 		return 0, 0, false, nil
@@ -833,6 +703,13 @@ func throwingLayout(returnType, throwsType string, types map[string]*semantics.T
 	}
 	compact := retInfo.SlotCount == 1 && throwInfo.SlotCount == 1
 	return retInfo.SlotCount, throwInfo.SlotCount, compact, nil
+}
+
+func throwingReturnSlotCount(successSlots, errorSlots int) int {
+	if successSlots == 1 && errorSlots == 1 {
+		return 2
+	}
+	return successSlots + errorSlots + 1
 }
 
 type loopLabels struct {
@@ -853,8 +730,8 @@ func (l *lowerer) newLabel() int {
 }
 
 func (l *lowerer) emit(instr ir.IRInstr) {
-	if l.budgetEnabled && l.policyFailLabel >= 0 && budgetChargedInstr(instr.Kind) {
-		l.emitBudgetGuardPreservingStack(instr.Pos)
+	if cost, ok := budgetChargeForInstr(instr.Kind); l.budgetEnabled && l.policyFailLabel >= 0 && ok {
+		l.emitBudgetGuardPreservingStack(instr.Pos, cost)
 	}
 	l.emitRaw(instr)
 }
@@ -872,17 +749,17 @@ func (l *lowerer) emitRaw(instr ir.IRInstr) {
 	}
 }
 
-func (l *lowerer) emitBudgetGuardPreservingStack(pos frontend.Position) {
+func (l *lowerer) emitBudgetGuardPreservingStack(pos frontend.Position, cost int32) {
 	depth := l.stackHeight
 	if depth == 0 {
-		l.emitBudgetGuard(pos)
+		l.emitBudgetGuard(pos, cost)
 		return
 	}
 	base := l.ensureBudgetScratchSlots(depth)
 	for slot := depth - 1; slot >= 0; slot-- {
 		l.emitRaw(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base + slot, Pos: pos})
 	}
-	l.emitBudgetGuard(pos)
+	l.emitBudgetGuard(pos, cost)
 	for slot := 0; slot < depth; slot++ {
 		l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slot, Pos: pos})
 	}
@@ -903,12 +780,12 @@ func (l *lowerer) ensureBudgetScratchSlots(slots int) int {
 	return l.budgetScratchBase
 }
 
-func (l *lowerer) emitBudgetGuard(pos frontend.Position) {
+func (l *lowerer) emitBudgetGuard(pos frontend.Position, cost int32) {
 	if l.budgetLocal < 0 {
 		return
 	}
 	l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.budgetLocal, Pos: pos})
-	l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
+	l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: cost, Pos: pos})
 	l.emitRaw(ir.IRInstr{Kind: ir.IRSubI32, Pos: pos})
 	l.emitRaw(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.budgetLocal, Pos: pos})
 	l.emitRaw(ir.IRInstr{Kind: ir.IRLoadLocal, Local: l.budgetLocal, Pos: pos})
@@ -955,28 +832,33 @@ func (l *lowerer) emitZeroSlots(count int, pos frontend.Position) {
 
 func (l *lowerer) emitZeroSlotsRaw(count int, pos frontend.Position) {
 	for i := 0; i < count; i++ {
-		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: policyFailureDefaultSlot, Pos: pos})
 	}
 }
 
+// emitPolicyFailureHandler is the public lowering ABI for budget exhaustion and
+// the current local policy-failure path. Non-throwing functions return their
+// normal result shape filled with zero/default slots. Throwing functions return
+// the normal throwing result shape with a zero/default error payload and status
+// 1, so catch/try observe a deterministic trap-shaped error result.
 func (l *lowerer) emitPolicyFailureHandler(pos frontend.Position) {
 	l.emitRaw(ir.IRInstr{Kind: ir.IRLabel, Label: l.policyFailLabel, Pos: pos})
 	if l.stagedTaskTarget.SlotCount > 4 {
-		if err := l.emitStageTypedTaskStatus(0, 1, l.stagedTaskTarget.SlotCount, pos); err == nil {
+		if err := l.emitStageTypedTaskStatus(policyFailureDefaultSlot, policyFailureStatusTrap, l.stagedTaskTarget.SlotCount, pos); err == nil {
 			l.emitCleanupRaw(pos)
-			l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
+			l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: policyFailureStatusTrap, Pos: pos})
 			l.emitRaw(ir.IRInstr{Kind: ir.IRReturn, Pos: pos})
 			return
 		}
 	}
 	if l.throwsType != "" {
 		if l.throwCompact {
-			l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+			l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: policyFailureDefaultSlot, Pos: pos})
 		} else {
 			l.emitZeroSlotsRaw(l.throwSuccessSlots, pos)
 			l.emitZeroSlotsRaw(l.throwErrorSlots, pos)
 		}
-		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
+		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: policyFailureStatusTrap, Pos: pos})
 	} else {
 		l.emitZeroSlotsRaw(l.returnSlots, pos)
 	}
@@ -1503,9 +1385,30 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: s.At})
 			return nil
 		}
-		slots, err := l.lowerExprAs(s.Value, l.returnType)
-		if err != nil {
-			return err
+		slots := 0
+		if closure, ok := s.Value.(*frontend.ClosureExpr); ok && l.returnType == "fnptr" {
+			if l.returnSlots == semantics.CallableHandleSlotCount {
+				slots = l.emitCallableHandleValue(l.closureSymbolName(closure), closure.Captures, closure.At)
+			} else {
+				slots = l.emitFunctionSymbolValue(l.closureSymbolName(closure), l.closureEnvLocals(closure.Captures), closure.At)
+			}
+		} else if id, ok := s.Value.(*frontend.IdentExpr); ok && l.returnType == "fnptr" {
+			if info, exists := l.locals[id.Name]; exists && info.FunctionValue != "" && len(info.FunctionCaptures) > 0 {
+				if l.returnSlots == semantics.CallableHandleSlotCount || info.FunctionHandleValue || len(l.closureEnvLocalsUnbounded(info.FunctionCaptures)) > semantics.FnPtrEnvSlotCount {
+					slots = l.emitCallableHandleValue(info.FunctionValue, info.FunctionCaptures, s.At)
+				} else {
+					slots = l.emitFunctionSymbolValue(info.FunctionValue, l.capturedClosureEnvLocals(info), s.At)
+				}
+			}
+		} else if target, ok := importedFunctionTargetFromExpr(s.Value, l.imports, l.funcs); ok {
+			slots = l.emitFunctionSymbolValue(target, nil, s.At)
+		}
+		if slots == 0 {
+			var err error
+			slots, err = l.lowerExprAs(s.Value, l.returnType)
+			if err != nil {
+				return err
+			}
 		}
 		expectedSlots := l.returnSlots
 		if l.throwsType != "" {
@@ -1628,9 +1531,58 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		}
 		slots := 0
 		if info.FunctionTypeValue {
-			if _, ok := s.Value.(*frontend.IdentExpr); ok && info.FunctionValue != "" {
-				l.emit(ir.IRInstr{Kind: ir.IRSymAddr, Name: info.FunctionValue, Pos: s.At})
-				slots = 1
+			if _, ok := s.Value.(*frontend.ClosureExpr); ok && info.FunctionValue != "" {
+				if info.FunctionHandleValue {
+					closure := s.Value.(*frontend.ClosureExpr)
+					slots = l.emitCallableHandleValue(info.FunctionValue, closure.Captures, s.At)
+				} else {
+					slots = l.emitFunctionSymbolValue(info.FunctionValue, l.capturedClosureEnvLocals(info), s.At)
+				}
+			} else if id, ok := s.Value.(*frontend.IdentExpr); ok && info.FunctionValue != "" {
+				if source, ok := l.locals[id.Name]; ok && source.FunctionTypeValue {
+					for slot := 0; slot < source.SlotCount; slot++ {
+						l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: source.Base + slot, Pos: s.At})
+					}
+					slots = source.SlotCount
+				} else if source, ok := l.locals[id.Name]; ok && !source.FunctionTypeValue && source.FunctionValue != "" && (source.FunctionHandleValue || len(l.closureEnvLocalsUnbounded(source.FunctionCaptures)) > semantics.FnPtrEnvSlotCount) {
+					slots = l.emitCallableHandleValue(source.FunctionValue, source.FunctionCaptures, s.At)
+				} else if len(info.FunctionCaptures) > 0 {
+					slots = l.emitFunctionSymbolValue(info.FunctionValue, l.capturedClosureEnvLocals(info), s.At)
+				} else {
+					slots = l.emitFunctionSymbolValue(info.FunctionValue, nil, s.At)
+				}
+			} else if _, ok := functionTypedGlobalFieldTargetFromExpr(s.Value, l.globals); ok && info.FunctionValue != "" {
+				slots = l.emitFunctionSymbolValue(info.FunctionValue, nil, s.At)
+			}
+		} else if len(info.FunctionFields) > 0 {
+			if call, ok := s.Value.(*frontend.CallExpr); ok {
+				var handled bool
+				var err error
+				slots, handled, err = l.lowerStructConstructorCall(call, info.FunctionFields)
+				if err != nil {
+					return err
+				}
+				if !handled {
+					slots = 0
+				}
+			} else if lit, ok := s.Value.(*frontend.StructLitExpr); ok {
+				var err error
+				slots, err = l.lowerStructLiteralExpr(lit, info.FunctionFields)
+				if err != nil {
+					return err
+				}
+			}
+		} else if len(info.EnumPayloadFunctions) > 0 {
+			if call, ok := s.Value.(*frontend.CallExpr); ok {
+				var handled bool
+				var err error
+				slots, handled, err = l.lowerEnumCaseConstructorCall(call, info.EnumPayloadFunctions)
+				if err != nil {
+					return err
+				}
+				if !handled {
+					slots = 0
+				}
 			}
 		}
 		if slots == 0 {
@@ -1646,6 +1598,9 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		for i := info.SlotCount - 1; i >= 0; i-- {
 			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: info.Base + i, Pos: s.At})
 		}
+		if info.SlotCount == 1 {
+			l.rememberRawPtrOffsetAlias(info.Base, s.Value)
+		}
 	case *frontend.AssignStmt:
 		if id, ok := s.Target.(*frontend.IdentExpr); ok {
 			if info, ok := l.locals[id.Name]; ok && info.ActorField {
@@ -1657,7 +1612,8 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 				if slots != 1 {
 					return fmt.Errorf("%s: actor state assignment expects single-slot value", frontend.FormatPos(s.At))
 				}
-				l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_state_store", ArgSlots: 2, RetSlots: 0, Pos: s.At})
+				l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_state_store", ArgSlots: 2, RetSlots: 1, Pos: s.At})
+				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.ensureDiscardLocal(), Pos: s.At})
 				return nil
 			}
 		}
@@ -1687,23 +1643,26 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			if valSlots != 1 {
 				return fmt.Errorf("%s: index assignment expects single-slot value", frontend.FormatPos(s.At))
 			}
-			switch elemType {
-			case "i32":
-				l.emit(ir.IRInstr{Kind: ir.IRIndexStoreI32, Pos: s.At})
-			case "bool":
-				l.emit(ir.IRInstr{Kind: ir.IRIndexStoreI32, Pos: s.At})
-			case "u8":
-				l.emit(ir.IRInstr{Kind: ir.IRIndexStoreU8, Pos: s.At})
-			case "u16":
-				l.emit(ir.IRInstr{Kind: ir.IRIndexStoreU16, Pos: s.At})
-			default:
+			targetKind, ok := lowerIndexStoreKind(elemType, l.types)
+			if !ok {
 				return lowerUnsupportedError(s.At, "unsupported index element type '%s'", elemType)
 			}
+			l.emit(ir.IRInstr{Kind: targetKind, Pos: s.At})
 			return nil
 		}
 		if id, ok := s.Target.(*frontend.IdentExpr); ok {
 			if g, ok := l.globals[id.Name]; ok {
-				slots, err := l.lowerExprAs(s.Value, g.TypeName)
+				var slots int
+				var err error
+				if g.FunctionTypeValue {
+					slots, err = l.lowerFunctionTypedLocalAssignmentValue(s.Value, semantics.LocalInfo{
+						SlotCount:         gSlotCount(g.TypeName, l.types),
+						TypeName:          g.TypeName,
+						FunctionTypeValue: true,
+					}, s.At)
+				} else {
+					slots, err = l.lowerExprAs(s.Value, g.TypeName)
+				}
 				if err != nil {
 					return err
 				}
@@ -1713,6 +1672,41 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 				}
 				for i := slotCount - 1; i >= 0; i-- {
 					l.emit(ir.IRInstr{Kind: ir.IRStoreGlobal, Local: g.DataIndex + i, Pos: s.At})
+				}
+				return nil
+			}
+			if info, ok := l.locals[id.Name]; ok && info.FunctionTypeValue {
+				slots, err := l.lowerFunctionTypedLocalAssignmentValue(s.Value, info, s.At)
+				if err != nil {
+					return err
+				}
+				if slots != info.SlotCount {
+					return fmt.Errorf("%s: slot mismatch for assignment", frontend.FormatPos(s.At))
+				}
+				for i := info.SlotCount - 1; i >= 0; i-- {
+					l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: info.Base + i, Pos: s.At})
+				}
+				return nil
+			}
+		} else if targetName := functionTypedFieldNameFromExpr(s.Target); targetName != "" {
+			if _, ok, _ := resolveFunctionFieldName(targetName, l.locals); ok {
+				target, err := l.resolveLValue(s.Target)
+				if err != nil {
+					return err
+				}
+				slots, err := l.lowerFunctionTypedLocalAssignmentValue(s.Value, semantics.LocalInfo{SlotCount: target.SlotCount, TypeName: target.TypeName, FunctionTypeValue: true}, s.At)
+				if err != nil {
+					return err
+				}
+				if slots != target.SlotCount {
+					return fmt.Errorf("%s: slot mismatch for assignment", frontend.FormatPos(s.At))
+				}
+				storeKind := ir.IRStoreLocal
+				if target.Global {
+					storeKind = ir.IRStoreGlobal
+				}
+				for i := target.SlotCount - 1; i >= 0; i-- {
+					l.emit(ir.IRInstr{Kind: storeKind, Local: target.Base + i, Pos: s.At})
 				}
 				return nil
 			}
@@ -1728,8 +1722,19 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		if slots != target.SlotCount {
 			return fmt.Errorf("%s: slot mismatch for assignment", frontend.FormatPos(s.At))
 		}
+		storeKind := ir.IRStoreLocal
+		if target.Global {
+			storeKind = ir.IRStoreGlobal
+		}
 		for i := target.SlotCount - 1; i >= 0; i-- {
-			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: target.Base + i, Pos: s.At})
+			l.emit(ir.IRInstr{Kind: storeKind, Local: target.Base + i, Pos: s.At})
+		}
+		if !target.Global && target.SlotCount == 1 {
+			if id, ok := s.Target.(*frontend.IdentExpr); ok {
+				if info, ok := l.locals[id.Name]; ok && info.Base == target.Base {
+					l.rememberRawPtrOffsetAlias(target.Base, s.Value)
+				}
+			}
 		}
 	case *frontend.IfStmt:
 		elseLabel := l.newLabel()
@@ -1878,18 +1883,11 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: iterInfo.Base, Pos: s.At})
 			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: iterInfo.Base + 1, Pos: s.At})
 			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: indexInfo.Base, Pos: s.At})
-			switch loopInfo.TypeName {
-			case "i32":
-				l.emit(ir.IRInstr{Kind: ir.IRIndexLoadI32, Pos: s.At})
-			case "bool":
-				l.emit(ir.IRInstr{Kind: ir.IRIndexLoadI32, Pos: s.At})
-			case "u8":
-				l.emit(ir.IRInstr{Kind: ir.IRIndexLoadU8, Pos: s.At})
-			case "u16":
-				l.emit(ir.IRInstr{Kind: ir.IRIndexLoadU16, Pos: s.At})
-			default:
+			loadKind, ok := lowerIndexLoadKind(loopInfo.TypeName, l.types)
+			if !ok {
 				return lowerUnsupportedError(s.At, "unsupported for collection element type '%s'", loopInfo.TypeName)
 			}
+			l.emit(ir.IRInstr{Kind: loadKind, Pos: s.At})
 			if loopInfo.SlotCount != 1 {
 				return fmt.Errorf("%s: for collection element slot mismatch", frontend.FormatPos(s.At))
 			}
@@ -2570,6 +2568,183 @@ func (l *lowerer) emitIfLetPatternBindings(pattern frontend.Expr, valueInfo sema
 	return nil
 }
 
+func rawPtrAddCall(expr frontend.Expr) (*frontend.CallExpr, bool) {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok {
+		return nil, false
+	}
+	name := call.Name
+	if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+		name = builtin
+	}
+	if name != "core.ptr_add" {
+		return nil, false
+	}
+	return call, true
+}
+
+func (l *lowerer) rawPtrOffsetAliasFromExpr(expr frontend.Expr) (rawPtrOffsetLocal, bool) {
+	call, ok := rawPtrAddCall(expr)
+	if !ok || len(call.Args) != 3 {
+		return rawPtrOffsetLocal{}, false
+	}
+	base, ok := call.Args[0].(*frontend.IdentExpr)
+	if !ok {
+		return rawPtrOffsetLocal{}, false
+	}
+	baseInfo, ok := l.locals[base.Name]
+	if !ok || baseInfo.SlotCount != 1 {
+		return rawPtrOffsetLocal{}, false
+	}
+	alias := rawPtrOffsetLocal{BaseLocal: baseInfo.Base, OffsetLocal: -1}
+	switch offset := call.Args[1].(type) {
+	case *frontend.NumberExpr:
+		alias.OffsetImm = offset.Value
+		alias.HasOffsetImm = true
+	case *frontend.IdentExpr:
+		offsetInfo, ok := l.locals[offset.Name]
+		if !ok || offsetInfo.SlotCount != 1 {
+			return rawPtrOffsetLocal{}, false
+		}
+		alias.OffsetLocal = offsetInfo.Base
+	default:
+		return rawPtrOffsetLocal{}, false
+	}
+	return alias, true
+}
+
+func (l *lowerer) rememberRawPtrOffsetAlias(local int, expr frontend.Expr) {
+	l.clearRawPtrOffsetAliasesForLocal(local)
+	alias, ok := l.rawPtrOffsetAliasFromExpr(expr)
+	if !ok {
+		delete(l.rawPtrOffsetLocals, local)
+		return
+	}
+	l.rawPtrOffsetLocals[local] = alias
+}
+
+func (l *lowerer) clearRawPtrOffsetAliasesForLocal(local int) {
+	delete(l.rawPtrOffsetLocals, local)
+	for aliasLocal, alias := range l.rawPtrOffsetLocals {
+		if alias.BaseLocal == local || (!alias.HasOffsetImm && alias.OffsetLocal == local) {
+			delete(l.rawPtrOffsetLocals, aliasLocal)
+		}
+	}
+}
+
+func (l *lowerer) lowerRawOffsetAlias(alias rawPtrOffsetLocal, pos frontend.Position) {
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: alias.BaseLocal, Pos: pos})
+	if alias.HasOffsetImm {
+		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: alias.OffsetImm, Pos: pos})
+		return
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: alias.OffsetLocal, Pos: pos})
+}
+
+func (l *lowerer) lowerRawOffsetAddress(expr frontend.Expr, pos frontend.Position) (bool, error) {
+	if id, ok := expr.(*frontend.IdentExpr); ok {
+		if info, ok := l.locals[id.Name]; ok {
+			if alias, ok := l.rawPtrOffsetLocals[info.Base]; ok {
+				l.lowerRawOffsetAlias(alias, pos)
+				return true, nil
+			}
+		}
+	}
+	call, ok := rawPtrAddCall(expr)
+	if !ok {
+		return false, nil
+	}
+	if len(call.Args) != 3 {
+		return true, fmt.Errorf("%s: ptr_add expects 3 arguments", frontend.FormatPos(call.At))
+	}
+	baseSlots, err := l.lowerExpr(call.Args[0])
+	if err != nil {
+		return true, err
+	}
+	if baseSlots != 1 {
+		return true, fmt.Errorf("%s: ptr_add expects a 1-slot base pointer", frontend.FormatPos(call.Args[0].Pos()))
+	}
+	offsetSlots, err := l.lowerExpr(call.Args[1])
+	if err != nil {
+		return true, err
+	}
+	if offsetSlots != 1 {
+		return true, fmt.Errorf("%s: ptr_add expects a 1-slot offset", frontend.FormatPos(call.Args[1].Pos()))
+	}
+	memSlots, err := l.lowerExpr(call.Args[2])
+	if err != nil {
+		return true, err
+	}
+	if memSlots != 1 {
+		return true, fmt.Errorf("%s: ptr_add expects a 1-slot memory capability", frontend.FormatPos(call.Args[2].Pos()))
+	}
+	discard := l.ensureDiscardLocal()
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: discard, Pos: pos})
+	return true, nil
+}
+
+func (l *lowerer) lowerRawOffsetCall(e *frontend.CallExpr) (int, bool, error) {
+	switch e.Name {
+	case "core.load_i32", "core.load_u8", "core.load_ptr":
+		if len(e.Args) != 2 {
+			return 0, true, fmt.Errorf("%s: %s expects 2 arguments", frontend.FormatPos(e.At), strings.TrimPrefix(e.Name, "core."))
+		}
+		ok, err := l.lowerRawOffsetAddress(e.Args[0], e.At)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		memSlots, err := l.lowerExpr(e.Args[1])
+		if err != nil {
+			return 0, true, err
+		}
+		if memSlots != 1 {
+			return 0, true, fmt.Errorf("%s: %s expects a 1-slot memory capability", frontend.FormatPos(e.Args[1].Pos()), strings.TrimPrefix(e.Name, "core."))
+		}
+		switch e.Name {
+		case "core.load_i32":
+			l.emit(ir.IRInstr{Kind: ir.IRMemReadI32Offset, Pos: e.At})
+		case "core.load_u8":
+			l.emit(ir.IRInstr{Kind: ir.IRMemReadU8Offset, Pos: e.At})
+		default:
+			l.emit(ir.IRInstr{Kind: ir.IRMemReadPtrOffset, Pos: e.At})
+		}
+		return 1, true, nil
+	case "core.store_i32", "core.store_u8", "core.store_ptr":
+		if len(e.Args) != 3 {
+			return 0, true, fmt.Errorf("%s: %s expects 3 arguments", frontend.FormatPos(e.At), strings.TrimPrefix(e.Name, "core."))
+		}
+		ok, err := l.lowerRawOffsetAddress(e.Args[0], e.At)
+		if err != nil || !ok {
+			return 0, ok, err
+		}
+		valueSlots, err := l.lowerExpr(e.Args[1])
+		if err != nil {
+			return 0, true, err
+		}
+		if valueSlots != 1 {
+			return 0, true, fmt.Errorf("%s: %s expects a 1-slot value", frontend.FormatPos(e.Args[1].Pos()), strings.TrimPrefix(e.Name, "core."))
+		}
+		memSlots, err := l.lowerExpr(e.Args[2])
+		if err != nil {
+			return 0, true, err
+		}
+		if memSlots != 1 {
+			return 0, true, fmt.Errorf("%s: %s expects a 1-slot memory capability", frontend.FormatPos(e.Args[2].Pos()), strings.TrimPrefix(e.Name, "core."))
+		}
+		switch e.Name {
+		case "core.store_i32":
+			l.emit(ir.IRInstr{Kind: ir.IRMemWriteI32Offset, Pos: e.At})
+		case "core.store_u8":
+			l.emit(ir.IRInstr{Kind: ir.IRMemWriteU8Offset, Pos: e.At})
+		default:
+			l.emit(ir.IRInstr{Kind: ir.IRMemWritePtrOffset, Pos: e.At})
+		}
+		return 1, true, nil
+	default:
+		return 0, false, nil
+	}
+}
+
 func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 	switch e := expr.(type) {
 	case *frontend.MatchExpr:
@@ -2597,6 +2772,17 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		info, ok := l.locals[e.Name]
 		if !ok {
 			if g, ok := l.globals[e.Name]; ok {
+				if g.FunctionTypeValue && g.FunctionValue != "" {
+					if g.Mutable {
+						l.emitGlobalFunctionValueInitIfNeeded(g, e.At)
+						slotCount := gSlotCount(g.TypeName, l.types)
+						for i := 0; i < slotCount; i++ {
+							l.emit(ir.IRInstr{Kind: ir.IRLoadGlobal, Local: g.DataIndex + i, Pos: e.At})
+						}
+						return slotCount, nil
+					}
+					return l.emitFunctionSymbolValue(g.FunctionValue, nil, e.At), nil
+				}
 				if g.TypeName == "str" && g.HasStringLiteralInit {
 					l.emitGlobalStringLiteralInitIfNeeded(g, e.At)
 				}
@@ -2610,8 +2796,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				if sig.Generic {
 					return 0, fmt.Errorf("%s: generic function symbol '%s' cannot be lowered as a callable value in this MVP", frontend.FormatPos(e.At), e.Name)
 				}
-				l.emit(ir.IRInstr{Kind: ir.IRSymAddr, Name: e.Name, Pos: e.At})
-				return 1, nil
+				return l.emitFunctionSymbolValue(e.Name, nil, e.At), nil
 			}
 			if field, ok := l.actorState[e.Name]; ok {
 				l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(field.Slot), Pos: e.At})
@@ -2677,47 +2862,14 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		if idxSlots != 1 {
 			return 0, fmt.Errorf("%s: index must be i32", frontend.FormatPos(e.At))
 		}
-		switch elemType {
-		case "i32":
-			l.emit(ir.IRInstr{Kind: ir.IRIndexLoadI32, Pos: e.At})
-			return 1, nil
-		case "bool":
-			l.emit(ir.IRInstr{Kind: ir.IRIndexLoadI32, Pos: e.At})
-			return 1, nil
-		case "u8":
-			l.emit(ir.IRInstr{Kind: ir.IRIndexLoadU8, Pos: e.At})
-			return 1, nil
-		case "u16":
-			l.emit(ir.IRInstr{Kind: ir.IRIndexLoadU16, Pos: e.At})
-			return 1, nil
-		default:
+		loadKind, ok := lowerIndexLoadKind(elemType, l.types)
+		if !ok {
 			return 0, lowerUnsupportedError(e.At, "unsupported index element type '%s'", elemType)
 		}
+		l.emit(ir.IRInstr{Kind: loadKind, Pos: e.At})
+		return 1, nil
 	case *frontend.StructLitExpr:
-		info, ok := l.types[e.Type.Name]
-		if !ok {
-			return 0, fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(e.At), e.Type.Name)
-		}
-		fieldMap := make(map[string]frontend.Expr, len(e.Fields))
-		for _, field := range e.Fields {
-			fieldMap[field.Name] = field.Value
-		}
-		total := 0
-		for _, field := range info.Fields {
-			expr, ok := fieldMap[field.Name]
-			if !ok {
-				return 0, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
-			}
-			slots, err := l.lowerExpr(expr)
-			if err != nil {
-				return 0, err
-			}
-			if slots != field.SlotCount {
-				return 0, fmt.Errorf("%s: slot mismatch for field '%s'", frontend.FormatPos(e.At), field.Name)
-			}
-			total += slots
-		}
-		return total, nil
+		return l.lowerStructLiteralExpr(e, nil)
 	case *frontend.TryExpr:
 		call, ok := e.X.(*frontend.CallExpr)
 		if !ok {
@@ -2731,12 +2883,39 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		if builtin, ok := semantics.ResolveBuiltinAlias(call.Name); ok {
 			call.Name = builtin
 		}
+		var dynamicFunctionValueSig *semantics.FuncSig
+		if local, ok := l.locals[call.Name]; ok && local.FunctionTypeValue && local.FunctionThrowsType != "" {
+			dynamicFunctionValueSig = &semantics.FuncSig{
+				ReturnType: local.FunctionReturnType,
+				ThrowsType: local.FunctionThrowsType,
+			}
+		} else if local, ok := l.locals[call.Name]; ok && local.FunctionTypeValue && local.FunctionValue != "" {
+			call.Name = local.FunctionValue
+		} else if fieldInfo, _, ok, err := l.functionFieldCallSource(call.Name, call.At); err != nil {
+			return 0, err
+		} else if ok && fieldInfo.FunctionThrowsType != "" {
+			dynamicFunctionValueSig = &semantics.FuncSig{
+				ReturnType: fieldInfo.FunctionReturnType,
+				ThrowsType: fieldInfo.FunctionThrowsType,
+			}
+		} else if global, ok := l.globals[call.Name]; ok && global.FunctionTypeValue && global.FunctionThrowsType != "" {
+			dynamicFunctionValueSig = &semantics.FuncSig{
+				ReturnType: global.FunctionReturnType,
+				ThrowsType: global.FunctionThrowsType,
+			}
+		}
 		if isTypedTaskJoinCall(call.Name) {
 			return l.lowerTypedTaskJoin(call, e.At)
 		}
-		sig, ok := l.funcs[call.Name]
-		if !ok {
-			return 0, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(call.At), call.Name)
+		var sig semantics.FuncSig
+		if dynamicFunctionValueSig != nil {
+			sig = *dynamicFunctionValueSig
+		} else {
+			var ok bool
+			sig, ok = l.funcs[call.Name]
+			if !ok {
+				return 0, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(call.At), call.Name)
+			}
 		}
 		if sig.ThrowsType == "" {
 			return 0, fmt.Errorf("%s: try expects a throwing function call", frontend.FormatPos(e.At))
@@ -2745,11 +2924,15 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		expectedReturnSlots := sig.ReturnSlots
+		if expectedReturnSlots == 0 {
+			expectedReturnSlots = throwingReturnSlotCount(callSuccessSlots, callErrorSlots)
+		}
 		slots, err := l.lowerExpr(call)
 		if err != nil {
 			return 0, err
 		}
-		if slots != sig.ReturnSlots {
+		if slots != expectedReturnSlots {
 			return 0, fmt.Errorf("%s: try result slot mismatch", frontend.FormatPos(e.At))
 		}
 		okLabel := l.newLabel()
@@ -2819,17 +3002,41 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		}
 		return l.lowerExpr(call)
 	case *frontend.CallExpr:
-		if slots, ok, err := l.lowerEnumCaseConstructorCall(e); ok {
+		if slots, ok, err := l.lowerEnumCaseConstructorCall(e, nil); ok {
 			return slots, err
 		}
-		if slots, ok, err := l.lowerStructConstructorCall(e); ok {
+		if slots, ok, err := l.lowerStructConstructorCall(e, nil); ok {
 			return slots, err
 		}
-		if local, ok := l.locals[e.Name]; ok && local.FunctionTypeValue && local.FunctionValue == "" {
+		if fieldInfo, base, ok, err := l.functionFieldCallSource(e.Name, e.At); err != nil {
+			return 0, err
+		} else if ok {
+			return l.lowerStoredFunctionCall(e, fieldInfo, base)
+		}
+		if local, ok := l.locals[e.Name]; ok && local.FunctionTypeValue {
+			if local.FunctionHandleValue {
+				return l.lowerFunctionTypedParamCall(e, local)
+			}
+			if local.FunctionValue != "" && !local.Mutable {
+				return l.lowerStoredFunctionCall(e, semantics.FunctionFieldInfo{
+					FunctionValue:          local.FunctionValue,
+					FunctionParamTypes:     append([]string(nil), local.FunctionParamTypes...),
+					FunctionParamOwnership: append([]string(nil), local.FunctionParamOwnership...),
+					FunctionReturnType:     local.FunctionReturnType,
+					FunctionThrowsType:     local.FunctionThrowsType,
+				}, local.Base)
+			}
 			return l.lowerFunctionTypedParamCall(e, local)
+		}
+		if global, ok := l.globals[e.Name]; ok && global.FunctionTypeValue {
+			l.emitGlobalFunctionValueInitIfNeeded(global, e.At)
+			return l.lowerGlobalStoredFunctionCall(e, global)
 		}
 		if builtin, ok := semantics.ResolveBuiltinAlias(e.Name); ok {
 			e.Name = builtin
+		}
+		if slots, ok, err := l.lowerRawOffsetCall(e); ok {
+			return slots, err
 		}
 		switch e.Name {
 		case "core.spawn":
@@ -2849,6 +3056,31 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			id := int32(h.Sum32())
 			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: id, Pos: e.At})
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_spawn", ArgSlots: 1, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.spawn_remote":
+			if len(e.Args) != 2 {
+				return 0, fmt.Errorf("%s: spawn_remote expects 2 arguments", frontend.FormatPos(e.At))
+			}
+			nodeSlots, err := l.lowerExpr(e.Args[0])
+			if err != nil {
+				return 0, err
+			}
+			if nodeSlots != 1 {
+				return 0, fmt.Errorf("%s: spawn_remote expects a 1-slot node id", frontend.FormatPos(e.Args[0].Pos()))
+			}
+			lit, ok := e.Args[1].(*frontend.StringLitExpr)
+			if !ok {
+				return 0, fmt.Errorf("%s: spawn_remote expects a string literal", frontend.FormatPos(e.At))
+			}
+			name := string(lit.Value)
+			if name == "" {
+				return 0, fmt.Errorf("%s: spawn_remote expects a non-empty name", frontend.FormatPos(e.At))
+			}
+			h := fnv.New32a()
+			_, _ = h.Write([]byte(name))
+			id := int32(h.Sum32())
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: id, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_spawn_remote", ArgSlots: 2, RetSlots: 1, Pos: e.At})
 			return 1, nil
 		case "core.task_spawn_i32":
 			if len(e.Args) != 1 {
@@ -3157,8 +3389,17 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			return 1, nil
 		}
 		total := 0
-		for _, arg := range e.Args {
-			slots, err := l.lowerExpr(arg)
+		callSig, hasCallSig := l.funcs[e.Name]
+		for i, arg := range e.Args {
+			var slots int
+			var err error
+			if hasCallSig && i < len(callSig.ParamFunctionTypes) && callSig.ParamFunctionTypes[i] {
+				slots, err = l.lowerFunctionTypedArgument(arg)
+			} else if hasCallSig && i < len(callSig.ParamTypes) {
+				slots, err = l.lowerExprAs(arg, callSig.ParamTypes[i])
+			} else {
+				slots, err = l.lowerExpr(arg)
+			}
 			if err != nil {
 				return 0, err
 			}
@@ -3249,6 +3490,12 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRMmioWriteI32, Pos: e.At})
 			return 1, nil
+		case "core.fs_exists":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: fs_exists expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_fs_exists", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
 		case "core.load_i32":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: load_i32 expects 2 arguments", frontend.FormatPos(e.At))
@@ -3301,7 +3548,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			if total != 0 {
 				return 0, fmt.Errorf("%s: consent_token expects 0 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: consentTokenRuntimeSentinel, Pos: e.At})
 			return 1, nil
 		case "core.secret_seal_i32":
 			if total != 2 {
@@ -3443,6 +3690,18 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_main_entry_id", ArgSlots: 0, RetSlots: 1, Pos: e.At})
 			return 1, nil
+		case "core.actor_node_connect":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: actor_node_connect expects 2 arguments", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_node_connect", ArgSlots: 2, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.actor_node_status":
+			if total != 1 {
+				return 0, fmt.Errorf("%s: actor_node_status expects 1 argument", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_node_status", ArgSlots: 1, RetSlots: 1, Pos: e.At})
+			return 1, nil
 		case "core.send":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: send expects 2 arguments", frontend.FormatPos(e.At))
@@ -3482,7 +3741,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			return sig.ReturnSlots, nil
 		}
 	case *frontend.ClosureExpr:
-		l.emit(ir.IRInstr{Kind: ir.IRSymAddr, Name: e.Name, Pos: e.At})
+		l.emit(ir.IRInstr{Kind: ir.IRSymAddr, Name: l.closureSymbolName(e), Pos: e.At})
 		return 1, nil
 	case *frontend.UnaryExpr:
 		slots, err := l.lowerExpr(e.X)
@@ -3625,7 +3884,29 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 	}
 }
 
+func (l *lowerer) closureSymbolName(closure *frontend.ClosureExpr) string {
+	if closure == nil || closure.Name == "" {
+		return ""
+	}
+	if _, ok := l.funcs[closure.Name]; ok {
+		return closure.Name
+	}
+	if l.module != "" {
+		qualified := l.module + "." + closure.Name
+		if _, ok := l.funcs[qualified]; ok {
+			return qualified
+		}
+	}
+	return closure.Name
+}
+
 func (l *lowerer) lowerExprAs(expr frontend.Expr, expectedType string) (int, error) {
+	if expectedType == "ptr" {
+		if closure, ok := expr.(*frontend.ClosureExpr); ok {
+			l.emit(ir.IRInstr{Kind: ir.IRSymAddr, Name: l.closureSymbolName(closure), Pos: closure.At})
+			return 1, nil
+		}
+	}
 	expectedInfo, ok := l.types[expectedType]
 	if !ok || expectedInfo.Kind != semantics.TypeOptional {
 		return l.lowerExpr(expr)
@@ -3642,10 +3923,10 @@ func (l *lowerer) lowerExprAs(expr frontend.Expr, expectedType string) (int, err
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: expr.Pos()})
 		return expectedInfo.SlotCount, nil
 	}
-	if actualType != expectedInfo.ElemType {
+	if !l.optionalPayloadSlotCompatible(expectedInfo.ElemType, actualType) {
 		return l.lowerExpr(expr)
 	}
-	slots, err := l.lowerExpr(expr)
+	slots, err := l.lowerExprAs(expr, expectedInfo.ElemType)
 	if err != nil {
 		return 0, err
 	}
@@ -3654,6 +3935,28 @@ func (l *lowerer) lowerExprAs(expr frontend.Expr, expectedType string) (int, err
 	}
 	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: expr.Pos()})
 	return expectedInfo.SlotCount, nil
+}
+
+func (l *lowerer) optionalPayloadSlotCompatible(expected, actual string) bool {
+	if expected == actual {
+		return true
+	}
+	if lowerInt32LikeType(expected) && lowerInt32LikeType(actual) {
+		return true
+	}
+	if expectedInfo, ok := l.types[expected]; ok && expectedInfo.Kind == semantics.TypeOptional {
+		return l.optionalPayloadSlotCompatible(expectedInfo.ElemType, actual)
+	}
+	return false
+}
+
+func lowerInt32LikeType(typeName string) bool {
+	switch typeName {
+	case "i32", "u8", "u16", "task.error":
+		return true
+	default:
+		return false
+	}
 }
 
 func gSlotCount(typeName string, types map[string]*semantics.TypeInfo) int {
@@ -3675,6 +3978,22 @@ func (l *lowerer) emitGlobalStringLiteralInitIfNeeded(g semantics.GlobalInfo, po
 	l.emit(ir.IRInstr{Kind: ir.IRStrLit, Str: g.StringLiteralInit, Pos: pos})
 	l.emit(ir.IRInstr{Kind: ir.IRStoreGlobal, Local: g.DataIndex + 1, Pos: pos})
 	l.emit(ir.IRInstr{Kind: ir.IRStoreGlobal, Local: g.DataIndex, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: readyLabel, Pos: pos})
+}
+
+func (l *lowerer) emitGlobalFunctionValueInitIfNeeded(g semantics.GlobalInfo, pos frontend.Position) {
+	if !g.FunctionTypeValue || !g.Mutable || g.FunctionValue == "" {
+		return
+	}
+	readyLabel := l.newLabel()
+	l.emit(ir.IRInstr{Kind: ir.IRLoadGlobal, Local: g.DataIndex, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRCmpEqI32, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: readyLabel, Pos: pos})
+	slots := l.emitFunctionSymbolValue(g.FunctionValue, nil, pos)
+	for i := slots - 1; i >= 0; i-- {
+		l.emit(ir.IRInstr{Kind: ir.IRStoreGlobal, Local: g.DataIndex + i, Pos: pos})
+	}
 	l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: readyLabel, Pos: pos})
 }
 
@@ -3823,6 +4142,48 @@ func (l *lowerer) indexElemType(base frontend.Expr) (string, error) {
 	}
 }
 
+func lowerIndexLoadKind(elemType string, types map[string]*semantics.TypeInfo) (ir.IRInstrKind, bool) {
+	switch elemType {
+	case "i32":
+		return ir.IRIndexLoadI32, true
+	case "bool":
+		return ir.IRIndexLoadI32, true
+	case "u8":
+		return ir.IRIndexLoadU8, true
+	case "u16":
+		return ir.IRIndexLoadU16, true
+	}
+	info, ok := types[elemType]
+	if !ok {
+		return 0, false
+	}
+	if info.Kind == semantics.TypeStruct && info.SlotCount == 1 {
+		return ir.IRIndexLoadI32, true
+	}
+	return 0, false
+}
+
+func lowerIndexStoreKind(elemType string, types map[string]*semantics.TypeInfo) (ir.IRInstrKind, bool) {
+	switch elemType {
+	case "i32":
+		return ir.IRIndexStoreI32, true
+	case "bool":
+		return ir.IRIndexStoreI32, true
+	case "u8":
+		return ir.IRIndexStoreU8, true
+	case "u16":
+		return ir.IRIndexStoreU16, true
+	}
+	info, ok := types[elemType]
+	if !ok {
+		return 0, false
+	}
+	if info.Kind == semantics.TypeStruct && info.SlotCount == 1 {
+		return ir.IRIndexStoreI32, true
+	}
+	return 0, false
+}
+
 func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 	switch e := expr.(type) {
 	case *frontend.NumberExpr:
@@ -3948,7 +4309,7 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 	}
 }
 
-func (l *lowerer) lowerStructConstructorCall(e *frontend.CallExpr) (int, bool, error) {
+func (l *lowerer) lowerStructConstructorCall(e *frontend.CallExpr, functionFields map[string]semantics.FunctionFieldInfo) (int, bool, error) {
 	if len(e.Args) == 0 || len(e.ArgLabels) != len(e.Args) {
 		return 0, false, nil
 	}
@@ -3985,9 +4346,54 @@ func (l *lowerer) lowerStructConstructorCall(e *frontend.CallExpr) (int, bool, e
 		if !ok {
 			return 0, true, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
 		}
-		slots, err := l.lowerExpr(expr)
-		if err != nil {
-			return 0, true, err
+		slots := 0
+		if field.FunctionTypeValue {
+			if closure, ok := expr.(*frontend.ClosureExpr); ok {
+				if fieldInfo, ok := functionFields[field.Name]; ok && fieldInfo.FunctionHandleValue {
+					slots = l.emitCallableHandleValue(fieldInfo.FunctionValue, fieldInfo.FunctionCaptures, closure.At)
+					l.emitZeroSlots(field.SlotCount-slots, closure.At)
+					slots = field.SlotCount
+				} else if envLocals := l.closureEnvLocalsUnbounded(closure.Captures); len(envLocals) > semantics.FnPtrEnvSlotCount {
+					slots = l.emitCallableHandleValue(l.closureSymbolName(closure), closure.Captures, closure.At)
+					l.emitZeroSlots(field.SlotCount-slots, closure.At)
+					slots = field.SlotCount
+				} else {
+					slots = l.emitFunctionSymbolValue(l.closureSymbolName(closure), l.closureEnvLocals(closure.Captures), closure.At)
+				}
+			} else if id, ok := expr.(*frontend.IdentExpr); ok {
+				if source, ok := l.locals[id.Name]; ok && !source.FunctionTypeValue && source.FunctionValue != "" {
+					slots = l.emitFunctionSymbolValue(source.FunctionValue, l.capturedClosureEnvLocals(source), expr.Pos())
+				}
+			} else if call, ok := expr.(*frontend.CallExpr); ok {
+				if fieldInfo, ok := functionFields[field.Name]; ok && fieldInfo.FunctionHandleValue {
+					var err error
+					slots, err = l.lowerExpr(call)
+					if err != nil {
+						return 0, true, err
+					}
+					if slots < field.SlotCount {
+						l.emitZeroSlots(field.SlotCount-slots, call.Pos())
+						slots = field.SlotCount
+					}
+				}
+			} else if target, ok := functionFieldTargetFromExpr(expr, l.locals); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, expr.Pos())
+			} else if target, ok := functionTypedGlobalFieldTargetFromExpr(expr, l.globals); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, expr.Pos())
+			} else if target, ok := importedFunctionTargetFromExpr(expr, l.imports, l.funcs); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, expr.Pos())
+			}
+		}
+		if slots == 0 {
+			var err error
+			if field.FunctionTypeValue {
+				slots, err = l.lowerExprAs(expr, field.TypeName)
+			} else {
+				slots, err = l.lowerExpr(expr)
+			}
+			if err != nil {
+				return 0, true, err
+			}
 		}
 		if slots != field.SlotCount {
 			return 0, true, fmt.Errorf("%s: slot mismatch for field '%s'", frontend.FormatPos(expr.Pos()), field.Name)
@@ -3997,7 +4403,86 @@ func (l *lowerer) lowerStructConstructorCall(e *frontend.CallExpr) (int, bool, e
 	return total, true, nil
 }
 
-func (l *lowerer) lowerEnumCaseConstructorCall(e *frontend.CallExpr) (int, bool, error) {
+func (l *lowerer) lowerStructLiteralExpr(e *frontend.StructLitExpr, functionFields map[string]semantics.FunctionFieldInfo) (int, error) {
+	info, ok := l.types[e.Type.Name]
+	if !ok {
+		return 0, fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(e.At), e.Type.Name)
+	}
+	fieldMap := make(map[string]frontend.Expr, len(e.Fields))
+	for _, field := range e.Fields {
+		fieldMap[field.Name] = field.Value
+	}
+	total := 0
+	for _, field := range info.Fields {
+		expr, ok := fieldMap[field.Name]
+		if !ok {
+			return 0, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
+		}
+		slots := 0
+		if field.FunctionTypeValue {
+			if closure, ok := expr.(*frontend.ClosureExpr); ok {
+				if fieldInfo, ok := functionFields[field.Name]; ok && fieldInfo.FunctionHandleValue {
+					slots = l.emitCallableHandleValue(fieldInfo.FunctionValue, fieldInfo.FunctionCaptures, closure.At)
+					l.emitZeroSlots(field.SlotCount-slots, closure.At)
+					slots = field.SlotCount
+				} else if envLocals := l.closureEnvLocalsUnbounded(closure.Captures); len(envLocals) > semantics.FnPtrEnvSlotCount {
+					slots = l.emitCallableHandleValue(l.closureSymbolName(closure), closure.Captures, closure.At)
+					l.emitZeroSlots(field.SlotCount-slots, closure.At)
+					slots = field.SlotCount
+				} else {
+					slots = l.emitFunctionSymbolValue(l.closureSymbolName(closure), l.closureEnvLocals(closure.Captures), closure.At)
+				}
+			} else if id, ok := expr.(*frontend.IdentExpr); ok {
+				if source, ok := l.locals[id.Name]; ok && source.FunctionTypeValue {
+					for slot := 0; slot < source.SlotCount; slot++ {
+						l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: source.Base + slot, Pos: expr.Pos()})
+					}
+					slots = source.SlotCount
+				} else if source, ok := l.locals[id.Name]; ok && !source.FunctionTypeValue && source.FunctionValue != "" {
+					slots = l.emitFunctionSymbolValue(source.FunctionValue, l.capturedClosureEnvLocals(source), expr.Pos())
+				} else if _, ok := l.funcs[id.Name]; ok {
+					slots = l.emitFunctionSymbolValue(id.Name, nil, expr.Pos())
+				}
+			} else if call, ok := expr.(*frontend.CallExpr); ok {
+				if fieldInfo, ok := functionFields[field.Name]; ok && fieldInfo.FunctionHandleValue {
+					var err error
+					slots, err = l.lowerExpr(call)
+					if err != nil {
+						return 0, err
+					}
+					if slots < field.SlotCount {
+						l.emitZeroSlots(field.SlotCount-slots, call.Pos())
+						slots = field.SlotCount
+					}
+				}
+			} else if target, ok := functionFieldTargetFromExpr(expr, l.locals); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, expr.Pos())
+			} else if target, ok := functionTypedGlobalFieldTargetFromExpr(expr, l.globals); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, expr.Pos())
+			} else if target, ok := importedFunctionTargetFromExpr(expr, l.imports, l.funcs); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, expr.Pos())
+			}
+		}
+		if slots == 0 {
+			var err error
+			if field.FunctionTypeValue {
+				slots, err = l.lowerExprAs(expr, field.TypeName)
+			} else {
+				slots, err = l.lowerExpr(expr)
+			}
+			if err != nil {
+				return 0, err
+			}
+		}
+		if slots != field.SlotCount {
+			return 0, fmt.Errorf("%s: slot mismatch for field '%s'", frontend.FormatPos(e.At), field.Name)
+		}
+		total += slots
+	}
+	return total, nil
+}
+
+func (l *lowerer) lowerEnumCaseConstructorCall(e *frontend.CallExpr, enumPayloadFunctions map[string]semantics.FunctionFieldInfo) (int, bool, error) {
 	typeName, caseInfo, ok := l.resolveEnumCaseConstructor(e)
 	if !ok {
 		return 0, false, nil
@@ -4012,9 +4497,54 @@ func (l *lowerer) lowerEnumCaseConstructorCall(e *frontend.CallExpr) (int, bool,
 	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: caseInfo.Ordinal, Pos: e.At})
 	payloadSlots := 0
 	for i, arg := range e.Args {
-		slots, err := l.lowerExpr(arg)
-		if err != nil {
-			return 0, true, err
+		slots := 0
+		if i < len(caseInfo.PayloadFunctionTypes) && caseInfo.PayloadFunctionTypes[i] {
+			if closure, ok := arg.(*frontend.ClosureExpr); ok {
+				if payloadInfo, ok := enumPayloadFunctions[enumPayloadTargetKey(caseInfo.Ordinal, i)]; ok && payloadInfo.FunctionHandleValue {
+					slots = l.emitCallableHandleValue(payloadInfo.FunctionValue, payloadInfo.FunctionCaptures, closure.At)
+					l.emitZeroSlots(caseInfo.PayloadSlots[i]-slots, closure.At)
+					slots = caseInfo.PayloadSlots[i]
+				} else if envLocals := l.closureEnvLocalsUnbounded(closure.Captures); len(envLocals) > semantics.FnPtrEnvSlotCount {
+					slots = l.emitCallableHandleValue(l.closureSymbolName(closure), closure.Captures, closure.At)
+					l.emitZeroSlots(caseInfo.PayloadSlots[i]-slots, closure.At)
+					slots = caseInfo.PayloadSlots[i]
+				} else {
+					slots = l.emitFunctionSymbolValue(l.closureSymbolName(closure), l.closureEnvLocals(closure.Captures), closure.At)
+				}
+			} else if id, ok := arg.(*frontend.IdentExpr); ok {
+				if source, ok := l.locals[id.Name]; ok && !source.FunctionTypeValue && source.FunctionValue != "" {
+					slots = l.emitFunctionSymbolValue(source.FunctionValue, l.capturedClosureEnvLocals(source), arg.Pos())
+				}
+			} else if call, ok := arg.(*frontend.CallExpr); ok {
+				if payloadInfo, ok := enumPayloadFunctions[enumPayloadTargetKey(caseInfo.Ordinal, i)]; ok && payloadInfo.FunctionHandleValue {
+					var err error
+					slots, err = l.lowerExpr(call)
+					if err != nil {
+						return 0, true, err
+					}
+					if slots < caseInfo.PayloadSlots[i] {
+						l.emitZeroSlots(caseInfo.PayloadSlots[i]-slots, call.Pos())
+						slots = caseInfo.PayloadSlots[i]
+					}
+				}
+			} else if target, ok := functionFieldTargetFromExpr(arg, l.locals); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, arg.Pos())
+			} else if target, ok := functionTypedGlobalFieldTargetFromExpr(arg, l.globals); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, arg.Pos())
+			} else if target, ok := importedFunctionTargetFromExpr(arg, l.imports, l.funcs); ok {
+				slots = l.emitFunctionSymbolValue(target, nil, arg.Pos())
+			}
+		}
+		if slots == 0 {
+			var err error
+			if i < len(caseInfo.PayloadFunctionTypes) && caseInfo.PayloadFunctionTypes[i] {
+				slots, err = l.lowerExprAs(arg, caseInfo.PayloadTypes[i])
+			} else {
+				slots, err = l.lowerExpr(arg)
+			}
+			if err != nil {
+				return 0, true, err
+			}
 		}
 		want := caseInfo.PayloadSlots[i]
 		if slots != want {
@@ -4028,88 +4558,6 @@ func (l *lowerer) lowerEnumCaseConstructorCall(e *frontend.CallExpr) (int, bool,
 	}
 	l.emitZeroSlots(padding, e.At)
 	return info.SlotCount, true, nil
-}
-
-func (l *lowerer) ensureCallableScratchBase(slots int) int {
-	if slots <= 0 {
-		return -1
-	}
-	base := l.localSlots
-	l.localSlots += slots
-	return base
-}
-
-func (l *lowerer) lowerFunctionTypedParamCall(e *frontend.CallExpr, local semantics.LocalInfo) (int, error) {
-	targets := l.callableParamTargets[e.Name]
-	if len(targets) == 0 {
-		return 0, fmt.Errorf("%s: function-typed parameter '%s' is not callable in this MVP; callback target must be a known symbol-backed local at call site", frontend.FormatPos(e.At), e.Name)
-	}
-	total := 0
-	for _, arg := range e.Args {
-		slots, err := l.lowerExpr(arg)
-		if err != nil {
-			return 0, err
-		}
-		total += slots
-	}
-	argScratch := l.ensureCallableScratchBase(total)
-	for slot := total - 1; slot >= 0; slot-- {
-		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: argScratch + slot, Pos: e.At})
-	}
-	returnInfo, ok := l.types[local.FunctionReturnType]
-	if !ok {
-		return 0, fmt.Errorf("%s: unknown callback return type '%s'", frontend.FormatPos(e.At), local.FunctionReturnType)
-	}
-	expectedArgSlots := total
-	expectedRetSlots := returnInfo.SlotCount
-	for _, target := range targets {
-		sig, ok := l.funcs[target]
-		if !ok {
-			return 0, fmt.Errorf("%s: unknown callback target '%s'", frontend.FormatPos(e.At), target)
-		}
-		if sig.ParamSlots != expectedArgSlots {
-			return 0, fmt.Errorf("%s: callback target '%s' slot mismatch: expected %d arg slots, got %d", frontend.FormatPos(e.At), target, expectedArgSlots, sig.ParamSlots)
-		}
-		if sig.ReturnSlots != expectedRetSlots {
-			return 0, fmt.Errorf("%s: callback target '%s' return slot mismatch: expected %d, got %d", frontend.FormatPos(e.At), target, expectedRetSlots, sig.ReturnSlots)
-		}
-	}
-	if len(targets) == 1 {
-		target := targets[0]
-		for slot := 0; slot < total; slot++ {
-			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: argScratch + slot, Pos: e.At})
-		}
-		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: total, RetSlots: returnInfo.SlotCount, Pos: e.At})
-		return returnInfo.SlotCount, nil
-	}
-
-	resultScratch := l.ensureCallableScratchBase(expectedRetSlots)
-	endLabel := l.newLabel()
-	for _, target := range targets {
-		nextLabel := l.newLabel()
-		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: local.Base, Pos: e.At})
-		l.emit(ir.IRInstr{Kind: ir.IRSymAddr, Name: target, Pos: e.At})
-		l.emit(ir.IRInstr{Kind: ir.IRCmpEqI32, Pos: e.At})
-		l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: nextLabel, Pos: e.At})
-		for slot := 0; slot < total; slot++ {
-			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: argScratch + slot, Pos: e.At})
-		}
-		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: total, RetSlots: expectedRetSlots, Pos: e.At})
-		for slot := expectedRetSlots - 1; slot >= 0; slot-- {
-			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: resultScratch + slot, Pos: e.At})
-		}
-		l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: endLabel, Pos: e.At})
-		l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: nextLabel, Pos: e.At})
-	}
-	l.emitZeroSlots(expectedRetSlots, e.At)
-	for slot := expectedRetSlots - 1; slot >= 0; slot-- {
-		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: resultScratch + slot, Pos: e.At})
-	}
-	l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: endLabel, Pos: e.At})
-	for slot := 0; slot < expectedRetSlots; slot++ {
-		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: resultScratch + slot, Pos: e.At})
-	}
-	return expectedRetSlots, nil
 }
 
 func (l *lowerer) resolveEnumCaseConstructor(e *frontend.CallExpr) (string, semantics.EnumCaseInfo, bool) {

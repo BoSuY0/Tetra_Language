@@ -149,15 +149,17 @@ const (
 )
 
 type TypeRef struct {
-	At       Position
-	Kind     TypeRefKind
-	Name     string
-	TypeArgs []TypeRef
-	Elem     *TypeRef
-	Len      int
-	Params   []TypeRef
-	Return   *TypeRef
-	Uses     []string
+	At             Position
+	Kind           TypeRefKind
+	Name           string
+	TypeArgs       []TypeRef
+	Elem           *TypeRef
+	Len            int
+	Params         []TypeRef
+	ParamOwnership []string
+	Return         *TypeRef
+	Throws         *TypeRef
+	Uses           []string
 }
 
 type StructDecl struct {
@@ -684,9 +686,10 @@ func (e *ClosureExpr) Pos() Position {
 }
 
 type ClosureCapture struct {
-	At   Position
-	Name string
-	Type TypeRef
+	At      Position
+	Name    string
+	Type    TypeRef
+	Mutable bool
 }
 
 type StructLitExpr struct {

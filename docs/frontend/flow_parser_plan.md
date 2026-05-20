@@ -76,7 +76,7 @@ Verification:
 
 ```sh
 go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
-bash scripts/release_v1_0_gate.sh
+bash scripts/release/v1_0/gate.sh
 ```
 
 ### Phase 3: Compatibility Tooling Sunset
@@ -105,5 +105,5 @@ readiness:
 go test ./compiler/internal/frontend ./compiler/... -run 'Flow|Parser|Lexer|Format'
 go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
-bash scripts/release_v1_0_gate.sh
+bash scripts/release/v1_0/gate.sh
 ```

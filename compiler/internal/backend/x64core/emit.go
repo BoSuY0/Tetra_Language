@@ -33,6 +33,9 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 		if dataBlobs == nil || leaPatches == nil || callPatches == nil {
 			return fmt.Errorf("missing patches buffers")
 		}
+		if fn.ParamSlots < 0 || fn.LocalSlots < fn.ParamSlots || fn.ReturnSlots < 0 {
+			return fmt.Errorf("x64 backend: function '%s' has invalid slots", fn.Name)
+		}
 
 		labelOffsets := make(map[int]int)
 		var patches []labelPatch
@@ -53,6 +56,64 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 			return nil
 		}
 		push := func(n int) { stackDepth += n }
+		localSlotOffset := func(slot int) (int32, error) {
+			if slot < 0 || slot >= fn.LocalSlots {
+				return 0, fmt.Errorf("x64 backend: local slot %d out of bounds in function '%s' (locals=%d)", slot, fn.Name, fn.LocalSlots)
+			}
+			return -int32((slot + 1) * 8), nil
+		}
+		guardAllocationBaseRawAccess := func(width int32) error {
+			e.MovRdiRax()
+			e.MovEcxFromRdiDisp(-8)
+			e.MovEdxImm32(uint32(width))
+			e.CmpEdxEcx()
+			failAt := e.JaRel32()
+			doneAt := e.JmpRel32()
+			failOff := len(e.Buf)
+			if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+				return err
+			}
+			doneOff := len(e.Buf)
+			if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
+				return err
+			}
+			if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
+				return err
+			}
+			return nil
+		}
+		guardAllocationOffsetRawAccess := func(width int32) error {
+			e.CmpEdxImm32(0)
+			okAt := e.JgeRel32()
+			if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+				return err
+			}
+			okOff := len(e.Buf)
+			if err := x64.PatchRel32(e.Buf, okAt, okOff); err != nil {
+				return err
+			}
+			e.MovRdiRax()
+			e.MovEcxFromRdiDisp(-8)
+			e.AddEdxImm32(width)
+			e.CmpEdxEcx()
+			failAt := e.JaRel32()
+			e.AddEdxImm32(-width)
+			e.MovsxdRdxEdx()
+			e.AddRaxRdx()
+			doneAt := e.JmpRel32()
+			failOff := len(e.Buf)
+			if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+				return err
+			}
+			doneOff := len(e.Buf)
+			if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
+				return err
+			}
+			if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
+				return err
+			}
+			return nil
+		}
 
 		e.PushRbp()
 		e.MovRbpRsp()
@@ -85,7 +146,10 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				e.PushRax()
 				push(1)
 			case ir.IRLoadLocal:
-				off := -int32((instr.Local + 1) * 8)
+				off, err := localSlotOffset(instr.Local)
+				if err != nil {
+					return err
+				}
 				e.MovRaxFromRbpDisp(off)
 				e.PushRax()
 				push(1)
@@ -93,10 +157,16 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				if err := pop(1); err != nil {
 					return err
 				}
-				off := -int32((instr.Local + 1) * 8)
+				off, err := localSlotOffset(instr.Local)
+				if err != nil {
+					return err
+				}
 				e.PopRax()
 				e.MovMem64RbpDispRax(off)
 			case ir.IRLoadGlobal:
+				if instr.Local < 0 {
+					return fmt.Errorf("x64 backend: global slot %d out of bounds in function '%s'", instr.Local, fn.Name)
+				}
 				leaPos := e.LeaRsiRipDisp()
 				e.MovRdiRsi()
 				e.MovRaxFromRdiDisp(0)
@@ -104,6 +174,9 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				push(1)
 				*leaPatches = append(*leaPatches, x64obj.LeaPatch{At: leaPos, DataIndex: instr.Local})
 			case ir.IRStoreGlobal:
+				if instr.Local < 0 {
+					return fmt.Errorf("x64 backend: global slot %d out of bounds in function '%s'", instr.Local, fn.Name)
+				}
 				if err := pop(1); err != nil {
 					return err
 				}
@@ -238,11 +311,23 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 					return err
 				}
 			case ir.IRLabel:
+				if instr.Label < 0 {
+					return fmt.Errorf("x64 backend: negative label %d in function '%s'", instr.Label, fn.Name)
+				}
+				if _, exists := labelOffsets[instr.Label]; exists {
+					return fmt.Errorf("x64 backend: duplicate label %d in function '%s'", instr.Label, fn.Name)
+				}
 				labelOffsets[instr.Label] = len(e.Buf)
 			case ir.IRJmp:
+				if instr.Label < 0 {
+					return fmt.Errorf("x64 backend: negative label %d in function '%s'", instr.Label, fn.Name)
+				}
 				at := e.JmpRel32()
 				patches = append(patches, labelPatch{at: at, label: instr.Label})
 			case ir.IRJmpIfZero:
+				if instr.Label < 0 {
+					return fmt.Errorf("x64 backend: negative label %d in function '%s'", instr.Label, fn.Name)
+				}
 				if err := pop(1); err != nil {
 					return err
 				}
@@ -265,6 +350,57 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 					e.PopRdx()
 					e.PopRax()
 				case 4:
+					e.PopR9()
+					e.PopR8()
+					e.PopRdx()
+					e.PopRax()
+				case 5:
+					e.PopR10()
+					e.PopR9()
+					e.PopR8()
+					e.PopRdx()
+					e.PopRax()
+				case 6:
+					e.PopR11()
+					e.PopR10()
+					e.PopR9()
+					e.PopR8()
+					e.PopRdx()
+					e.PopRax()
+				case 7:
+					e.PopR12()
+					e.PopR11()
+					e.PopR10()
+					e.PopR9()
+					e.PopR8()
+					e.PopRdx()
+					e.PopRax()
+				case 8:
+					e.PopR13()
+					e.PopR12()
+					e.PopR11()
+					e.PopR10()
+					e.PopR9()
+					e.PopR8()
+					e.PopRdx()
+					e.PopRax()
+				case 9:
+					e.PopR14()
+					e.PopR13()
+					e.PopR12()
+					e.PopR11()
+					e.PopR10()
+					e.PopR9()
+					e.PopR8()
+					e.PopRdx()
+					e.PopRax()
+				case 10:
+					e.PopR15()
+					e.PopR14()
+					e.PopR13()
+					e.PopR12()
+					e.PopR11()
+					e.PopR10()
 					e.PopR9()
 					e.PopR8()
 					e.PopRdx()
@@ -380,6 +516,9 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				}
 				e.PopRdx()
 				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
 				e.MovEaxFromRaxPtr()
 				e.PushRax()
 				push(1)
@@ -388,10 +527,14 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 					return err
 				}
 				e.PopRdx()
-				e.PopRcx()
+				e.PopR8()
 				e.PopRax()
-				e.MovMem32RaxPtrEcx()
-				e.PushRcx()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovMem32RdiDispR8d(0)
+				e.PushR8()
 				push(1)
 			case ir.IRMemReadU8:
 				if err := pop(2); err != nil {
@@ -418,6 +561,9 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				}
 				e.PopRdx()
 				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
 				e.MovRdiRax()
 				e.MovRaxFromRdiDisp(0)
 				e.PushRax()
@@ -426,12 +572,99 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				if err := pop(3); err != nil {
 					return err
 				}
-				e.PopR8()  // cap.mem (unused)
-				e.PopRax() // value
-				e.PopRcx() // addr
-				e.MovRdiRcx()
-				e.MovMem64RdiDispRax(0)
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovMem64RdiDispR8(0)
+				e.PushR8()
+				push(1)
+			case ir.IRMemReadI32Offset:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationOffsetRawAccess(4); err != nil {
+					return err
+				}
+				e.MovEaxFromRaxPtr()
 				e.PushRax()
+				push(1)
+			case ir.IRMemWriteI32Offset:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopR8()
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationOffsetRawAccess(4); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovMem32RdiDispR8d(0)
+				e.PushR8()
+				push(1)
+			case ir.IRMemReadU8Offset:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationOffsetRawAccess(1); err != nil {
+					return err
+				}
+				e.MovzxEaxBytePtrRax()
+				e.PushRax()
+				push(1)
+			case ir.IRMemWriteU8Offset:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopR8()
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationOffsetRawAccess(1); err != nil {
+					return err
+				}
+				e.MovMem8RaxPtrR8b()
+				e.PushR8()
+				push(1)
+			case ir.IRMemReadPtrOffset:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationOffsetRawAccess(8); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovRaxFromRdiDisp(0)
+				e.PushRax()
+				push(1)
+			case ir.IRMemWritePtrOffset:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopR8()
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationOffsetRawAccess(8); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovMem64RdiDispR8(0)
+				e.PushR8()
 				push(1)
 			case ir.IRPtrAdd:
 				if err := pop(3); err != nil {
@@ -440,10 +673,35 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				e.PopRcx()
 				e.PopRdx()
 				e.PopRax()
+				e.CmpEdxImm32(0)
+				okAt := e.JgeRel32()
+				if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+					return err
+				}
+				okOff := len(e.Buf)
+				if err := x64.PatchRel32(e.Buf, okAt, okOff); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovEcxFromRdiDisp(-8)
+				e.CmpEdxEcx()
+				failAt := e.JaeRel32()
 				e.MovsxdRdxEdx()
 				e.AddRaxRdx()
 				e.PushRax()
 				push(1)
+				doneAt := e.JmpRel32()
+				failOff := len(e.Buf)
+				if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+					return err
+				}
+				doneOff := len(e.Buf)
+				if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
+					return err
+				}
+				if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
+					return err
+				}
 			case ir.IRMmioReadI32:
 				if err := pop(2); err != nil {
 					return err
@@ -464,6 +722,9 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				e.PushRcx()
 				push(1)
 			case ir.IRSymAddr:
+				if instr.Name == "" {
+					return fmt.Errorf("x64 backend: symbol address is missing name in function '%s'", fn.Name)
+				}
 				leaPos := e.LeaRaxRipDisp()
 				*callPatches = append(*callPatches, x64obj.CallPatch{At: leaPos, Name: instr.Name})
 				e.PushRax()

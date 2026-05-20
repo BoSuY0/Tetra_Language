@@ -1,30 +1,12 @@
 package scriptstest
 
 import (
-	"bytes"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
-
-type testAllSummary struct {
-	Status          string `json:"status"`
-	StepCount       int    `json:"step_count"`
-	FailedCount     int    `json:"failed_count"`
-	ReleaseArtifact string `json:"release_artifact"`
-	Steps           []struct {
-		Name     string `json:"name"`
-		Status   string `json:"status"`
-		ExitCode *int   `json:"exit_code"`
-		Command  string `json:"command"`
-	} `json:"steps"`
-}
-
-const testAllFormatterStepName = "formatter check examples lib runtime"
 
 func TestTestAllQuickJSONIncludesStepExitCodes(t *testing.T) {
 	root := testAllFakeRepo(t, false)
@@ -40,7 +22,10 @@ func TestTestAllQuickJSONIncludesStepExitCodes(t *testing.T) {
 	if summary.StepCount != len(summary.Steps) || summary.FailedCount != 0 {
 		t.Fatalf("summary counts = steps:%d failed:%d len:%d", summary.StepCount, summary.FailedCount, len(summary.Steps))
 	}
-	if summary.ReleaseArtifact != "tetra.release.v0_2_0.test-all-summary.v1" {
+	if summary.ReleaseVersion != "v0.4.0" {
+		t.Fatalf("release_version = %q", summary.ReleaseVersion)
+	}
+	if summary.ReleaseArtifact != "tetra.release.v0_4_0.test-all-summary.v1" {
 		t.Fatalf("release_artifact = %q", summary.ReleaseArtifact)
 	}
 	for _, step := range summary.Steps {
@@ -53,6 +38,95 @@ func TestTestAllQuickJSONIncludesStepExitCodes(t *testing.T) {
 	}
 }
 
+func TestTestAllWorkflowLivesInCIEntryPoint(t *testing.T) {
+	root := repoRoot(t)
+	ciPath := filepath.Join(root, "scripts", "ci", "test-all.sh")
+	assertLegacyFileRemoved(t, "scripts/test_all.sh", "scripts/ci/test-all.sh")
+	ciRaw, err := os.ReadFile(ciPath)
+	if err != nil {
+		t.Fatalf("read ci test-all: %v", err)
+	}
+	ciText := string(ciRaw)
+	assertNoLegacyMention(t, ciText, "scripts/test_all.sh", "scripts/ci/test-all.sh help")
+	cmd := exec.Command("bash", ciPath, "--help")
+	cmd.Dir = root
+	helpOut, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scripts/ci/test-all.sh --help failed: %v\n%s", err, helpOut)
+	}
+	helpText := string(helpOut)
+	assertNoLegacyMention(t, helpText, "scripts/test_all.sh", "scripts/ci/test-all.sh --help")
+	for _, want := range []string{
+		"Usage: bash scripts/ci/test-all.sh",
+		"--quick",
+		"--full",
+		"--stabilization",
+		"release_artifact defaults",
+	} {
+		if !strings.Contains(helpText, want) {
+			t.Fatalf("scripts/ci/test-all.sh --help missing %q", want)
+		}
+	}
+	reportParent := t.TempDir()
+	reportDir := filepath.Join(reportParent, "test-all-help-report")
+	cmd = exec.Command("bash", ciPath, "--report-dir", reportDir, "--help")
+	cmd.Dir = root
+	helpOut, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scripts/ci/test-all.sh --report-dir DIR --help failed: %v\n%s", err, helpOut)
+	}
+	assertNoLegacyMention(t, string(helpOut), "scripts/test_all.sh", "scripts/ci/test-all.sh --report-dir DIR --help")
+	if _, err := os.Stat(reportDir); !os.IsNotExist(err) {
+		t.Fatalf("scripts/ci/test-all.sh --help must not create report dir %s: %v", reportDir, err)
+	}
+	for _, want := range []string{
+		"Usage: bash scripts/ci/test-all.sh",
+		"run_step \"bootstrap\"",
+		"write_summary()",
+		"validate-test-all-summary",
+	} {
+		if !strings.Contains(ciText, want) {
+			t.Fatalf("scripts/ci/test-all.sh missing %q", want)
+		}
+	}
+}
+
+func TestTestAllReleaseArtifactFollowsReleaseVersion(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{
+		"TETRA_TEST_ALL_RELEASE_VERSION=v0.3.0",
+		"TETRA_FAKE_TETRA_VERSION=v0.3.0",
+	}, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.ReleaseVersion != "v0.3.0" {
+		t.Fatalf("release_version = %q", summary.ReleaseVersion)
+	}
+	if summary.ReleaseArtifact != "tetra.release.v0_3_0.test-all-summary.v1" {
+		t.Fatalf("release_artifact = %q", summary.ReleaseArtifact)
+	}
+}
+
+func TestTestAllReleaseArtifactCanBeOverridden(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{
+		"TETRA_TEST_ALL_RELEASE_VERSION=v0.3.0",
+		"TETRA_TEST_ALL_RELEASE_ARTIFACT=tetra.release.custom.test-all-summary.v1",
+		"TETRA_FAKE_TETRA_VERSION=v0.3.0",
+	}, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.ReleaseArtifact != "tetra.release.custom.test-all-summary.v1" {
+		t.Fatalf("release_artifact = %q", summary.ReleaseArtifact)
+	}
+}
+
 func TestTestAllRejectsMalformedReportDirFlag(t *testing.T) {
 	root := testAllFakeRepo(t, false)
 	out, err := runTestAll(t, root, nil, "--report-dir")
@@ -61,6 +135,236 @@ func TestTestAllRejectsMalformedReportDirFlag(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "--report-dir requires a directory") {
 		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestTestAllRejectsExistingReportArtifacts(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(reportDir, "summary.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected stale report-dir rejection\n%s", out)
+	}
+	if !strings.Contains(string(out), "refusing to reuse non-empty report directory") {
+		t.Fatalf("unexpected stale report-dir output:\n%s", out)
+	}
+}
+
+func assertTestAllRejectsNonDirectoryReportPath(t *testing.T, root, reportPath, label string) {
+	t.Helper()
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportPath)
+	if err == nil {
+		t.Fatalf("expected %s report path rejection\n%s", label, out)
+	}
+	assertExitCode(t, err, 2, string(out))
+	output := string(out)
+	if !strings.Contains(output, "refusing to use non-directory report path: "+reportPath) {
+		t.Fatalf("unexpected %s report path output:\n%s", label, out)
+	}
+	if !strings.Contains(output, "choose a fresh --report-dir directory") {
+		t.Fatalf("%s report path output missing remediation:\n%s", label, out)
+	}
+	if strings.Contains(output, "mkdir:") {
+		t.Fatalf("%s report path should fail before mkdir:\n%s", label, out)
+	}
+}
+
+func TestTestAllRejectsExistingReportPathFile(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportPath := filepath.Join(root, "report-file")
+	if err := os.WriteFile(reportPath, []byte("stale\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	assertTestAllRejectsNonDirectoryReportPath(t, root, reportPath, "regular-file")
+}
+
+func TestTestAllRejectsDanglingReportDirSymlink(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportPath := filepath.Join(root, "report-link")
+	if err := os.Symlink(filepath.Join(root, "missing-report-target"), reportPath); err != nil {
+		t.Fatalf("create dangling report-dir symlink: %v", err)
+	}
+	assertTestAllRejectsSymlinkReportPath(t, root, reportPath, "dangling symlink")
+}
+
+func TestTestAllRejectsReportDirSymlinkToFile(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	targetPath := filepath.Join(root, "report-file-target")
+	if err := os.WriteFile(targetPath, []byte("stale\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reportPath := filepath.Join(root, "report-link")
+	if err := os.Symlink(targetPath, reportPath); err != nil {
+		t.Fatalf("create report-dir symlink to file: %v", err)
+	}
+	assertTestAllRejectsSymlinkReportPath(t, root, reportPath, "file symlink")
+}
+
+func assertTestAllRejectsSymlinkReportPath(t *testing.T, root, reportPath, label string) {
+	t.Helper()
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportPath)
+	if err == nil {
+		t.Fatalf("expected %s report path rejection\n%s", label, out)
+	}
+	assertExitCode(t, err, 2, string(out))
+	output := string(out)
+	if !strings.Contains(output, "refusing to use symlink report directory: "+reportPath) {
+		t.Fatalf("unexpected %s report path output:\n%s", label, out)
+	}
+	if !strings.Contains(output, "choose a real fresh --report-dir") {
+		t.Fatalf("%s report path output missing remediation:\n%s", label, out)
+	}
+	assertOutputAvoidsRawPathUtilityErrors(t, out)
+}
+
+func TestTestAllRejectsSymlinkToExistingReportArtifacts(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	targetDir := filepath.Join(root, "stale-target")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "summary.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reportDir := filepath.Join(root, "report-link")
+	if err := os.Symlink(targetDir, reportDir); err != nil {
+		t.Fatalf("create report-dir symlink: %v", err)
+	}
+	goLog := filepath.Join(root, "go.log")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_GO_LOG=" + goLog}, "--quick", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected stale symlinked report-dir rejection\n%s", out)
+	}
+	assertExitCode(t, err, 2, string(out))
+	if !strings.Contains(string(out), "refusing to reuse non-empty report directory") {
+		t.Fatalf("unexpected stale symlinked report-dir output:\n%s", out)
+	}
+	if _, err := os.Stat(goLog); err == nil {
+		t.Fatalf("fake go ran for stale symlinked report-dir\noutput:\n%s", out)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat fake go marker: %v", err)
+	}
+}
+
+func TestTestAllAllowsExistingEmptyReportDir(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick with empty report-dir failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "pass" {
+		t.Fatalf("summary status = %q", summary.Status)
+	}
+}
+
+func TestTestAllAllowsDashPrefixedFreshReportDir(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := "-fresh-report"
+	goLog := filepath.Join(root, "go.log")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_GO_LOG=" + goLog}, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick with dash-prefixed fresh report-dir failed: %v\n%s", err, out)
+	}
+	assertOutputAvoidsRawPathUtilityErrors(t, out)
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "pass" {
+		t.Fatalf("summary status = %q", summary.Status)
+	}
+	if _, err := os.Stat(filepath.Join(root, reportDir, "summary.json")); err != nil {
+		t.Fatalf("expected summary.json in dash-prefixed report-dir: %v", err)
+	}
+	if _, err := os.Stat(goLog); err != nil {
+		t.Fatalf("expected fake go to run for fresh report-dir: %v", err)
+	}
+}
+
+func TestTestAllRejectsSymlinkToEmptyReportDirBeforeExecution(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	targetDir := filepath.Join(root, "empty-target")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	reportDir := filepath.Join(root, "report-link")
+	if err := os.Symlink(targetDir, reportDir); err != nil {
+		t.Fatalf("create report-dir symlink: %v", err)
+	}
+	goLog := filepath.Join(root, "go.log")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_GO_LOG=" + goLog}, "--quick", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected symlink report-dir rejection\n%s", out)
+	}
+	assertExitCode(t, err, 2, string(out))
+	output := string(out)
+	if !strings.Contains(output, "refusing to use symlink report directory: "+reportDir) {
+		t.Fatalf("unexpected symlink report-dir output:\n%s", out)
+	}
+	if !strings.Contains(output, "choose a real fresh --report-dir") {
+		t.Fatalf("symlink report-dir output missing remediation:\n%s", out)
+	}
+	assertOutputAvoidsRawPathUtilityErrors(t, out)
+	if _, err := os.Stat(goLog); err == nil {
+		t.Fatalf("fake go ran for symlink report-dir\noutput:\n%s", out)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat fake go marker: %v", err)
+	}
+}
+
+func TestTestAllRejectsDashPrefixedExistingReportArtifacts(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := "-stale-report"
+	if err := os.MkdirAll(filepath.Join(root, reportDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, reportDir, "summary.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected dash-prefixed stale report-dir rejection\n%s", out)
+	}
+	assertExitCode(t, err, 2, string(out))
+	if !strings.Contains(string(out), "refusing to reuse non-empty report directory: "+reportDir) {
+		t.Fatalf("unexpected dash-prefixed stale report-dir output:\n%s", out)
+	}
+	if strings.Contains(string(out), "find:") {
+		t.Fatalf("dash-prefixed report-dir should not be parsed as a find option:\n%s", out)
+	}
+}
+
+func TestTestAllRejectsDashPrefixedSymlinkToExistingReportArtifacts(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	targetDir := filepath.Join(root, "stale-target")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "summary.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reportDir := "-stale-report-link"
+	if err := os.Symlink(targetDir, filepath.Join(root, reportDir)); err != nil {
+		t.Fatalf("create dash-prefixed report-dir symlink: %v", err)
+	}
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected dash-prefixed stale symlink report-dir rejection\n%s", out)
+	}
+	assertExitCode(t, err, 2, string(out))
+	if !strings.Contains(string(out), "refusing to reuse non-empty report directory: "+reportDir) {
+		t.Fatalf("unexpected dash-prefixed stale symlink report-dir output:\n%s", out)
+	}
+	if strings.Contains(string(out), "find:") {
+		t.Fatalf("dash-prefixed symlink report-dir should not be parsed as a find option:\n%s", out)
 	}
 }
 
@@ -142,7 +446,7 @@ func TestTestAllFailurePathPreservesSummaryWhenSummaryValidatorFails(t *testing.
 }
 
 func TestReleaseV06GateValidatesCrossTargetSmokeReports(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -156,7 +460,8 @@ func TestReleaseV06GateValidatesCrossTargetSmokeReports(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesHostSmokeReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	assertLegacyFileRemoved(t, "scripts/release_v0_6_gate.sh", "scripts/release/v0_6/gate.sh directly")
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -172,11 +477,16 @@ func TestReleaseV06GateValidatesHostSmokeReport(t *testing.T) {
 }
 
 func TestReleaseV05GateValidatesJSONReports(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_5_gate.sh"))
+	root := repoRoot(t)
+	assertLegacyFileRemoved(t, "scripts/release_v0_5_gate.sh", "scripts/release/v0_5/gate.sh directly")
+	raw, err := os.ReadFile(filepath.Join(root, "scripts", "release", "v0_5", "gate.sh"))
 	if err != nil {
 		t.Fatalf("read v0.5 release gate: %v", err)
 	}
 	text := string(raw)
+	if !strings.Contains(text, `repo_root="$(cd "$script_dir/../../.." && pwd)"`) {
+		t.Fatalf("v0.5 release gate should resolve the repo root from its versioned script path")
+	}
 	generatedManifest := `go run ./tools/cmd/validate-manifest --manifest "$tmp_dir/manifest.json"`
 	if !strings.Contains(text, generatedManifest) {
 		t.Fatalf("v0.5 release gate missing generated manifest validation %q", generatedManifest)
@@ -218,7 +528,7 @@ func TestReleaseV05GateValidatesJSONReports(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesTestRunnerJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -229,7 +539,7 @@ func TestReleaseV06GateValidatesTestRunnerJSONReport(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesDocsManifests(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -245,7 +555,7 @@ func TestReleaseV06GateValidatesDocsManifests(t *testing.T) {
 }
 
 func TestReleaseV06GateChecksShortAliasVersion(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -261,7 +571,7 @@ func TestReleaseV06GateChecksShortAliasVersion(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesLSPSmokeJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -272,7 +582,7 @@ func TestReleaseV06GateValidatesLSPSmokeJSONReport(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesLSPStdioTranscript(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -283,7 +593,7 @@ func TestReleaseV06GateValidatesLSPStdioTranscript(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesGeneratedAPIDocs(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -294,7 +604,7 @@ func TestReleaseV06GateValidatesGeneratedAPIDocs(t *testing.T) {
 }
 
 func TestReleaseV06GateFormatterCoversRuntimeSources(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -305,7 +615,7 @@ func TestReleaseV06GateFormatterCoversRuntimeSources(t *testing.T) {
 }
 
 func TestReleaseV06GateScansFlowOnlySources(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -316,7 +626,7 @@ func TestReleaseV06GateScansFlowOnlySources(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesTargetsJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -332,7 +642,7 @@ func TestReleaseV06GateValidatesTargetsJSONReport(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesDoctorJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -348,7 +658,7 @@ func TestReleaseV06GateValidatesDoctorJSONReport(t *testing.T) {
 }
 
 func TestReleaseV06GateRunsCheckAndDocCommands(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -365,7 +675,7 @@ func TestReleaseV06GateRunsCheckAndDocCommands(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesJSONDiagnosticShape(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -386,7 +696,7 @@ func TestReleaseV06GateValidatesJSONDiagnosticShape(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesSmokeListJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -402,7 +712,7 @@ func TestReleaseV06GateValidatesSmokeListJSONReport(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesEcoLock(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -413,7 +723,7 @@ func TestReleaseV06GateValidatesEcoLock(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesEcoUnpack(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -424,7 +734,7 @@ func TestReleaseV06GateValidatesEcoUnpack(t *testing.T) {
 }
 
 func TestReleaseV06GateValidatesEcoVault(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_6_gate.sh"))
+	raw, err := readReleaseV06GateScript(t)
 	if err != nil {
 		t.Fatalf("read release gate: %v", err)
 	}
@@ -435,7 +745,7 @@ func TestReleaseV06GateValidatesEcoVault(t *testing.T) {
 }
 
 func TestTestAllValidatesTestRunnerJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -446,7 +756,7 @@ func TestTestAllValidatesTestRunnerJSONReport(t *testing.T) {
 }
 
 func TestTestAllValidatesSummaryArtifacts(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -456,8 +766,19 @@ func TestTestAllValidatesSummaryArtifacts(t *testing.T) {
 	}
 }
 
+func TestTestAllTopLevelGoTestBypassesCache(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test_all: %v", err)
+	}
+	want := `run_step "go test all packages" go test ./compiler/... ./cli/... ./tools/... -count=1`
+	if !strings.Contains(string(raw), want) {
+		t.Fatalf("test_all top-level go test should bypass cache with %q", want)
+	}
+}
+
 func TestTestAllChecksShortAliasVersion(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -473,26 +794,26 @@ func TestTestAllChecksShortAliasVersion(t *testing.T) {
 }
 
 func TestTestAllValidatesHostSmokeReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
 	text := string(raw)
-	run := `run_release_smoke_target "linux-x64" "true" "$report_dir/host-smoke.json"`
+	run := `run_tetra_smoke_target "linux-x64" "true" "$report_dir/host-smoke.json"`
 	if !strings.Contains(text, run) {
 		t.Fatalf("test_all missing host smoke report command %q", run)
 	}
-	validate := `go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_dir/host-smoke.json"`
+	validate := `go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report_path"`
 	if !strings.Contains(text, validate) {
 		t.Fatalf("test_all missing host smoke report validation %q", validate)
 	}
-	if strings.Contains(text, `./tetra smoke --target linux-x64 --run=true`) {
-		t.Fatalf("test_all should not use legacy full smoke coverage for host run")
+	if strings.Contains(text, `release_smoke_cases=`) {
+		t.Fatalf("test_all should not keep a local release smoke case array")
 	}
 }
 
 func TestTestAllFormatterCoversRuntimeSources(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -503,7 +824,7 @@ func TestTestAllFormatterCoversRuntimeSources(t *testing.T) {
 }
 
 func TestTestAllScansFlowOnlySources(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -514,7 +835,7 @@ func TestTestAllScansFlowOnlySources(t *testing.T) {
 }
 
 func TestTestAllValidatesTargetsJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -531,7 +852,7 @@ func TestTestAllValidatesTargetsJSONReport(t *testing.T) {
 }
 
 func TestTestAllValidatesDoctorJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -548,7 +869,7 @@ func TestTestAllValidatesDoctorJSONReport(t *testing.T) {
 }
 
 func TestTestAllRunsCheckAndDocCommands(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -565,8 +886,75 @@ func TestTestAllRunsCheckAndDocCommands(t *testing.T) {
 	}
 }
 
+func TestTestAllFullRunsSafetyReadinessGate(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test_all: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "safety readiness evidence" check_safety_readiness`,
+		`go run ./tools/cmd/validate-safety-readiness`,
+		`--out "$report_dir/safety-readiness.json"`,
+		`go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("test_all missing safety readiness coverage %q", want)
+		}
+	}
+}
+
+func TestTestAllFullFailsOnSafetyReadinessValidatorFailure(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAIL_SAFETY_READINESS=1"}, "--full", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected full gate to fail on safety readiness validator failure\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary = %#v", summary)
+	}
+	var sawSafetyFailure bool
+	for _, step := range summary.Steps {
+		if step.Name == "safety readiness evidence" && step.Status == "fail" {
+			sawSafetyFailure = true
+		}
+		if step.Name == "tooling summary aggregation" {
+			t.Fatalf("tooling summary should not run after safety readiness failure without keep-going: %#v", summary.Steps)
+		}
+	}
+	if !sawSafetyFailure {
+		t.Fatalf("summary missing failing safety readiness step: %#v", summary.Steps)
+	}
+	logRaw, err := os.ReadFile(filepath.Join(reportDir, testAllStepLog(t, summary, "safety readiness evidence")))
+	if err != nil {
+		t.Fatalf("read safety readiness log: %v", err)
+	}
+	if !strings.Contains(string(logRaw), "safety readiness failed") {
+		t.Fatalf("safety readiness log missing validator failure detail:\n%s", logRaw)
+	}
+}
+
+func TestTestAllFullRunsOwnershipAuditGate(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test_all: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "ownership production audit" go run ./tools/cmd/validate-ownership-audit --audit docs/release/ownership_production_audit.md --expected-status achieved`,
+		`docs/release/ownership_production_audit.md`,
+		`--expected-status achieved`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("test_all missing ownership audit coverage %q", want)
+		}
+	}
+}
+
 func TestTestAllValidatesJSONDiagnosticShape(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -588,15 +976,15 @@ func TestTestAllValidatesJSONDiagnosticShape(t *testing.T) {
 }
 
 func TestTestAllValidatesSmokeListJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
 		`run_step "smoke list json report" check_smoke_list`,
-		`write_release_smoke_list "$report_dir/smoke-list.json"`,
-		`go run ./tools/cmd/validate-flow-only examples/flow_hello.tetra examples/flow_struct_smoke.tetra examples/flow_islands_smoke.tetra examples/flow_unsafe_cap_mem_smoke.tetra`,
+		`./tetra smoke --list --target linux-x64 --format=json >"$report_dir/smoke-list.json"`,
+		`go run ./tools/cmd/validate-smoke-list --report "$report_dir/smoke-list.json" --examples-root examples`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("test_all missing smoke list validation %q", want)
@@ -604,8 +992,53 @@ func TestTestAllValidatesSmokeListJSONReport(t *testing.T) {
 	}
 }
 
+func TestSmokeSourceSetsUseUnifiedRegistry(t *testing.T) {
+	root := repoRoot(t)
+	files := map[string][]string{
+		"scripts/ci/test-all.sh": {
+			`./tetra smoke --list --target linux-x64 --format=json >"$report_dir/smoke-list.json"`,
+			`run_tetra_smoke_target "linux-x64" "true" "$report_dir/host-smoke.json"`,
+			`run_tetra_smoke_target "wasm32-wasi" "false" "$report_dir/wasm32-wasi-artifact-smoke.json"`,
+			`run_tetra_smoke_target "wasm32-web" "false" "$report_dir/wasm32-web-artifact-smoke.json"`,
+		},
+		"scripts/release/v1_0/wasi-smoke.sh": {
+			`./tetra smoke --list --target wasm32-wasi --format=json >"$smoke_list"`,
+			`smoke_source_for_case "$smoke_list" "dogfood_wasi"`,
+			`smoke_source_for_case "$smoke_list" "ui_web_smoke"`,
+		},
+		"scripts/release/v1_0/web-smoke.sh": {
+			`./tetra smoke --list --target wasm32-web --format=json >"$smoke_list"`,
+			`smoke_source_for_case "$smoke_list" "dogfood_web_ui"`,
+			`smoke_source_for_case "$smoke_list" "ui_web_smoke"`,
+		},
+	}
+	for rel, wants := range files {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		text := string(raw)
+		for _, want := range wants {
+			if !strings.Contains(text, want) {
+				t.Fatalf("%s missing unified smoke registry contract %q", rel, want)
+			}
+		}
+		for _, forbidden := range []string{
+			`release_smoke_cases=`,
+			`examples/projects/dogfood_wasi/src/main.tetra`,
+			`examples/projects/dogfood_web_ui/src/main.tetra`,
+			`examples/ui_web_smoke.tetra`,
+			`examples/flow_struct_smoke.tetra`,
+		} {
+			if strings.Contains(text, forbidden) {
+				t.Fatalf("%s still hard-codes smoke source %q", rel, forbidden)
+			}
+		}
+	}
+}
+
 func TestTestAllValidatesDocsManifests(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -621,7 +1054,7 @@ func TestTestAllValidatesDocsManifests(t *testing.T) {
 }
 
 func TestTestAllFullValidatesPerformanceReportWhenPresent(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -654,7 +1087,7 @@ func TestTestAllFullRunsDocsManifestDiffStep(t *testing.T) {
 }
 
 func TestTestAllValidatesLSPSmokeJSONReport(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -669,7 +1102,7 @@ func TestTestAllValidatesLSPSmokeJSONReport(t *testing.T) {
 }
 
 func TestTestAllValidatesLSPStdioTranscript(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -680,7 +1113,7 @@ func TestTestAllValidatesLSPStdioTranscript(t *testing.T) {
 }
 
 func TestTestAllValidatesGeneratedAPIDocs(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -695,7 +1128,7 @@ func TestTestAllValidatesGeneratedAPIDocs(t *testing.T) {
 }
 
 func TestReleaseV012GateFormatterCoversRuntimeSources(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release_v0_1_2_gate.sh"))
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release", "v0_1_2", "gate.sh"))
 	if err != nil {
 		t.Fatalf("read v0.1.2 release gate: %v", err)
 	}
@@ -706,7 +1139,7 @@ func TestReleaseV012GateFormatterCoversRuntimeSources(t *testing.T) {
 }
 
 func TestTestAllValidatesEcoLock(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -717,7 +1150,7 @@ func TestTestAllValidatesEcoLock(t *testing.T) {
 }
 
 func TestTestAllValidatesEcoUnpack(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
@@ -728,13 +1161,30 @@ func TestTestAllValidatesEcoUnpack(t *testing.T) {
 }
 
 func TestTestAllValidatesEcoVault(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"))
+	raw, err := readTestAllScript(t)
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
 	want := `go run ./tools/cmd/validate-eco-vault --store "$tmp_dir/vault"`
 	if !strings.Contains(string(raw), want) {
 		t.Fatalf("test_all missing Eco vault validation %q", want)
+	}
+}
+
+func Test_test_all_validates_tool011_eco_reports(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test_all: %v", err)
+	}
+	for _, want := range []string{
+		`go run ./tools/cmd/validate-eco-seed --seed "$tmp_dir/tetra.seed.json"`,
+		`go run ./tools/cmd/validate-eco-needmap --needmap "$tmp_dir/tetra.needmap.json"`,
+		`go run ./tools/cmd/validate-eco-trust --trust "$tmp_dir/tetra.trust-snapshot.json"`,
+		`go run ./tools/cmd/validate-eco-materialization --materialization "$tmp_dir/materialized/tetra.materialization.json"`,
+	} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("test_all missing TOOL-011 Eco validation %q", want)
+		}
 	}
 }
 
@@ -751,11 +1201,103 @@ func TestTestAllFullValidatesCrossTargetSmokeReports(t *testing.T) {
 		t.Fatalf("read fake go log: %v", err)
 	}
 	log := string(raw)
-	for _, report := range []string{"linux-smoke.json", "macos-smoke.json", "windows-smoke.json", "wasm32-wasi-smoke.json", "wasm32-web-smoke.json"} {
+	for _, report := range []string{"linux-smoke.json", "macos-smoke.json", "windows-smoke.json", "wasm32-wasi-artifact-smoke.json", "wasm32-web-artifact-smoke.json"} {
 		want := "run ./tools/cmd/smoke-report-to-checklist --validate-only --report "
 		if !strings.Contains(log, want) || !strings.Contains(log, report) {
 			t.Fatalf("full gate missing validate-only call for %s in log:\n%s", report, log)
 		}
+	}
+	if !strings.Contains(log, "run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report ") ||
+		!strings.Contains(log, "wasm32-wasi-artifact-smoke.json") {
+		t.Fatalf("full gate missing strict WASI artifact/import report validation in log:\n%s", log)
+	}
+	summary := decodeTestAllSummary(t, out)
+	for _, step := range []string{"wasm32-wasi smoke schema", "wasm32-web smoke schema"} {
+		if !hasTestAllStep(summary, step) {
+			t.Fatalf("full gate missing %q step: %#v", step, summary.Steps)
+		}
+	}
+}
+
+func TestTestAllFullAggregatesToolingSummary(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--full", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all full failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if !hasTestAllStep(summary, "tooling summary aggregation") {
+		t.Fatalf("full gate missing tooling summary aggregation step: %#v", summary.Steps)
+	}
+	raw, err := os.ReadFile(filepath.Join(reportDir, "tooling-summary.json"))
+	if err != nil {
+		t.Fatalf("read tooling summary: %v", err)
+	}
+	for _, want := range []string{`"schema": "tetra.tooling-summary.v1alpha1"`, `"targets.json"`, `"doctor.json"`, `"safety-readiness.json"`, `"wasm32-wasi-artifact-smoke.json"`, `"wasm32-web-artifact-smoke.json"`} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("tooling summary missing %q:\n%s", want, raw)
+		}
+	}
+}
+
+func TestTestAllFullToolingSummaryFailsOnZeroByteRequiredArtifact(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_ZERO_DOCTOR_REPORT=1"}, "--full", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected full tooling summary to fail on zero-byte required artifact\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary = %#v", summary)
+	}
+	var sawToolingFailure bool
+	for _, step := range summary.Steps {
+		if step.Name == "tooling summary aggregation" && step.Status == "fail" {
+			sawToolingFailure = true
+		}
+	}
+	if !sawToolingFailure {
+		t.Fatalf("summary missing failing tooling summary step: %#v", summary.Steps)
+	}
+	logRaw, err := os.ReadFile(filepath.Join(reportDir, testAllStepLog(t, summary, "tooling summary aggregation")))
+	if err != nil {
+		t.Fatalf("read tooling summary log: %v", err)
+	}
+	log := string(logRaw)
+	if !strings.Contains(log, "required artifact is zero-byte: doctor.json") {
+		t.Fatalf("tooling summary log missing zero-byte artifact detail:\n%s", log)
+	}
+}
+
+func TestTestAllStabilizationToolingSummaryRequiresFocusedArtifacts(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_SKIP_WEB_UI_SMOKE_REPORT=1"}, "--stabilization", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected stabilization tooling summary to fail on missing focused artifact\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary = %#v", summary)
+	}
+	var sawToolingFailure bool
+	for _, step := range summary.Steps {
+		if step.Name == "tooling summary aggregation" && step.Status == "fail" {
+			sawToolingFailure = true
+		}
+	}
+	if !sawToolingFailure {
+		t.Fatalf("summary missing failing tooling summary step: %#v", summary.Steps)
+	}
+	logRaw, err := os.ReadFile(filepath.Join(reportDir, testAllStepLog(t, summary, "tooling summary aggregation")))
+	if err != nil {
+		t.Fatalf("read tooling summary log: %v", err)
+	}
+	log := string(logRaw)
+	if !strings.Contains(log, "required artifact missing: web-ui-smoke.json") {
+		t.Fatalf("tooling summary log missing required artifact detail:\n%s", log)
 	}
 }
 
@@ -774,7 +1316,7 @@ func TestTestAllStabilizationRunsFocusedGates(t *testing.T) {
 	if !hasTestAllStep(summary, "compiler pipeline focused gate") || !hasTestAllStep(summary, "api diff no-change") {
 		t.Fatalf("stabilization summary missing focused gates: %#v", summary.Steps)
 	}
-	if !hasTestAllStep(summary, "wasi runner smoke") || !hasTestAllStep(summary, "web ui browser smoke") {
+	if !hasTestAllStep(summary, "wasi runner smoke") || !hasTestAllStep(summary, "web runtime browser smoke") {
 		t.Fatalf("stabilization summary missing smoke gates: %#v", summary.Steps)
 	}
 	if summary.StepCount <= 24 {
@@ -788,521 +1330,11 @@ func TestTestAllStabilizationRunsFocusedGates(t *testing.T) {
 	for _, want := range []string{
 		"test ./tools/cmd/validate-lsp-stdio/...",
 		"./tools/cmd/validate-api-docs/...",
+		"./tools/cmd/validate-wasi-smoke-report/...",
 		"./tools/cmd/verify-docs/...",
 	} {
 		if !strings.Contains(log, want) {
 			t.Fatalf("stabilization missing validator go invocation %q in log:\n%s", want, log)
 		}
 	}
-}
-
-func hasTestAllStep(summary testAllSummary, name string) bool {
-	for _, step := range summary.Steps {
-		if step.Name == name && step.Status == "pass" {
-			return true
-		}
-	}
-	return false
-}
-
-func testAllFakeRepo(t *testing.T, failFmt bool) string {
-	t.Helper()
-	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "scripts"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := copyFile(filepath.Join(repoRoot(t), "scripts", "test_all.sh"), filepath.Join(root, "scripts", "test_all.sh"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "scripts", "bootstrap.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\ncp ./tetra ./t\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "scripts", "test.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "scripts", "release_v1_0_wasi_smoke.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nreport=\"\"\nwhile [[ $# -gt 0 ]]; do case \"$1\" in --report) report=\"$2\"; shift 2 ;; *) shift ;; esac; done\nmkdir -p \"$(dirname \"$report\")\"\nprintf '{\"status\":\"pass\",\"cases\":[]}\\n' >\"$report\"\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "scripts", "release_v1_0_web_smoke.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nreport=\"\"\nwhile [[ $# -gt 0 ]]; do case \"$1\" in --report) report=\"$2\"; shift 2 ;; *) shift ;; esac; done\nmkdir -p \"$(dirname \"$report\")\"\nprintf '{\"status\":\"pass\",\"ui_schema\":\"tetra.ui.bundle.v1\",\"cases\":[]}\\n' >\"$report\"\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "scripts", "release_v1_0_api_diff.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nreport_dir=\"\"\nwhile [[ $# -gt 0 ]]; do case \"$1\" in --report-dir) report_dir=\"$2\"; shift 2 ;; *) shift ;; esac; done\nmkdir -p \"$report_dir\"\nprintf '{\"review\":{\"status\":\"clean\"},\"diff\":{\"added\":[],\"removed\":[],\"changed\":[]}}\\n' >\"$report_dir/api-diff.json\"\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(root, "docs", "generated"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "docs", "generated", "manifest.json"), []byte("{}\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	binDir := filepath.Join(root, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	goScript := `#!/usr/bin/env bash
-set -euo pipefail
-if [[ -n "${TETRA_FAKE_GO_LOG:-}" ]]; then
-  printf '%s\n' "$*" >>"$TETRA_FAKE_GO_LOG"
-fi
-if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/validate-test-all-summary" && "${TETRA_FAIL_SUMMARY_VALIDATOR:-}" == "1" ]]; then
-  echo "summary validator unavailable" >&2
-  exit 23
-fi
-if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/gen-manifest" ]]; then
-  out=""
-  shift 2
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      -o)
-        out="$2"
-        shift 2
-        ;;
-      *)
-        shift
-        ;;
-    esac
-  done
-  if [[ -n "$out" ]]; then
-    printf '{}\n' >"$out"
-  fi
-fi
-exit 0
-`
-	if err := os.WriteFile(filepath.Join(binDir, "go"), []byte(goScript), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	tetra := `#!/usr/bin/env bash
-set -euo pipefail
-cmd="${1:-}"
-shift || true
-case "$cmd" in
-  version)
-    echo "v0.2.0"
-    ;;
-  fmt)
-    if [[ "${TETRA_FAIL_FMT:-}" == "1" ]]; then
-      echo "format mismatch" >&2
-      exit 7
-    fi
-    ;;
-  test)
-    for arg in "$@"; do
-      if [[ "$arg" == "--report=json" ]]; then
-        echo '{"total":0,"passed":0,"failed":0,"files":[],"results":[]}'
-        exit 0
-      fi
-    done
-    ;;
-  check)
-    for arg in "$@"; do
-      if [[ "$arg" == "--diagnostics=json" ]]; then
-        case "$*" in
-          *missing-effect-diagnostic.tetra*) echo '{"code":"TETRA2001","message":"function main uses effect '\''io'\'' but does not declare it","severity":"error"}' >&2 ;;
-          *tabs-diagnostic.tetra*) echo '{"code":"TETRA0001","message":"tabs are not supported in Flow indentation","severity":"error"}' >&2 ;;
-          *planned-actor-diagnostic.tetra*) echo '{"code":"TETRA0001","message":"actor declarations currently support state fields and func methods only","severity":"error"}' >&2 ;;
-          *) echo '{"code":"TETRA2001","message":"unknown function missing_call","severity":"error"}' >&2 ;;
-        esac
-        exit 1
-      fi
-    done
-    ;;
-  doc)
-    printf '%s\n' '# Tetra API Docs' ''
-    printf '%s\n' '<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:ede46e5e34948c25f6ec38b0b963a2d8d42f5aa09071128581ee08271e966459","module_count":1,"entry_count":1} -->' ''
-    printf '%s\n' '## examples' '' '### Functions' ''
-    printf '%b\n' '- \x60func main() -> Int\x60'
-    ;;
-  build)
-    out=""
-    prev=""
-    for arg in "$@"; do
-      if [[ "$prev" == "-o" ]]; then
-        out="$arg"
-      fi
-      prev="$arg"
-    done
-    if [[ -n "$out" ]]; then
-      mkdir -p "$(dirname "$out")"
-      printf '\x00\x61\x73\x6d\x01\x00\x00\x00' >"$out"
-    fi
-    ;;
-  targets)
-    printf '{"supported":["linux-x64","windows-x64","macos-x64"],"build_only":["wasm32-wasi","wasm32-web"],"planned":[]}\n'
-    ;;
-  doctor)
-    printf '{"status":"pass","checks":[{"name":"version","status":"pass"},{"name":"supported targets","status":"pass"},{"name":"build-only targets","status":"pass"},{"name":"planned targets","status":"pass"},{"name":"repo root","status":"pass"},{"name":"__rt/actors_sysv.tetra","status":"pass"},{"name":"__rt/actors_win64.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_sysv.tetra","status":"pass"},{"name":"compiler/selfhostrt/actors_win64.tetra","status":"pass"},{"name":"examples/flow_hello.tetra","status":"pass"},{"name":"docs/generated/manifest.json","status":"pass"},{"name":"docs manifest version","status":"pass"},{"name":"docs manifest surface","status":"pass"},{"name":"smoke sources","status":"pass"},{"name":"runtime exports","status":"pass"}]}\n'
-    ;;
-  smoke)
-    report=""
-    while [[ $# -gt 0 ]]; do
-      case "$1" in
-        --report)
-          report="$2"
-          shift 2
-          ;;
-        *)
-          shift
-          ;;
-      esac
-    done
-    if [[ -n "$report" ]]; then
-      printf '{"target":"linux-x64","cases":[]}\n' >"$report"
-    fi
-    echo "Smoke linux-x64: 0/0 passed"
-    ;;
-  lsp)
-    if [[ "${1:-}" == "--stdio" ]]; then
-      cat >/dev/null
-      printf '{"result":{"capabilities":{}}}\n'
-      printf '{"method":"textDocument/publishDiagnostics","params":{"diagnostics":[]}}\n'
-    else
-      printf '{"diagnostics":[]}\n'
-    fi
-    ;;
-  eco)
-    sub="${1:-}"
-    shift || true
-    case "$sub" in
-      verify)
-        lock=""
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            --lock)
-              lock="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-        if [[ -n "$lock" ]]; then
-          mkdir -p "$(dirname "$lock")"
-          cat >"$lock" <<'JSON'
-{
-  "schema": "tetra.eco.lock.v1",
-  "manifest_schema": "tetra.capsule.v1",
-  "permissions_model": "tetra.eco.permissions.v1",
-  "graph_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "capsules": [
-    {
-      "id": "tetra://app",
-      "name": "App",
-      "version": "0.1.0",
-      "path": "Tetra.capsule",
-      "targets": ["linux-x64"],
-      "permissions": ["io"]
-    }
-  ]
-}
-JSON
-        fi
-        ;;
-      seed)
-        action="${1:-}"
-        shift || true
-        case "$action" in
-          export)
-            out="tetra.seed.json"
-            while [[ $# -gt 0 ]]; do
-              case "$1" in
-                --out)
-                  out="$2"
-                  shift 2
-                  ;;
-                *)
-                  shift
-                  ;;
-              esac
-            done
-            mkdir -p "$(dirname "$out")"
-            printf '{}\n' >"$out"
-            ;;
-          import)
-            lock=""
-            capsules_dir=""
-            while [[ $# -gt 0 ]]; do
-              case "$1" in
-                --lock)
-                  lock="$2"
-                  shift 2
-                  ;;
-                --capsules-dir)
-                  capsules_dir="$2"
-                  shift 2
-                  ;;
-                *)
-                  shift
-                  ;;
-              esac
-            done
-            if [[ -n "$lock" ]]; then
-              mkdir -p "$(dirname "$lock")"
-              printf '{}\n' >"$lock"
-            fi
-            if [[ -n "$capsules_dir" ]]; then
-              mkdir -p "$capsules_dir"
-              printf 'capsule App:\n  id "tetra://app"\n  version "0.1.0"\n' >"$capsules_dir/App.capsule"
-            fi
-            ;;
-        esac
-        ;;
-      needmap)
-        out="tetra.needmap.json"
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            -o)
-              out="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-        mkdir -p "$(dirname "$out")"
-        printf '{}\n' >"$out"
-        ;;
-      pack)
-        out=""
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            -o|--out)
-              out="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-        if [[ -n "$out" ]]; then
-          mkdir -p "$(dirname "$out")"
-          printf 'todex\n' >"$out"
-        fi
-        ;;
-      unpack)
-        out=""
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            -C|--dir)
-              out="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-        if [[ -n "$out" ]]; then
-          mkdir -p "$out/src"
-          printf 'capsule App:\n  id "tetra://app"\n  version "0.1.0"\n  target "linux-x64"\n' >"$out/Tetra.capsule"
-          printf 'func main() -> Int:\n    return 0\n' >"$out/src/main.tetra"
-          printf '{"schema":"tetra.eco.package.v1","compression":"gzip","mtime_unix":0,"file_count":2,"files":[{"path":"Tetra.capsule","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":68},{"path":"src/main.tetra","sha256":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":32}]}\n' >"$out/tetra.package.json"
-        fi
-        ;;
-      vault)
-        action="${1:-}"
-        shift || true
-        store=".tetra/todex-vault"
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            --store)
-              store="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-        mkdir -p "$store/objects/sha256"
-        printf '{}' >"$store/records.json"
-        if [[ "$action" == "add" ]]; then
-          echo "Vault added: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa source fixture"
-        fi
-        if [[ "$action" == "verify" ]]; then
-          echo "Vault OK: 1 records"
-        fi
-        ;;
-      trust)
-        action="${1:-}"
-        shift || true
-        if [[ "$action" == "snapshot" ]]; then
-          out="tetra.trust-snapshot.json"
-          while [[ $# -gt 0 ]]; do
-            case "$1" in
-              -o)
-                out="$2"
-                shift 2
-                ;;
-              *)
-                shift
-                ;;
-            esac
-          done
-          mkdir -p "$(dirname "$out")"
-          printf '{}\n' >"$out"
-        fi
-        ;;
-      materialize)
-        out="."
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            -C|--dir)
-              out="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-        mkdir -p "$out"
-        printf '{}\n' >"$out/tetra.materialization.json"
-        ;;
-      publish)
-        registry=".tetra/registry-beta"
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            --registry)
-              registry="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-        mkdir -p "$registry/packages/tetra_app/0.1.0/linux-x64"
-        printf 'todex\n' >"$registry/packages/tetra_app/0.1.0/linux-x64/package.todex"
-        printf '{"schema":"tetra.eco.publish.v1beta","channel":"beta","hub":"local-beta","published_at_unix":0,"capsule":{"id":"tetra://app","name":"App","version":"0.1.0","target":"linux-x64","targets":["linux-x64"],"permissions":["io"]},"package":{"file":"package.todex","size":6,"sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"downloads":[{"target":"linux-x64","path":"packages/tetra_app/0.1.0/linux-x64/package.todex"}]}\n' >"$registry/packages/tetra_app/0.1.0/linux-x64/metadata.json"
-        ;;
-      download)
-        out=""
-        while [[ $# -gt 0 ]]; do
-          case "$1" in
-            -o)
-              out="$2"
-              shift 2
-              ;;
-            *)
-              shift
-              ;;
-          esac
-        done
-        if [[ -n "$out" ]]; then
-          mkdir -p "$(dirname "$out")"
-          printf 'todex\n' >"$out"
-        fi
-        ;;
-      tetrahub)
-        action="${1:-}"
-        shift || true
-        if [[ "$action" == "publish" ]]; then
-          store=".tetra/tetrahub-beta"
-          while [[ $# -gt 0 ]]; do
-            case "$1" in
-              --store)
-                store="$2"
-                shift 2
-                ;;
-              *)
-                shift
-                ;;
-            esac
-          done
-          mkdir -p "$store/packages/tetra_app/0.1.0/linux-x64"
-          printf 'todex\n' >"$store/packages/tetra_app/0.1.0/linux-x64/package.todex"
-        elif [[ "$action" == "download" ]]; then
-          out=""
-          while [[ $# -gt 0 ]]; do
-            case "$1" in
-              -o)
-                out="$2"
-                shift 2
-                ;;
-              *)
-                shift
-                ;;
-            esac
-          done
-          if [[ -n "$out" ]]; then
-            mkdir -p "$(dirname "$out")"
-            printf 'todex\n' >"$out"
-          fi
-        fi
-        ;;
-    esac
-    ;;
-  *)
-    ;;
-esac
-`
-	if failFmt && len(tetra) == 0 {
-		t.Fatal("unreachable")
-	}
-	if err := os.WriteFile(filepath.Join(root, "tetra"), []byte(tetra), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return root
-}
-
-func runTestAll(t *testing.T, root string, env []string, args ...string) ([]byte, error) {
-	t.Helper()
-	cmd := exec.Command("bash", append([]string{"scripts/test_all.sh"}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), env...)
-	cmd.Env = append(cmd.Env, "PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return cmd.CombinedOutput()
-}
-
-func runTestAllSplit(t *testing.T, root string, env []string, args ...string) ([]byte, []byte, error) {
-	t.Helper()
-	cmd := exec.Command("bash", append([]string{"scripts/test_all.sh"}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), env...)
-	cmd.Env = append(cmd.Env, "PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return stdout.Bytes(), stderr.Bytes(), err
-}
-
-func runTestAllFromWorkingDir(t *testing.T, root string, workingDir string, env []string, args ...string) ([]byte, error) {
-	t.Helper()
-	script := filepath.Join(root, "scripts", "test_all.sh")
-	cmd := exec.Command("bash", append([]string{script}, args...)...)
-	cmd.Dir = workingDir
-	cmd.Env = append(os.Environ(), env...)
-	cmd.Env = append(cmd.Env, "PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return cmd.CombinedOutput()
-}
-
-func decodeTestAllSummary(t *testing.T, raw []byte) testAllSummary {
-	t.Helper()
-	var summary testAllSummary
-	if err := json.Unmarshal(raw, &summary); err != nil {
-		t.Fatalf("decode summary: %v\n%s", err, string(raw))
-	}
-	return summary
-}
-
-func copyFile(src, dst string, mode os.FileMode) error {
-	raw, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(dst, raw, mode)
-}
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
 }

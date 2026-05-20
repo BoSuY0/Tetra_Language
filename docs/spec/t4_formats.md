@@ -67,7 +67,7 @@ verifies that generated interfaces, target-aware objects, dependency seeds, and
 `Tetra.lock` are current without writing files. The lower-level `tetra eco
 artifacts build/check` commands remain available for explicit capsule graph
 work, and `--all-targets` generates native object artifacts for every native
-target declared in `Capsule.t4` while skipping build-only targets. `tetra build
+target declared in `Capsule.t4` while skipping runner-gated WASM targets. `tetra build
 --artifacts=auto` runs artifact repair before compiling; strict build mode only
 validates and reports stale declared artifacts.
 

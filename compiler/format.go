@@ -288,6 +288,10 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 	if len(file.Imports) > 0 {
 		p.blank()
 	}
+	for _, capsule := range file.Capsules {
+		p.capsuleDecl(capsule)
+		p.blank()
+	}
 	for _, en := range file.Enums {
 		p.enumDecl(en)
 		p.blank()
@@ -435,6 +439,13 @@ func (p *sourcePrinter) protocolDecl(proto *frontend.ProtocolDecl) {
 	p.line(0, "protocol "+proto.Name+":")
 	for _, req := range proto.Requirements {
 		p.line(1, formatFuncSigDecl(req))
+	}
+}
+
+func (p *sourcePrinter) capsuleDecl(capsule *frontend.CapsuleDecl) {
+	p.line(0, "capsule "+capsule.Name+":")
+	for _, entry := range capsule.Entries {
+		p.line(1, entry.Key+": "+p.formatExpr(entry.Value))
 	}
 }
 
@@ -793,14 +804,21 @@ func formatTypeRef(ref frontend.TypeRef) string {
 		return formatTypeRef(*ref.Elem) + "?"
 	case frontend.TypeRefFunction:
 		params := make([]string, 0, len(ref.Params))
-		for _, param := range ref.Params {
-			params = append(params, formatTypeRef(param))
+		for i, param := range ref.Params {
+			formatted := formatTypeRef(param)
+			if i < len(ref.ParamOwnership) && ref.ParamOwnership[i] != "" {
+				formatted = ref.ParamOwnership[i] + " " + formatted
+			}
+			params = append(params, formatted)
 		}
 		ret := "?"
 		if ref.Return != nil {
 			ret = formatTypeRef(*ref.Return)
 		}
 		out := "fn(" + strings.Join(params, ", ") + ") -> " + ret
+		if ref.Throws != nil {
+			out += " throws " + formatTypeRef(*ref.Throws)
+		}
 		if len(ref.Uses) > 0 {
 			out += " uses " + strings.Join(ref.Uses, ", ")
 		}

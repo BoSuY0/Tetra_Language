@@ -101,8 +101,23 @@ func TestEmitCallReturnSlotLayout(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		for retSlots := 0; retSlots <= 2; retSlots++ {
-			t.Run(tc.name+"/"+argCountName(retSlots), func(t *testing.T) {
+		for _, ret := range []struct {
+			slots int
+			regs  []string
+		}{
+			{slots: 0},
+			{slots: 1, regs: []string{"rax"}},
+			{slots: 2, regs: []string{"rax", "rdx"}},
+			{slots: 3, regs: []string{"rax", "rdx", "r8"}},
+			{slots: 4, regs: []string{"rax", "rdx", "r8", "r9"}},
+			{slots: 5, regs: []string{"rax", "rdx", "r8", "r9", "r10"}},
+			{slots: 6, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11"}},
+			{slots: 7, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12"}},
+			{slots: 8, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12", "r13"}},
+			{slots: 9, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12", "r13", "r14"}},
+			{slots: 10, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"}},
+		} {
+			t.Run(tc.name+"/"+returnSlotName(ret.slots), func(t *testing.T) {
 				e := &x64.Emitter{}
 				stackDepth := 0
 				var callPatches []x64obj.CallPatch
@@ -110,7 +125,7 @@ func TestEmitCallReturnSlotLayout(t *testing.T) {
 					Kind:     ir.IRCall,
 					Name:     "callee",
 					ArgSlots: 0,
-					RetSlots: retSlots,
+					RetSlots: ret.slots,
 				}, &stackDepth, &callPatches)
 				if err != nil {
 					t.Fatalf("EmitCall: %v", err)
@@ -118,19 +133,14 @@ func TestEmitCallReturnSlotLayout(t *testing.T) {
 				if len(callPatches) != 1 || callPatches[0].Name != "callee" {
 					t.Fatalf("call patches = %#v", callPatches)
 				}
-				if stackDepth != retSlots {
-					t.Fatalf("stack depth = %d, want %d", stackDepth, retSlots)
+				if stackDepth != ret.slots {
+					t.Fatalf("stack depth = %d, want %d", stackDepth, ret.slots)
 				}
 
 				wantSuffix := &x64.Emitter{}
-				if retSlots >= 1 {
-					wantSuffix.PushRax()
-				}
-				if retSlots >= 2 {
-					wantSuffix.PushRdx()
-				}
+				emitReturnSlotPushes(wantSuffix, ret.regs)
 				if !bytes.HasSuffix(e.Buf, wantSuffix.Buf) {
-					t.Fatalf("return-slot push suffix mismatch\n got=% x\nwant suffix=% x", e.Buf, wantSuffix.Buf)
+					t.Fatalf("return-slot push suffix mismatch for registers %v\n got=% x\nwant suffix=% x", ret.regs, e.Buf, wantSuffix.Buf)
 				}
 			})
 		}
@@ -154,6 +164,21 @@ func TestEmitCallRejectsInvalidABIInputs(t *testing.T) {
 			err := tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "bad", ArgSlots: -1}, &stackDepth, &callPatches)
 			if err == nil {
 				t.Fatalf("expected invalid argument count error")
+			}
+
+			err = tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, ArgSlots: 0}, &stackDepth, &callPatches)
+			if err == nil || !strings.Contains(err.Error(), "call is missing target name") {
+				t.Fatalf("expected missing target error, got %v", err)
+			}
+
+			err = tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "bad_return", RetSlots: -1}, &stackDepth, &callPatches)
+			if err == nil || !strings.Contains(err.Error(), `call "bad_return" has negative ABI slots`) {
+				t.Fatalf("expected negative return slots error, got %v", err)
+			}
+
+			err = tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "too_many_returns", RetSlots: 11}, &stackDepth, &callPatches)
+			if err == nil || !strings.Contains(err.Error(), `call "too_many_returns" has unsupported return slots`) {
+				t.Fatalf("expected unsupported return slots error, got %v", err)
 			}
 
 			err = tc.abi.EmitCall(e, ir.IRInstr{Kind: ir.IRCall, Name: "underflow", ArgSlots: 1}, &stackDepth, &callPatches)
@@ -270,6 +295,31 @@ func TestEmitIslandFreeDebugEmitsDoubleFreeGuard(t *testing.T) {
 	}
 }
 
+func TestSysVAllocBytesEmitsDeterministicMmapFailureGuard(t *testing.T) {
+	e := &x64.Emitter{}
+	stackDepth := 1
+	if err := LinuxSysV().EmitAllocBytes(e, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+		t.Fatalf("EmitAllocBytes: %v", err)
+	}
+	if stackDepth != 1 {
+		t.Fatalf("stack depth = %d, want 1", stackDepth)
+	}
+
+	cmpMmapErrorRange := []byte{0x48, 0x3D, 0x01, 0xF0, 0xFF, 0xFF}
+	if !bytes.Contains(e.Buf, cmpMmapErrorRange) {
+		t.Fatalf("alloc_bytes missing mmap error-range compare\n got=% x\nwant contains=% x", e.Buf, cmpMmapErrorRange)
+	}
+	jaeRel32 := []byte{0x0F, 0x83}
+	if !bytes.Contains(e.Buf, jaeRel32) {
+		t.Fatalf("alloc_bytes missing mmap failure branch\n got=% x", e.Buf)
+	}
+	exit2 := &x64.Emitter{}
+	exit2.MovEdiImm32(2)
+	if !bytes.Contains(e.Buf, exit2.Buf) {
+		t.Fatalf("alloc_bytes missing deterministic failure exit code 2\n got=% x", e.Buf)
+	}
+}
+
 func hasImportPatch(patches []x64obj.ImportPatch, name string) bool {
 	for _, patch := range patches {
 		if patch.Name == name {
@@ -381,4 +431,37 @@ func TestABIDiagnosticMethodsRejectMissingPointers(t *testing.T) {
 
 func argCountName(n int) string {
 	return fmt.Sprintf("args_%02d", n)
+}
+
+func returnSlotName(n int) string {
+	return fmt.Sprintf("return_slots_%02d", n)
+}
+
+func emitReturnSlotPushes(e *x64.Emitter, regs []string) {
+	for _, reg := range regs {
+		switch reg {
+		case "rax":
+			e.PushRax()
+		case "rdx":
+			e.PushRdx()
+		case "r8":
+			e.PushR8()
+		case "r9":
+			e.PushR9()
+		case "r10":
+			e.PushR10()
+		case "r11":
+			e.PushR11()
+		case "r12":
+			e.PushR12()
+		case "r13":
+			e.PushR13()
+		case "r14":
+			e.PushR14()
+		case "r15":
+			e.PushR15()
+		default:
+			panic(fmt.Sprintf("unknown return register %q", reg))
+		}
+	}
 }

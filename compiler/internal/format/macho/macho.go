@@ -67,8 +67,11 @@ func WriteMachO64MacOSX64(path string, img *MachOImage) error {
 	cstringVMAddr := machoBaseAddr + uint64(cstringFileOff)
 
 	for _, reloc := range img.DataRelocs {
-		if reloc.At < 0 || reloc.At+4 > len(textData) {
+		if !validDisp32PatchOffset(textData, reloc.At) {
 			return fmt.Errorf("rdata relocation out of range")
+		}
+		if reloc.TargetOff >= uint32(len(cstringData)) {
+			return fmt.Errorf("data relocation target out of range")
 		}
 		target := cstringVMAddr + uint64(reloc.TargetOff)
 		if err := patchRipDisp32From64(textData, reloc.At, textVMAddr, target); err != nil {
@@ -271,6 +274,9 @@ func writePadding(w *bytes.Buffer, size int) error {
 }
 
 func patchRipDisp32From64(code []byte, at int, srcVA, targetVA uint64) error {
+	if !validDisp32PatchOffset(code, at) {
+		return fmt.Errorf("rel32 patch offset out of range")
+	}
 	next := srcVA + uint64(at+4)
 	disp := int64(targetVA) - int64(next)
 	if disp < -2147483648 || disp > 2147483647 {
@@ -278,4 +284,8 @@ func patchRipDisp32From64(code []byte, at int, srcVA, targetVA uint64) error {
 	}
 	binary.LittleEndian.PutUint32(code[at:at+4], uint32(int32(disp)))
 	return nil
+}
+
+func validDisp32PatchOffset(code []byte, at int) bool {
+	return at >= 0 && at <= len(code)-4
 }

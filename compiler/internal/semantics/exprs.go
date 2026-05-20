@@ -2,11 +2,71 @@ package semantics
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"tetra_language/compiler/internal/frontend"
 )
 
+func markMutableFunctionTypedGlobalSource(expr frontend.Expr, globals map[string]GlobalInfo, analysis *functionAnalysisState) {
+	if analysis == nil {
+		return
+	}
+	id, ok := expr.(*frontend.IdentExpr)
+	if !ok {
+		return
+	}
+	global, ok := globals[id.Name]
+	if ok && global.Mutable && global.FunctionTypeValue {
+		analysis.touchesMutableGlobals = true
+	}
+}
+
+func markFunctionTargetMutableGlobalUse(sig FuncSig, analysis *functionAnalysisState) {
+	if analysis != nil && sig.TouchesMutableGlobals {
+		analysis.touchesMutableGlobals = true
+	}
+}
+
+func markFunctionTypedReturnCallMutableGlobalUse(
+	callSig FuncSig,
+	call *frontend.CallExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	analysis *functionAnalysisState,
+) error {
+	if analysis == nil {
+		return nil
+	}
+	if callSig.ReturnFunctionTouchesMutableGlobals {
+		analysis.touchesMutableGlobals = true
+	}
+	if callSig.ReturnFunctionSymbol != "" {
+		if targetSig, ok := funcs[callSig.ReturnFunctionSymbol]; ok {
+			markFunctionTargetMutableGlobalUse(targetSig, analysis)
+		}
+	}
+	if callSig.ReturnFunctionParamName == "" {
+		return nil
+	}
+	returnInfo, found, err := functionTypedReturnParamRefMetadata(callSig, callSig.ReturnFunctionParamName, call, locals, globals, funcs, types, module, imports)
+	if err != nil || !found || returnInfo.FunctionValue == "" {
+		return err
+	}
+	if targetSig, ok := funcs[returnInfo.FunctionValue]; ok {
+		markFunctionTargetMutableGlobalUse(targetSig, analysis)
+	}
+	return nil
+}
+
+// checkExprWithEffects returns both the semantic type name and the region id
+// carried by expressions that produce region-backed resources. Callers rely on
+// the region result for ownership/resource diagnostics, so this function should
+// stay conservative when an expression has ambiguous provenance.
 func checkExprWithEffects(
 	expr frontend.Expr,
 	locals map[string]LocalInfo,
@@ -51,7 +111,7 @@ func checkExprWithEffects(
 			return "", regionNone, err
 		}
 		if state.resourceUnknown(e.Name) {
-			return "", regionNone, fmt.Errorf("%s: ambiguous resource provenance for '%s' after control-flow merge", frontend.FormatPos(e.At), e.Name)
+			return "", regionNone, ownershipDiagnosticf(e.At, "ambiguous resource provenance for '%s' after control-flow merge", e.Name)
 		}
 		if err := checkLocalScope(e.Name, state, e.At); err != nil {
 			return "", regionNone, err
@@ -75,13 +135,13 @@ func checkExprWithEffects(
 			return "", regionNone, fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(e.At), e.Name)
 		}
 		if info.GenericFunctionValue {
-			return "", regionNone, fmt.Errorf("%s: generic closure '%s' cannot be used as a pointer value; only let-bound direct local calls with inferable concrete arguments are supported in this MVP", frontend.FormatPos(e.At), e.Name)
+			return "", regionNone, unsupportedGenericClosurePointerEscapeError(e.At, e.Name)
 		}
 		if info.FunctionTypeValue && info.FunctionValue != "" {
-			return "", regionNone, fmt.Errorf("%s: function value '%s' cannot escape as a first-class value in this MVP; only direct local calls are supported", frontend.FormatPos(e.At), e.Name)
+			return "", regionNone, unsupportedFunctionValueEscapeError(e.At, e.Name)
 		}
 		if len(info.FunctionCaptures) > 0 {
-			return "", regionNone, fmt.Errorf("%s: capturing closure '%s' cannot be used as a pointer value; only direct local calls are supported in this MVP", frontend.FormatPos(e.At), e.Name)
+			return "", regionNone, unsupportedCapturingClosurePointerEscapeError(e.At, e.Name)
 		}
 		if err := checkResourceTreeUsable(e.Name, info.TypeName, types, state, e.At); err != nil {
 			return "", regionNone, err
@@ -109,7 +169,7 @@ func checkExprWithEffects(
 				return "", regionNone, fmt.Errorf("%s: ambiguous region for '%s'", frontend.FormatPos(e.At), e.Name)
 			}
 			if !state.isScopeActive(regionID) {
-				return "", regionNone, fmt.Errorf("%s: slice from scoped island is out of scope", frontend.FormatPos(e.At))
+				return "", regionNone, lifetimeDiagnosticf(e.At, "slice from scoped island is out of scope")
 			}
 			return info.TypeName, regionID, nil
 		}
@@ -129,6 +189,11 @@ func checkExprWithEffects(
 		if err != nil {
 			return "", regionNone, err
 		}
+		if path, ok := canonicalOwnershipAccessPath(e); ok {
+			if err := state.checkNotConsumed(path, e.At); err != nil {
+				return "", regionNone, err
+			}
+		}
 		if baseType == "" {
 			return "", regionNone, fmt.Errorf("%s: invalid field access base", frontend.FormatPos(e.At))
 		}
@@ -143,11 +208,11 @@ func checkExprWithEffects(
 				return "", regionNone, err
 			}
 			if source.ambiguous {
-				return "", regionNone, fmt.Errorf("%s: resource expression mixes resource provenance", frontend.FormatPos(e.At))
+				return "", regionNone, ownershipDiagnosticf(e.At, "resource expression mixes resource provenance")
 			}
 			path, _ := resourcePathForExpr(e)
 			if source.unknown {
-				return "", regionNone, fmt.Errorf("%s: ambiguous resource provenance for '%s' after control-flow merge", frontend.FormatPos(e.At), path)
+				return "", regionNone, ownershipDiagnosticf(e.At, "ambiguous resource provenance for '%s' after control-flow merge", path)
 			}
 			if source.known {
 				if err := state.checkNotConsumed(source.name, e.At); err != nil {
@@ -160,6 +225,16 @@ func checkExprWithEffects(
 		}
 		if typeMayContainRegion(targetType, types) && baseRegion != regionNone {
 			return targetType, baseRegion, nil
+		}
+		if typeMayContainRegion(targetType, types) {
+			if path, ok := resourcePathForExpr(e); ok {
+				if regionID, found := state.regionVars[path]; found {
+					if err := checkRegionUsable(regionID, path, e.At, state); err != nil {
+						return "", regionNone, err
+					}
+					return targetType, regionID, nil
+				}
+			}
 		}
 		return targetType, regionNone, nil
 	case *frontend.IndexExpr:
@@ -206,30 +281,41 @@ func checkExprWithEffects(
 			if len(e.Args) != len(caseInfo.PayloadTypes) {
 				return "", regionNone, fmt.Errorf("%s: enum case '%s.%s' expects %d payload argument(s), got %d", frontend.FormatPos(e.At), displayTypeName(enumType, module), caseInfo.Name, len(caseInfo.PayloadTypes), len(e.Args))
 			}
-			payloadRegion := regionNone
+			payloadTree := make(map[string]int)
 			for i, arg := range e.Args {
-				argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
-				if err != nil {
-					return "", regionNone, err
+				argType := ""
+				argRegion := regionNone
+				if i < len(caseInfo.PayloadFunctionTypes) && caseInfo.PayloadFunctionTypes[i] {
+					markMutableFunctionTypedGlobalSource(arg, globals, analysis)
+					if _, err := validateFunctionTypeEnumPayloadBinding(enumType, caseInfo, i, arg, locals, globals, funcs, types, module, imports); err != nil {
+						return "", regionNone, err
+					}
+					argType = caseInfo.PayloadTypes[i]
+				} else {
+					var err error
+					argType, argRegion, err = checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
+					if err != nil {
+						return "", regionNone, err
+					}
 				}
 				if !typesCompatibleWithNullPtr(caseInfo.PayloadTypes[i], argType, arg) {
 					return "", regionNone, fmt.Errorf("%s: enum case '%s.%s' payload %d expects '%s', got '%s'", frontend.FormatPos(arg.Pos()), displayTypeName(enumType, module), caseInfo.Name, i+1, caseInfo.PayloadTypes[i], argType)
 				}
-				consumeIslandSourceLocals(arg, caseInfo.PayloadTypes[i], locals, types, module, imports, state)
-				payloadRegion = joinRegion(payloadRegion, argRegion)
-				if payloadRegion == regionUnknown {
-					return "", regionNone, fmt.Errorf("%s: enum case '%s.%s' mixes values from different regions", frontend.FormatPos(arg.Pos()), displayTypeName(enumType, module), caseInfo.Name)
+				if i >= len(caseInfo.PayloadFunctionTypes) || !caseInfo.PayloadFunctionTypes[i] {
+					consumeIslandSourceLocals(arg, caseInfo.PayloadTypes[i], locals, types, module, imports, state)
+					appendRegionTree(payloadTree, resourceEnumPayloadPath("", caseInfo.Ordinal, i), caseInfo.PayloadTypes[i], arg, argRegion, types, state)
 				}
 			}
 			e.ResolvedType = enumType
-			return enumType, payloadRegion, nil
+			state.setExprRegionTree(e, payloadTree)
+			return enumType, constructorRegionFromTree(payloadTree), nil
 		}
 		return checkCallExprWithEffects(e, locals, globals, funcs, types, module, imports, state, effects, analysis)
 	case *frontend.ClosureExpr:
 		if e.Decl != nil {
 			if len(e.Decl.TypeParams) > 0 {
 				if name, pos, ok := firstCapture(collectClosureCaptures(e.Decl, locals)); ok {
-					return "", regionNone, fmt.Errorf("%s: generic closure literals do not support captures in this MVP (captured '%s')", frontend.FormatPos(pos), name)
+					return "", regionNone, unsupportedGenericClosureCaptureError(pos, name)
 				}
 				return "ptr", regionNone, nil
 			}
@@ -313,11 +399,18 @@ func checkExprWithEffects(
 			}
 			seen[field.Name] = field
 		}
-		structRegion := regionNone
+		fieldTree := make(map[string]int)
 		for _, field := range info.Fields {
 			init, ok := seen[field.Name]
 			if !ok {
 				return "", regionNone, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
+			}
+			if field.FunctionTypeValue {
+				markMutableFunctionTypedGlobalSource(init.Value, globals, analysis)
+				if _, err := validateFunctionTypeStructFieldBinding(resolved, field, init.Value, locals, globals, funcs, types, module, imports); err != nil {
+					return "", regionNone, err
+				}
+				continue
 			}
 			valType, valRegion, err := checkExprWithEffects(init.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
@@ -327,12 +420,10 @@ func checkExprWithEffects(
 				return "", regionNone, fmt.Errorf("%s: type mismatch for field '%s'", frontend.FormatPos(init.At), field.Name)
 			}
 			consumeIslandSourceLocals(init.Value, field.TypeName, locals, types, module, imports, state)
-			structRegion = joinRegion(structRegion, valRegion)
-			if structRegion == regionUnknown {
-				return "", regionNone, fmt.Errorf("%s: struct literal mixes values from different regions", frontend.FormatPos(init.At))
-			}
+			appendRegionTree(fieldTree, field.Name, field.TypeName, init.Value, valRegion, types, state)
 		}
-		return resolved, structRegion, nil
+		state.setExprRegionTree(e, fieldTree)
+		return resolved, constructorRegionFromTree(fieldTree), nil
 	case *frontend.UnaryExpr:
 		xtype, _, err := checkExprWithEffects(e.X, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
@@ -402,7 +493,7 @@ func checkMatchExpr(
 	effects *effectContext,
 	analysis *functionAnalysisState,
 ) (string, error) {
-	scrutType, _, err := checkExprWithEffects(e.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
+	scrutType, scrutRegion, err := checkExprWithEffects(e.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 	if err != nil {
 		return "", err
 	}
@@ -425,7 +516,7 @@ func checkMatchExpr(
 	if !matchExprHasCompleteOptionalPatterns(e) && !matchExprHasCompleteEnumPatterns(e, locals, globals, funcs, types, module, imports) {
 		hasDefault := false
 		for _, c := range e.Cases {
-			if c.Default {
+			if c.Default && c.Guard == nil {
 				hasDefault = true
 				break
 			}
@@ -435,10 +526,15 @@ func checkMatchExpr(
 		}
 	}
 	scrutineeResourcePath := e.ScrutineeLocal
+	scrutineeOwnershipPath := scrutineeResourcePath
+	if path, ok := resourcePathForExpr(e.Value); ok {
+		scrutineeOwnershipPath = path
+	}
 	if scrutineeResourcePath != "" {
 		if err := bindResourceTreeFromExpr(scrutineeResourcePath, scrutType, e.Value, funcs, types, module, imports, state); err != nil {
 			return "", err
 		}
+		bindRegionTreeFromExpr(scrutineeResourcePath, scrutType, e.Value, scrutRegion, types, state)
 	} else if path, ok := resourcePathForExpr(e.Value); ok {
 		scrutineeResourcePath = path
 	}
@@ -504,7 +600,13 @@ func checkMatchExpr(
 			caseScopeID = caseScopes[i]
 		}
 		err := withActiveScope(state, caseScopeID, func() error {
+			if err := bindPatternOwnershipAliases(c.Pattern, "", scrutineeOwnershipPath, scrutType, types, module, imports, state); err != nil {
+				return err
+			}
 			if err := bindPatternResourceLocals(c.Pattern, "", scrutineeResourcePath, scrutType, types, module, imports, state); err != nil {
+				return err
+			}
+			if err := bindPatternRegionLocals(c.Pattern, "", scrutineeResourcePath, scrutType, types, module, imports, state); err != nil {
 				return err
 			}
 			if c.Guard != nil {
@@ -516,7 +618,7 @@ func checkMatchExpr(
 					return fmt.Errorf("%s: match guard must be Bool", frontend.FormatPos(c.Guard.Pos()))
 				}
 			}
-			armType, _, err := checkExprWithEffects(c.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
+			armType, armRegion, err := checkExprWithEffects(c.Value, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return err
 			}
@@ -527,6 +629,7 @@ func checkMatchExpr(
 				if err := bindResourceTreeFromExpr(e.ResultLocal, e.ResultType, c.Value, funcs, types, module, imports, state); err != nil {
 					return err
 				}
+				bindRegionTreeFromExpr(e.ResultLocal, e.ResultType, c.Value, armRegion, types, state)
 			}
 			return nil
 		})
@@ -541,7 +644,7 @@ func checkMatchExpr(
 			mergedSet = true
 		} else {
 			state.regionVars = mergeRegionVars(mergedVars, caseVars)
-			mergeFlow(state, mergedFlow, caseFlow)
+			mergeFlowWithLabels(state, mergedFlow, caseFlow, "previous cases", fmt.Sprintf("case %d", i+1))
 			mergedVars = copyRegionVars(state.regionVars)
 			mergedFlow = snapshotFlow(state)
 		}
@@ -577,6 +680,8 @@ func checkCatchExpr(
 	if err != nil {
 		return "", err
 	}
+	var catchSig FuncSig
+	catchSigOK := false
 	if call.Name == "core.task_join_i32_typed" || call.Name == "core.task_join_group_i32_typed" {
 		if len(call.TypeArgs) != 1 || call.TypeArgs[0].Name == "" {
 			return "", fmt.Errorf("%s: task_join_i32_typed missing resolved error type", frontend.FormatPos(call.At))
@@ -588,9 +693,16 @@ func checkCatchExpr(
 			return "", fmt.Errorf("%s: catch expects a throwing function call", frontend.FormatPos(e.At))
 		}
 		e.ErrorType = sig.ThrowsType
+		catchSig = sig
+		catchSigOK = true
 	}
 	if e.ResultType == "" {
 		e.ResultType = successType
+	}
+	if catchSigOK {
+		if err := bindCatchErrorResourceSummary(e.ErrorLocal, call, catchSig, funcs, types, module, imports, state); err != nil {
+			return "", err
+		}
 	}
 	if err := reportBarePayloadCatchExprPatterns(e, locals, globals, funcs, types, module, imports); err != nil {
 		return "", err
@@ -598,7 +710,7 @@ func checkCatchExpr(
 	if !catchExprHasCompleteOptionalPatterns(e, e.ErrorType, types) && !catchExprHasCompleteEnumPatterns(e, e.ErrorType, locals, globals, funcs, types, module, imports) {
 		hasDefault := false
 		for _, c := range e.Cases {
-			if c.Default {
+			if c.Default && c.Guard == nil {
 				hasDefault = true
 				break
 			}
@@ -644,6 +756,18 @@ func checkCatchExpr(
 			caseScopeID = caseScopes[i]
 		}
 		err := withActiveScope(state, caseScopeID, func() error {
+			if err := bindPatternOwnershipAliases(c.Pattern, "", e.ErrorLocal, e.ErrorType, types, module, imports, state); err != nil {
+				return err
+			}
+			if err := bindPatternBorrowedPtrAliases(c.Pattern, "", e.ErrorLocal, e.ErrorType, types, module, imports, state); err != nil {
+				return err
+			}
+			if err := bindPatternResourceLocals(c.Pattern, "", e.ErrorLocal, e.ErrorType, types, module, imports, state); err != nil {
+				return err
+			}
+			if err := bindPatternRegionLocals(c.Pattern, "", e.ErrorLocal, e.ErrorType, types, module, imports, state); err != nil {
+				return err
+			}
 			if c.Guard != nil {
 				guardType, _, err := checkExprWithEffects(c.Guard, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
@@ -668,7 +792,7 @@ func checkCatchExpr(
 		caseVars := copyRegionVars(state.regionVars)
 		caseFlow := snapshotFlow(state)
 		state.regionVars = mergeRegionVars(mergedVars, caseVars)
-		mergeFlow(state, mergedFlow, caseFlow)
+		mergeFlowWithLabels(state, mergedFlow, caseFlow, "previous cases", fmt.Sprintf("case %d", i+1))
 		mergedVars = copyRegionVars(state.regionVars)
 		mergedFlow = snapshotFlow(state)
 	}
@@ -677,6 +801,204 @@ func checkCatchExpr(
 	return e.ResultType, nil
 }
 
+// ownershipArgRef records canonical call-argument access paths in source order.
+type ownershipArgRef struct {
+	path string
+	pos  frontend.Position
+}
+
+func canonicalOwnershipAccessPath(expr frontend.Expr) (string, bool) {
+	base, fields, _, ok := splitOwnershipPath(expr)
+	if !ok {
+		return "", false
+	}
+	if len(fields) == 0 || base == "" {
+		return base, len(fields) == 0
+	}
+	path := base
+	for _, field := range fields {
+		path = joinOwnershipPath(path, field)
+	}
+	return path, true
+}
+
+func splitOwnershipPath(expr frontend.Expr) (string, []string, frontend.Position, bool) {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		return e.Name, nil, e.At, true
+	case *frontend.FieldAccessExpr:
+		base, fields, pos, ok := splitOwnershipPath(e.Base)
+		if !ok {
+			return "", nil, pos, false
+		}
+		fields = append(fields, e.Field)
+		return base, fields, e.At, true
+	case *frontend.IndexExpr:
+		base, fields, pos, ok := splitOwnershipPath(e.Base)
+		if !ok {
+			return "", nil, pos, false
+		}
+		fields = append(fields, splitOwnershipIndexSegment(e.Index))
+		return base, fields, e.At, true
+	default:
+		return "", nil, expr.Pos(), false
+	}
+}
+
+func splitOwnershipPathSegments(path string) []string {
+	if path == "" {
+		return nil
+	}
+	segments := make([]string, 0, 4)
+	start := 0
+	depth := 0
+	for i := 0; i <= len(path); i++ {
+		if i == len(path) || (path[i] == '.' && depth == 0) {
+			if i >= start {
+				segments = append(segments, path[start:i])
+			}
+			start = i + 1
+			continue
+		}
+		switch path[i] {
+		case '[':
+			depth++
+		case ']':
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
+	return segments
+}
+
+func ownershipPathSegmentsMatch(left string, right string) bool {
+	if left == right {
+		return true
+	}
+	if left == "[_]" || right == "[_]" {
+		return true
+	}
+	return false
+}
+
+func ownershipPathPrefix(prefix string, path string) bool {
+	if prefix == "" || path == "" {
+		return false
+	}
+	prefixParts := splitOwnershipPathSegments(prefix)
+	pathParts := splitOwnershipPathSegments(path)
+	if len(prefixParts) == 0 || len(prefixParts) > len(pathParts) {
+		return false
+	}
+	for i := 0; i < len(prefixParts); i++ {
+		if !ownershipPathSegmentsMatch(prefixParts[i], pathParts[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func ownershipPathParent(prefix string) string {
+	parts := splitOwnershipPathSegments(prefix)
+	if len(parts) <= 1 {
+		return ""
+	}
+	return strings.Join(parts[:len(parts)-1], ".")
+}
+
+func splitOwnershipIndexSegment(index frontend.Expr) string {
+	switch i := index.(type) {
+	case *frontend.NumberExpr:
+		return fmt.Sprintf("[%d]", i.Value)
+	case *frontend.IdentExpr:
+		return "[" + i.Name + "]"
+	default:
+		return "[_]"
+	}
+}
+
+func joinOwnershipPath(prefix string, segment string) string {
+	if segment == "" {
+		return prefix
+	}
+	if strings.HasPrefix(segment, "[") {
+		return prefix + segment
+	}
+	if prefix == "" {
+		return segment
+	}
+	return prefix + "." + segment
+}
+
+func consumeLocalArgumentName(expr frontend.Expr, callee string, callback bool, phraseOverride ...string) (string, error) {
+	targetPhrase := fmt.Sprintf("'%s'", callee)
+	if callback {
+		targetPhrase = fmt.Sprintf("callback '%s'", callee)
+	}
+	if len(phraseOverride) > 0 && phraseOverride[0] != "" {
+		targetPhrase = phraseOverride[0]
+	}
+	path, ok := canonicalOwnershipAccessPath(expr)
+	if !ok {
+		return "", ownershipDiagnosticf(expr.Pos(), "consume argument for %s must be a local value", targetPhrase)
+	}
+	return path, nil
+}
+
+func checkWholeOwnershipValueAvailable(expr frontend.Expr, state *regionState) error {
+	if expr == nil || state == nil {
+		return nil
+	}
+	if path, ok := canonicalOwnershipAccessPath(expr); ok {
+		if err := state.checkNoConsumedDescendants(path, expr.Pos()); err != nil {
+			return err
+		}
+	}
+	switch e := expr.(type) {
+	case *frontend.StructLitExpr:
+		for _, field := range e.Fields {
+			if err := checkWholeOwnershipValueAvailable(field.Value, state); err != nil {
+				return err
+			}
+		}
+	case *frontend.CallExpr:
+		if e.ResolvedType == "" {
+			return nil
+		}
+		for _, arg := range e.Args {
+			if err := checkWholeOwnershipValueAvailable(arg, state); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return nil
+}
+
+func ownershipAccessPathsAlias(left, right string) bool {
+	if left == "" || right == "" {
+		return false
+	}
+	if left == right {
+		return true
+	}
+	return ownershipPathPrefix(left, right) || ownershipPathPrefix(right, left)
+}
+
+func findOwnershipAlias(refs []ownershipArgRef, path string) (ownershipArgRef, bool) {
+	for _, ref := range refs {
+		if ownershipAccessPathsAlias(ref.path, path) {
+			return ref, true
+		}
+	}
+	return ownershipArgRef{}, false
+}
+
+// checkCallExprWithEffects intentionally keeps call validation in one ordered
+// path: resolve local/builtin/imported targets, enforce semantic clauses and
+// effects, validate async/throw context, then check arguments, ownership, and
+// resource provenance before returning type and region metadata.
 func checkCallExprWithEffects(
 	e *frontend.CallExpr,
 	locals map[string]LocalInfo,
@@ -692,53 +1014,503 @@ func checkCallExprWithEffects(
 	callerSig, hasCallerSig := currentCallerSignature(effects, funcs)
 	resolved := ""
 	isBuiltin := false
-	if local, ok := locals[e.Name]; ok {
-		if local.FunctionValue == "" {
+	preserveDynamicCallName := false
+	functionTypedGlobalCallName := ""
+	if fieldInfo, ok, err := resolveFunctionFieldCall(e.Name, locals); err != nil {
+		return "", regionNone, err
+	} else if ok {
+		if analysis != nil && fieldInfo.FunctionTouchesMutableGlobals {
+			analysis.touchesMutableGlobals = true
+		}
+		if len(e.TypeArgs) > 0 {
+			return "", regionNone, unsupportedFunctionTypedExplicitTypeArgsError(e.At, fmt.Sprintf("function-typed struct field call '%s'", e.Name))
+		}
+		if len(e.Args) != len(fieldInfo.FunctionParamTypes) {
+			return "", regionNone, fmt.Errorf("%s: wrong argument count for function-typed struct field call '%s'", frontend.FormatPos(e.At), e.Name)
+		}
+		if err := validateFunctionTypedValueCallLabels(e, "function-typed struct field call", e.Name); err != nil {
+			return "", regionNone, err
+		}
+		if fieldInfo.FunctionValue != "" {
+			targetSig, ok := funcs[fieldInfo.FunctionValue]
+			if !ok {
+				return "", regionNone, fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(e.At), fieldInfo.FunctionValue)
+			}
+			markFunctionTargetMutableGlobalUse(targetSig, analysis)
+			if targetSig.Generic {
+				return "", regionNone, fmt.Errorf("%s: generic function symbol '%s' is not supported for function-typed struct field call in this MVP", frontend.FormatPos(e.At), e.Name)
+			}
+			explicitSlots, err := functionParamSlotCount(fieldInfo.FunctionParamTypes, types)
+			if err != nil {
+				return "", regionNone, err
+			}
+			hiddenSlots := targetSig.ParamSlots - explicitSlots
+			if hiddenSlots < 0 || (hiddenSlots > FnPtrEnvSlotCount && !fieldInfo.FunctionHandleValue) {
+				return "", regionNone, unsupportedFunctionFieldCallCaptureError(e.At, e.Name, hiddenSlots)
+			}
+			if hasCallerSig {
+				if err := validateCallAgainstSemanticClauseTarget(callerSig, targetSig, fmt.Sprintf("function-typed struct field call '%s'", e.Name), e.At); err != nil {
+					return "", regionNone, err
+				}
+			}
+		} else if hasCallerSig {
+			if err := validateFunctionTypeCallableEffects(callerSig.Effects, fieldInfo.FunctionEffects, e.At, "function-typed struct field call", e.Name); err != nil {
+				return "", regionNone, err
+			}
+		}
+		consumeArgs := make([]string, len(e.Args))
+		consumeArgTypes := make([]string, len(e.Args))
+		consumeArgRefs := make([]ownershipArgRef, 0, len(e.Args))
+		borrowArgs := make([]ownershipArgRef, 0, len(e.Args))
+		inoutArgs := make([]ownershipArgRef, 0, len(e.Args))
+		for i, arg := range e.Args {
+			argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
+			if err != nil {
+				return "", regionNone, err
+			}
+			if !typesCompatibleWithNullPtr(fieldInfo.FunctionParamTypes[i], argType, arg) {
+				return "", regionNone, fmt.Errorf("%s: type mismatch for function-typed struct field call '%s' arg %d", frontend.FormatPos(arg.Pos()), e.Name, i+1)
+			}
+			paramOwnership := ownershipAt(fieldInfo.FunctionParamOwnership, i)
+			if paramOwnership == "" {
+				if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of function-typed struct field call '%s'", borrowedName, i+1, e.Name)
+				}
+				if argType == "ptr" {
+					if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of function-typed struct field call '%s'", borrowedName, i+1, e.Name)
+					}
+				}
+				if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+					if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+						return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of function-typed struct field call '%s'", borrowedName, i+1, e.Name)
+					}); err != nil {
+						return "", regionNone, err
+					}
+				}
+				if path, ok := canonicalOwnershipAccessPath(arg); ok {
+					if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+						return "", regionNone, err
+					}
+				}
+			}
+			if paramOwnership == "consume" {
+				name, err := consumeLocalArgumentName(arg, e.Name, true)
+				if err != nil {
+					return "", regionNone, err
+				}
+				if err := state.checkNoConsumedDescendants(name, arg.Pos()); err != nil {
+					return "", regionNone, err
+				}
+				if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by function-typed struct field call '%s'", borrowedName, e.Name)
+				}
+				if argType == "ptr" {
+					if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by function-typed struct field call '%s'", borrowedName, e.Name)
+					}
+				}
+				if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+					if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+						return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by function-typed struct field call '%s'", borrowedName, e.Name)
+					}); err != nil {
+						return "", regionNone, err
+					}
+				}
+				path := name
+				if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "consumed argument '%s' aliases inout argument in function-typed struct field call '%s' (inout at %s)", path, e.Name, frontend.FormatPos(first.pos))
+				}
+				consumeArgs[i] = name
+				consumeArgTypes[i] = argType
+				consumeArgRefs = append(consumeArgRefs, ownershipArgRef{path: path, pos: arg.Pos()})
+			}
+			if paramOwnership == "borrow" {
+				path, ok := canonicalOwnershipAccessPath(arg)
+				if ok {
+					if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+						return "", regionNone, err
+					}
+					if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed argument '%s' aliases inout argument in function-typed struct field call '%s' (inout at %s)", path, e.Name, frontend.FormatPos(first.pos))
+					}
+					borrowArgs = append(borrowArgs, ownershipArgRef{path: path, pos: arg.Pos()})
+				}
+			}
+			if paramOwnership == "inout" {
+				path, ok := canonicalOwnershipAccessPath(arg)
+				if !ok {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument for function-typed struct field call '%s' must be a mutable local value", e.Name)
+				}
+				if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to function-typed struct field call '%s'", borrowedName, e.Name)
+				}
+				if argType == "ptr" {
+					if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to function-typed struct field call '%s'", borrowedName, e.Name)
+					}
+				}
+				if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+					if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+						return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to function-typed struct field call '%s'", borrowedName, e.Name)
+					}); err != nil {
+						return "", regionNone, err
+					}
+				}
+				if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+					return "", regionNone, err
+				}
+				targetInfo, _, err := resolveAssignTarget(arg, locals, globals, types)
+				if err != nil || !targetInfo.Mutable || targetInfo.Global {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' for function-typed struct field call '%s' must be mutable", path, e.Name)
+				}
+				if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' used more than once in function-typed struct field call '%s' (first at %s)", path, e.Name, frontend.FormatPos(first.pos))
+				}
+				if first, exists := findOwnershipAlias(borrowArgs, path); exists {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' aliases borrowed argument in function-typed struct field call '%s' (borrow at %s)", path, e.Name, frontend.FormatPos(first.pos))
+				}
+				if first, exists := findOwnershipAlias(consumeArgRefs, path); exists {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' aliases consumed argument in function-typed struct field call '%s' (consume at %s)", path, e.Name, frontend.FormatPos(first.pos))
+				}
+				inoutArgs = append(inoutArgs, ownershipArgRef{path: path, pos: arg.Pos()})
+			}
+		}
+		for i, name := range consumeArgs {
+			if name == "" {
+				continue
+			}
+			for j := 0; j < i; j++ {
+				if consumeArgs[j] == name {
+					return "", regionNone, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in function-typed struct field call '%s'", name, e.Name)
+				}
+				if resourceValuesAlias(consumeArgs[j], consumeArgTypes[j], name, consumeArgTypes[i], types, state) {
+					return "", regionNone, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in function-typed struct field call '%s'", name, e.Name)
+				}
+			}
+			markConsumedResourceValue(name, consumeArgTypes[i], types, state, e.Args[i].Pos())
+		}
+		if err := effects.requireAll(e.At, fieldInfo.FunctionEffects); err != nil {
+			return "", regionNone, err
+		}
+		if err := validateFunctionTypedThrowCall(fieldInfo.FunctionThrowsType, e, state); err != nil {
+			return "", regionNone, err
+		}
+		return fieldInfo.FunctionReturnType, regionNone, nil
+	} else if local, ok := locals[e.Name]; ok {
+		if analysis != nil && local.FunctionTouchesMutableGlobals {
+			analysis.touchesMutableGlobals = true
+		}
+		if local.FunctionEnumPayload && local.FunctionValue != "" && local.FunctionTypeValue {
+			targetSig, ok := funcs[local.FunctionValue]
+			if !ok {
+				return "", regionNone, fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(e.At), local.FunctionValue)
+			}
+			markFunctionTargetMutableGlobalUse(targetSig, analysis)
+			explicitSlots, err := functionParamSlotCount(local.FunctionParamTypes, types)
+			if err != nil {
+				return "", regionNone, err
+			}
+			hiddenSlots := targetSig.ParamSlots - explicitSlots
+			if hiddenSlots < 0 || (hiddenSlots > FnPtrEnvSlotCount && !local.FunctionHandleValue) {
+				return "", regionNone, unsupportedEnumPayloadCallCaptureError(e.At, e.Name, hiddenSlots)
+			}
+		}
+		if local.FunctionValue == "" || (local.FunctionTypeValue && len(local.FunctionCaptures) == 0 && local.SlotCount == FnPtrSlotCount) {
 			if !local.FunctionTypeValue {
-				return "", regionNone, fmt.Errorf("%s: function value '%s' is not callable in this MVP; only local closure literals are supported", frontend.FormatPos(e.At), e.Name)
+				return "", regionNone, unsupportedFunctionValueCallError(e.At, e.Name)
 			}
 			if len(local.FunctionCaptures) > 0 {
 				return "", regionNone, fmt.Errorf("%s: function-typed callback '%s' captures local values; captured function values cannot be called through function type in this MVP", frontend.FormatPos(e.At), e.Name)
 			}
+			valueCallKind := "callback"
+			valueCallPhrase := fmt.Sprintf("callback '%s'", e.Name)
+			if local.FunctionEnumPayload {
+				valueCallKind = "function-typed enum payload call"
+				valueCallPhrase = fmt.Sprintf("function-typed enum payload call '%s'", e.Name)
+			}
 			if len(e.TypeArgs) > 0 {
-				return "", regionNone, fmt.Errorf("%s: explicit type arguments are not supported for function-typed callback values in this MVP", frontend.FormatPos(e.At))
+				return "", regionNone, unsupportedFunctionTypedExplicitTypeArgsError(e.At, valueCallPhrase)
 			}
 			if len(e.Args) != len(local.FunctionParamTypes) {
-				return "", regionNone, fmt.Errorf("%s: wrong argument count for callback '%s'", frontend.FormatPos(e.At), e.Name)
+				return "", regionNone, fmt.Errorf("%s: wrong argument count for %s", frontend.FormatPos(e.At), valueCallPhrase)
 			}
-			if len(e.ArgLabels) > 0 {
-				return "", regionNone, fmt.Errorf("%s: argument labels are not supported for callback '%s' in this MVP", frontend.FormatPos(e.At), e.Name)
+			if err := validateFunctionTypedValueCallLabels(e, valueCallKind, e.Name); err != nil {
+				return "", regionNone, err
 			}
+			consumeArgs := make([]string, len(e.Args))
+			consumeArgTypes := make([]string, len(e.Args))
+			consumeArgRefs := make([]ownershipArgRef, 0, len(e.Args))
+			borrowArgs := make([]ownershipArgRef, 0, len(e.Args))
+			inoutArgs := make([]ownershipArgRef, 0, len(e.Args))
 			for i, arg := range e.Args {
-				argType, _, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
+				argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
 					return "", regionNone, err
 				}
 				if !typesCompatibleWithNullPtr(local.FunctionParamTypes[i], argType, arg) {
-					return "", regionNone, fmt.Errorf("%s: type mismatch for callback '%s' arg %d", frontend.FormatPos(arg.Pos()), e.Name, i+1)
+					return "", regionNone, fmt.Errorf("%s: type mismatch for %s arg %d", frontend.FormatPos(arg.Pos()), valueCallPhrase, i+1)
+				}
+				paramOwnership := ownershipAt(local.FunctionParamOwnership, i)
+				if paramOwnership == "" {
+					if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, valueCallPhrase)
+					}
+					if argType == "ptr" {
+						if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+							return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, valueCallPhrase)
+						}
+					}
+					if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+						if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+							return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, valueCallPhrase)
+						}); err != nil {
+							return "", regionNone, err
+						}
+					}
+					if path, ok := canonicalOwnershipAccessPath(arg); ok {
+						if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+							return "", regionNone, err
+						}
+					}
+				}
+				if paramOwnership == "consume" {
+					name, err := consumeLocalArgumentName(arg, e.Name, true)
+					if err != nil {
+						return "", regionNone, err
+					}
+					if err := state.checkNoConsumedDescendants(name, arg.Pos()); err != nil {
+						return "", regionNone, err
+					}
+					if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, valueCallPhrase)
+					}
+					if argType == "ptr" {
+						if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+							return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, valueCallPhrase)
+						}
+					}
+					if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+						if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+							return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, valueCallPhrase)
+						}); err != nil {
+							return "", regionNone, err
+						}
+					}
+					path := name
+					if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "consumed argument '%s' aliases inout argument in %s (inout at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+					}
+					consumeArgs[i] = name
+					consumeArgTypes[i] = argType
+					consumeArgRefs = append(consumeArgRefs, ownershipArgRef{path: path, pos: arg.Pos()})
+				}
+				if paramOwnership == "borrow" {
+					path, ok := canonicalOwnershipAccessPath(arg)
+					if ok {
+						if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+							return "", regionNone, err
+						}
+						if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+							return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed argument '%s' aliases inout argument in %s (inout at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+						}
+						borrowArgs = append(borrowArgs, ownershipArgRef{path: path, pos: arg.Pos()})
+					}
+				}
+				if paramOwnership == "inout" {
+					path, ok := canonicalOwnershipAccessPath(arg)
+					if !ok {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument for %s must be a mutable local value", valueCallPhrase)
+					}
+					if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, valueCallPhrase)
+					}
+					if argType == "ptr" {
+						if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+							return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, valueCallPhrase)
+						}
+					}
+					if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+						if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+							return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, valueCallPhrase)
+						}); err != nil {
+							return "", regionNone, err
+						}
+					}
+					if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+						return "", regionNone, err
+					}
+					targetInfo, _, err := resolveAssignTarget(arg, locals, globals, types)
+					if err != nil || !targetInfo.Mutable || targetInfo.Global {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' for %s must be mutable", path, valueCallPhrase)
+					}
+					if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' used more than once in %s (first at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+					}
+					if first, exists := findOwnershipAlias(borrowArgs, path); exists {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' aliases borrowed argument in %s (borrow at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+					}
+					if first, exists := findOwnershipAlias(consumeArgRefs, path); exists {
+						return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' aliases consumed argument in %s (consume at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+					}
+					inoutArgs = append(inoutArgs, ownershipArgRef{path: path, pos: arg.Pos()})
+				}
+			}
+			for i, name := range consumeArgs {
+				if name == "" {
+					continue
+				}
+				for j := 0; j < i; j++ {
+					if consumeArgs[j] == name {
+						return "", regionNone, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in %s", name, valueCallPhrase)
+					}
+					if resourceValuesAlias(consumeArgs[j], consumeArgTypes[j], name, consumeArgTypes[i], types, state) {
+						return "", regionNone, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in %s", name, valueCallPhrase)
+					}
+				}
+				markConsumedResourceValue(name, consumeArgTypes[i], types, state, e.Args[i].Pos())
+			}
+			if hasCallerSig && hasStrictSemanticCallClauses(callerSig) {
+				if local.FunctionValue == "" {
+					paramSlots, err := functionParamSlotCount(local.FunctionParamTypes, types)
+					if err != nil {
+						return "", regionNone, err
+					}
+					declaredSig := FuncSig{
+						ParamTypes:     append([]string(nil), local.FunctionParamTypes...),
+						ParamOwnership: append([]string(nil), local.FunctionParamOwnership...),
+						ParamSlots:     paramSlots,
+						ReturnType:     local.FunctionReturnType,
+						Effects:        append([]string(nil), local.FunctionEffects...),
+					}
+					semanticCallPhrase := fmt.Sprintf("call to '%s'", e.Name)
+					if local.FunctionEnumPayload {
+						semanticCallPhrase = valueCallPhrase
+					}
+					if err := validateCallAgainstSemanticClauseTarget(callerSig, declaredSig, semanticCallPhrase, e.At); err != nil {
+						return "", regionNone, err
+					}
+				} else {
+					targetSig, ok := funcs[local.FunctionValue]
+					if !ok {
+						return "", regionNone, fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(e.At), local.FunctionValue)
+					}
+					semanticCallPhrase := fmt.Sprintf("call to callback '%s'", e.Name)
+					if local.FunctionEnumPayload {
+						semanticCallPhrase = valueCallPhrase
+					}
+					if err := validateCallAgainstSemanticClauseTarget(callerSig, targetSig, semanticCallPhrase, e.At); err != nil {
+						return "", regionNone, err
+					}
 				}
 			}
 			if err := effects.requireAll(e.At, local.FunctionEffects); err != nil {
 				return "", regionNone, err
 			}
-			if hasCallerSig && hasStrictSemanticCallClauses(callerSig) {
-				return "", regionNone, fmt.Errorf(
-					"%s: function-typed callback '%s' has unknown target and cannot be called under semantic clause '%s' in this MVP",
-					frontend.FormatPos(e.At),
-					e.Name,
-					firstStrictSemanticCallClause(callerSig),
-				)
+			if local.FunctionValue != "" {
+				if targetSig, ok := funcs[local.FunctionValue]; ok {
+					markFunctionTargetMutableGlobalUse(targetSig, analysis)
+				}
+			}
+			if err := validateFunctionTypedThrowCall(local.FunctionThrowsType, e, state); err != nil {
+				return "", regionNone, err
 			}
 			return local.FunctionReturnType, regionNone, nil
 		}
 		if local.GenericFunctionValue {
-			return "", regionNone, fmt.Errorf("%s: generic closure '%s' is only supported for let-bound direct local calls with inferable concrete arguments in this MVP", frontend.FormatPos(e.At), e.Name)
+			return "", regionNone, unsupportedGenericClosureDirectCallError(e.At, e.Name)
+		}
+		if local.FunctionTypeValue && local.FunctionReturnType != "" {
+			targetSig, ok := funcs[local.FunctionValue]
+			if !ok {
+				return "", regionNone, fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(e.At), local.FunctionValue)
+			}
+			markFunctionTargetMutableGlobalUse(targetSig, analysis)
+			explicitSlots, err := functionParamSlotCount(local.FunctionParamTypes, types)
+			if err != nil {
+				return "", regionNone, err
+			}
+			hiddenSlots := targetSig.ParamSlots - explicitSlots
+			if hiddenSlots < 0 || (hiddenSlots > FnPtrEnvSlotCount && !local.FunctionHandleValue) {
+				if local.FunctionEnumPayload {
+					return "", regionNone, unsupportedEnumPayloadCallCaptureError(e.At, e.Name, hiddenSlots)
+				} else {
+					return "", regionNone, unsupportedFunctionTypedCallCaptureError(e.At, e.Name, hiddenSlots)
+				}
+			}
+			if hiddenSlots > 0 || local.Mutable {
+				valueCallPhrase := fmt.Sprintf("function-typed callback '%s'", e.Name)
+				if len(e.TypeArgs) > 0 {
+					return "", regionNone, unsupportedFunctionTypedExplicitTypeArgsError(e.At, valueCallPhrase)
+				}
+				if len(e.Args) != len(local.FunctionParamTypes) {
+					return "", regionNone, fmt.Errorf("%s: wrong argument count for %s", frontend.FormatPos(e.At), valueCallPhrase)
+				}
+				if err := validateFunctionTypedValueCallLabels(e, "function-typed callback", e.Name); err != nil {
+					return "", regionNone, err
+				}
+				if hasCallerSig {
+					if err := validateCallAgainstSemanticClauseTarget(callerSig, targetSig, valueCallPhrase, e.At); err != nil {
+						return "", regionNone, err
+					}
+				}
+				for i, arg := range e.Args {
+					argType, _, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
+					if err != nil {
+						return "", regionNone, err
+					}
+					if !typesCompatibleWithNullPtr(local.FunctionParamTypes[i], argType, arg) {
+						return "", regionNone, fmt.Errorf("%s: type mismatch for %s arg %d", frontend.FormatPos(arg.Pos()), valueCallPhrase, i+1)
+					}
+				}
+				if err := effects.requireAll(e.At, local.FunctionEffects); err != nil {
+					return "", regionNone, err
+				}
+				if err := validateFunctionTypedThrowCall(local.FunctionThrowsType, e, state); err != nil {
+					return "", regionNone, err
+				}
+				return local.FunctionReturnType, regionNone, nil
+			}
 		}
 		if err := appendClosureCaptureArgs(e, local); err != nil {
 			return "", regionNone, err
 		}
 		resolved = local.FunctionValue
 		e.Name = resolved
+	} else if global, ok := globals[e.Name]; ok && global.FunctionTypeValue {
+		if analysis != nil && global.Mutable {
+			analysis.touchesMutableGlobals = true
+		}
+		if global.FunctionValue == "" {
+			if global.Mutable {
+				return "", regionNone, unsupportedImportedMutableFunctionTypedGlobalCallError(e.At, e.Name)
+			}
+			return "", regionNone, unsupportedFunctionTypedGlobalTargetError(e.At, e.Name)
+		}
+		targetSig, ok := funcs[global.FunctionValue]
+		if !ok {
+			return "", regionNone, fmt.Errorf("%s: unknown function symbol '%s'", frontend.FormatPos(e.At), global.FunctionValue)
+		}
+		targetInfo := LocalInfo{
+			TypeName:               global.TypeName,
+			FunctionValue:          global.FunctionValue,
+			FunctionTypeValue:      true,
+			FunctionParamTypes:     append([]string(nil), global.FunctionParamTypes...),
+			FunctionParamOwnership: append([]string(nil), global.FunctionParamOwnership...),
+			FunctionReturnType:     global.FunctionReturnType,
+			FunctionThrowsType:     global.FunctionThrowsType,
+			FunctionEffects:        append([]string(nil), global.FunctionEffects...),
+		}
+		if err := validateFunctionInfoAssignable(e.Name, targetInfo, targetSig, e.At); err != nil {
+			return "", regionNone, err
+		}
+		functionTypedGlobalCallName = e.Name
+		resolved = global.FunctionValue
+		if !global.Mutable {
+			e.Name = resolved
+		} else {
+			preserveDynamicCallName = true
+		}
 	} else if builtin, ok := ResolveBuiltinAlias(e.Name); ok {
 		resolved = builtin
 		isBuiltin = true
@@ -772,10 +1544,17 @@ func checkCallExprWithEffects(
 		return "", regionNone, fmt.Errorf("%s: generic function '%s' could not be monomorphized; use inferable value arguments", frontend.FormatPos(e.At), e.Name)
 	}
 	if len(e.TypeArgs) > 0 {
+		if functionTypedGlobalCallName != "" {
+			return "", regionNone, unsupportedFunctionTypedExplicitTypeArgsError(e.At, fmt.Sprintf("function-typed global call '%s'", functionTypedGlobalCallName))
+		}
 		return "", regionNone, fmt.Errorf("%s: explicit type arguments are only supported for recv_typed", frontend.FormatPos(e.At))
 	}
 	if hasCallerSig {
-		if err := validateCallAgainstSemanticClauses(callerSig, sig, resolved, e.At); err != nil {
+		semanticCallPhrase := fmt.Sprintf("call to '%s'", resolved)
+		if functionTypedGlobalCallName != "" {
+			semanticCallPhrase = fmt.Sprintf("function-typed global call '%s'", functionTypedGlobalCallName)
+		}
+		if err := validateCallAgainstSemanticClauseTarget(callerSig, sig, semanticCallPhrase, e.At); err != nil {
 			return "", regionNone, err
 		}
 	}
@@ -813,10 +1592,20 @@ func checkCallExprWithEffects(
 	if (resolved == "core.actor_dispatch" || resolved == "core.actor_main_entry_id") && !strings.HasPrefix(module, "__") {
 		return "", regionNone, fmt.Errorf("%s: '%s' is reserved for internal runtime modules", frontend.FormatPos(e.At), resolved)
 	}
-	if len(e.Args) != len(sig.ParamTypes) {
-		return "", regionNone, fmt.Errorf("%s: wrong argument count for '%s'", frontend.FormatPos(e.At), resolved)
+	callTargetPhrase := fmt.Sprintf("'%s'", resolved)
+	callActionPhrase := fmt.Sprintf("call to '%s'", resolved)
+	if functionTypedGlobalCallName != "" {
+		callTargetPhrase = fmt.Sprintf("function-typed global call '%s'", functionTypedGlobalCallName)
+		callActionPhrase = callTargetPhrase
 	}
-	if len(e.ArgLabels) > 0 {
+	if len(e.Args) != len(sig.ParamTypes) {
+		return "", regionNone, fmt.Errorf("%s: wrong argument count for %s", frontend.FormatPos(e.At), callTargetPhrase)
+	}
+	if len(e.ArgLabels) > 0 && functionTypedGlobalCallName != "" {
+		if err := validateFunctionTypedValueCallLabels(e, "function-typed global call", functionTypedGlobalCallName); err != nil {
+			return "", regionNone, err
+		}
+	} else if len(e.ArgLabels) > 0 {
 		if len(e.ArgLabels) != len(e.Args) {
 			return "", regionNone, fmt.Errorf("%s: internal error: call argument labels are inconsistent", frontend.FormatPos(e.At))
 		}
@@ -832,52 +1621,78 @@ func checkCallExprWithEffects(
 			}
 		}
 	}
+	ownershipTargetPhrase := callTargetPhrase
+	ownershipCallPhrase := callActionPhrase
+	consumeTargetPhrase := ""
+	if functionTypedGlobalCallName != "" {
+		consumeTargetPhrase = ownershipTargetPhrase
+	}
 	argRegions := make([]int, len(e.Args))
 	consumeArgs := make([]string, len(e.Args))
 	consumeArgTypes := make([]string, len(e.Args))
-	consumeArgPositions := make(map[string]frontend.Position)
-	borrowArgs := make(map[string]frontend.Position)
-	inoutArgs := make(map[string]frontend.Position)
+	consumeArgRefs := make([]ownershipArgRef, 0, len(e.Args))
+	borrowArgs := make([]ownershipArgRef, 0, len(e.Args))
+	inoutArgs := make([]ownershipArgRef, 0, len(e.Args))
 	for i, arg := range e.Args {
 		argType := ""
 		argRegion := regionNone
 		callbackParam := i < len(sig.ParamFunctionTypes) && sig.ParamFunctionTypes[i]
+		localCallbackArg := false
+		globalCallbackArg := false
+		fieldCallbackArg := false
 		if callbackParam {
-			id, ok := arg.(*frontend.IdentExpr)
-			if !ok {
-				return "", regionNone, fmt.Errorf("%s: callback argument for '%s' must be a symbol-backed local function value or direct named function/closure symbol in this MVP", frontend.FormatPos(arg.Pos()), resolved)
+			if id, ok := arg.(*frontend.IdentExpr); ok {
+				if _, exists := locals[id.Name]; exists {
+					localCallbackArg = true
+				}
+				if global, exists := globals[id.Name]; exists && global.FunctionTypeValue {
+					globalCallbackArg = true
+				}
+			} else if _, ok, err := resolveFunctionFieldArgument(arg, locals); err != nil {
+				return "", regionNone, err
+			} else if ok {
+				fieldCallbackArg = true
+			} else if fieldAccess, ok := arg.(*frontend.FieldAccessExpr); ok {
+				if _, _, globalOK, err := resolveFunctionTypedGlobalFieldAccess(fieldAccess, globals, funcs); err != nil {
+					return "", regionNone, err
+				} else if globalOK {
+					globalCallbackArg = true
+				}
 			}
-			callbackType, callbackSymbol, err := resolveCallbackArgumentType(id, resolved, sig, i, locals, funcs, module, imports, hasCallerSig && hasStrictSemanticCallClauses(callerSig))
+			callbackType, callbackSymbol, err := resolveCallbackArgumentType(arg, resolved, sig, i, locals, globals, funcs, types, module, imports, state, effects, analysis, hasCallerSig && hasStrictSemanticCallClauses(callerSig))
 			if err != nil {
 				return "", regionNone, err
-			}
-			if callbackSymbol == "" {
-				return "", regionNone, fmt.Errorf("%s: callback argument for '%s' has unknown target; pass a symbol-backed local function value or direct named function/closure symbol in this MVP", frontend.FormatPos(arg.Pos()), resolved)
 			}
 			if hasCallerSig {
 				if callbackSymbol == "" {
 					if hasStrictSemanticCallClauses(callerSig) {
-						return "", regionNone, fmt.Errorf(
-							"%s: callback argument for '%s' has unknown target and is not allowed under semantic clause '%s' in this MVP",
-							frontend.FormatPos(arg.Pos()),
-							resolved,
-							firstStrictSemanticCallClause(callerSig),
-						)
+						return "", regionNone, unsupportedCallbackUnknownSemanticTargetError(arg.Pos(), resolved, firstStrictSemanticCallClause(callerSig))
 					}
 				} else if callbackSig, ok := funcs[callbackSymbol]; ok {
-					if err := validateCallAgainstSemanticClauses(callerSig, callbackSig, callbackSymbol, arg.Pos()); err != nil {
+					callbackPhrase := fmt.Sprintf("call to '%s'", callbackSymbol)
+					if localCallbackArg || globalCallbackArg || fieldCallbackArg {
+						if name := callbackArgumentName(arg); name != "" {
+							callbackPhrase = fmt.Sprintf("callback argument '%s'", name)
+						}
+					}
+					if err := validateCallAgainstSemanticClauseTarget(callerSig, callbackSig, callbackPhrase, arg.Pos()); err != nil {
 						return "", regionNone, err
 					}
 				}
 			}
 			if callbackSymbol != "" {
 				if callbackSig, ok := funcs[callbackSymbol]; ok {
+					if analysis != nil && callbackSig.TouchesMutableGlobals {
+						analysis.touchesMutableGlobals = true
+					}
 					if err := effects.requireAll(arg.Pos(), callbackSig.Effects); err != nil {
 						return "", regionNone, err
 					}
 				}
-				// Keep lowered target collection deterministic across modules/import aliases.
-				id.Name = callbackSymbol
+				if id, ok := arg.(*frontend.IdentExpr); ok && !localCallbackArg && !globalCallbackArg && !fieldCallbackArg {
+					// Keep lowered target collection deterministic across modules/import aliases.
+					id.Name = callbackSymbol
+				}
 			}
 			argType = callbackType
 		} else {
@@ -888,7 +1703,7 @@ func checkCallExprWithEffects(
 			}
 		}
 		if !typesCompatibleWithNullPtr(sig.ParamTypes[i], argType, arg) {
-			return "", regionNone, fmt.Errorf("%s: type mismatch for '%s' arg %d", frontend.FormatPos(arg.Pos()), resolved, i+1)
+			return "", regionNone, fmt.Errorf("%s: type mismatch for %s arg %d", frontend.FormatPos(arg.Pos()), callTargetPhrase, i+1)
 		}
 		if err := checkResourceCallArg(resolved, sig.ParamTypes[i], arg, funcs, module, imports, state); err != nil {
 			return "", regionNone, err
@@ -899,55 +1714,106 @@ func checkCallExprWithEffects(
 		}
 		if paramOwnership == "" {
 			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
-				return "", regionNone, fmt.Errorf("%s: borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of '%s'", frontend.FormatPos(arg.Pos()), borrowedName, i+1, resolved)
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, ownershipTargetPhrase)
+			}
+			if argType == "ptr" {
+				if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, ownershipTargetPhrase)
+				}
+			}
+			if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+				if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+					return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, ownershipTargetPhrase)
+				}); err != nil {
+					return "", regionNone, err
+				}
+			}
+			if path, ok := canonicalOwnershipAccessPath(arg); ok {
+				if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+					return "", regionNone, err
+				}
 			}
 		}
 		if paramOwnership == "consume" {
-			id, ok := arg.(*frontend.IdentExpr)
-			if !ok {
-				return "", regionNone, fmt.Errorf("%s: consume argument for '%s' must be a local value", frontend.FormatPos(arg.Pos()), resolved)
+			name, err := consumeLocalArgumentName(arg, resolved, false, consumeTargetPhrase)
+			if err != nil {
+				return "", regionNone, err
+			}
+			if err := state.checkNoConsumedDescendants(name, arg.Pos()); err != nil {
+				return "", regionNone, err
 			}
 			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
-				return "", regionNone, fmt.Errorf("%s: borrowed value derived from '%s' cannot be consumed by '%s'", frontend.FormatPos(arg.Pos()), borrowedName, resolved)
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, ownershipTargetPhrase)
 			}
-			if firstPos, exists := inoutArgs[id.Name]; exists {
-				return "", regionNone, fmt.Errorf("%s: consumed argument '%s' aliases inout argument in call to '%s' (inout at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+			if argType == "ptr" {
+				if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, ownershipTargetPhrase)
+				}
 			}
-			consumeArgs[i] = id.Name
+			if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+				if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+					return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, ownershipTargetPhrase)
+				}); err != nil {
+					return "", regionNone, err
+				}
+			}
+			path := name
+			if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "consumed argument '%s' aliases inout argument in %s (inout at %s)", path, ownershipCallPhrase, frontend.FormatPos(first.pos))
+			}
+			consumeArgs[i] = name
 			consumeArgTypes[i] = argType
-			consumeArgPositions[id.Name] = arg.Pos()
+			consumeArgRefs = append(consumeArgRefs, ownershipArgRef{path: path, pos: arg.Pos()})
 		}
 		if paramOwnership == "borrow" {
-			id, ok := arg.(*frontend.IdentExpr)
+			path, ok := canonicalOwnershipAccessPath(arg)
 			if ok {
-				if firstPos, exists := inoutArgs[id.Name]; exists {
-					return "", regionNone, fmt.Errorf("%s: borrowed argument '%s' aliases inout argument in call to '%s' (inout at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+				if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+					return "", regionNone, err
 				}
-				borrowArgs[id.Name] = arg.Pos()
+				if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed argument '%s' aliases inout argument in %s (inout at %s)", path, ownershipCallPhrase, frontend.FormatPos(first.pos))
+				}
+				borrowArgs = append(borrowArgs, ownershipArgRef{path: path, pos: arg.Pos()})
 			}
 		}
 		if paramOwnership == "inout" {
-			id, ok := arg.(*frontend.IdentExpr)
+			path, ok := canonicalOwnershipAccessPath(arg)
 			if !ok {
-				return "", regionNone, fmt.Errorf("%s: inout argument for '%s' must be a mutable local value", frontend.FormatPos(arg.Pos()), resolved)
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument for %s must be a mutable local value", ownershipTargetPhrase)
 			}
 			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
-				return "", regionNone, fmt.Errorf("%s: borrowed value derived from '%s' cannot be passed as inout to '%s'", frontend.FormatPos(arg.Pos()), borrowedName, resolved)
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, ownershipTargetPhrase)
 			}
-			local, ok := locals[id.Name]
-			if !ok || !local.Mutable {
-				return "", regionNone, fmt.Errorf("%s: inout argument '%s' for '%s' must be mutable", frontend.FormatPos(arg.Pos()), id.Name, resolved)
+			if argType == "ptr" {
+				if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+					return "", regionNone, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, ownershipTargetPhrase)
+				}
 			}
-			if firstPos, exists := inoutArgs[id.Name]; exists {
-				return "", regionNone, fmt.Errorf("%s: inout argument '%s' used more than once in call to '%s' (first at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+			if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+				if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+					return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, ownershipTargetPhrase)
+				}); err != nil {
+					return "", regionNone, err
+				}
 			}
-			if firstPos, exists := borrowArgs[id.Name]; exists {
-				return "", regionNone, fmt.Errorf("%s: inout argument '%s' aliases borrowed argument in call to '%s' (borrow at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+			if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+				return "", regionNone, err
 			}
-			if firstPos, exists := consumeArgPositions[id.Name]; exists {
-				return "", regionNone, fmt.Errorf("%s: inout argument '%s' aliases consumed argument in call to '%s' (consume at %s)", frontend.FormatPos(arg.Pos()), id.Name, resolved, frontend.FormatPos(firstPos))
+			targetInfo, _, err := resolveAssignTarget(arg, locals, globals, types)
+			if err != nil || !targetInfo.Mutable || targetInfo.Global {
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' for %s must be mutable", path, ownershipTargetPhrase)
 			}
-			inoutArgs[id.Name] = arg.Pos()
+			if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' used more than once in %s (first at %s)", path, ownershipCallPhrase, frontend.FormatPos(first.pos))
+			}
+			if first, exists := findOwnershipAlias(borrowArgs, path); exists {
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' aliases borrowed argument in %s (borrow at %s)", path, ownershipCallPhrase, frontend.FormatPos(first.pos))
+			}
+			if first, exists := findOwnershipAlias(consumeArgRefs, path); exists {
+				return "", regionNone, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' aliases consumed argument in %s (consume at %s)", path, ownershipCallPhrase, frontend.FormatPos(first.pos))
+			}
+			inoutArgs = append(inoutArgs, ownershipArgRef{path: path, pos: arg.Pos()})
 		}
 		argRegions[i] = argRegion
 	}
@@ -957,15 +1823,20 @@ func checkCallExprWithEffects(
 		}
 		for j := 0; j < i; j++ {
 			if consumeArgs[j] == name {
-				return "", regionNone, fmt.Errorf("%s: value '%s' consumed more than once in call to '%s'", frontend.FormatPos(e.Args[i].Pos()), name, resolved)
+				return "", regionNone, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in %s", name, ownershipCallPhrase)
 			}
 			if resourceValuesAlias(consumeArgs[j], consumeArgTypes[j], name, consumeArgTypes[i], types, state) {
-				return "", regionNone, fmt.Errorf("%s: value '%s' consumed more than once in call to '%s'", frontend.FormatPos(e.Args[i].Pos()), name, resolved)
+				return "", regionNone, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in %s", name, ownershipCallPhrase)
 			}
 		}
 		markConsumedResourceValue(name, consumeArgTypes[i], types, state, e.Args[i].Pos())
 	}
 	markCallFinalizedResources(resolved, e, funcs, module, imports, state)
+	if isTryCall {
+		if err := recordTryCallThrowResourceSummary(e, sig, funcs, types, module, imports, state); err != nil {
+			return "", regionNone, err
+		}
+	}
 	if resolved == "core.spawn" {
 		if len(e.Args) != 1 {
 			return "", regionNone, fmt.Errorf("%s: spawn expects 1 argument", frontend.FormatPos(e.At))
@@ -1001,8 +1872,54 @@ func checkCallExprWithEffects(
 		if targetSig.TouchesMutableGlobals {
 			return "", regionNone, fmt.Errorf("%s: spawn target '%s' touches mutable global state and cannot cross actor boundary", frontend.FormatPos(e.At), target)
 		}
+		if blocked := actorTaskWorkerBoundaryEffect(targetSig); blocked != "" {
+			return "", regionNone, fmt.Errorf("%s: spawn target '%s' uses effect '%s' and cannot cross actor boundary", frontend.FormatPos(e.At), target, blocked)
+		}
 		if !funcSigActorTaskTransferSafe(targetSig, types) {
 			return "", regionNone, fmt.Errorf("%s: spawn target '%s' is not sendable across actor boundary", frontend.FormatPos(e.At), target)
+		}
+		lit.Value = []byte(target)
+	}
+	if resolved == "core.spawn_remote" {
+		if len(e.Args) != 2 {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote expects 2 arguments", frontend.FormatPos(e.At))
+		}
+		lit, ok := e.Args[1].(*frontend.StringLitExpr)
+		if !ok {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote expects a string literal", frontend.FormatPos(e.At))
+		}
+		raw := string(lit.Value)
+		if raw == "" {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote expects a non-empty name", frontend.FormatPos(e.At))
+		}
+		target, err := resolveCallName(raw, module, imports, e.At)
+		if err != nil {
+			return "", regionNone, err
+		}
+		if strings.HasPrefix(target, "core.") {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote target must be a user function, got '%s'", frontend.FormatPos(e.At), target)
+		}
+		targetSig, ok := funcs[target]
+		if !ok {
+			return "", regionNone, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), target)
+		}
+		if len(targetSig.ParamTypes) != 0 || targetSig.ReturnType != "i32" {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote target must have shape fun %s(): i32", frontend.FormatPos(e.At), target)
+		}
+		if targetSig.Async {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote target must be synchronous", frontend.FormatPos(e.At))
+		}
+		if targetSig.ThrowsType != "" {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote target must not throw", frontend.FormatPos(e.At))
+		}
+		if targetSig.TouchesMutableGlobals {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote target '%s' touches mutable global state and cannot cross actor boundary", frontend.FormatPos(e.At), target)
+		}
+		if blocked := actorTaskWorkerBoundaryEffect(targetSig); blocked != "" {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote target '%s' uses effect '%s' and cannot cross actor boundary", frontend.FormatPos(e.At), target, blocked)
+		}
+		if !funcSigActorTaskTransferSafe(targetSig, types) {
+			return "", regionNone, fmt.Errorf("%s: spawn_remote target '%s' is not sendable across actor boundary", frontend.FormatPos(e.At), target)
 		}
 		lit.Value = []byte(target)
 	}
@@ -1040,6 +1957,9 @@ func checkCallExprWithEffects(
 		}
 		if targetSig.TouchesMutableGlobals {
 			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target '%s' touches mutable global state and cannot cross task boundary", frontend.FormatPos(e.At), target)
+		}
+		if blocked := actorTaskWorkerBoundaryEffect(targetSig); blocked != "" {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target '%s' uses effect '%s' and cannot cross task boundary", frontend.FormatPos(e.At), target, blocked)
 		}
 		if !funcSigActorTaskTransferSafe(targetSig, types) {
 			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 target '%s' is not sendable across task boundary", frontend.FormatPos(e.At), target)
@@ -1081,6 +2001,9 @@ func checkCallExprWithEffects(
 		if targetSig.TouchesMutableGlobals {
 			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target '%s' touches mutable global state and cannot cross task boundary", frontend.FormatPos(e.At), target)
 		}
+		if blocked := actorTaskWorkerBoundaryEffect(targetSig); blocked != "" {
+			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target '%s' uses effect '%s' and cannot cross task boundary", frontend.FormatPos(e.At), target, blocked)
+		}
 		if !funcSigActorTaskTransferSafe(targetSig, types) {
 			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 target '%s' is not sendable across task boundary", frontend.FormatPos(e.At), target)
 		}
@@ -1105,16 +2028,34 @@ func checkCallExprWithEffects(
 		return "", regionNone, err
 	}
 	if builtinNeedsUnsafe(resolved, argRegions) && !state.inUnsafe() {
-		return "", regionNone, fmt.Errorf("%s: '%s' is only allowed in unsafe blocks", frontend.FormatPos(e.At), resolved)
+		return "", regionNone, effectDiagnosticf(e.At, "'%s' is only allowed in unsafe blocks", resolved)
 	}
 	if permission, attenuatedEffect := builtinCapsulePermission(resolved); permission != "" {
 		if err := effects.requireCapsulePermission(e.At, permission, attenuatedEffect); err != nil {
 			return "", regionNone, err
 		}
 	}
-	e.Name = resolved
+	if !preserveDynamicCallName {
+		e.Name = resolved
+	}
 	regionID := regionNone
-	if sig.ReturnRegionParam >= 0 {
+	if len(sig.ReturnRegionSummary) > 0 {
+		tree := make(map[string]int, len(sig.ReturnRegionSummary))
+		for leaf, paramIndex := range sig.ReturnRegionSummary {
+			if paramIndex < 0 || paramIndex >= len(argRegions) {
+				return "", regionNone, fmt.Errorf("%s: invalid region signature for '%s'", frontend.FormatPos(e.At), resolved)
+			}
+			leafRegion := argRegions[paramIndex]
+			if leafRegion == regionUnknown {
+				return "", regionNone, fmt.Errorf("%s: ambiguous region for '%s' return", frontend.FormatPos(e.At), resolved)
+			}
+			if leafRegion != regionNone {
+				tree[leaf] = leafRegion
+			}
+		}
+		state.setExprRegionTree(e, tree)
+		regionID = constructorRegionFromTree(tree)
+	} else if sig.ReturnRegionParam >= 0 {
 		if sig.ReturnRegionParam >= len(argRegions) {
 			return "", regionNone, fmt.Errorf("%s: invalid region signature for '%s'", frontend.FormatPos(e.At), resolved)
 		}
@@ -1124,6 +2065,21 @@ func checkCallExprWithEffects(
 		}
 	}
 	return sig.ReturnType, regionID, nil
+}
+
+func validateFunctionTypedValueCallLabels(e *frontend.CallExpr, kind, name string) error {
+	if len(e.ArgLabels) == 0 {
+		return nil
+	}
+	if len(e.ArgLabels) != len(e.Args) {
+		return fmt.Errorf("%s: internal error: call argument labels are inconsistent", frontend.FormatPos(e.At))
+	}
+	for i, label := range e.ArgLabels {
+		if label == "" {
+			return fmt.Errorf("%s: cannot mix labeled and unlabeled arguments in %s '%s'", frontend.FormatPos(e.Args[i].Pos()), kind, name)
+		}
+	}
+	return nil
 }
 
 var noblockForbiddenCallEffects = []string{"actors", "control", "io", "link", "mmio", "runtime"}
@@ -1142,18 +2098,39 @@ func currentCallerSignature(effects *effectContext, funcs map[string]FuncSig) (F
 }
 
 func validateCallAgainstSemanticClauses(callerSig FuncSig, calleeSig FuncSig, calleeName string, pos frontend.Position) error {
+	return validateCallAgainstSemanticClauseTarget(callerSig, calleeSig, fmt.Sprintf("call to '%s'", calleeName), pos)
+}
+
+func validateCallAgainstSemanticClauseTarget(callerSig FuncSig, calleeSig FuncSig, calleePhrase string, pos frontend.Position) error {
+	if err := validateBudgetedSemanticCallTarget(callerSig, calleeSig, calleePhrase, pos); err != nil {
+		return err
+	}
 	if callerSig.HasRealtime {
 		if blocked := firstFuncSigForbiddenEffect(calleeSig, realtimeForbiddenCallEffects); blocked != "" {
-			return fmt.Errorf("%s: semantic clause 'realtime' forbids call to '%s' because it is not realtime-safe (effect '%s')", frontend.FormatPos(pos), calleeName, blocked)
+			return fmt.Errorf("%s: semantic clause 'realtime' forbids %s because it is not realtime-safe (effect '%s')", frontend.FormatPos(pos), calleePhrase, blocked)
 		}
 	}
 	if callerSig.HasNoAlloc && funcSigHasEffect(calleeSig, "alloc") {
-		return fmt.Errorf("%s: semantic clause 'noalloc' forbids call to '%s' because it may allocate", frontend.FormatPos(pos), calleeName)
+		return fmt.Errorf("%s: semantic clause 'noalloc' forbids %s because it may allocate", frontend.FormatPos(pos), calleePhrase)
 	}
 	if callerSig.HasNoBlock {
 		if blocked := firstFuncSigForbiddenEffect(calleeSig, noblockForbiddenCallEffects); blocked != "" {
-			return fmt.Errorf("%s: semantic clause 'noblock' forbids call to '%s' because it may block (effect '%s')", frontend.FormatPos(pos), calleeName, blocked)
+			return fmt.Errorf("%s: semantic clause 'noblock' forbids %s because it may block (effect '%s')", frontend.FormatPos(pos), calleePhrase, blocked)
 		}
+	}
+	return nil
+}
+
+func validateBudgetedSemanticCallTarget(callerSig FuncSig, calleeSig FuncSig, calleePhrase string, pos frontend.Position) error {
+	if !calleeSig.HasBudget {
+		return nil
+	}
+	required := calleeSig.Budget
+	if !callerSig.HasBudget {
+		return budgetDiagnosticf(pos, "budget context for %s requires caller budget at least %d", calleePhrase, required)
+	}
+	if callerSig.Budget < required {
+		return budgetDiagnosticf(pos, "budget context for %s requires caller budget at least %d, got %d", calleePhrase, required, callerSig.Budget)
 	}
 	return nil
 }
@@ -1165,6 +2142,9 @@ func validateCallbackClauseCompatibility(
 	pos frontend.Position,
 	callbackName string,
 ) error {
+	if err := validateBudgetedSemanticCallTarget(calleeSig, callbackSig, fmt.Sprintf("callback function symbol '%s' for callee '%s'", callbackName, calleeName), pos); err != nil {
+		return err
+	}
 	if calleeSig.HasRealtime {
 		if blocked := firstFuncSigForbiddenEffect(callbackSig, realtimeForbiddenCallEffects); blocked != "" {
 			return fmt.Errorf("%s: callback function symbol '%s' is not realtime-safe (effect '%s') for callee '%s'", frontend.FormatPos(pos), callbackName, blocked, calleeName)
@@ -1190,13 +2170,23 @@ func funcSigHasEffect(sig FuncSig, effect string) bool {
 	return false
 }
 
+func actorTaskWorkerBoundaryEffect(sig FuncSig) string {
+	for _, effect := range sig.Effects {
+		switch effect {
+		case "alloc", "capability", "control", "islands", "link", "mem", "mmio", "privacy":
+			return effect
+		}
+	}
+	return ""
+}
+
 func firstFuncSigForbiddenEffect(sig FuncSig, forbidden []string) string {
 	effects := effectSet(sig.Effects)
 	return firstForbiddenEffect(effects, forbidden)
 }
 
 func hasStrictSemanticCallClauses(sig FuncSig) bool {
-	return sig.HasNoAlloc || sig.HasNoBlock || sig.HasRealtime
+	return sig.HasNoAlloc || sig.HasNoBlock || sig.HasRealtime || sig.HasBudget
 }
 
 func firstStrictSemanticCallClause(sig FuncSig) string {
@@ -1209,71 +2199,460 @@ func firstStrictSemanticCallClause(sig FuncSig) string {
 	if sig.HasNoBlock {
 		return "noblock"
 	}
+	if sig.HasBudget {
+		return "budget"
+	}
 	return ""
 }
 
 func resolveCallbackArgumentType(
-	arg *frontend.IdentExpr,
+	arg frontend.Expr,
 	calleeName string,
 	calleeSig FuncSig,
 	paramIndex int,
 	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
 	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
 	module string,
 	imports map[string]string,
+	state *regionState,
+	effects *effectContext,
+	analysis *functionAnalysisState,
 	deferEffectValidation bool,
 ) (string, string, error) {
-	if localInfo, ok := locals[arg.Name]; ok {
-		if !localInfo.FunctionTypeValue || localInfo.FunctionValue == "" {
-			return "", "", fmt.Errorf("%s: callback argument must be a symbol-backed local function value or direct named function/closure symbol in this MVP", frontend.FormatPos(arg.Pos()))
+	if closure, ok := arg.(*frontend.ClosureExpr); ok {
+		targetInfo := functionParamLocalInfo(calleeSig, paramIndex)
+		if err := validateFunctionTypedClosureAssignment("closure literal", targetInfo, closure, locals, funcs, types, module, imports, closure.At, "callback argument"); err != nil {
+			return "", "", err
+		}
+		if len(closure.Captures) > 0 {
+			captureSlots, err := functionCaptureSlotCount(closure.Captures, types)
+			if err != nil {
+				return "", "", err
+			}
+			if captureSlots > FnPtrEnvSlotCount {
+				if _, _, err := classifyCallableEscape(callableBoundaryCallback, closure.Captures, types); err != nil {
+					return "", "", err
+				}
+			}
+		}
+		callbackSig, ok := funcs[closure.Name]
+		if !ok {
+			callbackSig = FuncSig{
+				ParamTypes:     append([]string(nil), targetInfo.FunctionParamTypes...),
+				ParamOwnership: append([]string(nil), targetInfo.FunctionParamOwnership...),
+				ReturnType:     targetInfo.FunctionReturnType,
+				Effects:        append([]string(nil), targetInfo.FunctionEffects...),
+			}
+		}
+		if !deferEffectValidation {
+			if err := validateCallbackClauseCompatibility(callbackSig, calleeSig, calleeName, closure.At, callbackArgumentName(arg)); err != nil {
+				return "", "", err
+			}
+		}
+		return targetInfo.TypeName, closure.Name, nil
+	}
+	if call, ok := arg.(*frontend.CallExpr); ok {
+		argType, _, err := checkExprWithEffects(call, locals, globals, funcs, types, module, imports, state, effects, analysis)
+		if err != nil {
+			return "", "", err
+		}
+		callSig, ok := funcs[call.Name]
+		if !ok || !callSig.ReturnFunctionType {
+			return "", "", fmt.Errorf("%s: callback argument call '%s' does not return a function type", frontend.FormatPos(call.At), call.Name)
+		}
+		if err := markFunctionTypedReturnCallMutableGlobalUse(callSig, call, locals, globals, funcs, types, module, imports, analysis); err != nil {
+			return "", "", err
+		}
+		returnedSig := FuncSig{
+			ParamTypes:     append([]string(nil), callSig.ReturnFunctionParams...),
+			ParamOwnership: append([]string(nil), callSig.ReturnFunctionParamOwnership...),
+			ReturnType:     callSig.ReturnFunctionReturn,
+			ThrowsType:     callSig.ReturnFunctionThrows,
+			Effects:        append([]string(nil), callSig.ReturnFunctionEffects...),
+		}
+		if err := validateCallbackSignature(returnedSig, calleeSig, paramIndex, call.At, callbackArgumentName(call), deferEffectValidation); err != nil {
+			return "", "", err
+		}
+		if err := validateCallbackClauseCompatibility(returnedSig, calleeSig, calleeName, call.At, callbackArgumentName(call)); err != nil {
+			return "", "", err
+		}
+		return argType, "", nil
+	}
+	if fieldInfo, ok, err := resolveFunctionFieldArgument(arg, locals); err != nil {
+		return "", "", err
+	} else if ok {
+		if analysis != nil && fieldInfo.FunctionTouchesMutableGlobals {
+			analysis.touchesMutableGlobals = true
+		}
+		if fieldInfo.FunctionValue == "" {
+			paramSlots, err := functionParamSlotCount(fieldInfo.FunctionParamTypes, types)
+			if err != nil {
+				return "", "", err
+			}
+			callbackSig := FuncSig{
+				ParamTypes:     append([]string(nil), fieldInfo.FunctionParamTypes...),
+				ParamOwnership: append([]string(nil), fieldInfo.FunctionParamOwnership...),
+				ParamSlots:     paramSlots,
+				ReturnType:     fieldInfo.FunctionReturnType,
+				ThrowsType:     fieldInfo.FunctionThrowsType,
+				Effects:        append([]string(nil), fieldInfo.FunctionEffects...),
+			}
+			if err := validateCallbackSignatureForField(callbackSig, fieldInfo, calleeSig, paramIndex, arg.Pos(), callbackArgumentName(arg), types, deferEffectValidation); err != nil {
+				return "", "", err
+			}
+			if err := validateCallbackClauseCompatibility(callbackSig, calleeSig, calleeName, arg.Pos(), callbackArgumentName(arg)); err != nil {
+				return "", "", err
+			}
+			return "fnptr", "", nil
+		}
+		localSig, ok := funcs[fieldInfo.FunctionValue]
+		if !ok {
+			return "", "", fmt.Errorf("%s: unknown callback function symbol '%s'", frontend.FormatPos(arg.Pos()), fieldInfo.FunctionValue)
+		}
+		if err := validateCallbackSignatureForField(localSig, fieldInfo, calleeSig, paramIndex, arg.Pos(), callbackArgumentName(arg), types, deferEffectValidation); err != nil {
+			return "", "", err
+		}
+		if err := validateCallbackClauseCompatibility(localSig, calleeSig, calleeName, arg.Pos(), callbackArgumentName(arg)); err != nil {
+			return "", "", err
+		}
+		return "fnptr", fieldInfo.FunctionValue, nil
+	}
+	if fieldAccess, ok := arg.(*frontend.FieldAccessExpr); ok {
+		globalInfo, globalSig, globalOK, err := resolveFunctionTypedGlobalFieldAccess(fieldAccess, globals, funcs)
+		if err != nil {
+			return "", "", err
+		}
+		if globalOK {
+			globalLocal := LocalInfo{
+				TypeName:               globalInfo.TypeName,
+				FunctionTypeValue:      true,
+				FunctionValue:          globalInfo.FunctionValue,
+				FunctionParamTypes:     append([]string(nil), globalInfo.FunctionParamTypes...),
+				FunctionParamOwnership: append([]string(nil), globalInfo.FunctionParamOwnership...),
+				FunctionReturnType:     globalInfo.FunctionReturnType,
+				FunctionThrowsType:     globalInfo.FunctionThrowsType,
+				FunctionEffects:        append([]string(nil), globalInfo.FunctionEffects...),
+			}
+			if err := validateCallbackSignatureForLocal(globalSig, globalLocal, calleeSig, paramIndex, arg.Pos(), callbackArgumentName(arg), types, deferEffectValidation); err != nil {
+				return "", "", err
+			}
+			if err := validateCallbackClauseCompatibility(globalSig, calleeSig, calleeName, arg.Pos(), callbackArgumentName(arg)); err != nil {
+				return "", "", err
+			}
+			return globalInfo.TypeName, globalInfo.FunctionValue, nil
+		}
+	}
+	id, ok := arg.(*frontend.IdentExpr)
+	if !ok {
+		return "", "", unsupportedCallbackArgumentSourceError(arg.Pos(), calleeName)
+	}
+	if localInfo, ok := locals[id.Name]; ok {
+		if analysis != nil && localInfo.FunctionTouchesMutableGlobals {
+			analysis.touchesMutableGlobals = true
+		}
+		if !localInfo.FunctionTypeValue {
+			if localInfo.FunctionValue == "" {
+				return "", "", unsupportedCallbackArgumentSourceError(arg.Pos(), calleeName)
+			}
+			if localInfo.GenericFunctionValue {
+				return "", "", unsupportedGenericCallbackSymbolError(arg.Pos(), id.Name)
+			}
+			localSig, ok := funcs[localInfo.FunctionValue]
+			if !ok {
+				return "", "", fmt.Errorf("%s: unknown callback function symbol '%s'", frontend.FormatPos(arg.Pos()), localInfo.FunctionValue)
+			}
+			if localSig.ThrowsType != "" && callbackExpectedThrowsType(calleeSig, paramIndex) == "" {
+				return "", "", unsupportedThrowingCallbackSymbolError(arg.Pos(), id.Name)
+			}
+			targetInfo := functionParamLocalInfo(calleeSig, paramIndex)
+			targetInfo.FunctionValue = localInfo.FunctionValue
+			targetInfo.FunctionCaptures = append([]frontend.ClosureCapture(nil), localInfo.FunctionCaptures...)
+			if len(targetInfo.FunctionCaptures) > 0 {
+				captureSlots, err := functionCaptureSlotCount(targetInfo.FunctionCaptures, types)
+				if err != nil {
+					return "", "", err
+				}
+				if captureSlots > FnPtrEnvSlotCount {
+					escapeKind, handleValue, err := classifyCallableEscape(callableBoundaryCallback, targetInfo.FunctionCaptures, types)
+					if err != nil {
+						return "", "", err
+					}
+					targetInfo.FunctionEscapeKind = escapeKind
+					targetInfo.FunctionHandleValue = handleValue
+				}
+			}
+			if err := validateCallbackSignatureForLocal(localSig, targetInfo, calleeSig, paramIndex, arg.Pos(), id.Name, types, deferEffectValidation); err != nil {
+				return "", "", err
+			}
+			if err := validateCallbackClauseCompatibility(localSig, calleeSig, calleeName, arg.Pos(), id.Name); err != nil {
+				return "", "", err
+			}
+			return targetInfo.TypeName, localInfo.FunctionValue, nil
+		}
+		if localInfo.FunctionValue == "" {
+			paramSlots, err := functionParamSlotCount(localInfo.FunctionParamTypes, types)
+			if err != nil {
+				return "", "", err
+			}
+			callbackSig := FuncSig{
+				ParamTypes:     append([]string(nil), localInfo.FunctionParamTypes...),
+				ParamOwnership: append([]string(nil), localInfo.FunctionParamOwnership...),
+				ParamSlots:     paramSlots,
+				ReturnType:     localInfo.FunctionReturnType,
+				ThrowsType:     localInfo.FunctionThrowsType,
+				Effects:        append([]string(nil), localInfo.FunctionEffects...),
+			}
+			if err := validateCallbackSignatureForLocal(callbackSig, localInfo, calleeSig, paramIndex, arg.Pos(), id.Name, types, deferEffectValidation); err != nil {
+				return "", "", err
+			}
+			if err := validateCallbackClauseCompatibility(callbackSig, calleeSig, calleeName, arg.Pos(), id.Name); err != nil {
+				return "", "", err
+			}
+			return "fnptr", "", nil
 		}
 		if localInfo.GenericFunctionValue {
-			return "", "", fmt.Errorf("%s: generic function symbol '%s' is not supported for callback argument in this MVP", frontend.FormatPos(arg.Pos()), arg.Name)
-		}
-		if len(localInfo.FunctionCaptures) > 0 {
-			return "", "", unsupportedCallbackCaptureError(arg.Pos(), arg.Name)
+			return "", "", unsupportedGenericCallbackSymbolError(arg.Pos(), id.Name)
 		}
 		localSig, ok := funcs[localInfo.FunctionValue]
 		if !ok {
 			return "", "", fmt.Errorf("%s: unknown callback function symbol '%s'", frontend.FormatPos(arg.Pos()), localInfo.FunctionValue)
 		}
-		if err := validateCallbackSignature(localSig, calleeSig, paramIndex, arg.At, arg.Name, deferEffectValidation); err != nil {
+		if err := validateCallbackSignatureForLocal(localSig, localInfo, calleeSig, paramIndex, arg.Pos(), id.Name, types, deferEffectValidation); err != nil {
 			return "", "", err
 		}
-		if err := validateCallbackClauseCompatibility(localSig, calleeSig, calleeName, arg.At, arg.Name); err != nil {
+		if err := validateCallbackClauseCompatibility(localSig, calleeSig, calleeName, arg.Pos(), id.Name); err != nil {
 			return "", "", err
 		}
 		return localInfo.TypeName, localInfo.FunctionValue, nil
 	}
+	if globalInfo, ok := globals[id.Name]; ok {
+		if analysis != nil && globalInfo.Mutable {
+			analysis.touchesMutableGlobals = true
+		}
+		if !globalInfo.FunctionTypeValue || globalInfo.FunctionValue == "" {
+			return "", "", unsupportedCallbackArgumentSourceError(arg.Pos(), calleeName)
+		}
+		globalSig, ok := funcs[globalInfo.FunctionValue]
+		if !ok {
+			return "", "", fmt.Errorf("%s: unknown callback function symbol '%s'", frontend.FormatPos(arg.Pos()), globalInfo.FunctionValue)
+		}
+		globalLocal := LocalInfo{
+			TypeName:               globalInfo.TypeName,
+			FunctionTypeValue:      true,
+			FunctionValue:          globalInfo.FunctionValue,
+			FunctionParamTypes:     append([]string(nil), globalInfo.FunctionParamTypes...),
+			FunctionParamOwnership: append([]string(nil), globalInfo.FunctionParamOwnership...),
+			FunctionReturnType:     globalInfo.FunctionReturnType,
+			FunctionThrowsType:     globalInfo.FunctionThrowsType,
+			FunctionEffects:        append([]string(nil), globalInfo.FunctionEffects...),
+		}
+		if err := validateCallbackSignatureForLocal(globalSig, globalLocal, calleeSig, paramIndex, arg.Pos(), id.Name, types, deferEffectValidation); err != nil {
+			return "", "", err
+		}
+		if err := validateCallbackClauseCompatibility(globalSig, calleeSig, calleeName, arg.Pos(), id.Name); err != nil {
+			return "", "", err
+		}
+		return globalInfo.TypeName, globalInfo.FunctionValue, nil
+	}
 
-	resolved, err := resolveCheckedCallName(arg.Name, funcs, module, imports, arg.At)
+	resolved, err := resolveCheckedCallName(id.Name, funcs, module, imports, id.At)
 	if err != nil {
-		return "", "", fmt.Errorf("%s: callback argument must be a symbol-backed local function value or direct named function/closure symbol in this MVP", frontend.FormatPos(arg.Pos()))
+		return "", "", unsupportedCallbackArgumentSourceError(arg.Pos(), calleeName)
 	}
 	sig, ok := funcs[resolved]
 	if !ok {
-		return "", "", fmt.Errorf("%s: callback argument must be a symbol-backed local function value or direct named function/closure symbol in this MVP", frontend.FormatPos(arg.Pos()))
+		return "", "", unsupportedCallbackArgumentSourceError(arg.Pos(), calleeName)
 	}
-	if err := ensureFuncVisible(resolved, sig, module, arg.At); err != nil {
+	if err := ensureFuncVisible(resolved, sig, module, id.At); err != nil {
 		return "", "", err
 	}
 	if sig.Generic {
-		return "", "", fmt.Errorf("%s: generic function symbol '%s' is not supported for callback argument in this MVP", frontend.FormatPos(arg.Pos()), arg.Name)
+		return "", "", unsupportedGenericCallbackSymbolError(arg.Pos(), id.Name)
 	}
-	if sig.ThrowsType != "" {
-		return "", "", fmt.Errorf("%s: throwing function symbol '%s' is not supported for callback argument in this MVP", frontend.FormatPos(arg.Pos()), arg.Name)
+	if sig.ThrowsType != "" && callbackExpectedThrowsType(calleeSig, paramIndex) == "" {
+		return "", "", unsupportedThrowingCallbackSymbolError(arg.Pos(), id.Name)
 	}
-	if err := validateCallbackSignature(sig, calleeSig, paramIndex, arg.At, arg.Name, deferEffectValidation); err != nil {
+	if err := validateCallbackSignature(sig, calleeSig, paramIndex, arg.Pos(), id.Name, deferEffectValidation); err != nil {
 		return "", "", err
 	}
-	if err := validateCallbackClauseCompatibility(sig, calleeSig, calleeName, arg.At, arg.Name); err != nil {
+	if err := validateCallbackClauseCompatibility(sig, calleeSig, calleeName, arg.Pos(), id.Name); err != nil {
 		return "", "", err
 	}
-	return "ptr", resolved, nil
+	return "fnptr", resolved, nil
 }
 
-func unsupportedCallbackCaptureError(pos frontend.Position, rawName string) error {
-	return fmt.Errorf("%s: callback argument '%s' captures local values; captured function values cannot be passed as callback arguments in this MVP", frontend.FormatPos(pos), rawName)
+func unsupportedCallbackArgumentSourceError(pos frontend.Position, calleeName string) error {
+	return fmt.Errorf(
+		"%s: callback argument for '%s' must be a supported fnptr source: closure literal, function-typed local/global/struct field, direct named function/closure symbol, or function-typed return call",
+		frontend.FormatPos(pos),
+		calleeName,
+	)
+}
+
+func unsupportedCallbackCaptureError(pos frontend.Position, rawName string, envSlots int) error {
+	if envSlots > FnPtrEnvSlotCount {
+		return fmt.Errorf("%s: callback argument '%s' captures %d environment slots; captured callback arguments support at most %d fnptr environment slots within the supported fnptr ABI", frontend.FormatPos(pos), rawName, envSlots, FnPtrEnvSlotCount)
+	}
+	return fmt.Errorf("%s: callback argument '%s' captures local values; captured function values cannot be passed as callback arguments in this MVP; closure lifetime/ABI evidence is only available for local direct calls", frontend.FormatPos(pos), rawName)
+}
+
+func unsupportedClosureLiteralCallbackCaptureError(pos frontend.Position, envSlots int) error {
+	if envSlots > FnPtrEnvSlotCount {
+		return fmt.Errorf("%s: callback argument 'closure literal' captures %d environment slots; captured callback arguments support at most %d fnptr environment slots within the supported fnptr ABI", frontend.FormatPos(pos), envSlots, FnPtrEnvSlotCount)
+	}
+	return fmt.Errorf("%s: callback argument 'closure literal' captures local values; captured function values cannot be passed as callback arguments in this MVP; closure lifetime/ABI evidence is only available for local direct calls", frontend.FormatPos(pos))
+}
+
+func unsupportedFunctionTypedCallCaptureError(pos frontend.Position, rawName string, envSlots int) error {
+	if envSlots > FnPtrEnvSlotCount {
+		return fmt.Errorf("%s: function-typed callback '%s' captures %d environment slots; direct function-typed calls support at most %d fnptr environment slots within the supported fnptr ABI", frontend.FormatPos(pos), rawName, envSlots, FnPtrEnvSlotCount)
+	}
+	return fmt.Errorf("%s: function-typed callback '%s' has unsupported captured environment size", frontend.FormatPos(pos), rawName)
+}
+
+func unsupportedFunctionFieldCallCaptureError(pos frontend.Position, rawName string, envSlots int) error {
+	if envSlots > FnPtrEnvSlotCount {
+		return fmt.Errorf("%s: function-typed struct field call '%s' captures %d environment slots; direct struct-field calls support at most %d fnptr environment slots within the supported fnptr ABI", frontend.FormatPos(pos), rawName, envSlots, FnPtrEnvSlotCount)
+	}
+	return fmt.Errorf("%s: function-typed struct field call '%s' has unsupported captured environment size", frontend.FormatPos(pos), rawName)
+}
+
+func unsupportedEnumPayloadCallCaptureError(pos frontend.Position, rawName string, envSlots int) error {
+	if envSlots > FnPtrEnvSlotCount {
+		return fmt.Errorf("%s: function-typed enum payload binding '%s' captures %d environment slots; direct enum-payload calls support at most %d fnptr environment slots within the supported fnptr ABI", frontend.FormatPos(pos), rawName, envSlots, FnPtrEnvSlotCount)
+	}
+	return fmt.Errorf("%s: function-typed enum payload binding '%s' has unsupported captured environment size", frontend.FormatPos(pos), rawName)
+}
+
+func validateCallbackSignatureForLocal(
+	callbackSig FuncSig,
+	localInfo LocalInfo,
+	calleeSig FuncSig,
+	paramIndex int,
+	pos frontend.Position,
+	rawName string,
+	types map[string]*TypeInfo,
+	deferEffectValidation bool,
+) error {
+	if localInfo.FunctionReturnType != "" {
+		explicitSlots, err := functionParamSlotCount(localInfo.FunctionParamTypes, types)
+		if err != nil {
+			return err
+		}
+		hiddenSlots := callbackSig.ParamSlots - explicitSlots
+		if hiddenSlots < 0 || (hiddenSlots > FnPtrEnvSlotCount && !localInfo.FunctionHandleValue) {
+			return unsupportedCallbackCaptureError(pos, rawName, hiddenSlots)
+		}
+		visibleSig := callbackSig
+		visibleSig.ParamTypes = append([]string(nil), localInfo.FunctionParamTypes...)
+		visibleSig.ParamOwnership = append([]string(nil), localInfo.FunctionParamOwnership...)
+		visibleSig.ParamSlots = explicitSlots
+		visibleSig.ReturnType = localInfo.FunctionReturnType
+		return validateCallbackSignature(visibleSig, calleeSig, paramIndex, pos, rawName, deferEffectValidation)
+	}
+	if len(localInfo.FunctionCaptures) == 0 {
+		return validateCallbackSignature(callbackSig, calleeSig, paramIndex, pos, rawName, deferEffectValidation)
+	}
+	captureSlots := 0
+	for _, capture := range localInfo.FunctionCaptures {
+		info, err := ensureTypeInfo(capture.Type.Name, types)
+		if err != nil {
+			return err
+		}
+		captureSlots += info.SlotCount
+	}
+	if captureSlots < 1 || captureSlots > FnPtrEnvSlotCount {
+		return unsupportedCallbackCaptureError(pos, rawName, captureSlots)
+	}
+	trimmed := callbackSig
+	trimmed.ParamTypes = append([]string(nil), localInfo.FunctionParamTypes...)
+	trimmed.ParamOwnership = append([]string(nil), localInfo.FunctionParamOwnership...)
+	trimmed.ParamSlots -= captureSlots
+	return validateCallbackSignature(trimmed, calleeSig, paramIndex, pos, rawName, deferEffectValidation)
+}
+
+func validateCallbackSignatureForField(
+	callbackSig FuncSig,
+	fieldInfo FunctionFieldInfo,
+	calleeSig FuncSig,
+	paramIndex int,
+	pos frontend.Position,
+	rawName string,
+	types map[string]*TypeInfo,
+	deferEffectValidation bool,
+) error {
+	if fieldInfo.FunctionReturnType == "" {
+		return validateCallbackSignature(callbackSig, calleeSig, paramIndex, pos, rawName, deferEffectValidation)
+	}
+	explicitSlots, err := functionParamSlotCount(fieldInfo.FunctionParamTypes, types)
+	if err != nil {
+		return err
+	}
+	hiddenSlots := callbackSig.ParamSlots - explicitSlots
+	if hiddenSlots < 0 || (hiddenSlots > FnPtrEnvSlotCount && !fieldInfo.FunctionHandleValue) {
+		return unsupportedCallbackCaptureError(pos, rawName, hiddenSlots)
+	}
+	visibleSig := callbackSig
+	visibleSig.ParamTypes = append([]string(nil), fieldInfo.FunctionParamTypes...)
+	visibleSig.ParamOwnership = append([]string(nil), fieldInfo.FunctionParamOwnership...)
+	visibleSig.ParamSlots = explicitSlots
+	visibleSig.ReturnType = fieldInfo.FunctionReturnType
+	return validateCallbackSignature(visibleSig, calleeSig, paramIndex, pos, rawName, deferEffectValidation)
+}
+
+func functionParamSlotCount(typeNames []string, types map[string]*TypeInfo) (int, error) {
+	slots := 0
+	for _, typeName := range typeNames {
+		info, err := ensureTypeInfo(typeName, types)
+		if err != nil {
+			return 0, err
+		}
+		slots += info.SlotCount
+	}
+	return slots, nil
+}
+
+func resolveFunctionFieldCall(name string, locals map[string]LocalInfo) (FunctionFieldInfo, bool, error) {
+	if !strings.Contains(name, ".") {
+		return FunctionFieldInfo{}, false, nil
+	}
+	parts := strings.Split(name, ".")
+	if len(parts) < 2 {
+		return FunctionFieldInfo{}, false, nil
+	}
+	local, ok := locals[parts[0]]
+	if !ok || len(local.FunctionFields) == 0 {
+		return FunctionFieldInfo{}, false, nil
+	}
+	field, ok := local.FunctionFields[strings.Join(parts[1:], ".")]
+	return field, ok, nil
+}
+
+func resolveFunctionFieldArgument(expr frontend.Expr, locals map[string]LocalInfo) (FunctionFieldInfo, bool, error) {
+	name := callbackArgumentName(expr)
+	if name == "" {
+		return FunctionFieldInfo{}, false, nil
+	}
+	return resolveFunctionFieldCall(name, locals)
+}
+
+func callbackArgumentName(expr frontend.Expr) string {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		return e.Name
+	case *frontend.FieldAccessExpr:
+		base := callbackArgumentName(e.Base)
+		if base != "" && e.Field != "" {
+			return base + "." + e.Field
+		}
+	case *frontend.CallExpr:
+		if e.Name != "" {
+			return e.Name + "()"
+		}
+	}
+	return ""
 }
 
 func validateCallbackSignature(
@@ -1289,12 +2668,20 @@ func validateCallbackSignature(
 	}
 	wantParams := calleeSig.ParamFunctionParams[paramIndex]
 	wantReturn := calleeSig.ParamFunctionReturns[paramIndex]
+	wantThrows := callbackExpectedThrowsType(calleeSig, paramIndex)
 	wantEffects := []string(nil)
 	if paramIndex < len(calleeSig.ParamFunctionEffects) {
 		wantEffects = calleeSig.ParamFunctionEffects[paramIndex]
 	}
 	if len(wantParams) != len(callbackSig.ParamTypes) {
 		return fmt.Errorf("%s: callback function symbol '%s' has incompatible parameter count: expected %d, got %d", frontend.FormatPos(pos), rawName, len(wantParams), len(callbackSig.ParamTypes))
+	}
+	wantOwnership := []string(nil)
+	if paramIndex < len(calleeSig.ParamFunctionOwnership) {
+		wantOwnership = calleeSig.ParamFunctionOwnership[paramIndex]
+	}
+	if err := validateFunctionTypeParamOwnership(wantOwnership, callbackSig.ParamOwnership, len(wantParams), pos, "callback function symbol", rawName); err != nil {
+		return err
 	}
 	for i := range wantParams {
 		if wantParams[i] != callbackSig.ParamTypes[i] {
@@ -1304,10 +2691,44 @@ func validateCallbackSignature(
 	if wantReturn != "" && wantReturn != callbackSig.ReturnType {
 		return fmt.Errorf("%s: callback function symbol '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), rawName, wantReturn, callbackSig.ReturnType)
 	}
+	if wantThrows != callbackSig.ThrowsType {
+		return fmt.Errorf("%s: callback function symbol '%s' throws type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), rawName, wantThrows, callbackSig.ThrowsType)
+	}
 	if !deferEffectValidation {
 		if err := validateFunctionTypeCallableEffects(wantEffects, callbackSig.Effects, pos, "callback function symbol", rawName); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func callbackExpectedThrowsType(calleeSig FuncSig, paramIndex int) string {
+	if paramIndex >= 0 && paramIndex < len(calleeSig.ParamFunctionThrows) {
+		return calleeSig.ParamFunctionThrows[paramIndex]
+	}
+	return ""
+}
+
+func validateFunctionTypedThrowCall(throwsType string, e *frontend.CallExpr, state *regionState) error {
+	isTryCall := state != nil && state.allowThrowDepth > 0 && state.allowThrowCall == e
+	isCatchCall := state != nil && state.allowCatchDepth > 0 && state.allowCatchCall == e
+	if throwsType == "" {
+		if isTryCall {
+			return fmt.Errorf("%s: try expects a throwing function call", frontend.FormatPos(e.At))
+		}
+		if isCatchCall {
+			return fmt.Errorf("%s: catch expects a throwing function call", frontend.FormatPos(e.At))
+		}
+		return nil
+	}
+	if !isTryCall && !isCatchCall {
+		return fmt.Errorf("%s: call to throwing function '%s' requires try", frontend.FormatPos(e.At), e.Name)
+	}
+	if isTryCall && state.throwType == "" {
+		return fmt.Errorf("%s: try is only allowed in throwing functions", frontend.FormatPos(e.At))
+	}
+	if isTryCall && !typesCompatibleWithNullPtr(state.throwType, throwsType, e) {
+		return fmt.Errorf("%s: thrown error type mismatch: expected '%s', got '%s'", frontend.FormatPos(e.At), state.throwType, throwsType)
 	}
 	return nil
 }
@@ -1434,6 +2855,9 @@ func checkTypedTaskBuiltin(
 			if groupType != "task.group" {
 				return "", regionNone, fmt.Errorf("%s: type mismatch for 'core.task_spawn_group_i32_typed' arg 1", frontend.FormatPos(e.Args[0].Pos()))
 			}
+			if err := checkResourceCallArg(resolved, "task.group", e.Args[0], funcs, module, imports, state); err != nil {
+				return "", regionNone, err
+			}
 			workerArg = 1
 		}
 		lit, ok := e.Args[workerArg].(*frontend.StringLitExpr)
@@ -1479,6 +2903,9 @@ func checkTypedTaskBuiltin(
 		}
 		if targetSig.TouchesMutableGlobals {
 			return "", regionNone, fmt.Errorf("%s: %s target '%s' touches mutable global state and cannot cross task boundary", frontend.FormatPos(e.At), taskTypedSpawnName(resolved), target)
+		}
+		if blocked := actorTaskWorkerBoundaryEffect(targetSig); blocked != "" {
+			return "", regionNone, fmt.Errorf("%s: %s target '%s' uses effect '%s' and cannot cross task boundary", frontend.FormatPos(e.At), taskTypedSpawnName(resolved), target, blocked)
 		}
 		if !funcSigActorTaskTransferSafe(targetSig, types) {
 			return "", regionNone, fmt.Errorf("%s: %s target '%s' is not sendable across task boundary", frontend.FormatPos(e.At), taskTypedSpawnName(resolved), target)
@@ -1533,14 +2960,14 @@ func checkResourceCallArg(
 		return err
 	}
 	if source.ambiguous {
-		return fmt.Errorf("%s: resource expression mixes resource provenance", frontend.FormatPos(arg.Pos()))
+		return ownershipDiagnosticf(arg.Pos(), "resource expression mixes resource provenance")
 	}
 	if source.unknown {
 		name, _ := resourcePathForExpr(arg)
 		if name == "" {
 			name = "<resource>"
 		}
-		return fmt.Errorf("%s: ambiguous resource provenance for '%s' after control-flow merge", frontend.FormatPos(arg.Pos()), name)
+		return ownershipDiagnosticf(arg.Pos(), "ambiguous resource provenance for '%s' after control-flow merge", name)
 	}
 	if !source.known {
 		return nil
@@ -1592,11 +3019,39 @@ func borrowedOwnerForRegion(regionID int, state *regionState) (string, bool) {
 }
 
 func borrowedOwnerFromExpr(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState) (string, bool, error) {
-	_, regionID, err := checkExprWithEffects(expr, locals, globals, funcs, types, module, imports, state, effects, analysis)
+	tname, regionID, err := checkExprWithEffects(expr, locals, globals, funcs, types, module, imports, state, effects, analysis)
 	if err != nil {
 		return "", false, err
 	}
 	borrowedName, borrowed := borrowedOwnerForRegion(regionID, state)
+	if borrowed {
+		return borrowedName, true, nil
+	}
+	if typeMayContainRegion(tname, types) {
+		owners := map[string]struct{}{}
+		for _, leafRegion := range regionTreeForExpr(tname, expr, regionID, types, state) {
+			if borrowedName, borrowed := borrowedOwnerForRegion(leafRegion, state); borrowed {
+				owners[borrowedName] = struct{}{}
+			}
+		}
+		if len(owners) > 0 {
+			names := make([]string, 0, len(owners))
+			for name := range owners {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			return names[0], true, nil
+		}
+	}
+	if tname == "ptr" {
+		borrowedName, borrowed := borrowedPtrOwnerFromExpr(expr, state, nil)
+		return borrowedName, borrowed, nil
+	}
+	if typeMayContainPtr(tname, types) {
+		if borrowedName, borrowed := borrowedPtrOwnerFromExpr(expr, state, nil); borrowed {
+			return borrowedName, true, nil
+		}
+	}
 	return borrowedName, borrowed, nil
 }
 
@@ -1616,12 +3071,84 @@ func checkBorrowedEscape(expr frontend.Expr, locals map[string]LocalInfo, global
 			}
 		}
 	}
+	if call, ok := expr.(*frontend.CallExpr); ok {
+		if _, caseInfo, found, err := resolveEnumCaseConstructorCall(call, types, module, imports); err != nil {
+			return err
+		} else if found {
+			for i, arg := range call.Args {
+				if i >= len(caseInfo.PayloadTypes) {
+					break
+				}
+				if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+					return err
+				}
+			}
+		} else if len(call.Args) > 0 && len(call.ArgLabels) == len(call.Args) {
+			allLabels := true
+			for _, label := range call.ArgLabels {
+				if label == "" {
+					allLabels = false
+					break
+				}
+			}
+			typeRef := frontend.TypeRef{At: call.At, Kind: frontend.TypeRefNamed, Name: call.Name}
+			resolvedType, err := resolveTypeName(&typeRef, module, imports)
+			if err == nil && allLabels {
+				if info, ok := types[resolvedType]; ok && info.Kind == TypeStruct {
+					for _, arg := range call.Args {
+						if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
+	if fieldAccess, ok := expr.(*frontend.FieldAccessExpr); ok {
+		if err := checkBorrowedEscape(fieldAccess.Base, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+			return err
+		}
+	}
+	if idx, ok := expr.(*frontend.IndexExpr); ok {
+		if err := checkBorrowedEscape(idx.Base, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+			return err
+		}
+	}
+	if match, ok := expr.(*frontend.MatchExpr); ok {
+		for _, c := range match.Cases {
+			if err := checkBorrowedEscape(c.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+				return err
+			}
+		}
+	}
+	if catch, ok := expr.(*frontend.CatchExpr); ok {
+		for _, c := range catch.Cases {
+			if err := checkBorrowedEscape(c.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+				return err
+			}
+		}
+	}
+	if tryExpr, ok := expr.(*frontend.TryExpr); ok {
+		return checkBorrowedEscape(tryExpr.X, locals, globals, funcs, types, module, imports, state, effects, analysis, format)
+	}
+	if awaitExpr, ok := expr.(*frontend.AwaitExpr); ok {
+		return checkBorrowedEscape(awaitExpr.X, locals, globals, funcs, types, module, imports, state, effects, analysis, format)
+	}
+	if unary, ok := expr.(*frontend.UnaryExpr); ok {
+		return checkBorrowedEscape(unary.X, locals, globals, funcs, types, module, imports, state, effects, analysis, format)
+	}
+	if binary, ok := expr.(*frontend.BinaryExpr); ok {
+		if err := checkBorrowedEscape(binary.Left, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+			return err
+		}
+		return checkBorrowedEscape(binary.Right, locals, globals, funcs, types, module, imports, state, effects, analysis, format)
+	}
 	return nil
 }
 
 func checkBorrowedInoutEscape(expr frontend.Expr, targetName string, pos frontend.Position, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState) error {
 	return checkBorrowedEscape(expr, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
-		return fmt.Errorf("%s: borrowed local '%s' cannot escape via inout assignment to '%s'", frontend.FormatPos(pos), borrowedName, targetName)
+		return lifetimeDiagnosticf(pos, "borrowed local '%s' cannot escape via inout assignment to '%s'", borrowedName, targetName)
 	})
 }
 
@@ -1719,7 +3246,7 @@ func checkResourceTreeUsable(name string, typeName string, types map[string]*Typ
 		path := joinResourcePath(name, leaf)
 		source := resourceSourceForPath(path, state)
 		if source.unknown {
-			return fmt.Errorf("%s: ambiguous resource provenance for '%s' after control-flow merge", frontend.FormatPos(pos), path)
+			return ownershipDiagnosticf(pos, "ambiguous resource provenance for '%s' after control-flow merge", path)
 		}
 		if !source.known {
 			continue
@@ -1741,6 +3268,9 @@ func validateTypedTaskErrorType(typeName string, types map[string]*TypeInfo, pos
 	}
 	if info.Kind != TypeEnum {
 		return fmt.Errorf("%s: typed task error argument must be an enum", frontend.FormatPos(pos))
+	}
+	if reason := typeActorTaskSendabilityUnsafeReason(typeName, types, map[string]bool{}); reason != "" {
+		return fmt.Errorf("%s: typed task error payload must be sendable across task boundary: %s", frontend.FormatPos(pos), reason)
 	}
 	return nil
 }
@@ -1789,9 +3319,27 @@ func validateTypedActorMessageType(typeName string, types map[string]*TypeInfo, 
 			}
 		}
 		return nil
+	case TypeActor:
+		return typedActorUnsupportedTransferTypeError("actor handle", typeName)
+	case TypeCap:
+		return typedActorUnsupportedTransferTypeError("capability handle", typeName)
+	case TypePtr:
+		return typedActorUnsupportedTransferTypeError("pointer handle", typeName)
+	case TypeStr:
+		return typedActorUnsupportedTransferTypeError("string view", typeName)
+	case TypeSlice:
+		return typedActorUnsupportedTransferTypeError("slice view", typeName)
+	case TypeArray:
+		return typedActorUnsupportedTransferTypeError("array view", typeName)
+	case TypeOptional:
+		return typedActorUnsupportedTransferTypeError("optional wrapper", typeName)
 	default:
-		return fmt.Errorf("typed actor message payload must be value-only, got '%s'", typeName)
+		return typedActorUnsupportedTransferTypeError("non-value type", typeName)
 	}
+}
+
+func typedActorUnsupportedTransferTypeError(category string, typeName string) error {
+	return fmt.Errorf("typed actor message payload must be value-only, got %s '%s'", category, typeName)
 }
 
 func typedActorTypeContainsIsland(typeName string, types map[string]*TypeInfo, visiting map[string]bool) bool {
@@ -1901,10 +3449,10 @@ func consumeTypedActorTransferPayloads(
 		}
 		id, ok := expr.(*frontend.IdentExpr)
 		if !ok {
-			return fmt.Errorf("%s: island transfer payload must be a local value", frontend.FormatPos(expr.Pos()))
+			return ownershipDiagnosticf(expr.Pos(), "island transfer payload must be a local value")
 		}
 		if _, ok := locals[id.Name]; !ok {
-			return fmt.Errorf("%s: island transfer payload '%s' must be a local value", frontend.FormatPos(id.At), id.Name)
+			return ownershipDiagnosticf(id.At, "island transfer payload '%s' must be a local value", id.Name)
 		}
 		markConsumedResourceValue(id.Name, typeName, types, state, id.At)
 		return nil
@@ -1926,10 +3474,10 @@ func consumeTypedActorTransferPayloads(
 		}
 		id, ok := expr.(*frontend.IdentExpr)
 		if !ok {
-			return fmt.Errorf("%s: island-containing struct transfer payload must be a local value", frontend.FormatPos(expr.Pos()))
+			return ownershipDiagnosticf(expr.Pos(), "island-containing struct transfer payload must be a local value")
 		}
 		if _, ok := locals[id.Name]; !ok {
-			return fmt.Errorf("%s: island-containing transfer payload '%s' must be a local value", frontend.FormatPos(id.At), id.Name)
+			return ownershipDiagnosticf(id.At, "island-containing transfer payload '%s' must be a local value", id.Name)
 		}
 		markConsumedResourceValue(id.Name, typeName, types, state, id.At)
 		return nil
@@ -1956,10 +3504,10 @@ func consumeTypedActorTransferPayloads(
 		}
 		id, ok := expr.(*frontend.IdentExpr)
 		if !ok {
-			return fmt.Errorf("%s: island-containing enum transfer payload must be a local value", frontend.FormatPos(expr.Pos()))
+			return ownershipDiagnosticf(expr.Pos(), "island-containing enum transfer payload must be a local value")
 		}
 		if _, ok := locals[id.Name]; !ok {
-			return fmt.Errorf("%s: island-containing transfer payload '%s' must be a local value", frontend.FormatPos(id.At), id.Name)
+			return ownershipDiagnosticf(id.At, "island-containing transfer payload '%s' must be a local value", id.Name)
 		}
 		markConsumedResourceValue(id.Name, typeName, types, state, id.At)
 		return nil
@@ -2020,11 +3568,20 @@ func checkStructConstructorCallWithEffects(
 
 	orderedArgs := make([]frontend.Expr, 0, len(info.Fields))
 	orderedLabels := make([]string, 0, len(info.Fields))
-	structRegion := regionNone
+	fieldTree := make(map[string]int)
 	for _, field := range info.Fields {
 		arg, ok := argByLabel[field.Name]
 		if !ok {
 			return "", regionNone, true, fmt.Errorf("%s: missing field '%s'", frontend.FormatPos(e.At), field.Name)
+		}
+		if field.FunctionTypeValue {
+			markMutableFunctionTypedGlobalSource(arg, globals, analysis)
+			if _, err := validateFunctionTypeStructFieldBinding(resolvedType, field, arg, locals, globals, funcs, types, module, imports); err != nil {
+				return "", regionNone, true, err
+			}
+			orderedArgs = append(orderedArgs, arg)
+			orderedLabels = append(orderedLabels, field.Name)
+			continue
 		}
 		valType, valRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		if err != nil {
@@ -2034,10 +3591,7 @@ func checkStructConstructorCallWithEffects(
 			return "", regionNone, true, fmt.Errorf("%s: type mismatch for field '%s'", frontend.FormatPos(arg.Pos()), field.Name)
 		}
 		consumeIslandSourceLocals(arg, field.TypeName, locals, types, module, imports, state)
-		structRegion = joinRegion(structRegion, valRegion)
-		if structRegion == regionUnknown {
-			return "", regionNone, true, fmt.Errorf("%s: struct constructor mixes values from different regions", frontend.FormatPos(arg.Pos()))
-		}
+		appendRegionTree(fieldTree, field.Name, field.TypeName, arg, valRegion, types, state)
 		orderedArgs = append(orderedArgs, arg)
 		orderedLabels = append(orderedLabels, field.Name)
 	}
@@ -2045,7 +3599,9 @@ func checkStructConstructorCallWithEffects(
 	e.Name = resolvedType
 	e.Args = orderedArgs
 	e.ArgLabels = orderedLabels
-	return resolvedType, structRegion, true, nil
+	e.ResolvedType = resolvedType
+	state.setExprRegionTree(e, fieldTree)
+	return resolvedType, constructorRegionFromTree(fieldTree), true, nil
 }
 
 func reportBarePayloadMatchExprPatterns(

@@ -2,6 +2,7 @@ package x64
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 )
 
@@ -32,6 +33,29 @@ func TestObjectPatchRel32RejectsOutOfRangeTargets(t *testing.T) {
 	}
 	if err := PatchRel32(code, 4, -1<<31-16); err == nil {
 		t.Fatalf("expected out-of-range error for large backward target")
+	}
+}
+
+func TestObjectPatchRel32RejectsInvalidPatchOffsets(t *testing.T) {
+	cases := []struct {
+		name string
+		at   int
+	}{
+		{name: "negative", at: -1},
+		{name: "past_last_disp_byte", at: 5},
+		{name: "overflow_sized", at: int(^uint(0) >> 1)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			code := make([]byte, 8)
+			err := PatchRel32(code, tc.at, 8)
+			if err == nil {
+				t.Fatalf("expected invalid patch offset error")
+			}
+			if !strings.Contains(err.Error(), "patch offset") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 

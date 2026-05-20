@@ -5,9 +5,9 @@ stabilization point release.
 
 ## Wrapper
 
-- [x] `bash scripts/test_all.sh --help` documents `--keep-going`, `--json-only`,
+- [x] `bash scripts/ci/test-all.sh --help` documents `--keep-going`, `--json-only`,
       `--report-dir`, and exit codes.
-- [x] `bash scripts/test_all.sh --quick --json-only` emits valid JSON.
+- [x] `bash scripts/ci/test-all.sh --quick --json-only` emits valid JSON.
 - [x] `summary.json` records each step `exit_code` for pass/fail CI consumers.
 - [x] `summary.json` records top-level `step_count` and `failed_count`.
 - [x] `summary.json` is validated against step counts, exit codes, and log
@@ -33,7 +33,7 @@ stabilization point release.
 ## Required Commands
 
 - [ ] `go test ./compiler/... ./cli/... ./tools/...`
-- [ ] `bash scripts/test_all.sh --quick`
-- [ ] `bash scripts/test_all.sh --full`
-- [ ] `bash scripts/release_v0_6_gate.sh`
+- [ ] `bash scripts/ci/test-all.sh --quick`
+- [ ] `bash scripts/ci/test-all.sh --full`
+- [ ] `bash scripts/release/v0_6/gate.sh`
 - [ ] `git diff --check`

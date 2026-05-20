@@ -1,11 +1,11 @@
 {
   "schema": "tetra.reproducible-build-proof.v1alpha1",
   "timestamp_policy": "no wall-clock timestamps; release gate summary records run time",
-  "compiler_version": "v0.1.3",
-  "source": "examples/flow_struct_smoke.tetra",
-  "source_sha256": "sha256:c482f08b1b4991a360cd6e1c081c8ca1f7abf86a7be0b4c5ecdb712fe4c01387",
+  "compiler_version": "v0.3.0",
+  "source": "examples/ui_web_smoke.tetra",
+  "source_sha256": "sha256:b988bf77b2cc3dd6eee17b2b05228a29c825c2508803464fd1aff3b4a0c3d522",
   "target_count": 5,
-  "matched_count": 5,
+  "matched_count": 10,
   "mismatched_count": 0,
   "targets": [
     "linux-x64",
@@ -14,14 +14,19 @@
     "wasm32-wasi",
     "wasm32-web"
   ],
-  "native": {"target":"linux-x64","hash_a":"sha256:653b9137ab80acce41812f7fb97d3e38fd5f38648bf6def2b5d329b205f2e0c0","hash_b":"sha256:653b9137ab80acce41812f7fb97d3e38fd5f38648bf6def2b5d329b205f2e0c0","size_a":4096,"size_b":4096,"match":true},
-  "wasm": {"target":"wasm32-wasi","hash_a":"sha256:2429a257d0deecf64249d1e0123bddc33e6e7bb6ab71e28086e344956447c87a","hash_b":"sha256:2429a257d0deecf64249d1e0123bddc33e6e7bb6ab71e28086e344956447c87a","size_a":169,"size_b":169,"match":true},
+  "native": {"target":"linux-x64","extension":"","sidecar":false,"exists_a":true,"exists_b":true,"hash_a":"sha256:984a041c0b9b9a94fc899cf5ef71982a3fc56b9170ac772626581e277f62ee20","hash_b":"sha256:984a041c0b9b9a94fc899cf5ef71982a3fc56b9170ac772626581e277f62ee20","size_a":4096,"size_b":4096,"match":true},
+  "wasm": {"target":"wasm32-wasi","extension":".wasm","sidecar":false,"exists_a":true,"exists_b":true,"hash_a":"sha256:549715c4f50f27af5a5553649b2da3a01cc73e7318b2c715bdf3bd8492da5011","hash_b":"sha256:549715c4f50f27af5a5553649b2da3a01cc73e7318b2c715bdf3bd8492da5011","size_a":167,"size_b":167,"match":true},
   "artifacts": [
-    {"target":"linux-x64","hash_a":"sha256:653b9137ab80acce41812f7fb97d3e38fd5f38648bf6def2b5d329b205f2e0c0","hash_b":"sha256:653b9137ab80acce41812f7fb97d3e38fd5f38648bf6def2b5d329b205f2e0c0","size_a":4096,"size_b":4096,"match":true},
-    {"target":"macos-x64","hash_a":"sha256:b0bed6929e5581bfbd8e478262d16626cbd539084a5ccdfa47744a70af9f4c46","hash_b":"sha256:b0bed6929e5581bfbd8e478262d16626cbd539084a5ccdfa47744a70af9f4c46","size_a":8192,"size_b":8192,"match":true},
-    {"target":"windows-x64","hash_a":"sha256:8fc4003ef08a36fe6426726ff16169d037bab95842ed8be0855978afd0d85854","hash_b":"sha256:8fc4003ef08a36fe6426726ff16169d037bab95842ed8be0855978afd0d85854","size_a":2560,"size_b":2560,"match":true},
-    {"target":"wasm32-wasi","hash_a":"sha256:2429a257d0deecf64249d1e0123bddc33e6e7bb6ab71e28086e344956447c87a","hash_b":"sha256:2429a257d0deecf64249d1e0123bddc33e6e7bb6ab71e28086e344956447c87a","size_a":169,"size_b":169,"match":true},
-    {"target":"wasm32-web","hash_a":"sha256:e1ef17082e61b9145bf6612dcb8d3873bc525ae52ef307fae3a8dbfff0a0169e","hash_b":"sha256:e1ef17082e61b9145bf6612dcb8d3873bc525ae52ef307fae3a8dbfff0a0169e","size_a":133,"size_b":133,"match":true}
+    {"target":"linux-x64","extension":"","sidecar":false,"exists_a":true,"exists_b":true,"hash_a":"sha256:984a041c0b9b9a94fc899cf5ef71982a3fc56b9170ac772626581e277f62ee20","hash_b":"sha256:984a041c0b9b9a94fc899cf5ef71982a3fc56b9170ac772626581e277f62ee20","size_a":4096,"size_b":4096,"match":true},
+    {"target":"macos-x64","extension":"","sidecar":false,"exists_a":true,"exists_b":true,"hash_a":"sha256:55ece548a497badb9f02165e7d59e8263539a5399f721730258c34164d5c5528","hash_b":"sha256:55ece548a497badb9f02165e7d59e8263539a5399f721730258c34164d5c5528","size_a":8192,"size_b":8192,"match":true},
+    {"target":"windows-x64","extension":".exe","sidecar":false,"exists_a":true,"exists_b":true,"hash_a":"sha256:16d95a6e9eba9794849ebb738128379c0136eace966b7386fd6e71cc5f832f96","hash_b":"sha256:16d95a6e9eba9794849ebb738128379c0136eace966b7386fd6e71cc5f832f96","size_a":2560,"size_b":2560,"match":true},
+    {"target":"wasm32-wasi","extension":".wasm","sidecar":false,"exists_a":true,"exists_b":true,"hash_a":"sha256:549715c4f50f27af5a5553649b2da3a01cc73e7318b2c715bdf3bd8492da5011","hash_b":"sha256:549715c4f50f27af5a5553649b2da3a01cc73e7318b2c715bdf3bd8492da5011","size_a":167,"size_b":167,"match":true},
+    {"target":"wasm32-wasi","extension":".ui.json","sidecar":true,"exists_a":true,"exists_b":true,"hash_a":"sha256:00077bcf2dc625618af9e7f6779bf53c94dfbe8bcd881aacb2dea5099ab3fbea","hash_b":"sha256:00077bcf2dc625618af9e7f6779bf53c94dfbe8bcd881aacb2dea5099ab3fbea","size_a":1508,"size_b":1508,"match":true},
+    {"target":"wasm32-web","extension":".wasm","sidecar":false,"exists_a":true,"exists_b":true,"hash_a":"sha256:e01486958c6c3aa50eb59499fca472703deb1b6e2c7cc0769ddeba60122e0258","hash_b":"sha256:e01486958c6c3aa50eb59499fca472703deb1b6e2c7cc0769ddeba60122e0258","size_a":131,"size_b":131,"match":true},
+    {"target":"wasm32-web","extension":".mjs","sidecar":true,"exists_a":true,"exists_b":true,"hash_a":"sha256:45ecbb9b7aaff356f78a34c2bae2e51db3846701aa44d663226d18190ba1825f","hash_b":"sha256:45ecbb9b7aaff356f78a34c2bae2e51db3846701aa44d663226d18190ba1825f","size_a":1861,"size_b":1861,"match":true},
+    {"target":"wasm32-web","extension":".ui.json","sidecar":true,"exists_a":true,"exists_b":true,"hash_a":"sha256:00077bcf2dc625618af9e7f6779bf53c94dfbe8bcd881aacb2dea5099ab3fbea","hash_b":"sha256:00077bcf2dc625618af9e7f6779bf53c94dfbe8bcd881aacb2dea5099ab3fbea","size_a":1508,"size_b":1508,"match":true},
+    {"target":"wasm32-web","extension":".ui.web.mjs","sidecar":true,"exists_a":true,"exists_b":true,"hash_a":"sha256:4ea73882551b7961eac8343ff2dda20b284bc31e1d92e9b321b4527bdcbb1c30","hash_b":"sha256:4ea73882551b7961eac8343ff2dda20b284bc31e1d92e9b321b4527bdcbb1c30","size_a":1261,"size_b":1261,"match":true},
+    {"target":"wasm32-web","extension":".ui.html","sidecar":true,"exists_a":true,"exists_b":true,"hash_a":"sha256:77c58cdd40a79388d1077a64b302fd3c72c3e09fff67e9c9528e0c05ed4373cd","hash_b":"sha256:77c58cdd40a79388d1077a64b302fd3c72c3e09fff67e9c9528e0c05ed4373cd","size_a":765,"size_b":765,"match":true}
   ],
   "status": "pass"
 }

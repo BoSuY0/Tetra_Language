@@ -36,22 +36,12 @@ func ParseFile(src []byte, filename string) (*FileAST, error) {
 	return parsePreparedSource(src, parseSrc, filename)
 }
 
-// ParseFileDiagnostics performs limited top-level recovery for independent
-// release-boundary declarations, then parses the remaining source.
+// ParseFileDiagnostics performs limited top-level recovery for independent Flow
+// declarations, then parses the remaining source.
 func ParseFileDiagnostics(src []byte, filename string) (*FileAST, []Diagnostic) {
 	recovered, diagnostics := recoverTopLevelPlannedFeatures(src, filename)
-	if len(diagnostics) == 0 {
-		file, err := ParseFile(src, filename)
-		if err != nil {
-			return nil, []Diagnostic{diagnosticFromError(err)}
-		}
-		return file, nil
-	}
-	file, err := ParseFile(recovered, filename)
-	if err != nil {
-		diagnostics = append(diagnostics, diagnosticFromError(err))
-		return nil, diagnostics
-	}
+	file, recoveredDiagnostics := parseFileDiagnosticsWithTopLevelRecovery(recovered, filename)
+	diagnostics = append(diagnostics, recoveredDiagnostics...)
 	return file, diagnostics
 }
 
@@ -87,6 +77,11 @@ type parser struct {
 	closureSeq            int
 	closureDecls          []*FuncDecl
 }
+
+const (
+	maxI32NumberLiteral = int64(1<<31 - 1)
+	minI32NumberLiteral = int32(-1 << 31)
+)
 
 func newParser(src []byte, filename string) (*parser, error) {
 	p := &parser{l: newLexer(src, filename)}
@@ -811,6 +806,7 @@ func (p *parser) parseCapsuleDecl(public bool) (*CapsuleDecl, error) {
 		return nil, err
 	}
 	var entries []CapsuleEntryDecl
+	seen := map[string]struct{}{}
 	for p.cur.typ != TokenRBrace && p.cur.typ != TokenEOF {
 		if p.cur.typ == TokenSemicolon {
 			if err := p.next(); err != nil {
@@ -832,12 +828,17 @@ func (p *parser) parseCapsuleDecl(public bool) (*CapsuleDecl, error) {
 		if err != nil {
 			return nil, err
 		}
+		key := strings.Join(parts, ".")
+		if _, ok := seen[key]; ok {
+			return nil, diagnosticErrorf(entryPos, "duplicate capsule metadata key '%s'", key)
+		}
+		seen[key] = struct{}{}
 		if err := p.consumeOptionalSemicolon(); err != nil {
 			return nil, err
 		}
 		entries = append(entries, CapsuleEntryDecl{
 			At:    entryPos,
-			Key:   strings.Join(parts, "."),
+			Key:   key,
 			Value: value,
 		})
 	}
@@ -1717,6 +1718,17 @@ func (p *parser) startsTypeRef() bool {
 	return p.cur.typ == TokenIdent || p.cur.typ == TokenFn || p.cur.typ == TokenLBracket
 }
 
+func numberExprFromToken(tok token) (*NumberExpr, error) {
+	if tok.num > maxI32NumberLiteral {
+		return nil, integerLiteralRangeError(tok)
+	}
+	return &NumberExpr{At: tok.pos, Value: int32(tok.num)}, nil
+}
+
+func integerLiteralRangeError(tok token) error {
+	return diagnosticErrorf(tok.pos, "integer literal %s exceeds i32 range 0..2147483647", tok.lit)
+}
+
 func isFunctionLikeCallee(parts []string) bool {
 	if len(parts) == 0 {
 		return false
@@ -1911,6 +1923,9 @@ func (p *parser) parseTypeRefPrimary() (TypeRef, error) {
 		if _, err := p.expect(TokenRBracket); err != nil {
 			return TypeRef{}, err
 		}
+		if lenTok.num > maxI32NumberLiteral {
+			return TypeRef{}, integerLiteralRangeError(lenTok)
+		}
 		elem, err := p.parseTypeRef()
 		if err != nil {
 			return TypeRef{}, err
@@ -1949,12 +1964,28 @@ func (p *parser) parseFunctionTypeRef() (TypeRef, error) {
 		return TypeRef{}, err
 	}
 	params := make([]TypeRef, 0, 2)
+	paramOwnership := make([]string, 0, 2)
 	for p.cur.typ != TokenRParen {
+		ownership := ""
+		if p.cur.typ == TokenIdent && isOwnershipMarker(p.cur.lit) {
+			ownershipTok := p.cur
+			ownership = ownershipTok.lit
+			if err := p.next(); err != nil {
+				return TypeRef{}, err
+			}
+			if p.cur.typ == TokenIdent && isOwnershipMarker(p.cur.lit) {
+				return TypeRef{}, diagnosticErrorf(p.cur.pos, "ownership marker '%s' cannot follow ownership marker '%s'; use exactly one of borrow, inout, or consume before the function type parameter", p.cur.lit, ownershipTok.lit)
+			}
+			if !p.startsTypeRef() {
+				return TypeRef{}, diagnosticErrorf(ownershipTok.pos, "ownership marker '%s' must be followed by a function type parameter", ownershipTok.lit)
+			}
+		}
 		param, err := p.parseTypeRef()
 		if err != nil {
 			return TypeRef{}, err
 		}
 		params = append(params, param)
+		paramOwnership = append(paramOwnership, ownership)
 		if p.cur.typ != TokenComma {
 			break
 		}
@@ -1976,6 +2007,17 @@ func (p *parser) parseFunctionTypeRef() (TypeRef, error) {
 	if err != nil {
 		return TypeRef{}, err
 	}
+	var throws *TypeRef
+	if p.cur.typ == TokenThrows {
+		if err := p.next(); err != nil {
+			return TypeRef{}, err
+		}
+		throwRef, err := p.parseTypeRef()
+		if err != nil {
+			return TypeRef{}, err
+		}
+		throws = &throwRef
+	}
 	uses, clauses, err := p.parseFunctionModifiers()
 	if err != nil {
 		return TypeRef{}, err
@@ -1983,7 +2025,7 @@ func (p *parser) parseFunctionTypeRef() (TypeRef, error) {
 	if len(clauses) > 0 {
 		return TypeRef{}, diagnosticErrorf(clauses[0].At, "semantic clauses are not allowed in function types")
 	}
-	return TypeRef{At: at, Kind: TypeRefFunction, Params: params, Return: &ret, Uses: uses}, nil
+	return TypeRef{At: at, Kind: TypeRefFunction, Params: params, ParamOwnership: paramOwnership, Return: &ret, Throws: throws, Uses: uses}, nil
 }
 
 func (p *parser) parseOptionalNamedTypeArgs() ([]TypeRef, error) {
@@ -2361,7 +2403,20 @@ func plannedFeatureFromToken(tok token) (string, bool) {
 	if tok.typ != TokenIdent {
 		return "", false
 	}
-	return "", false
+	switch tok.lit {
+	case "class":
+		return "class declarations", true
+	case "trait":
+		return "trait declarations", true
+	case "interface":
+		return "interface declarations", true
+	case "typealias":
+		return "type alias declarations", true
+	case "macro":
+		return "macro declarations", true
+	default:
+		return "", false
+	}
 }
 
 func plannedFeatureError(pos Position, feature string) error {
@@ -2416,6 +2471,206 @@ func recoverTopLevelPlannedFeatures(src []byte, filename string) ([]byte, []Diag
 		}
 	}
 	return []byte(strings.Join(out, "\n")), diagnostics
+}
+
+func parseFileDiagnosticsWithTopLevelRecovery(src []byte, filename string) (*FileAST, []Diagnostic) {
+	lines := strings.Split(string(src), "\n")
+	var diagnostics []Diagnostic
+	removed := map[int]struct{}{}
+	for attempt := 0; attempt <= len(lines); attempt++ {
+		file, err := ParseFile([]byte(strings.Join(lines, "\n")), filename)
+		if err == nil {
+			return file, diagnostics
+		}
+		diag := adjustDiagnosticForRecoveredSyntheticClose(lines, diagnosticFromError(err))
+		diagnostics = append(diagnostics, diag)
+		if !isRecoverableTopLevelDiagnostic(diag) {
+			return nil, diagnostics
+		}
+		start, end, ok := topLevelDeclarationSpanForDiagnostic(lines, diagnostics[len(diagnostics)-1])
+		if !ok {
+			return nil, diagnostics
+		}
+		if _, exists := removed[start]; exists {
+			return nil, diagnostics
+		}
+		removed[start] = struct{}{}
+		blankSourceSpan(lines, start, end)
+	}
+	return nil, diagnostics
+}
+
+func isRecoverableTopLevelDiagnostic(diagnostic Diagnostic) bool {
+	return diagnostic.Message != "invalid UTF-8 encoding"
+}
+
+func topLevelDeclarationSpanForDiagnostic(lines []string, diagnostic Diagnostic) (int, int, bool) {
+	if len(lines) == 0 || diagnostic.Line < 1 {
+		return 0, 0, false
+	}
+	idx := diagnostic.Line - 1
+	if idx >= len(lines) {
+		idx = len(lines) - 1
+	}
+	if previousIdx, ok := previousDeclarationLineForSyntheticClose(lines, idx, diagnostic); ok {
+		idx = previousIdx
+	}
+	for ; idx >= 0; idx-- {
+		line := strings.TrimRight(lines[idx], "\r")
+		if isBlankOrCommentLine(line) {
+			continue
+		}
+		if !isTopLevelSourceLine(line) {
+			continue
+		}
+		if !startsRecoverableTopLevelDeclaration(line) {
+			return 0, 0, false
+		}
+		start := includeLeadingAttributeLines(lines, idx)
+		end := topLevelDeclarationEnd(lines, start)
+		return start, end, true
+	}
+	return 0, 0, false
+}
+
+func adjustDiagnosticForRecoveredSyntheticClose(lines []string, diagnostic Diagnostic) Diagnostic {
+	idx := diagnostic.Line - 1
+	if prev, ok := previousDeclarationLineForSyntheticClose(lines, idx, diagnostic); ok {
+		diagnostic.Line = prev + 1
+		diagnostic.Column = firstSourceColumn(lines[prev])
+	}
+	return diagnostic
+}
+
+func previousDeclarationLineForSyntheticClose(lines []string, idx int, diagnostic Diagnostic) (int, bool) {
+	if !strings.Contains(diagnostic.Message, "got }") || idx < 1 || idx >= len(lines) {
+		return 0, false
+	}
+	current := strings.TrimRight(lines[idx], "\r")
+	currentIsRecoveryBoundary := isBlankOrCommentLine(current) || (isTopLevelSourceLine(current) && startsRecoverableTopLevelDeclaration(current))
+	if !currentIsRecoveryBoundary {
+		return 0, false
+	}
+	for prev := idx - 1; prev >= 0; prev-- {
+		line := strings.TrimRight(lines[prev], "\r")
+		if isBlankOrCommentLine(line) {
+			continue
+		}
+		if isTopLevelSourceLine(line) {
+			return 0, false
+		}
+		return prev, true
+	}
+	return 0, false
+}
+
+func firstSourceColumn(line string) int {
+	for idx, r := range line {
+		if r != ' ' && r != '\t' && r != '\r' {
+			return idx + 1
+		}
+	}
+	return 1
+}
+
+func includeLeadingAttributeLines(lines []string, start int) int {
+	for idx := start - 1; idx >= 0; idx-- {
+		line := strings.TrimRight(lines[idx], "\r")
+		if isBlankOrCommentLine(line) {
+			continue
+		}
+		if !isTopLevelAttributeLine(line) {
+			break
+		}
+		start = idx
+	}
+	return start
+}
+
+func topLevelDeclarationEnd(lines []string, start int) int {
+	seenDeclarationHeader := !isTopLevelAttributeLine(lines[start])
+	for idx := start + 1; idx < len(lines); idx++ {
+		line := strings.TrimRight(lines[idx], "\r")
+		if isBlankOrCommentLine(line) {
+			continue
+		}
+		if !isTopLevelSourceLine(line) {
+			continue
+		}
+		if !seenDeclarationHeader {
+			if isTopLevelAttributeLine(line) {
+				continue
+			}
+			if startsFunctionLikeTopLevelDeclaration(line) {
+				seenDeclarationHeader = true
+				continue
+			}
+		}
+		return idx
+	}
+	return len(lines)
+}
+
+func blankSourceSpan(lines []string, start, end int) {
+	for idx := start; idx < end && idx < len(lines); idx++ {
+		lines[idx] = ""
+	}
+}
+
+func isBlankOrCommentLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	return trimmed == "" || strings.HasPrefix(trimmed, "//")
+}
+
+func isTopLevelSourceLine(line string) bool {
+	return !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t")
+}
+
+func isTopLevelAttributeLine(line string) bool {
+	return strings.HasPrefix(strings.TrimSpace(line), "@")
+}
+
+func startsRecoverableTopLevelDeclaration(line string) bool {
+	trimmed := strings.TrimSpace(strings.TrimSuffix(line, ":"))
+	if strings.HasPrefix(trimmed, "pub ") {
+		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "pub "))
+	}
+	if strings.HasPrefix(trimmed, "@") {
+		return true
+	}
+	return startsFunctionLikeTopLevelDeclaration(trimmed) || startsNonFunctionTopLevelDeclaration(trimmed)
+}
+
+func startsFunctionLikeTopLevelDeclaration(line string) bool {
+	trimmed := strings.TrimSpace(strings.TrimSuffix(line, ":"))
+	if strings.HasPrefix(trimmed, "pub ") {
+		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "pub "))
+	}
+	fields := strings.Fields(trimmed)
+	if len(fields) == 0 {
+		return false
+	}
+	switch fields[0] {
+	case "fn", "fun", "func":
+		return true
+	case "async":
+		return len(fields) > 1 && (fields[1] == "fn" || fields[1] == "fun" || fields[1] == "func")
+	default:
+		return false
+	}
+}
+
+func startsNonFunctionTopLevelDeclaration(line string) bool {
+	fields := strings.Fields(strings.TrimSpace(strings.TrimSuffix(line, ":")))
+	if len(fields) == 0 {
+		return false
+	}
+	switch fields[0] {
+	case "module", "import", "capsule", "enum", "struct", "state", "view", "extension", "impl", "protocol", "actor", "var", "val", "const", "closure", "property", "test":
+		return true
+	default:
+		return false
+	}
 }
 
 func diagnosticFromError(err error) Diagnostic {
@@ -2892,7 +3147,7 @@ func (p *parser) parseMatchPattern() (Expr, error) {
 		if err := p.next(); err != nil {
 			return nil, err
 		}
-		return &NumberExpr{At: tok.pos, Value: int32(tok.num)}, nil
+		return numberExprFromToken(tok)
 	case TokenIdent:
 		pos := p.cur.pos
 		parts, err := p.parsePathParts()
@@ -3132,6 +3387,16 @@ func (p *parser) parseUnary() (Expr, error) {
 		}
 		return &AwaitExpr{At: opTok.pos, X: x}, nil
 	}
+	if p.cur.typ == TokenMinus && p.peek.typ == TokenNumber && p.peek.num == maxI32NumberLiteral+1 {
+		opTok := p.cur
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		if err := p.next(); err != nil {
+			return nil, err
+		}
+		return p.parsePostfix(&NumberExpr{At: opTok.pos, Value: minI32NumberLiteral})
+	}
 	if p.cur.typ == TokenMinus || p.cur.typ == TokenBang {
 		opTok := p.cur
 		if err := p.next(); err != nil {
@@ -3153,7 +3418,11 @@ func (p *parser) parsePrimary() (Expr, error) {
 		if err := p.next(); err != nil {
 			return nil, err
 		}
-		return p.parsePostfix(&NumberExpr{At: tok.pos, Value: int32(tok.num)})
+		num, err := numberExprFromToken(tok)
+		if err != nil {
+			return nil, err
+		}
+		return p.parsePostfix(num)
 	case TokenTrue:
 		tok := p.cur
 		if err := p.next(); err != nil {

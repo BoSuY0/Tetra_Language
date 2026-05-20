@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,28 +42,52 @@ type exampleIndexEntry struct {
 const exampleIndexArtifact = "tetra.release.v0_2_0.examples-index.v1"
 
 func main() {
-	smokeListPath := flag.String("smoke-list", "", "path to tetra smoke --list --format=json output")
-	indexPath := flag.String("index", "docs/user/examples_index.md", "path to examples index markdown")
-	flag.Parse()
+	os.Exit(runValidateExampleIndex(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func runValidateExampleIndex(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("validate-example-index", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	smokeListPath := flags.String("smoke-list", "", "path to tetra smoke --list --format=json output")
+	indexPath := flags.String("index", "docs/user/examples_index.md", "path to examples index markdown")
+	docsPath := flags.String("docs", "", "path to examples index markdown for docs-only validation")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+
+	_ = stdout
+	if *docsPath != "" {
+		rawIndex, err := os.ReadFile(*docsPath)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		if err := validateExampleDocs(string(rawIndex)); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	}
 
 	if *smokeListPath == "" {
-		fmt.Fprintln(os.Stderr, "error: --smoke-list is required")
-		os.Exit(2)
+		fmt.Fprintln(stderr, "error: --smoke-list is required")
+		return 2
 	}
 	rawSmoke, err := os.ReadFile(*smokeListPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(stderr, err)
+		return 1
 	}
 	rawIndex, err := os.ReadFile(*indexPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(stderr, err)
+		return 1
 	}
 	if err := validateExampleIndex(rawSmoke, string(rawIndex)); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(stderr, err)
+		return 1
 	}
+	return 0
 }
 
 func validateExampleIndex(rawSmoke []byte, markdown string) error {
@@ -133,6 +158,28 @@ func validateExampleIndex(rawSmoke []byte, markdown string) error {
 	return nil
 }
 
+func validateExampleDocs(markdown string) error {
+	entries, err := parseExampleIndex(markdown)
+	if err != nil {
+		return err
+	}
+	for path, entry := range entries {
+		if entry.Purpose == "" {
+			return fmt.Errorf("example index %s missing purpose", path)
+		}
+		if entry.Target == "" {
+			return fmt.Errorf("example index %s missing target group", path)
+		}
+		if !strings.Contains(entry.Target, "native") && !strings.Contains(entry.Target, "wasm") {
+			return fmt.Errorf("example index %s target group %q must mention native or wasm", path, entry.Target)
+		}
+		if entry.Expected == "" {
+			return fmt.Errorf("example index %s missing expected behavior", path)
+		}
+	}
+	return nil
+}
+
 func parseExampleIndex(markdown string) (map[string]exampleIndexEntry, error) {
 	entries := map[string]exampleIndexEntry{}
 	for _, line := range strings.Split(markdown, "\n") {
@@ -185,8 +232,8 @@ func validateExamplePath(path string) error {
 	if strings.Contains(path, "..") {
 		return fmt.Errorf("src_path %q must not contain ..", path)
 	}
-	if !strings.HasSuffix(path, ".tetra") {
-		return fmt.Errorf("src_path %q must point to a .tetra file", path)
+	if !strings.HasSuffix(path, ".tetra") && !strings.HasSuffix(path, ".t4") {
+		return fmt.Errorf("src_path %q must point to a .tetra or .t4 file", path)
 	}
 	return nil
 }

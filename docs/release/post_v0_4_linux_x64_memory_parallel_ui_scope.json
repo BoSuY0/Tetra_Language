@@ -1,0 +1,103 @@
+{
+  "schema": "tetra.release.post_v0_4.memory_parallel_ui_scope.v1",
+  "status": "active-production-scope",
+  "target": "linux-x64",
+  "combined_gate_entrypoint": "bash scripts/release/post_v0_4/memory-parallel-ui-production-linux-x64-gate.sh --report-dir <dir>",
+  "compiler_combined_gate_entrypoint": "bash scripts/release/post_v0_4/memory-parallel-compiler-production-linux-x64-gate.sh --report-dir <dir>",
+  "ordered_layers": [
+    {
+      "id": "memory.production-core",
+      "order": 1,
+      "artifact": "tetra.memory.production.v1",
+      "release_gate_entrypoint": "bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir <dir>",
+      "required": [
+        "stable allocator/runtime memory model",
+        "ownership/borrow/consume escape model for heap, slices, structs, closures, and actor/task transfer",
+        "explicit cap.mem unsafe-boundary, heap-closure handle, callable mutable-capture heap escape, slice/struct borrow-escape, and function-typed slice aggregate borrow-escape compiler-test coverage cases in the memory release gate",
+        "unsafe/cap.mem/raw memory/memcpy/memset rules",
+        "runtime bounds checks or stable diagnostics",
+        "negative diagnostics for use-after-free, double-free, borrow escape, aliasing, and transfer",
+        "stress/fuzz-like evidence for allocator reuse and deterministic memcpy/memset length sweeps",
+        "checked-in memory examples for core memory, ownership, and unsafe cap.mem behavior",
+        "safe memory documentation",
+        "embedded completion audit mapping memory requirements to concrete artifacts",
+        "artifact hash manifest for memory release-gate evidence"
+      ]
+    },
+    {
+      "id": "parallel.production-core",
+      "order": 2,
+      "artifact": "tetra.parallel.production.v1",
+      "validator": "go run ./tools/cmd/validate-parallel-production --report <path>",
+      "release_gate_entrypoint": "bash scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh --report-dir <dir>",
+      "required": [
+        "production task scheduler",
+        "join/cancel/deadline/select/group lifecycle including cancel-wakes-deadline-join and nested cancellation propagation",
+        "actor mailbox backpressure, task actor mailbox handoff, and failure handling",
+        "task/actor/thread-boundary transfer rules",
+        "race-safety model or conservative compile-time rejections",
+        "stable diagnostics for cancellation, deadline, backpressure, invalid handle, transfer, double join, task-group use-after-close, and race-safety rejections",
+        "stress evidence for many tasks, actor messages, cancellation storms, and timeouts",
+        "explicit safe/unsafe/forbidden boundary compiler-test coverage for allowed immutable task targets, missing runtime/actors effects, unsafe-only operations, and forbidden mutable actor/task targets",
+        "safe/unsafe/forbidden parallelism documentation",
+        "embedded completion audit mapping parallel requirements to concrete artifacts"
+      ]
+    },
+    {
+      "id": "compiler.production-core",
+      "order": 3,
+      "artifact": "tetra.compiler.production.v1",
+      "validator": "go run ./tools/cmd/validate-compiler-production --report <path>",
+      "release_gate_entrypoint": "bash scripts/release/post_v0_4/compiler-production-linux-x64-smoke.sh --report-dir <dir>",
+      "required": [
+        "fresh CLI compiler build",
+        "v0.4.0 version identity",
+        "Linux-x64 native compile and run",
+        "Linux-x64 TOBJ object emission",
+        "interface-only compilation",
+        "wasm32-wasi module emission",
+        "wasm32-web module and loader emission",
+        "frontend parser fixture corpus",
+        "semantic diagnostics stability",
+        "IR verifier diagnostics",
+        "backend format emission",
+        "CLI build option diagnostics",
+        "compiler cache separation and deterministic backend output",
+        "smoke profile compilation matrix",
+        "embedded completion audit mapping compiler requirements to concrete artifacts"
+      ]
+    },
+    {
+      "id": "ui.production-runtime",
+      "order": 4,
+      "artifact": "tetra.ui.desktop-runtime.v1",
+      "validator": "go run ./tools/cmd/validate-ui-production-runtime --report <path>",
+      "release_gate_entrypoint": "bash scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh --report-dir <dir>",
+      "required": [
+        "Linux-x64 desktop UI runtime",
+        "window lifecycle",
+        "layout system",
+        "buttons, text, input, lists, panels, and state binding",
+        "input focus, input edit, and input change commit transitions",
+        "event loop with focus, input, change, select, click, timer, and redraw/update evidence",
+        "async UI commands",
+        "timer tick event evidence",
+        "redraw/update model",
+        "error and crash handling",
+        "stable UI diagnostics for invalid widget, command failure, and crash handling",
+        "real dogfood applications",
+        "compiler-emitted UI bundle/native-shell trace load evidence",
+        "sidecar-driven native UI runtime integration with tetra.ui.native-runtime.v1 consistency evidence",
+        "UI release gate rejecting mock, placeholder, metadata-only, and runtime-less evidence"
+      ]
+    }
+  ],
+  "explicit_exclusions": [
+    "non-Linux production runtime promotion",
+    "WASM/browser production UI",
+    "EcoNet",
+    "full v1.0 language guarantees",
+    "metadata-only, docs-only, build-only, fake, mock, or placeholder production evidence"
+  ],
+  "completion_rule": "The scope is complete only when all ordered layers have real Linux-x64 implementation, stable diagnostics, documentation, examples, smoke/stress/fuzz evidence, strict validators, release-gate evidence from a clean snapshot, and a completion audit mapping every requirement to concrete artifacts."
+}

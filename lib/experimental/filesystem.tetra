@@ -5,6 +5,10 @@ module lib.experimental.filesystem
 
 import lib.core.filesystem as stable_filesystem
 
+func exists(path: String, io_cap: cap.io) -> Bool
+uses io:
+    return stable_filesystem.exists(path, io_cap)
+
 func has_leading_slash(path: String) -> Bool:
     return stable_filesystem.has_leading_slash(path)
 

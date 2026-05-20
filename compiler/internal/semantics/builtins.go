@@ -113,6 +113,7 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 		"core.ptr_add":                    {ParamTypes: []string{"ptr", "i32", capMem.Name}, ParamSlots: 3, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
 		"core.mmio_read_i32":              {ParamTypes: []string{"ptr", capIO.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
 		"core.mmio_write_i32":             {ParamTypes: []string{"ptr", "i32", capIO.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.fs_exists":                  {ParamTypes: []string{"str", capIO.Name}, ParamSlots: 3, ReturnType: "bool", ReturnSlots: 1, ReturnRegionParam: regionNone},
 		"core.sym_addr":                   {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: "ptr", ReturnSlots: ptrInfo.SlotCount, ReturnRegionParam: regionNone},
 		"core.ctx_switch":                 {ParamTypes: []string{"ptr", "ptr", capMem.Name}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
 		"core.time_now_ms":                {ParamTypes: nil, ParamSlots: 0, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
@@ -141,7 +142,10 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 		"core.select2_i32":                {ParamTypes: []string{"task.i32", "i32"}, ParamSlots: taskHandleI32.SlotCount + 1, ReturnType: taskResultI32.Name, ReturnSlots: taskResultI32.SlotCount, ReturnRegionParam: regionNone},
 		"core.actor_dispatch":             {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
 		"core.actor_main_entry_id":        {ParamTypes: nil, ParamSlots: 0, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.actor_node_connect":         {ParamTypes: []string{"i32", "i32"}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
+		"core.actor_node_status":          {ParamTypes: []string{"i32"}, ParamSlots: 1, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
 		"core.spawn":                      {ParamTypes: []string{"str"}, ParamSlots: 2, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
+		"core.spawn_remote":               {ParamTypes: []string{"i32", "str"}, ParamSlots: 3, ReturnType: actorInfo.Name, ReturnSlots: actorInfo.SlotCount, ReturnRegionParam: regionNone},
 		"core.send":                       {ParamTypes: []string{"actor", "i32"}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
 		"core.send_msg":                   {ParamTypes: []string{"actor", "i32", "i32"}, ParamSlots: 3, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
 		"core.send_typed":                 {ParamTypes: []string{"actor", "enum"}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
@@ -315,7 +319,7 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 		"core.task_join_i32", "core.task_join_i32_typed", "core.task_join_group_i32_typed", "core.task_join_result_i32", "core.task_join_until_i32",
 		"core.task_poll_i32", "core.select2_i32",
 		"core.send_msg", "core.recv_msg", "core.recv_poll", "core.recv_until", "core.recv_msg_until", "core.send_typed", "core.recv_typed",
-		"core.actor_dispatch", "core.actor_main_entry_id",
+		"core.actor_dispatch", "core.actor_main_entry_id", "core.actor_node_connect", "core.actor_node_status", "core.spawn_remote",
 		"core.consent_token", "core.secret_seal_i32", "core.secret_unseal_i32":
 		return name, true
 	default:

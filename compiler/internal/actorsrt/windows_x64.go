@@ -20,8 +20,8 @@ const (
 // entries[0] must be the program entry symbol (main).
 // Actor entry IDs are computed as FNV-1a 32-bit hashes of the string literals used in `core.spawn(...)`.
 func BuildWindowsX64(entries []string) (*tobj.Object, error) {
-	if len(entries) == 0 || entries[0] == "" {
-		return nil, fmt.Errorf("missing entry symbols (need main at index 0)")
+	if err := validateRuntimeEntrySymbols(entries); err != nil {
+		return nil, err
 	}
 
 	e := &x64.Emitter{}
@@ -74,6 +74,9 @@ func BuildWindowsX64(entries []string) (*tobj.Object, error) {
 		return nil, err
 	}
 	if err := emitFunc("__tetra_actor_send_commit_impl", func() error { return emitSendCommit(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_actor_net_pump", func() error { return emitActorNetPumpNoop(e) }); err != nil {
 		return nil, err
 	}
 	if err := emitFunc("__tetra_actor_recv_impl", func() error { return emitRecv(e, &callPatches) }); err != nil {

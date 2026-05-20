@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,7 @@ import (
 
 type vaultIndex struct {
 	RecordsRaw json.RawMessage `json:"records"`
-	Records    []vaultRecord
+	Records    []vaultRecord   `json:"-"`
 }
 
 type vaultRecord struct {
@@ -55,7 +56,7 @@ func validateEcoVault(store string) error {
 		return err
 	}
 	var index vaultIndex
-	if err := json.Unmarshal(raw, &index); err != nil {
+	if err := strictUnmarshalJSON(raw, &index); err != nil {
 		return err
 	}
 	if err := unmarshalRecords(index.RecordsRaw, &index.Records); err != nil {
@@ -86,8 +87,22 @@ func unmarshalRecords(raw json.RawMessage, out *[]vaultRecord) error {
 	if bytes.Equal(trimmed, []byte("null")) || trimmed[0] != '[' {
 		return fmt.Errorf("records must be an array, not null")
 	}
-	if err := json.Unmarshal(trimmed, out); err != nil {
+	if err := strictUnmarshalJSON(trimmed, out); err != nil {
 		return fmt.Errorf("records: %w", err)
+	}
+	return nil
+}
+
+func strictUnmarshalJSON(raw []byte, out any) error {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(out); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); err != nil && err != io.EOF {
+		return err
+	} else if err == nil {
+		return fmt.Errorf("invalid JSON after top-level value")
 	}
 	return nil
 }

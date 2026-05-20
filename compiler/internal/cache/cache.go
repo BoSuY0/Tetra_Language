@@ -16,6 +16,8 @@ import (
 	"tetra_language/compiler/internal/version"
 )
 
+const compilerCacheABIVersion = "linux-x64-memory-runtime-abi-v3"
+
 func cacheDir(root, target string) string {
 	return filepath.Join(root, ".tetra_cache", target)
 }
@@ -29,6 +31,8 @@ func cacheKey(module, target, buildTag string, srcHash, depSigHash [32]byte) str
 	h.Write([]byte(buildTag))
 	h.Write([]byte{0})
 	h.Write([]byte(version.CompilerVersion))
+	h.Write([]byte{0})
+	h.Write([]byte(compilerCacheABIVersion))
 	h.Write([]byte{0})
 	h.Write(srcHash[:])
 	h.Write(depSigHash[:])

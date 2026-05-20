@@ -4,8 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -350,6 +354,53 @@ func TestEcoUnpackRejectsUnsafeArchivePath(t *testing.T) {
 	}
 }
 
+func TestEcoUnpackRejectsArchiveSymlinkEntry(t *testing.T) {
+	dir := t.TempDir()
+	pkgPath := filepath.Join(dir, "symlink-entry.todex")
+	writeTodexWithSymlinkEntry(t, pkgPath)
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "unpack", pkgPath, "-C", filepath.Join(dir, "out")}, &stdout, &stderr); code == 0 {
+		t.Fatalf("expected symlink archive entry rejection, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "unsupported archive entry type") {
+		t.Fatalf("stderr = %q, want unsupported archive entry type", stderr.String())
+	}
+}
+
+func TestEcoUnpackRejectsOutputSymlinkAncestor(t *testing.T) {
+	dir := t.TempDir()
+	_, capsule := writeEcoProjectFixture(t, dir)
+	pkgPath := filepath.Join(dir, "demo.todex")
+	outDir := filepath.Join(dir, "out")
+	outside := filepath.Join(dir, "outside")
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(outDir, "src")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "unpack", pkgPath, "-C", outDir}, &stdout, &stderr); code == 0 {
+		t.Fatalf("expected output symlink rejection, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "symlink") {
+		t.Fatalf("stderr = %q, want symlink rejection", stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(outside, "main.tetra")); !os.IsNotExist(err) {
+		t.Fatalf("unpack wrote through symlink ancestor: %v", err)
+	}
+}
+
 func TestEcoNeedMapTrustSnapshotAndMaterialize(t *testing.T) {
 	dir := t.TempDir()
 	capsule := filepath.Join(dir, "Tetra.capsule")
@@ -493,6 +544,68 @@ capsule App:
 	}
 }
 
+func TestEcoTrustSnapshotRejectsUnreadableVaultStore(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, store string)
+	}{
+		{
+			name: "missing index",
+			setup: func(t *testing.T, store string) {
+				if err := os.MkdirAll(store, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name: "broken index",
+			setup: func(t *testing.T, store string) {
+				if err := os.MkdirAll(store, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(store, "records.json"), []byte("{not json\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			capsule := filepath.Join(dir, "Tetra.capsule")
+			writeCapsuleFile(t, capsule, `manifest "tetra.capsule.v1"
+capsule App:
+    id "tetra://app"
+    version "0.1.0"
+    target "linux-x64"
+    permission "io"
+`)
+			lockPath := filepath.Join(dir, "tetra.lock.json")
+			store := filepath.Join(dir, "vault")
+			trustPath := filepath.Join(dir, "trust.json")
+			tt.setup(t, store)
+
+			var stdout, stderr bytes.Buffer
+			if code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lockPath, capsule}, &stdout, &stderr); code != 0 {
+				t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+			stdout.Reset()
+			stderr.Reset()
+			if code := runCLI([]string{"eco", "trust", "snapshot", "--lock", lockPath, "--store", store, "-o", trustPath}, &stdout, &stderr); code == 0 {
+				t.Fatalf("expected eco trust snapshot failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+			}
+			if !strings.Contains(stderr.String(), "read vault store") {
+				t.Fatalf("unexpected stderr: %q", stderr.String())
+			}
+			if _, err := os.Stat(trustPath); err == nil {
+				t.Fatalf("trust snapshot should not be written for unreadable vault store")
+			} else if !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestEcoBetaPublishDownloadAndTetraHubPath(t *testing.T) {
 	dir := t.TempDir()
 	project := filepath.Join(dir, "project")
@@ -601,6 +714,401 @@ capsule Demo:
 	}
 }
 
+func TestEcoPublishStableChannelProducesProductionMetadata(t *testing.T) {
+	dir := t.TempDir()
+	project, capsule := writeEcoProjectFixture(t, dir)
+	pkgPath := filepath.Join(dir, "demo.todex")
+	registry := filepath.Join(dir, "registry")
+	store := filepath.Join(dir, "vault")
+	lockPath := filepath.Join(dir, "tetra.lock.json")
+	trustPath := filepath.Join(dir, "trust.snapshot.json")
+	downloadPath := filepath.Join(dir, "downloaded-stable.todex")
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "vault", "add", "--store", store, "--kind", "source", filepath.Join(project, "src", "main.tetra")}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco vault add exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lockPath, capsule}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "trust", "snapshot", "--lock", lockPath, "--store", store, "-o", trustPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco trust snapshot exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "publish", "--package", pkgPath, "--registry", registry, "--target", "linux-x64", "--trust", trustPath, "--channel", "stable", "--hub", "production"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco stable publish exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Published (stable)") {
+		t.Fatalf("stable publish stdout = %q", stdout.String())
+	}
+
+	metaPath := filepath.Join(registry, "packages", "tetra_demo", "0.1.0", "linux-x64", "metadata.json")
+	rawMeta, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatalf("read publish metadata: %v", err)
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(rawMeta, &meta); err != nil {
+		t.Fatalf("decode publish metadata: %v\n%s", err, string(rawMeta))
+	}
+	if meta["schema"] != "tetra.eco.publish.v1" || meta["channel"] != "stable" || meta["hub"] != "production" {
+		t.Fatalf("stable publish metadata = %#v", meta)
+	}
+	cmd := testCommand(t, "go", "run", "./tools/cmd/validate-eco-publish", "--registry", registry, "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "--channel", "stable")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("validate-eco-publish stable failed: %v\n%s", err, out)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "download", "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "--registry", registry, "-o", downloadPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco stable download exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(downloadPath); err != nil {
+		t.Fatalf("stable downloaded package missing: %v", err)
+	}
+}
+
+func TestEcoTetraHubStableChannelProducesProductionMetadata(t *testing.T) {
+	dir := t.TempDir()
+	project, capsule := writeEcoProjectFixture(t, dir)
+	pkgPath := filepath.Join(dir, "demo.todex")
+	store := filepath.Join(dir, "tetrahub")
+	vaultStore := filepath.Join(dir, "vault")
+	lockPath := filepath.Join(dir, "tetra.lock.json")
+	trustPath := filepath.Join(dir, "trust.snapshot.json")
+	downloadPath := filepath.Join(dir, "hub-downloaded-stable.todex")
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "vault", "add", "--store", vaultStore, "--kind", "source", filepath.Join(project, "src", "main.tetra")}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco vault add exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lockPath, capsule}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "trust", "snapshot", "--lock", lockPath, "--store", vaultStore, "-o", trustPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco trust snapshot exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "publish", "--package", pkgPath, "--store", store, "--target", "linux-x64", "--trust", trustPath, "--channel", "stable"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub stable publish exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "TetraHub stable published") {
+		t.Fatalf("stable tetrahub publish stdout = %q", stdout.String())
+	}
+
+	metaPath := filepath.Join(store, "packages", "tetra_demo", "0.1.0", "linux-x64", "metadata.json")
+	rawMeta, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatalf("read tetrahub metadata: %v", err)
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(rawMeta, &meta); err != nil {
+		t.Fatalf("decode tetrahub metadata: %v\n%s", err, string(rawMeta))
+	}
+	if meta["schema"] != "tetra.eco.publish.v1" || meta["channel"] != "stable" || meta["hub"] != "tetrahub-stable" {
+		t.Fatalf("stable tetrahub metadata = %#v", meta)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "download", "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "--store", store, "-o", downloadPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub stable download exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(downloadPath); err != nil {
+		t.Fatalf("stable tetrahub downloaded package missing: %v", err)
+	}
+}
+
+func TestEcoTetraHubMirrorCopiesStablePackageAndWritesReport(t *testing.T) {
+	dir := t.TempDir()
+	project, capsule := writeEcoProjectFixture(t, dir)
+	pkgPath := filepath.Join(dir, "demo.todex")
+	sourceStore := filepath.Join(dir, "tetrahub-a")
+	destStore := filepath.Join(dir, "tetrahub-b")
+	vaultStore := filepath.Join(dir, "vault")
+	lockPath := filepath.Join(dir, "tetra.lock.json")
+	trustPath := filepath.Join(dir, "trust.snapshot.json")
+	reportPath := filepath.Join(dir, "mirror.report.json")
+	downloadPath := filepath.Join(dir, "mirrored-download.todex")
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "vault", "add", "--store", vaultStore, "--kind", "source", filepath.Join(project, "src", "main.tetra")}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco vault add exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lockPath, capsule}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "trust", "snapshot", "--lock", lockPath, "--store", vaultStore, "-o", trustPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco trust snapshot exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "publish", "--package", pkgPath, "--store", sourceStore, "--target", "linux-x64", "--trust", trustPath, "--channel", "stable"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub stable publish exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "mirror", "--from", sourceStore, "--to", destStore, "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "-o", reportPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub mirror exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "TetraHub mirrored") {
+		t.Fatalf("mirror stdout = %q", stdout.String())
+	}
+	rawReport, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read mirror report: %v", err)
+	}
+	var report map[string]any
+	if err := json.Unmarshal(rawReport, &report); err != nil {
+		t.Fatalf("decode mirror report: %v\n%s", err, string(rawReport))
+	}
+	if report["schema"] != "tetra.eco.mirror.v1" || report["id"] != "tetra://demo" || report["target"] != "linux-x64" {
+		t.Fatalf("mirror report = %#v", report)
+	}
+	if report["package_sha256"] == "" || report["metadata_sha256"] == "" || report["trust_snapshot_sha256"] == "" {
+		t.Fatalf("mirror report missing hashes: %#v", report)
+	}
+	cmd := testCommand(t, "go", "run", "./tools/cmd/validate-eco-mirror", "--mirror", reportPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("validate mirror report failed: %v\n%s", err, out)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "download", "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "--store", destStore, "-o", downloadPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub mirrored download exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	sourceMeta, err := os.ReadFile(filepath.Join(sourceStore, "packages", "tetra_demo", "0.1.0", "linux-x64", "metadata.json"))
+	if err != nil {
+		t.Fatalf("read source metadata: %v", err)
+	}
+	destMeta, err := os.ReadFile(filepath.Join(destStore, "packages", "tetra_demo", "0.1.0", "linux-x64", "metadata.json"))
+	if err != nil {
+		t.Fatalf("read mirrored metadata: %v", err)
+	}
+	if !bytes.Equal(sourceMeta, destMeta) {
+		t.Fatalf("mirrored metadata changed\nsource=%s\ndest=%s", sourceMeta, destMeta)
+	}
+}
+
+func TestEcoTetraHubFetchMirrorsStablePackageOverHTTP(t *testing.T) {
+	dir := t.TempDir()
+	project, capsule := writeEcoProjectFixture(t, dir)
+	pkgPath := filepath.Join(dir, "demo.todex")
+	sourceStore := filepath.Join(dir, "tetrahub-source")
+	destStore := filepath.Join(dir, "tetrahub-fetched")
+	vaultStore := filepath.Join(dir, "vault")
+	lockPath := filepath.Join(dir, "tetra.lock.json")
+	trustPath := filepath.Join(dir, "trust.snapshot.json")
+	reportPath := filepath.Join(dir, "fetch.report.json")
+	downloadPath := filepath.Join(dir, "fetched-download.todex")
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "vault", "add", "--store", vaultStore, "--kind", "source", filepath.Join(project, "src", "main.tetra")}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco vault add exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "verify", "--target", "linux-x64", "--lock", lockPath, capsule}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco verify exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "trust", "snapshot", "--lock", lockPath, "--store", vaultStore, "-o", trustPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco trust snapshot exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "publish", "--package", pkgPath, "--store", sourceStore, "--target", "linux-x64", "--trust", trustPath, "--channel", "stable"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub stable publish exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	server := httptest.NewServer(http.FileServer(http.Dir(sourceStore)))
+	defer server.Close()
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "fetch", "--url", server.URL, "--to", destStore, "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "-o", reportPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub fetch exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "TetraHub fetched") {
+		t.Fatalf("fetch stdout = %q", stdout.String())
+	}
+	cmd := testCommand(t, "go", "run", "./tools/cmd/validate-eco-mirror", "--mirror", reportPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("validate fetch mirror report failed: %v\n%s", err, out)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "download", "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "--store", destStore, "-o", downloadPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub fetched download exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(downloadPath); err != nil {
+		t.Fatalf("fetched package missing: %v", err)
+	}
+}
+
+func TestEcoTetraHubFetchRejectsTamperedHTTPPackage(t *testing.T) {
+	dir := t.TempDir()
+	_, capsule := writeEcoProjectFixture(t, dir)
+	pkgPath := filepath.Join(dir, "demo.todex")
+	sourceStore := filepath.Join(dir, "tetrahub-source")
+	destStore := filepath.Join(dir, "tetrahub-fetched")
+	reportPath := filepath.Join(dir, "fetch.report.json")
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "publish", "--package", pkgPath, "--store", sourceStore, "--target", "linux-x64", "--channel", "stable"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub stable publish exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	publishedPackage := filepath.Join(sourceStore, "packages", "tetra_demo", "0.1.0", "linux-x64", "package.todex")
+	raw, err := os.ReadFile(publishedPackage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(publishedPackage, append(raw, []byte("tampered")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	server := httptest.NewServer(http.FileServer(http.Dir(sourceStore)))
+	defer server.Close()
+
+	stdout.Reset()
+	stderr.Reset()
+	code := runCLI([]string{"eco", "tetrahub", "fetch", "--url", server.URL, "--to", destStore, "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "-o", reportPath}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected fetch failure for tampered package, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "package size mismatch") && !strings.Contains(stderr.String(), "package hash mismatch") {
+		t.Fatalf("stderr = %q, want package integrity failure", stderr.String())
+	}
+	if _, err := os.Stat(reportPath); !os.IsNotExist(err) {
+		t.Fatalf("fetch report should not be written after integrity failure: %v", err)
+	}
+}
+
+func TestEcoTetraHubMirrorRejectsTamperedSourcePackage(t *testing.T) {
+	dir := t.TempDir()
+	_, capsule := writeEcoProjectFixture(t, dir)
+	pkgPath := filepath.Join(dir, "demo.todex")
+	sourceStore := filepath.Join(dir, "tetrahub-a")
+	destStore := filepath.Join(dir, "tetrahub-b")
+	reportPath := filepath.Join(dir, "mirror.report.json")
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "publish", "--package", pkgPath, "--store", sourceStore, "--target", "linux-x64", "--channel", "stable"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub stable publish exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	publishedPackage := filepath.Join(sourceStore, "packages", "tetra_demo", "0.1.0", "linux-x64", "package.todex")
+	raw, err := os.ReadFile(publishedPackage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(publishedPackage, append(raw, []byte("tampered")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code := runCLI([]string{"eco", "tetrahub", "mirror", "--from", sourceStore, "--to", destStore, "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "-o", reportPath}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected mirror failure for tampered package, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "package size mismatch") && !strings.Contains(stderr.String(), "package hash mismatch") {
+		t.Fatalf("stderr = %q, want package integrity failure", stderr.String())
+	}
+	if _, err := os.Stat(reportPath); !os.IsNotExist(err) {
+		t.Fatalf("mirror report should not be written after integrity failure: %v", err)
+	}
+}
+
+func TestEcoTetraHubMirrorRejectsDestinationSymlinkTraversal(t *testing.T) {
+	dir := t.TempDir()
+	_, capsule := writeEcoProjectFixture(t, dir)
+	pkgPath := filepath.Join(dir, "demo.todex")
+	sourceStore := filepath.Join(dir, "tetrahub-a")
+	destStore := filepath.Join(dir, "tetrahub-b")
+	outside := filepath.Join(dir, "outside")
+	reportPath := filepath.Join(dir, "mirror.report.json")
+
+	var stdout, stderr bytes.Buffer
+	if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := runCLI([]string{"eco", "tetrahub", "publish", "--package", pkgPath, "--store", sourceStore, "--target", "linux-x64", "--channel", "stable"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("eco tetrahub stable publish exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	targetParent := filepath.Join(destStore, "packages", "tetra_demo", "0.1.0")
+	if err := os.MkdirAll(targetParent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(targetParent, "linux-x64")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code := runCLI([]string{"eco", "tetrahub", "mirror", "--from", sourceStore, "--to", destStore, "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "-o", reportPath}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("expected mirror symlink destination failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "symlink") {
+		t.Fatalf("stderr = %q, want symlink rejection", stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(outside, "package.todex")); !os.IsNotExist(err) {
+		t.Fatalf("mirror wrote through destination symlink: %v", err)
+	}
+	if _, err := os.Stat(reportPath); !os.IsNotExist(err) {
+		t.Fatalf("mirror report should not be written after symlink failure: %v", err)
+	}
+}
+
 func TestEcoDownloadRejectsTamperedPublishedPackage(t *testing.T) {
 	dir := t.TempDir()
 	project := filepath.Join(dir, "project")
@@ -652,6 +1160,101 @@ capsule Demo:
 	}
 	if !strings.Contains(stderr.String(), "package hash mismatch") {
 		t.Fatalf("unexpected stderr: %q", stderr.String())
+	}
+}
+
+func TestEcoDownloadRejectsPublishMetadataUnknownFieldsAndKeyMismatches(t *testing.T) {
+	tests := []struct {
+		name      string
+		mutate    func(map[string]any)
+		rawSuffix string
+		want      string
+	}{
+		{
+			name: "unknown field",
+			mutate: func(meta map[string]any) {
+				meta["unexpected"] = true
+			},
+			want: "unknown field",
+		},
+		{
+			name: "extra field",
+			mutate: func(meta map[string]any) {
+				meta["extra"] = map[string]any{"note": "not in publish contract"}
+			},
+			want: "unknown field",
+		},
+		{
+			name: "capsule id mismatch",
+			mutate: func(meta map[string]any) {
+				capsule := meta["capsule"].(map[string]any)
+				capsule["id"] = "tetra://other"
+			},
+			want: "capsule id mismatch",
+		},
+		{
+			name: "download target mismatch",
+			mutate: func(meta map[string]any) {
+				downloads := meta["downloads"].([]any)
+				download := downloads[0].(map[string]any)
+				download["target"] = "windows-x64"
+			},
+			want: "download target mismatch",
+		},
+		{
+			name:      "trailing JSON payload",
+			rawSuffix: "\n{}",
+			want:      "trailing",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			_, capsule := writeEcoProjectFixture(t, dir)
+			pkgPath := filepath.Join(dir, "demo.todex")
+			registry := filepath.Join(dir, "registry")
+			downloadPath := filepath.Join(dir, "downloaded.todex")
+
+			var stdout, stderr bytes.Buffer
+			if code := runCLI([]string{"eco", "pack", "--project", capsule, "-o", pkgPath}, &stdout, &stderr); code != 0 {
+				t.Fatalf("eco pack --project exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+			stdout.Reset()
+			stderr.Reset()
+			if code := runCLI([]string{"eco", "publish", "--package", pkgPath, "--registry", registry, "--target", "linux-x64"}, &stdout, &stderr); code != 0 {
+				t.Fatalf("eco publish exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+
+			metaPath := filepath.Join(registry, "packages", "tetra_demo", "0.1.0", "linux-x64", "metadata.json")
+			rawMeta, err := os.ReadFile(metaPath)
+			if err != nil {
+				t.Fatalf("read publish metadata: %v", err)
+			}
+			var meta map[string]any
+			if err := json.Unmarshal(rawMeta, &meta); err != nil {
+				t.Fatalf("decode publish metadata: %v\n%s", err, string(rawMeta))
+			}
+			if tt.mutate != nil {
+				tt.mutate(meta)
+			}
+			rawMeta, err = json.MarshalIndent(meta, "", "  ")
+			if err != nil {
+				t.Fatalf("encode publish metadata: %v", err)
+			}
+			rawMeta = append(rawMeta, tt.rawSuffix...)
+			if err := os.WriteFile(metaPath, append(rawMeta, '\n'), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			stdout.Reset()
+			stderr.Reset()
+			if code := runCLI([]string{"eco", "download", "--id", "tetra://demo", "--version", "0.1.0", "--target", "linux-x64", "--registry", registry, "-o", downloadPath}, &stdout, &stderr); code == 0 {
+				t.Fatalf("expected eco download failure, stdout=%q stderr=%q", stdout.String(), stderr.String())
+			}
+			if !strings.Contains(stderr.String(), tt.want) {
+				t.Fatalf("unexpected stderr: got %q, want %q", stderr.String(), tt.want)
+			}
+		})
 	}
 }
 
@@ -876,6 +1479,70 @@ func writeTarGzFixture(t *testing.T, path string, name string, body []byte) {
 		t.Fatal(err)
 	}
 	if _, err := tw.Write(body); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeTodexWithSymlinkEntry(t *testing.T, path string) {
+	t.Helper()
+	capsule := []byte(`manifest "tetra.capsule.v1"
+capsule Demo:
+    id "tetra://demo"
+    version "0.1.0"
+    target "linux-x64"
+`)
+	emptySum := sha256.Sum256(nil)
+	capsuleSum := sha256.Sum256(capsule)
+	files := []ecoPackageMetadataFile{
+		{Path: "Capsule.t4", SHA256: "sha256:" + hex.EncodeToString(capsuleSum[:]), Size: int64(len(capsule))},
+		{Path: "src/main.tetra", SHA256: "sha256:" + hex.EncodeToString(emptySum[:]), Size: 0},
+	}
+	metadata := ecoPackageMetadata{
+		Schema:           ecoPackageSchemaV1,
+		Compression:      "gzip",
+		MTimeUnix:        0,
+		Reproducible:     true,
+		ManifestSchema:   capsuleManifestSchemaV1,
+		PermissionsModel: ecoPermissionsModelV1,
+		FileCount:        len(files),
+		Files:            files,
+	}
+	fingerprintSum := sha256.Sum256([]byte(packageMetadataFingerprint(files)))
+	metadata.BuildInputsSHA = "sha256:" + hex.EncodeToString(fingerprintSum[:])
+	rawMetadata, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawMetadata = append(rawMetadata, '\n')
+
+	out, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz := gzip.NewWriter(out)
+	tw := tar.NewWriter(gz)
+	if err := tw.WriteHeader(&tar.Header{Name: "Capsule.t4", Mode: 0o644, Size: int64(len(capsule))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(capsule); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.WriteHeader(&tar.Header{Name: "src/main.tetra", Typeflag: tar.TypeSymlink, Linkname: "../outside.tetra", Mode: 0o777}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.WriteHeader(&tar.Header{Name: ecoPackageMetadataPath, Mode: 0o644, Size: int64(len(rawMetadata))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(rawMetadata); err != nil {
 		t.Fatal(err)
 	}
 	if err := tw.Close(); err != nil {

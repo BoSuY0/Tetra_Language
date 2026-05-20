@@ -9,7 +9,7 @@ Status (as of 2025-12-30):
 ## P0 — Build confidence (process)
 
 ### A) Keep CI matrix green (Linux/Windows/macOS)
-- Files: `.github/workflows/ci.yml`, `scripts/bootstrap.sh`, `scripts/test.sh`
+- Files: `.github/workflows/ci.yml`, `scripts/dev/bootstrap.sh`, `scripts/ci/test.sh`
 - Acceptance:
   - CI runs `bootstrap` + `test` + `tetra smoke` on all three OS runners.
   - Status: DONE

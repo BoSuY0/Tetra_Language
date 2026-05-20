@@ -15,7 +15,7 @@ func TestTestAllScriptInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := filepath.Clean(filepath.Join(wd, "..", "..", ".."))
-	script := filepath.Join(root, "scripts", "test_all.sh")
+	script := filepath.Join(root, "scripts", "ci", "test-all.sh")
 
 	if out, err := exec.Command("bash", "-n", script).CombinedOutput(); err != nil {
 		t.Fatalf("bash -n failed: %v\n%s", err, string(out))
@@ -50,19 +50,25 @@ func TestTestAllScriptKeepGoingJSONOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := filepath.Clean(filepath.Join(wd, "..", "..", ".."))
-	scriptRaw, err := os.ReadFile(filepath.Join(root, "scripts", "test_all.sh"))
+	scriptRaw, err := os.ReadFile(filepath.Join(root, "scripts", "ci", "test-all.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "scripts", "ci"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "scripts", "test_all.sh"), scriptRaw, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "scripts", "dev"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "scripts", "bootstrap.sh"), []byte("#!/usr/bin/env bash\ncp ./tetra ./t\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "scripts", "ci", "test-all.sh"), scriptRaw, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "scripts", "ci", "test.sh"), []byte("#!/usr/bin/env bash\nset -euo pipefail\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "scripts", "dev", "bootstrap.sh"), []byte("#!/usr/bin/env bash\ncp ./tetra ./t\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	binDir := filepath.Join(dir, "bin")
@@ -74,7 +80,7 @@ func TestTestAllScriptKeepGoingJSONOnly(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "tetra"), []byte(`#!/usr/bin/env bash
 case "$1" in
-  version) echo "v0.2.0"; exit 0 ;;
+  version) echo "v0.3.0"; exit 0 ;;
   fmt|test|smoke) exit 0 ;;
   check)
     for arg in "$@"; do
@@ -120,7 +126,7 @@ esac
 	}
 
 	reportDir := filepath.Join(dir, "report")
-	cmd := exec.Command("bash", "scripts/test_all.sh", "--quick", "--keep-going", "--json-only", "--report-dir", reportDir)
+	cmd := exec.Command("bash", "scripts/ci/test-all.sh", "--quick", "--keep-going", "--json-only", "--report-dir", reportDir)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()

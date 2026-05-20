@@ -1,17 +1,571 @@
 {
-  "timestamp": "2026-04-27T10:32:31Z",
+  "timestamp": "2026-05-01T07:41:24Z",
   "target": "linux-x64",
-  "host": "linux-x86_64",
-  "version": "v0.1.1",
-  "git_head": "4c9a01d",
+  "host": "linux-x64",
+  "version": "v0.3.0",
+  "git_head": "b884653",
   "islands_debug": false,
-  "total": 4,
-  "passed": 4,
+  "total": 62,
+  "passed": 62,
   "failed": 0,
   "cases": [
-    {"name":"flow_hello","src_path":"examples/flow_hello.tetra","expected_exit":0,"actual_exit":0,"ran":true,"pass":true},
-    {"name":"flow_struct_smoke","src_path":"examples/flow_struct_smoke.tetra","expected_exit":42,"actual_exit":42,"ran":true,"pass":true},
-    {"name":"flow_islands_smoke","src_path":"examples/flow_islands_smoke.tetra","expected_exit":0,"actual_exit":0,"ran":true,"pass":true},
-    {"name":"flow_unsafe_cap_mem_smoke","src_path":"examples/flow_unsafe_cap_mem_smoke.tetra","expected_exit":42,"actual_exit":42,"ran":true,"pass":true}
+    {
+      "name": "islands_hello",
+      "src_path": "examples/islands_hello.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/islands_hello",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "islands_i32",
+      "src_path": "examples/islands_i32.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/islands_i32",
+      "expected_exit": 55,
+      "actual_exit": 55,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "islands_overflow",
+      "src_path": "examples/islands_overflow.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/islands_overflow",
+      "expected_exit": 1,
+      "actual_exit": 1,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "mmio_smoke",
+      "src_path": "examples/mmio_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/mmio_smoke",
+      "expected_exit": 123,
+      "actual_exit": 123,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "cap_mem_smoke",
+      "src_path": "examples/cap_mem_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/cap_mem_smoke",
+      "expected_exit": 77,
+      "actual_exit": 77,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "memset_smoke",
+      "src_path": "examples/memset_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/memset_smoke",
+      "expected_exit": 88,
+      "actual_exit": 88,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "actors_pingpong",
+      "src_path": "examples/actors_pingpong.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/actors_pingpong",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "actor_sleep_pingpong",
+      "src_path": "examples/actor_sleep_pingpong.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/actor_sleep_pingpong",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "flow_hello",
+      "src_path": "examples/flow_hello.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/flow_hello",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "flow_struct_smoke",
+      "src_path": "examples/flow_struct_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/flow_struct_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "flow_islands_smoke",
+      "src_path": "examples/flow_islands_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/flow_islands_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "flow_unsafe_cap_mem_smoke",
+      "src_path": "examples/flow_unsafe_cap_mem_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/flow_unsafe_cap_mem_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "ui_native_shell_smoke",
+      "src_path": "examples/ui_native_shell_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/ui_native_shell_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "bool_smoke",
+      "src_path": "examples/bool_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/bool_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "for_range_smoke",
+      "src_path": "examples/for_range_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/for_range_smoke",
+      "expected_exit": 55,
+      "actual_exit": 55,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "for_collection_smoke",
+      "src_path": "examples/for_collection_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/for_collection_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "for_collection_u8_smoke",
+      "src_path": "examples/for_collection_u8_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/for_collection_u8_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "loop_control_smoke",
+      "src_path": "examples/loop_control_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/loop_control_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "complex_control_flow_smoke",
+      "src_path": "examples/complex_control_flow_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/complex_control_flow_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "unary_not_smoke",
+      "src_path": "examples/unary_not_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/unary_not_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "const_smoke",
+      "src_path": "examples/const_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/const_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "const_bool_smoke",
+      "src_path": "examples/const_bool_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/const_bool_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "local_const_smoke",
+      "src_path": "examples/local_const_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/local_const_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "compound_assignment_smoke",
+      "src_path": "examples/compound_assignment_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/compound_assignment_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "else_if_smoke",
+      "src_path": "examples/else_if_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/else_if_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "enum_match_smoke",
+      "src_path": "examples/enum_match_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/enum_match_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "enum_exhaustive_match_smoke",
+      "src_path": "examples/enum_exhaustive_match_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/enum_exhaustive_match_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "effects_io_smoke",
+      "src_path": "examples/effects_io_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/effects_io_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "effects_mem_smoke",
+      "src_path": "examples/effects_mem_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/effects_mem_smoke",
+      "expected_exit": 17,
+      "actual_exit": 17,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "effects_actors_smoke",
+      "src_path": "examples/effects_actors_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/effects_actors_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "optional_smoke",
+      "src_path": "examples/optional_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/optional_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "optional_match_smoke",
+      "src_path": "examples/optional_match_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/optional_match_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "optional_match_some_smoke",
+      "src_path": "examples/optional_match_some_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/optional_match_some_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "ownership_smoke",
+      "src_path": "examples/ownership_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/ownership_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "typed_errors_smoke",
+      "src_path": "examples/typed_errors_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/typed_errors_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "async_smoke",
+      "src_path": "examples/async_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/async_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "task_smoke",
+      "src_path": "examples/task_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/task_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "time_sleep_smoke",
+      "src_path": "examples/time_sleep_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/time_sleep_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "task_sleep_deadline_smoke",
+      "src_path": "examples/task_sleep_deadline_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/task_sleep_deadline_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "task_join_wait_smoke",
+      "src_path": "examples/task_join_wait_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/task_join_wait_smoke",
+      "expected_exit": 5,
+      "actual_exit": 5,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "deadline_aware_waits_smoke",
+      "src_path": "examples/deadline_aware_waits_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/deadline_aware_waits_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "wait_composition_smoke",
+      "src_path": "examples/wait_composition_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/wait_composition_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_math_smoke",
+      "src_path": "examples/core_math_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_math_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_memory_smoke",
+      "src_path": "examples/core_memory_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_memory_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_strings_smoke",
+      "src_path": "examples/core_strings_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_strings_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_slices_smoke",
+      "src_path": "examples/core_slices_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_slices_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_io_smoke",
+      "src_path": "examples/core_io_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_io_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_testing_smoke",
+      "src_path": "examples/core_testing_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_testing_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_collections_smoke",
+      "src_path": "examples/core_collections_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_collections_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_serialization_smoke",
+      "src_path": "examples/core_serialization_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_serialization_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_filesystem_smoke",
+      "src_path": "examples/core_filesystem_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_filesystem_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_networking_smoke",
+      "src_path": "examples/core_networking_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_networking_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_async_smoke",
+      "src_path": "examples/core_async_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_async_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_sync_smoke",
+      "src_path": "examples/core_sync_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_sync_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_time_smoke",
+      "src_path": "examples/core_time_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_time_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_crypto_smoke",
+      "src_path": "examples/core_crypto_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_crypto_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_capability_smoke",
+      "src_path": "examples/core_capability_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/core_capability_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "extension_smoke",
+      "src_path": "examples/extension_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/extension_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "generic_smoke",
+      "src_path": "examples/generic_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/generic_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "protocol_impl_smoke",
+      "src_path": "examples/protocol_impl_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/protocol_impl_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "dogfood_cli",
+      "src_path": "examples/projects/dogfood_cli/src/main.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/dogfood_cli",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "dogfood_actor_task",
+      "src_path": "examples/projects/dogfood_actor_task/src/main.tetra",
+      "out_path": "/tmp/tetra-smoke-750342342/dogfood_actor_task",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    }
   ]
 }

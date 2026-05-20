@@ -1,0 +1,80 @@
+{
+  "schema": "tetra.ui.v1",
+  "states": [
+    {
+      "name": "CounterState",
+      "module": "",
+      "fields": [
+        {
+          "name": "count",
+          "type": "i32",
+          "mutable": true,
+          "const": false,
+          "init": "0"
+        },
+        {
+          "name": "title",
+          "type": "str",
+          "mutable": false,
+          "const": false,
+          "init": "\"Wave 9 Web\""
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "CounterView",
+      "module": "",
+      "state_type": "CounterState",
+      "bindings": [
+        {
+          "name": "countValue",
+          "type": "i32",
+          "source": "state.count"
+        },
+        {
+          "name": "titleText",
+          "type": "str",
+          "source": "state.title"
+        }
+      ],
+      "events": [
+        {
+          "name": "click",
+          "command": "increment"
+        }
+      ],
+      "commands": [
+        {
+          "name": "increment",
+          "statement_count": 1
+        }
+      ],
+      "styles": [
+        {
+          "name": "width",
+          "type": "i32",
+          "value": "320"
+        },
+        {
+          "name": "theme",
+          "type": "str",
+          "value": "\"web\""
+        }
+      ],
+      "accessibility": [
+        {
+          "name": "role",
+          "type": "str",
+          "value": "\"button\""
+        },
+        {
+          "name": "label",
+          "type": "str",
+          "value": "\"Increment counter\""
+        }
+      ]
+    }
+  ]
+}

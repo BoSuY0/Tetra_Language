@@ -1,11 +1,15 @@
 # UI v1 Surface
 
-Status: v1.0 required metadata UI surface.
+Status: current `v0.4.0` metadata UI surface with web and native shell scalar
+command-dispatch previews plus a Linux-x64 native runtime smoke path. This does
+not claim GTK/Qt/OS widget backends, macOS/Windows native UI runtimes, or
+platform accessibility integration.
 
 This document defines the UI syntax and backend artifact contract that is in
-scope for v1.0. It intentionally describes a metadata-first UI surface: the
-compiler validates UI declarations, lowers them to deterministic metadata, and
-emits preview artifacts for web and native shell targets.
+scope for the `v0.4.0` metadata contract. It intentionally describes a
+metadata-first UI surface: the compiler validates UI declarations, lowers them
+to deterministic metadata, and emits preview artifacts for web and native shell
+targets when the relevant gated paths are exercised.
 
 ## Syntax
 
@@ -67,13 +71,69 @@ When a build contains a view:
 
 ## Backend Status
 
-`wasm32-web` is the v1 browser preview backend. The generated web module reads
-the UI JSON bundle and mounts a simple DOM representation before running
-`tetra_main`.
+`wasm32-web` is the browser command-dispatch preview backend. The generated web
+module reads the UI JSON bundle, mounts a simple DOM representation before
+running `tetra_main`, dispatches supported DOM events to lowered command
+operations, and refreshes scalar state bindings. The current lowered scalar
+operation set includes direct state assignment plus integer increment and
+decrement patterns of the form `state.field = state.field +/- <integer>`.
+The same integer delta operations are emitted for supported `+=` and `-=`
+compound assignments.
+String, boolean, and integer-like assignments are hydrated as scalar runtime
+values rather than raw source literals, and same-state field assignments copy
+the current source field value in command order.
+The web preview also mirrors supported style and accessibility metadata into
+DOM preview attributes such as `data-tetra-style-*`,
+`data-tetra-accessibility-*`, `role`, and `aria-label`; full styling/layout
+engines and platform accessibility API integration remain outside this surface.
+Passing web UI smoke evidence must carry the runtime trace marker
+`ui-event-dispatch:web-command-dispatch`.
 
-Native shell UI is a v1 metadata preview backend. It renders the same validated
-state/view metadata into a deterministic text sidecar. It is release-supported
-as an artifact contract and smoke target, not as a full native widget toolkit.
+Native shell UI is a deterministic text-mode command-dispatch preview backend.
+It renders the same validated state/view metadata into a sidecar, hydrates
+scalar bindings from the lowered initial state, dispatches each declared event
+through its lowered command operations, applies supported scalar state
+updates, including direct assignment plus integer increment/decrement, and
+records the resulting binding values. It also writes a machine-readable
+`tetra.ui.native-shell.v1` JSON trace sidecar containing the same runtime,
+event, operation, state-field, and post-dispatch binding evidence. The JSON
+sidecar also includes a deterministic `widgets` array for each view: binding
+widgets record hydrated display values plus style/accessibility metadata, and
+event widgets record the action-to-command dispatch entrypoint. It is a
+production artifact contract and smoke target for the native shell preview, not
+a full platform widget toolkit.
+Validate native shell JSON traces with
+`go run ./tools/cmd/validate-native-ui-smoke --report <output>.ui.shell.json`.
+The validator requires `tetra.ui.native-shell.v1`, `tetra.ui.v1`, native shell
+command-dispatch runtime identity, state/view evidence, event operation traces,
+post-dispatch bindings, and both binding/action widgets.
+
+Linux-x64 native UI runtime evidence is a separate production gate from the
+native shell sidecar. `scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh`
+builds the current CLI, builds `examples/ui_native_shell_smoke.tetra` for
+`linux-x64`, runs the native executable, loads the generated
+`tetra.ui.native-shell.v1` sidecar into the native runtime smoke process, and
+emits `reports/v0.4.0/native-ui-linux-x64.json` with schema
+`tetra.ui.native-runtime.v1`. That report records:
+
+- runtime widget instances with stable IDs, parent/child hierarchy, bounds,
+  text/value state, enabled state, and visible state;
+- click dispatch from an action widget to the lowered command operation path;
+- ordered repeated events with before/after state maps and widget updates;
+- negative invalid widget, malformed metadata, unsupported event, and command
+  failure cases;
+- runtime lifecycle close.
+
+Validate the production native runtime report with:
+
+```sh
+go run ./tools/cmd/validate-native-ui-runtime --report reports/v0.4.0/native-ui-linux-x64.json
+```
+
+The native runtime validator rejects metadata-only, web-only, native-shell
+sidecar-only, fake/mock/placeholder, missing event execution, and missing state
+transition evidence. macOS/Windows native UI runtime claims require separate
+host-native reports and are not promoted by the Linux-x64 report.
 
 `wasm32-wasi` in this wave remains non-UI runtime: it may compile UI metadata
 for artifact inspection, but it does not ship web/native UI preview sidecars
@@ -85,10 +145,36 @@ Current smoke/dogfood expectation:
 - `examples/ui_web_smoke.tetra` and `examples/ui_native_shell_smoke.tetra` stay
   as metadata-oriented UI source fixtures.
 - `examples/projects/dogfood_wasi/src/main.tetra` stays intentionally non-UI for
-  WASI runner/build-only evidence.
+  WASI runner and artifact/import preflight evidence.
+
+## v0.4.0 Evidence Snapshot
+
+The `v0.4.0` feature promotion is limited to metadata and preview artifacts.
+Release readiness still requires a fresh v0.4 gate report before the overall
+release can be marked final. The table below records checked-in historical
+artifacts; the machine-readable `v0.4.0` scope decisions name the fresh test
+commands that must back the promotion.
+
+| Evidence field | Value |
+| --- | --- |
+| Web UI smoke report | `reports/plan250/backend/web-ui-smoke.json` |
+| Web UI source | `examples/projects/dogfood_web_ui/src/main.tetra` |
+| Web UI status/result | `pass`; `ok:0:ui=1` |
+| UI schema | `tetra.ui.v1` |
+| Native shell trace schema | `tetra.ui.native-shell.v1` |
+| Native shell trace validator | `go run ./tools/cmd/validate-native-ui-smoke --report <output>.ui.shell.json` |
+| Native Linux-x64 runtime report | `reports/v0.4.0/native-ui-linux-x64.json` |
+| Native Linux-x64 runtime validator | `go run ./tools/cmd/validate-native-ui-runtime --report reports/v0.4.0/native-ui-linux-x64.json` |
+| Native Linux-x64 runtime schema | `tetra.ui.native-runtime.v1` |
+| UI bundle/module/DOM | `reports/plan250/backend/web-ui-smoke.ui.json`; `reports/plan250/backend/web-ui-smoke.ui.web.mjs`; `reports/plan250/backend/web-ui-smoke.dom.html` |
+| Lowered metadata content | 1 state, 1 view, bindings `countValue`/`titleText`, event `click -> increment`, styles `width`/`theme`, accessibility `role`/`label` |
+| WASI runner report | `reports/plan250/backend/wasi-smoke.json` |
+| WASI runner status | target `wasm32-wasi`, runner `node-wasi`, total `5`, passed `5`, failed `0` |
+| WASM artifact/import reports | `reports/plan250/backend/wasm32-wasi-artifact-smoke.json`; `reports/plan250/backend/wasm32-web-artifact-smoke.json` |
 
 ## Post-v1
 
-Native widgets, layout engines, command dispatch at runtime, richer event
-payloads, styling systems, and accessibility integration with platform APIs are
-post-v1 unless promoted by a reviewed scope update.
+GTK/Qt/OS widget toolkit backends, macOS/Windows native UI runtime reports,
+richer event payloads, broad input/change/focus behavior, full styling/layout
+systems, and accessibility integration with platform APIs remain post-v1 unless
+promoted by a reviewed scope update.

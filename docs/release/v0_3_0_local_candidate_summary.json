@@ -1,0 +1,61 @@
+{
+  "schema": "tetra.release.local-candidate.v1",
+  "release_version": "v0.3.0",
+  "status": "local_candidate",
+  "tag_ready": false,
+  "generated_at": "2026-05-04T13:01:06Z",
+  "git_head": "b884653",
+  "dirty_worktree_entries": 293,
+  "evidence": {
+    "version": {
+      "tetra": "v0.3.0",
+      "t": "v0.3.0",
+      "status": "pass"
+    },
+    "linux_runtime_smoke": {
+      "status": "pass",
+      "report": "/tmp/tetra-v0.3-linux-runtime-smoke.json",
+      "target": "linux-x64",
+      "host": "linux-x64",
+      "total": 62,
+      "passed": 62,
+      "failed": 0,
+      "all_runtime_cases_ran": true,
+      "validation_command": "go run ./tools/cmd/smoke-report-to-checklist --validate-only --report /tmp/tetra-v0.3-linux-runtime-smoke.json"
+    },
+    "stabilization": {
+      "status": "pass",
+      "summary": "/tmp/tetra-v0.3-stabilization-audit-rerun/summary.md",
+      "summary_json": "/tmp/tetra-v0.3-stabilization-audit-rerun/summary.json",
+      "step_count": 38,
+      "failed_count": 0,
+      "release_artifact": "tetra.release.v0_3_0.test-all-summary.v1"
+    },
+    "release_gate": {
+      "status": "blocked",
+      "summary": "/tmp/tetra-v0.3-gate-audit-crossbuild-runtime-blocked/summary.md",
+      "summary_json": "/tmp/tetra-v0.3-gate-audit-crossbuild-runtime-blocked/summary.json",
+      "release_artifact": "tetra.release.v0_3_0.gate-report.v1",
+      "failed_count": 3
+    }
+  },
+  "excluded_from_local_candidate": [
+    {
+      "requirement": "macos-x64 native runtime execution evidence",
+      "reason": "not available without a macOS host or CI artifact"
+    },
+    {
+      "requirement": "windows-x64 native runtime execution evidence",
+      "reason": "not available without a Windows host or CI artifact"
+    },
+    {
+      "requirement": "human security signoff",
+      "reason": "explicitly omitted from the local-only candidate"
+    },
+    {
+      "requirement": "tag-ready clean worktree",
+      "reason": "git status --porcelain --untracked-files=all reported dirty entries"
+    }
+  ],
+  "next_full_release_command": "TETRA_MACOS_RUNTIME_SMOKE_REPORT=<macos-smoke-run-true.json> TETRA_WINDOWS_RUNTIME_SMOKE_REPORT=<windows-smoke-run-true.json> TETRA_SECURITY_REVIEW_SIGNOFF=<security-review.md> bash scripts/release/v0_3_0/gate.sh --report-dir reports/release-v0.3.0-gate"
+}

@@ -57,11 +57,16 @@ type builtinManifest struct {
 }
 
 type runtimeABIManifest struct {
-	ReservedPrefix           string   `json:"reserved_prefix"`
-	ActorsSupportedTargets   []string `json:"actors_supported_targets"`
-	ActorsRequiredSymbols    []string `json:"actors_required_symbols"`
-	TimeRequiredSymbols      []string `json:"time_required_symbols,omitempty"`
-	ActorsProgramGlueSymbols []string `json:"actors_program_glue_symbols"`
+	ReservedPrefix            string   `json:"reserved_prefix"`
+	ActorsSupportedTargets    []string `json:"actors_supported_targets"`
+	ActorsRequiredSymbols     []string `json:"actors_required_symbols"`
+	ActorStateRequiredSymbols []string `json:"actor_state_required_symbols,omitempty"`
+	TaskRequiredSymbols       []string `json:"task_required_symbols,omitempty"`
+	TaskGroupRequiredSymbols  []string `json:"task_group_required_symbols,omitempty"`
+	TypedTaskRequiredSymbols  []string `json:"typed_task_required_symbols,omitempty"`
+	TimeRequiredSymbols       []string `json:"time_required_symbols,omitempty"`
+	FilesystemRequiredSymbols []string `json:"filesystem_required_symbols,omitempty"`
+	ActorsProgramGlueSymbols  []string `json:"actors_program_glue_symbols"`
 }
 
 type featureManifest struct {
@@ -74,7 +79,7 @@ type featureManifest struct {
 	Docs      []string `json:"docs"`
 }
 
-const manifestArtifact = "tetra.release.v0_2_0.manifest-json.v1"
+const manifestArtifact = "tetra.release.v0_4_0.manifest-json.v1"
 
 func main() {
 	var manifestPath string
@@ -139,11 +144,14 @@ func validateManifest(raw []byte) error {
 		targets[target.Triple] = true
 		targetTriples = append(targetTriples, target.Triple)
 	}
-	if !sameStringSet(targetTriples, ctarget.SupportedTriples()) {
-		return fmt.Errorf("targets got %s want %s", strings.Join(sortedStrings(targetTriples), ", "), strings.Join(sortedStrings(ctarget.SupportedTriples()), ", "))
+	supportedTargets := ctarget.SupportedTriples()
+	wantTargets := append([]string{}, ctarget.SupportedTriples()...)
+	wantTargets = append(wantTargets, ctarget.BuildOnlyTriples()...)
+	if !sameStringSet(targetTriples, supportedTargets) && !sameStringSet(targetTriples, wantTargets) {
+		return fmt.Errorf("targets got %s want %s", strings.Join(sortedStrings(targetTriples), ", "), strings.Join(sortedStrings(wantTargets), ", "))
 	}
-	if !sameStringSequence(targetTriples, ctarget.SupportedTriples()) {
-		return fmt.Errorf("targets must follow supported target order: got %s want %s", strings.Join(targetTriples, ", "), strings.Join(ctarget.SupportedTriples(), ", "))
+	if !sameStringSequence(targetTriples, supportedTargets) && !sameStringSequence(targetTriples, wantTargets) {
+		return fmt.Errorf("targets must follow buildable target order: got %s want %s", strings.Join(targetTriples, ", "), strings.Join(wantTargets, ", "))
 	}
 	builtins := map[string]bool{}
 	for _, builtin := range manifest.Builtins {
@@ -161,7 +169,23 @@ func validateManifest(raw []byte) error {
 	if err := unmarshalArray(manifest.FeaturesRaw, "features", &manifest.Features); err != nil {
 		return err
 	}
+	if featureHasStatus(manifest.Features, "targets.wasm-artifact-preflight", "current") {
+		for _, triple := range ctarget.WASMTriples() {
+			if !targets[triple] {
+				return fmt.Errorf("targets.wasm-artifact-preflight is current but targets missing %s", triple)
+			}
+		}
+	}
 	return validateFeatures(manifest.Features)
+}
+
+func featureHasStatus(features []featureManifest, id string, status string) bool {
+	for _, feature := range features {
+		if feature.ID == id && feature.Status == status {
+			return true
+		}
+	}
+	return false
 }
 
 func validateFormats(formats []formatManifest) error {
@@ -300,26 +324,29 @@ func validateFeatures(features []featureManifest) error {
 		return fmt.Errorf("features must not be empty")
 	}
 	allowedStatus := map[string]bool{"current": true, "experimental": true, "planned": true, "post-v1": true}
-	requiredStatus := map[string]bool{"current": false, "experimental": false, "planned": false, "post-v1": false}
+	requiredStatus := map[string]bool{"current": false, "planned": false, "post-v1": false}
 	requiredIDs := map[string]string{
-		"cli.core":                            "current",
-		"language.flow":                       "current",
-		"language.generics-mvp":               "current",
-		"language.protocol-conformance-mvp":   "current",
-		"language.callable-mvp":               "current",
-		"language.callable-level1":            "experimental",
-		"targets.wasm-build-only":             "current",
-		"stdlib.experimental-mirrors":         "experimental",
-		"language.enum-payload-match":         "experimental",
-		"language.ownership-markers-mvp":      "current",
-		"language.resource-lifetime-mvp":      "current",
-		"actors.task-transfer-safety":         "current",
-		"language.lifetime-ssa":               "planned",
-		"language.callable-level2":            "planned",
-		"wasm.runtime-execution":              "planned",
-		"language.full-v1-guarantees":         "planned",
-		"eco.distributed-network":             "post-v1",
-		"language.full-first-class-callables": "post-v1",
+		"cli.core":                                "current",
+		"language.flow":                           "current",
+		"language.generics-mvp":                   "current",
+		"language.protocol-conformance-mvp":       "current",
+		"language.callable-mvp":                   "current",
+		"language.callable-level1":                "current",
+		"targets.wasm-artifact-preflight":         "current",
+		"stdlib.experimental-mirrors":             "current",
+		"language.enum-payload-match":             "current",
+		"language.protocol-bound-generics-static": "current",
+		"language.ownership-markers-mvp":          "current",
+		"language.resource-lifetime-mvp":          "current",
+		"actors.task-transfer-safety":             "current",
+		"language.lifetime-ssa":                   "current",
+		"safety.production-core":                  "current",
+		"language.callable-level2":                "current",
+		"ui.metadata-v1":                          "current",
+		"wasm.runtime-execution":                  "current",
+		"language.full-v1-guarantees":             "planned",
+		"eco.distributed-network":                 "post-v1",
+		"language.full-first-class-callables":     "current",
 	}
 	seen := map[string]string{}
 	featureByID := map[string]featureManifest{}
@@ -409,19 +436,48 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"distributed actors",
 		},
 		"language.lifetime-ssa": {
-			"planned full SSA lifetime analysis",
-			"precise merge reasoning",
-			"no current v0.2.0 support guarantee",
-			"conservative ownership/resource MVP",
+			"production SSA-like local lifetime join analysis",
+			"ownership consume state",
+			"resource finalization state",
+			"maybe-consumed diagnostics",
+			"richer interprocedural lifetime proofs",
+		},
+		"safety.production-core": {
+			"production local safety model",
+			"ownership/lifetime/borrow/consume/inout",
+			"resource finalization",
+			"callable escape diagnostics",
+			"effects/capabilities/privacy/consent/budget",
+			"unsafe boundaries",
+			"actor/task transfer safety",
+			"pointer/MMIO/memory capability gates",
+			"explicit diagnostics",
+		},
+		"language.enum-payload-match": {
+			"positional enum payload constructors",
+			"match/catch/if-let",
+			"exhaustive unguarded enum match/catch",
+			"nested destructuring patterns",
+			"guard expansion remain future/post-v1",
+		},
+		"language.protocol-bound-generics-static": {
+			"validated statically during monomorphization",
+			"same-module and cross-module impl conformance",
+			"visibility diagnostics",
+			"calling protocol requirements through generic bounds",
+			"dynamic dispatch remain unsupported",
 		},
 	}
 	docChecks := map[string][]string{
-		"language.generics-mvp":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
-		"language.protocol-conformance-mvp": {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
-		"language.ownership-markers-mvp":    {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"language.resource-lifetime-mvp":    {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"actors.task-transfer-safety":       {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"language.lifetime-ssa":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.generics-mvp":                   {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
+		"language.protocol-conformance-mvp":       {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
+		"language.ownership-markers-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.resource-lifetime-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"actors.task-transfer-safety":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"language.lifetime-ssa":                   {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
+		"safety.production-core":                  {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md"},
+		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
+		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
 	}
 	for id, required := range checks {
 		feature, ok := features[id]
@@ -473,8 +529,8 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 			return fmt.Errorf("actors_supported_targets references unknown target %s", target)
 		}
 	}
-	if !sameStringSet(abi.ActorsSupportedTargets, ctarget.SupportedTriples()) {
-		return fmt.Errorf("actors_supported_targets got %s want %s", strings.Join(sortedStrings(abi.ActorsSupportedTargets), ", "), strings.Join(sortedStrings(ctarget.SupportedTriples()), ", "))
+	if !sameStringSet(abi.ActorsSupportedTargets, ctarget.ActorRuntimeTriples()) {
+		return fmt.Errorf("actors_supported_targets got %s want %s", strings.Join(sortedStrings(abi.ActorsSupportedTargets), ", "), strings.Join(sortedStrings(ctarget.ActorRuntimeTriples()), ", "))
 	}
 	requiredRuntimeSymbols := []string{
 		"__tetra_entry",
@@ -506,11 +562,77 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 		"__tetra_deadline_ms",
 		"__tetra_timer_ready_ms",
 	}
+	requiredFilesystemSymbols := []string{
+		"__tetra_fs_exists",
+	}
+	requiredActorStateSymbols := []string{
+		"__tetra_actor_state_load",
+		"__tetra_actor_state_store",
+	}
+	requiredTaskSymbols := []string{
+		"__tetra_task_spawn_i32",
+		"__tetra_task_join_i32",
+		"__tetra_task_join_result_i32",
+		"__tetra_task_join_until_i32",
+		"__tetra_task_poll_i32",
+		"__tetra_task_is_canceled",
+		"__tetra_task_checkpoint",
+	}
+	requiredTaskGroupSymbols := []string{
+		"__tetra_task_group_open",
+		"__tetra_task_group_close",
+		"__tetra_task_group_cancel",
+		"__tetra_task_group_current",
+		"__tetra_task_group_status",
+		"__tetra_task_spawn_group_i32",
+	}
+	requiredTypedTaskSymbols := []string{
+		"__tetra_task_result_begin",
+		"__tetra_task_result_slot",
+		"__tetra_task_result_get",
+		"__tetra_task_join_typed_2",
+		"__tetra_task_join_typed_3",
+		"__tetra_task_join_typed_4",
+		"__tetra_task_join_typed_5",
+		"__tetra_task_join_typed_6",
+		"__tetra_task_join_typed_7",
+		"__tetra_task_join_typed_8",
+	}
 	if len(abi.TimeRequiredSymbols) == 0 {
 		return fmt.Errorf("time_required_symbols must not be empty")
 	}
 	if !sameStringSet(abi.TimeRequiredSymbols, requiredTimeSymbols) {
 		return fmt.Errorf("time_required_symbols got %s want %s", strings.Join(sortedStrings(abi.TimeRequiredSymbols), ", "), strings.Join(sortedStrings(requiredTimeSymbols), ", "))
+	}
+	if len(abi.FilesystemRequiredSymbols) == 0 {
+		return fmt.Errorf("filesystem_required_symbols must not be empty")
+	}
+	if !sameStringSet(abi.FilesystemRequiredSymbols, requiredFilesystemSymbols) {
+		return fmt.Errorf("filesystem_required_symbols got %s want %s", strings.Join(sortedStrings(abi.FilesystemRequiredSymbols), ", "), strings.Join(sortedStrings(requiredFilesystemSymbols), ", "))
+	}
+	if len(abi.ActorStateRequiredSymbols) == 0 {
+		return fmt.Errorf("actor_state_required_symbols must not be empty")
+	}
+	if !sameStringSet(abi.ActorStateRequiredSymbols, requiredActorStateSymbols) {
+		return fmt.Errorf("actor_state_required_symbols got %s want %s", strings.Join(sortedStrings(abi.ActorStateRequiredSymbols), ", "), strings.Join(sortedStrings(requiredActorStateSymbols), ", "))
+	}
+	if len(abi.TaskRequiredSymbols) == 0 {
+		return fmt.Errorf("task_required_symbols must not be empty")
+	}
+	if !sameStringSet(abi.TaskRequiredSymbols, requiredTaskSymbols) {
+		return fmt.Errorf("task_required_symbols got %s want %s", strings.Join(sortedStrings(abi.TaskRequiredSymbols), ", "), strings.Join(sortedStrings(requiredTaskSymbols), ", "))
+	}
+	if len(abi.TaskGroupRequiredSymbols) == 0 {
+		return fmt.Errorf("task_group_required_symbols must not be empty")
+	}
+	if !sameStringSet(abi.TaskGroupRequiredSymbols, requiredTaskGroupSymbols) {
+		return fmt.Errorf("task_group_required_symbols got %s want %s", strings.Join(sortedStrings(abi.TaskGroupRequiredSymbols), ", "), strings.Join(sortedStrings(requiredTaskGroupSymbols), ", "))
+	}
+	if len(abi.TypedTaskRequiredSymbols) == 0 {
+		return fmt.Errorf("typed_task_required_symbols must not be empty")
+	}
+	if !sameStringSet(abi.TypedTaskRequiredSymbols, requiredTypedTaskSymbols) {
+		return fmt.Errorf("typed_task_required_symbols got %s want %s", strings.Join(sortedStrings(abi.TypedTaskRequiredSymbols), ", "), strings.Join(sortedStrings(requiredTypedTaskSymbols), ", "))
 	}
 	requiredGlueSymbols := []string{
 		"__tetra_actor_dispatch",
@@ -520,7 +642,12 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 		return fmt.Errorf("actors_program_glue_symbols got %s want %s", strings.Join(sortedStrings(abi.ActorsProgramGlueSymbols), ", "), strings.Join(sortedStrings(requiredGlueSymbols), ", "))
 	}
 	allSymbols := append([]string{}, abi.ActorsRequiredSymbols...)
+	allSymbols = append(allSymbols, abi.ActorStateRequiredSymbols...)
+	allSymbols = append(allSymbols, abi.TaskRequiredSymbols...)
+	allSymbols = append(allSymbols, abi.TaskGroupRequiredSymbols...)
+	allSymbols = append(allSymbols, abi.TypedTaskRequiredSymbols...)
 	allSymbols = append(allSymbols, abi.TimeRequiredSymbols...)
+	allSymbols = append(allSymbols, abi.FilesystemRequiredSymbols...)
 	allSymbols = append(allSymbols, abi.ActorsProgramGlueSymbols...)
 	for _, symbol := range allSymbols {
 		if symbol == "" {

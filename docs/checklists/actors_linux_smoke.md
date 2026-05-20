@@ -10,7 +10,7 @@ Compiler version (compilerVersion):
 ## Prereqs
 
 - Linux x64 host
-- `tetra` built: `bash scripts/bootstrap.sh`
+- `tetra` built: `bash scripts/dev/bootstrap.sh`
 
 ## Build
 

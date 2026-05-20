@@ -13,7 +13,7 @@ git fetch origin
 git switch main
 git pull --ff-only origin main
 git switch -c release/v0.2.0-rc1
-bash scripts/bootstrap.sh
+bash scripts/dev/bootstrap.sh
 ./tetra version
 ./t version
 ```
@@ -30,7 +30,7 @@ v0.2.0
 report_dir=/tmp/tetra-v0.2.0-rc1-gate
 rm -rf "$report_dir"
 TETRA_SECURITY_REVIEW_SIGNOFF=<path-to-signoff> \
-  bash scripts/release_v0_2_0_gate.sh --report-dir "$report_dir"
+  bash scripts/release/v0_2_0/gate.sh --report-dir "$report_dir"
 ```
 
 The gate must produce:
@@ -49,7 +49,7 @@ Run the quick wrapper separately when preparing the candidate so the handoff can
 distinguish local iteration coverage from the full nested gate:
 
 ```bash
-bash scripts/test_all.sh --quick --report-dir "$report_dir/test-all-quick"
+bash scripts/ci/test-all.sh --quick --report-dir "$report_dir/test-all-quick"
 ```
 
 ## Validate Archive
@@ -65,12 +65,12 @@ git diff --check
 
 ## Failure Triage
 
-- If `scripts/release_v0_2_0_gate.sh` blocks at version preflight, finish the
+- If `scripts/release/v0_2_0/gate.sh` blocks at version preflight, finish the
   intentional version promotion before rerunning the gate.
 - If a release gate step fails, read `$report_dir/summary.json`, open the first
   failed step log under `$report_dir/logs/`, and rerun that exact command
   before rerunning the full gate.
-- If `bash scripts/test_all.sh --quick` or the nested full wrapper fails, use
+- If `bash scripts/ci/test-all.sh --quick` or the nested full wrapper fails, use
   the wrapper `summary.json` to find the named failed step and matching log.
 - If release-state or artifact-hash validation fails, treat the named stale,
   dirty, missing, or mismatched artifact as a release blocker.

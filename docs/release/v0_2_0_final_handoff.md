@@ -1,9 +1,9 @@
 # Tetra v0.2.0 Final Handoff
 
-Status: green release-gate handoff complete for the current `v0.2.0` cut.
+Status: archived green release-gate handoff for the historical `v0.2.0` cut.
 
-The `v0.2.0` version metadata is the current release line. Fresh release-gate
-evidence is archived under
+The `v0.2.0` version metadata was the release line for this archived handoff.
+Fresh release-gate evidence for that cut is archived under
 `reports/v0_2_0_candidate_20260428-rerun-210701` with `status: pass`,
 `failed_count: 0`, and `step_count: 35`.
 
@@ -38,11 +38,11 @@ All completed rows below cite the current release archive
 
 | Check | Command or gate step | Evidence path | Result |
 | --- | --- | --- | --- |
-| Bootstrap binaries | `bash scripts/bootstrap.sh` | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/01-bootstrap-tetra-binaries.log` | pass, exit `0` |
+| Bootstrap binaries | `bash scripts/dev/bootstrap.sh` | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/01-bootstrap-tetra-binaries.log` | pass, exit `0` |
 | Version preflight | `check_release_version`; `check_short_alias_version` | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/02-version-preflight-v0-2-0-required.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/03-short-alias-version-parity.log` | pass, `v0.2.0` |
 | Go workspace tests | `go test ./compiler/... ./cli/... ./tools/... -count=1` | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/04-go-test-packages.log` | pass, exit `0` |
-| Full wrapper | `bash scripts/test_all.sh --full --keep-going --report-dir reports/v0_2_0_candidate_20260428-rerun-210701/artifacts/test-all` | `reports/v0_2_0_candidate_20260428-rerun-210701/artifacts/test-all/summary.json`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/05-full-stabilization-wrapper.log` | pass, `mode: full`, `failed_count: 0`, `step_count: 24` |
-| Quick wrapper | `bash scripts/test_all.sh --quick --report-dir <dir>/test-all-quick` | `reports/v0_2_0_candidate_20260428-rerun-210701/test-all-quick/summary.json`; `reports/v0_2_0_candidate_20260428-rerun-210701/test-all-quick/summary.md`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/H-test-all-quick.log.exit` | pass, `mode: quick`, `failed_count: 0`, exit `0` |
+| Full wrapper | `bash scripts/ci/test-all.sh --full --keep-going --report-dir reports/v0_2_0_candidate_20260428-rerun-210701/artifacts/test-all` | `reports/v0_2_0_candidate_20260428-rerun-210701/artifacts/test-all/summary.json`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/05-full-stabilization-wrapper.log` | pass, `mode: full`, `failed_count: 0`, `step_count: 24` |
+| Quick wrapper | `bash scripts/ci/test-all.sh --quick --report-dir <dir>/test-all-quick` | `reports/v0_2_0_candidate_20260428-rerun-210701/test-all-quick/summary.json`; `reports/v0_2_0_candidate_20260428-rerun-210701/test-all-quick/summary.md`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/H-test-all-quick.log.exit` | pass, `mode: quick`, `failed_count: 0`, exit `0` |
 | Formatter and Flow gates | `./tetra fmt --check examples lib __rt compiler/selfhostrt`; `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt` | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/10-formatter-check.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/06-flow-only-source-scan.log` | pass, exit `0` |
 | CLI report gates | targets, doctor, and tetra-test JSON validation steps | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/07-targets-report-validation.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/08-doctor-report-validation.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/11-tetra-test-examples-json.log` | pass, exit `0` |
 | Smoke gates | smoke list, host, cross-target, WASI, and Web UI smoke steps | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/16-smoke-list-validation.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/17-native-host-smoke-linux-x64.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/18-build-only-smoke-linux-x64.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/19-build-only-smoke-macos-x64.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/20-build-only-smoke-windows-x64.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/21-build-only-smoke-wasm32-wasi.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/22-build-only-smoke-wasm32-web.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/23-wasi-runner-smoke.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/24-web-ui-browser-smoke.log` | pass, exit `0` |
@@ -54,7 +54,7 @@ All completed rows below cite the current release archive
 | Reproducible build proof | `check_repro_build` | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/29-reproducible-build-proof.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/artifacts/reproducible-build.json` | pass; `matched_count: 5`, `mismatched_count: 0` |
 | Release state | `check_release_state` | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/34-release-state-audit.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/artifacts/release-state.txt` | pass; `missing artifacts: 0` |
 | Artifact hashes | `check_artifact_hash_manifest` | `reports/v0_2_0_candidate_20260428-rerun-210701/logs/32-artifact-hash-manifest.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/logs/35-artifact-hash-manifest-refresh.log`; `reports/v0_2_0_candidate_20260428-rerun-210701/artifacts/artifact-hashes.json` | pass; manifest contains 69 artifacts |
-| Final release gate | `bash scripts/release_v0_2_0_gate.sh --report-dir reports/v0_2_0_candidate_20260428-rerun-210701` | `reports/v0_2_0_candidate_20260428-rerun-210701/summary.json`; `reports/v0_2_0_candidate_20260428-rerun-210701/summary.md`; `reports/v0_2_0_candidate_20260428-rerun-210701/gate.log` | pass; `failed_count: 0`, `step_count: 35` |
+| Final release gate | `bash scripts/release/v0_2_0/gate.sh --report-dir reports/v0_2_0_candidate_20260428-rerun-210701` | `reports/v0_2_0_candidate_20260428-rerun-210701/summary.json`; `reports/v0_2_0_candidate_20260428-rerun-210701/summary.md`; `reports/v0_2_0_candidate_20260428-rerun-210701/gate.log` | pass; `failed_count: 0`, `step_count: 35` |
 
 ## Verification Matrix Signoff
 

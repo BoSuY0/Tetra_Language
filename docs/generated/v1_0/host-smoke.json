@@ -1,18 +1,18 @@
 {
-  "timestamp": "2026-04-27T10:32:33Z",
+  "timestamp": "2026-05-01T07:41:10Z",
   "target": "linux-x64",
   "host": "linux-x64",
-  "version": "v0.1.1",
-  "git_head": "4c9a01d",
+  "version": "v0.3.0",
+  "git_head": "b884653",
   "islands_debug": false,
-  "total": 43,
-  "passed": 43,
+  "total": 62,
+  "passed": 62,
   "failed": 0,
   "cases": [
     {
       "name": "islands_hello",
       "src_path": "examples/islands_hello.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/islands_hello",
+      "out_path": "/tmp/tetra-smoke-1121529142/islands_hello",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,
@@ -21,7 +21,7 @@
     {
       "name": "islands_i32",
       "src_path": "examples/islands_i32.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/islands_i32",
+      "out_path": "/tmp/tetra-smoke-1121529142/islands_i32",
       "expected_exit": 55,
       "actual_exit": 55,
       "ran": true,
@@ -30,7 +30,7 @@
     {
       "name": "islands_overflow",
       "src_path": "examples/islands_overflow.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/islands_overflow",
+      "out_path": "/tmp/tetra-smoke-1121529142/islands_overflow",
       "expected_exit": 1,
       "actual_exit": 1,
       "ran": true,
@@ -39,7 +39,7 @@
     {
       "name": "mmio_smoke",
       "src_path": "examples/mmio_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/mmio_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/mmio_smoke",
       "expected_exit": 123,
       "actual_exit": 123,
       "ran": true,
@@ -48,7 +48,7 @@
     {
       "name": "cap_mem_smoke",
       "src_path": "examples/cap_mem_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/cap_mem_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/cap_mem_smoke",
       "expected_exit": 77,
       "actual_exit": 77,
       "ran": true,
@@ -57,7 +57,7 @@
     {
       "name": "memset_smoke",
       "src_path": "examples/memset_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/memset_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/memset_smoke",
       "expected_exit": 88,
       "actual_exit": 88,
       "ran": true,
@@ -66,7 +66,16 @@
     {
       "name": "actors_pingpong",
       "src_path": "examples/actors_pingpong.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/actors_pingpong",
+      "out_path": "/tmp/tetra-smoke-1121529142/actors_pingpong",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "actor_sleep_pingpong",
+      "src_path": "examples/actor_sleep_pingpong.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/actor_sleep_pingpong",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,
@@ -75,7 +84,7 @@
     {
       "name": "flow_hello",
       "src_path": "examples/flow_hello.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/flow_hello",
+      "out_path": "/tmp/tetra-smoke-1121529142/flow_hello",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,
@@ -84,7 +93,7 @@
     {
       "name": "flow_struct_smoke",
       "src_path": "examples/flow_struct_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/flow_struct_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/flow_struct_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -93,7 +102,7 @@
     {
       "name": "flow_islands_smoke",
       "src_path": "examples/flow_islands_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/flow_islands_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/flow_islands_smoke",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,
@@ -102,7 +111,7 @@
     {
       "name": "flow_unsafe_cap_mem_smoke",
       "src_path": "examples/flow_unsafe_cap_mem_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/flow_unsafe_cap_mem_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/flow_unsafe_cap_mem_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -111,7 +120,7 @@
     {
       "name": "ui_native_shell_smoke",
       "src_path": "examples/ui_native_shell_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/ui_native_shell_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/ui_native_shell_smoke",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,
@@ -120,7 +129,7 @@
     {
       "name": "bool_smoke",
       "src_path": "examples/bool_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/bool_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/bool_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -129,7 +138,7 @@
     {
       "name": "for_range_smoke",
       "src_path": "examples/for_range_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/for_range_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/for_range_smoke",
       "expected_exit": 55,
       "actual_exit": 55,
       "ran": true,
@@ -138,7 +147,7 @@
     {
       "name": "for_collection_smoke",
       "src_path": "examples/for_collection_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/for_collection_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/for_collection_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -147,7 +156,7 @@
     {
       "name": "for_collection_u8_smoke",
       "src_path": "examples/for_collection_u8_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/for_collection_u8_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/for_collection_u8_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -156,7 +165,7 @@
     {
       "name": "loop_control_smoke",
       "src_path": "examples/loop_control_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/loop_control_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/loop_control_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -165,7 +174,7 @@
     {
       "name": "complex_control_flow_smoke",
       "src_path": "examples/complex_control_flow_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/complex_control_flow_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/complex_control_flow_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -174,7 +183,7 @@
     {
       "name": "unary_not_smoke",
       "src_path": "examples/unary_not_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/unary_not_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/unary_not_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -183,7 +192,7 @@
     {
       "name": "const_smoke",
       "src_path": "examples/const_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/const_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/const_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -192,7 +201,7 @@
     {
       "name": "const_bool_smoke",
       "src_path": "examples/const_bool_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/const_bool_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/const_bool_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -201,7 +210,7 @@
     {
       "name": "local_const_smoke",
       "src_path": "examples/local_const_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/local_const_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/local_const_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -210,7 +219,7 @@
     {
       "name": "compound_assignment_smoke",
       "src_path": "examples/compound_assignment_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/compound_assignment_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/compound_assignment_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -219,7 +228,7 @@
     {
       "name": "else_if_smoke",
       "src_path": "examples/else_if_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/else_if_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/else_if_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -228,7 +237,7 @@
     {
       "name": "enum_match_smoke",
       "src_path": "examples/enum_match_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/enum_match_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/enum_match_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -237,7 +246,7 @@
     {
       "name": "enum_exhaustive_match_smoke",
       "src_path": "examples/enum_exhaustive_match_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/enum_exhaustive_match_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/enum_exhaustive_match_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -246,7 +255,7 @@
     {
       "name": "effects_io_smoke",
       "src_path": "examples/effects_io_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/effects_io_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/effects_io_smoke",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,
@@ -255,7 +264,7 @@
     {
       "name": "effects_mem_smoke",
       "src_path": "examples/effects_mem_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/effects_mem_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/effects_mem_smoke",
       "expected_exit": 17,
       "actual_exit": 17,
       "ran": true,
@@ -264,7 +273,7 @@
     {
       "name": "effects_actors_smoke",
       "src_path": "examples/effects_actors_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/effects_actors_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/effects_actors_smoke",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,
@@ -273,7 +282,7 @@
     {
       "name": "optional_smoke",
       "src_path": "examples/optional_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/optional_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/optional_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -282,7 +291,7 @@
     {
       "name": "optional_match_smoke",
       "src_path": "examples/optional_match_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/optional_match_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/optional_match_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -291,7 +300,7 @@
     {
       "name": "optional_match_some_smoke",
       "src_path": "examples/optional_match_some_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/optional_match_some_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/optional_match_some_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -300,7 +309,7 @@
     {
       "name": "ownership_smoke",
       "src_path": "examples/ownership_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/ownership_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/ownership_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -309,7 +318,7 @@
     {
       "name": "typed_errors_smoke",
       "src_path": "examples/typed_errors_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/typed_errors_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/typed_errors_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -318,7 +327,7 @@
     {
       "name": "async_smoke",
       "src_path": "examples/async_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/async_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/async_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -327,16 +336,61 @@
     {
       "name": "task_smoke",
       "src_path": "examples/task_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/task_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/task_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
       "pass": true
     },
     {
+      "name": "time_sleep_smoke",
+      "src_path": "examples/time_sleep_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/time_sleep_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "task_sleep_deadline_smoke",
+      "src_path": "examples/task_sleep_deadline_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/task_sleep_deadline_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "task_join_wait_smoke",
+      "src_path": "examples/task_join_wait_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/task_join_wait_smoke",
+      "expected_exit": 5,
+      "actual_exit": 5,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "deadline_aware_waits_smoke",
+      "src_path": "examples/deadline_aware_waits_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/deadline_aware_waits_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "wait_composition_smoke",
+      "src_path": "examples/wait_composition_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/wait_composition_smoke",
+      "expected_exit": 0,
+      "actual_exit": 0,
+      "ran": true,
+      "pass": true
+    },
+    {
       "name": "core_math_smoke",
       "src_path": "examples/core_math_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/core_math_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_math_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -345,7 +399,124 @@
     {
       "name": "core_memory_smoke",
       "src_path": "examples/core_memory_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/core_memory_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_memory_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_strings_smoke",
+      "src_path": "examples/core_strings_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_strings_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_slices_smoke",
+      "src_path": "examples/core_slices_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_slices_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_io_smoke",
+      "src_path": "examples/core_io_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_io_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_testing_smoke",
+      "src_path": "examples/core_testing_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_testing_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_collections_smoke",
+      "src_path": "examples/core_collections_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_collections_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_serialization_smoke",
+      "src_path": "examples/core_serialization_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_serialization_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_filesystem_smoke",
+      "src_path": "examples/core_filesystem_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_filesystem_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_networking_smoke",
+      "src_path": "examples/core_networking_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_networking_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_async_smoke",
+      "src_path": "examples/core_async_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_async_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_sync_smoke",
+      "src_path": "examples/core_sync_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_sync_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_time_smoke",
+      "src_path": "examples/core_time_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_time_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_crypto_smoke",
+      "src_path": "examples/core_crypto_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_crypto_smoke",
+      "expected_exit": 42,
+      "actual_exit": 42,
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "core_capability_smoke",
+      "src_path": "examples/core_capability_smoke.tetra",
+      "out_path": "/tmp/tetra-smoke-1121529142/core_capability_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -354,7 +525,7 @@
     {
       "name": "extension_smoke",
       "src_path": "examples/extension_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/extension_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/extension_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -363,7 +534,7 @@
     {
       "name": "generic_smoke",
       "src_path": "examples/generic_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/generic_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/generic_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -372,7 +543,7 @@
     {
       "name": "protocol_impl_smoke",
       "src_path": "examples/protocol_impl_smoke.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/protocol_impl_smoke",
+      "out_path": "/tmp/tetra-smoke-1121529142/protocol_impl_smoke",
       "expected_exit": 42,
       "actual_exit": 42,
       "ran": true,
@@ -381,7 +552,7 @@
     {
       "name": "dogfood_cli",
       "src_path": "examples/projects/dogfood_cli/src/main.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/dogfood_cli",
+      "out_path": "/tmp/tetra-smoke-1121529142/dogfood_cli",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,
@@ -390,7 +561,7 @@
     {
       "name": "dogfood_actor_task",
       "src_path": "examples/projects/dogfood_actor_task/src/main.tetra",
-      "out_path": "/tmp/tetra-smoke-1478447533/dogfood_actor_task",
+      "out_path": "/tmp/tetra-smoke-1121529142/dogfood_actor_task",
       "expected_exit": 0,
       "actual_exit": 0,
       "ran": true,

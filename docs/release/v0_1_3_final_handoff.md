@@ -8,8 +8,9 @@ Version: `v0.1.3`
 
 - Stabilization backlog: no open checkboxes in
   `docs/plans/2026-04-27-tetra-real-stabilization-agent-backlog.md`.
-- v1.0 TODO plan: no open checkboxes in
-  `docs/plans/2026-04-27-tetra-v0_1-to-v1_0-full-todo.md`.
+- v1.0 closure evidence: historical TODO planning has been retired; current
+  future-scope evidence lives in `docs/spec/v1_scope.md` and
+  `docs/checklists/v1_0_release_gate.md`.
 - Release checklist: no open checkboxes in
   `docs/checklists/v0_1_3_release_gate.md`.
 - Canonical release archive for the prep branch:
@@ -28,9 +29,9 @@ Version: `v0.1.3`
   pass.
 - `go test ./compiler/... ./cli/... ./tools/... -count=1`:
   pass.
-- `bash scripts/test_all.sh --full --report-dir reports/codex-v0_1_3-post-bump-full-2`:
+- `bash scripts/ci/test-all.sh --full --report-dir reports/codex-v0_1_3-post-bump-full-2`:
   pass, 23 full checks.
-- `TETRA_SECURITY_REVIEW_SIGNOFF=reports/codex-current-security-review.md bash scripts/release_v0_1_3_gate.sh --report-dir reports/codex-v0_1_3-post-bump-release-gate-2`:
+- `TETRA_SECURITY_REVIEW_SIGNOFF=reports/codex-current-security-review.md bash scripts/release/v0_1_3/gate.sh --report-dir reports/codex-v0_1_3-post-bump-release-gate-2`:
   pass, 33 release-gate checks.
 - `go run ./tools/cmd/validate-release-state --format=text --report-dir reports/codex-v0_1_3-post-bump-release-gate-2`:
   pass, `36` required artifacts, `0` missing artifacts, artifact hash manifest
@@ -39,9 +40,9 @@ Version: `v0.1.3`
 
 ## Integration Notes
 
-- `scripts/release_v0_1_3_gate.sh` archives the external `security-review.md`
+- `scripts/release/v0_1_3/gate.sh` archives the external `security-review.md`
   signoff into the release evidence artifacts before hashing the archive.
-- `scripts/release_v1_0_security_review.sh` validates the signoff against the
+- `scripts/release/v1_0/security-review.sh` validates the signoff against the
   current repository version and exact commit under review.
 - `tools/cmd/validate-release-state` now rejects stale release summaries with
   fewer than `33` steps and validates the tracked artifact hash manifest.
@@ -56,5 +57,5 @@ Version: `v0.1.3`
 The code is release-gate clean except for the intentionally external security
 review signoff when no `TETRA_SECURITY_REVIEW_SIGNOFF` is supplied. Final
 tagging requires a fresh signoff for the exact commit, rerunning
-`scripts/release_v0_1_3_gate.sh` with that signoff, and preserving the report
+`scripts/release/v0_1_3/gate.sh` with that signoff, and preserving the report
 archive.

@@ -36,6 +36,70 @@ func TestValidateLSPSmokeRejectsNullCollections(t *testing.T) {
 	}
 }
 
+func TestValidateLSPSmokeRejectsUnknownEnvelopeField(t *testing.T) {
+	report := `{
+  "uri": "sample.tetra",
+  "diagnostics": [],
+  "symbols": [],
+  "hovers": [],
+  "extra": true
+}`
+	out, err := runLSPValidator(t, report)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), "unknown field") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateLSPSmokeRejectsUnknownItemFields(t *testing.T) {
+	tests := []struct {
+		name   string
+		report string
+	}{
+		{
+			name: "diagnostic",
+			report: `{
+  "uri": "sample.tetra",
+  "diagnostics": [{"message": "bad", "severity": "error", "line": 1, "column": 1, "extra": true}],
+  "symbols": [],
+  "hovers": []
+}`,
+		},
+		{
+			name: "symbol",
+			report: `{
+  "uri": "sample.tetra",
+  "diagnostics": [],
+  "symbols": [{"name": "main", "kind": "function", "line": 1, "column": 5, "extra": true}],
+  "hovers": []
+}`,
+		},
+		{
+			name: "hover",
+			report: `{
+  "uri": "sample.tetra",
+  "diagnostics": [],
+  "symbols": [{"name": "main", "kind": "function", "line": 1, "column": 5}],
+  "hovers": [{"name": "main", "line": 1, "column": 5, "contents": "func main() -> Int", "extra": true}]
+}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := runLSPValidator(t, tt.report)
+			if err == nil {
+				t.Fatalf("expected validator failure\n%s", out)
+			}
+			if !strings.Contains(string(out), "unknown field") {
+				t.Fatalf("unexpected output:\n%s", out)
+			}
+		})
+	}
+}
+
 func TestValidateLSPSmokeRejectsSymbolWithoutPosition(t *testing.T) {
 	report := `{
   "uri": "sample.tetra",

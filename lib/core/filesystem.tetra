@@ -1,5 +1,5 @@
 // Stable v1 core filesystem helpers promoted from lib.experimental.filesystem.
-// Effects: none
+// Effects: io
 // ```tetra doctest
 // func filesystem_doctest() -> Int:
 //     if lib.core.filesystem.has_leading_slash("/") && lib.core.filesystem.directory_depth("/tmp/cache") == 2:
@@ -9,6 +9,10 @@
 module lib.core.filesystem
 
 import lib.core.strings as core_strings
+
+func exists(path: String, io_cap: cap.io) -> Bool
+uses io:
+    return core.fs_exists(path, io_cap)
 
 func has_leading_slash(path: String) -> Bool:
     for ch in path:

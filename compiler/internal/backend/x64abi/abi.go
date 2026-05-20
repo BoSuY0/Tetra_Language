@@ -6,6 +6,8 @@ import (
 	"tetra_language/compiler/internal/ir"
 )
 
+const maxCallReturnSlots = 10
+
 type ABI interface {
 	SpillParams(e *x64.Emitter, fn ir.IRFunc)
 

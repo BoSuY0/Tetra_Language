@@ -19,6 +19,44 @@ func TestValidateEcoVaultAcceptsValidStore(t *testing.T) {
 	}
 }
 
+func TestValidateEcoVaultRejectsUnknownTopLevelField(t *testing.T) {
+	root := makeVaultStore(t, []byte("hello tetra\n"), 0, "")
+	raw, err := os.ReadFile(filepath.Join(root, "records.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), "{\n", "{\n  \"extra\": true,\n", 1))
+	if err := os.WriteFile(filepath.Join(root, "records.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runVaultValidator(t, root)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), `unknown field "extra"`) {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestValidateEcoVaultRejectsUnknownRecordField(t *testing.T) {
+	root := makeVaultStore(t, []byte("hello tetra\n"), 0, "")
+	raw, err := os.ReadFile(filepath.Join(root, "records.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), `"size": `, `"extra": true, "size": `, 1))
+	if err := os.WriteFile(filepath.Join(root, "records.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runVaultValidator(t, root)
+	if err == nil {
+		t.Fatalf("expected validator failure\n%s", out)
+	}
+	if !strings.Contains(string(out), `unknown field "extra"`) {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
 func TestValidateEcoVaultRejectsMissingRecords(t *testing.T) {
 	root := t.TempDir()
 	out, err := runVaultValidator(t, root)

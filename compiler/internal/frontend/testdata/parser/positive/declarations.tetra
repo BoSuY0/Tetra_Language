@@ -1,0 +1,12 @@
+module fixtures.declarations
+
+capsule App:
+    id: "tetra://fixtures/declarations"
+    version: "1.0.0"
+    flags.enabled: true
+
+property title: String = "Declarations"
+const answer: Int = 42
+
+test "declarations":
+    expect answer == 42

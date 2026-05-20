@@ -25,6 +25,9 @@ const (
 	schedCurrentGroupOff = 104 // u32
 	schedSpawnGroupOff   = 108 // u32
 	schedTimeMsOff       = 112 // u32
+	schedNetFDOff        = 116 // i32
+	schedNodeIDOff       = 120 // u32
+	schedNetStatusOff    = 124 // u32
 	maxActors            = 128
 	schedActorGroup0Off  = 128  // u32[maxActors]
 	schedActorWakeAt0Off = 640  // u32[maxActors]
@@ -75,12 +78,12 @@ const (
 func BuildLinuxX64(entries []string) (*tobj.Object, error) {
 	abi := x64abi.LinuxSysV()
 	const linuxMapPrivateAnon = 0x22
-	return buildSysVUnixX64(entries, abi.SysMmap, linuxMapPrivateAnon)
+	return buildSysVUnixX64(entries, abi.SysMmap, linuxMapPrivateAnon, true)
 }
 
-func buildSysVUnixX64(entries []string, sysMmap uint32, mapFlags uint32) (*tobj.Object, error) {
-	if len(entries) == 0 || entries[0] == "" {
-		return nil, fmt.Errorf("missing entry symbols (need main at index 0)")
+func buildSysVUnixX64(entries []string, sysMmap uint32, mapFlags uint32, distributedActorNet bool) (*tobj.Object, error) {
+	if err := validateRuntimeEntrySymbols(entries); err != nil {
+		return nil, err
 	}
 
 	e := &x64.Emitter{}
@@ -132,6 +135,15 @@ func buildSysVUnixX64(entries []string, sysMmap uint32, mapFlags uint32) (*tobj.
 	}
 	if err := emitFunc("__tetra_actor_send_commit", func() error { return emitSendCommit(e) }); err != nil {
 		return nil, err
+	}
+	if distributedActorNet {
+		if err := emitFunc("__tetra_actor_net_pump", func() error { return emitActorNetPump(e) }); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := emitFunc("__tetra_actor_net_pump", func() error { return emitActorNetPumpNoop(e) }); err != nil {
+			return nil, err
+		}
 	}
 	if err := emitFunc("__tetra_actor_recv", func() error { return emitRecv(e, &callPatches) }); err != nil {
 		return nil, err
@@ -208,6 +220,20 @@ func buildSysVUnixX64(entries []string, sysMmap uint32, mapFlags uint32) (*tobj.
 	if err := emitFunc("__tetra_timer_ready_ms", func() error { return emitTimerReadyMs(e) }); err != nil {
 		return nil, err
 	}
+	if err := emitFunc("__tetra_fs_exists", func() error { return emitFilesystemExists(e) }); err != nil {
+		return nil, err
+	}
+	if distributedActorNet {
+		if err := emitFunc("__tetra_actor_node_connect", func() error { return emitActorNodeConnect(e) }); err != nil {
+			return nil, err
+		}
+		if err := emitFunc("__tetra_actor_spawn_remote", func() error { return emitActorSpawnRemote(e) }); err != nil {
+			return nil, err
+		}
+		if err := emitFunc("__tetra_actor_node_status", func() error { return emitActorNodeStatus(e) }); err != nil {
+			return nil, err
+		}
+	}
 	if err := emitFunc("__tetra_task_spawn_group_i32", func() error { return emitTaskSpawnGroupI32(e, "__tetra_actor_spawn", &callPatches) }); err != nil {
 		return nil, err
 	}
@@ -273,6 +299,23 @@ func buildSysVUnixX64(entries []string, sysMmap uint32, mapFlags uint32) (*tobj.
 	}
 
 	return &tobj.Object{Code: code, Data: nil, Symbols: symbols, Relocs: relocs}, nil
+}
+
+func validateRuntimeEntrySymbols(entries []string) error {
+	if len(entries) == 0 || entries[0] == "" {
+		return fmt.Errorf("missing entry symbols (need main at index 0)")
+	}
+	seen := make(map[string]struct{}, len(entries))
+	for i, name := range entries {
+		if name == "" {
+			return fmt.Errorf("empty runtime entry symbol at index %d", i)
+		}
+		if _, exists := seen[name]; exists {
+			return fmt.Errorf("duplicate runtime entry symbol '%s'", name)
+		}
+		seen[name] = struct{}{}
+	}
+	return nil
 }
 
 type callPatch struct {

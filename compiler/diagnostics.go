@@ -6,6 +6,7 @@ import (
 
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/semantics"
 )
 
 type Diagnostic struct {
@@ -21,8 +22,14 @@ type Diagnostic struct {
 const (
 	DiagnosticCodeParse            = frontend.DiagnosticCodeParse
 	DiagnosticCodeSemantic         = "TETRA2001"
+	DiagnosticCodeSafetyOwnership  = semantics.DiagnosticCodeSafetyOwnership
+	DiagnosticCodeSafetyLifetime   = semantics.DiagnosticCodeSafetyLifetime
+	DiagnosticCodeSafetyEffect     = semantics.DiagnosticCodeSafetyEffect
+	DiagnosticCodeSafetyPrivacy    = semantics.DiagnosticCodeSafetyPrivacy
+	DiagnosticCodeSafetyBudget     = semantics.DiagnosticCodeSafetyBudget
 	DiagnosticCodeIRVerifier       = lower.DiagnosticCodeIRVerifier
 	DiagnosticCodeLowerUnsupported = lower.DiagnosticCodeLowerUnsupported
+	DiagnosticCodeTargetRuntime    = "TETRA3003"
 	DiagnosticCodeFormatter        = "TETRA_FMT001"
 	DiagnosticCodeFormatterCheck   = "TETRA_FMT002"
 )
@@ -44,6 +51,26 @@ func DiagnosticCodeRegistry() map[string]DiagnosticCodeInfo {
 			Severity: "error",
 			Surface:  "semantic/compiler",
 		},
+		DiagnosticCodeSafetyOwnership: {
+			Severity: "error",
+			Surface:  "semantic safety/ownership",
+		},
+		DiagnosticCodeSafetyLifetime: {
+			Severity: "error",
+			Surface:  "semantic safety/lifetime",
+		},
+		DiagnosticCodeSafetyEffect: {
+			Severity: "error",
+			Surface:  "semantic safety/effect",
+		},
+		DiagnosticCodeSafetyPrivacy: {
+			Severity: "error",
+			Surface:  "semantic safety/privacy",
+		},
+		DiagnosticCodeSafetyBudget: {
+			Severity: "error",
+			Surface:  "semantic safety/budget",
+		},
 		DiagnosticCodeIRVerifier: {
 			Severity: "error",
 			Surface:  "ir verifier",
@@ -51,6 +78,10 @@ func DiagnosticCodeRegistry() map[string]DiagnosticCodeInfo {
 		DiagnosticCodeLowerUnsupported: {
 			Severity: "error",
 			Surface:  "lowering unsupported",
+		},
+		DiagnosticCodeTargetRuntime: {
+			Severity: "error",
+			Surface:  "target runtime support",
 		},
 		DiagnosticCodeFormatter: {
 			Severity: "error",

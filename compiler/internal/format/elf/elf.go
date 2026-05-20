@@ -37,6 +37,9 @@ func LinuxX64Layout(codeSize, dataSize int) LinuxX64LayoutInfo {
 }
 
 func WriteELF64LinuxX64(path string, img *Image) error {
+	if img == nil {
+		return fmt.Errorf("missing ELF image")
+	}
 	if img.EntryOffset > uint64(len(img.Code)) {
 		return fmt.Errorf("entry offset out of range")
 	}

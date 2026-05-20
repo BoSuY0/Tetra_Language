@@ -10,9 +10,9 @@ func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
   "status": "pass",
   "checks": [
     {"name":"version","status":"pass","detail":"v0.6.0"},
-    {"name":"supported targets","status":"pass","detail":"linux-x64, windows-x64, macos-x64"},
-    {"name":"build-only targets","status":"pass","detail":"wasm32-wasi"},
-    {"name":"planned targets","status":"pass","detail":"wasm32-web"},
+    {"name":"supported targets","status":"pass","detail":"linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web"},
+    {"name":"build-only targets","status":"pass"},
+    {"name":"planned targets","status":"pass"},
     {"name":"repo root","status":"pass","detail":"/tmp/tetra"},
     {"name":"__rt/actors_sysv.tetra","status":"pass","detail":"found"},
     {"name":"__rt/actors_win64.tetra","status":"pass","detail":"found"},
@@ -24,7 +24,7 @@ func TestValidateDoctorReportAcceptsExpectedShape(t *testing.T) {
     {"name":"docs manifest surface","status":"pass","detail":"3 targets, 6 runtime symbols"},
     {"name":"smoke sources","status":"pass","detail":"40 sources"},
     {"name":"runtime exports","status":"pass","detail":"4 files, 6 symbols"},
-    {"name":"target metadata","status":"pass","detail":"5 targets, 2 build-only"},
+    {"name":"target metadata","status":"pass","detail":"5 targets, 0 build-only"},
     {"name":"tooling commands","status":"pass","detail":"fmt, test, doc, smoke, lsp, eco"}
   ]
 }`)

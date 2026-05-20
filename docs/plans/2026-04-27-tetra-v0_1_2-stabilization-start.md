@@ -21,19 +21,19 @@ belong in a later minor or major line.
 
 - [x] Audit docs for remaining current-release references that should point to
       `docs/checklists/v0_1_2_release_gate.md` or
-      `scripts/release_v0_1_2_gate.sh`.
+      `scripts/release/v0_1_2/gate.sh`.
 - [x] Decide whether `docs/generated/v1_0` should remain the compatibility
       archive path for all `v0.1.x` snapshots or gain a new `v0_1` directory in
       a reviewed migration.
       Decision: keep `docs/generated/v1_0` as the compatibility archive path
       during `v0.1.x`; migrate only through a reviewed post-release cleanup.
 - [x] Add focused tests for the compatibility alias
-      `scripts/release_v1_0_gate.sh` so future cleanup cannot silently remove
+      `scripts/release/v1_0/gate.sh` so future cleanup cannot silently remove
       the current gate path.
 - [x] Review `docs/spec/v1_scope.md` and split future-only v1 requirements from
       current `v0.1.x` release claims.
 - [x] Run `go test ./compiler/... ./cli/... ./tools/... -count=1` and
-      `bash scripts/test_all.sh --full --keep-going` before any `v0.1.2`
+      `bash scripts/ci/test-all.sh --full --keep-going` before any `v0.1.2`
       version bump.
 
 ## Non-goals
