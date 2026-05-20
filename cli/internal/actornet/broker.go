@@ -218,7 +218,7 @@ func (b *Broker) routeFrame(frame actorwire.Frame) error {
 		b.report.DroppedFrames++
 		b.mu.Unlock()
 		if source != nil {
-			return source.write(actorwire.Frame{
+			err := source.write(actorwire.Frame{
 				Type:         actorwire.FrameNodeDown,
 				SourceNodeID: frame.DestNodeID,
 				DestNodeID:   frame.SourceNodeID,
@@ -226,12 +226,41 @@ func (b *Broker) routeFrame(frame actorwire.Frame) error {
 				ActorID:      frame.ActorID,
 				Status:       actorwire.StatusNodeUnavailable,
 			})
+			if b.handleClosedRouteWrite(frame.SourceNodeID, source.conn, err, false) {
+				return nil
+			}
+			return err
 		}
 		return fmt.Errorf("actornet: destination node %d unavailable", frame.DestNodeID)
 	}
+	b.mu.Unlock()
+	if err := dest.write(frame); err != nil {
+		if b.handleClosedRouteWrite(frame.DestNodeID, dest.conn, err, true) {
+			return nil
+		}
+		return err
+	}
+	b.mu.Lock()
 	b.report.RoutedFrames++
 	b.mu.Unlock()
-	return dest.write(frame)
+	return nil
+}
+
+func (b *Broker) handleClosedRouteWrite(nodeID uint16, conn net.Conn, err error, countDrop bool) bool {
+	if err == nil || !isClosedConnError(err) {
+		return false
+	}
+	b.mu.Lock()
+	if existing := b.nodes[nodeID]; existing != nil && existing.conn == conn {
+		delete(b.nodes, nodeID)
+	}
+	if countDrop {
+		b.report.DroppedFrames++
+	}
+	b.report.ConnectedNodes = len(b.nodes)
+	b.mu.Unlock()
+	_ = conn.Close()
+	return true
 }
 
 func (b *Broker) recordAcceptedConnection() {
@@ -296,6 +325,7 @@ func readFrame(conn net.Conn) (actorwire.Frame, error) {
 func isClosedConnError(err error) bool {
 	return errors.Is(err, io.EOF) ||
 		errors.Is(err, net.ErrClosed) ||
+		errors.Is(err, io.ErrClosedPipe) ||
 		errors.Is(err, io.ErrUnexpectedEOF) ||
 		errors.Is(err, syscall.ECONNRESET)
 }

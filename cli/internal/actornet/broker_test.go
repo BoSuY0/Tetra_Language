@@ -118,6 +118,47 @@ func TestBrokerReportsNodeDownForMissingDestination(t *testing.T) {
 	}
 }
 
+func TestBrokerTreatsClosedDestinationWriteAsDroppedFrame(t *testing.T) {
+	destWriter, destReader := net.Pipe()
+	defer destWriter.Close()
+	_ = destReader.Close()
+
+	sourceWriter, sourceReader := net.Pipe()
+	defer sourceWriter.Close()
+	defer sourceReader.Close()
+
+	broker := &Broker{
+		nodes: map[uint16]*nodeConn{
+			1: {nodeID: 1, conn: sourceWriter},
+			2: {nodeID: 2, conn: destWriter},
+		},
+	}
+
+	err := broker.routeFrame(actorwire.Frame{
+		Type:         actorwire.FrameSendI32,
+		SourceNodeID: 1,
+		DestNodeID:   2,
+		SequenceID:   91,
+		Payload:      []int32{4},
+	})
+	if err != nil {
+		t.Fatalf("routeFrame closed destination error = %v, want nil", err)
+	}
+	report := broker.Report()
+	if report.LastError != "" {
+		t.Fatalf("LastError = %q, want empty for closed destination write", report.LastError)
+	}
+	if report.DroppedFrames != 1 {
+		t.Fatalf("DroppedFrames = %d, want 1", report.DroppedFrames)
+	}
+	if report.RoutedFrames != 0 {
+		t.Fatalf("RoutedFrames = %d, want 0 for undelivered frame", report.RoutedFrames)
+	}
+	if report.ConnectedNodes != 1 {
+		t.Fatalf("ConnectedNodes = %d, want stale destination removed", report.ConnectedNodes)
+	}
+}
+
 func TestClosedConnectionErrorsIncludePeerReset(t *testing.T) {
 	err := &net.OpError{Op: "read", Net: "tcp", Err: os.NewSyscallError("read", syscall.ECONNRESET)}
 	if !isClosedConnError(err) {

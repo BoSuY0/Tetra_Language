@@ -252,12 +252,12 @@
     "hash": "637be31b504dbc3d2354459ca49ed2ee"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/v0.4.0-final-production/cli/internal/actornet/broker.go": {
-    "mtime": 1778960346.209042,
-    "hash": "77d38ed20b4392ae80e0229c4e756b60"
+    "mtime": 1779256488.3297024,
+    "hash": "a70b6a847d8eb35dce58137ab66c1a8c"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/v0.4.0-final-production/cli/internal/actornet/broker_test.go": {
-    "mtime": 1778960346.2096088,
-    "hash": "5e678e0dc8bc57493de22f88d67e14cb"
+    "mtime": 1779256469.795069,
+    "hash": "73dc4da089a1ffb88f124297270b97c8"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/v0.4.0-final-production/cli/internal/actornet/runtime_integration_test.go": {
     "mtime": 1778958763.261055,
