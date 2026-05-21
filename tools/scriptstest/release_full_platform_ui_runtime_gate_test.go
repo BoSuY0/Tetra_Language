@@ -140,6 +140,7 @@ func TestReleaseFullPlatformGitHubActionsStartupDiagnosticIsBlockedOnly(t *testi
 		"gh api \"repos/$repo/actions/permissions\"",
 		"gh api \"repos/$repo/actions/runners\"",
 		"gh api \"users/$billing_owner/settings/billing/actions\"",
+		"s#\\.git$##",
 		"minimal_canary",
 		"startup_failure",
 		"tetra.actions.startup-blocker.v1",

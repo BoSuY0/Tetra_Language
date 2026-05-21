@@ -103,7 +103,7 @@ cd "$repo_root"
 
 if [[ -z "$repo" ]]; then
   remote_url="$(git remote get-url origin 2>/dev/null || true)"
-  repo="$(printf '%s' "$remote_url" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\\.git$##')"
+  repo="$(printf '%s' "$remote_url" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
 fi
 if [[ -z "$branch" ]]; then
   branch="$(git rev-parse --abbrev-ref HEAD)"
