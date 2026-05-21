@@ -34,9 +34,15 @@ v1.0.0
 report_dir=/tmp/tetra-v1.0.0-rc1-gate
 rm -rf "$report_dir"
 GOCACHE=/tmp/tetra-go-build \
-  TETRA_SECURITY_REVIEW_SIGNOFF=docs/generated/v1_0/security-review.md \
+  TETRA_SECURITY_REVIEW_SIGNOFF=/path/to/reviewed/security-review.md \
   bash scripts/release/v1_0/gate.sh --report-dir "$report_dir"
 ```
+
+If `TETRA_SECURITY_REVIEW_SIGNOFF` is omitted, the gate writes a blocked
+`$report_dir/artifacts/security-review.md` placeholder plus
+`$report_dir/artifacts/security-review.md.sha256` so the archive records the
+missing-signoff blocker. That placeholder is not release approval and the gate
+must remain blocked.
 
 Required archive entry points:
 
@@ -44,6 +50,8 @@ Required archive entry points:
 $report_dir/summary.json
 $report_dir/summary.md
 $report_dir/artifacts/release-state.json
+$report_dir/artifacts/security-review.md
+$report_dir/artifacts/security-review.md.sha256
 $report_dir/artifacts/known_issues.md
 $report_dir/artifacts/artifact-hashes.json
 ```

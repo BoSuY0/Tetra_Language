@@ -337,7 +337,28 @@ check_repro_build() {
 }
 
 check_security_review_signoff() {
-  local signoff_path="${TETRA_SECURITY_REVIEW_SIGNOFF:-$artifacts_dir/security-review.md}"
+  local signoff_path="${TETRA_SECURITY_REVIEW_SIGNOFF:-}"
+  if [[ -z "$signoff_path" ]]; then
+    cat >"$artifacts_dir/security-review.md" <<EOF
+# $release_version Security Review Signoff
+
+Decision: blocked
+Reason: missing TETRA_SECURITY_REVIEW_SIGNOFF for the exact $release_version candidate.
+Report directory: $report_dir
+Generated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+Create a signoff with:
+
+\`\`\`sh
+bash scripts/release/v1_0/security-review.sh --write-template <security-review.md>
+\`\`\`
+
+This artifact is a blocked placeholder so the release archive can preserve the
+missing-signoff evidence. It is not release approval.
+EOF
+    echo "release/v1_0/gate: missing TETRA_SECURITY_REVIEW_SIGNOFF=<security-review.md>" >&2
+    return 1
+  fi
   signoff_path="$(normalize_relative_dash_leading_path "$signoff_path")"
   bash scripts/release/v1_0/security-review.sh --signoff "$signoff_path"
   cp -- "$signoff_path" "$artifacts_dir/security-review.md"

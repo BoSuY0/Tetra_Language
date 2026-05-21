@@ -353,6 +353,46 @@ func TestReleaseV10GateAcceptsDashPrefixedSecuritySignoff(t *testing.T) {
 	}
 }
 
+func TestReleaseV10GateWritesBlockedSecurityArtifactWhenSignoffMissing(t *testing.T) {
+	root := releaseV10GateFakeRepo(t)
+	reportDir := filepath.Join(root, "report")
+
+	cmd := exec.Command("bash", "scripts/release/v1_0/gate.sh", "--report-dir", reportDir)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(),
+		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("v1.0 gate should block when security signoff is missing\n%s", out)
+	}
+	if !strings.Contains(string(out), "release/v1_0/gate: missing TETRA_SECURITY_REVIEW_SIGNOFF=<security-review.md>") {
+		t.Fatalf("missing signoff output did not explain the blocker:\n%s", out)
+	}
+	reviewPath := filepath.Join(reportDir, "artifacts", "security-review.md")
+	reviewRaw, err := os.ReadFile(reviewPath)
+	if err != nil {
+		t.Fatalf("blocked security review artifact was not written: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Decision: blocked",
+		"Reason: missing TETRA_SECURITY_REVIEW_SIGNOFF for the exact v1.0.0 candidate.",
+		"bash scripts/release/v1_0/security-review.sh --write-template <security-review.md>",
+	} {
+		if !strings.Contains(string(reviewRaw), want) {
+			t.Fatalf("blocked security review artifact missing %q:\n%s", want, reviewRaw)
+		}
+	}
+	hashRaw, err := os.ReadFile(filepath.Join(reportDir, "artifacts", "security-review.md.sha256"))
+	if err != nil {
+		t.Fatalf("blocked security review detached hash was not written: %v\n%s", err, out)
+	}
+	wantHash := fmt.Sprintf("%x  artifacts/security-review.md\n", sha256.Sum256(reviewRaw))
+	if string(hashRaw) != wantHash {
+		t.Fatalf("blocked security review detached hash = %q, want %q", string(hashRaw), wantHash)
+	}
+}
+
 func releaseV10MinimalGateRoot(t *testing.T) string {
 	t.Helper()
 
