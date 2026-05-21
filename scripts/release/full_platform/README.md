@@ -24,6 +24,9 @@ Manual target-host evidence:
 - Check out the same Git commit on a real Windows amd64 host and run
   `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
   --target windows-x64 --report windows-ui-runtime.json`.
+  On Windows hosts without Bash, run
+  `pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1
+  -Report windows-ui-runtime.json`.
 - Check out the same Git commit on a real macOS amd64 host and run
   `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
   --target macos-x64 --report macos-ui-runtime.json`.

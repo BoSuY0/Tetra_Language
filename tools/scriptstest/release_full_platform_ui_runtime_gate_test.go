@@ -55,6 +55,7 @@ func TestReleaseFullPlatformSmokeScriptsExist(t *testing.T) {
 		"scripts/release/full_platform/actions-availability-preflight.sh",
 		"scripts/release/full_platform/github-actions-startup-diagnostic.sh",
 		"scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
+		"scripts/release/full_platform/windows-ui-runtime-smoke.ps1",
 		"scripts/release/full_platform/windows-ui-runtime-smoke.sh",
 		"scripts/release/full_platform/macos-ui-runtime-smoke.sh",
 	} {
@@ -184,6 +185,7 @@ func TestReleaseFullPlatformTargetHostHelperDocumentsManualEvidence(t *testing.T
 	for _, want := range []string{
 		"Manual target-host evidence",
 		"bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
+		"pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1",
 		"TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json",
 		"TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json",
 		"same Git commit",
@@ -192,6 +194,29 @@ func TestReleaseFullPlatformTargetHostHelperDocumentsManualEvidence(t *testing.T
 	} {
 		if !strings.Contains(readme, want) {
 			t.Fatalf("full-platform README missing manual evidence detail %q", want)
+		}
+	}
+}
+
+func TestReleaseFullPlatformWindowsPowerShellTargetHostHelper(t *testing.T) {
+	scriptPath := filepath.Join(repoRoot(t), "scripts", "release", "full_platform", "windows-ui-runtime-smoke.ps1")
+	raw, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read Windows PowerShell target-host helper: %v", err)
+	}
+	script := string(raw)
+	for _, want := range []string{
+		"Usage: pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1 [-Report FILE] [-ReportDir DIR]",
+		"Windows_NT",
+		"OSArchitecture",
+		"IsPathRooted",
+		"windows-x64 UI runtime production evidence requires a real Windows x64 host",
+		"go run ./tools/cmd/platform-ui-runtime-smoke --target windows-x64 --report",
+		"go run ./tools/cmd/validate-windows-ui-runtime --report",
+		"target-host UI runtime report",
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("Windows PowerShell target-host helper missing %q", want)
 		}
 	}
 }
