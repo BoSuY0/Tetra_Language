@@ -84,6 +84,42 @@ func TestBuildCommandWASMTargetWritesWasmModule(t *testing.T) {
 	}
 }
 
+func TestBuildCommandLinuxX32AutoRuntimeWritesSelfHostELF(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "time_x32.tetra")
+	outPath := filepath.Join(dir, "time-x32")
+	if err := os.WriteFile(srcPath, []byte(`
+func main() -> Int
+uses runtime:
+    return core.time_now_ms()
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := runCLI([]string{"build", "--target", "x32", "-o", outPath, srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x32 output: %v", err)
+	}
+	if len(data) < 20 {
+		t.Fatalf("x32 ELF too short: %d bytes", len(data))
+	}
+	if !bytes.Equal(data[:4], []byte{0x7f, 'E', 'L', 'F'}) {
+		t.Fatalf("missing ELF magic: % x", data[:4])
+	}
+	if data[4] != 1 {
+		t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+		t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+	}
+}
+
 func TestBuildCommandUIWritesBackendSidecars(t *testing.T) {
 	src := `state CounterState:
     var count: Int = 0
@@ -220,7 +256,7 @@ func TestBuildCommandRejectsInvalidTarget(t *testing.T) {
 	if code != 2 {
 		t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "unsupported target") || !strings.Contains(stderr.String(), "supported targets: linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web") || !strings.Contains(stderr.String(), "build-only targets: ") {
+	if !strings.Contains(stderr.String(), "unsupported target") || !strings.Contains(stderr.String(), "supported targets: linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web") || !strings.Contains(stderr.String(), "build-only targets: linux-x86, linux-x32") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
@@ -230,7 +266,7 @@ func TestBuildCommandJSONDiagnosticsForInvalidTarget(t *testing.T) {
 	if diag.Code != "TETRA0001" || diag.Severity != "error" {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
-	for _, want := range []string{"unsupported target: not-a-target", "supported targets: linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web", "build-only targets: "} {
+	for _, want := range []string{"unsupported target: not-a-target", "supported targets: linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web", "build-only targets: linux-x86, linux-x32"} {
 		if !strings.Contains(diag.Message, want) {
 			t.Fatalf("diagnostic missing %q: %#v", want, diag)
 		}

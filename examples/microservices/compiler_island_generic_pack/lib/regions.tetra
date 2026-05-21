@@ -1,0 +1,13 @@
+module lib.regions
+
+struct Box<T>:
+    value: T
+
+func pass_region(box: Box<island>) -> Box<island>:
+    return box
+
+func alias_region(region: island) -> island:
+    return region
+
+func id<T>(value: T) -> T:
+    return value

@@ -1,0 +1,23 @@
+// Memory journal microservice smoke.
+//
+// The service writes two i32 journal cells through capability-bound pointer
+// arithmetic and reads them back through the same cap.mem token.
+module examples.microservices.memory_journal_service
+
+import lib.core.capability as cap
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let journal_base: ptr = core.alloc_bytes(12)
+        let journal_second: ptr = core.ptr_add(journal_base, 4, memory_cap)
+        let _stored_first: Int = core.store_i32(journal_base, 18, memory_cap)
+        let _stored_second: Int = core.store_i32(journal_second, 24, memory_cap)
+        let first_value: Int = core.load_i32(journal_base, memory_cap)
+        let second_value: Int = core.load_i32(journal_second, memory_cap)
+        let checksum: Int = first_value + second_value
+        if checksum == 42:
+            return 0
+        return checksum
+    return 91

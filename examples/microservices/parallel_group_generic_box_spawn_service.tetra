@@ -1,0 +1,30 @@
+// Generic task-group box spawn microservice smoke.
+//
+// The service carries a task group through a monomorphized generic struct,
+// spawns a grouped worker from the boxed handle, joins it, and closes it.
+module examples.microservices.parallel_group_generic_box_spawn_service
+
+struct Box<T>:
+    value: T
+
+func worker() -> Int:
+    return 42
+
+func pass_group(box: Box<task.group>) -> Box<task.group>:
+    return box
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let box: Box<task.group> = Box<task.group>(value: group)
+    let returned: Box<task.group> = pass_group(box)
+    let task: task.i32 = core.task_spawn_group_i32(returned.value, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let close_error: Int = core.task_group_close(returned.value)
+    if result.error != 0:
+        return 10 + result.error
+    if close_error != 0:
+        return 20 + close_error
+    if result.value == 42:
+        return 0
+    return result.value

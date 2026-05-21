@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,22 @@ func stubLookPath(fn func(string) (string, error)) func() {
 	return func() {
 		commandLookPath = old
 		webRunnerProbe = oldWebRunnerProbe
+	}
+}
+
+func stubLinuxX32HostSupport(supported bool) func() {
+	old := linuxX32HostSupport
+	linuxX32HostSupport = func() bool { return supported }
+	return func() {
+		linuxX32HostSupport = old
+	}
+}
+
+func stubNativeExec(fn func(string, io.Writer, io.Writer) int) func() {
+	old := execNativeProgram
+	execNativeProgram = fn
+	return func() {
+		execNativeProgram = old
 	}
 }
 

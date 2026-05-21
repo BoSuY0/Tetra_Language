@@ -1,0 +1,41 @@
+// Actor task-recovery microservice smoke.
+//
+// An actor catches a typed task failure, spawns a recovery task, and replies
+// with the combined recovery result.
+enum RecoveryErr:
+    case failed(Int)
+
+actor RecoveryBridge:
+    func run() -> Int
+    uses actors, runtime:
+        let request: actor.msg = core.recv_msg()
+        let reply_to: actor = core.sender()
+        let failing = core.task_spawn_i32_typed<RecoveryErr>("failing_worker")
+        let failed_value: Int = catch core.task_join_i32_typed<RecoveryErr>(failing):
+        case RecoveryErr.failed(code):
+            code
+        let recovery: task.i32 = core.task_spawn_i32("recovery_worker")
+        let recovered: Int = core.task_join_i32(recovery)
+        let _reply: Int = core.send_msg(reply_to, request.value + failed_value + recovered, request.tag + 1)
+        return 0
+
+func failing_worker() -> Int throws RecoveryErr:
+    throw RecoveryErr.failed(20)
+
+func recovery_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 22
+
+func main() -> Int
+uses actors, runtime:
+    let bridge: actor = core.spawn("RecoveryBridge.run")
+    let _sent: Int = core.send_msg(bridge, 0, 5)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(10))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 6:
+        return 20 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

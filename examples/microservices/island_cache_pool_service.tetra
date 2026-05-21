@@ -1,0 +1,28 @@
+// Island cache pool microservice smoke.
+//
+// The service allocates two scoped regions, stores both buffers in one struct,
+// mutates each slice inside the island lifetime, and returns the checksum.
+module examples.microservices.island_cache_pool_service
+
+struct CachePair:
+    hot: []u8
+    cold: []u8
+
+func make_pair(hot_region: island, cold_region: island) -> CachePair
+uses alloc, islands, mem:
+    return CachePair(hot: core.island_make_u8(hot_region, 2), cold: core.island_make_u8(cold_region, 2))
+
+func main() -> Int
+uses alloc, islands, mem:
+    var checksum: Int = 0
+    island(128) as hot_region:
+        island(128) as cold_region:
+            var cache_pair: CachePair = make_pair(hot_region, cold_region)
+            cache_pair.hot[0] = 19
+            cache_pair.hot[1] = 2
+            cache_pair.cold[0] = 23
+            cache_pair.cold[1] = 3
+            checksum = cache_pair.hot[0] + cache_pair.cold[0]
+    if checksum == 42:
+        return 0
+    return checksum

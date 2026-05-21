@@ -1,0 +1,28 @@
+module lib.resources
+
+enum ActorSlot:
+    case ready(actor)
+    case missing
+
+enum TaskSlot:
+    case ready(task.i32)
+    case missing
+
+enum ResultSlot:
+    case done(task.result_i32)
+    case missing
+
+func actor_slot(peer: actor) -> ActorSlot?:
+    let slot: ActorSlot = ActorSlot.ready(peer)
+    let maybe: ActorSlot? = slot
+    return maybe
+
+func task_slot(task: task.i32) -> TaskSlot?:
+    let slot: TaskSlot = TaskSlot.ready(task)
+    let maybe: TaskSlot? = slot
+    return maybe
+
+func result_slot(result: task.result_i32) -> ResultSlot?:
+    let slot: ResultSlot = ResultSlot.done(result)
+    let maybe: ResultSlot? = slot
+    return maybe

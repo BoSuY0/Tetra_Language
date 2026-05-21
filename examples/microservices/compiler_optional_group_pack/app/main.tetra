@@ -1,0 +1,18 @@
+module app.main
+
+import lib.groups as groups
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let returned: task.group? = groups.maybe(group)
+    if let handle = returned:
+        let canceled: task.group = core.task_group_cancel(handle)
+        let status: Int = core.task_group_status(canceled)
+        let close_error: Int = core.task_group_close(canceled)
+        if close_error != 0:
+            return 10 + close_error
+        if status == 2:
+            return 0
+        return status
+    return 99

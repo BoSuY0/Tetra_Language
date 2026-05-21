@@ -1,0 +1,28 @@
+module lib.errors
+
+enum OffsetKind:
+    case value(Int)
+    case empty
+
+enum OffsetErr:
+    case stopped
+    case boxed(OffsetBox)
+    case nested(OffsetKind)
+    case maybe(Int?)
+    case guarded(Int)
+
+struct OffsetBox:
+    offset: Int
+
+func boxed_worker() -> Int throws OffsetErr:
+    throw OffsetErr.boxed(OffsetBox(offset: 4))
+
+func nested_worker() -> Int throws OffsetErr:
+    throw OffsetErr.nested(OffsetKind.value(4))
+
+func optional_worker() -> Int throws OffsetErr:
+    let offset: Int? = 4
+    throw OffsetErr.maybe(offset)
+
+func guarded_worker() -> Int throws OffsetErr:
+    throw OffsetErr.guarded(4)

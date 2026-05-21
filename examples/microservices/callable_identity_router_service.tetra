@@ -1,0 +1,20 @@
+// Callable identity router microservice smoke.
+//
+// The service routes a function-typed value through a function-typed identity
+// helper directly into a callback parameter.
+module examples.microservices.callable_identity_router_service
+
+func add_one(value: Int) -> Int:
+    return value + 1
+
+func identity(cb: fn(Int) -> Int) -> fn(Int) -> Int:
+    return cb
+
+func apply(cb: fn(Int) -> Int, value: Int) -> Int:
+    return cb(value)
+
+func main() -> Int:
+    let routed: Int = apply(identity(add_one), 41)
+    if routed == 42:
+        return 0
+    return routed

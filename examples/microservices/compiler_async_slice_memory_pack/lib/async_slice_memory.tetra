@@ -1,0 +1,40 @@
+module lib.async_slice_memory
+
+enum SliceErr:
+    case failed
+
+struct SliceBox:
+    bytes: []u8
+
+async func pass(bytes: []u8) -> []u8:
+    return bytes
+
+async func pass_throw(bytes: []u8, fail: Bool) -> []u8 throws SliceErr:
+    if fail:
+        throw SliceErr.failed
+    return bytes
+
+async func box(bytes: []u8) -> SliceBox:
+    return SliceBox(bytes: bytes)
+
+async func sum_local(bytes: []u8) -> Int:
+    let out: []u8 = await pass(bytes)
+    return out[0] + out[1] + out[2]
+
+async func sum_throw_local(bytes: []u8) -> Int throws SliceErr:
+    let out: []u8 = try await pass_throw(bytes, false)
+    return out[0] + out[1] + out[2]
+
+async func relay_int(value: Int) -> Int:
+    return value
+
+func fallback() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(3)
+    bytes[0] = 10
+    bytes[1] = 11
+    bytes[2] = 21
+    let total: Int = bytes[0] + bytes[1] + bytes[2]
+    if total == 42:
+        return 42
+    return total

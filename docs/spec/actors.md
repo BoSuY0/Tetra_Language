@@ -150,6 +150,9 @@ Typed actor messages are supported as an enum-only MVP:
   from supported value-only payloads, and checked `island` transfer payloads.
 - Typed actor message payloads support at most 8 value slots. The enum tag is
   carried separately from those payload slots.
+- Distributed typed actor frames carry `hash(enum type name) + case ordinal` as
+  their wire tag. This keeps `send_typed` and `recv_typed<MessageEnum>()`
+  aligned when messages cross the actor network boundary.
 - Reference-shaped payloads such as `String`, pointer payloads, and unrelated
   runtime handles are rejected by the current value-only payload rule.
 - `island` payload transfer is the only checked ownership-transfer path in this

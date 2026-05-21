@@ -1,0 +1,10 @@
+module app.main
+
+import engine.vec as vec
+
+func main() -> Int:
+    let value: vec.Vec2 = vec.Vec2(x: 19, y: 23)
+    let total: Int = vec.Vec2.sum(value)
+    if total == 42:
+        return 0
+    return total

@@ -17,6 +17,7 @@ uses alloc, capability, mem:
         let value: Int = core.load_i32(core.ptr_add(p, 4, mem), mem)
         let stored_ptr: ptr = core.store_ptr(core.ptr_add(p, 8, mem), p, mem)
         let loaded_ptr: ptr = core.load_ptr(core.ptr_add(p, 8, mem), mem)
+        let stored_arch_ptr: ptr = core.store_arch_ptr(core.ptr_add(p, 8, mem), p, mem)
         return value
     return 0
 `, "main")
@@ -32,6 +33,9 @@ uses alloc, capability, mem:
 	}
 	if got := countInstr(fn.Instrs, ir.IRMemReadPtrOffset, ""); got != 1 {
 		t.Fatalf("direct ptr_add load_ptr should lower to one offset read, got %d: %#v", got, fn.Instrs)
+	}
+	if got := countInstr(fn.Instrs, ir.IRMemWriteArchPtrOffset, ""); got != 1 {
+		t.Fatalf("direct ptr_add store_arch_ptr should lower to one offset write, got %d: %#v", got, fn.Instrs)
 	}
 	if got := countInstr(fn.Instrs, ir.IRPtrAdd, ""); got != 0 {
 		t.Fatalf("direct ptr_add memory access should fold into offset IR, got %d ptr_add instructions: %#v", got, fn.Instrs)

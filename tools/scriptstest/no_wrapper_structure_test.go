@@ -141,16 +141,23 @@ func hasShebang(t *testing.T, path string) bool {
 
 func TestNoWrapperCompilerRootTestsAreDocumentedExceptions(t *testing.T) {
 	root := repoRoot(t)
-	allowed := map[string]bool{
-		"actors_test.go":                    true,
-		"compiler_pipeline_stage_test.go":   true,
-		"compiler_test.go":                  true,
-		"distributed_actor_runtime_test.go": true,
-		"filesystem_runtime_test.go":        true,
-		"link_object_contract_test.go":      true,
-		"manifest_test.go":                  true,
+		allowed := map[string]bool{
+			"abi_suite_test.go":                  true,
+			"actors_test.go":                    true,
+			"atomic_suite_test.go":               true,
+			"atomic_target_diagnostics_test.go":  true,
+			"compiler_pipeline_stage_test.go":   true,
+			"compiler_test.go":                  true,
+			"distributed_actor_runtime_test.go": true,
+			"ffi_target_diagnostics_test.go":     true,
+			"filesystem_runtime_test.go":        true,
+			"fuzz_suite_test.go":                 true,
+			"link_object_contract_test.go":      true,
+			"manifest_test.go":                  true,
+			"net_runtime_test.go":               true,
 		"runtime_override_test.go":          true,
 		"task_runtime_test.go":              true,
+		"tetra_bug_regression_test.go":      true,
 		"wasm_policy_test.go":               true,
 		"wasm_runtime_diagnostics_test.go":  true,
 	}

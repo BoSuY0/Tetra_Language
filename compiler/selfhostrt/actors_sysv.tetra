@@ -1,4 +1,4 @@
-// Self-hosted actors runtime (SysV ABI: linux-x64, macos-x64)
+// Self-hosted actors runtime (SysV ABI: linux-x64, macos-x64, linux-x32)
 //
 // NOTE: This copy is embedded into the compiler binary so that self-host runtime
 // can be used regardless of the current working directory.
@@ -376,19 +376,24 @@ func set_task_result_slot(index: i32, value: i32) -> i32:
         g_task_result_s7 = value
     return value
 
+func store_context_ptr_at(base: ptr, off: i32, value: ptr, mem: cap.mem) -> ptr:
+    unsafe:
+        return core.store_arch_ptr(core.ptr_add(base, off, mem), value, mem)
+    return value
+
 func build_actor_stack(slot: ptr) -> ptr:
     unsafe:
         var mem: cap.mem = core.cap_mem()
         var stack: ptr = core.alloc_bytes(65536)
         var sp: ptr = core.ptr_add(stack, 65480, mem)
-        var _ret: ptr = core.store_ptr(core.ptr_add(stack, 65528, mem), core.sym_addr("__tetra_actor_trampoline"), mem)
-        var _rbx: ptr = core.store_ptr(core.ptr_add(stack, 65520, mem), 0, mem)
-        var _rbp: ptr = core.store_ptr(core.ptr_add(stack, 65512, mem), 0, mem)
-        var _r12: ptr = core.store_ptr(core.ptr_add(stack, 65504, mem), 0, mem)
-        var _r13: ptr = core.store_ptr(core.ptr_add(stack, 65496, mem), 0, mem)
-        var _r14: ptr = core.store_ptr(core.ptr_add(stack, 65488, mem), 0, mem)
-        var _r15: ptr = core.store_ptr(core.ptr_add(stack, 65480, mem), 0, mem)
-        var _set: ptr = core.store_ptr(slot, sp, mem)
+        var _ret: ptr = store_context_ptr_at(stack, 65528, core.sym_addr("__tetra_actor_trampoline"), mem)
+        var _rbx: ptr = store_context_ptr_at(stack, 65520, 0, mem)
+        var _rbp: ptr = store_context_ptr_at(stack, 65512, 0, mem)
+        var _r12: ptr = store_context_ptr_at(stack, 65504, 0, mem)
+        var _r13: ptr = store_context_ptr_at(stack, 65496, 0, mem)
+        var _r14: ptr = store_context_ptr_at(stack, 65488, 0, mem)
+        var _r15: ptr = store_context_ptr_at(stack, 65480, 0, mem)
+        var _set: ptr = store_context_ptr_at(slot, 0, sp, mem)
         return slot
     return slot
 

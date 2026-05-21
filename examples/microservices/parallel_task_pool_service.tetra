@@ -1,0 +1,25 @@
+// Parallel task pool microservice smoke.
+//
+// The service repeatedly schedules deterministic shard workers and joins every
+// task before the next scheduling round.
+module examples.microservices.parallel_task_pool_service
+
+val SHARDS: Int = 32
+val EXPECTED: Int = 73
+
+func shard_worker() -> Int:
+    return 1
+
+func main() -> Int
+uses runtime:
+    var shard_index: Int = 0
+    var rolling_seed: Int = 5
+    var joined_total: Int = 0
+    while shard_index < SHARDS:
+        rolling_seed = (rolling_seed * 19 + 7) % 101
+        let shard_job: task.i32 = core.task_spawn_i32("shard_worker")
+        joined_total = joined_total + core.task_join_i32(shard_job) + rolling_seed % 3
+        shard_index = shard_index + 1
+    if joined_total == EXPECTED:
+        return 0
+    return joined_total

@@ -1,0 +1,24 @@
+// SPEC-CPU-style integer branch and arithmetic mix.
+module examples.benchmarks.spec_cpu_branch_mix
+
+func transform(seed: Int, index: Int) -> Int:
+    if seed % 3 == 0:
+        return (seed / 3 + index * 11 + 7) % 10000
+    if seed % 3 == 1:
+        return (seed * 5 + index * 2 + 13) % 10000
+    return (seed * 7 + index + 17) % 10000
+
+func main() -> Int:
+    var i: Int = 0
+    var seed: Int = 19
+    var checksum: Int = 0
+    while i < 128:
+        seed = transform(seed, i)
+        if seed % 2 == 0:
+            checksum = checksum + seed / 2
+        else:
+            checksum = checksum + seed % 97
+        i = i + 1
+    if checksum == 141151:
+        return 0
+    return checksum % 251

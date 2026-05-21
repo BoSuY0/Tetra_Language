@@ -1,0 +1,29 @@
+// Task actor-roundtrip microservice smoke.
+//
+// A task worker spawns an actor, exchanges a tagged message with it, and
+// returns the actor reply to the main service through the task runtime.
+actor Doubler:
+    func run() -> Int
+    uses actors:
+        let request: actor.msg = core.recv_msg()
+        let _reply: Int = core.send_msg(core.sender(), request.value * 2, request.tag + 1)
+        return 0
+
+func actor_roundtrip_worker() -> Int
+uses actors, runtime:
+    let actor_ref: actor = core.spawn("Doubler.run")
+    let _sent: Int = core.send_msg(actor_ref, 21, 4)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(8))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 5:
+        return 20 + reply.tag
+    return reply.value
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("actor_roundtrip_worker")
+    let value: Int = core.task_join_i32(task)
+    if value == 42:
+        return 0
+    return value

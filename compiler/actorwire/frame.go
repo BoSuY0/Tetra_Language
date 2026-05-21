@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/fnv"
 )
 
 const (
@@ -135,6 +136,16 @@ func DecodeFrame(data []byte) (Frame, error) {
 		frame.Payload[i] = int32(binary.LittleEndian.Uint32(data[offset:]))
 	}
 	return frame, nil
+}
+
+func TypedMessageTagBase(typeName string) int32 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(typeName))
+	return int32(h.Sum32() & 0x7FFFFF00)
+}
+
+func TypedMessageTag(typeName string, ordinal int32) int32 {
+	return TypedMessageTagBase(typeName) + ordinal
 }
 
 func EncodeRemoteHandle(nodeID, actorID uint16) (int32, error) {

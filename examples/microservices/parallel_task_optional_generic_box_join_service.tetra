@@ -1,0 +1,25 @@
+// Optional generic task-handle box join microservice smoke.
+//
+// The service carries a generic task-handle box through an optional payload and
+// joins the unwrapped generic field.
+module examples.microservices.parallel_task_optional_generic_box_join_service
+
+struct Box<T>:
+    value: T
+
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let box: Box<task.i32> = Box<task.i32>(value: task)
+    let maybe: Box<task.i32>? = box
+    if let returned = maybe:
+        let result: task.result_i32 = core.task_join_result_i32(returned.value)
+        if result.error != 0:
+            return 10 + result.error
+        if result.value == 42:
+            return 0
+        return result.value
+    return 99

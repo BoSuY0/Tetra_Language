@@ -1,0 +1,11 @@
+module app.main
+
+import lib.math as math
+
+func main() -> Int:
+    let left: Int = math.add(19, 2)
+    let right: Int = math.scale(7, 3)
+    let total: Int = left + right
+    if total == 42:
+        return 0
+    return total

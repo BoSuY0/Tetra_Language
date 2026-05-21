@@ -1,0 +1,14 @@
+module app.main
+
+import lib.routes as routes
+
+func main() -> Int:
+    let packet: routes.Packet = routes.Packet.ready(40)
+    let left: Int = routes.score(packet)
+    let maybe_delta: Int? = routes.maybe(2)
+    if let some(delta) = maybe_delta:
+        let total: Int = left + delta
+        if total == 42:
+            return 0
+        return total
+    return left

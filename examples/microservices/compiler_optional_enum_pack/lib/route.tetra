@@ -1,0 +1,21 @@
+module lib.route
+
+enum Route:
+    case ready(Int?)
+    case empty
+
+func empty() -> Route:
+    return Route.empty
+
+func ready(value: Int) -> Route:
+    let maybe: Int? = value
+    return Route.ready(maybe)
+
+func score(route: Route) -> Int:
+    match route:
+    case Route.ready(maybe):
+        if let value = maybe:
+            return value
+        return 0
+    case Route.empty:
+        return 0

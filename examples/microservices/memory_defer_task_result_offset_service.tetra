@@ -1,0 +1,28 @@
+// Deferred task-result memory-offset microservice smoke.
+//
+// The service joins a task, aliases the result value into a local offset, then
+// performs a deferred raw-memory write through the derived cell.
+module examples.microservices.memory_defer_task_result_offset_service
+
+func worker() -> Int:
+    return 4
+
+func main() -> Int
+uses alloc, capability, mem, runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    if result.error != 0:
+        return 10 + result.error
+    let offset: Int = result.value
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(8)
+        let cell: ptr = core.ptr_add(base, offset, memory_cap)
+        if true:
+            defer:
+                let _write: Int = core.store_i32(cell, 42, memory_cap)
+        let value: Int = core.load_i32(cell, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 99

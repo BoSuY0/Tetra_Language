@@ -1,0 +1,8 @@
+module lib.pointers
+
+enum OptionalPtrErr:
+    case maybe(ptr?)
+
+func route_base(raw: ptr) -> ptr? throws OptionalPtrErr:
+    let maybe: ptr? = raw
+    throw OptionalPtrErr.maybe(maybe)

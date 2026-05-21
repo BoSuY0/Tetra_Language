@@ -1,0 +1,13 @@
+module lib.pipeline
+
+enum Route:
+    case forward(Int)
+    case drop
+
+func score(route: Route) -> Int:
+    let result: Int = match route:
+    case Route.forward(value):
+        value
+    case Route.drop:
+        0
+    return result

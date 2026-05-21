@@ -1248,6 +1248,96 @@ func TestBuildCoreNetworkingSmoke(t *testing.T) {
 	}
 }
 
+func TestBuildCoreNetSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_net_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreJSONSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_json_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCoreHTTPSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_http_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCorePostgresSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_postgres_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCorePostgresPreparedSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_postgres_prepared_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
+func TestBuildCorePostgresResultSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_postgres_result_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
 func TestBuildCoreAsyncSmoke(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -2094,6 +2184,20 @@ func buildAndRunFile(t *testing.T, srcPath string) (string, int) {
 	return runBinary(t, outPath)
 }
 
+func buildAndRunFileWithOptions(t *testing.T, srcPath string, opt BuildOptions) (string, int) {
+	t.Helper()
+
+	tmp := t.TempDir()
+	outPath := filepath.Join(tmp, "app")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", opt); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if err := verifyELF(outPath); err != nil {
+		t.Fatalf("verify ELF: %v", err)
+	}
+	return runBinary(t, outPath)
+}
+
 func projectRoot(t *testing.T) string {
 	t.Helper()
 	// Walk up from the test binary's working directory to find the project root.
@@ -2211,6 +2315,537 @@ func TestExampleCapMemPtrAddLocal(t *testing.T) {
 	}
 	if exitCode != 77 {
 		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
+}
+
+func TestMicroserviceExamplesAndBugLedger(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	for _, name := range []string{
+		"inventory_service.tetra",
+		"payments_service.tetra",
+		"orders_gateway.tetra",
+		"memory_cache_service.tetra",
+		"parallel_fanout_service.tetra",
+		"compiler_pipeline_service.tetra",
+		"island_cache_pool_service.tetra",
+		"parallel_task_pool_service.tetra",
+		"compiler_artifact_router_service.tetra",
+		"memory_journal_service.tetra",
+		"task_group_service.tetra",
+		"typed_task_error_service.tetra",
+		"task_group_cancel_service.tetra",
+		"wait_select_service.tetra",
+		"memory_bounds_probe_service.tetra",
+		"callable_router_service.tetra",
+		filepath.FromSlash("compiler_modular_gateway/app/main.tetra"),
+		"island_slice_matrix_service.tetra",
+		"generic_optional_router_service.tetra",
+		"actor_deadline_router_service.tetra",
+		"typed_task_success_service.tetra",
+		"memory_byte_window_service.tetra",
+		"callable_return_router_service.tetra",
+		filepath.FromSlash("compiler_callable_pack/app/main.tetra"),
+		"actor_tagged_loop_service.tetra",
+		"task_group_lifecycle_service.tetra",
+		"memory_negative_guard_service.tetra",
+		"callable_identity_router_service.tetra",
+		filepath.FromSlash("compiler_throwing_callable_pack/app/main.tetra"),
+		"actor_poll_timeout_service.tetra",
+		"task_timeout_recovery_service.tetra",
+		"memory_u16_lane_service.tetra",
+		"generic_struct_router_service.tetra",
+		filepath.FromSlash("compiler_generic_box_pack/app/main.tetra"),
+		"task_group_payload_service.tetra",
+		"actor_sender_snapshot_service.tetra",
+		"memory_copy_window_service.tetra",
+		"protocol_bound_generic_service.tetra",
+		filepath.FromSlash("compiler_protocol_pack/app/main.tetra"),
+		"actor_state_counter_service.tetra",
+		"task_group_self_cancel_service.tetra",
+		"generic_typed_error_service.tetra",
+		filepath.FromSlash("compiler_generic_error_pack/app/main.tetra"),
+		"task_group_current_status_service.tetra",
+		"actor_dual_mailbox_service.tetra",
+		"memory_memset_stride_service.tetra",
+		"island_bool_flags_service.tetra",
+		filepath.FromSlash("compiler_generic_pair_pack/app/main.tetra"),
+		"actor_dual_value_mailbox_service.tetra",
+		"task_dual_deadline_service.tetra",
+		"memory_zero_copy_service.tetra",
+		filepath.FromSlash("compiler_optional_box_pack/app/main.tetra"),
+		"actor_timeout_retry_service.tetra",
+		"task_poll_deadline_matrix_service.tetra",
+		"memory_ptr_table_service.tetra",
+		"optional_enum_router_service.tetra",
+		"optional_field_update_service.tetra",
+		"actor_chain_reply_service.tetra",
+		"task_group_poll_service.tetra",
+		"memory_i32_stride_service.tetra",
+		"actor_value_chain_service.tetra",
+		"task_group_typed_success_service.tetra",
+		"memory_chained_ptr_stride_service.tetra",
+		filepath.FromSlash("compiler_optional_enum_pack/app/main.tetra"),
+		"actor_typed_payload_service.tetra",
+		"task_select_timeout_service.tetra",
+		"memory_mixed_width_service.tetra",
+		filepath.FromSlash("compiler_extension_pack/app/main.tetra"),
+		"actor_self_mailbox_service.tetra",
+		"task_group_cancel_after_spawn_service.tetra",
+		"memory_derived_copy_service.tetra",
+		filepath.FromSlash("compiler_protocol_extension_pack/app/main.tetra"),
+		"actor_typed_chain_service.tetra",
+		"task_group_multi_cancel_service.tetra",
+		"memory_derived_ptr_table_service.tetra",
+		filepath.FromSlash("compiler_generic_function_pack/app/main.tetra"),
+		"actor_self_typed_mailbox_service.tetra",
+		"actor_task_bridge_service.tetra",
+		"memory_aggregate_ptr_service.tetra",
+		"compiler_generic_extension_local_service.tetra",
+		"actor_typed_task_bridge_service.tetra",
+		"task_group_actor_fanout_service.tetra",
+		"memory_optional_ptr_service.tetra",
+		"compiler_callable_generic_route_service.tetra",
+		"task_actor_roundtrip_service.tetra",
+		"actor_typed_task_group_service.tetra",
+		"memory_function_ptr_service.tetra",
+		"task_typed_actor_roundtrip_service.tetra",
+		"actor_task_select_service.tetra",
+		"compiler_generic_optional_route_service.tetra",
+		"memory_global_state_service.tetra",
+		"actor_typed_task_error_bridge_service.tetra",
+		"actor_task_cancel_select_service.tetra",
+		filepath.FromSlash("compiler_generic_optional_import_pack/app/main.tetra"),
+		"memory_mutable_ptr_service.tetra",
+		"memory_struct_offset_service.tetra",
+		"actor_task_recovery_service.tetra",
+		filepath.FromSlash("compiler_generic_nested_optional_pack/app/main.tetra"),
+		"memory_function_offset_service.tetra",
+		"memory_expression_offset_service.tetra",
+		"actor_timer_task_matrix_service.tetra",
+		filepath.FromSlash("compiler_generic_enum_import_pack/app/main.tetra"),
+		"memory_task_result_offset_service.tetra",
+		"memory_actor_message_offset_service.tetra",
+		"memory_actor_recv_value_offset_service.tetra",
+		"memory_actor_poll_value_offset_service.tetra",
+		"memory_actor_tag_offset_service.tetra",
+		filepath.FromSlash("compiler_actor_wait_memory_pack/app/main.tetra"),
+		"memory_actor_recv_error_offset_service.tetra",
+		"memory_actor_poll_error_offset_service.tetra",
+		"memory_actor_recv_msg_error_offset_service.tetra",
+		filepath.FromSlash("compiler_actor_error_memory_pack/app/main.tetra"),
+		"actor_task_group_error_recovery_service.tetra",
+		filepath.FromSlash("compiler_generic_struct_field_pack/app/main.tetra"),
+		"memory_indexed_metadata_offset_service.tetra",
+		"parallel_typed_task_payload_handle_service.tetra",
+		"actor_typed_dual_mailbox_service.tetra",
+		"task_group_nested_service.tetra",
+		filepath.FromSlash("compiler_generic_optional_struct_pack/app/main.tetra"),
+		"memory_direct_base_offset_service.tetra",
+		"parallel_typed_task_wide_payload_service.tetra",
+		"actor_typed_wide_payload_service.tetra",
+		filepath.FromSlash("compiler_cross_module_runtime_pack/app/main.tetra"),
+		"actor_typed_envelope_service.tetra",
+		"parallel_time_window_service.tetra",
+		"actor_state_status_service.tetra",
+		"memory_inline_ptradd_window_service.tetra",
+		"parallel_typed_task_struct_payload_service.tetra",
+		"actor_typed_struct_payload_service.tetra",
+		"memory_callable_ptr_base_service.tetra",
+		"memory_callable_optional_ptr_service.tetra",
+		"compiler_match_ptr_base_service.tetra",
+		"memory_typed_error_ptr_base_service.tetra",
+		"parallel_join_until_rejoin_service.tetra",
+		"actor_task_result_window_service.tetra",
+		"compiler_inout_return_service.tetra",
+		"memory_dynamic_base_offset_service.tetra",
+		"parallel_group_close_before_join_service.tetra",
+		"parallel_group_cancel_after_join_service.tetra",
+		filepath.FromSlash("parallel_cross_module_typed_task_pack/app/main.tetra"),
+		"memory_struct_base_dynamic_service.tetra",
+		"memory_enum_base_dynamic_service.tetra",
+		"memory_typed_error_base_dynamic_service.tetra",
+		"parallel_select_recovery_service.tetra",
+		"compiler_pattern_binding_unique_service.tetra",
+		"memory_base_dynamic_copy_service.tetra",
+		"parallel_select_rejoin_service.tetra",
+		"parallel_group_cancel_select_service.tetra",
+		filepath.FromSlash("compiler_interface_jobs_pack/app/main.tetra"),
+		"memory_zero_length_derived_helper_service.tetra",
+		"parallel_group_spawn_after_cancel_service.tetra",
+		"parallel_join_until_poll_service.tetra",
+		filepath.FromSlash("compiler_interface_control_pack/app/main.tetra"),
+		"memory_zero_length_base_helper_service.tetra",
+		"parallel_yield_join_window_service.tetra",
+		"parallel_group_status_roundtrip_service.tetra",
+		"memory_group_status_direct_offset_service.tetra",
+		"memory_group_current_status_offset_service.tetra",
+		"parallel_group_cancel_close_direct_service.tetra",
+		filepath.FromSlash("compiler_group_status_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_import_alias_pack/app/main.tetra"),
+		"memory_heap_u16_slice_service.tetra",
+		"memory_heap_bool_flags_service.tetra",
+		"parallel_actor_yield_mailbox_service.tetra",
+		"parallel_group_current_cancel_status_service.tetra",
+		filepath.FromSlash("compiler_cross_module_actor_pack/app/main.tetra"),
+		"memory_heap_i32_bool_slice_service.tetra",
+		"parallel_task_actor_deadline_service.tetra",
+		filepath.FromSlash("compiler_actor_resource_pack/app/main.tetra"),
+		"memory_heap_u8_slice_service.tetra",
+		"parallel_typed_group_cancel_status_service.tetra",
+		filepath.FromSlash("compiler_callable_return_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_callable_optional_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_interface_pack/app/main.tetra"),
+		"memory_slice_optional_service.tetra",
+		"memory_slice_enum_service.tetra",
+		"parallel_task_result_box_service.tetra",
+		"parallel_task_result_enum_service.tetra",
+		"compiler_test_command_service.tetra",
+		"parallel_task_test_command_service.tetra",
+		"generic_typed_result_payload_service.tetra",
+		"memory_slice_struct_loop_service.tetra",
+		"memory_slice_generic_box_service.tetra",
+		"parallel_task_result_optional_service.tetra",
+		"parallel_nested_task_spawn_service.tetra",
+		filepath.FromSlash("compiler_generic_slice_pack/app/main.tetra"),
+		"memory_slice_for_loop_service.tetra",
+		"memory_slice_inout_mutation_service.tetra",
+		"parallel_task_handle_optional_join_service.tetra",
+		filepath.FromSlash("compiler_optional_task_pack/app/main.tetra"),
+		"memory_bool_for_loop_service.tetra",
+		"memory_i32_for_loop_service.tetra",
+		"parallel_actor_handle_optional_send_service.tetra",
+		filepath.FromSlash("compiler_optional_actor_pack/app/main.tetra"),
+		"memory_u16_for_loop_service.tetra",
+		"parallel_group_optional_close_service.tetra",
+		"parallel_group_optional_cancel_service.tetra",
+		filepath.FromSlash("compiler_optional_group_pack/app/main.tetra"),
+		"memory_bool_inout_toggle_service.tetra",
+		"memory_i32_inout_fill_service.tetra",
+		"parallel_group_optional_match_close_service.tetra",
+		filepath.FromSlash("compiler_optional_group_match_pack/app/main.tetra"),
+		"parallel_group_struct_spawn_service.tetra",
+		"parallel_group_enum_spawn_service.tetra",
+		"parallel_group_typed_struct_spawn_service.tetra",
+		"parallel_group_typed_enum_spawn_service.tetra",
+		"memory_u16_inout_stride_service.tetra",
+		filepath.FromSlash("compiler_group_aggregate_pack/app/main.tetra"),
+		"parallel_group_alias_spawn_service.tetra",
+		"parallel_group_generic_box_spawn_service.tetra",
+		"memory_optional_generic_u16_box_service.tetra",
+		filepath.FromSlash("compiler_group_generic_pack/app/main.tetra"),
+		"parallel_task_alias_join_service.tetra",
+		"parallel_task_generic_box_join_service.tetra",
+		"parallel_task_optional_struct_box_join_service.tetra",
+		"parallel_task_optional_generic_box_join_service.tetra",
+		"memory_optional_generic_bool_box_service.tetra",
+		filepath.FromSlash("compiler_task_generic_pack/app/main.tetra"),
+		"parallel_actor_alias_send_service.tetra",
+		"parallel_actor_generic_box_send_service.tetra",
+		"parallel_actor_optional_struct_box_send_service.tetra",
+		"parallel_actor_optional_generic_box_send_service.tetra",
+		"memory_optional_generic_i32_box_service.tetra",
+		filepath.FromSlash("compiler_actor_generic_pack/app/main.tetra"),
+		"memory_island_alias_region_service.tetra",
+		"memory_island_generic_box_region_service.tetra",
+		"memory_island_optional_struct_box_service.tetra",
+		"memory_island_optional_generic_box_service.tetra",
+		filepath.FromSlash("compiler_island_generic_pack/app/main.tetra"),
+		"memory_ptr_alias_base_service.tetra",
+		"memory_ptr_generic_identity_base_service.tetra",
+		filepath.FromSlash("compiler_ptr_generic_pack/app/main.tetra"),
+		"memory_task_result_optional_offset_service.tetra",
+		"parallel_task_result_generic_box_service.tetra",
+		filepath.FromSlash("compiler_task_result_generic_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_optional_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_throw_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_resource_wrapper_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_throw_resource_wrapper_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_generic_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_throw_generic_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_throw_memory_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_optional_memory_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_generic_memory_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_enum_memory_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_slice_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_slice_lane_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_slice_shape_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_string_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_optional_generic_string_pack/app/main.tetra"),
+		"memory_ptr_generic_optional_field_service.tetra",
+		"parallel_task_result_generic_optional_field_service.tetra",
+		filepath.FromSlash("compiler_generic_optional_field_pack/app/main.tetra"),
+		"memory_ptr_generic_optional_call_service.tetra",
+		"memory_optional_ptr_inout_return_service.tetra",
+		filepath.FromSlash("compiler_ptr_optional_generic_call_pack/app/main.tetra"),
+		"parallel_actor_optional_alias_send_service.tetra",
+		"parallel_task_optional_alias_join_service.tetra",
+		"parallel_group_optional_alias_close_service.tetra",
+		filepath.FromSlash("compiler_optional_alias_resource_pack/app/main.tetra"),
+		"parallel_actor_optional_enum_send_service.tetra",
+		"parallel_task_optional_enum_join_service.tetra",
+		"parallel_group_optional_enum_close_service.tetra",
+		"memory_task_result_optional_enum_offset_service.tetra",
+		filepath.FromSlash("compiler_optional_enum_resource_pack/app/main.tetra"),
+		"parallel_actor_typed_optional_alias_send_service.tetra",
+		"parallel_typed_group_optional_alias_spawn_service.tetra",
+		filepath.FromSlash("compiler_typed_optional_alias_resource_pack/app/main.tetra"),
+		"parallel_typed_task_match_catch_service.tetra",
+		"memory_typed_task_error_offset_service.tetra",
+		filepath.FromSlash("compiler_typed_task_match_pack/app/main.tetra"),
+		"memory_typed_task_error_struct_offset_service.tetra",
+		"memory_typed_task_error_nested_enum_offset_service.tetra",
+		"memory_typed_task_error_optional_offset_service.tetra",
+		"memory_typed_task_error_guarded_offset_service.tetra",
+		filepath.FromSlash("compiler_typed_error_payload_memory_pack/app/main.tetra"),
+		"parallel_defer_group_close_service.tetra",
+		"memory_defer_store_service.tetra",
+		"parallel_defer_group_cancel_checkpoint_service.tetra",
+		"memory_defer_task_result_offset_service.tetra",
+		filepath.FromSlash("compiler_defer_cleanup_pack/app/main.tetra"),
+		"memory_defer_throw_base_store_service.tetra",
+		"memory_defer_return_base_store_service.tetra",
+		"parallel_typed_task_defer_actor_reply_service.tetra",
+		filepath.FromSlash("compiler_defer_unwind_pack/app/main.tetra"),
+		"memory_join_until_result_offset_service.tetra",
+		"memory_poll_result_offset_service.tetra",
+		"memory_select_result_offset_service.tetra",
+		filepath.FromSlash("compiler_task_wait_memory_pack/app/main.tetra"),
+		"memory_join_until_error_offset_service.tetra",
+		"memory_poll_error_offset_service.tetra",
+		"memory_select_error_offset_service.tetra",
+		filepath.FromSlash("compiler_task_wait_error_memory_pack/app/main.tetra"),
+		"memory_typed_error_optional_ptr_base_service.tetra",
+		"memory_typed_error_optional_ptr_dynamic_service.tetra",
+		filepath.FromSlash("compiler_typed_error_optional_ptr_pack/app/main.tetra"),
+		"memory_actor_typed_payload_offset_service.tetra",
+		"memory_actor_typed_struct_payload_offset_service.tetra",
+		filepath.FromSlash("compiler_typed_actor_payload_memory_pack/app/main.tetra"),
+		"memory_actor_typed_enum_payload_offset_service.tetra",
+		"memory_actor_typed_enum_struct_payload_offset_service.tetra",
+		filepath.FromSlash("compiler_typed_actor_enum_payload_memory_pack/app/main.tetra"),
+	} {
+		stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "microservices", name))
+		if stdout != "" {
+			t.Fatalf("%s stdout mismatch: %q", name, stdout)
+		}
+		if exitCode != 0 {
+			t.Fatalf("%s exit code mismatch: %d", name, exitCode)
+		}
+	}
+	for _, name := range []string{
+		filepath.FromSlash("compiler_parallel_jobs_pack/app/main.tetra"),
+	} {
+		stdout, exitCode := buildAndRunFileWithOptions(t, filepath.Join(root, "examples", "microservices", name), BuildOptions{Jobs: 4})
+		if stdout != "" {
+			t.Fatalf("%s stdout mismatch: %q", name, stdout)
+		}
+		if exitCode != 0 {
+			t.Fatalf("%s exit code mismatch: %d", name, exitCode)
+		}
+	}
+	for _, name := range []string{
+		filepath.FromSlash("compiler_interface_jobs_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_interface_control_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_import_alias_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_cross_module_actor_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_actor_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_callable_return_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_callable_optional_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_interface_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_generic_slice_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_optional_task_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_optional_actor_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_optional_group_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_optional_group_match_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_group_aggregate_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_group_generic_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_task_generic_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_actor_generic_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_island_generic_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_ptr_generic_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_task_result_generic_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_optional_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_throw_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_resource_wrapper_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_throw_resource_wrapper_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_generic_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_throw_generic_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_throw_memory_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_optional_memory_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_generic_memory_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_enum_memory_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_slice_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_slice_lane_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_slice_shape_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_string_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_async_optional_generic_string_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_generic_optional_field_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_ptr_optional_generic_call_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_optional_alias_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_optional_enum_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_typed_optional_alias_resource_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_typed_task_match_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_typed_error_payload_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_defer_cleanup_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_defer_unwind_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_task_wait_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_task_wait_error_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_actor_wait_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_actor_error_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_group_status_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_typed_error_optional_ptr_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_typed_actor_payload_memory_pack/app/main.tetra"),
+		filepath.FromSlash("compiler_typed_actor_enum_payload_memory_pack/app/main.tetra"),
+	} {
+		outPath := filepath.Join(t.TempDir(), "interface-only")
+		if _, err := BuildFileWithStatsOpt(filepath.Join(root, "examples", "microservices", name), outPath, "linux-x64", BuildOptions{Jobs: 4, InterfaceOnly: true}); err != nil {
+			t.Fatalf("%s interface-only build: %v", name, err)
+		}
+	}
+	for _, name := range []string{
+		"parallel_selfhost_deadline_service.tetra",
+	} {
+		stdout, exitCode := buildAndRunFileWithOptions(t, filepath.Join(root, "examples", "microservices", name), BuildOptions{Runtime: RuntimeSelfHost})
+		if stdout != "" {
+			t.Fatalf("%s stdout mismatch: %q", name, stdout)
+		}
+		if exitCode != 0 {
+			t.Fatalf("%s exit code mismatch: %d", name, exitCode)
+		}
+	}
+
+	raw, err := os.ReadFile(filepath.Join(root, "Tetra_BUGS.md"))
+	if err != nil {
+		t.Fatalf("read Tetra_BUGS.md: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"# Tetra Bugs",
+		"Confirmed Language Bugs",
+		"TETRA-BUG-0001",
+		"cannot infer generic argument",
+		"TETRA-BUG-0002",
+		"unknown function 'Unit.score'",
+		"TETRA-BUG-0003",
+		"count mismatch: expected 1, got 2",
+		"TETRA-BUG-0004",
+		"Formatter drops function-typed local annotations",
+		"TETRA-BUG-0005",
+		"unknown function 'Router.run'",
+		"TETRA-BUG-0006",
+		"global var requires an explicit type annotation",
+		"TETRA-BUG-0007",
+		"Derived pointer arithmetic loses allocation provenance",
+		"TETRA-BUG-0008",
+		"Formatter rewrites mutable actor state fields as immutable",
+		"TETRA-BUG-0009",
+		"Blocking tagged receive fails in dual actor fan-in",
+		"TETRA-BUG-0010",
+		"Blocking value receive fails in dual actor fan-in",
+		"TETRA-BUG-0011",
+		"Struct constructors do not wrap scalar values into optional fields",
+		"TETRA-BUG-0012",
+		"Enum constructors do not wrap scalar values into optional payloads",
+		"TETRA-BUG-0013",
+		"Derived pointer loop arithmetic fails after pointer parameters",
+		"TETRA-BUG-0014",
+		"Formatter drops generic protocol requirement type parameters",
+		"TETRA-BUG-0015",
+		"Imported generic extension static calls do not monomorphize",
+		"TETRA-BUG-0016",
+		"Match case payload bindings leak across sibling cases",
+		"TETRA-BUG-0017",
+		"Stored derived pointers lose loadable memory provenance",
+		"TETRA-BUG-0018",
+		"Struct pointer fields lose memory provenance",
+		"TETRA-BUG-0019",
+		"Enum derived pointer payloads lose memory provenance",
+		"TETRA-BUG-0020",
+		"Generic identity over function-typed locals lowers to an unknown fn type",
+		"TETRA-BUG-0021",
+		"Optional derived pointer payloads lose memory provenance",
+		"TETRA-BUG-0022",
+		"Generic callback parameters do not accept compatible function symbols",
+		"TETRA-BUG-0023",
+		"Function returns of derived pointers lose memory provenance",
+		"Function-typed callable returns of derived pointers hit the same guard",
+		"TETRA-BUG-0024",
+		"Global pointer variables lose memory provenance",
+		"TETRA-BUG-0025",
+		"Global integer offsets break raw pointer arithmetic provenance",
+		"TETRA-BUG-0026",
+		"Mutable local derived pointer variables lose memory provenance",
+		"TETRA-BUG-0027",
+		"Struct field offsets break raw pointer arithmetic provenance",
+		"TETRA-BUG-0028",
+		"Function-call offset operands break raw pointer arithmetic provenance",
+		"TETRA-BUG-0029",
+		"Expression offset operands break raw pointer arithmetic provenance",
+		"TETRA-BUG-0030",
+		"Runtime result and message fields break raw pointer arithmetic provenance",
+		"TETRA-BUG-0031",
+		"Enum payloads reject generic struct instantiations",
+		"TETRA-BUG-0032",
+		"Indexed and metadata offsets break raw pointer arithmetic provenance",
+		"TETRA-BUG-0033",
+		"Payload-typed task handles reject explicit task.i32 annotations",
+		"TETRA-BUG-0034",
+		"Direct pointer base expressions break raw pointer arithmetic provenance",
+		"TETRA-BUG-0035",
+		"Typed actor receives silently reinterpret mismatched enum message types",
+		"TETRA-BUG-0036",
+		"Typed error payloads of derived pointers lose memory provenance",
+		"TETRA-BUG-0037",
+		"Global fixed-array element writes do not round-trip at runtime",
+		"TETRA-BUG-0038",
+		"Scalar inout writes do not propagate back to caller locals",
+		"TETRA-BUG-0039",
+		"Dynamic ptr_add offsets from derived pointer locals lose memory provenance",
+		"TETRA-BUG-0040",
+		"Explicit selfhost task-group builds fail with raw missing ABI symbol",
+		"TETRA-BUG-0041",
+		"Scoped if-let and catch payload bindings remain reserved after scope exit",
+		"TETRA-BUG-0042",
+		"Stdlib byte helpers fail on valid derived memory windows",
+		"TETRA-BUG-0043",
+		"Formatter drops public visibility modifiers from declarations",
+		"TETRA-BUG-0044",
+		"Formatter corrupts selective import declarations",
+		"TETRA-BUG-0045",
+		"Spawning through an optional task-group payload returns the wrong worker value",
+		"TETRA-BUG-0046",
+		"Generic identity over actor/task/island resources loses usable provenance",
+		"TETRA-BUG-0047",
+		"Island parameters cannot be returned inside aggregate constructors",
+		"TETRA-BUG-0048",
+		"Function-typed local, field, and payload calls returning optionals fail as unknown functions",
+		"TETRA-BUG-0049",
+		"Generic inference fails on generic struct field selections",
+		"TETRA-BUG-0050",
+		"Task spawns inside match expressions miss required runtime symbols",
+		"TETRA-BUG-0051",
+		"Formatter corrupts nested catch cases inside match expression arms",
+		"TETRA-BUG-0052",
+		"Formatter corrupts nested match cases inside catch expression arms",
+		"TETRA-BUG-0053",
+		"Awaited optional resource locals lose provenance",
+		"TETRA-BUG-0054",
+		"Awaited resource aggregate locals lose provenance",
+		"TETRA-BUG-0055",
+		"Direct awaited pointer returns ignore await and try",
+		"Microservice Bug-Hunt Runs",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("Tetra_BUGS.md missing %q", want)
+		}
 	}
 }
 

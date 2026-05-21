@@ -1,0 +1,24 @@
+// Parallel fanout microservice smoke.
+//
+// The service spawns independent deterministic workers and joins their results.
+// It stresses the cooperative task ABI without relying on wall-clock timing.
+module examples.microservices.parallel_fanout_service
+
+func price_worker() -> Int:
+    return 13
+
+func inventory_worker() -> Int:
+    return 17
+
+func fraud_worker() -> Int:
+    return 12
+
+func main() -> Int
+uses runtime:
+    let price: task.i32 = core.task_spawn_i32("price_worker")
+    let inventory: task.i32 = core.task_spawn_i32("inventory_worker")
+    let fraud: task.i32 = core.task_spawn_i32("fraud_worker")
+    let total: Int = core.task_join_i32(price) + core.task_join_i32(inventory) + core.task_join_i32(fraud)
+    if total == 42:
+        return 0
+    return total

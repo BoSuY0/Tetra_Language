@@ -1,0 +1,54 @@
+// Structured typed-actor payload microservice smoke.
+//
+// The service sends a value-only struct through a typed actor envelope and
+// receives the same structured payload back.
+module examples.microservices.actor_typed_struct_payload_service
+
+enum StructActorMsg:
+    case request(Eight)
+    case reply(Eight)
+    case failed(Int)
+
+struct Eight:
+    a: Int
+    b: Int
+    c: Int
+    d: Int
+    e: Int
+    f: Int
+    g: Int
+    h: Int
+
+func sum_eight(box: Eight) -> Int:
+    return box.a + box.b + box.c + box.d + box.e + box.f + box.g + box.h
+
+func worker() -> Int
+uses actors:
+    let msg: StructActorMsg = core.recv_typed<StructActorMsg>()
+    match msg:
+    case StructActorMsg.request(request_box):
+        let _reply: Int = core.send_typed(core.sender(), StructActorMsg.reply(request_box))
+        return 0
+    case StructActorMsg.reply(reply_box):
+        let _unexpected_reply: Int = core.send_typed(core.sender(), StructActorMsg.failed(sum_eight(reply_box)))
+        return 0
+    case StructActorMsg.failed(code):
+        let _failed: Int = core.send_typed(core.sender(), StructActorMsg.failed(code))
+        return 0
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("worker")
+    let payload: Eight = Eight(a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 14)
+    let _sent: Int = core.send_typed(peer, StructActorMsg.request(payload))
+    let reply: StructActorMsg = core.recv_typed<StructActorMsg>()
+    match reply:
+    case StructActorMsg.request(unexpected_request_box):
+        return 70 + sum_eight(unexpected_request_box)
+    case StructActorMsg.reply(reply_payload):
+        let total: Int = sum_eight(reply_payload)
+        if total == 42:
+            return 0
+        return total
+    case StructActorMsg.failed(code):
+        return 80 + code

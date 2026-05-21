@@ -1,0 +1,34 @@
+// Deferred typed-error memory store microservice smoke.
+//
+// The service passes an allocation base into a throwing helper and verifies a
+// deferred raw-memory write runs while the typed error unwinds.
+module examples.microservices.memory_defer_throw_base_store_service
+
+enum CleanupErr:
+    case failed
+
+func fail_with_defer(base: ptr, memory_cap: cap.mem) -> Int throws CleanupErr
+uses mem:
+    unsafe:
+        defer:
+            let cell: ptr = core.ptr_add(base, 4, memory_cap)
+            let _write: Int = core.store_i32(cell, 42, memory_cap)
+        throw CleanupErr.failed
+    return 99
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(8)
+        let recovered: Int = catch fail_with_defer(base, memory_cap):
+        case CleanupErr.failed:
+            7
+        if recovered != 7:
+            return recovered
+        let cell: ptr = core.ptr_add(base, 4, memory_cap)
+        let value: Int = core.load_i32(cell, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 99

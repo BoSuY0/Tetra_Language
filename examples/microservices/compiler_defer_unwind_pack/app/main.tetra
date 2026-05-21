@@ -1,0 +1,36 @@
+module app.main
+
+import lib.cleanups as cleanups
+
+func main() -> Int
+uses actors, alloc, capability, mem, runtime:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let recovered: Int = catch cleanups.throw_defer_store(left_base, memory_cap):
+        case cleanups.CleanupErr.failed(recovered_value):
+            recovered_value
+        if recovered != 7:
+            return recovered
+        let returned: Int = cleanups.return_defer_store(right_base, memory_cap)
+        if returned != 8:
+            return 10 + returned
+        let task = core.task_spawn_i32_typed<cleanups.CleanupErr>("cleanups.actor_worker")
+        let task_error: Int = catch core.task_join_i32_typed<cleanups.CleanupErr>(task):
+        case cleanups.CleanupErr.failed(task_value):
+            task_value
+        if task_error != 9:
+            return 20 + task_error
+        let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+        if reply.error != 0:
+            return 30 + reply.error
+        if reply.value != 13:
+            return 40 + reply.value
+        let left_cell: ptr = core.ptr_add(left_base, 4, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, 4, memory_cap)
+        let total: Int = core.load_i32(left_cell, memory_cap) + core.load_i32(right_cell, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

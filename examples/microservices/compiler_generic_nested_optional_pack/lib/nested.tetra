@@ -1,0 +1,16 @@
+module lib.nested
+
+struct Box<T>:
+    value: T?
+
+func id<T>(value: T) -> T:
+    return value
+
+func make(value: Int) -> Box<Int>:
+    let maybe: Int? = id(value)
+    return Box<Int>(value: maybe)
+
+func score(box: Box<Int>) -> Int:
+    if let value = box.value:
+        return value
+    return 0

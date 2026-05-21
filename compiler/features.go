@@ -239,8 +239,8 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Core standard library current profile",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.2.0",
-			Scope:     "release-covered lib.core helper modules with a capability-gated linux-x64 filesystem exists slice, stable crypto interface helpers, and stable networking endpoint policy helpers",
-			Stability: "current import paths and smoke coverage; filesystem exists is host-backed on linux-x64, crypto exposes deterministic interface helpers, and networking exposes deterministic endpoint policy helpers",
+			Scope:     "release-covered lib.core helper modules with a capability-gated linux-x64 filesystem exists slice, executable Linux TCP socket client/server I/O helpers with recv/send, SO_REUSEPORT, TCP_NODELAY, nonblocking accept convenience, and epoll add/mod/delete plus wait-one readiness flag capture and predicates, stable crypto interface helpers, stable networking endpoint policy helpers, executable HTTP/1.1 String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers, and executable JSON byte-buffer response helpers",
+			Stability: "current import paths and smoke coverage; filesystem exists is host-backed on linux-x64, net socket open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close plus SO_REUSEPORT, TCP_NODELAY, SOCK_NONBLOCK/SOCK_CLOEXEC accept helpers, and epoll create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one/wait-one-into helpers with EPOLLIN/EPOLLOUT/EPOLLERR/EPOLLHUP predicates are host-backed on linux-x64, crypto exposes deterministic interface helpers, networking exposes deterministic endpoint policy helpers, HTTP helpers classify TechEmpower request lines from String text or caller-owned byte buffers, locate CRLFCRLF request-head boundaries for pipelined buffers, and write compact response payloads into caller-owned buffers, and JSON helpers write compact response bodies into caller-owned buffers",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/stdlib.md", "docs/user/standard_library_guide.md"},
 		},
 		{

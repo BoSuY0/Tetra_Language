@@ -1,0 +1,57 @@
+// Actor typed-task bridge microservice smoke.
+//
+// A typed actor request is handled by an actor that joins a typed task worker
+// and replies with a typed actor payload.
+enum BridgeMsg:
+    case work(Int)
+    case done(Int)
+    case failed(Int)
+
+enum BridgeErr:
+    case stopped
+    case denied(Int)
+
+actor TypedBridge:
+    func run() -> Int
+    uses actors, runtime:
+        let request: BridgeMsg = core.recv_typed<BridgeMsg>()
+        let reply_to: actor = core.sender()
+        match request:
+        case BridgeMsg.work(input):
+            let task = core.task_spawn_i32_typed<BridgeErr>("typed_bridge_worker")
+            let worker_value: Int = catch core.task_join_i32_typed<BridgeErr>(task):
+            case BridgeErr.stopped:
+                70
+            case BridgeErr.denied(denied_code):
+                denied_code
+            if worker_value != 21:
+                let _failed: Int = core.send_typed(reply_to, BridgeMsg.failed(worker_value))
+                return 0
+            let _reply: Int = core.send_typed(reply_to, BridgeMsg.done(input + worker_value))
+            return 0
+        case BridgeMsg.done(done_value):
+            let _done: Int = core.send_typed(reply_to, BridgeMsg.done(done_value))
+            return 0
+        case BridgeMsg.failed(failed_code):
+            let _failure: Int = core.send_typed(reply_to, BridgeMsg.failed(failed_code))
+            return 0
+
+func typed_bridge_worker() -> Int throws BridgeErr
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 21
+
+func main() -> Int
+uses actors:
+    let bridge: actor = core.spawn("TypedBridge.run")
+    let _sent: Int = core.send_typed(bridge, BridgeMsg.work(21))
+    let reply: BridgeMsg = core.recv_typed<BridgeMsg>()
+    match reply:
+    case BridgeMsg.done(done_value):
+        if done_value == 42:
+            return 0
+        return done_value
+    case BridgeMsg.work(work_value):
+        return 40 + work_value
+    case BridgeMsg.failed(code):
+        return 80 + code

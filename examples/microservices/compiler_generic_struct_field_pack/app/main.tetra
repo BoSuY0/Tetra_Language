@@ -1,0 +1,10 @@
+module app.main
+
+import lib.score as score
+
+func main() -> Int:
+    let holder: score.Holder = score.make(42)
+    let total: Int = score.score(holder)
+    if total == 42:
+        return 0
+    return total

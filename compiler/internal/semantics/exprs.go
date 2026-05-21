@@ -946,19 +946,41 @@ func consumeLocalArgumentName(expr frontend.Expr, callee string, callback bool, 
 	return path, nil
 }
 
-func checkWholeOwnershipValueAvailable(expr frontend.Expr, state *regionState) error {
+func checkWholeOwnershipValueAvailable(expr frontend.Expr, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState) error {
+	return checkWholeOwnershipValueAvailableForType(expr, "", types, module, imports, state)
+}
+
+func checkWholeOwnershipValueAvailableForType(expr frontend.Expr, expectedType string, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState) error {
 	if expr == nil || state == nil {
 		return nil
 	}
 	if path, ok := canonicalOwnershipAccessPath(expr); ok {
-		if err := state.checkNoConsumedDescendants(path, expr.Pos()); err != nil {
-			return err
+		if expectedType != "" && typeContainsResourceHandle(expectedType, types) {
+			if err := state.checkNoConsumedProperDescendants(path, expr.Pos()); err != nil {
+				return err
+			}
+		} else {
+			if err := state.checkNoConsumedDescendants(path, expr.Pos()); err != nil {
+				return err
+			}
 		}
 	}
 	switch e := expr.(type) {
 	case *frontend.StructLitExpr:
+		typeName, err := resolveTypeName(&e.Type, module, imports)
+		if err != nil {
+			return err
+		}
+		info, ok := types[typeName]
+		if !ok || info.Kind != TypeStruct {
+			return nil
+		}
 		for _, field := range e.Fields {
-			if err := checkWholeOwnershipValueAvailable(field.Value, state); err != nil {
+			fieldInfo, ok := info.FieldMap[field.Name]
+			if !ok {
+				continue
+			}
+			if err := checkWholeOwnershipValueAvailableForType(field.Value, fieldInfo.TypeName, types, module, imports, state); err != nil {
 				return err
 			}
 		}
@@ -966,12 +988,37 @@ func checkWholeOwnershipValueAvailable(expr frontend.Expr, state *regionState) e
 		if e.ResolvedType == "" {
 			return nil
 		}
-		for _, arg := range e.Args {
-			if err := checkWholeOwnershipValueAvailable(arg, state); err != nil {
+		info, ok := types[e.ResolvedType]
+		if !ok {
+			return nil
+		}
+		switch info.Kind {
+		case TypeStruct:
+			for i, field := range info.Fields {
+				if i >= len(e.Args) {
+					break
+				}
+				if err := checkWholeOwnershipValueAvailableForType(e.Args[i], field.TypeName, types, module, imports, state); err != nil {
+					return err
+				}
+			}
+		case TypeEnum:
+			_, caseInfo, found, err := resolveEnumCaseConstructorCall(e, types, module, imports)
+			if err != nil {
 				return err
 			}
+			if !found {
+				return nil
+			}
+			for i, arg := range e.Args {
+				if i >= len(caseInfo.PayloadTypes) {
+					break
+				}
+				if err := checkWholeOwnershipValueAvailableForType(arg, caseInfo.PayloadTypes[i], types, module, imports, state); err != nil {
+					return err
+				}
+			}
 		}
-		return nil
 	}
 	return nil
 }
@@ -1518,8 +1565,11 @@ func checkCallExprWithEffects(
 		resolved = e.Name
 	} else {
 		var err error
-		resolved, err = resolveCallName(e.Name, module, imports, e.At)
+		resolved, err = resolveKnownCallName(e.Name, funcs, module, imports, e.At)
 		if err != nil {
+			if diagnostic, ok := atomicBuiltinDiagnostic(e.Name); ok {
+				return "", regionNone, fmt.Errorf("%s: %s", frontend.FormatPos(e.At), diagnostic)
+			}
 			return "", regionNone, err
 		}
 	}
@@ -1534,6 +1584,9 @@ func checkCallExprWithEffects(
 	if !ok {
 		if ctorType, ctorRegion, handled, err := checkStructConstructorCallWithEffects(e, locals, globals, funcs, types, module, imports, state, effects, analysis); handled {
 			return ctorType, ctorRegion, err
+		}
+		if diagnostic, ok := atomicBuiltinDiagnostic(resolved); ok {
+			return "", regionNone, fmt.Errorf("%s: %s", frontend.FormatPos(e.At), diagnostic)
 		}
 		return "", regionNone, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), resolved)
 	}
@@ -1849,7 +1902,7 @@ func checkCallExprWithEffects(
 		if raw == "" {
 			return "", regionNone, fmt.Errorf("%s: spawn expects a non-empty name", frontend.FormatPos(e.At))
 		}
-		target, err := resolveCallName(raw, module, imports, e.At)
+		target, err := resolveKnownCallName(raw, funcs, module, imports, e.At)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -1892,7 +1945,7 @@ func checkCallExprWithEffects(
 		if raw == "" {
 			return "", regionNone, fmt.Errorf("%s: spawn_remote expects a non-empty name", frontend.FormatPos(e.At))
 		}
-		target, err := resolveCallName(raw, module, imports, e.At)
+		target, err := resolveKnownCallName(raw, funcs, module, imports, e.At)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -1935,7 +1988,7 @@ func checkCallExprWithEffects(
 		if raw == "" {
 			return "", regionNone, fmt.Errorf("%s: task_spawn_i32 expects a non-empty name", frontend.FormatPos(e.At))
 		}
-		target, err := resolveCallName(raw, module, imports, e.At)
+		target, err := resolveKnownCallName(raw, funcs, module, imports, e.At)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -1978,7 +2031,7 @@ func checkCallExprWithEffects(
 		if raw == "" {
 			return "", regionNone, fmt.Errorf("%s: task_spawn_group_i32 expects a non-empty name", frontend.FormatPos(e.At))
 		}
-		target, err := resolveCallName(raw, module, imports, e.At)
+		target, err := resolveKnownCallName(raw, funcs, module, imports, e.At)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -2874,7 +2927,7 @@ func checkTypedTaskBuiltin(
 			}
 			return "", regionNone, fmt.Errorf("%s: task_spawn_i32_typed expects a non-empty name", frontend.FormatPos(e.At))
 		}
-		target, err := resolveCallName(raw, module, imports, e.At)
+		target, err := resolveKnownCallName(raw, funcs, module, imports, e.At)
 		if err != nil {
 			return "", regionNone, err
 		}
@@ -2921,7 +2974,7 @@ func checkTypedTaskBuiltin(
 		if err != nil {
 			return "", regionNone, err
 		}
-		if argType != handleType {
+		if !typesCompatibleWithNullPtr(handleType, argType, e.Args[0]) {
 			return "", regionNone, fmt.Errorf("%s: type mismatch for '%s' arg 1: expected '%s', got '%s'", frontend.FormatPos(e.Args[0].Pos()), resolved, handleType, argType)
 		}
 		isTryCall := state != nil && state.allowThrowDepth > 0 && state.allowThrowCall == e
@@ -3059,6 +3112,9 @@ func checkBorrowedEscape(expr frontend.Expr, locals map[string]LocalInfo, global
 	if expr == nil {
 		return nil
 	}
+	if handled, err := checkBorrowedEscapeAggregateConstructor(expr, locals, globals, funcs, types, module, imports, state, effects, analysis, format); handled || err != nil {
+		return err
+	}
 	if borrowedName, borrowed, err := borrowedOwnerFromExpr(expr, locals, globals, funcs, types, module, imports, state, effects, analysis); err != nil {
 		return err
 	} else if borrowed {
@@ -3128,11 +3184,11 @@ func checkBorrowedEscape(expr frontend.Expr, locals map[string]LocalInfo, global
 			}
 		}
 	}
-	if tryExpr, ok := expr.(*frontend.TryExpr); ok {
-		return checkBorrowedEscape(tryExpr.X, locals, globals, funcs, types, module, imports, state, effects, analysis, format)
+	if _, ok := expr.(*frontend.TryExpr); ok {
+		return nil
 	}
-	if awaitExpr, ok := expr.(*frontend.AwaitExpr); ok {
-		return checkBorrowedEscape(awaitExpr.X, locals, globals, funcs, types, module, imports, state, effects, analysis, format)
+	if _, ok := expr.(*frontend.AwaitExpr); ok {
+		return nil
 	}
 	if unary, ok := expr.(*frontend.UnaryExpr); ok {
 		return checkBorrowedEscape(unary.X, locals, globals, funcs, types, module, imports, state, effects, analysis, format)
@@ -3144,6 +3200,75 @@ func checkBorrowedEscape(expr frontend.Expr, locals map[string]LocalInfo, global
 		return checkBorrowedEscape(binary.Right, locals, globals, funcs, types, module, imports, state, effects, analysis, format)
 	}
 	return nil
+}
+
+func checkBorrowedEscapeAggregateConstructor(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState, format func(string) error) (bool, error) {
+	switch e := expr.(type) {
+	case *frontend.StructLitExpr:
+		typeName, err := resolveTypeName(&e.Type, module, imports)
+		if err != nil {
+			return true, err
+		}
+		info, ok := types[typeName]
+		if !ok || info.Kind != TypeStruct {
+			return false, nil
+		}
+		for _, field := range e.Fields {
+			fieldInfo, ok := info.FieldMap[field.Name]
+			if !ok || !borrowedEscapeShouldInspect(fieldInfo.TypeName, types) {
+				continue
+			}
+			if err := checkBorrowedEscape(field.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+				return true, err
+			}
+		}
+		return true, nil
+	case *frontend.CallExpr:
+		if e.ResolvedType == "" {
+			return false, nil
+		}
+		info, ok := types[e.ResolvedType]
+		if !ok {
+			return false, nil
+		}
+		switch info.Kind {
+		case TypeStruct:
+			for i, field := range info.Fields {
+				if i >= len(e.Args) || !borrowedEscapeShouldInspect(field.TypeName, types) {
+					continue
+				}
+				if err := checkBorrowedEscape(e.Args[i], locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+					return true, err
+				}
+			}
+			return true, nil
+		case TypeEnum:
+			_, caseInfo, found, err := resolveEnumCaseConstructorCall(e, types, module, imports)
+			if err != nil {
+				return true, err
+			}
+			if !found {
+				return true, nil
+			}
+			for i, arg := range e.Args {
+				if i >= len(caseInfo.PayloadTypes) || !borrowedEscapeShouldInspect(caseInfo.PayloadTypes[i], types) {
+					continue
+				}
+				if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
+					return true, err
+				}
+			}
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func borrowedEscapeShouldInspect(typeName string, types map[string]*TypeInfo) bool {
+	if typeMayContainPtr(typeName, types) {
+		return true
+	}
+	return typeMayContainRegion(typeName, types) && !typeContainsResourceHandle(typeName, types)
 }
 
 func checkBorrowedInoutEscape(expr frontend.Expr, targetName string, pos frontend.Position, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState) error {
@@ -3291,6 +3416,9 @@ func validateTypedActorMessageType(typeName string, types map[string]*TypeInfo, 
 	case TypeI32, TypeU8, TypeBool, TypeIsland:
 		return nil
 	case TypeEnum:
+		if len(info.EnumCases) > 255 {
+			return fmt.Errorf("typed actor message enum supports at most 255 cases, got %d for '%s'", len(info.EnumCases), typeName)
+		}
 		if info.SlotCount-1 > 8 {
 			return fmt.Errorf("typed actor message payload supports at most 8 value slots, got %d for '%s'", info.SlotCount-1, typeName)
 		}
@@ -3736,7 +3864,7 @@ func comparableTypes(left, right string, types map[string]*TypeInfo) bool {
 			return false
 		}
 		switch info.Kind {
-		case TypeI32, TypeU8, TypeBool, TypePtr, TypeIsland, TypeCap, TypeActor, TypeEnum:
+		case TypeI32, TypeI64, TypeU8, TypeBool, TypePtr, TypeIsland, TypeCap, TypeActor, TypeEnum:
 			return info.SlotCount == 1
 		default:
 			return false

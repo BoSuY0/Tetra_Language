@@ -1,0 +1,26 @@
+module app.main
+
+import lib.jobs as jobs
+
+func main() -> Int
+uses runtime:
+    let direct = core.task_spawn_i32_typed<jobs.JobErr>("jobs.worker")
+    let left: Int = catch core.task_join_i32_typed<jobs.JobErr>(direct):
+    case jobs.JobErr.failed(code):
+        code
+    case jobs.JobErr.stopped:
+        70
+    let group: task.group = core.task_group_open()
+    let grouped = core.task_spawn_group_i32_typed<jobs.JobErr>(group, "jobs.group_worker")
+    let right: Int = catch core.task_join_group_i32_typed<jobs.JobErr>(grouped):
+    case jobs.JobErr.failed(group_code):
+        group_code
+    case jobs.JobErr.stopped:
+        80
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    let total: Int = left + right
+    if total == 42:
+        return 0
+    return total

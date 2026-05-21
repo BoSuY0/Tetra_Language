@@ -1,0 +1,13 @@
+module lib.results
+
+struct Box<T>:
+    value: T
+
+func id<T>(value: T) -> T:
+    return value
+
+func pass_result(box: Box<task.result_i32>) -> Box<task.result_i32>:
+    return box
+
+func pass_plain(value: task.result_i32) -> task.result_i32:
+    return value

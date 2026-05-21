@@ -1,0 +1,30 @@
+// Optional-pointer inout return-value microservice smoke.
+//
+// The service avoids relying on current scalar inout writeback by consuming the
+// explicit returned optional pointer before deriving the checked cell.
+module examples.microservices.memory_optional_ptr_inout_return_service
+
+import lib.core.capability as cap
+
+func replace(slot: inout ptr?, value: ptr?) -> ptr?:
+    slot = value
+    return value
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(8)
+        let cell: ptr = core.ptr_add(payload, 4, memory_cap)
+        let _stored_value: Int = core.store_i32(cell, 42, memory_cap)
+        var maybe_base: ptr? = none
+        let next_base: ptr? = payload
+        let returned: ptr? = replace(maybe_base, next_base)
+        if let base = returned:
+            let loaded_cell: ptr = core.ptr_add(base, 4, memory_cap)
+            let value: Int = core.load_i32(loaded_cell, memory_cap)
+            if value == 42:
+                return 0
+            return value
+        return 98
+    return 99

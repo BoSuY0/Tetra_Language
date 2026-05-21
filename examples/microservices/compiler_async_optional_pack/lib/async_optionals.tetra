@@ -1,0 +1,24 @@
+module lib.async_optionals
+
+enum AsyncErr:
+    case failed
+
+struct Box:
+    value: Int?
+
+async func maybe_score(seed: Int) -> Int?:
+    if seed == 0:
+        return none
+    return seed + 1
+
+async func boxed_score(seed: Int) -> Box:
+    let value: Int? = await maybe_score(seed)
+    return Box(value: value)
+
+async func throwing_score(seed: Int) -> Int? throws AsyncErr:
+    if seed < 0:
+        throw AsyncErr.failed
+    return await maybe_score(seed)
+
+func fallback() -> Int:
+    return 42

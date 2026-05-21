@@ -36,6 +36,14 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 		if fn.ParamSlots < 0 || fn.LocalSlots < fn.ParamSlots || fn.ReturnSlots < 0 {
 			return fmt.Errorf("x64 backend: function '%s' has invalid slots", fn.Name)
 		}
+		pointerWidthBytes, err := opt.PointerWidthBytes()
+		if err != nil {
+			return fmt.Errorf("x64 backend: %w", err)
+		}
+		registerWidthBytes, err := opt.RegisterWidthBytes()
+		if err != nil {
+			return fmt.Errorf("x64 backend: %w", err)
+		}
 
 		labelOffsets := make(map[int]int)
 		var patches []labelPatch
@@ -62,12 +70,29 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 			}
 			return -int32((slot + 1) * 8), nil
 		}
-		guardAllocationBaseRawAccess := func(width int32) error {
+		guardAllocationOffsetRawAccess := func(width int32) error {
+			e.CmpEdxImm32(0)
+			okAt := e.JgeRel32()
+			if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+				return err
+			}
+			okOff := len(e.Buf)
+			if err := x64.PatchRel32(e.Buf, okAt, okOff); err != nil {
+				return err
+			}
 			e.MovRdiRax()
-			e.MovEcxFromRdiDisp(-8)
-			e.MovEdxImm32(uint32(width))
+			e.AndRdiImm32(-4096)
+			e.MovEcxFromRdiDisp(0)
+			e.AddRdiImm32(8)
+			e.SubRaxRdi()
+			e.AddRdxRax()
+			e.AddEdxImm32(width)
 			e.CmpEdxEcx()
 			failAt := e.JaRel32()
+			e.AddEdxImm32(-width)
+			e.MovsxdRdxEdx()
+			e.MovRaxRdi()
+			e.AddRaxRdx()
 			doneAt := e.JmpRel32()
 			failOff := len(e.Buf)
 			if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
@@ -82,36 +107,177 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 			}
 			return nil
 		}
-		guardAllocationOffsetRawAccess := func(width int32) error {
-			e.CmpEdxImm32(0)
-			okAt := e.JgeRel32()
-			if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
-				return err
+		guardAllocationBaseRawAccess := func(width int32) error {
+			e.MovEdxImm32(0)
+			return guardAllocationOffsetRawAccess(width)
+		}
+		emitPointerLoad := func() {
+			switch pointerWidthBytes {
+			case 4:
+				e.MovEaxFromRaxPtr()
+			default:
+				e.MovRdiRax()
+				e.MovRaxFromRdiDisp(0)
 			}
-			okOff := len(e.Buf)
-			if err := x64.PatchRel32(e.Buf, okAt, okOff); err != nil {
-				return err
-			}
+		}
+		emitPointerStore := func() {
 			e.MovRdiRax()
-			e.MovEcxFromRdiDisp(-8)
-			e.AddEdxImm32(width)
-			e.CmpEdxEcx()
-			failAt := e.JaRel32()
-			e.AddEdxImm32(-width)
-			e.MovsxdRdxEdx()
-			e.AddRaxRdx()
-			doneAt := e.JmpRel32()
-			failOff := len(e.Buf)
-			if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+			switch pointerWidthBytes {
+			case 4:
+				e.MovR8dR8d()
+				e.MovMem32RdiDispR8d(0)
+			default:
+				e.MovMem64RdiDispR8(0)
+			}
+		}
+		emitArchPointerStore := func() {
+			e.MovRdiRax()
+			switch registerWidthBytes {
+			case 4:
+				e.MovMem32RdiDispR8d(0)
+			default:
+				e.MovMem64RdiDispR8(0)
+			}
+		}
+		emitAtomicPointerExchange := func() {
+			e.MovRdiRax()
+			switch pointerWidthBytes {
+			case 4:
+				e.XchgMem32RdiPtrR8d()
+			default:
+				e.XchgMem64RdiPtrR8()
+			}
+		}
+		emitAtomicPointerStore := func() {
+			switch pointerWidthBytes {
+			case 4:
+				e.MovR9dR8d()
+			default:
+				e.MovR9R8()
+			}
+			emitAtomicPointerExchange()
+		}
+		emitAtomicPointerCompareExchange := func() {
+			e.MovRdiRax()
+			switch pointerWidthBytes {
+			case 4:
+				e.MovEaxR9d()
+				e.LockCmpxchgMem32RdiPtrR8d()
+			default:
+				e.MovRaxR9()
+				e.LockCmpxchgMem64RdiPtrR8()
+			}
+		}
+		emitAtomicPointerFetchAdd := func() {
+			e.MovRdiRax()
+			switch pointerWidthBytes {
+			case 4:
+				e.LockXaddMem32RdiPtrR8d()
+			default:
+				e.LockXaddMem64RdiPtrR8()
+			}
+		}
+		emitAtomicPointerFetchSub := func() {
+			e.MovRdiRax()
+			switch pointerWidthBytes {
+			case 4:
+				e.NegR8d()
+				e.LockXaddMem32RdiPtrR8d()
+			default:
+				e.NegR8()
+				e.LockXaddMem64RdiPtrR8()
+			}
+		}
+		emitAtomicPointerFetchCASLoop := func(op32 func(), op64 func()) error {
+			e.MovRdiRax()
+			switch pointerWidthBytes {
+			case 4:
+				e.MovEaxFromRdiDisp(0)
+			default:
+				e.MovRaxFromRdiDisp(0)
+			}
+			retryOff := len(e.Buf)
+			switch pointerWidthBytes {
+			case 4:
+				e.MovR10dEax()
+				op32()
+				e.LockCmpxchgMem32RdiPtrR10d()
+			default:
+				e.MovR10Rax()
+				op64()
+				e.LockCmpxchgMem64RdiPtrR10()
+			}
+			retryAt := e.JnzRel32()
+			return x64.PatchRel32(e.Buf, retryAt, retryOff)
+		}
+		emitAtomicI32CompareExchange := func() {
+			e.MovRdiRax()
+			e.MovRaxR9()
+			e.LockCmpxchgMem32RdiPtrR8d()
+		}
+		emitAtomicI32FetchCASLoop := func(op func()) error {
+			e.MovRdiRax()
+			e.MovEaxFromRdiDisp(0)
+			retryOff := len(e.Buf)
+			e.MovR10dEax()
+			op()
+			e.LockCmpxchgMem32RdiPtrR10d()
+			retryAt := e.JnzRel32()
+			return x64.PatchRel32(e.Buf, retryAt, retryOff)
+		}
+		emitAtomicI64CompareExchange := func() {
+			e.MovRdiRax()
+			e.MovRaxR9()
+			e.LockCmpxchgMem64RdiPtrR8()
+		}
+		emitAtomicI64FetchCASLoop := func(op func()) error {
+			e.MovRdiRax()
+			e.MovRaxFromRdiDisp(0)
+			retryOff := len(e.Buf)
+			e.MovR10Rax()
+			op()
+			e.LockCmpxchgMem64RdiPtrR10()
+			retryAt := e.JnzRel32()
+			return x64.PatchRel32(e.Buf, retryAt, retryOff)
+		}
+		emitAtomicI8CompareExchange := func() {
+			e.MovRdiRax()
+			e.MovRaxR9()
+			e.LockCmpxchgMem8RdiPtrR8b()
+			e.MovzxEaxAl()
+		}
+		emitAtomicI16CompareExchange := func() {
+			e.MovRdiRax()
+			e.MovRaxR9()
+			e.LockCmpxchgMem16RdiPtrR8w()
+			e.MovzxEaxAx()
+		}
+		emitAtomicI8FetchCASLoop := func(op func()) error {
+			e.MovRdiRax()
+			e.MovzxEaxBytePtrRdi()
+			retryOff := len(e.Buf)
+			e.MovR10dEax()
+			op()
+			e.LockCmpxchgMem8RdiPtrR10b()
+			retryAt := e.JnzRel32()
+			if err := x64.PatchRel32(e.Buf, retryAt, retryOff); err != nil {
 				return err
 			}
-			doneOff := len(e.Buf)
-			if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
+			e.MovzxEaxAl()
+			return nil
+		}
+		emitAtomicI16FetchCASLoop := func(op func()) error {
+			e.MovRdiRax()
+			e.MovzxEaxWordPtrRdi()
+			retryOff := len(e.Buf)
+			e.MovR10dEax()
+			op()
+			e.LockCmpxchgMem16RdiPtrR10w()
+			retryAt := e.JnzRel32()
+			if err := x64.PatchRel32(e.Buf, retryAt, retryOff); err != nil {
 				return err
 			}
-			if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
-				return err
-			}
+			e.MovzxEaxAx()
 			return nil
 		}
 
@@ -542,6 +708,9 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				}
 				e.PopRdx()
 				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
 				e.MovzxEaxBytePtrRax()
 				e.PushRax()
 				push(1)
@@ -550,12 +719,311 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 					return err
 				}
 				e.PopRdx()
-				e.PopRcx()
+				e.PopR8()
 				e.PopRax()
-				e.MovMem8RaxPtrCl()
-				e.PushRcx()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				e.MovMem8RaxPtrR8b()
+				e.PushR8()
 				push(1)
 			case ir.IRMemReadPtr:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				emitPointerLoad()
+				e.PushRax()
+				push(1)
+			case ir.IRMemWritePtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				emitPointerStore()
+				e.PushR8()
+				push(1)
+			case ir.IRMemWriteArchPtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(registerWidthBytes); err != nil {
+					return err
+				}
+				emitArchPointerStore()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicLoadPtr:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				emitPointerLoad()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicStorePtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				emitAtomicPointerStore()
+				e.PushR9()
+				push(1)
+			case ir.IRAtomicExchangePtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				emitAtomicPointerExchange()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchAddPtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				emitAtomicPointerFetchAdd()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchSubPtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				emitAtomicPointerFetchSub()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchAndPtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				if err := emitAtomicPointerFetchCASLoop(e.AndR10dR8d, e.AndR10R8); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchOrPtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				if err := emitAtomicPointerFetchCASLoop(e.OrR10dR8d, e.OrR10R8); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchXorPtr:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				if err := emitAtomicPointerFetchCASLoop(e.XorR10dR8d, e.XorR10R8); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicCompareExchangePtr:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopR9()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(pointerWidthBytes); err != nil {
+					return err
+				}
+				emitAtomicPointerCompareExchange()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFenceSeqCst:
+				e.Mfence()
+			case ir.IRAtomicFenceRelaxed, ir.IRAtomicFenceAcquire,
+				ir.IRAtomicFenceRelease, ir.IRAtomicFenceAcqRel:
+				// x86-family TSO gives acquire/release fence semantics without
+				// a hardware fence; seq_cst remains the explicit mfence case.
+			case ir.IRAtomicLoadI32:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				e.MovEaxFromRaxPtr()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicStoreI32:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovR9R8()
+				e.XchgMem32RdiPtrR8d()
+				e.PushR9()
+				push(1)
+			case ir.IRAtomicExchangeI32:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.XchgMem32RdiPtrR8d()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicCompareExchangeI32:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopR9()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				emitAtomicI32CompareExchange()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchAddI32:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.LockXaddMem32RdiPtrR8d()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchSubI32:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.NegR8d()
+				e.LockXaddMem32RdiPtrR8d()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchAndI32:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				if err := emitAtomicI32FetchCASLoop(e.AndR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchOrI32:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				if err := emitAtomicI32FetchCASLoop(e.OrR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchXorI32:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(4); err != nil {
+					return err
+				}
+				if err := emitAtomicI32FetchCASLoop(e.XorR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicLoadI64:
 				if err := pop(2); err != nil {
 					return err
 				}
@@ -568,7 +1036,7 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				e.MovRaxFromRdiDisp(0)
 				e.PushRax()
 				push(1)
-			case ir.IRMemWritePtr:
+			case ir.IRAtomicStoreI64:
 				if err := pop(3); err != nil {
 					return err
 				}
@@ -579,8 +1047,377 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 					return err
 				}
 				e.MovRdiRax()
-				e.MovMem64RdiDispR8(0)
+				e.MovR9R8()
+				e.XchgMem64RdiPtrR8()
+				e.PushR9()
+				push(1)
+			case ir.IRAtomicExchangeI64:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.XchgMem64RdiPtrR8()
 				e.PushR8()
+				push(1)
+			case ir.IRAtomicCompareExchangeI64:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopR9()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
+				emitAtomicI64CompareExchange()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchAddI64:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.LockXaddMem64RdiPtrR8()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchSubI64:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.NegR8()
+				e.LockXaddMem64RdiPtrR8()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchAndI64:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
+				if err := emitAtomicI64FetchCASLoop(e.AndR10R8); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchOrI64:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
+				if err := emitAtomicI64FetchCASLoop(e.OrR10R8); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchXorI64:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(8); err != nil {
+					return err
+				}
+				if err := emitAtomicI64FetchCASLoop(e.XorR10R8); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicLoadI8:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				e.MovzxEaxBytePtrRax()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicStoreI8:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovzxR8dR8b()
+				e.MovR9R8()
+				e.XchgMem8RdiPtrR8b()
+				e.PushR9()
+				push(1)
+			case ir.IRAtomicExchangeI8:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.XchgMem8RdiPtrR8b()
+				e.MovzxR8dR8b()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicCompareExchangeI8:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopR9()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				emitAtomicI8CompareExchange()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchAddI8:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.LockXaddMem8RdiPtrR8b()
+				e.MovzxR8dR8b()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchSubI8:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.NegR8b()
+				e.LockXaddMem8RdiPtrR8b()
+				e.MovzxR8dR8b()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchAndI8:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				if err := emitAtomicI8FetchCASLoop(e.AndR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchOrI8:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				if err := emitAtomicI8FetchCASLoop(e.OrR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchXorI8:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(1); err != nil {
+					return err
+				}
+				if err := emitAtomicI8FetchCASLoop(e.XorR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicLoadI16:
+				if err := pop(2); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				e.MovzxEaxWordPtrRax()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicStoreI16:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.MovzxR8dR8w()
+				e.MovR9R8()
+				e.XchgMem16RdiPtrR8w()
+				e.PushR9()
+				push(1)
+			case ir.IRAtomicExchangeI16:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.XchgMem16RdiPtrR8w()
+				e.MovzxR8dR8w()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicCompareExchangeI16:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopR9()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				emitAtomicI16CompareExchange()
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchAddI16:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.LockXaddMem16RdiPtrR8w()
+				e.MovzxR8dR8w()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchSubI16:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				e.MovRdiRax()
+				e.NegR8w()
+				e.LockXaddMem16RdiPtrR8w()
+				e.MovzxR8dR8w()
+				e.PushR8()
+				push(1)
+			case ir.IRAtomicFetchAndI16:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				if err := emitAtomicI16FetchCASLoop(e.AndR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchOrI16:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				if err := emitAtomicI16FetchCASLoop(e.OrR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
+				push(1)
+			case ir.IRAtomicFetchXorI16:
+				if err := pop(3); err != nil {
+					return err
+				}
+				e.PopRdx()
+				e.PopR8()
+				e.PopRax()
+				if err := guardAllocationBaseRawAccess(2); err != nil {
+					return err
+				}
+				if err := emitAtomicI16FetchCASLoop(e.XorR10dR8d); err != nil {
+					return err
+				}
+				e.PushRax()
 				push(1)
 			case ir.IRMemReadI32Offset:
 				if err := pop(3); err != nil {
@@ -644,11 +1481,10 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				e.PopRcx()
 				e.PopRdx()
 				e.PopRax()
-				if err := guardAllocationOffsetRawAccess(8); err != nil {
+				if err := guardAllocationOffsetRawAccess(pointerWidthBytes); err != nil {
 					return err
 				}
-				e.MovRdiRax()
-				e.MovRaxFromRdiDisp(0)
+				emitPointerLoad()
 				e.PushRax()
 				push(1)
 			case ir.IRMemWritePtrOffset:
@@ -659,11 +1495,24 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				e.PopR8()
 				e.PopRdx()
 				e.PopRax()
-				if err := guardAllocationOffsetRawAccess(8); err != nil {
+				if err := guardAllocationOffsetRawAccess(pointerWidthBytes); err != nil {
 					return err
 				}
-				e.MovRdiRax()
-				e.MovMem64RdiDispR8(0)
+				emitPointerStore()
+				e.PushR8()
+				push(1)
+			case ir.IRMemWriteArchPtrOffset:
+				if err := pop(4); err != nil {
+					return err
+				}
+				e.PopRcx()
+				e.PopR8()
+				e.PopRdx()
+				e.PopRax()
+				if err := guardAllocationOffsetRawAccess(registerWidthBytes); err != nil {
+					return err
+				}
+				emitArchPointerStore()
 				e.PushR8()
 				push(1)
 			case ir.IRPtrAdd:
@@ -673,35 +1522,11 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				e.PopRcx()
 				e.PopRdx()
 				e.PopRax()
-				e.CmpEdxImm32(0)
-				okAt := e.JgeRel32()
-				if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
+				if err := guardAllocationOffsetRawAccess(1); err != nil {
 					return err
 				}
-				okOff := len(e.Buf)
-				if err := x64.PatchRel32(e.Buf, okAt, okOff); err != nil {
-					return err
-				}
-				e.MovRdiRax()
-				e.MovEcxFromRdiDisp(-8)
-				e.CmpEdxEcx()
-				failAt := e.JaeRel32()
-				e.MovsxdRdxEdx()
-				e.AddRaxRdx()
 				e.PushRax()
 				push(1)
-				doneAt := e.JmpRel32()
-				failOff := len(e.Buf)
-				if err := abi.EmitExit(e, 2, stackDepth, importPatches); err != nil {
-					return err
-				}
-				doneOff := len(e.Buf)
-				if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
-					return err
-				}
-				if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
-					return err
-				}
 			case ir.IRMmioReadI32:
 				if err := pop(2); err != nil {
 					return err
@@ -726,7 +1551,7 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 					return fmt.Errorf("x64 backend: symbol address is missing name in function '%s'", fn.Name)
 				}
 				leaPos := e.LeaRaxRipDisp()
-				*callPatches = append(*callPatches, x64obj.CallPatch{At: leaPos, Name: instr.Name})
+				*callPatches = append(*callPatches, x64obj.CallPatch{At: leaPos, Name: instr.Name, Kind: x64obj.PatchFuncAddrRel32})
 				e.PushRax()
 				push(1)
 			case ir.IRCtxSwitch:

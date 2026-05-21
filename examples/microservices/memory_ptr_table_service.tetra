@@ -1,0 +1,22 @@
+// Memory pointer table microservice smoke.
+//
+// The service stores an allocation-base pointer in a raw pointer table and
+// loads it back before reading the pointed-to payload.
+module examples.microservices.memory_ptr_table_service
+
+import lib.core.capability as cap
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(4)
+        let table: ptr = core.alloc_bytes(8)
+        let _stored_value: Int = core.store_i32(payload, 42, memory_cap)
+        let _stored_ptr: ptr = core.store_ptr(table, payload, memory_cap)
+        let loaded: ptr = core.load_ptr(table, memory_cap)
+        let value: Int = core.load_i32(loaded, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 99

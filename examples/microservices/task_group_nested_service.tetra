@@ -1,0 +1,30 @@
+// Nested task-group microservice smoke.
+//
+// A grouped parent task opens a child group, joins its child worker, and then
+// the outer service joins and closes the parent group.
+module examples.microservices.task_group_nested_service
+
+func child_worker() -> Int:
+    return 20
+
+func parent_worker() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let child: task.i32 = core.task_spawn_group_i32(group, "child_worker")
+    let value: Int = core.task_join_i32(child)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 80 + close_error
+    return value + 1
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let parent: task.i32 = core.task_spawn_group_i32(group, "parent_worker")
+    let value: Int = core.task_join_i32(parent)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    if value == 21:
+        return 0
+    return value

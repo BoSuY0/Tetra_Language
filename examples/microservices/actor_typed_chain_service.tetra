@@ -1,0 +1,55 @@
+// Actor typed-chain microservice smoke.
+//
+// A router actor receives a typed request, forwards a typed payload to a worker,
+// and returns the worker's typed reply to the main service.
+enum ChainMsg:
+    case work(Int)
+    case done(Int)
+    case failed(Int)
+
+func typed_worker() -> Int
+uses actors:
+    let msg: ChainMsg = core.recv_typed<ChainMsg>()
+    match msg:
+    case ChainMsg.work(work_value):
+        let _reply: Int = core.send_typed(core.sender(), ChainMsg.done(work_value + 1))
+        return 0
+    case ChainMsg.done(done_value):
+        let _reply_done: Int = core.send_typed(core.sender(), ChainMsg.failed(done_value))
+        return 0
+    case ChainMsg.failed(code):
+        let _reply_failed: Int = core.send_typed(core.sender(), ChainMsg.failed(code))
+        return 0
+
+func typed_router() -> Int
+uses actors:
+    let request: ChainMsg = core.recv_typed<ChainMsg>()
+    let reply_to: actor = core.sender()
+    let worker: actor = core.spawn("typed_worker")
+    match request:
+    case ChainMsg.work(request_value):
+        let _sent: Int = core.send_typed(worker, ChainMsg.work(request_value + 20))
+        let reply: ChainMsg = core.recv_typed<ChainMsg>()
+        let _forward: Int = core.send_typed(reply_to, reply)
+        return 0
+    case ChainMsg.done(done_value):
+        let _done: Int = core.send_typed(reply_to, ChainMsg.done(done_value))
+        return 0
+    case ChainMsg.failed(code):
+        let _failed: Int = core.send_typed(reply_to, ChainMsg.failed(code))
+        return 0
+
+func main() -> Int
+uses actors:
+    let router: actor = core.spawn("typed_router")
+    let _sent: Int = core.send_typed(router, ChainMsg.work(21))
+    let reply: ChainMsg = core.recv_typed<ChainMsg>()
+    match reply:
+    case ChainMsg.done(done_value):
+        if done_value == 42:
+            return 0
+        return done_value
+    case ChainMsg.work(work_value):
+        return 40 + work_value
+    case ChainMsg.failed(code):
+        return 80 + code

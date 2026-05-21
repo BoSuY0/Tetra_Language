@@ -1,0 +1,51 @@
+// Actor typed dual-mailbox microservice smoke.
+//
+// The service fans out typed enum requests to two actors and combines the two
+// blocking typed replies.
+module examples.microservices.actor_typed_dual_mailbox_service
+
+enum DualReply:
+    case value(Int)
+    case failed(Int)
+
+func typed_adder() -> Int
+uses actors:
+    let request: DualReply = core.recv_typed<DualReply>()
+    match request:
+    case DualReply.value(value):
+        let _reply: Int = core.send_typed(core.sender(), DualReply.value(value + 1))
+        return 0
+    case DualReply.failed(code):
+        let _failed: Int = core.send_typed(core.sender(), DualReply.failed(code))
+        return 0
+
+func typed_multiplier() -> Int
+uses actors:
+    let request: DualReply = core.recv_typed<DualReply>()
+    match request:
+    case DualReply.value(value):
+        let _reply: Int = core.send_typed(core.sender(), DualReply.value(value * 2))
+        return 0
+    case DualReply.failed(code):
+        let _failed: Int = core.send_typed(core.sender(), DualReply.failed(code))
+        return 0
+
+func score(reply: DualReply) -> Int:
+    match reply:
+    case DualReply.value(value):
+        return value
+    case DualReply.failed(code):
+        return 80 + code
+
+func main() -> Int
+uses actors:
+    let adder: actor = core.spawn("typed_adder")
+    let multiplier: actor = core.spawn("typed_multiplier")
+    let _left: Int = core.send_typed(adder, DualReply.value(20))
+    let _right: Int = core.send_typed(multiplier, DualReply.value(21))
+    let first: DualReply = core.recv_typed<DualReply>()
+    let second: DualReply = core.recv_typed<DualReply>()
+    let total: Int = score(first) + score(second)
+    if total == 63:
+        return 0
+    return total

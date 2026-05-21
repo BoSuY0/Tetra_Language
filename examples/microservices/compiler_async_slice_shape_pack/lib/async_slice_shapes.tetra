@@ -1,0 +1,105 @@
+module lib.async_slice_shapes
+
+enum SliceShapeErr:
+    case failed
+
+enum SliceRoute:
+    case raw([]i32)
+    case empty
+
+struct Box<T>:
+    value: T
+
+async func maybe_values(values: []i32) -> []i32?:
+    let out: []i32? = values
+    return out
+
+async func maybe_values_throw(values: []i32, fail: Bool) -> []i32? throws SliceShapeErr:
+    if fail:
+        throw SliceShapeErr.failed
+    let out: []i32? = values
+    return out
+
+async func id<T>(value: T) -> T:
+    return value
+
+async func id_throw<T>(value: T, fail: Bool) -> T throws SliceShapeErr:
+    if fail:
+        throw SliceShapeErr.failed
+    return value
+
+async func wrap<T>(value: T) -> Box<T>:
+    return Box<T>(value: value)
+
+async func wrap_throw<T>(value: T, fail: Bool) -> Box<T> throws SliceShapeErr:
+    if fail:
+        throw SliceShapeErr.failed
+    return Box<T>(value: value)
+
+async func make_route(values: []i32) -> SliceRoute:
+    return SliceRoute.raw(values)
+
+async func make_route_throw(values: []i32, fail: Bool) -> SliceRoute throws SliceShapeErr:
+    if fail:
+        throw SliceShapeErr.failed
+    return SliceRoute.raw(values)
+
+async func sum_optional_local(values: []i32) -> Int:
+    let maybe: []i32? = await maybe_values(values)
+    if let unwrapped = maybe:
+        return unwrapped[0] + unwrapped[1] + unwrapped[2]
+    return 0
+
+async func sum_optional_throw_local(values: []i32) -> Int throws SliceShapeErr:
+    let maybe: []i32? = try await maybe_values_throw(values, false)
+    if let unwrapped = maybe:
+        return unwrapped[0] + unwrapped[1] + unwrapped[2]
+    return 0
+
+async func sum_generic_local(values: []i32) -> Int:
+    let out: []i32 = await id(values)
+    return out[0] + out[1] + out[2]
+
+async func sum_generic_throw_local(values: []i32) -> Int throws SliceShapeErr:
+    let out: []i32 = try await id_throw(values, false)
+    return out[0] + out[1] + out[2]
+
+async func sum_box_local(values: []i32) -> Int:
+    let boxed: Box<[]i32> = await wrap(values)
+    return boxed.value[0] + boxed.value[1] + boxed.value[2]
+
+async func sum_box_throw_local(values: []i32) -> Int throws SliceShapeErr:
+    let boxed: Box<[]i32> = try await wrap_throw(values, false)
+    return boxed.value[0] + boxed.value[1] + boxed.value[2]
+
+async func sum_route_local(values: []i32) -> Int:
+    let route: SliceRoute = await make_route(values)
+    match route:
+    case SliceRoute.raw(unwrapped):
+        return unwrapped[0] + unwrapped[1] + unwrapped[2]
+    case SliceRoute.empty:
+        return 0
+    return 99
+
+async func sum_route_throw_local(values: []i32) -> Int throws SliceShapeErr:
+    let route: SliceRoute = try await make_route_throw(values, false)
+    match route:
+    case SliceRoute.raw(unwrapped):
+        return unwrapped[0] + unwrapped[1] + unwrapped[2]
+    case SliceRoute.empty:
+        return 0
+    return 99
+
+async func relay_int(value: Int) -> Int:
+    return await id(value)
+
+func fallback() -> Int
+uses alloc, mem:
+    var values: []i32 = core.make_i32(3)
+    values[0] = 10
+    values[1] = 11
+    values[2] = 21
+    let maybe: []i32? = values
+    if let unwrapped = maybe:
+        return unwrapped[0] + unwrapped[1] + unwrapped[2]
+    return 99

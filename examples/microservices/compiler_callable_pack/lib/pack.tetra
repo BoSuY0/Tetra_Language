@@ -1,0 +1,12 @@
+module lib.pack
+
+enum MaybeCallback:
+    case some(fn(Int) -> Int)
+    case empty
+
+struct Box:
+    choice: MaybeCallback
+
+func make_box() -> Box:
+    let delta: Int = 2
+    return Box(choice: MaybeCallback.some(fn(value: Int) -> Int = value + delta))

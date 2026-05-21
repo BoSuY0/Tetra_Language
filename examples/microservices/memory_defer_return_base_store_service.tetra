@@ -1,0 +1,29 @@
+// Deferred return memory store microservice smoke.
+//
+// The service passes an allocation base into a helper and verifies a deferred
+// raw-memory write runs before an early return.
+module examples.microservices.memory_defer_return_base_store_service
+
+func return_with_defer(base: ptr, memory_cap: cap.mem) -> Int
+uses mem:
+    unsafe:
+        defer:
+            let cell: ptr = core.ptr_add(base, 4, memory_cap)
+            let _write: Int = core.store_i32(cell, 42, memory_cap)
+        return 7
+    return 99
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(8)
+        let returned: Int = return_with_defer(base, memory_cap)
+        if returned != 7:
+            return returned
+        let cell: ptr = core.ptr_add(base, 4, memory_cap)
+        let value: Int = core.load_i32(cell, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 99

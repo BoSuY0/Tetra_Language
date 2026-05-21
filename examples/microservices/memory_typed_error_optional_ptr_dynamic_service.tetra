@@ -1,0 +1,38 @@
+// Typed-error optional pointer dynamic-memory microservice smoke.
+//
+// The service unwraps an optional allocation-base pointer recovered from a
+// typed error and uses the base in a small dynamic byte-window loop.
+module examples.microservices.memory_typed_error_optional_ptr_dynamic_service
+
+import lib.core.capability as cap
+
+enum OptionalPtrErr:
+    case maybe(ptr?)
+
+func route_base(raw: ptr) -> ptr? throws OptionalPtrErr:
+    let maybe: ptr? = raw
+    throw OptionalPtrErr.maybe(maybe)
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(4)
+        let base_one: ptr = core.ptr_add(base, 1, memory_cap)
+        let _write_zero: UInt8 = core.store_u8(base, 20, memory_cap)
+        let _write_one: UInt8 = core.store_u8(base_one, 22, memory_cap)
+        let recovered_maybe: ptr? = catch route_base(base):
+        case OptionalPtrErr.maybe(payload):
+            payload
+        if let recovered_base = recovered_maybe:
+            var offset: Int = 0
+            var total: Int = 0
+            while offset < 2:
+                let cell: ptr = core.ptr_add(recovered_base, offset, memory_cap)
+                total = total + core.load_u8(cell, memory_cap)
+                offset = offset + 1
+            if total == 42:
+                return 0
+            return total
+        return 98
+    return 99

@@ -1,0 +1,5 @@
+module lib.tasks
+
+func maybe(task: task.i32) -> task.i32?:
+    let out: task.i32? = task
+    return out

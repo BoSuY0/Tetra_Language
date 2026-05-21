@@ -1,0 +1,26 @@
+// Actor deadline router microservice smoke.
+//
+// The service verifies an empty tagged receive timeout, then routes a tagged
+// actor message through a deadline-aware receive.
+actor Router:
+    func run() -> Int
+    uses actors:
+        var request: actor.msg = core.recv_msg()
+        let _sent: Int = core.send_msg(core.sender(), request.value + 1, request.tag + 1)
+        return 0
+
+func main() -> Int
+uses actors, runtime:
+    let empty: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(0))
+    if empty.error != 2:
+        return 10 + empty.error
+    let router: actor = core.spawn("Router.run")
+    let _request: Int = core.send_msg(router, 41, 70)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(5))
+    if reply.error != 0:
+        return 20 + reply.error
+    if reply.tag != 71:
+        return reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

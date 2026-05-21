@@ -23,6 +23,7 @@ type targetReportEntry struct {
 	OS                      string `json:"os"`
 	Arch                    string `json:"arch"`
 	ABI                     string `json:"abi"`
+	DataModel               string `json:"data_model"`
 	Format                  string `json:"format"`
 	ExeExt                  string `json:"exe_ext"`
 	BuildOnly               bool   `json:"build_only"`
@@ -30,6 +31,15 @@ type targetReportEntry struct {
 	RunRunner               string `json:"run_runner,omitempty"`
 	RunSupported            bool   `json:"run_supported"`
 	RunUnsupportedReason    string `json:"run_unsupported_reason,omitempty"`
+	PointerWidthBits        int    `json:"pointer_width_bits"`
+	RegisterWidthBits       int    `json:"register_width_bits"`
+	NativeIntWidthBits      int    `json:"native_int_width_bits"`
+	Endian                  string `json:"endian"`
+	StackAlignmentBytes     int    `json:"stack_alignment_bytes"`
+	MaxAtomicWidthBits      int    `json:"max_atomic_width_bits"`
+	AtomicWidthBits         []int  `json:"atomic_width_bits"`
+	AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits"`
+	UnsupportedReason       string `json:"unsupported_reason,omitempty"`
 	SupportsDebugInfo       bool   `json:"supports_debug_info"`
 	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 }
@@ -61,7 +71,7 @@ func validateTargetsReport(raw []byte) error {
 	if err := validateTargetList("supported", report.Supported, []string{"linux-x64", "windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web"}); err != nil {
 		return err
 	}
-	if err := validateTargetList("build_only", report.BuildOnly, []string{}); err != nil {
+	if err := validateTargetList("build_only", report.BuildOnly, []string{"linux-x86", "linux-x32"}); err != nil {
 		return err
 	}
 	if err := validateTargetList("planned", report.Planned, []string{}); err != nil {
@@ -103,6 +113,8 @@ func validateTargetMetadata(got []targetReportEntry) error {
 		{Triple: "macos-x64", Status: "supported", OS: "macos", Arch: "x64", ABI: "sysv", Format: "macho", ExeExt: "", BuildOnly: false, RunMode: "host_native", SupportsDebugInfo: true, SupportsReleaseOptimize: true},
 		{Triple: "wasm32-wasi", Status: "supported", OS: "wasi", Arch: "wasm32", ABI: "wasi", Format: "wasm", ExeExt: ".wasm", BuildOnly: false, RunMode: "wasi_runner", SupportsDebugInfo: false, SupportsReleaseOptimize: true},
 		{Triple: "wasm32-web", Status: "supported", OS: "web", Arch: "wasm32", ABI: "web", Format: "wasm", ExeExt: ".wasm", BuildOnly: false, RunMode: "web_runner", SupportsDebugInfo: false, SupportsReleaseOptimize: true},
+		{Triple: "linux-x86", Status: "build_only", OS: "linux", Arch: "x86", ABI: "i386-sysv", Format: "elf", ExeExt: "", BuildOnly: true, RunMode: "host_probed", SupportsDebugInfo: false, SupportsReleaseOptimize: false},
+		{Triple: "linux-x32", Status: "build_only", OS: "linux", Arch: "x64", ABI: "x32-sysv", Format: "elf", ExeExt: "", BuildOnly: true, RunMode: "host_probed", SupportsDebugInfo: false, SupportsReleaseOptimize: false},
 	}
 	if len(got) != len(want) {
 		return fmt.Errorf("target metadata count = %d, want %d", len(got), len(want))
@@ -184,6 +196,20 @@ func validateRunContract(entry targetReportEntry) error {
 				return fmt.Errorf("target metadata[%s].run_unsupported_reason must explain missing WASI runner", entry.Triple)
 			}
 		}
+	case "host_probed":
+		if !entry.BuildOnly {
+			return fmt.Errorf("target metadata[%s].run_mode host_probed is only valid for build-only native targets", entry.Triple)
+		}
+		if entry.RunRunner != "" {
+			return fmt.Errorf("target metadata[%s].run_runner = %q, want empty for host_probed", entry.Triple, entry.RunRunner)
+		}
+		if entry.RunSupported {
+			if entry.RunUnsupportedReason != "" {
+				return fmt.Errorf("target metadata[%s].run_unsupported_reason must be empty when host probe succeeds", entry.Triple)
+			}
+		} else if !strings.Contains(entry.RunUnsupportedReason, "no host fallback") {
+			return fmt.Errorf("target metadata[%s].run_unsupported_reason must explain host probe failure and no host fallback", entry.Triple)
+		}
 	case "web_runner":
 		if entry.Triple != "wasm32-web" || entry.BuildOnly {
 			return fmt.Errorf("target metadata[%s].run_mode web_runner is only valid for supported wasm32-web target", entry.Triple)
@@ -204,7 +230,7 @@ func validateRunContract(entry targetReportEntry) error {
 			}
 		}
 	default:
-		return fmt.Errorf("target metadata[%s].run_mode = %q, want host_native, wasi_runner, or web_runner", entry.Triple, entry.RunMode)
+		return fmt.Errorf("target metadata[%s].run_mode = %q, want host_native, host_probed, wasi_runner, or web_runner", entry.Triple, entry.RunMode)
 	}
 	return nil
 }

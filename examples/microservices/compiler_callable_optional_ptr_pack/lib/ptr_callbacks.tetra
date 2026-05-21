@@ -1,0 +1,14 @@
+module lib.ptr_callbacks
+
+enum Route:
+    case keep(fn(ptr?) -> ptr?)
+    case empty
+
+struct Handler:
+    cb: fn(ptr?) -> ptr?
+
+func keep_optional(value: ptr?) -> ptr?:
+    return value
+
+func apply_optional(cb: fn(ptr?) -> ptr?, value: ptr?) -> ptr?:
+    return cb(value)

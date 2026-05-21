@@ -1226,6 +1226,153 @@ func TestActorsPingPongBuildsSelfHostRuntimeForAllX64Targets(t *testing.T) {
 	}
 }
 
+func TestActorsPingPongBuildsSelfHostRuntimeForX32(t *testing.T) {
+	srcPath := filepath.Join("..", "examples", "actors_pingpong.tetra")
+	if _, err := os.Stat(srcPath); err != nil {
+		t.Fatalf("missing example: %v", err)
+	}
+
+	tmp := t.TempDir()
+	outPath := filepath.Join(tmp, "actors_x32")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Runtime: RuntimeSelfHost, Jobs: 1}); err != nil {
+		t.Fatalf("build x32 self-host runtime: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x32 executable: %v", err)
+	}
+	if len(data) < 20 {
+		t.Fatalf("x32 executable too small: %d bytes", len(data))
+	}
+	if string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x32 executable missing ELF magic: % x", data[:4])
+	}
+	if data[4] != 1 {
+		t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+		t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+	}
+}
+
+func TestX32MultiSpawnActorRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "actors_x32_multi_spawn.tetra")
+	outPath := filepath.Join(tmp, "actors-x32-multi-spawn")
+	if err := os.WriteFile(srcPath, []byte(`
+func slow() -> Int
+uses actors:
+    return 1
+
+func fast() -> Int
+uses actors:
+    return 2
+
+func main() -> Int
+uses actors, runtime:
+    let _slow: actor = core.spawn("slow")
+    let _fast: actor = core.spawn("fast")
+    return 0
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1})
+	if err == nil {
+		t.Fatalf("expected x32 multi-spawn actors runtime support diagnostic")
+	}
+	diag := DiagnosticFromError(err)
+	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v", diag)
+	}
+	if diag.Message != "multi-spawn actors runtime not supported on linux-x32" {
+		t.Fatalf("message = %q, want x32 multi-spawn actors runtime diagnostic", diag.Message)
+	}
+	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
+		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	}
+	if _, statErr := os.Stat(outPath); statErr == nil {
+		t.Fatalf("x32 multi-spawn actors runtime rejection wrote executable %s", outPath)
+	}
+}
+
+func TestX86ActorsRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "actors_x86.tetra")
+	outPath := filepath.Join(tmp, "actors-x86")
+	if err := os.WriteFile(srcPath, []byte(`
+func worker() -> Int
+uses actors:
+    return core.recv()
+
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("worker")
+    let _sent: Int = core.send(peer, 41)
+    return core.recv()
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1})
+	if err == nil {
+		t.Fatalf("expected x86 actors runtime support diagnostic")
+	}
+	diag := DiagnosticFromError(err)
+	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v", diag)
+	}
+	if diag.Message != "actors runtime not supported on linux-x86" {
+		t.Fatalf("message = %q, want x86 actors runtime diagnostic", diag.Message)
+	}
+	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
+		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	}
+	if _, statErr := os.Stat(outPath); statErr == nil {
+		t.Fatalf("x86 actors runtime rejection wrote executable %s", outPath)
+	}
+}
+
+func TestX86ActorStateRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "actor_state_x86.tetra")
+	outPath := filepath.Join(tmp, "actor-state-x86")
+	if err := os.WriteFile(srcPath, []byte(`
+actor Counter:
+    var count: Int = 0
+    func run() -> Int
+    uses actors:
+        count = count + 1
+        return count
+
+func main() -> Int:
+    return 0
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1})
+	if err == nil {
+		t.Fatalf("expected x86 actor state runtime support diagnostic")
+	}
+	diag := DiagnosticFromError(err)
+	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v", diag)
+	}
+	if diag.File != srcPath || diag.Line == 0 {
+		t.Fatalf("diagnostic position = %s:%d, want actor method source position in %s", diag.File, diag.Line, srcPath)
+	}
+	if diag.Message != "actors runtime not supported on linux-x86" {
+		t.Fatalf("message = %q, want x86 actor state runtime diagnostic", diag.Message)
+	}
+	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
+		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	}
+	if _, statErr := os.Stat(outPath); statErr == nil {
+		t.Fatalf("x86 actor state runtime rejection wrote executable %s", outPath)
+	}
+}
+
 func TestCanonicalSelfHostRuntimeSources(t *testing.T) {
 	tests := []struct {
 		path       string
@@ -1262,6 +1409,7 @@ func TestSelfHostRuntimeObjectsExportRequiredSymbols(t *testing.T) {
 	}{
 		{"sysv-linux", filepath.Join("..", "__rt", "actors_sysv.tetra"), "linux-x64"},
 		{"sysv-macos", filepath.Join("..", "__rt", "actors_sysv.tetra"), "macos-x64"},
+		{"sysv-linux-x32", filepath.Join("..", "__rt", "actors_sysv.tetra"), "linux-x32"},
 		{"win64", filepath.Join("..", "__rt", "actors_win64.tetra"), "windows-x64"},
 	}
 

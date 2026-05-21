@@ -1,0 +1,66 @@
+module app.main
+
+import lib.resources as resources
+
+enum Ping:
+    case request(Int)
+    case reply(Int)
+    case failed(Int)
+
+enum GroupErr:
+    case stopped
+    case code(Int)
+
+func actor_worker() -> Int
+uses actors:
+    let msg: Ping = core.recv_typed<Ping>()
+    match msg:
+    case Ping.request(request_value):
+        let _reply: Int = core.send_typed(core.sender(), Ping.reply(request_value + 1))
+        return 0
+    case Ping.reply(reply_value):
+        let _failed: Int = core.send_typed(core.sender(), Ping.failed(reply_value))
+        return 0
+    case Ping.failed(code):
+        let _failed_again: Int = core.send_typed(core.sender(), Ping.failed(code))
+        return 0
+
+func group_worker() -> Int throws GroupErr:
+    return 21
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("actor_worker")
+    let maybe_peer: actor? = resources.maybe_actor(peer)
+    if let actor_handle = maybe_peer:
+        let returned_peer: actor = resources.alias_actor(actor_handle)
+        let _sent: Int = core.send_typed(returned_peer, Ping.request(20))
+        let reply: Ping = core.recv_typed<Ping>()
+        match reply:
+        case Ping.request(unexpected_request):
+            return 50 + unexpected_request
+        case Ping.reply(reply_code):
+            if reply_code != 21:
+                return reply_code
+        case Ping.failed(failed_code):
+            return 80 + failed_code
+    else:
+        return 90
+    let group: task.group = core.task_group_open()
+    let maybe_group: task.group? = resources.maybe_group(group)
+    if let group_handle = maybe_group:
+        let returned_group: task.group = resources.alias_group(group_handle)
+        let task = core.task_spawn_group_i32_typed<GroupErr>(returned_group, "group_worker")
+        let value: Int = catch core.task_join_group_i32_typed<GroupErr>(task):
+        case GroupErr.stopped:
+            70
+        case GroupErr.code(error_code):
+            error_code
+        let close_error: Int = core.task_group_close(returned_group)
+        if close_error != 0:
+            return 100 + close_error
+        if value == 21:
+            return 0
+        return value
+    else:
+        return 91

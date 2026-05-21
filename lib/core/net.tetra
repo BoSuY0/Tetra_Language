@@ -1,0 +1,171 @@
+// Stable core Linux TCP networking helpers.
+// Effects: io, mem
+// Runtime boundary: real linux-x64 TCP socket client/server helpers backed by
+// socket/bind/connect/listen/accept4/read/recv/write/send/epoll/fcntl/setsockopt/close syscalls.
+// Full event-loop abstractions, DNS, TLS, and database protocols remain
+// outside this current surface.
+// ```tetra doctest
+// func net_doctest(io_cap: cap.io) -> Int
+// uses alloc, io, mem:
+//     let fd: Int = lib.core.net.socket_tcp4(io_cap)
+//     if fd < 0:
+//         return 1
+//     let nb: Int = lib.core.net.set_nonblocking(fd, io_cap)
+//     let reuse: Int = lib.core.net.set_reuseport(fd, io_cap)
+//     let nodelay: Int = lib.core.net.set_tcp_nodelay(fd, io_cap)
+//     let bound: Int = lib.core.net.bind_tcp4_loopback(fd, 0, io_cap)
+//     let listening: Int = lib.core.net.listen(fd, 8, io_cap)
+//     let epfd: Int = lib.core.net.epoll_create(io_cap)
+//     let added: Int = lib.core.net.epoll_ctl_add_read(epfd, fd, io_cap)
+//     let deleted_read: Int = lib.core.net.epoll_ctl_delete(epfd, fd, io_cap)
+//     let added_rw: Int = lib.core.net.epoll_ctl_add_read_write(epfd, fd, io_cap)
+//     let mod_read: Int = lib.core.net.epoll_ctl_mod_read(epfd, fd, io_cap)
+//     let mod_rw: Int = lib.core.net.epoll_ctl_mod_read_write(epfd, fd, io_cap)
+//     let deleted: Int = lib.core.net.epoll_ctl_delete(epfd, fd, io_cap)
+//     var event: []i32 = core.make_i32(2)
+//     let ready: Int = lib.core.net.epoll_wait_one(epfd, 0, io_cap)
+//     let event_ready: Int = lib.core.net.epoll_wait_one_into(epfd, event, 0, io_cap)
+//     event[1] = lib.core.net.epoll_event_in() + lib.core.net.epoll_event_hup()
+//     let flags_ok: Bool = lib.core.net.epoll_event_readable(lib.core.net.epoll_event_flags(event)) && lib.core.net.epoll_event_hung_up(lib.core.net.epoll_event_flags(event))
+//     let epoll_closed: Int = lib.core.net.close(epfd, io_cap)
+//     let closed: Int = lib.core.net.close(fd, io_cap)
+//     if nb < 0 || reuse < 0 || nodelay < 0 || bound < 0 || listening < 0 || epfd < 0 || added < 0 || deleted_read < 0 || added_rw < 0 || mod_read < 0 || mod_rw < 0 || deleted < 0 || ready != 0 || event_ready != 0 || !flags_ok || epoll_closed != 0 || closed != 0:
+//         return 2
+//     return 0
+// ```
+module lib.core.net
+
+func socket_tcp4(io_cap: cap.io) -> Int
+uses io:
+    return core.net_socket_tcp4(io_cap)
+
+func bind_tcp4_loopback(fd: Int, port: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_bind_tcp4_loopback(fd, port, io_cap)
+
+func connect_tcp4_loopback(fd: Int, port: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_connect_tcp4_loopback(fd, port, io_cap)
+
+func listen(fd: Int, backlog: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_listen(fd, backlog, io_cap)
+
+func accept4(fd: Int, flags: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_accept4(fd, flags, io_cap)
+
+func accept(fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_accept4(fd, 0, io_cap)
+
+func accept_nonblocking(fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_accept4(fd, sock_nonblock() + sock_cloexec(), io_cap)
+
+func read(fd: Int, dst: inout []u8, start: Int, count: Int, io_cap: cap.io) -> Int
+uses io, mem:
+    return core.net_read(fd, dst, start, count, io_cap)
+
+func recv(fd: Int, dst: inout []u8, start: Int, count: Int, io_cap: cap.io) -> Int
+uses io, mem:
+    return core.net_recv(fd, dst, start, count, io_cap)
+
+func write(fd: Int, src: []u8, start: Int, count: Int, io_cap: cap.io) -> Int
+uses io, mem:
+    return core.net_write(fd, src, start, count, io_cap)
+
+func send(fd: Int, src: []u8, start: Int, count: Int, io_cap: cap.io) -> Int
+uses io, mem:
+    return core.net_send(fd, src, start, count, io_cap)
+
+func epoll_create(io_cap: cap.io) -> Int
+uses io:
+    return core.net_epoll_create(io_cap)
+
+func epoll_ctl_add_read(epfd: Int, fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_epoll_ctl_add_read(epfd, fd, io_cap)
+
+func epoll_ctl_add_read_write(epfd: Int, fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_epoll_ctl_add_read_write(epfd, fd, io_cap)
+
+func epoll_ctl_mod_read(epfd: Int, fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_epoll_ctl_mod_read(epfd, fd, io_cap)
+
+func epoll_ctl_mod_read_write(epfd: Int, fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_epoll_ctl_mod_read_write(epfd, fd, io_cap)
+
+func epoll_ctl_delete(epfd: Int, fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_epoll_ctl_delete(epfd, fd, io_cap)
+
+func epoll_wait_one(epfd: Int, timeout_ms: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_epoll_wait_one(epfd, timeout_ms, io_cap)
+
+func epoll_wait_one_into(epfd: Int, event: inout []i32, timeout_ms: Int, io_cap: cap.io) -> Int
+uses io, mem:
+    return core.net_epoll_wait_one_into(epfd, event, timeout_ms, io_cap)
+
+func sock_nonblock() -> Int:
+    return 2048
+
+func sock_cloexec() -> Int:
+    return 524288
+
+func epoll_event_in() -> Int:
+    return 1
+
+func epoll_event_out() -> Int:
+    return 4
+
+func epoll_event_err() -> Int:
+    return 8
+
+func epoll_event_hup() -> Int:
+    return 16
+
+func epoll_event_fd(event: []i32) -> Int
+uses mem:
+    return event[0]
+
+func epoll_event_flags(event: []i32) -> Int
+uses mem:
+    return event[1]
+
+func epoll_event_readable(flags: Int) -> Bool:
+    return flag_set(flags, epoll_event_in())
+
+func epoll_event_writable(flags: Int) -> Bool:
+    return flag_set(flags, epoll_event_out())
+
+func epoll_event_has_error(flags: Int) -> Bool:
+    return flag_set(flags, epoll_event_err())
+
+func epoll_event_hung_up(flags: Int) -> Bool:
+    return flag_set(flags, epoll_event_hup())
+
+func flag_set(flags: Int, bit: Int) -> Bool:
+    if flags < 0 || bit <= 0:
+        return false
+    return (flags / bit) % 2 == 1
+
+func set_nonblocking(fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_set_nonblocking(fd, io_cap)
+
+func set_reuseport(fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_set_reuseport(fd, io_cap)
+
+func set_tcp_nodelay(fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_set_tcp_nodelay(fd, io_cap)
+
+func close(fd: Int, io_cap: cap.io) -> Int
+uses io:
+    return core.net_close(fd, io_cap)

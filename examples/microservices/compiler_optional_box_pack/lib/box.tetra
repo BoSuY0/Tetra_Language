@@ -1,0 +1,16 @@
+module lib.box
+
+struct MaybeBox<T>:
+    value: T?
+
+func empty() -> MaybeBox<Int>:
+    return MaybeBox<Int>(value: none)
+
+func filled(value: Int) -> MaybeBox<Int>:
+    let maybe: Int? = value
+    return MaybeBox<Int>(value: maybe)
+
+func score(box: MaybeBox<Int>) -> Int:
+    if let value = box.value:
+        return value
+    return 0

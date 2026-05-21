@@ -1,0 +1,53 @@
+// Orders gateway microservice smoke.
+//
+// The gateway composes inventory, payments, and audit handlers. This mirrors a
+// microservice workflow without claiming an HTTP server API that Tetra does not
+// currently expose.
+actor Inventory:
+    func run() -> Int
+    uses actors:
+        var request: actor.msg = core.recv_msg()
+        if request.tag != 10:
+            return 10
+        if request.value <= 5:
+            let _sent_ok: Int = core.send_msg(core.sender(), 1, 11)
+            return 0
+        let _sent_empty: Int = core.send_msg(core.sender(), 0, 11)
+        return 0
+
+actor Payments:
+    func run() -> Int
+    uses actors:
+        var request: actor.msg = core.recv_msg()
+        if request.tag != 20:
+            return 20
+        if request.value == 42:
+            let _sent_ok: Int = core.send_msg(core.sender(), 42, 21)
+            return 0
+        let _sent_reject: Int = core.send_msg(core.sender(), 0, 21)
+        return 0
+
+func audit_order() -> Int:
+    return 7
+
+func main() -> Int
+uses actors, runtime:
+    let audit: task.i32 = core.task_spawn_i32("audit_order")
+    let inventory: actor = core.spawn("Inventory.run")
+    let payments: actor = core.spawn("Payments.run")
+    let _stock_request: Int = core.send_msg(inventory, 3, 10)
+    var stock: actor.msg = core.recv_msg()
+    if stock.tag != 11:
+        return stock.tag
+    if stock.value != 1:
+        return 31
+    let _payment_request: Int = core.send_msg(payments, 42, 20)
+    var payment: actor.msg = core.recv_msg()
+    if payment.tag != 21:
+        return payment.tag
+    if payment.value != 42:
+        return 32
+    let audit_status: Int = core.task_join_i32(audit)
+    if audit_status == 7:
+        return 0
+    return audit_status

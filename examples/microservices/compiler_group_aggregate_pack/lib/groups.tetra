@@ -1,0 +1,20 @@
+module lib.groups
+
+enum GroupSlot:
+    case ready(task.group)
+    case missing
+
+struct GroupBox:
+    group: task.group
+
+func wrap(group: task.group) -> GroupBox:
+    return GroupBox(group: group)
+
+func unwrap(box: GroupBox) -> task.group:
+    return box.group
+
+func slot(group: task.group) -> GroupSlot:
+    return GroupSlot.ready(group)
+
+func pass(slot: GroupSlot) -> GroupSlot:
+    return slot

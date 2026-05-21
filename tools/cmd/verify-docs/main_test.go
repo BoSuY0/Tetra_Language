@@ -241,6 +241,53 @@ func TestVerifyMemoryProductionContractDocsAcceptsRequiredContract(t *testing.T)
 	}
 }
 
+func TestVerifyNetworkingRuntimeBoundaryDocsRejectsIncompleteBoundary(t *testing.T) {
+	dir := t.TempDir()
+	paths := networkingRuntimeBoundaryDocPaths{
+		CurrentSurface: filepath.Join(dir, "current_supported_surface.md"),
+		Stdlib:         filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:    filepath.Join(dir, "standard_library_guide.md"),
+		CoreNet:        filepath.Join(dir, "net.tetra"),
+		CoreNetworking: filepath.Join(dir, "networking.tetra"),
+	}
+	for _, path := range []string{paths.CurrentSurface, paths.Stdlib, paths.StdlibGuide, paths.CoreNet, paths.CoreNetworking} {
+		if err := os.WriteFile(path, []byte("networking docs\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyNetworkingRuntimeBoundaryDocs(paths)
+	if err == nil {
+		t.Fatalf("expected incomplete networking runtime boundary failure")
+	}
+	for _, want := range []string{"current_supported_surface.md", "TechEmpower-compatible web stack", "`lib.core.net`"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected %q in error, got %v", want, err)
+		}
+	}
+}
+
+func TestVerifyNetworkingRuntimeBoundaryDocsAcceptsRequiredBoundary(t *testing.T) {
+	dir := t.TempDir()
+	paths := networkingRuntimeBoundaryDocPaths{
+		CurrentSurface: filepath.Join(dir, "current_supported_surface.md"),
+		Stdlib:         filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:    filepath.Join(dir, "standard_library_guide.md"),
+		CoreNet:        filepath.Join(dir, "net.tetra"),
+		CoreNetworking: filepath.Join(dir, "networking.tetra"),
+	}
+	for _, requirement := range networkingRuntimeBoundaryRequirements(paths) {
+		body := strings.Join(requirement.Required, "\n")
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := verifyNetworkingRuntimeBoundaryDocs(paths); err != nil {
+		t.Fatalf("verifyNetworkingRuntimeBoundaryDocs: %v", err)
+	}
+}
+
 func TestVerifyFeatureRegistryAcceptsRequiredStatuses(t *testing.T) {
 	features := []featureManifest{
 		{ID: "cli.core", Name: "CLI", Status: "current", Since: "v0.2.0", Scope: "core CLI", Stability: "supported", Docs: []string{"docs/spec/current_supported_surface.md"}},

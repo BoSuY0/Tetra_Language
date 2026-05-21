@@ -1,0 +1,39 @@
+// Match pointer-base microservice smoke.
+//
+// The service extracts allocation-base pointers from enum match expressions
+// and performs raw pointer arithmetic only after the match.
+module examples.microservices.compiler_match_ptr_base_service
+
+enum PtrChoice:
+    case primary(ptr)
+    case secondary(ptr)
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let left_cell: ptr = core.ptr_add(left_base, 4, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, 4, memory_cap)
+        let _left_write: Int = core.store_i32(left_cell, 20, memory_cap)
+        let _right_write: Int = core.store_i32(right_cell, 22, memory_cap)
+        let left_choice: PtrChoice = PtrChoice.primary(left_base)
+        let right_choice: PtrChoice = PtrChoice.secondary(right_base)
+        let selected_left: ptr = match left_choice:
+        case PtrChoice.primary(primary_left_base):
+            primary_left_base
+        case PtrChoice.secondary(secondary_left_base):
+            secondary_left_base
+        let selected_right: ptr = match right_choice:
+        case PtrChoice.primary(primary_right_base):
+            primary_right_base
+        case PtrChoice.secondary(secondary_right_base):
+            secondary_right_base
+        let loaded_left: ptr = core.ptr_add(selected_left, 4, memory_cap)
+        let loaded_right: ptr = core.ptr_add(selected_right, 4, memory_cap)
+        let total: Int = core.load_i32(loaded_left, memory_cap) + core.load_i32(loaded_right, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

@@ -1,0 +1,41 @@
+module examples.core_postgres_smoke
+
+import lib.core.postgres as pg
+
+func main() -> Int
+uses alloc, mem:
+    let user: String = "benchmarkdbuser"
+    let database: String = "hello_world"
+    let application: String = "tetra-techempower"
+    let query: String = "SELECT 1"
+
+    var startup: []u8 = core.make_u8(pg.startup_message_len(user, database, application))
+    let startup_written: Int = pg.write_startup_message(startup, user, database, application)
+    if startup_written != pg.startup_message_len(user, database, application):
+        return 1
+    if pg.read_i32_be(startup, 0) != startup_written:
+        return 2
+    if pg.read_i32_be(startup, 4) != pg.protocol_version_3():
+        return 3
+    if startup[8] != 117 || startup[9] != 115 || startup[10] != 101 || startup[11] != 114 || startup[12] != 0:
+        return 4
+
+    var simple: []u8 = core.make_u8(pg.simple_query_frame_len(query))
+    let simple_written: Int = pg.write_simple_query(simple, query)
+    if simple_written != pg.simple_query_frame_len(query):
+        return 5
+    if simple[0] != pg.frame_simple_query():
+        return 6
+    if pg.read_i32_be(simple, 1) != pg.simple_query_payload_len(query):
+        return 7
+
+    var terminate: []u8 = core.make_u8(pg.terminate_frame_len())
+    let terminate_written: Int = pg.write_terminate(terminate)
+    if terminate_written != pg.terminate_frame_len():
+        return 8
+    if terminate[0] != pg.frame_terminate():
+        return 9
+    if pg.read_i32_be(terminate, 1) != 4:
+        return 10
+
+    return 42

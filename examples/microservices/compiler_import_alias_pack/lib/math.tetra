@@ -1,0 +1,7 @@
+module lib.math
+
+func add(a: Int, b: Int) -> Int:
+    return a + b
+
+func scale(value: Int, factor: Int) -> Int:
+    return value * factor

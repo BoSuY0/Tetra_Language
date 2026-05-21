@@ -1,0 +1,27 @@
+// Inventory microservice smoke.
+//
+// Request tag 10 carries the desired item count.
+// Response tag 11 carries 1 when stock is available and 0 otherwise.
+actor Inventory:
+    func run() -> Int
+    uses actors:
+        var request: actor.msg = core.recv_msg()
+        if request.tag != 10:
+            return 10
+        let stock: Int = 7
+        if request.value <= stock:
+            let _sent_ok: Int = core.send_msg(core.sender(), 1, 11)
+            return 0
+        let _sent_empty: Int = core.send_msg(core.sender(), 0, 11)
+        return 0
+
+func main() -> Int
+uses actors:
+    let inventory: actor = core.spawn("Inventory.run")
+    let _sent: Int = core.send_msg(inventory, 4, 10)
+    var reply: actor.msg = core.recv_msg()
+    if reply.tag != 11:
+        return reply.tag
+    if reply.value == 1:
+        return 0
+    return 2

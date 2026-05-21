@@ -1,0 +1,11 @@
+module lib.asyncs
+
+async func add(a: Int, b: Int) -> Int:
+    return a + b
+
+async func score() -> Int:
+    let value: Int = await add(20, 22)
+    return value
+
+func fallback() -> Int:
+    return 42

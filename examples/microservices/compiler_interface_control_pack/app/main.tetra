@@ -1,0 +1,12 @@
+module app.main
+
+import lib.pipeline as pipeline
+
+func main() -> Int:
+    let routed: pipeline.Route = pipeline.Route.forward(20)
+    let left: Int = pipeline.score(routed)
+    let right: Int = pipeline.score(pipeline.Route.forward(22))
+    let total: Int = left + right
+    if total == 42:
+        return 0
+    return total

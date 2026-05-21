@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"tetra_language/compiler/internal/backend/linux_x64"
+	"tetra_language/compiler/internal/backend/linux_x86"
 	"tetra_language/compiler/internal/backend/macos_x64"
 	"tetra_language/compiler/internal/backend/windows_x64"
 	"tetra_language/compiler/internal/format/elf"
@@ -34,9 +35,12 @@ type ModuleRoot = module.ModuleRoot
 type CheckOptions = semantics.CheckOptions
 
 const (
-	RelocCallRel32  = tobj.RelocCallRel32
-	RelocIATDisp32  = tobj.RelocIATDisp32
-	RelocDataDisp32 = tobj.RelocDataDisp32
+	RelocCallRel32      = tobj.RelocCallRel32
+	RelocIATDisp32      = tobj.RelocIATDisp32
+	RelocDataDisp32     = tobj.RelocDataDisp32
+	RelocFuncAddrDisp32 = tobj.RelocFuncAddrDisp32
+	RelocDataAbs32      = tobj.RelocDataAbs32
+	RelocFuncAddrAbs32  = tobj.RelocFuncAddrAbs32
 )
 
 func Parse(src []byte) (*Program, error) {
@@ -106,6 +110,13 @@ func CodegenObjectLinuxX64(funcs []IRFunc) (*Object, error) {
 	return linux_x64.CodegenObjectLinuxX64(funcs)
 }
 
+func CodegenObjectLinuxX86(funcs []IRFunc) (*Object, error) {
+	if err := verifyIRFuncs(funcs); err != nil {
+		return nil, err
+	}
+	return linux_x86.CodegenObjectLinuxX86(funcs)
+}
+
 func CodegenObjectWindowsX64(funcs []IRFunc) (*Object, error) {
 	if err := verifyIRFuncs(funcs); err != nil {
 		return nil, err
@@ -133,6 +144,14 @@ func LinkLinuxX64(objects []*Object, mainName string) (*elf.Image, error) {
 	return linker.LinkLinuxX64(objects, mainName)
 }
 
+func LinkLinuxX32(objects []*Object, mainName string) (*elf.Image, error) {
+	return linker.LinkLinuxX32(objects, mainName)
+}
+
+func LinkLinuxX86(objects []*Object, mainName string) (*elf.Image, error) {
+	return linker.LinkLinuxX86(objects, mainName)
+}
+
 func LinkWindowsX64(objects []*Object, mainName string) (*pe.PEImage, error) {
 	return linker.LinkWindowsX64(objects, mainName)
 }
@@ -143,6 +162,14 @@ func LinkMacOSX64(objects []*Object, mainName string) (*macho.MachOImage, error)
 
 func WriteELF64LinuxX64(path string, img *elf.Image) error {
 	return elf.WriteELF64LinuxX64(path, img)
+}
+
+func WriteELF32LinuxX32(path string, img *elf.Image) error {
+	return elf.WriteELF32LinuxX32(path, img)
+}
+
+func WriteELF32LinuxX86(path string, img *elf.Image) error {
+	return elf.WriteELF32LinuxX86(path, img)
 }
 
 func WritePE64WindowsX64(path string, img *pe.PEImage) error {

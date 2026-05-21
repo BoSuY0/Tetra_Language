@@ -1,0 +1,27 @@
+// Task result enum microservice smoke.
+//
+// The service stores a joined task result in an enum payload and reads the
+// result fields through a match payload binding.
+module examples.microservices.parallel_task_result_enum_service
+
+enum Joined:
+    case done(task.result_i32)
+    case missing
+
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let joined: Joined = Joined.done(result)
+    match joined:
+    case Joined.done(payload):
+        if payload.error != 0:
+            return 10 + payload.error
+        if payload.value == 42:
+            return 0
+        return payload.value
+    case Joined.missing:
+        return 99

@@ -6,12 +6,51 @@ import (
 )
 
 type CodegenOptions struct {
-	IslandsDebug    bool
-	DebugInfo       bool
-	ReleaseOptimize bool
+	IslandsDebug       bool
+	DebugInfo          bool
+	ReleaseOptimize    bool
+	PointerWidthBits   int
+	NativeIntWidthBits int
+	RegisterWidthBits  int
 }
 
 const IslandsDebugPageSize = 4096
+
+func (o CodegenOptions) EffectivePointerWidthBits() int {
+	if o.PointerWidthBits == 0 {
+		return 64
+	}
+	return o.PointerWidthBits
+}
+
+func (o CodegenOptions) PointerWidthBytes() (int32, error) {
+	switch bits := o.EffectivePointerWidthBits(); bits {
+	case 32:
+		return 4, nil
+	case 64:
+		return 8, nil
+	default:
+		return 0, fmt.Errorf("unsupported pointer width %d for x64 codegen", bits)
+	}
+}
+
+func (o CodegenOptions) EffectiveRegisterWidthBits() int {
+	if o.RegisterWidthBits == 0 {
+		return 64
+	}
+	return o.RegisterWidthBits
+}
+
+func (o CodegenOptions) RegisterWidthBytes() (int32, error) {
+	switch bits := o.EffectiveRegisterWidthBits(); bits {
+	case 32:
+		return 4, nil
+	case 64:
+		return 8, nil
+	default:
+		return 0, fmt.Errorf("unsupported register width %d for x64 codegen", bits)
+	}
+}
 
 type Emitter struct {
 	Buf []byte
@@ -159,6 +198,10 @@ func (e *Emitter) MovRaxRsi() {
 
 func (e *Emitter) MovRaxRcx() {
 	e.Emit(0x48, 0x89, 0xC8)
+}
+
+func (e *Emitter) MovRaxR9() {
+	e.Emit(0x4C, 0x89, 0xC8)
 }
 
 func (e *Emitter) MovRaxR15() {
@@ -644,8 +687,68 @@ func (e *Emitter) SubEaxEcx() {
 	e.Emit(0x29, 0xC8)
 }
 
+func (e *Emitter) SubRaxRdi() {
+	e.Emit(0x48, 0x29, 0xF8)
+}
+
+func (e *Emitter) AddR10R8() {
+	e.Emit(0x4D, 0x01, 0xC2)
+}
+
+func (e *Emitter) AddR10dR8d() {
+	e.Emit(0x45, 0x01, 0xC2)
+}
+
+func (e *Emitter) SubR10R8() {
+	e.Emit(0x4D, 0x29, 0xC2)
+}
+
+func (e *Emitter) SubR10dR8d() {
+	e.Emit(0x45, 0x29, 0xC2)
+}
+
+func (e *Emitter) AndR10R8() {
+	e.Emit(0x4D, 0x21, 0xC2)
+}
+
+func (e *Emitter) AndR10dR8d() {
+	e.Emit(0x45, 0x21, 0xC2)
+}
+
+func (e *Emitter) OrR10R8() {
+	e.Emit(0x4D, 0x09, 0xC2)
+}
+
+func (e *Emitter) OrR10dR8d() {
+	e.Emit(0x45, 0x09, 0xC2)
+}
+
+func (e *Emitter) XorR10R8() {
+	e.Emit(0x4D, 0x31, 0xC2)
+}
+
+func (e *Emitter) XorR10dR8d() {
+	e.Emit(0x45, 0x31, 0xC2)
+}
+
 func (e *Emitter) NegEax() {
 	e.Emit(0xF7, 0xD8)
+}
+
+func (e *Emitter) NegR8() {
+	e.Emit(0x49, 0xF7, 0xD8)
+}
+
+func (e *Emitter) NegR8d() {
+	e.Emit(0x41, 0xF7, 0xD8)
+}
+
+func (e *Emitter) NegR8w() {
+	e.Emit(0x66, 0x41, 0xF7, 0xD8)
+}
+
+func (e *Emitter) NegR8b() {
+	e.Emit(0x41, 0xF6, 0xD8)
 }
 
 func (e *Emitter) CmpEaxEcx() {
@@ -708,6 +811,18 @@ func (e *Emitter) MovzxEaxAl() {
 	e.Emit(0x0F, 0xB6, 0xC0)
 }
 
+func (e *Emitter) MovzxEaxAx() {
+	e.Emit(0x0F, 0xB7, 0xC0)
+}
+
+func (e *Emitter) MovzxR8dR8b() {
+	e.Emit(0x45, 0x0F, 0xB6, 0xC0)
+}
+
+func (e *Emitter) MovzxR8dR8w() {
+	e.Emit(0x45, 0x0F, 0xB7, 0xC0)
+}
+
 func (e *Emitter) MovEaxFromRaxPtr() {
 	e.Emit(0x8B, 0x00)
 }
@@ -718,6 +833,14 @@ func (e *Emitter) MovzxEaxBytePtrRax() {
 
 func (e *Emitter) MovzxEaxWordPtrRax() {
 	e.Emit(0x0F, 0xB7, 0x00)
+}
+
+func (e *Emitter) MovzxEaxBytePtrRdi() {
+	e.Emit(0x0F, 0xB6, 0x07)
+}
+
+func (e *Emitter) MovzxEaxWordPtrRdi() {
+	e.Emit(0x0F, 0xB7, 0x07)
 }
 
 func (e *Emitter) MovMem32RaxPtrR8d() {
@@ -791,6 +914,13 @@ func (e *Emitter) SubEaxImm32(v int32) {
 
 func (e *Emitter) AddRaxImm32(v int32) {
 	e.Emit(0x48, 0x05)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(v))
+	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) AndRdiImm32(v int32) {
+	e.Emit(0x48, 0x81, 0xE7)
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], uint32(v))
 	e.Emit(buf[:]...)
@@ -969,6 +1099,74 @@ func (e *Emitter) MovMem32RdiDispR8d(disp int32) {
 	}
 }
 
+func (e *Emitter) XchgMem64RdiPtrR8() {
+	e.Emit(0x4C, 0x87, 0x07)
+}
+
+func (e *Emitter) XchgMem32RdiPtrR8d() {
+	e.Emit(0x44, 0x87, 0x07)
+}
+
+func (e *Emitter) XchgMem16RdiPtrR8w() {
+	e.Emit(0x66, 0x44, 0x87, 0x07)
+}
+
+func (e *Emitter) XchgMem8RdiPtrR8b() {
+	e.Emit(0x44, 0x86, 0x07)
+}
+
+func (e *Emitter) LockCmpxchgMem64RdiPtrR8() {
+	e.Emit(0xF0, 0x4C, 0x0F, 0xB1, 0x07)
+}
+
+func (e *Emitter) LockCmpxchgMem32RdiPtrR8d() {
+	e.Emit(0xF0, 0x44, 0x0F, 0xB1, 0x07)
+}
+
+func (e *Emitter) LockCmpxchgMem16RdiPtrR8w() {
+	e.Emit(0xF0, 0x66, 0x44, 0x0F, 0xB1, 0x07)
+}
+
+func (e *Emitter) LockCmpxchgMem8RdiPtrR8b() {
+	e.Emit(0xF0, 0x44, 0x0F, 0xB0, 0x07)
+}
+
+func (e *Emitter) LockCmpxchgMem64RdiPtrR10() {
+	e.Emit(0xF0, 0x4C, 0x0F, 0xB1, 0x17)
+}
+
+func (e *Emitter) LockCmpxchgMem32RdiPtrR10d() {
+	e.Emit(0xF0, 0x44, 0x0F, 0xB1, 0x17)
+}
+
+func (e *Emitter) LockCmpxchgMem16RdiPtrR10w() {
+	e.Emit(0xF0, 0x66, 0x44, 0x0F, 0xB1, 0x17)
+}
+
+func (e *Emitter) LockCmpxchgMem8RdiPtrR10b() {
+	e.Emit(0xF0, 0x44, 0x0F, 0xB0, 0x17)
+}
+
+func (e *Emitter) LockXaddMem64RdiPtrR8() {
+	e.Emit(0xF0, 0x4C, 0x0F, 0xC1, 0x07)
+}
+
+func (e *Emitter) LockXaddMem32RdiPtrR8d() {
+	e.Emit(0xF0, 0x44, 0x0F, 0xC1, 0x07)
+}
+
+func (e *Emitter) LockXaddMem16RdiPtrR8w() {
+	e.Emit(0xF0, 0x66, 0x44, 0x0F, 0xC1, 0x07)
+}
+
+func (e *Emitter) LockXaddMem8RdiPtrR8b() {
+	e.Emit(0xF0, 0x44, 0x0F, 0xC0, 0x07)
+}
+
+func (e *Emitter) Mfence() {
+	e.Emit(0x0F, 0xAE, 0xF0)
+}
+
 func (e *Emitter) CmpEaxImm32(v int32) {
 	e.Emit(0x3D)
 	var buf [4]byte
@@ -1066,6 +1264,26 @@ func (e *Emitter) MovR9Rdx() {
 
 func (e *Emitter) MovR9Rcx() {
 	e.Emit(0x49, 0x89, 0xC9)
+}
+
+func (e *Emitter) MovR9R8() {
+	e.Emit(0x4D, 0x89, 0xC1)
+}
+
+func (e *Emitter) MovR8dR8d() {
+	e.Emit(0x45, 0x89, 0xC0)
+}
+
+func (e *Emitter) MovR9dR8d() {
+	e.Emit(0x45, 0x89, 0xC1)
+}
+
+func (e *Emitter) MovR10Rax() {
+	e.Emit(0x49, 0x89, 0xC2)
+}
+
+func (e *Emitter) MovR10dEax() {
+	e.Emit(0x41, 0x89, 0xC2)
 }
 
 func (e *Emitter) MovRcxR9() {

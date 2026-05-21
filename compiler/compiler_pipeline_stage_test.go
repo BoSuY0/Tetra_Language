@@ -1,11 +1,13 @@
 package compiler
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/testkit"
 	ctarget "tetra_language/compiler/target"
 )
@@ -70,6 +72,98 @@ func TestPipelineResolveNativeTargetStage(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "unsupported target: unknown-target") {
 		t.Fatalf("unknown target error = %v", err)
 	}
+
+	native, handled, stats, err = resolveExecutableBuildTarget("missing.tetra", "out", "x32", BuildOptions{Jobs: 1})
+	if err != nil {
+		t.Fatalf("resolve x32 executable target: %v", err)
+	}
+	if handled {
+		t.Fatalf("x32 executable build should continue through native pipeline")
+	}
+	if stats != nil {
+		t.Fatalf("x32 native resolve should not produce stats before pipeline execution")
+	}
+	if native.triple != "linux-x32" || native.codegen == nil {
+		t.Fatalf("x32 native target = %#v, want linux-x32 with codegen", native)
+	}
+	if native.backend.name != "linux-x32" || native.backend.link == nil || native.backend.actorRuntime != nil {
+		t.Fatalf("x32 backend = %#v, want linker/codegen without runtime", native.backend)
+	}
+
+	native, handled, stats, err = resolveExecutableBuildTarget("missing.tetra", "out", "x86", BuildOptions{Jobs: 1})
+	if err != nil {
+		t.Fatalf("resolve x86 executable target: %v", err)
+	}
+	if handled {
+		t.Fatalf("x86 executable build should continue through native pipeline")
+	}
+	if stats != nil {
+		t.Fatalf("x86 native resolve should not produce stats before pipeline execution")
+	}
+	if native.triple != "linux-x86" || native.codegen == nil {
+		t.Fatalf("x86 native target = %#v, want linux-x86 with codegen", native)
+	}
+	if native.backend.name != "linux-x86" || native.backend.link == nil || native.backend.actorRuntime != nil {
+		t.Fatalf("x86 backend = %#v, want linker/codegen without runtime", native.backend)
+	}
+}
+
+func TestNativeCodegenOptionsInheritTargetWidths(t *testing.T) {
+	for _, tc := range []struct {
+		target        string
+		pointerWidth  int
+		nativeWidth   int
+		registerWidth int
+	}{
+		{"linux-x64", 64, 64, 64},
+		{"windows-x64", 64, 64, 64},
+		{"x32", 32, 32, 64},
+		{"x86", 32, 32, 32},
+	} {
+		tgt, err := ctarget.Parse(tc.target)
+		if err != nil {
+			t.Fatalf("parse %s: %v", tc.target, err)
+		}
+		got := nativeCodegenOptionsForTarget(tgt, BuildOptions{IslandsDebug: true, DebugInfo: true, ReleaseOptimize: true})
+		if got.PointerWidthBits != tc.pointerWidth || got.NativeIntWidthBits != tc.nativeWidth || got.RegisterWidthBits != tc.registerWidth {
+			t.Fatalf("%s codegen widths ptr=%d native=%d reg=%d, want ptr=%d native=%d reg=%d",
+				tc.target, got.PointerWidthBits, got.NativeIntWidthBits, got.RegisterWidthBits, tc.pointerWidth, tc.nativeWidth, tc.registerWidth)
+		}
+		if !got.IslandsDebug || !got.DebugInfo || !got.ReleaseOptimize {
+			t.Fatalf("%s codegen flags not preserved: %#v", tc.target, got)
+		}
+	}
+}
+
+func TestNativeX86CodegenHonorsIslandsDebugOption(t *testing.T) {
+	tgt, err := ctarget.Parse("x86")
+	if err != nil {
+		t.Fatalf("parse x86: %v", err)
+	}
+	codegen, err := nativeCodegenForTarget(tgt, BuildOptions{IslandsDebug: true})
+	if err != nil {
+		t.Fatalf("native codegen: %v", err)
+	}
+	obj, err := codegen([]IRFunc{{
+		Name:        "main",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}, nil)
+	if err != nil {
+		t.Fatalf("x86 native codegen: %v", err)
+	}
+	if !bytes.Contains(obj.Code, []byte{0xC7, 0x00, 0x00, 0x10, 0x00, 0x00}) {
+		t.Fatalf("x86 native codegen ignored IslandsDebug header:\n% x", obj.Code)
+	}
+	if !bytes.Contains(obj.Code, []byte{0xB8, 0x7D, 0x00, 0x00, 0x00, 0xCD, 0x80}) {
+		t.Fatalf("x86 native codegen ignored IslandsDebug free protect path:\n% x", obj.Code)
+	}
 }
 
 func TestBuildTagFromOptionsIncludesLinkedObjectContentDeterministically(t *testing.T) {
@@ -111,7 +205,7 @@ func TestPipelineLoadCheckedBuildWorldRequireMainStage(t *testing.T) {
 	})
 	entry := filepath.Join(tmp, filepath.FromSlash("math/core.t4"))
 
-	build, err := loadCheckedBuildWorld(entry, BuildOptions{Jobs: 1}, false)
+	build, err := loadCheckedBuildWorld(entry, BuildOptions{Jobs: 1}, false, "linux-x64")
 	if err != nil {
 		t.Fatalf("load checked world without main requirement: %v", err)
 	}
@@ -122,7 +216,7 @@ func TestPipelineLoadCheckedBuildWorldRequireMainStage(t *testing.T) {
 		t.Fatalf("world modules = %#v, want math.core", build.world.ByModule)
 	}
 
-	_, err = loadCheckedBuildWorld(entry, BuildOptions{Jobs: 1}, true)
+	_, err = loadCheckedBuildWorld(entry, BuildOptions{Jobs: 1}, true, "linux-x64")
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "main") {
 		t.Fatalf("require-main error = %v", err)
 	}
@@ -136,7 +230,7 @@ func TestPipelineNativeModulePlanInvalidatesWhenLinkedObjectContentChanges(t *te
 	entry := filepath.Join(tmp, filepath.FromSlash("app/main.t4"))
 	opt := BuildOptions{Jobs: 1}
 
-	build, err := loadCheckedBuildWorld(entry, opt, true)
+	build, err := loadCheckedBuildWorld(entry, opt, true, "linux-x64")
 	if err != nil {
 		t.Fatalf("load checked world: %v", err)
 	}
@@ -196,7 +290,7 @@ func TestPipelineNativeModulePlanCacheStages(t *testing.T) {
 	entry := filepath.Join(tmp, filepath.FromSlash("app/game.t4"))
 	opt := BuildOptions{Jobs: 1}
 
-	build, err := loadCheckedBuildWorld(entry, opt, true)
+	build, err := loadCheckedBuildWorld(entry, opt, true, "linux-x64")
 	if err != nil {
 		t.Fatalf("load checked world: %v", err)
 	}

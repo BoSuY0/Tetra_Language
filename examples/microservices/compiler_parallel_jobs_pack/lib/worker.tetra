@@ -1,0 +1,4 @@
+module lib.worker
+
+func task_worker() -> Int:
+    return 22

@@ -1,0 +1,20 @@
+module app.main
+
+import lib.results as results
+
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let joined: task.result_i32 = core.task_join_result_i32(task)
+    let plain: task.result_i32 = results.pass_plain(joined)
+    let boxed: results.Box<task.result_i32> = results.pass_result(results.Box<task.result_i32>(value: plain))
+    let selected: task.result_i32 = boxed.value
+    let same: task.result_i32 = results.id(selected)
+    if same.error != 0:
+        return 10 + same.error
+    if same.value == 42:
+        return 0
+    return same.value

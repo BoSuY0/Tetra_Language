@@ -1,0 +1,39 @@
+// Actor timer task-matrix microservice smoke.
+//
+// An actor combines timer readiness, task polling, and final task join before
+// replying through a tagged mailbox.
+actor TimerBridge:
+    func run() -> Int
+    uses actors, runtime:
+        let request: actor.msg = core.recv_msg()
+        let reply_to: actor = core.sender()
+        let ready: Bool = core.timer_ready(core.deadline_ms(0))
+        let task: task.i32 = core.task_spawn_i32("timer_matrix_worker")
+        let early: task.result_i32 = core.task_poll_i32(task)
+        if early.error != 2:
+            let _early_reply: Int = core.send_msg(reply_to, early.error, 80)
+            return 0
+        let result: Int = core.task_join_i32(task)
+        if ready:
+            let _reply: Int = core.send_msg(reply_to, request.value + result, request.tag + 1)
+            return 0
+        let _bad: Int = core.send_msg(reply_to, 90, 90)
+        return 0
+
+func timer_matrix_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 22
+
+func main() -> Int
+uses actors, runtime:
+    let bridge: actor = core.spawn("TimerBridge.run")
+    let _sent: Int = core.send_msg(bridge, 20, 4)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(10))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 5:
+        return 20 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

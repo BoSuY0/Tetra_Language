@@ -13,6 +13,12 @@ examples/.tetra_cache/
 # Local agent/orchestration state
 .orchestrator/
 
+# Local release/security evidence
+/security-review.md
+
+# Graphify generated cache; graph/report artifacts stay tracked explicitly.
+graphify-out/cache/
+
 # Build outputs
 dumps/
 bin/

@@ -1,0 +1,25 @@
+module app.main
+
+import lib.regions as regions
+
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe:
+        let first_region: island = core.island_new(128)
+        let first_box: regions.Box<island> = regions.Box<island>(value: first_region)
+        let boxed: regions.Box<island> = regions.pass_region(first_box)
+        var left: []u8 = core.island_make_u8(boxed.value, 2)
+        left[0] = 19
+        left[1] = 1
+        let second_region: island = core.island_new(128)
+        let returned: island = regions.alias_region(second_region)
+        var right: []u8 = core.island_make_u8(returned, 2)
+        right[0] = 23
+        right[1] = 2
+        let total: Int = left[0] + right[0]
+        free(boxed.value)
+        free(returned)
+        if total == 42:
+            return 0
+        return total
+    return 99

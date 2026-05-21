@@ -1,0 +1,4 @@
+module lib.pipe
+
+func keep<T>(value: T) -> T:
+    return value

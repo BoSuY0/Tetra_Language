@@ -1,0 +1,20 @@
+// Memory negative guard microservice smoke.
+//
+// The service treats rejected negative memory helper lengths as the expected
+// defensive path for invalid input.
+module examples.microservices.memory_negative_guard_service
+
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let src: ptr = core.alloc_bytes(4)
+        let dst: ptr = core.alloc_bytes(4)
+        let memset_status: Int = memory.memset_u8(dst, 0, 0 - 1, memory_cap)
+        let memcpy_status: Int = memory.memcpy_u8(dst, src, 0 - 1, memory_cap)
+        if memset_status == 2 && memcpy_status == 2:
+            return 0
+        return memset_status + memcpy_status
+    return 95

@@ -1,0 +1,16 @@
+module lib.routes
+
+enum Packet:
+    case ready(Int)
+    case empty
+
+func maybe(value: Int) -> Int?:
+    return value
+
+func score(packet: Packet) -> Int:
+    let result: Int = match packet:
+    case Packet.ready(packet_value):
+        packet_value
+    case Packet.empty:
+        0
+    return result

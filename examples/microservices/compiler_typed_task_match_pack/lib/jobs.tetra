@@ -1,0 +1,11 @@
+module lib.jobs
+
+enum MatchErr:
+    case stopped
+    case wide(Int, Int, Int, Int, Int)
+
+func worker() -> Int throws MatchErr:
+    throw MatchErr.wide(1, 2, 3, 4, 10)
+
+func group_worker() -> Int throws MatchErr:
+    throw MatchErr.wide(1, 2, 3, 4, 12)

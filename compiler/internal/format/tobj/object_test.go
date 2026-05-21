@@ -29,6 +29,9 @@ func TestObjectRoundTripPreservesV4MetadataSymbolsAndRelocs(t *testing.T) {
 			{Kind: RelocCallRel32, At: 1, Name: "helper"},
 			{Kind: RelocDataDisp32, At: 4, Addend: 7},
 			{Kind: RelocIATDisp32, At: 8, Name: "kernel32.WriteFile"},
+			{Kind: RelocFuncAddrDisp32, At: 0, Name: "helper"},
+			{Kind: RelocDataAbs32, At: 2, Addend: 4},
+			{Kind: RelocFuncAddrAbs32, At: 6, Name: "main"},
 		},
 	}
 
@@ -128,6 +131,28 @@ func TestWriteObjectRejectsMalformedSymbolAndRelocNames(t *testing.T) {
 			want: "IAT relocation with empty symbol name",
 		},
 		{
+			name: "empty_function_address_relocation_name",
+			obj: &Object{
+				Target:  "linux-x64",
+				Module:  "app.main",
+				Code:    []byte{0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xC3},
+				Symbols: []Symbol{{Name: "main", Offset: 0}},
+				Relocs:  []Reloc{{Kind: RelocFuncAddrDisp32, At: 3, Name: ""}},
+			},
+			want: "function address relocation with empty symbol name",
+		},
+		{
+			name: "empty_absolute_function_address_relocation_name",
+			obj: &Object{
+				Target:  "linux-x86",
+				Module:  "app.main",
+				Code:    []byte{0xB8, 0, 0, 0, 0, 0xC3},
+				Symbols: []Symbol{{Name: "main", Offset: 0}},
+				Relocs:  []Reloc{{Kind: RelocFuncAddrAbs32, At: 1, Name: ""}},
+			},
+			want: "function address relocation with empty symbol name",
+		},
+		{
 			name: "unsupported_relocation_kind",
 			obj: &Object{
 				Target:  "linux-x64",
@@ -184,6 +209,16 @@ func TestWriteObjectRejectsNonDataRelocationAddends(t *testing.T) {
 			name:  "iat_relocation_addend",
 			reloc: Reloc{Kind: RelocIATDisp32, At: 2, Name: "kernel32.ExitProcess", Addend: 7},
 			want:  "IAT relocation addend must be zero",
+		},
+		{
+			name:  "function_address_relocation_addend",
+			reloc: Reloc{Kind: RelocFuncAddrDisp32, At: 1, Name: "main", Addend: 7},
+			want:  "function address relocation addend must be zero",
+		},
+		{
+			name:  "absolute_function_address_relocation_addend",
+			reloc: Reloc{Kind: RelocFuncAddrAbs32, At: 1, Name: "main", Addend: 7},
+			want:  "function address relocation addend must be zero",
 		},
 	}
 
@@ -245,6 +280,17 @@ func TestWriteObjectRejectsMalformedSymbolAndRelocRanges(t *testing.T) {
 				Code:    []byte{0xFF, 0x15, 0, 0},
 				Symbols: []Symbol{{Name: "main", Offset: 0}},
 				Relocs:  []Reloc{{Kind: RelocIATDisp32, At: 1, Name: "kernel32.ExitProcess"}},
+			},
+			want: "relocation offset out of range",
+		},
+		{
+			name: "function_address_relocation_offset_out_of_range",
+			obj: &Object{
+				Target:  "linux-x64",
+				Module:  "app.main",
+				Code:    []byte{0x48, 0x8D, 0x05, 0, 0, 0},
+				Symbols: []Symbol{{Name: "main", Offset: 0}},
+				Relocs:  []Reloc{{Kind: RelocFuncAddrDisp32, At: 3, Name: "main"}},
 			},
 			want: "relocation offset out of range",
 		},
@@ -393,6 +439,18 @@ func TestReadObjectRejectsMalformedSymbolAndRelocRanges(t *testing.T) {
 			want: "relocation offset out of range",
 		},
 		{
+			name: "function_address_relocation_offset_out_of_range",
+			raw: func(t *testing.T) []byte {
+				var raw bytes.Buffer
+				writeObjectHeaderForTest(t, &raw)
+				writeObjectPayloadForTest(t, &raw, []byte{0x48, 0x8D, 0x05, 0, 0, 0}, nil)
+				writeSymbolRecordForTest(t, &raw, "main", 0)
+				writeRelocRecordForTest(t, &raw, RelocFuncAddrDisp32, 3, "main", 0)
+				return raw.Bytes()
+			},
+			want: "relocation offset out of range",
+		},
+		{
 			name: "data_relocation_offset_out_of_range",
 			raw: func(t *testing.T) []byte {
 				var raw bytes.Buffer
@@ -486,6 +544,30 @@ func TestReadObjectRejectsMalformedSymbolAndRelocNames(t *testing.T) {
 			want: "IAT relocation with empty symbol name",
 		},
 		{
+			name: "empty_function_address_relocation_name",
+			raw: func(t *testing.T) []byte {
+				var raw bytes.Buffer
+				writeObjectHeaderForTest(t, &raw)
+				writeObjectPayloadForTest(t, &raw, []byte{0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xC3}, nil)
+				writeSymbolRecordForTest(t, &raw, "main", 0)
+				writeRelocRecordForTest(t, &raw, RelocFuncAddrDisp32, 3, "", 0)
+				return raw.Bytes()
+			},
+			want: "function address relocation with empty symbol name",
+		},
+		{
+			name: "empty_absolute_function_address_relocation_name",
+			raw: func(t *testing.T) []byte {
+				var raw bytes.Buffer
+				writeObjectHeaderForTest(t, &raw)
+				writeObjectPayloadForTest(t, &raw, []byte{0xB8, 0, 0, 0, 0, 0xC3}, nil)
+				writeSymbolRecordForTest(t, &raw, "main", 0)
+				writeRelocRecordForTest(t, &raw, RelocFuncAddrAbs32, 1, "", 0)
+				return raw.Bytes()
+			},
+			want: "function address relocation with empty symbol name",
+		},
+		{
 			name: "unsupported_relocation_kind",
 			raw: func(t *testing.T) []byte {
 				var raw bytes.Buffer
@@ -545,6 +627,20 @@ func TestReadObjectRejectsNonDataRelocationAddends(t *testing.T) {
 			at:   2,
 			sym:  "kernel32.ExitProcess",
 			want: "IAT relocation addend must be zero",
+		},
+		{
+			name: "function_address_relocation_addend",
+			kind: RelocFuncAddrDisp32,
+			at:   1,
+			sym:  "main",
+			want: "function address relocation addend must be zero",
+		},
+		{
+			name: "absolute_function_address_relocation_addend",
+			kind: RelocFuncAddrAbs32,
+			at:   1,
+			sym:  "main",
+			want: "function address relocation addend must be zero",
 		},
 	}
 

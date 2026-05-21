@@ -1,0 +1,22 @@
+// rustc-perf-inspired frontend mix with generics, calls, and branches.
+module examples.benchmarks.rustc_perf_frontend_mix
+
+func id<T>(value: T) -> T:
+    return value
+
+func branch(value: Int) -> Int:
+    if value < 10:
+        return value * 3
+    if value < 20:
+        return value * 2
+    return value + 7
+
+func main() -> Int:
+    var i: Int = 0
+    var total: Int = 0
+    while i < 48:
+        total = total + branch(id(i))
+        i = i + 1
+    if total == 1559:
+        return 0
+    return total

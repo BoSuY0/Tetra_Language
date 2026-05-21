@@ -1,0 +1,30 @@
+// Optional task enum-join microservice smoke.
+//
+// The service carries a task handle through an enum payload wrapped in an
+// optional and joins the matched handle.
+module examples.microservices.parallel_task_optional_enum_join_service
+
+enum TaskSlot:
+    case ready(task.i32)
+    case missing
+
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let slot: TaskSlot = TaskSlot.ready(task)
+    let maybe: TaskSlot? = slot
+    if let unwrapped = maybe:
+        match unwrapped:
+        case TaskSlot.ready(handle):
+            let result: task.result_i32 = core.task_join_result_i32(handle)
+            if result.error != 0:
+                return 10 + result.error
+            if result.value == 42:
+                return 0
+            return result.value
+        case TaskSlot.missing:
+            return 98
+    return 99

@@ -143,6 +143,9 @@ func main() {
 	if err := verifyWASMBackendPlan("docs/backend/wasm_backend_plan.md", ctarget.WASMTriples()); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifyNetworkingRuntimeBoundaryDocs(defaultNetworkingRuntimeBoundaryDocPaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
 	if err := verifyMemoryProductionContractDocs(defaultMemoryProductionContractDocPaths()); err != nil {
 		errs = append(errs, err.Error())
 	}
@@ -332,6 +335,180 @@ func verifyMemoryProductionContractDocs(paths memoryProductionContractDocPaths) 
 		for _, want := range requirement.Required {
 			if !strings.Contains(text, want) {
 				errs = append(errs, fmt.Sprintf("%s: missing %q for %s memory production contract", requirement.Path, want, requirement.Name))
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+type networkingRuntimeBoundaryDocPaths struct {
+	CurrentSurface string
+	Stdlib         string
+	StdlibGuide    string
+	CoreNet        string
+	CoreNetworking string
+}
+
+type networkingRuntimeBoundaryRequirement struct {
+	Name     string
+	Path     string
+	Required []string
+}
+
+func defaultNetworkingRuntimeBoundaryDocPaths() networkingRuntimeBoundaryDocPaths {
+	return networkingRuntimeBoundaryDocPaths{
+		CurrentSurface: filepath.FromSlash("docs/spec/current_supported_surface.md"),
+		Stdlib:         filepath.FromSlash("docs/spec/stdlib.md"),
+		StdlibGuide:    filepath.FromSlash("docs/user/standard_library_guide.md"),
+		CoreNet:        filepath.FromSlash("lib/core/net.tetra"),
+		CoreNetworking: filepath.FromSlash("lib/core/networking.tetra"),
+	}
+}
+
+func networkingRuntimeBoundaryRequirements(paths networkingRuntimeBoundaryDocPaths) []networkingRuntimeBoundaryRequirement {
+	return []networkingRuntimeBoundaryRequirement{
+		{
+			Name: "current supported surface",
+			Path: paths.CurrentSurface,
+			Required: []string{
+				"TechEmpower-compatible web stack",
+				"no production HTTP server, full HTTP header/body",
+				"parser, full event-loop abstraction, io_uring path, per-core worker runtime",
+				"`lib.core.net` now provides executable linux-x64 TCP socket",
+				"open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close helpers",
+				"`SO_REUSEPORT` and `TCP_NODELAY` helpers",
+				"plus epoll",
+				"create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one",
+				"wait-one-into readiness flag helpers",
+				"`SOCK_NONBLOCK`/`SOCK_CLOEXEC`",
+				"`EPOLLIN`/`EPOLLOUT`/`EPOLLERR`/`EPOLLHUP` predicates",
+				"`lib.core.http` now provides",
+				"executable HTTP/1.1 String and byte-buffer",
+				"request-line routing, byte-buffer request-head framing",
+				"response byte-buffer helpers",
+				"`lib.core.json` provides executable JSON",
+				"`lib.core.postgres`",
+				"wire-frame byte-buffer helpers",
+				"Parse/Bind/Describe/Execute/Sync",
+				"RowDescription/DataRow/CommandComplete/ReadyForQuery",
+				"`lib.core.net` event-loop/socket-option expansion",
+			},
+		},
+		{
+			Name: "core net module",
+			Path: paths.CoreNet,
+			Required: []string{
+				"Stable core Linux TCP networking helpers",
+				"Runtime boundary: real linux-x64 TCP socket client/server helpers",
+				"socket/bind/connect/listen/accept4/read/recv/write/send/epoll/fcntl/setsockopt/close syscalls",
+				"event-loop abstractions",
+				"outside this current surface",
+			},
+		},
+		{
+			Name: "stdlib spec",
+			Path: paths.Stdlib,
+			Required: []string{
+				"`lib.core.net`",
+				"`lib.core.net` is a stable capability-bound Linux TCP socket client/server I/O slice",
+				"open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close",
+				"`SO_REUSEPORT` and `TCP_NODELAY` helpers",
+				"plus epoll",
+				"create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one",
+				"wait-one-into readiness flag helpers",
+				"`SOCK_NONBLOCK`/`SOCK_CLOEXEC`",
+				"`EPOLLIN`/`EPOLLOUT`/`EPOLLERR`/`EPOLLHUP` predicates",
+				"Full event-loop abstractions",
+				"`lib.core.networking` Runtime Boundary",
+				"`lib.core.networking` remains endpoint policy only",
+				"`lib.core.http`",
+				"`lib.core.json`",
+				"`lib.core.postgres`",
+				"PostgreSQL wire-frame helper module",
+				"`func write_simple_query(dst: inout []u8, query: String) -> Int`",
+				"`func write_parse(dst: inout []u8, statement: String, query: String, param_type_oids: []i32) -> Int`",
+				"`func write_bind_text_2(dst: inout []u8, portal: String, statement: String, value0: String, value1: String) -> Int`",
+				"`func data_row_i32_at(payload: []u8, start: Int, column_index: Int) -> Int`",
+				"`func command_complete_affected_rows(payload: []u8, start: Int, payload_len: Int) -> Int`",
+				"HTTP/1.1 String and byte-buffer request-line routing, byte-buffer request-head framing, and response byte-buffer serialization helpers live in `lib.core.http`",
+				"`func route_tech_empower_bytes(request: []u8, request_len: Int) -> Int`",
+				"`func request_head_len_bytes(request: []u8, request_len: Int) -> Int`",
+				"not an alias for sockets",
+				"does not open sockets",
+			},
+		},
+		{
+			Name: "stdlib guide",
+			Path: paths.StdlibGuide,
+			Required: []string{
+				"Linux TCP socket client/server I/O helpers",
+				"`net.socket_tcp4(io_cap)`",
+				"`net.connect_tcp4_loopback(fd, port, io_cap)`",
+				"`net.read(fd, buffer, start, count, io_cap)`",
+				"`net.recv(fd, buffer, start, count, io_cap)`",
+				"`net.send(fd, buffer, start, count, io_cap)`",
+				"`net.accept_nonblocking(fd, io_cap)`",
+				"`net.set_reuseport(fd, io_cap)`",
+				"`net.set_tcp_nodelay(fd, io_cap)`",
+				"`net.epoll_ctl_add_read_write(epfd, fd, io_cap)`",
+				"`net.epoll_ctl_mod_read(epfd, fd, io_cap)`",
+				"`net.epoll_ctl_mod_read_write(epfd, fd, io_cap)`",
+				"`net.epoll_ctl_delete(epfd, fd, io_cap)`",
+				"`net.epoll_wait_one(epfd, timeout_ms, io_cap)`",
+				"`net.epoll_wait_one_into(epfd, event, timeout_ms, io_cap)`",
+				"`net.epoll_event_readable(flags)`",
+				"`net.epoll_event_hung_up(flags)`",
+				"`lib.core.net` is a stable linux-x64 TCP socket client/server I/O slice",
+				"Networking Runtime Boundary",
+				"`lib.core.networking` remains endpoint policy only",
+				"`lib.core.net`",
+				"`lib.core.http`",
+				"`lib.core.json`",
+				"`lib.core.postgres`",
+				"PostgreSQL wire-frame byte-buffer helpers",
+				"`lib.core.postgres` is a stable executable helper surface",
+				"extended-query Parse/Bind/Describe/Execute/Sync",
+				"RowDescription/DataRow/CommandComplete/ReadyForQuery",
+				"HTTP String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers",
+				"`http.route_tech_empower_bytes(buffer, length)`",
+				"`http.request_head_len_bytes(buffer, length)`",
+				"TechEmpower-compatible web stack",
+			},
+		},
+		{
+			Name: "core networking module",
+			Path: paths.CoreNetworking,
+			Required: []string{
+				"Runtime boundary: endpoint policy only",
+				"does not perform socket, TCP, DNS, HTTP request, PostgreSQL, or database I/O",
+				"Real socket open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close helpers",
+				"SO_REUSEPORT/TCP_NODELAY helpers",
+				"epoll add/mod/delete plus wait-one",
+				"fd/readiness flag capture and predicates live in",
+				"`lib.core.net`",
+				"`lib.core.http`",
+				"`lib.core.json`",
+				"`lib.core.postgres`",
+			},
+		},
+	}
+}
+
+func verifyNetworkingRuntimeBoundaryDocs(paths networkingRuntimeBoundaryDocPaths) error {
+	var errs []string
+	for _, requirement := range networkingRuntimeBoundaryRequirements(paths) {
+		raw, err := os.ReadFile(requirement.Path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", requirement.Path, err))
+			continue
+		}
+		text := string(raw)
+		for _, want := range requirement.Required {
+			if !strings.Contains(text, want) {
+				errs = append(errs, fmt.Sprintf("%s: missing %q for %s networking runtime boundary", requirement.Path, want, requirement.Name))
 			}
 		}
 	}

@@ -42,7 +42,27 @@ type genericProtocolInfo struct {
 	public bool
 }
 
+func monomorphizeFuncDeclFullName(module string, fn *frontend.FuncDecl) string {
+	if fn != nil && fn.ExtensionOf != "" {
+		return fn.Name
+	}
+	if fn == nil {
+		return qualifyName(module, "")
+	}
+	return qualifyName(module, fn.Name)
+}
+
+func genericInstanceFullName(generic genericDef, name string) string {
+	if generic.decl != nil && generic.decl.ExtensionOf != "" {
+		return name
+	}
+	return qualifyName(generic.module, name)
+}
+
 func monomorphizeGenerics(world *module.World) error {
+	if err := normalizeExtensionMethodNames(world); err != nil {
+		return err
+	}
 	fileImports := make(map[*frontend.FileAST]map[string]string, len(world.Files))
 	generics := map[string]genericDef{}
 	for _, file := range world.Files {
@@ -53,7 +73,7 @@ func monomorphizeGenerics(world *module.World) error {
 		fileImports[file] = imports
 		for _, fn := range file.Funcs {
 			if len(fn.TypeParams) > 0 {
-				fullName := qualifyName(file.Module, fn.Name)
+				fullName := monomorphizeFuncDeclFullName(file.Module, fn)
 				generics[fullName] = genericDef{
 					module:  file.Module,
 					file:    file,
@@ -101,7 +121,12 @@ func monomorphizeGenerics(world *module.World) error {
 			}
 		}
 		for _, fn := range file.Funcs {
-			funcDecls[qualifyName(file.Module, fn.Name)] = fn
+			funcDecls[monomorphizeFuncDeclFullName(file.Module, fn)] = fn
+		}
+	}
+	if structCtx != nil {
+		for name, st := range structCtx.created {
+			structDecls[name] = st
 		}
 	}
 	created := map[string]*frontend.FuncDecl{}
@@ -150,9 +175,11 @@ func monomorphizeGenerics(world *module.World) error {
 			names = append(names, name)
 		}
 		sort.Strings(names)
+		generated := make([]*frontend.FuncDecl, 0, len(names))
 		for _, name := range names {
-			file.Funcs = append(file.Funcs, perFile[name])
+			generated = append(generated, perFile[name])
 		}
+		file.Funcs = append(generated, file.Funcs...)
 	}
 	if structCtx != nil {
 		structCtx.finalize(world)
@@ -298,6 +325,15 @@ func (ctx *genericStructContext) rewriteWorld(world *module.World) error {
 			for i := range st.Fields {
 				if err := ctx.rewriteTypeRef(&st.Fields[i].Type, file.Module, imports); err != nil {
 					return err
+				}
+			}
+		}
+		for _, enum := range file.Enums {
+			for i := range enum.Cases {
+				for j := range enum.Cases[i].Payload {
+					if err := ctx.rewriteTypeRef(&enum.Cases[i].Payload[j], file.Module, imports); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -1038,7 +1074,7 @@ func monomorphizeGenericClosureLiteralValue(
 		return nil, false, err
 	}
 	name := mangleGenericName(generic.decl.Name, generic.decl.TypeParams, subst)
-	fullName := qualifyName(generic.module, name)
+	fullName := genericInstanceFullName(generic, name)
 	clone, exists := created[fullName]
 	if !exists {
 		clone = cloneGenericFunc(generic.decl, name, subst)
@@ -1144,7 +1180,7 @@ func monomorphizeGenericFunctionValue(
 		return "", false, err
 	}
 	name := mangleGenericName(generic.decl.Name, generic.decl.TypeParams, subst)
-	fullName := qualifyName(generic.module, name)
+	fullName := genericInstanceFullName(generic, name)
 	if _, exists := created[fullName]; !exists {
 		clone := cloneGenericFunc(generic.decl, name, subst)
 		cloneImports := fileImports[generic.file]
@@ -1207,6 +1243,63 @@ func monomorphizeFunctionTypedCallArgs(
 		}
 	}
 	return nil
+}
+
+func resolveMonomorphizeCallName(
+	name string,
+	module string,
+	imports map[string]string,
+	funcDecls map[string]*frontend.FuncDecl,
+	generics map[string]genericDef,
+	pos frontend.Position,
+) (string, error) {
+	if _, ok := funcDecls[name]; ok {
+		return name, nil
+	}
+	if _, ok := generics[name]; ok {
+		return name, nil
+	}
+	resolved, err := resolveCallName(name, module, imports, pos)
+	if err != nil {
+		return "", err
+	}
+	if _, ok := funcDecls[resolved]; ok {
+		return resolved, nil
+	}
+	if _, ok := generics[resolved]; ok {
+		return resolved, nil
+	}
+	if module != "" && strings.Contains(name, ".") {
+		moduleLocal := qualifyName(module, name)
+		if _, ok := funcDecls[moduleLocal]; ok {
+			return moduleLocal, nil
+		}
+		if _, ok := generics[moduleLocal]; ok {
+			return moduleLocal, nil
+		}
+	}
+	return resolved, nil
+}
+
+func monomorphizeConcreteReturnType(callee *frontend.FuncDecl, resolvedName string, module string, imports map[string]string) (string, error) {
+	if callee == nil {
+		return "", nil
+	}
+	calleeModule := module
+	if callee.Name != "" {
+		suffix := "." + callee.Name
+		if resolvedName == callee.Name {
+			calleeModule = ""
+		} else if strings.HasSuffix(resolvedName, suffix) {
+			calleeModule = strings.TrimSuffix(resolvedName, suffix)
+		}
+	}
+	ret := substituteTypeRef(callee.ReturnType, nil)
+	resolved, err := resolveTypeName(&ret, calleeModule, imports)
+	if err != nil {
+		return "", err
+	}
+	return resolved, nil
 }
 
 func monomorphizeFunctionTypedEnumPayloadArgs(
@@ -1307,6 +1400,29 @@ func functionTypeForFieldAssignmentTarget(expr frontend.Expr, env map[string]str
 	return functionTypeForFieldAssignmentTargetFrom(expr, "", env, structDecls)
 }
 
+func functionTypeRefFromFuncDecl(fn *frontend.FuncDecl) frontend.TypeRef {
+	params := make([]frontend.TypeRef, 0, len(fn.Params))
+	paramOwnership := make([]string, 0, len(fn.Params))
+	for _, param := range fn.Params {
+		params = append(params, param.Type)
+		paramOwnership = append(paramOwnership, param.Ownership)
+	}
+	ret := fn.ReturnType
+	out := frontend.TypeRef{
+		At:             fn.Pos,
+		Kind:           frontend.TypeRefFunction,
+		Params:         params,
+		ParamOwnership: paramOwnership,
+		Return:         &ret,
+		Uses:           append([]string(nil), fn.Uses...),
+	}
+	if fn.HasThrows {
+		throws := fn.Throws
+		out.Throws = &throws
+	}
+	return out
+}
+
 func functionTypeForFieldAssignmentTargetFrom(expr frontend.Expr, path string, env map[string]string, structDecls map[string]*frontend.StructDecl) (frontend.TypeRef, string, bool) {
 	switch target := expr.(type) {
 	case *frontend.IdentExpr:
@@ -1390,10 +1506,24 @@ func monomorphizeExpr(
 		if tname, ok := env[e.Name]; ok {
 			return tname, nil
 		}
+		resolved, err := resolveMonomorphizeCallName(e.Name, module, imports, funcDecls, generics, e.At)
+		if err == nil {
+			if fn, ok := funcDecls[resolved]; ok && len(fn.TypeParams) == 0 {
+				return genericTypeName(functionTypeRefFromFuncDecl(fn)), nil
+			}
+		}
 		return "", nil
 	case *frontend.FieldAccessExpr:
-		if _, err := monomorphizeExpr(e.Base, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
+		baseType, err := monomorphizeExpr(e.Base, env, funcDecls, structDecls, enumDecls, generics, created, createdByFile, work, fileImports, module, imports, structCtx)
+		if err != nil {
 			return "", err
+		}
+		if decl, ok := structDecls[baseType]; ok {
+			for _, field := range decl.Fields {
+				if field.Name == e.Field {
+					return genericTypeName(qualifyFieldAssignmentPathType(field.Type, baseType)), nil
+				}
+			}
 		}
 		return "", nil
 	case *frontend.IndexExpr:
@@ -1523,7 +1653,7 @@ func monomorphizeExpr(
 				resolved = builtin
 			} else {
 				var err error
-				resolved, err = resolveCallName(e.Name, module, imports, e.At)
+				resolved, err = resolveMonomorphizeCallName(e.Name, module, imports, funcDecls, generics, e.At)
 				if err != nil {
 					return "", err
 				}
@@ -1535,6 +1665,7 @@ func monomorphizeExpr(
 				if err := monomorphizeFunctionTypedCallArgs(e, callee, env, generics, created, createdByFile, work, fileImports, module, imports, structCtx); err != nil {
 					return "", err
 				}
+				return monomorphizeConcreteReturnType(callee, resolved, module, imports)
 			}
 			return "", nil
 		}
@@ -1559,7 +1690,7 @@ func monomorphizeExpr(
 			return "", err
 		}
 		name := mangleGenericName(generic.decl.Name, generic.decl.TypeParams, subst)
-		fullName := qualifyName(generic.module, name)
+		fullName := genericInstanceFullName(generic, name)
 		var returnType frontend.TypeRef
 		if existing, exists := created[fullName]; exists {
 			returnType = existing.ReturnType
@@ -1677,6 +1808,22 @@ func bindGenericType(param frontend.TypeRef, actual string, typeParams []string,
 		return nil
 	}
 	switch param.Kind {
+	case frontend.TypeRefFunction:
+		actualParams, actualReturn, ok := parseGenericFunctionTypeName(actual)
+		if !ok {
+			return nil
+		}
+		if len(param.Params) != len(actualParams) {
+			return nil
+		}
+		for i := range param.Params {
+			if err := bindGenericType(param.Params[i], actualParams[i], typeParams, subst); err != nil {
+				return err
+			}
+		}
+		if param.Return != nil {
+			return bindGenericType(*param.Return, actualReturn, typeParams, subst)
+		}
 	case frontend.TypeRefOptional:
 		if param.Elem == nil {
 			return nil
@@ -1916,6 +2063,14 @@ func substituteTypeRef(ref frontend.TypeRef, subst map[string]string) frontend.T
 }
 
 func typeRefFromGenericTypeName(at frontend.Position, name string) frontend.TypeRef {
+	if params, ret, ok := parseGenericFunctionTypeName(name); ok {
+		paramRefs := make([]frontend.TypeRef, 0, len(params))
+		for _, param := range params {
+			paramRefs = append(paramRefs, typeRefFromGenericTypeName(at, param))
+		}
+		retRef := typeRefFromGenericTypeName(at, ret)
+		return frontend.TypeRef{At: at, Kind: frontend.TypeRefFunction, Params: paramRefs, Return: &retRef}
+	}
 	if elem, ok := optionalElemName(name); ok {
 		elemRef := typeRefFromGenericTypeName(at, elem)
 		return frontend.TypeRef{At: at, Kind: frontend.TypeRefOptional, Elem: &elemRef}
@@ -1929,6 +2084,87 @@ func typeRefFromGenericTypeName(at frontend.Position, name string) frontend.Type
 		return frontend.TypeRef{At: at, Kind: frontend.TypeRefArray, Elem: &elemRef, Len: n}
 	}
 	return frontend.TypeRef{At: at, Kind: frontend.TypeRefNamed, Name: name}
+}
+
+func parseGenericFunctionTypeName(name string) ([]string, string, bool) {
+	name = strings.TrimSpace(name)
+	if !strings.HasPrefix(name, "fn(") {
+		return nil, "", false
+	}
+	depth := 1
+	closeIdx := -1
+	for i := len("fn("); i < len(name); i++ {
+		switch name[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				closeIdx = i
+				i = len(name)
+			}
+		}
+	}
+	if closeIdx < 0 {
+		return nil, "", false
+	}
+	rest := strings.TrimSpace(name[closeIdx+1:])
+	if !strings.HasPrefix(rest, "->") {
+		return nil, "", false
+	}
+	paramsText := name[len("fn("):closeIdx]
+	params := []string{}
+	if strings.TrimSpace(paramsText) != "" {
+		params = splitGenericTypeList(paramsText)
+	}
+	ret := strings.TrimSpace(rest[len("->"):])
+	if idx := strings.Index(ret, " uses "); idx >= 0 {
+		ret = strings.TrimSpace(ret[:idx])
+	}
+	if idx := strings.Index(ret, " throws "); idx >= 0 {
+		ret = strings.TrimSpace(ret[:idx])
+	}
+	if ret == "" {
+		return nil, "", false
+	}
+	return params, ret, true
+}
+
+func splitGenericTypeList(text string) []string {
+	var out []string
+	start := 0
+	parenDepth := 0
+	angleDepth := 0
+	bracketDepth := 0
+	for i, r := range text {
+		switch r {
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '<':
+			angleDepth++
+		case '>':
+			if angleDepth > 0 {
+				angleDepth--
+			}
+		case '[':
+			bracketDepth++
+		case ']':
+			if bracketDepth > 0 {
+				bracketDepth--
+			}
+		case ',':
+			if parenDepth == 0 && angleDepth == 0 && bracketDepth == 0 {
+				out = append(out, strings.TrimSpace(text[start:i]))
+				start = i + len(string(r))
+			}
+		}
+	}
+	out = append(out, strings.TrimSpace(text[start:]))
+	return out
 }
 
 func substituteGenericTypeName(ref frontend.TypeRef, subst map[string]string) string {

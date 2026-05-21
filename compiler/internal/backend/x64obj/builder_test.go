@@ -62,6 +62,45 @@ func TestObjectBuildCollectsRelocsAndSymbols(t *testing.T) {
 	}
 }
 
+func TestObjectBuildEmitsFunctionAddressRelocDistinctFromCall(t *testing.T) {
+	emit := func(
+		e *x64.Emitter,
+		fn ir.IRFunc,
+		dataBlobs *[][]byte,
+		leaPatches *[]LeaPatch,
+		callPatches *[]CallPatch,
+		importPatches *[]ImportPatch,
+		opt x64.CodegenOptions,
+	) error {
+		e.Emit(0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xC3)
+		*callPatches = append(*callPatches, CallPatch{At: 3, Name: "ext.callback", Kind: PatchFuncAddrRel32})
+		return nil
+	}
+
+	obj, err := BuildObject([]ir.IRFunc{{
+		Name:        "main",
+		ParamSlots:  0,
+		LocalSlots:  0,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRSymAddr, Name: "ext.callback"},
+			{Kind: ir.IRReturn},
+		},
+	}}, emit, x64.CodegenOptions{}, Options{})
+	if err != nil {
+		t.Fatalf("BuildObject: %v", err)
+	}
+	if len(obj.Relocs) != 1 {
+		t.Fatalf("relocs len = %d, want 1: %#v", len(obj.Relocs), obj.Relocs)
+	}
+	if obj.Relocs[0].Kind != tobj.RelocFuncAddrDisp32 {
+		t.Fatalf("reloc kind = %v, want RelocFuncAddrDisp32", obj.Relocs[0].Kind)
+	}
+	if obj.Relocs[0].Kind == tobj.RelocCallRel32 {
+		t.Fatalf("function address was emitted as call relocation: %#v", obj.Relocs[0])
+	}
+}
+
 func TestObjectBuildRejectsInvalidDataPatchIndex(t *testing.T) {
 	emit := func(
 		e *x64.Emitter,

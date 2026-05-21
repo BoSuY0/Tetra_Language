@@ -1,0 +1,24 @@
+// Actor poll timeout microservice smoke.
+//
+// The service verifies an empty actor poll, then receives a delayed tagged
+// actor reply through a deadline-aware tagged receive.
+func delayed_sender() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    let _sent: Int = core.send_msg(core.sender(), 42, 91)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let empty: actor.recv_result_i32 = core.recv_poll()
+    if empty.error != 2:
+        return 10 + empty.error
+    let _actor: actor = core.spawn("delayed_sender")
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(4))
+    if reply.error != 0:
+        return 20 + reply.error
+    if reply.tag != 91:
+        return reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

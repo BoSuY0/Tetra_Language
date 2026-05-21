@@ -1,0 +1,9 @@
+module app.ext
+
+import engine.core as core
+
+extension core.Vec2:
+    func score(self: core.Vec2) -> Int:
+        return self.x + self.y
+
+impl core.Vec2: core.Score

@@ -1,0 +1,22 @@
+// Pointer alias-base memory microservice smoke.
+//
+// The service sends an allocation-base pointer through a non-generic identity
+// helper and derives the checked cell from the returned base.
+module examples.microservices.memory_ptr_alias_base_service
+
+func alias_base(base: ptr) -> ptr:
+    return base
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(8)
+        let returned: ptr = alias_base(payload)
+        let cell: ptr = core.ptr_add(returned, 4, memory_cap)
+        let _stored: Int = core.store_i32(cell, 42, memory_cap)
+        let value: Int = core.load_i32(cell, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 99

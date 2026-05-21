@@ -1,0 +1,9 @@
+module app.main
+
+import lib.box as box
+
+func main() -> Int:
+    let boxed: box.Box<Int> = box.wrap(42)
+    if boxed.value == 42:
+        return 0
+    return boxed.value

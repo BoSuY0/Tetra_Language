@@ -1,0 +1,25 @@
+// Slice struct loop memory microservice smoke.
+//
+// The service stores a heap-backed []u8 in a struct field and reads it through
+// an indexed loop.
+module examples.microservices.memory_slice_struct_loop_service
+
+struct Window:
+    bytes: []u8
+
+func main() -> Int
+uses alloc, mem:
+    var raw: []u8 = core.make_u8(4)
+    var i: Int = 0
+    while i < 4:
+        raw[i] = i + 9
+        i = i + 1
+    let window: Window = Window(bytes: raw)
+    var total: Int = 0
+    var j: Int = 0
+    while j < 4:
+        total = total + window.bytes[j]
+        j = j + 1
+    if total == 42:
+        return 0
+    return total

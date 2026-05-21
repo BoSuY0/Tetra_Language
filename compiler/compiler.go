@@ -13,7 +13,9 @@ import (
 	"sync"
 
 	"tetra_language/compiler/internal/actorsrt"
+	"tetra_language/compiler/internal/backend/linux_x32"
 	"tetra_language/compiler/internal/backend/linux_x64"
+	"tetra_language/compiler/internal/backend/linux_x86"
 	"tetra_language/compiler/internal/backend/macos_x64"
 	"tetra_language/compiler/internal/backend/native_shell"
 	"tetra_language/compiler/internal/backend/wasm32_wasi"
@@ -131,12 +133,15 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		return stats, err
 	}
 
-	build, err := loadCheckedBuildWorld(inputPath, opt, !opt.InterfaceOnly)
+	build, err := loadCheckedBuildWorld(inputPath, opt, !opt.InterfaceOnly, native.triple)
 	if err != nil {
-		return nil, err
+		return nil, translateTargetExportedFFISemanticError(err, native.triple)
 	}
 	if opt.InterfaceOnly {
 		return interfaceOnlyBuildStats(build.world), nil
+	}
+	if err := validateTargetExportedFFIABI(build.checked, native.triple); err != nil {
+		return nil, err
 	}
 	linkedObjects, err := prepareLinkedObjects(build.world, build.checked, opt.LinkObjectPaths, native.triple)
 	if err != nil {
@@ -184,12 +189,15 @@ func resolveExecutableBuildTarget(inputPath, outputPath, target string, opt Buil
 		stats, err := buildWASM32WEBWithStatsOpt(inputPath, outputPath, tgt, opt)
 		return nativeBuildTarget{}, true, stats, err
 	}
-	if ctarget.IsBuildOnlyTarget(tgt.Triple) {
-		return nativeBuildTarget{}, false, nil, fmt.Errorf("target backend not implemented: %s (codegen/link/run blocked)", tgt.Triple)
-	}
 	switch opt.Emit {
 	case EmitExe:
-		// continue
+		if ctarget.IsBuildOnlyTarget(tgt.Triple) && tgt.Triple != "linux-x32" && tgt.Triple != "linux-x86" {
+			reason := tgt.UnsupportedReason
+			if reason == "" {
+				reason = "executable support is not implemented yet"
+			}
+			return nativeBuildTarget{}, false, nil, fmt.Errorf("target backend not implemented: %s (%s)", tgt.Triple, reason)
+		}
 	case EmitObject, EmitLibrary:
 		stats, err := buildObjectFileWithStatsOpt(inputPath, outputPath, tgt, opt)
 		return nativeBuildTarget{}, true, stats, err
@@ -212,12 +220,20 @@ func nativeCodegenForTarget(tgt ctarget.Target, opt BuildOptions) (nativeCodegen
 	if !ok {
 		return nil, fmt.Errorf("unsupported target: %s", tgt.Triple)
 	}
-	return backend.codegen(nativeCodegenOptions(opt)), nil
+	return backend.codegen(nativeCodegenOptionsForTarget(tgt, opt)), nil
 }
 
 func nativeExecutableBackendForTarget(tgt ctarget.Target) (nativeExecutableBackend, bool) {
+	if tgt.Triple == "linux-x86" {
+		backend := nativeLinuxX86ExecutableBackend()
+		return backend, true
+	}
 	if tgt.Arch != ctarget.ArchX64 {
 		return nativeExecutableBackend{}, false
+	}
+	if tgt.Triple == "linux-x32" {
+		backend := nativeLinuxX32ExecutableBackend()
+		return backend, true
 	}
 	backend, ok := nativeExecutableBackends()[tgt.OS]
 	if !ok || backend.format != tgt.Format {
@@ -227,10 +243,17 @@ func nativeExecutableBackendForTarget(tgt ctarget.Target) (nativeExecutableBacke
 }
 
 func nativeCodegenOptions(opt BuildOptions) x64.CodegenOptions {
+	return nativeCodegenOptionsForTarget(ctarget.Target{}, opt)
+}
+
+func nativeCodegenOptionsForTarget(tgt ctarget.Target, opt BuildOptions) x64.CodegenOptions {
 	return x64.CodegenOptions{
-		IslandsDebug:    opt.IslandsDebug,
-		DebugInfo:       opt.DebugInfo,
-		ReleaseOptimize: opt.ReleaseOptimize,
+		IslandsDebug:       opt.IslandsDebug,
+		DebugInfo:          opt.DebugInfo,
+		ReleaseOptimize:    opt.ReleaseOptimize,
+		PointerWidthBits:   tgt.PointerWidthBits,
+		NativeIntWidthBits: tgt.NativeIntWidthBits,
+		RegisterWidthBits:  tgt.RegisterWidthBits,
 	}
 }
 
@@ -293,9 +316,52 @@ func nativeExecutableBackends() map[ctarget.OS]nativeExecutableBackend {
 	}
 }
 
-func loadCheckedBuildWorld(inputPath string, opt BuildOptions, requireMain bool) (checkedBuildWorld, error) {
+func nativeLinuxX32ExecutableBackend() nativeExecutableBackend {
+	return nativeExecutableBackend{
+		name:   "linux-x32",
+		os:     ctarget.OSLinux,
+		format: ctarget.FormatELF,
+		codegen: func(opt x64.CodegenOptions) nativeCodegenFunc {
+			return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+				return linux_x32.CodegenObjectLinuxX32WithOptionsAndDataPrefix(funcs, dataPrefix, opt)
+			}
+		},
+		link: func(outputPath string, objects []*Object, mainName string) error {
+			img, err := LinkLinuxX32(objects, mainName)
+			if err != nil {
+				return err
+			}
+			return WriteELF32LinuxX32(outputPath, img)
+		},
+	}
+}
+
+func nativeLinuxX86ExecutableBackend() nativeExecutableBackend {
+	return nativeExecutableBackend{
+		name:   "linux-x86",
+		os:     ctarget.OSLinux,
+		format: ctarget.FormatELF,
+		codegen: func(opt x64.CodegenOptions) nativeCodegenFunc {
+			return func(funcs []IRFunc, dataPrefix [][]byte) (*Object, error) {
+				return linux_x86.CodegenObjectLinuxX86WithOptionsAndDataPrefix(funcs, dataPrefix, opt)
+			}
+		},
+		link: func(outputPath string, objects []*Object, mainName string) error {
+			img, err := LinkLinuxX86(objects, mainName)
+			if err != nil {
+				return err
+			}
+			return WriteELF32LinuxX86(outputPath, img)
+		},
+	}
+}
+
+func loadCheckedBuildWorld(inputPath string, opt BuildOptions, requireMain bool, target string) (checkedBuildWorld, error) {
 	world, err := loadWorldForBuild(inputPath, opt)
 	if err != nil {
+		return checkedBuildWorld{}, err
+	}
+	if err := validateTargetExportedFFIAST(world, target); err != nil {
 		return checkedBuildWorld{}, err
 	}
 	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: requireMain})
@@ -443,6 +509,10 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 				setErr(err)
 				continue
 			}
+			if err := validateTargetAtomicIR(funcs, native.target); err != nil {
+				setErr(err)
+				continue
+			}
 			mu.Lock()
 			stats.LoweredModules = append(stats.LoweredModules, job.module)
 			mu.Unlock()
@@ -517,33 +587,59 @@ func objectsFromModulePlan(plan moduleBuildPlan) ([]*Object, error) {
 }
 
 func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt BuildOptions, checked *semantics.CheckedProgram, objects []*Object, linkedObjects []linkedObject) error {
-	actorsUsed, actorEntries, err := collectActorEntries(checked)
+	actorsUsed, actorEntries, actorSpawnCount, err := collectActorEntries(checked)
 	if err != nil {
 		return err
 	}
-	actorStateUsed := collectActorStateRuntimeUsage(checked)
-	tasksUsed := collectTaskRuntimeUsage(checked)
+	actorStateUsed, actorStatePos := collectActorStateRuntimeUsagePosition(checked)
+	actorRuntimeUsed, actorRuntimePos := collectActorRuntimeUsagePosition(checked)
+	tasksUsed, tasksPos := collectTaskRuntimeUsagePosition(checked)
 	taskGroupsUsed := collectTaskGroupRuntimeUsage(checked)
 	typedTasksUsed, typedTaskMaxSlots := collectTypedTaskRuntimeUsage(checked)
-	timeRuntimeUsed := collectTimeRuntimeUsage(checked)
+	timeRuntimeUsed, timeRuntimePos := collectTimeRuntimeUsagePosition(checked)
 	filesystemRuntimeUsed, filesystemRuntimePos := collectFilesystemRuntimeUsagePosition(checked)
+	netRuntimeUsed, netRuntimePos := collectNetRuntimeUsagePosition(checked)
 	distributedActorsUsed, distributedActorsPos := collectDistributedActorRuntimeUsagePosition(checked)
 	if filesystemRuntimeUsed && native.triple != "linux-x64" {
 		return targetRuntimeDiagnostic(filesystemRuntimePos, native.triple, "filesystem")
 	}
+	if netRuntimeUsed && native.triple != "linux-x64" {
+		return targetRuntimeDiagnostic(netRuntimePos, native.triple, "networking")
+	}
 	if distributedActorsUsed && native.triple != "linux-x64" {
 		return targetRuntimeDiagnostic(distributedActorsPos, native.triple, "distributed actors")
 	}
-	runtimeUsed := actorsUsed || actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed || filesystemRuntimeUsed || distributedActorsUsed
+	if timeRuntimeUsed && native.triple == "linux-x86" {
+		return targetRuntimeDiagnostic(timeRuntimePos, native.triple, "time")
+	}
+	if tasksUsed && native.triple == "linux-x86" {
+		return targetRuntimeDiagnostic(tasksPos, native.triple, "task")
+	}
+	if actorRuntimeUsed && native.triple == "linux-x86" {
+		return targetRuntimeDiagnostic(actorRuntimePos, native.triple, "actors")
+	}
+	if actorStateUsed && native.triple == "linux-x86" {
+		return targetRuntimeDiagnostic(actorStatePos, native.triple, "actors")
+	}
+	if actorSpawnCount > 1 && native.triple == "linux-x32" {
+		return targetRuntimeDiagnostic(actorRuntimePos, native.triple, "multi-spawn actors")
+	}
+	if taskGroupsUsed && native.triple == "linux-x32" {
+		return targetRuntimeDiagnostic(tasksPos, native.triple, "task group")
+	}
+	if typedTasksUsed && native.triple == "linux-x32" {
+		return targetRuntimeDiagnostic(tasksPos, native.triple, "typed task")
+	}
+	runtimeUsed := actorsUsed || actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed || filesystemRuntimeUsed || netRuntimeUsed || distributedActorsUsed
 	if runtimeUsed && len(actorEntries) == 0 {
 		actorEntries = []string{checked.MainName}
 	}
 	mainName := checked.MainName
 	if opt.RuntimeObjectPath != "" && !runtimeUsed {
-		return fmt.Errorf("runtime object override requires runtime usage (no actor/task/time/filesystem/distributed actor builtins found)")
+		return fmt.Errorf("runtime object override requires runtime usage (no actor/task/time/filesystem/networking/distributed actor builtins found)")
 	}
 	if runtimeUsed {
-		runtimeMode, err := selectRuntimeMode(opt.Runtime, runtimeUsageProfile{
+		usage := runtimeUsageProfile{
 			actorStateUsed:        actorStateUsed,
 			tasksUsed:             tasksUsed,
 			taskGroupsUsed:        taskGroupsUsed,
@@ -551,10 +647,20 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 			typedTaskMaxSlots:     typedTaskMaxSlots,
 			timeRuntimeUsed:       timeRuntimeUsed,
 			filesystemUsed:        filesystemRuntimeUsed,
+			netUsed:               netRuntimeUsed,
 			distributedActorsUsed: distributedActorsUsed,
-		})
+			actorSpawnCount:       actorSpawnCount,
+		}
+		runtimeMode, err := selectRuntimeMode(opt.Runtime, usage)
 		if err != nil {
 			return err
+		}
+		runtimeMode, err = runtimeModeForNativeTarget(native.triple, opt.Runtime, runtimeMode, usage)
+		if err != nil {
+			return err
+		}
+		if native.triple == "linux-x32" && opt.RuntimeObjectPath == "" && runtimeMode == RuntimeBuiltin {
+			return fmt.Errorf("builtin runtime is not supported on target linux-x32; use runtime=selfhost for supported self-host runtime builds or remove runtime builtins")
 		}
 		var rt *Object
 		needsDispatchGlue := true
@@ -615,6 +721,11 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 		}
 		if filesystemRuntimeUsed {
 			if err := validateFilesystemRuntimeObject(rt); err != nil {
+				return err
+			}
+		}
+		if netRuntimeUsed {
+			if err := validateNetRuntimeObject(rt); err != nil {
 				return err
 			}
 		}
@@ -691,14 +802,16 @@ type runtimeUsageProfile struct {
 	typedTaskMaxSlots     int
 	timeRuntimeUsed       bool
 	filesystemUsed        bool
+	netUsed               bool
 	distributedActorsUsed bool
+	actorSpawnCount       int
 }
 
 func selectRuntimeMode(requested RuntimeMode, usage runtimeUsageProfile) (RuntimeMode, error) {
 	switch requested {
 	case RuntimeAuto:
 		// Default to self-host runtime when its ABI can express the program surface.
-		if usage.actorStateUsed || usage.tasksUsed || usage.taskGroupsUsed || usage.typedTasksUsed || usage.timeRuntimeUsed || usage.filesystemUsed || usage.distributedActorsUsed || usage.typedTaskMaxSlots > 4 {
+		if usage.actorStateUsed || usage.tasksUsed || usage.taskGroupsUsed || usage.typedTasksUsed || usage.timeRuntimeUsed || usage.filesystemUsed || usage.netUsed || usage.distributedActorsUsed || usage.typedTaskMaxSlots > 4 || usage.actorSpawnCount > 1 {
 			return RuntimeBuiltin, nil
 		}
 		return RuntimeSelfHost, nil
@@ -706,8 +819,14 @@ func selectRuntimeMode(requested RuntimeMode, usage runtimeUsageProfile) (Runtim
 		if usage.distributedActorsUsed {
 			return 0, fmt.Errorf("self-host runtime does not support distributed actors; use runtime=auto or runtime=builtin")
 		}
+		if usage.taskGroupsUsed {
+			return 0, fmt.Errorf("self-host runtime does not support task groups; use runtime=auto or runtime=builtin")
+		}
 		if usage.typedTasksUsed {
 			return 0, fmt.Errorf("self-host runtime does not support typed task handles; use runtime=auto or runtime=builtin")
+		}
+		if usage.actorSpawnCount > 1 {
+			return 0, fmt.Errorf("self-host runtime supports at most one spawned actor; use runtime=auto or runtime=builtin")
 		}
 		return RuntimeSelfHost, nil
 	case RuntimeBuiltin:
@@ -715,6 +834,16 @@ func selectRuntimeMode(requested RuntimeMode, usage runtimeUsageProfile) (Runtim
 	default:
 		return 0, fmt.Errorf("unsupported runtime mode: %d", requested)
 	}
+}
+
+func runtimeModeForNativeTarget(target string, requested RuntimeMode, selected RuntimeMode, usage runtimeUsageProfile) (RuntimeMode, error) {
+	if target != "linux-x32" || requested != RuntimeAuto || selected != RuntimeBuiltin {
+		return selected, nil
+	}
+	if _, err := selectRuntimeMode(RuntimeSelfHost, usage); err != nil {
+		return selected, nil
+	}
+	return RuntimeSelfHost, nil
 }
 
 func requiredActorRuntimeSymbols() []string {
@@ -747,6 +876,10 @@ func requiredTimeRuntimeSymbols() []string {
 
 func requiredFilesystemRuntimeSymbols() []string {
 	return runtimeabi.RequiredFilesystemSymbols()
+}
+
+func requiredNetRuntimeSymbols() []string {
+	return runtimeabi.RequiredNetSymbols()
 }
 
 type runtimeObjectSlotSignature struct {
@@ -831,6 +964,10 @@ func validateFilesystemRuntimeObject(rt *Object) error {
 	return validateRuntimeObjectSymbols(rt, "missing filesystem runtime object", requiredFilesystemRuntimeSymbols())
 }
 
+func validateNetRuntimeObject(rt *Object) error {
+	return validateRuntimeObjectSymbols(rt, "missing networking runtime object", requiredNetRuntimeSymbols())
+}
+
 func validateTypedTaskRuntimeObject(rt *Object, maxSlots int) error {
 	return validateRuntimeObjectSymbols(rt, "missing typed task runtime object", requiredTypedTaskRuntimeSymbols(maxSlots))
 }
@@ -845,19 +982,18 @@ func validateTaskGroupRuntimeObject(rt *Object) error {
 
 func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target, opt BuildOptions) (*BuildStats, error) {
 	requireMain := opt.Emit == EmitObject && !opt.InterfaceOnly
-	codegenOptions := x64.CodegenOptions{
-		IslandsDebug:    opt.IslandsDebug,
-		DebugInfo:       opt.DebugInfo,
-		ReleaseOptimize: opt.ReleaseOptimize,
-	}
+	codegenOptions := nativeCodegenOptionsForTarget(tgt, opt)
 
 	world, err := loadWorldForBuild(inputPath, opt)
 	if err != nil {
 		return nil, err
 	}
+	if err := validateTargetExportedFFIAST(world, tgt.Triple); err != nil {
+		return nil, err
+	}
 	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: requireMain})
 	if err != nil {
-		return nil, err
+		return nil, translateTargetExportedFFISemanticError(err, tgt.Triple)
 	}
 	if opt.InterfaceOnly {
 		return interfaceOnlyBuildStats(world), nil
@@ -865,9 +1001,15 @@ func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 	if err := rejectInterfaceModulesForCodegen(world); err != nil {
 		return nil, err
 	}
+	if err := validateTargetExportedFFIABI(checked, tgt.Triple); err != nil {
+		return nil, err
+	}
 
 	funcs, err := LowerModule(checked, world.EntryModule)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateTargetAtomicIR(funcs, tgt); err != nil {
 		return nil, err
 	}
 
@@ -875,7 +1017,16 @@ func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 	dataPrefix := checked.GlobalDataByModule[world.EntryModule]
 	switch tgt.OS {
 	case ctarget.OSLinux:
-		obj, err = linux_x64.CodegenObjectLinuxX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
+		switch tgt.Triple {
+		case "linux-x86":
+			obj, err = linux_x86.CodegenObjectLinuxX86WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
+		case "linux-x64":
+			obj, err = linux_x64.CodegenObjectLinuxX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
+		case "linux-x32":
+			obj, err = linux_x32.CodegenObjectLinuxX32WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
+		default:
+			return nil, fmt.Errorf("target backend not implemented: %s (object codegen blocked)", tgt.Triple)
+		}
 	case ctarget.OSWindows:
 		obj, err = windows_x64.CodegenObjectWindowsX64WithOptionsAndDataPrefix(funcs, dataPrefix, codegenOptions)
 	case ctarget.OSMacOS:
@@ -1129,6 +1280,8 @@ func wasmRuntimeNameForBuiltin(name string) (string, bool) {
 		return "task", true
 	case strings.HasPrefix(name, "__tetra_fs_"):
 		return "filesystem", true
+	case strings.HasPrefix(name, "__tetra_net_"):
+		return "networking", true
 	case strings.HasPrefix(name, "__tetra_time_"), name == "__tetra_sleep_ms", name == "__tetra_sleep_until_ms", name == "__tetra_deadline_ms", name == "__tetra_timer_ready_ms":
 		return "time", true
 	default:
@@ -1193,6 +1346,8 @@ func blockedWASMIRPolicy(kind ir.IRInstrKind) (wasmIRPolicy, bool) {
 		return wasmIRPolicy{builtin: "core.load_ptr", category: "raw pointer memory access"}, true
 	case ir.IRMemWritePtr:
 		return wasmIRPolicy{builtin: "core.store_ptr", category: "raw pointer memory access"}, true
+	case ir.IRMemWriteArchPtr:
+		return wasmIRPolicy{builtin: "core.store_arch_ptr", category: "raw architectural pointer memory access"}, true
 	case ir.IRMemReadI32Offset:
 		return wasmIRPolicy{builtin: "core.load_i32", category: "raw memory access"}, true
 	case ir.IRMemWriteI32Offset:
@@ -1205,6 +1360,8 @@ func blockedWASMIRPolicy(kind ir.IRInstrKind) (wasmIRPolicy, bool) {
 		return wasmIRPolicy{builtin: "core.load_ptr", category: "raw pointer memory access"}, true
 	case ir.IRMemWritePtrOffset:
 		return wasmIRPolicy{builtin: "core.store_ptr", category: "raw pointer memory access"}, true
+	case ir.IRMemWriteArchPtrOffset:
+		return wasmIRPolicy{builtin: "core.store_arch_ptr", category: "raw architectural pointer memory access"}, true
 	case ir.IRPtrAdd:
 		return wasmIRPolicy{builtin: "core.ptr_add", category: "raw pointer arithmetic"}, true
 	case ir.IRMmioReadI32:
@@ -1556,11 +1713,12 @@ func buildTagFromOptions(opt BuildOptions, linkedObjects []linkedObject) string 
 	return strings.Join(tags, "+")
 }
 
-func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, error) {
+func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, int, error) {
 	if checked == nil {
-		return false, nil, nil
+		return false, nil, 0, nil
 	}
 	used := false
+	spawnCount := 0
 	targets := make(map[string]struct{})
 
 	var walkExpr func(frontend.Expr) error
@@ -1576,6 +1734,7 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 			switch name {
 			case "core.spawn":
 				used = true
+				spawnCount++
 				if len(e.Args) == 1 {
 					if lit, ok := e.Args[0].(*frontend.StringLitExpr); ok {
 						name := string(lit.Value)
@@ -1598,6 +1757,7 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 				used = true
 			case "core.task_spawn_i32":
 				used = true
+				spawnCount++
 				if len(e.Args) == 1 {
 					if lit, ok := e.Args[0].(*frontend.StringLitExpr); ok {
 						name := string(lit.Value)
@@ -1676,7 +1836,39 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 		case *frontend.TryExpr:
 			return walkExpr(e.X)
 		case *frontend.CatchExpr:
-			return walkExpr(e.Call)
+			if err := walkExpr(e.Call); err != nil {
+				return err
+			}
+			for _, c := range e.Cases {
+				if !c.Default {
+					if err := walkExpr(c.Pattern); err != nil {
+						return err
+					}
+				}
+				if err := walkExpr(c.Guard); err != nil {
+					return err
+				}
+				if err := walkExpr(c.Value); err != nil {
+					return err
+				}
+			}
+		case *frontend.MatchExpr:
+			if err := walkExpr(e.Value); err != nil {
+				return err
+			}
+			for _, c := range e.Cases {
+				if !c.Default {
+					if err := walkExpr(c.Pattern); err != nil {
+						return err
+					}
+				}
+				if err := walkExpr(c.Guard); err != nil {
+					return err
+				}
+				if err := walkExpr(c.Value); err != nil {
+					return err
+				}
+			}
 		case *frontend.IdentExpr, *frontend.NumberExpr, *frontend.BoolLitExpr, *frontend.StringLitExpr:
 			return nil
 		default:
@@ -1712,6 +1904,25 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 		case *frontend.IfStmt:
 			if err := walkExpr(s.Cond); err != nil {
 				return err
+			}
+			for _, inner := range s.Then {
+				if err := walkStmt(inner); err != nil {
+					return err
+				}
+			}
+			for _, inner := range s.Else {
+				if err := walkStmt(inner); err != nil {
+					return err
+				}
+			}
+		case *frontend.IfLetStmt:
+			if err := walkExpr(s.Value); err != nil {
+				return err
+			}
+			if s.Pattern != nil {
+				if err := walkExpr(s.Pattern); err != nil {
+					return err
+				}
 			}
 			for _, inner := range s.Then {
 				if err := walkStmt(inner); err != nil {
@@ -1795,12 +2006,12 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 		}
 		for _, stmt := range fn.Decl.Body {
 			if err := walkStmt(stmt); err != nil {
-				return false, nil, err
+				return false, nil, 0, err
 			}
 		}
 	}
 	if !used {
-		return false, nil, nil
+		return false, nil, 0, nil
 	}
 
 	names := make([]string, 0, len(targets))
@@ -1812,28 +2023,44 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, err
 	}
 	sort.Strings(names)
 	entries := append([]string{checked.MainName}, names...)
-	return true, entries, nil
+	return true, entries, spawnCount, nil
 }
 
 func collectActorStateRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	used, _ := collectActorStateRuntimeUsagePosition(checked)
+	return used
+}
+
+func collectActorStateRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
 	if checked == nil {
-		return false
+		return false, frontend.Position{}
 	}
 	for _, fn := range checked.Funcs {
 		if len(fn.ActorState) > 0 {
-			return true
+			if fn.Decl != nil {
+				return true, fn.Decl.Pos
+			}
+			return true, frontend.Position{}
 		}
 	}
-	return false
+	return false, frontend.Position{}
 }
 
-func collectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
+func collectActorRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
 	if checked == nil {
-		return false
+		return false, frontend.Position{}
 	}
 	var used bool
+	var first frontend.Position
 	var walkExpr func(frontend.Expr)
 	var walkStmt func(frontend.Stmt)
+
+	mark := func(pos frontend.Position) {
+		if !used {
+			used = true
+			first = pos
+		}
+	}
 
 	walkExpr = func(expr frontend.Expr) {
 		switch e := expr.(type) {
@@ -1843,12 +2070,11 @@ func collectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
 				name = builtin
 			}
 			switch name {
-			case "core.task_spawn_i32", "core.task_spawn_group_i32", "core.task_spawn_i32_typed", "core.task_spawn_group_i32_typed",
-				"core.task_join_i32", "core.task_join_result_i32", "core.task_join_until_i32", "core.task_poll_i32", "core.select2_i32",
-				"core.task_join_i32_typed", "core.task_join_group_i32_typed",
-				"core.task_group_open", "core.task_group_close", "core.task_group_cancel", "core.task_group_current", "core.task_group_status",
-				"core.task_is_canceled", "core.task_checkpoint":
-				used = true
+			case "core.spawn",
+				"core.send", "core.send_msg", "core.send_typed",
+				"core.recv", "core.recv_msg", "core.recv_poll", "core.recv_until", "core.recv_msg_until", "core.recv_typed",
+				"core.self", "core.sender", "core.yield":
+				mark(e.At)
 			}
 			for _, arg := range e.Args {
 				walkExpr(arg)
@@ -1871,6 +2097,22 @@ func collectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			walkExpr(e.X)
 		case *frontend.CatchExpr:
 			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
 		}
 	}
 
@@ -1893,6 +2135,17 @@ func collectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			walkExpr(s.Value)
 		case *frontend.IfStmt:
 			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
 			for _, inner := range s.Then {
 				walkStmt(inner)
 			}
@@ -1946,7 +2199,169 @@ func collectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			walkStmt(stmt)
 		}
 	}
+	return used, first
+}
+
+func collectTaskRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	used, _ := collectTaskRuntimeUsagePosition(checked)
 	return used
+}
+
+func collectTaskRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
+	if checked == nil {
+		return false, frontend.Position{}
+	}
+	var used bool
+	var first frontend.Position
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	mark := func(pos frontend.Position) {
+		if !used {
+			used = true
+			first = pos
+		}
+	}
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
+			case "core.task_spawn_i32", "core.task_spawn_group_i32", "core.task_spawn_i32_typed", "core.task_spawn_group_i32_typed",
+				"core.task_join_i32", "core.task_join_result_i32", "core.task_join_until_i32", "core.task_poll_i32", "core.select2_i32",
+				"core.task_join_i32_typed", "core.task_join_group_i32_typed",
+				"core.task_group_open", "core.task_group_close", "core.task_group_cancel", "core.task_group_current", "core.task_group_status",
+				"core.task_is_canceled", "core.task_checkpoint":
+				mark(e.At)
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return used, first
 }
 
 func collectTaskGroupRuntimeUsage(checked *semantics.CheckedProgram) bool {
@@ -1991,6 +2406,22 @@ func collectTaskGroupRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			walkExpr(e.X)
 		case *frontend.CatchExpr:
 			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
 		}
 	}
 
@@ -2013,6 +2444,17 @@ func collectTaskGroupRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			walkExpr(s.Value)
 		case *frontend.IfStmt:
 			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
 			for _, inner := range s.Then {
 				walkStmt(inner)
 			}
@@ -2117,6 +2559,22 @@ func collectTypedTaskRuntimeUsage(checked *semantics.CheckedProgram) (bool, int)
 			walkExpr(e.X)
 		case *frontend.CatchExpr:
 			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
 		}
 	}
 
@@ -2139,6 +2597,17 @@ func collectTypedTaskRuntimeUsage(checked *semantics.CheckedProgram) (bool, int)
 			walkExpr(s.Value)
 		case *frontend.IfStmt:
 			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
 			for _, inner := range s.Then {
 				walkStmt(inner)
 			}
@@ -2246,6 +2715,22 @@ func collectDistributedActorRuntimeUsagePosition(checked *semantics.CheckedProgr
 			walkExpr(e.X)
 		case *frontend.CatchExpr:
 			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
 		}
 	}
 
@@ -2268,6 +2753,17 @@ func collectDistributedActorRuntimeUsagePosition(checked *semantics.CheckedProgr
 			walkExpr(s.Value)
 		case *frontend.IfStmt:
 			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
 			for _, inner := range s.Then {
 				walkStmt(inner)
 			}
@@ -2325,12 +2821,25 @@ func collectDistributedActorRuntimeUsagePosition(checked *semantics.CheckedProgr
 }
 
 func collectTimeRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	used, _ := collectTimeRuntimeUsagePosition(checked)
+	return used
+}
+
+func collectTimeRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
 	if checked == nil {
-		return false
+		return false, frontend.Position{}
 	}
 	var used bool
+	var first frontend.Position
 	var walkExpr func(frontend.Expr)
 	var walkStmt func(frontend.Stmt)
+
+	mark := func(pos frontend.Position) {
+		if !used {
+			used = true
+			first = pos
+		}
+	}
 
 	walkExpr = func(expr frontend.Expr) {
 		switch e := expr.(type) {
@@ -2341,7 +2850,7 @@ func collectTimeRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			}
 			switch name {
 			case "core.time_now_ms", "core.sleep_ms", "core.sleep_until", "core.deadline_ms", "core.timer_ready":
-				used = true
+				mark(e.At)
 			}
 			for _, arg := range e.Args {
 				walkExpr(arg)
@@ -2364,6 +2873,22 @@ func collectTimeRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			walkExpr(e.X)
 		case *frontend.CatchExpr:
 			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
 		}
 	}
 
@@ -2386,6 +2911,17 @@ func collectTimeRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			walkExpr(s.Value)
 		case *frontend.IfStmt:
 			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
 			for _, inner := range s.Then {
 				walkStmt(inner)
 			}
@@ -2439,7 +2975,7 @@ func collectTimeRuntimeUsage(checked *semantics.CheckedProgram) bool {
 			walkStmt(stmt)
 		}
 	}
-	return used
+	return used, first
 }
 
 func collectFilesystemRuntimeUsage(checked *semantics.CheckedProgram) bool {
@@ -2490,6 +3026,22 @@ func collectFilesystemRuntimeUsagePosition(checked *semantics.CheckedProgram) (b
 			walkExpr(e.X)
 		case *frontend.CatchExpr:
 			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
 		}
 	}
 
@@ -2512,6 +3064,177 @@ func collectFilesystemRuntimeUsagePosition(checked *semantics.CheckedProgram) (b
 			walkExpr(s.Value)
 		case *frontend.IfStmt:
 			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return used, pos
+}
+
+func collectNetRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	used, _ := collectNetRuntimeUsagePosition(checked)
+	return used
+}
+
+func collectNetRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
+	if checked == nil {
+		return false, frontend.Position{}
+	}
+	var used bool
+	var pos frontend.Position
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			switch name {
+			case "core.net_socket_tcp4", "core.net_bind_tcp4_loopback", "core.net_connect_tcp4_loopback", "core.net_listen", "core.net_accept4",
+				"core.net_read", "core.net_recv", "core.net_write", "core.net_send", "core.net_epoll_create", "core.net_epoll_ctl_add_read",
+				"core.net_epoll_ctl_add_read_write", "core.net_epoll_ctl_mod_read",
+				"core.net_epoll_ctl_mod_read_write", "core.net_epoll_ctl_delete",
+				"core.net_epoll_wait_one", "core.net_epoll_wait_one_into",
+				"core.net_set_nonblocking", "core.net_set_reuseport",
+				"core.net_set_tcp_nodelay", "core.net_close":
+				used = true
+				if pos.Line == 0 && pos.Col == 0 {
+					pos = e.At
+				}
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
 			for _, inner := range s.Then {
 				walkStmt(inner)
 			}

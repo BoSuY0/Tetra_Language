@@ -1,0 +1,45 @@
+module lib.async_generic_memory
+
+enum GenericPtrErr:
+    case failed
+
+async func id<T>(value: T) -> T:
+    return value
+
+async func id_throw<T>(value: T, fail: Bool) -> T throws GenericPtrErr:
+    if fail:
+        throw GenericPtrErr.failed
+    return value
+
+async func load_generic_local(base: ptr, memory_cap: cap.mem) -> Int
+uses mem:
+    let out: ptr = await id(base)
+    unsafe:
+        let cell: ptr = core.ptr_add(out, 4, memory_cap)
+        return core.load_i32(cell, memory_cap)
+    return 0
+
+async func load_throw_generic_local(base: ptr, memory_cap: cap.mem) -> Int throws GenericPtrErr
+uses mem:
+    let out: ptr = try await id_throw(base, false)
+    unsafe:
+        let cell: ptr = core.ptr_add(out, 4, memory_cap)
+        return core.load_i32(cell, memory_cap)
+    return 0
+
+async func relay_int(value: Int) -> Int:
+    return await id(value)
+
+async func relay_int_throw(value: Int) -> Int throws GenericPtrErr:
+    return try await id_throw(value, false)
+
+func fallback() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(12)
+        let alias: ptr = base
+        let cell: ptr = core.ptr_add(alias, 4, memory_cap)
+        let _store: Int = core.store_i32(cell, 42, memory_cap)
+        return core.load_i32(cell, memory_cap)
+    return 99

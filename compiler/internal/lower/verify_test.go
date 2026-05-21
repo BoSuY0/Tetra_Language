@@ -605,44 +605,221 @@ func TestStackEffectCoversEveryIRInstrKind(t *testing.T) {
 	}
 }
 
+func TestAtomicPointerExchangeAndFenceStackEffects(t *testing.T) {
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicLoadPtr}); !known || pop != 2 || push != 1 {
+		t.Fatalf("IRAtomicLoadPtr stack effect pop=%d push=%d known=%v, want pop2 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicStorePtr}); !known || pop != 3 || push != 1 {
+		t.Fatalf("IRAtomicStorePtr stack effect pop=%d push=%d known=%v, want pop3 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicExchangePtr}); !known || pop != 3 || push != 1 {
+		t.Fatalf("IRAtomicExchangePtr stack effect pop=%d push=%d known=%v, want pop3 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicFetchAddPtr}); !known || pop != 3 || push != 1 {
+		t.Fatalf("IRAtomicFetchAddPtr stack effect pop=%d push=%d known=%v, want pop3 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicFetchSubPtr}); !known || pop != 3 || push != 1 {
+		t.Fatalf("IRAtomicFetchSubPtr stack effect pop=%d push=%d known=%v, want pop3 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicFetchAndPtr}); !known || pop != 3 || push != 1 {
+		t.Fatalf("IRAtomicFetchAndPtr stack effect pop=%d push=%d known=%v, want pop3 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicFetchOrPtr}); !known || pop != 3 || push != 1 {
+		t.Fatalf("IRAtomicFetchOrPtr stack effect pop=%d push=%d known=%v, want pop3 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicFetchXorPtr}); !known || pop != 3 || push != 1 {
+		t.Fatalf("IRAtomicFetchXorPtr stack effect pop=%d push=%d known=%v, want pop3 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicCompareExchangePtr}); !known || pop != 4 || push != 1 {
+		t.Fatalf("IRAtomicCompareExchangePtr stack effect pop=%d push=%d known=%v, want pop4 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicFenceSeqCst}); !known || pop != 0 || push != 0 {
+		t.Fatalf("IRAtomicFenceSeqCst stack effect pop=%d push=%d known=%v, want pop0 push0", pop, push, known)
+	}
+	for _, kind := range []ir.IRInstrKind{
+		ir.IRAtomicFenceRelaxed,
+		ir.IRAtomicFenceAcquire,
+		ir.IRAtomicFenceRelease,
+		ir.IRAtomicFenceAcqRel,
+	} {
+		if pop, push, known := stackEffect(ir.IRInstr{Kind: kind}); !known || pop != 0 || push != 0 {
+			t.Fatalf("%v stack effect pop=%d push=%d known=%v, want pop0 push0", kind, pop, push, known)
+		}
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicLoadI32}); !known || pop != 2 || push != 1 {
+		t.Fatalf("IRAtomicLoadI32 stack effect pop=%d push=%d known=%v, want pop2 push1", pop, push, known)
+	}
+	for _, kind := range []ir.IRInstrKind{
+		ir.IRAtomicStoreI32,
+		ir.IRAtomicExchangeI32,
+		ir.IRAtomicFetchAddI32,
+		ir.IRAtomicFetchSubI32,
+		ir.IRAtomicFetchAndI32,
+		ir.IRAtomicFetchOrI32,
+		ir.IRAtomicFetchXorI32,
+	} {
+		if pop, push, known := stackEffect(ir.IRInstr{Kind: kind}); !known || pop != 3 || push != 1 {
+			t.Fatalf("%v stack effect pop=%d push=%d known=%v, want pop3 push1", kind, pop, push, known)
+		}
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicCompareExchangeI32}); !known || pop != 4 || push != 1 {
+		t.Fatalf("IRAtomicCompareExchangeI32 stack effect pop=%d push=%d known=%v, want pop4 push1", pop, push, known)
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicLoadI64}); !known || pop != 2 || push != 1 {
+		t.Fatalf("IRAtomicLoadI64 stack effect pop=%d push=%d known=%v, want pop2 push1", pop, push, known)
+	}
+	for _, kind := range []ir.IRInstrKind{
+		ir.IRAtomicStoreI64,
+		ir.IRAtomicExchangeI64,
+		ir.IRAtomicFetchAddI64,
+		ir.IRAtomicFetchSubI64,
+		ir.IRAtomicFetchAndI64,
+		ir.IRAtomicFetchOrI64,
+		ir.IRAtomicFetchXorI64,
+	} {
+		if pop, push, known := stackEffect(ir.IRInstr{Kind: kind}); !known || pop != 3 || push != 1 {
+			t.Fatalf("%v stack effect pop=%d push=%d known=%v, want pop3 push1", kind, pop, push, known)
+		}
+	}
+	if pop, push, known := stackEffect(ir.IRInstr{Kind: ir.IRAtomicCompareExchangeI64}); !known || pop != 4 || push != 1 {
+		t.Fatalf("IRAtomicCompareExchangeI64 stack effect pop=%d push=%d known=%v, want pop4 push1", pop, push, known)
+	}
+	for _, tc := range []struct {
+		load ir.IRInstrKind
+		cas  ir.IRInstrKind
+		ops  []ir.IRInstrKind
+	}{
+		{
+			load: ir.IRAtomicLoadI8,
+			cas:  ir.IRAtomicCompareExchangeI8,
+			ops: []ir.IRInstrKind{
+				ir.IRAtomicStoreI8,
+				ir.IRAtomicExchangeI8,
+				ir.IRAtomicFetchAddI8,
+				ir.IRAtomicFetchSubI8,
+				ir.IRAtomicFetchAndI8,
+				ir.IRAtomicFetchOrI8,
+				ir.IRAtomicFetchXorI8,
+			},
+		},
+		{
+			load: ir.IRAtomicLoadI16,
+			cas:  ir.IRAtomicCompareExchangeI16,
+			ops: []ir.IRInstrKind{
+				ir.IRAtomicStoreI16,
+				ir.IRAtomicExchangeI16,
+				ir.IRAtomicFetchAddI16,
+				ir.IRAtomicFetchSubI16,
+				ir.IRAtomicFetchAndI16,
+				ir.IRAtomicFetchOrI16,
+				ir.IRAtomicFetchXorI16,
+			},
+		},
+	} {
+		if pop, push, known := stackEffect(ir.IRInstr{Kind: tc.load}); !known || pop != 2 || push != 1 {
+			t.Fatalf("%v stack effect pop=%d push=%d known=%v, want pop2 push1", tc.load, pop, push, known)
+		}
+		for _, kind := range tc.ops {
+			if pop, push, known := stackEffect(ir.IRInstr{Kind: kind}); !known || pop != 3 || push != 1 {
+				t.Fatalf("%v stack effect pop=%d push=%d known=%v, want pop3 push1", kind, pop, push, known)
+			}
+		}
+		if pop, push, known := stackEffect(ir.IRInstr{Kind: tc.cas}); !known || pop != 4 || push != 1 {
+			t.Fatalf("%v stack effect pop=%d push=%d known=%v, want pop4 push1", tc.cas, pop, push, known)
+		}
+	}
+}
+
 func TestBudgetChargeModelIsExplicit(t *testing.T) {
 	charged := map[ir.IRInstrKind]int32{
-		ir.IRWrite:              1,
-		ir.IRCall:               1,
-		ir.IRAllocBytes:         1,
-		ir.IRMakeSliceU8:        1,
-		ir.IRMakeSliceU16:       1,
-		ir.IRMakeSliceI32:       1,
-		ir.IRIndexLoadI32:       1,
-		ir.IRIndexStoreI32:      1,
-		ir.IRIndexLoadU8:        1,
-		ir.IRIndexStoreU8:       1,
-		ir.IRIndexLoadU16:       1,
-		ir.IRIndexStoreU16:      1,
-		ir.IRIslandNew:          1,
-		ir.IRIslandMakeSliceU8:  1,
-		ir.IRIslandMakeSliceU16: 1,
-		ir.IRIslandMakeSliceI32: 1,
-		ir.IRIslandFree:         1,
-		ir.IRCapIO:              1,
-		ir.IRCapMem:             1,
-		ir.IRMemReadI32:         1,
-		ir.IRMemWriteI32:        1,
-		ir.IRMemReadU8:          1,
-		ir.IRMemWriteU8:         1,
-		ir.IRMemReadPtr:         1,
-		ir.IRMemWritePtr:        1,
-		ir.IRMemReadI32Offset:   1,
-		ir.IRMemWriteI32Offset:  1,
-		ir.IRMemReadU8Offset:    1,
-		ir.IRMemWriteU8Offset:   1,
-		ir.IRMemReadPtrOffset:   1,
-		ir.IRMemWritePtrOffset:  1,
-		ir.IRPtrAdd:             1,
-		ir.IRMmioReadI32:        1,
-		ir.IRMmioWriteI32:       1,
-		ir.IRSymAddr:            1,
-		ir.IRCtxSwitch:          1,
+		ir.IRWrite:                    1,
+		ir.IRCall:                     1,
+		ir.IRAllocBytes:               1,
+		ir.IRMakeSliceU8:              1,
+		ir.IRMakeSliceU16:             1,
+		ir.IRMakeSliceI32:             1,
+		ir.IRIndexLoadI32:             1,
+		ir.IRIndexStoreI32:            1,
+		ir.IRIndexLoadU8:              1,
+		ir.IRIndexStoreU8:             1,
+		ir.IRIndexLoadU16:             1,
+		ir.IRIndexStoreU16:            1,
+		ir.IRIslandNew:                1,
+		ir.IRIslandMakeSliceU8:        1,
+		ir.IRIslandMakeSliceU16:       1,
+		ir.IRIslandMakeSliceI32:       1,
+		ir.IRIslandFree:               1,
+		ir.IRCapIO:                    1,
+		ir.IRCapMem:                   1,
+		ir.IRMemReadI32:               1,
+		ir.IRMemWriteI32:              1,
+		ir.IRMemReadU8:                1,
+		ir.IRMemWriteU8:               1,
+		ir.IRMemReadPtr:               1,
+		ir.IRMemWritePtr:              1,
+		ir.IRMemWriteArchPtr:          1,
+		ir.IRMemReadI32Offset:         1,
+		ir.IRMemWriteI32Offset:        1,
+		ir.IRMemReadU8Offset:          1,
+		ir.IRMemWriteU8Offset:         1,
+		ir.IRMemReadPtrOffset:         1,
+		ir.IRMemWritePtrOffset:        1,
+		ir.IRMemWriteArchPtrOffset:    1,
+		ir.IRPtrAdd:                   1,
+		ir.IRMmioReadI32:              1,
+		ir.IRMmioWriteI32:             1,
+		ir.IRSymAddr:                  1,
+		ir.IRCtxSwitch:                1,
+		ir.IRAtomicLoadPtr:            1,
+		ir.IRAtomicStorePtr:           1,
+		ir.IRAtomicExchangePtr:        1,
+		ir.IRAtomicFetchAddPtr:        1,
+		ir.IRAtomicFetchSubPtr:        1,
+		ir.IRAtomicFetchAndPtr:        1,
+		ir.IRAtomicFetchOrPtr:         1,
+		ir.IRAtomicFetchXorPtr:        1,
+		ir.IRAtomicCompareExchangePtr: 1,
+		ir.IRAtomicFenceSeqCst:        1,
+		ir.IRAtomicFenceRelaxed:       1,
+		ir.IRAtomicFenceAcquire:       1,
+		ir.IRAtomicFenceRelease:       1,
+		ir.IRAtomicFenceAcqRel:        1,
+		ir.IRAtomicLoadI32:            1,
+		ir.IRAtomicStoreI32:           1,
+		ir.IRAtomicExchangeI32:        1,
+		ir.IRAtomicCompareExchangeI32: 1,
+		ir.IRAtomicFetchAddI32:        1,
+		ir.IRAtomicFetchSubI32:        1,
+		ir.IRAtomicFetchAndI32:        1,
+		ir.IRAtomicFetchOrI32:         1,
+		ir.IRAtomicFetchXorI32:        1,
+		ir.IRAtomicLoadI64:            1,
+		ir.IRAtomicStoreI64:           1,
+		ir.IRAtomicExchangeI64:        1,
+		ir.IRAtomicCompareExchangeI64: 1,
+		ir.IRAtomicFetchAddI64:        1,
+		ir.IRAtomicFetchSubI64:        1,
+		ir.IRAtomicFetchAndI64:        1,
+		ir.IRAtomicFetchOrI64:         1,
+		ir.IRAtomicFetchXorI64:        1,
+		ir.IRAtomicLoadI8:             1,
+		ir.IRAtomicStoreI8:            1,
+		ir.IRAtomicExchangeI8:         1,
+		ir.IRAtomicCompareExchangeI8:  1,
+		ir.IRAtomicFetchAddI8:         1,
+		ir.IRAtomicFetchSubI8:         1,
+		ir.IRAtomicFetchAndI8:         1,
+		ir.IRAtomicFetchOrI8:          1,
+		ir.IRAtomicFetchXorI8:         1,
+		ir.IRAtomicLoadI16:            1,
+		ir.IRAtomicStoreI16:           1,
+		ir.IRAtomicExchangeI16:        1,
+		ir.IRAtomicCompareExchangeI16: 1,
+		ir.IRAtomicFetchAddI16:        1,
+		ir.IRAtomicFetchSubI16:        1,
+		ir.IRAtomicFetchAndI16:        1,
+		ir.IRAtomicFetchOrI16:         1,
+		ir.IRAtomicFetchXorI16:        1,
 	}
 	for kind, want := range charged {
 		got, ok := budgetChargeForInstr(kind)

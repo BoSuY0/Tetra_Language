@@ -1,0 +1,8 @@
+module lib.actors
+
+actor Worker:
+    func run() -> Int
+    uses actors:
+        let request: actor.msg = core.recv_msg()
+        let _sent: Int = core.send_msg(core.sender(), request.value + 1, request.tag + 1)
+        return 0

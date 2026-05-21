@@ -1,0 +1,69 @@
+module lib.async_slice_lanes
+
+enum SliceLaneErr:
+    case failed
+
+struct I32SliceBox:
+    values: []i32
+
+async func pass_i32(values: []i32) -> []i32:
+    return values
+
+async func pass_i32_throw(values: []i32, fail: Bool) -> []i32 throws SliceLaneErr:
+    if fail:
+        throw SliceLaneErr.failed
+    return values
+
+async func pass_bool(flags: []bool) -> []bool:
+    return flags
+
+async func pass_u16(values: []u16) -> []u16:
+    return values
+
+async func box_i32(values: []i32) -> I32SliceBox:
+    return I32SliceBox(values: values)
+
+async func pass_int(value: Int) -> Int:
+    return value
+
+async func sum_i32_local(values: []i32) -> Int:
+    let out: []i32 = await pass_i32(values)
+    return out[0] + out[1] + out[2]
+
+async func sum_i32_throw_local(values: []i32) -> Int throws SliceLaneErr:
+    let out: []i32 = try await pass_i32_throw(values, false)
+    return out[0] + out[1] + out[2]
+
+async func score_bool_local(flags: []bool) -> Int:
+    let out: []bool = await pass_bool(flags)
+    if out[0] && out[1]:
+        return 42
+    return 0
+
+async func sum_u16_local(values: []u16) -> Int:
+    let out: []u16 = await pass_u16(values)
+    return out[0] + out[1] + out[2]
+
+async func sum_box_i32_local(values: []i32) -> Int:
+    let boxed: I32SliceBox = await box_i32(values)
+    return boxed.values[0] + boxed.values[1] + boxed.values[2]
+
+async func relay_int(value: Int) -> Int:
+    return await pass_int(value)
+
+func fallback() -> Int
+uses alloc, mem:
+    var nums: []i32 = core.make_i32(3)
+    var flags: []bool = core.make_bool(2)
+    var lane: []u16 = core.make_u16(3)
+    nums[0] = 10
+    nums[1] = 11
+    nums[2] = 21
+    flags[0] = true
+    flags[1] = nums[0] + nums[1] + nums[2] == 42
+    lane[0] = 9
+    lane[1] = 10
+    lane[2] = 21
+    if flags[0] && flags[1]:
+        return nums[0] + nums[1] + lane[2]
+    return nums[2]

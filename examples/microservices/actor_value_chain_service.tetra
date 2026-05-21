@@ -1,0 +1,33 @@
+// Actor value-chain microservice smoke.
+//
+// The router actor forwards a plain value request through a worker actor and
+// sends the transformed result back to the main service.
+func value_worker() -> Int
+uses actors:
+    let request: Int = core.recv()
+    let _reply: Int = core.send(core.sender(), request + 3)
+    return 0
+
+func value_router() -> Int
+uses actors, runtime:
+    let request: Int = core.recv()
+    let reply_to: actor = core.sender()
+    let worker: actor = core.spawn("value_worker")
+    let _sent: Int = core.send(worker, request + 10)
+    let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+    if reply.error != 0:
+        let _error_reply: Int = core.send(reply_to, reply.error)
+        return 0
+    let _reply: Int = core.send(reply_to, reply.value + 8)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let router: actor = core.spawn("value_router")
+    let _request: Int = core.send(router, 21)
+    let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(8))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.value == 42:
+        return 0
+    return reply.value

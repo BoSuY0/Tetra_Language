@@ -1,0 +1,11 @@
+module app.main
+
+import lib.errors as errors
+
+func main() -> Int:
+    let status: Int = catch errors.handler():
+    case errors.ServiceErr.code(code):
+        code
+    if status == 42:
+        return 0
+    return status

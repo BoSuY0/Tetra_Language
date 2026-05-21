@@ -567,6 +567,34 @@ func isSupportedZeroedAggregateGlobalType(name string, types map[string]*TypeInf
 	}
 }
 
+func collectGlobalArrayBackings(typeName string, offset int, types map[string]*TypeInfo, visiting map[string]bool) []GlobalArrayBackingInfo {
+	info, ok := types[typeName]
+	if !ok || info == nil {
+		return nil
+	}
+	switch info.Kind {
+	case TypeArray:
+		return []GlobalArrayBackingInfo{{
+			HeaderOffset: offset,
+			ElemType:     info.ElemType,
+			Len:          info.ArrayLen,
+		}}
+	case TypeStruct:
+		if visiting[typeName] {
+			return nil
+		}
+		visiting[typeName] = true
+		defer delete(visiting, typeName)
+		var out []GlobalArrayBackingInfo
+		for _, field := range info.Fields {
+			out = append(out, collectGlobalArrayBackings(field.TypeName, offset+field.Offset, types, visiting)...)
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
 func isSupportedOptionalSliceGlobalType(name string) bool {
 	elem, ok := optionalElemName(name)
 	if !ok {
@@ -937,6 +965,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 		}
 		if isArrayTypeName(name) {
 			return nil, fmt.Errorf("invalid array type '%s'", name)
+		}
+		if isTargetLayoutOnlyScalar(name) {
+			return nil, targetLayoutOnlyScalarError(name)
 		}
 		ctx, ok := structs[name]
 		if !ok {
@@ -1374,6 +1405,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			}
 
 			dataIndex := len(dataBlobs)
+			arrayBackings := collectGlobalArrayBackings(resolved, 0, types, map[string]bool{})
 			globals[glob.Name] = GlobalInfo{
 				DataIndex:              dataIndex,
 				TypeName:               resolved,
@@ -1389,6 +1421,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				FunctionEffects:        functionEffects,
 				HasStringLiteralInit:   hasStringInit,
 				StringLiteralInit:      stringInit,
+				ArrayBackings:          arrayBackings,
 			}
 
 			slots := typeInfo.SlotCount
@@ -3147,7 +3180,7 @@ func resolveCallSigForInference(call *frontend.CallExpr, funcs map[string]FuncSi
 	} else if _, ok := funcs[call.Name]; ok {
 		resolved = call.Name
 	} else {
-		name, err := resolveCallName(call.Name, module, imports, call.At)
+		name, err := resolveKnownCallName(call.Name, funcs, module, imports, call.At)
 		if err != nil {
 			return FuncSig{}, err
 		}
@@ -3966,7 +3999,7 @@ func validateBudgetSpawnContext(call *frontend.CallExpr, resolved string, caller
 	if !ok || len(lit.Value) == 0 {
 		return nil
 	}
-	target, err := resolveCallName(string(lit.Value), module, imports, call.At)
+	target, err := resolveKnownCallName(string(lit.Value), funcs, module, imports, call.At)
 	if err != nil {
 		return err
 	}
@@ -5609,7 +5642,7 @@ func applyInterfaceFunctionReturnMetadata(
 					calleeSig, ok := funcs[resolved]
 					if !ok {
 						var err error
-						resolved, err = resolveCallName(call.Name, module, imports, call.At)
+						resolved, err = resolveKnownCallName(call.Name, funcs, module, imports, call.At)
 						if err != nil {
 							return false, err
 						}
@@ -6897,6 +6930,10 @@ func bindResourceTreeFromExpr(
 		return nil
 	}
 	switch e := expr.(type) {
+	case *frontend.TryExpr:
+		return bindResourceTreeFromExpr(name, typeName, e.X, funcs, types, module, imports, state)
+	case *frontend.AwaitExpr:
+		return bindResourceTreeFromExpr(name, typeName, e.X, funcs, types, module, imports, state)
 	case *frontend.MatchExpr:
 		if e.ResultLocal != "" {
 			copyResourceTreeFromPath(name, e.ResultLocal, typeName, types, state)
@@ -7877,10 +7914,7 @@ func resolveCheckedCallName(name string, funcs map[string]FuncSig, module string
 	if builtin, ok := ResolveBuiltinAlias(name); ok {
 		return builtin, nil
 	}
-	if _, ok := funcs[name]; ok {
-		return name, nil
-	}
-	return resolveCallName(name, module, imports, pos)
+	return resolveKnownCallName(name, funcs, module, imports, pos)
 }
 
 func paramDeclOwnership(params []frontend.ParamDecl) []string {
@@ -10246,7 +10280,7 @@ func checkStmts(
 			if callerSigOK && callerSig.ReturnFunctionType && !handledFunctionReturn {
 				return unsupportedFunctionTypedReturnSourceError(s.At)
 			}
-			if err := checkWholeOwnershipValueAvailable(s.Value, state); err != nil {
+			if err := checkWholeOwnershipValueAvailable(s.Value, types, module, imports, state); err != nil {
 				return err
 			}
 			if typeMayContainRegion(tname, types) || typeMayContainPtr(tname, types) {
@@ -10494,7 +10528,7 @@ func checkStmts(
 			if !typesCompatibleWithNullPtr(resolved, valType, s.Value) {
 				return fmt.Errorf("%s: type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), resolved, valType)
 			}
-			if err := checkWholeOwnershipValueAvailable(s.Value, state); err != nil {
+			if err := checkWholeOwnershipValueAvailable(s.Value, types, module, imports, state); err != nil {
 				return err
 			}
 			secretTainted, err := exprSecretTainted(s.Value, valType, locals, globals, funcs, types, module, imports, analysis)
@@ -10577,7 +10611,7 @@ func checkStmts(
 					if !typesCompatibleWithNullPtr(g.TypeName, valType, s.Value) {
 						return fmt.Errorf("%s: type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), g.TypeName, valType)
 					}
-					if err := checkWholeOwnershipValueAvailable(s.Value, state); err != nil {
+					if err := checkWholeOwnershipValueAvailable(s.Value, types, module, imports, state); err != nil {
 						return err
 					}
 					if typeMayContainRegion(valType, types) || typeMayContainRegion(g.TypeName, types) ||
@@ -10664,7 +10698,7 @@ func checkStmts(
 			if !typesCompatibleWithNullPtr(targetType, valType, s.Value) {
 				return fmt.Errorf("%s: type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), targetType, valType)
 			}
-			if err := checkWholeOwnershipValueAvailable(s.Value, state); err != nil {
+			if err := checkWholeOwnershipValueAvailable(s.Value, types, module, imports, state); err != nil {
 				return err
 			}
 			secretTainted := false
@@ -11304,6 +11338,49 @@ func uniqueHiddenLocal(prefix string, pos frontend.Position, locals map[string]L
 	}
 }
 
+func collectScopedLocal(
+	name string,
+	info LocalInfo,
+	pos frontend.Position,
+	locals map[string]LocalInfo,
+	slotIndex *int,
+	scopes *scopeInfo,
+) error {
+	if existing, exists := locals[name]; exists {
+		if scopes == nil {
+			return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(pos), name)
+		}
+		currentScope := scopes.currentScopeID()
+		existingScope := scopes.localScopes[name]
+		if currentScope == regionNone || existingScope == regionNone || currentScope == existingScope || !localInfosShareScopedStorage(existing, info) {
+			return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(pos), name)
+		}
+		ids := scopes.localScopeSets[name]
+		if ids == nil {
+			ids = make(map[int]struct{}, 2)
+			scopes.localScopeSets[name] = ids
+		}
+		ids[existingScope] = struct{}{}
+		ids[currentScope] = struct{}{}
+		scopes.localScopes[name] = currentScope
+		return nil
+	}
+	locals[name] = info
+	if scopes != nil {
+		scopes.localScopes[name] = scopes.currentScopeID()
+	}
+	*slotIndex += info.SlotCount
+	return nil
+}
+
+func localInfosShareScopedStorage(left, right LocalInfo) bool {
+	return left.SlotCount == right.SlotCount &&
+		left.TypeName == right.TypeName &&
+		left.FunctionTypeValue == right.FunctionTypeValue &&
+		left.FunctionReturnType == right.FunctionReturnType &&
+		strings.Join(left.FunctionParamTypes, "\x00") == strings.Join(right.FunctionParamTypes, "\x00")
+}
+
 func collectionElementType(typeName string, types map[string]*TypeInfo) (string, error) {
 	info, err := ensureTypeInfo(typeName, types)
 	if err != nil {
@@ -11581,18 +11658,13 @@ func collectPatternLocals(
 		if _, exists := globals[pat.Name]; exists {
 			return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(pat.At), pat.Name, pat.Name)
 		}
-		if _, exists := locals[pat.Name]; exists {
-			return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(pat.At), pat.Name)
-		}
 		elemInfo, err := ensureTypeInfo(info.ElemType, types)
 		if err != nil {
 			return err
 		}
-		locals[pat.Name] = LocalInfo{Base: *slotIndex, SlotCount: elemInfo.SlotCount, TypeName: info.ElemType, Mutable: false}
-		if scopes != nil {
-			scopes.localScopes[pat.Name] = scopes.currentScopeID()
+		if err := collectScopedLocal(pat.Name, LocalInfo{Base: *slotIndex, SlotCount: elemInfo.SlotCount, TypeName: info.ElemType, Mutable: false}, pat.At, locals, slotIndex, scopes); err != nil {
+			return err
 		}
-		*slotIndex += elemInfo.SlotCount
 	case *frontend.EnumCasePatternExpr:
 		caseType, caseInfo, found, err := resolveEnumCasePattern(pat, types, module, imports)
 		if err != nil {
@@ -11608,9 +11680,6 @@ func collectPatternLocals(
 			if _, exists := globals[binding]; exists {
 				return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(pat.At), binding, binding)
 			}
-			if _, exists := locals[binding]; exists {
-				return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(pat.At), binding)
-			}
 			localInfo := LocalInfo{Base: *slotIndex, SlotCount: caseInfo.PayloadSlots[i], TypeName: caseInfo.PayloadTypes[i], Mutable: false}
 			if i < len(caseInfo.PayloadFunctionTypes) && caseInfo.PayloadFunctionTypes[i] {
 				localInfo = functionLocalInfoForEnumPayload(caseInfo, i, FunctionFieldInfo{})
@@ -11618,11 +11687,9 @@ func collectPatternLocals(
 				localInfo.SlotCount = caseInfo.PayloadSlots[i]
 				localInfo.TypeName = caseInfo.PayloadTypes[i]
 			}
-			locals[binding] = localInfo
-			if scopes != nil {
-				scopes.localScopes[binding] = scopes.currentScopeID()
+			if err := collectScopedLocal(binding, localInfo, pat.At, locals, slotIndex, scopes); err != nil {
+				return err
 			}
-			*slotIndex += caseInfo.PayloadSlots[i]
 		}
 	}
 	return nil
@@ -12010,9 +12077,6 @@ func collectLocals(
 				if _, exists := globals[s.Name]; exists {
 					return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(s.At), s.Name, s.Name)
 				}
-				if _, exists := locals[s.Name]; exists {
-					return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(s.At), s.Name)
-				}
 			}
 			elemInfo, err := ensureTypeInfo(valueInfo.ElemType, types)
 			if s.Pattern == nil && err != nil {
@@ -12035,16 +12099,14 @@ func collectLocals(
 				thenScopeID = scopes.enterScope()
 			}
 			if s.Pattern == nil {
-				locals[s.Name] = LocalInfo{
+				if err := collectScopedLocal(s.Name, LocalInfo{
 					Base:      *slotIndex,
 					SlotCount: elemInfo.SlotCount,
 					TypeName:  valueInfo.ElemType,
 					Mutable:   false,
+				}, s.At, locals, slotIndex, scopes); err != nil {
+					return err
 				}
-				if scopes != nil {
-					scopes.localScopes[s.Name] = scopes.currentScopeID()
-				}
-				*slotIndex += elemInfo.SlotCount
 			} else if err := collectPatternLocals(s.Pattern, valueType, locals, slotIndex, types, module, imports, scopes, globals); err != nil {
 				return err
 			}
@@ -12224,23 +12286,18 @@ func collectLocals(
 					if _, exists := globals[some.Name]; exists {
 						return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(some.At), some.Name, some.Name)
 					}
-					if _, exists := locals[some.Name]; exists {
-						return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(some.At), some.Name)
-					}
 					elemInfo, err := ensureTypeInfo(info.ElemType, types)
 					if err != nil {
 						return fmt.Errorf("%s: %v", frontend.FormatPos(some.At), err)
 					}
-					locals[some.Name] = LocalInfo{
+					if err := collectScopedLocal(some.Name, LocalInfo{
 						Base:      *slotIndex,
 						SlotCount: elemInfo.SlotCount,
 						TypeName:  info.ElemType,
 						Mutable:   false,
+					}, some.At, locals, slotIndex, scopes); err != nil {
+						return err
 					}
-					if scopes != nil {
-						scopes.localScopes[some.Name] = scopes.currentScopeID()
-					}
-					*slotIndex += elemInfo.SlotCount
 				}
 				if enumPat, ok := c.Pattern.(*frontend.EnumCasePatternExpr); ok {
 					caseType, caseInfo, found, err := resolveEnumCasePattern(enumPat, types, module, imports)
@@ -12256,9 +12313,6 @@ func collectLocals(
 					for j, binding := range enumPat.Bindings {
 						if _, exists := globals[binding]; exists {
 							return fmt.Errorf("%s: local '%s' conflicts with global '%s'", frontend.FormatPos(enumPat.At), binding, binding)
-						}
-						if _, exists := locals[binding]; exists {
-							return fmt.Errorf("%s: duplicate local '%s'", frontend.FormatPos(enumPat.At), binding)
 						}
 						slots := 1
 						if j < len(caseInfo.PayloadSlots) {
@@ -12276,11 +12330,9 @@ func collectLocals(
 							localInfo.SlotCount = slots
 							localInfo.TypeName = caseInfo.PayloadTypes[j]
 						}
-						locals[binding] = localInfo
-						if scopes != nil {
-							scopes.localScopes[binding] = scopes.currentScopeID()
+						if err := collectScopedLocal(binding, localInfo, enumPat.At, locals, slotIndex, scopes); err != nil {
+							return err
 						}
-						*slotIndex += slots
 					}
 					if err := bindEnumPatternFunctionPayloadLocals(enumPat, scrutineeFunctionPayloads, locals, types, module, imports); err != nil {
 						return err

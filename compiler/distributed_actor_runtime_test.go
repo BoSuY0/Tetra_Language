@@ -26,7 +26,7 @@ uses actors, runtime:
 		t.Fatalf("distributed actor runtime usage was not detected")
 	}
 
-	actorsUsed, entries, err := collectActorEntries(checked)
+	actorsUsed, entries, _, err := collectActorEntries(checked)
 	if err != nil {
 		t.Fatalf("collectActorEntries: %v", err)
 	}

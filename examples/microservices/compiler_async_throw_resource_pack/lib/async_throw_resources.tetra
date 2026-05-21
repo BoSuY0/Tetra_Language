@@ -1,0 +1,58 @@
+module lib.async_throw_resources
+
+enum AsyncResourceErr:
+    case failed
+
+async func maybe_task(handle: task.i32, fail: Bool) -> task.i32? throws AsyncResourceErr:
+    if fail:
+        throw AsyncResourceErr.failed
+    let out: task.i32? = handle
+    return out
+
+async func relay_task(handle: task.i32) -> task.i32? throws AsyncResourceErr:
+    return try await maybe_task(handle, false)
+
+async func maybe_actor(peer: actor, fail: Bool) -> actor? throws AsyncResourceErr:
+    if fail:
+        throw AsyncResourceErr.failed
+    let out: actor? = peer
+    return out
+
+async func relay_actor(peer: actor) -> actor? throws AsyncResourceErr:
+    return try await maybe_actor(peer, false)
+
+async func maybe_group(group: task.group, fail: Bool) -> task.group? throws AsyncResourceErr:
+    if fail:
+        throw AsyncResourceErr.failed
+    let out: task.group? = group
+    return out
+
+async func relay_group(group: task.group) -> task.group? throws AsyncResourceErr:
+    return try await maybe_group(group, false)
+
+func task_worker() -> Int:
+    return 4
+
+func group_worker() -> Int:
+    return 4
+
+func fallback() -> Int
+uses alloc, capability, mem, runtime:
+    let task: task.i32 = core.task_spawn_i32("task_worker")
+    let group: task.group = core.task_group_open()
+    let grouped: task.i32 = core.task_spawn_group_i32(group, "group_worker")
+    let left_offset: Int = core.task_join_i32(task)
+    let right_offset: Int = core.task_join_i32(grouped)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let left_cell: ptr = core.ptr_add(left_base, left_offset, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, right_offset, memory_cap)
+        let _left_store: Int = core.store_i32(left_cell, 18, memory_cap)
+        let _right_store: Int = core.store_i32(right_cell, 24, memory_cap)
+        return core.load_i32(left_cell, memory_cap) + core.load_i32(right_cell, memory_cap)
+    return 99

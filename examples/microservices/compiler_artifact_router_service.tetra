@@ -1,0 +1,64 @@
+// Compiler artifact router microservice smoke.
+//
+// The service routes a compile unit through enum-payload states, static
+// protocol dispatch, and a generic helper whose argument is a typed local.
+enum Artifact:
+    case source(Int)
+    case checked(Int)
+    case object(Int)
+
+struct CompileUnit:
+    stage: Artifact
+    salt: Int
+
+protocol Cost:
+    func cost(self: CompileUnit) -> Int
+
+extension CompileUnit:
+    func cost(self: CompileUnit) -> Int:
+        return artifact_value(self.stage) + self.salt
+
+impl CompileUnit: Cost
+
+func keep<T>(x: T) -> T:
+    return x
+
+func parse_unit(seed: Int) -> CompileUnit:
+    return CompileUnit(stage: Artifact.source(seed + 3), salt: 5)
+
+func typecheck_unit(unit: CompileUnit) -> CompileUnit:
+    match unit.stage:
+    case Artifact.source(source_payload):
+        return CompileUnit(stage: Artifact.checked(source_payload + unit.salt), salt: unit.salt)
+    case Artifact.checked(checked_payload):
+        return CompileUnit(stage: Artifact.checked(checked_payload), salt: unit.salt)
+    case Artifact.object(object_payload):
+        return CompileUnit(stage: Artifact.checked(object_payload), salt: unit.salt)
+
+func emit_unit(unit: CompileUnit) -> CompileUnit:
+    match unit.stage:
+    case Artifact.checked(checked_emit_payload):
+        return CompileUnit(stage: Artifact.object(checked_emit_payload + 20), salt: unit.salt)
+    case Artifact.source(source_emit_payload):
+        return CompileUnit(stage: Artifact.object(source_emit_payload), salt: unit.salt)
+    case Artifact.object(object_emit_payload):
+        return CompileUnit(stage: Artifact.object(object_emit_payload), salt: unit.salt)
+
+func artifact_value(stage: Artifact) -> Int:
+    match stage:
+    case Artifact.source(source_value_payload):
+        return source_value_payload
+    case Artifact.checked(checked_value_payload):
+        return checked_value_payload
+    case Artifact.object(object_value_payload):
+        return object_value_payload
+
+func main() -> Int:
+    let parsed_unit: CompileUnit = parse_unit(9)
+    let checked_unit: CompileUnit = typecheck_unit(parsed_unit)
+    let object_unit: CompileUnit = emit_unit(checked_unit)
+    let cost_value: Int = CompileUnit.cost(object_unit)
+    let stable_cost: Int = keep(cost_value)
+    if stable_cost == 42:
+        return 0
+    return stable_cost

@@ -109,6 +109,32 @@ func RequiredFilesystemSymbols() []string {
 	}
 }
 
+func RequiredNetSymbols() []string {
+	return []string{
+		"__tetra_net_socket_tcp4",
+		"__tetra_net_bind_tcp4_loopback",
+		"__tetra_net_connect_tcp4_loopback",
+		"__tetra_net_listen",
+		"__tetra_net_accept4",
+		"__tetra_net_read",
+		"__tetra_net_recv",
+		"__tetra_net_write",
+		"__tetra_net_send",
+		"__tetra_net_epoll_create",
+		"__tetra_net_epoll_ctl_add_read",
+		"__tetra_net_epoll_ctl_add_read_write",
+		"__tetra_net_epoll_ctl_mod_read",
+		"__tetra_net_epoll_ctl_mod_read_write",
+		"__tetra_net_epoll_ctl_delete",
+		"__tetra_net_epoll_wait_one",
+		"__tetra_net_epoll_wait_one_into",
+		"__tetra_net_set_nonblocking",
+		"__tetra_net_set_reuseport",
+		"__tetra_net_set_tcp_nodelay",
+		"__tetra_net_close",
+	}
+}
+
 func SignatureForSymbol(name string) (Signature, bool) {
 	switch name {
 	case "__tetra_entry":
@@ -201,6 +227,22 @@ func SignatureForSymbol(name string) (Signature, bool) {
 		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
 	case "__tetra_fs_exists":
 		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
+	case "__tetra_net_socket_tcp4":
+		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
+	case "__tetra_net_bind_tcp4_loopback", "__tetra_net_connect_tcp4_loopback", "__tetra_net_listen", "__tetra_net_accept4":
+		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
+	case "__tetra_net_read", "__tetra_net_recv", "__tetra_net_write", "__tetra_net_send":
+		return Signature{ParamSlots: 6, ReturnSlots: 1}, true
+	case "__tetra_net_epoll_create":
+		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
+	case "__tetra_net_epoll_ctl_add_read", "__tetra_net_epoll_ctl_add_read_write",
+		"__tetra_net_epoll_ctl_mod_read", "__tetra_net_epoll_ctl_mod_read_write",
+		"__tetra_net_epoll_ctl_delete", "__tetra_net_epoll_wait_one":
+		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
+	case "__tetra_net_epoll_wait_one_into":
+		return Signature{ParamSlots: 5, ReturnSlots: 1}, true
+	case "__tetra_net_set_nonblocking", "__tetra_net_set_reuseport", "__tetra_net_set_tcp_nodelay", "__tetra_net_close":
+		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
 	}
 
 	const typedJoinPrefix = "__tetra_task_join_typed_"

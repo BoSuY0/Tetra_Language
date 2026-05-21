@@ -235,7 +235,7 @@ func TestTargetAwareCommandsRejectInvalidTargetConsistently(t *testing.T) {
 			if code != 2 {
 				t.Fatalf("exit code = %d, stderr=%q", code, stderr.String())
 			}
-			for _, want := range []string{"unsupported target: not-a-target", "supported targets: linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web", "build-only targets: "} {
+			for _, want := range []string{"unsupported target: not-a-target", "supported targets: linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web", "build-only targets: linux-x86, linux-x32"} {
 				if !strings.Contains(stderr.String(), want) {
 					t.Fatalf("stderr missing %q: %q", want, stderr.String())
 				}

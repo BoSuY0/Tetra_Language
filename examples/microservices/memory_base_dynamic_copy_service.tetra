@@ -1,0 +1,35 @@
+// Base-dynamic copy microservice smoke.
+//
+// The service copies a byte subwindow with dynamic offsets anchored at the
+// original allocation bases, which is the stable workaround for helper calls
+// over already-derived source or destination pointers.
+module examples.microservices.memory_base_dynamic_copy_service
+
+import lib.core.capability as cap
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let source: ptr = core.alloc_bytes(8)
+        let target: ptr = core.alloc_bytes(8)
+        let source_two: ptr = core.ptr_add(source, 2, memory_cap)
+        let source_three: ptr = core.ptr_add(source, 3, memory_cap)
+        let target_one: ptr = core.ptr_add(target, 1, memory_cap)
+        let target_two: ptr = core.ptr_add(target, 2, memory_cap)
+        let _seed_two: UInt8 = core.store_u8(source_two, 20, memory_cap)
+        let _seed_three: UInt8 = core.store_u8(source_three, 22, memory_cap)
+        let _clear: Int = memory.memset_u8(target, 0, 8, memory_cap)
+        var i: Int = 0
+        while i < 2:
+            let src_cell: ptr = core.ptr_add(source, i + 2, memory_cap)
+            let dst_cell: ptr = core.ptr_add(target, i + 1, memory_cap)
+            let value: UInt8 = core.load_u8(src_cell, memory_cap)
+            let _write: UInt8 = core.store_u8(dst_cell, value, memory_cap)
+            i = i + 1
+        let total: Int = core.load_u8(target_one, memory_cap) + core.load_u8(target_two, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

@@ -1,0 +1,18 @@
+// Inline ptr_add window microservice smoke.
+//
+// The service exercises direct load/store calls whose address operand is an
+// inline allocation-base ptr_add expression.
+module examples.microservices.memory_inline_ptradd_window_service
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(12)
+        let _first: Int = core.store_i32(core.ptr_add(payload, 4, memory_cap), 20, memory_cap)
+        let _second: Int = core.store_i32(core.ptr_add(payload, 8, memory_cap), 22, memory_cap)
+        let total: Int = core.load_i32(core.ptr_add(payload, 4, memory_cap), memory_cap) + core.load_i32(core.ptr_add(payload, 8, memory_cap), memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

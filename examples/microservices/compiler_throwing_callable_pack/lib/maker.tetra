@@ -1,0 +1,9 @@
+module lib.maker
+
+enum Boom:
+    case bad
+
+func make() -> fn(Int) -> Int throws Boom:
+    let delta: Int = 2
+    return fn(value: Int) -> Int throws Boom:
+        return value + delta

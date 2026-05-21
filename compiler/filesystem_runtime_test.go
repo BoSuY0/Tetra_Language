@@ -144,14 +144,21 @@ uses capability, io:
 		t.Fatalf("write source: %v", err)
 	}
 
-	for _, target := range []string{"macos-x64", "windows-x64"} {
-		t.Run(target, func(t *testing.T) {
-			outPath := filepath.Join(tmp, "filesystem-"+target)
-			_, err := BuildFileWithStatsOpt(srcPath, outPath, target, BuildOptions{Jobs: 1})
+	for _, tc := range []struct {
+		target string
+		want   string
+	}{
+		{target: "macos-x64", want: "macos-x64"},
+		{target: "windows-x64", want: "windows-x64"},
+		{target: "x32", want: "linux-x32"},
+	} {
+		t.Run(tc.target, func(t *testing.T) {
+			outPath := filepath.Join(tmp, "filesystem-"+tc.target)
+			_, err := BuildFileWithStatsOpt(srcPath, outPath, tc.target, BuildOptions{Jobs: 1})
 			if err == nil {
 				t.Fatalf("expected unsupported filesystem runtime diagnostic")
 			}
-			want := "filesystem runtime not supported on " + target
+			want := "filesystem runtime not supported on " + tc.want
 			if !strings.Contains(err.Error(), want) {
 				t.Fatalf("error = %v, want %q", err, want)
 			}

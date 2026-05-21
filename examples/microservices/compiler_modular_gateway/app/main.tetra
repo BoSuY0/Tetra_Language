@@ -1,0 +1,12 @@
+module app.main
+
+import lib.pipeline as pipe
+
+func main() -> Int:
+    let parsed: pipe.Stage = pipe.parse(20)
+    let emitted: pipe.Stage = pipe.emit(parsed)
+    let raw_value: Int = pipe.value(emitted)
+    let stable_value: Int = pipe.id(raw_value)
+    if stable_value == 42:
+        return 0
+    return stable_value

@@ -1,0 +1,193 @@
+# TechEmpower-Compatible Web Stack
+
+Status: local compatible runtime and benchmark app slice for Tetra v0.4.0.
+
+This is a real TCP/HTTP/PostgreSQL path implemented inside the current Tetra
+runtime codebase. It is not an official upstream TechEmpower submission yet.
+The upstream FrameworkBenchmarks repository was archived on March 24, 2026, so
+official publication mechanics may require a fork or successor process.
+
+## Runtime Pieces
+
+- `compiler/internal/netrt`: Linux TCP sockets and epoll-backed event polling.
+- `compiler/internal/httprt`: HTTP/1.1 parser, router, and response writer.
+- `compiler/internal/jsonrt`: byte-buffer JSON serializers.
+- `compiler/internal/htmlrt`: Fortunes HTML escaping and rendering.
+- `compiler/internal/pgrt`: PostgreSQL wire protocol client, prepared statement
+  execution, TCP dial path, and connection pool.
+- `lib/core/postgres.tetra`: executable Tetra-source PostgreSQL startup,
+  Simple Query, Parse/Bind/Describe/Execute/Sync,
+  RowDescription/DataRow/CommandComplete/ReadyForQuery, Terminate, and endian
+  byte-buffer helpers used to grow the stdlib-facing DB surface.
+- `compiler/internal/webrt`: HTTP server and TechEmpower endpoint handlers.
+- `compiler/cmd/tetra-techempower`: runnable benchmark server executable.
+
+## Endpoints
+
+- `/plaintext`
+- `/json`
+- `/db`
+- `/queries?queries=N`
+- `/updates?queries=N`
+- `/fortunes`
+
+## Local Packaging
+
+The local benchmark packaging lives in `benchmarks/techempower/tetra/`:
+
+- `benchmark_config.json`
+- `Dockerfile`
+- `docker-compose.yml`
+- `run-local.sh`
+- `run-bench.sh`
+- `run-full-local.sh`
+- `run-scram-local-bench.sh`
+- `setup-postgres.sql`
+- `README.md`
+
+Run the app from the repository root:
+
+```sh
+benchmarks/techempower/tetra/run-local.sh
+```
+
+The app expects a PostgreSQL instance with the TechEmpower `hello_world` schema.
+Use environment variables such as `TETRA_TE_WORKERS`, `TETRA_TE_PG_HOST`,
+`TETRA_TE_PG_PORT`, `TETRA_TE_PG_USER`, `TETRA_TE_PG_DATABASE`,
+`TETRA_TE_PG_PASSWORD`, and `TETRA_TE_PG_POOL` to tune per-core event-loop
+workers and point at the database. `TETRA_TE_PG_PASSWORD` may be empty for
+trust-auth local setups; when PostgreSQL requests password authentication,
+`compiler/internal/pgrt` supports cleartext PasswordMessage and SCRAM-SHA-256
+SASL startup flows.
+
+For a self-contained local six-endpoint run:
+
+```sh
+benchmarks/techempower/tetra/run-full-local.sh
+```
+
+This starts PostgreSQL 16, initializes the `World` and `Fortune` tables from
+`setup-postgres.sql`, starts the Tetra benchmark app, and runs the benchmark
+harness without `--skip-db`.
+
+Generate a local benchmark/stress report against a running server:
+
+```sh
+benchmarks/techempower/tetra/run-bench.sh
+```
+
+The harness writes `tetra.techempower.benchmark.v1` JSON with one row per
+endpoint, correctness validation, concurrent request counts, latency summaries,
+and threshold decisions. The default artifact path is
+`reports/techempower/tetra-local-benchmark.json`.
+
+Validate a checked report before treating it as release evidence:
+
+```sh
+go run ./tools/cmd/validate-techempower-report \
+  --report reports/techempower/tetra-local-benchmark.json
+```
+
+Only local no-database smoke reports may use the explicit allowance:
+
+```sh
+go run ./tools/cmd/validate-techempower-report \
+  --report docs/benchmarks/techempower_local_smoke_skip_db_report.json \
+  --allow-skip-db
+```
+
+Generate the reproducible local SCRAM/PostgreSQL evidence without Docker:
+
+```sh
+benchmarks/techempower/tetra/run-scram-local-bench.sh \
+  --duration 30s \
+  --warmup 5s \
+  --repeats 2 \
+  --levels 8:8,16:16,32:32 \
+  --semantic-requests 64 \
+  --semantic-concurrency 8 \
+  --workers 2 \
+  --pool 64 \
+  --semantic-report docs/benchmarks/techempower_scram_single_query_local_report.json \
+  --matrix-report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
+```
+
+For release gates, raise the matrix duration to `--duration 30s` or
+`--duration 60s`.
+
+Current local evidence:
+
+- generated smoke artifact:
+  `reports/techempower/tetra-db-unavailable-benchmark.json`
+- durable checked-in copy: `docs/benchmarks/techempower_local_smoke_skip_db_report.json`
+- DB-backed SCRAM-SHA-256 local run:
+  `docs/benchmarks/techempower_scram_single_query_local_report.json`
+- DB-backed SCRAM-SHA-256 `/db` matrix:
+  `docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`
+- DB-backed SCRAM-SHA-256 run notes:
+  `docs/benchmarks/techempower_scram_single_query_local_2026-05-21.md`
+- full DB-backed local attempt log:
+  `docs/benchmarks/techempower_full_local_attempt_2026-05-20.md`
+
+The no-database smoke artifact intentionally uses `--skip-db`, so it covers only
+`/plaintext` and `/json`. The SCRAM local run used PostgreSQL 16.9.0 with
+`scram-sha-256` host authentication, `password_encryption=scram-sha-256`, and a
+role verifier prefix of `SCRAM-SHA-256`. It passed all six endpoints and the
+matrix semantic probe verified real DB reads, `queries` clamping, update
+persistence, Fortune insertion, HTML escaping, and sorted Fortune rendering.
+The `/db` Single Query matrix completed 5263983 total requests, 0 failures, best
+run 32732.74687056707 rps, and worst p99 2.826155 ms across 8/16/32
+concurrency and connection levels. Full release evidence should still raise
+worker count and request volume before making competitive performance claims.
+
+Docker Compose status in this environment:
+
+```sh
+docker compose -f benchmarks/techempower/tetra/docker-compose.yml config
+docker compose -f benchmarks/techempower/tetra/docker-compose.yml --profile benchmark config
+```
+
+Both static config validations passed. The actual Compose stack was not run
+because `docker info` could not connect to `/var/run/docker.sock`.
+
+## Verification
+
+Relevant checks:
+
+```sh
+go test ./compiler/internal/netrt ./compiler/internal/httprt ./compiler/internal/jsonrt ./compiler/internal/htmlrt ./compiler/internal/webrt ./compiler/internal/pgrt -count=1
+go test ./compiler/cmd/tetra-techempower -count=1
+go test ./compiler/cmd/tetra-techempower-bench -count=1
+go test ./tools/validators/techempower ./tools/cmd/validate-techempower-report -count=1
+go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_local_smoke_skip_db_report.json --allow-skip-db
+go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json
+GOWORK=off go test ./benchmarks/techempower/tetra/cmd/scram-local-bench -count=1
+docker compose -f benchmarks/techempower/tetra/docker-compose.yml config
+docker compose -f benchmarks/techempower/tetra/docker-compose.yml --profile benchmark config
+go test ./compiler/internal/pgrt ./compiler/internal/webrt -run 'Prepared|DBEndpoint|QueriesEndpoint|UpdatesEndpoint|FortunesEndpoint' -count=1
+go test ./compiler/internal/webrt -run 'Stress|SlowHeader' -count=1
+go build -o /tmp/tetra-techempower ./compiler/cmd/tetra-techempower
+go build -o /tmp/tetra-techempower-bench ./compiler/cmd/tetra-techempower-bench
+```
+
+Short fuzz smoke checks:
+
+```sh
+go test ./compiler/internal/httprt -run '^$' -fuzz=FuzzHTTPParseRequest -fuzztime=1s
+go test ./compiler/internal/jsonrt -run '^$' -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=1s
+go test ./compiler/internal/htmlrt -run '^$' -fuzz=FuzzAppendEscapedRemovesRawHTMLSpecials -fuzztime=1s
+go test ./compiler/internal/pgrt -run '^$' -fuzz=FuzzReadFrameDoesNotPanic -fuzztime=1s
+```
+
+## PostgreSQL Authentication
+
+The DB-backed TechEmpower path now covers PostgreSQL cleartext password auth and
+SCRAM-SHA-256. The SCRAM client parses `AuthenticationSASL`,
+`AuthenticationSASLContinue`, and `AuthenticationSASLFinal`, generates a secure
+nonce, computes the client proof with PBKDF2-HMAC-SHA-256, verifies the server
+signature before accepting startup completion, and rejects malformed messages,
+nonce mismatches, missing server-final messages, and bad signatures.
+
+Known unsupported cases are explicit rather than silent fallbacks:
+SASL mechanisms other than `SCRAM-SHA-256`, SCRAM-SHA-256-PLUS channel binding,
+and SASLprep normalization for non-ASCII user names or passwords.

@@ -93,12 +93,19 @@ documented validator tools reject unknown JSON fields so release evidence stays
 canonical for the contract revision being validated.
 
 - `targets --format=json` emits target metadata including `triple`, `os`,
-  `arch`, `abi`, `format`, `exe_ext`, `build_only`, `run_mode`,
-  `run_runner`, and `run_supported`. `run_mode` is one of `host_native`,
+  `arch`, `abi`, `data_model`, `format`, `exe_ext`, `build_only`,
+  `run_mode`, `run_runner`, `run_supported`, pointer/register/native-int
+  widths, endian, stack alignment, atomic widths, and any
+  `unsupported_reason`. `run_mode` is one of `host_native`, `host_probed`,
   `wasi_runner`, or `web_runner`.
   `run_supported` is the CLI contract for whether `tetra run --target <triple>`
   is runnable in the current host environment. Native targets are runnable only
-  when they match the detected host. `wasm32-wasi` uses
+  when they match the detected host. Build-only native targets such as
+  `linux-x86` and `linux-x32` use `run_mode: "host_probed"`: the CLI may run
+  them only when the current host can execute that exact ABI, and a failed
+  probe must report `run_supported: false` with a no-host-fallback
+  `run_unsupported_reason`. General target limitations stay in
+  `unsupported_reason`. `wasm32-wasi` uses
   `run_mode: "wasi_runner"` and is runnable when the CLI can discover
   `wasmtime` or the Node WASI fallback. `wasm32-web` uses
   `run_mode: "web_runner"` and is runnable when the CLI can discover a

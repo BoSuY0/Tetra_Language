@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -16,7 +17,7 @@ func TestTargetsCommandText(t *testing.T) {
 		t.Fatalf("targets exit code = %d, stdout=%q", code, stdout.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"Supported targets:", "linux-x64", "windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web", "Build-only targets:", "Planned targets:"} {
+	for _, want := range []string{"Supported targets:", "linux-x64", "windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web", "Build-only targets:", "linux-x86", "linux-x32", "Planned targets:"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("targets output missing %q:\n%s", want, out)
 		}
@@ -30,6 +31,7 @@ func TestTargetsCommandJSON(t *testing.T) {
 		OS                      string `json:"os"`
 		Arch                    string `json:"arch"`
 		ABI                     string `json:"abi"`
+		DataModel               string `json:"data_model"`
 		Format                  string `json:"format"`
 		ExeExt                  string `json:"exe_ext"`
 		BuildOnly               bool   `json:"build_only"`
@@ -37,6 +39,15 @@ func TestTargetsCommandJSON(t *testing.T) {
 		RunRunner               string `json:"run_runner,omitempty"`
 		RunSupported            bool   `json:"run_supported"`
 		RunUnsupportedReason    string `json:"run_unsupported_reason"`
+		PointerWidthBits        int    `json:"pointer_width_bits"`
+		RegisterWidthBits       int    `json:"register_width_bits"`
+		NativeIntWidthBits      int    `json:"native_int_width_bits"`
+		Endian                  string `json:"endian"`
+		StackAlignmentBytes     int    `json:"stack_alignment_bytes"`
+		MaxAtomicWidthBits      int    `json:"max_atomic_width_bits"`
+		AtomicWidthBits         []int  `json:"atomic_width_bits"`
+		AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits"`
+		UnsupportedReason       string `json:"unsupported_reason"`
 		SupportsDebugInfo       bool   `json:"supports_debug_info"`
 		SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 	}
@@ -50,14 +61,14 @@ func TestTargetsCommandJSON(t *testing.T) {
 	if strings.Join(report.Supported, ",") != "linux-x64,windows-x64,macos-x64,wasm32-wasi,wasm32-web" {
 		t.Fatalf("supported targets = %#v", report.Supported)
 	}
-	if len(report.BuildOnly) != 0 {
+	if strings.Join(report.BuildOnly, ",") != "linux-x86,linux-x32" {
 		t.Fatalf("build-only targets = %#v", report.BuildOnly)
 	}
 	if len(report.Planned) != 0 {
 		t.Fatalf("planned targets = %#v", report.Planned)
 	}
-	if len(report.Targets) != 5 {
-		t.Fatalf("targets metadata count = %d, want 5: %#v", len(report.Targets), report.Targets)
+	if len(report.Targets) != 7 {
+		t.Fatalf("targets metadata count = %d, want 7: %#v", len(report.Targets), report.Targets)
 	}
 	byTriple := map[string]targetMeta{}
 	for _, tgt := range report.Targets {
@@ -71,15 +82,58 @@ func TestTargetsCommandJSON(t *testing.T) {
 			t.Fatalf("target metadata missing %s in %#v", triple, report.Targets)
 		}
 	}
-	if got := byTriple["linux-x64"]; got.Status != "supported" || got.OS != "linux" || got.Arch != "x64" || got.ABI != "sysv" || got.Format != "elf" || got.BuildOnly || !got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
+	if got := byTriple["linux-x64"]; got.Status != "supported" || got.OS != "linux" || got.Arch != "x64" || got.ABI != "sysv" || got.DataModel != "lp64" || got.Format != "elf" || got.PointerWidthBits != 64 || got.RegisterWidthBits != 64 || got.NativeIntWidthBits != 64 || got.AtomicPointerWidthBits != 64 || !reflect.DeepEqual(got.AtomicWidthBits, []int{8, 16, 32, 64}) || got.Endian != "little" || got.BuildOnly || !got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 		t.Fatalf("linux-x64 metadata = %#v", got)
 	}
-	if got := byTriple["windows-x64"]; got.Status != "supported" || got.OS != "windows" || got.ABI != "win64" || got.Format != "pe" || got.ExeExt != ".exe" || !got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
+	if got := byTriple["windows-x64"]; got.Status != "supported" || got.OS != "windows" || got.ABI != "win64" || got.DataModel != "llp64" || got.Format != "pe" || got.ExeExt != ".exe" || got.PointerWidthBits != 64 || got.RegisterWidthBits != 64 || !got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 		t.Fatalf("windows-x64 metadata = %#v", got)
+	}
+	if got := byTriple["linux-x86"]; got.Status != "build_only" || got.OS != "linux" || got.Arch != "x86" || got.ABI != "i386-sysv" || got.DataModel != "ilp32" || got.PointerWidthBits != 32 || got.RegisterWidthBits != 32 || got.NativeIntWidthBits != 32 || got.AtomicPointerWidthBits != 32 || got.MaxAtomicWidthBits != 32 || !reflect.DeepEqual(got.AtomicWidthBits, []int{8, 16, 32}) || got.RunMode != "host_probed" || !got.BuildOnly || !strings.Contains(got.UnsupportedReason, "not implemented yet") || !strings.Contains(got.UnsupportedReason, "executable build/link") || !strings.Contains(got.UnsupportedReason, "run/test execution") || !strings.Contains(got.UnsupportedReason, "stdout write/string literal data") || !strings.Contains(got.UnsupportedReason, "stack-argument") || !strings.Contains(got.UnsupportedReason, "scalar global") || !strings.Contains(got.UnsupportedReason, "symbol-backed callback") || !strings.Contains(got.UnsupportedReason, "heap-backed slice allocation/indexing") || !strings.Contains(got.UnsupportedReason, "raw ptr_add/load/store") || !strings.Contains(got.UnsupportedReason, "MMIO read/write") || !strings.Contains(got.UnsupportedReason, "scoped island bump allocation/free") || !strings.Contains(got.UnsupportedReason, "debug double-free guard/page-protect") {
+		t.Fatalf("linux-x86 metadata = %#v", got)
+	} else {
+		requireUnsupportedReasonContains(t, "linux-x86", got.UnsupportedReason, []string{
+			"i386 SysV ABI classifier",
+			"explicit filesystem/networking stdlib plus time/task/actors target-runtime boundary diagnostics",
+			"x86 pointer/native-libc/function-pointer @export diagnostics",
+			"source native scalar diagnostics",
+			"pointer-only atomic ABI-width object check",
+			"source-level atomic diagnostics",
+		})
+		if got.RunSupported {
+			if got.RunUnsupportedReason != "" {
+				t.Fatalf("linux-x86 supported host-probed metadata = %#v", got)
+			}
+		} else if !strings.Contains(got.RunUnsupportedReason, "host does not support Linux i386 execution") || !strings.Contains(got.RunUnsupportedReason, "no host fallback") {
+			t.Fatalf("linux-x86 unsupported host-probed metadata = %#v", got)
+		}
+	}
+	if got := byTriple["linux-x32"]; got.Status != "build_only" || got.OS != "linux" || got.Arch != "x64" || got.ABI != "x32-sysv" || got.DataModel != "x32" || got.PointerWidthBits != 32 || got.RegisterWidthBits != 64 || got.NativeIntWidthBits != 32 || got.AtomicPointerWidthBits != 32 || !reflect.DeepEqual(got.AtomicWidthBits, []int{8, 16, 32, 64}) || got.RunMode != "host_probed" || !got.BuildOnly || !strings.Contains(got.UnsupportedReason, "full linux-x32 runtime/stdlib/FFI support is not implemented yet") || !strings.Contains(got.UnsupportedReason, "executable build/link") || !strings.Contains(got.UnsupportedReason, "object codegen") || !strings.Contains(got.UnsupportedReason, "self-host runtime builds") || !strings.Contains(got.UnsupportedReason, "compiler-owned target suites") || !strings.Contains(got.UnsupportedReason, "host-probed source run/test execution") || !strings.Contains(got.UnsupportedReason, "Linux kernel supports the x32 ABI") {
+		t.Fatalf("linux-x32 metadata = %#v", got)
+	} else {
+		requireUnsupportedReasonContains(t, "linux-x32", got.UnsupportedReason, []string{
+			"x32 SysV ABI classifier",
+			"raw ptr_add/load/store",
+			"pointer load/store",
+			"MMIO read/write",
+			"scoped island bump allocation/free",
+			"explicit filesystem/networking stdlib plus x32 multi-spawn actors/task, task-group, and typed-task runtime boundary diagnostics",
+			"x32 pointer/native-libc/function-pointer @export diagnostics",
+			"source native scalar diagnostics",
+			"pointer-only atomic ABI-width object check",
+			"dword pointer atomics",
+			"x32 syscall numbers",
+		})
+		if got.RunSupported {
+			if got.RunUnsupportedReason != "" {
+				t.Fatalf("linux-x32 supported host-probed metadata = %#v", got)
+			}
+		} else if !strings.Contains(got.RunUnsupportedReason, "host does not support Linux x32 ABI execution") || !strings.Contains(got.RunUnsupportedReason, "no host fallback") {
+			t.Fatalf("linux-x32 unsupported host-probed metadata = %#v", got)
+		}
 	}
 	for _, triple := range []string{"wasm32-wasi", "wasm32-web"} {
 		got := byTriple[triple]
-		if got.Status != "supported" || got.Arch != "wasm32" || got.Format != "wasm" || got.ExeExt != ".wasm" || got.BuildOnly || got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
+		if got.Status != "supported" || got.Arch != "wasm32" || got.DataModel != "ilp32" || got.PointerWidthBits != 32 || got.Format != "wasm" || got.ExeExt != ".wasm" || got.BuildOnly || got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 			t.Fatalf("%s metadata = %#v", triple, got)
 		}
 	}
@@ -155,6 +209,15 @@ func targetMetaForTest(t *testing.T, report targetsJSONReportForTest, triple str
 	}
 	t.Fatalf("missing target metadata for %s in %#v", triple, report.Targets)
 	return targetMetaJSONForTest{}
+}
+
+func requireUnsupportedReasonContains(t *testing.T, triple string, reason string, wants []string) {
+	t.Helper()
+	for _, want := range wants {
+		if !strings.Contains(reason, want) {
+			t.Fatalf("%s unsupported_reason missing %q: %q", triple, want, reason)
+		}
+	}
 }
 
 func TestTargetsCommandRejectsUnsupportedFormat(t *testing.T) {

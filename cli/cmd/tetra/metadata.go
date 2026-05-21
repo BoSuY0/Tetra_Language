@@ -25,6 +25,7 @@ type targetReportEntry struct {
 	OS                      string `json:"os"`
 	Arch                    string `json:"arch"`
 	ABI                     string `json:"abi"`
+	DataModel               string `json:"data_model"`
 	Format                  string `json:"format"`
 	ExeExt                  string `json:"exe_ext"`
 	BuildOnly               bool   `json:"build_only"`
@@ -32,6 +33,15 @@ type targetReportEntry struct {
 	RunRunner               string `json:"run_runner,omitempty"`
 	RunSupported            bool   `json:"run_supported"`
 	RunUnsupportedReason    string `json:"run_unsupported_reason,omitempty"`
+	PointerWidthBits        int    `json:"pointer_width_bits"`
+	RegisterWidthBits       int    `json:"register_width_bits"`
+	NativeIntWidthBits      int    `json:"native_int_width_bits"`
+	Endian                  string `json:"endian"`
+	StackAlignmentBytes     int    `json:"stack_alignment_bytes"`
+	MaxAtomicWidthBits      int    `json:"max_atomic_width_bits"`
+	AtomicWidthBits         []int  `json:"atomic_width_bits"`
+	AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits"`
+	UnsupportedReason       string `json:"unsupported_reason,omitempty"`
 	SupportsDebugInfo       bool   `json:"supports_debug_info"`
 	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 }
@@ -201,6 +211,7 @@ func buildTargetReportEntries() []targetReportEntry {
 			OS:                      tgt.OS.String(),
 			Arch:                    tgt.Arch.String(),
 			ABI:                     tgt.ABI.String(),
+			DataModel:               tgt.DataModel.String(),
 			Format:                  tgt.Format.String(),
 			ExeExt:                  tgt.ExeExt,
 			BuildOnly:               buildOnly,
@@ -208,11 +219,28 @@ func buildTargetReportEntries() []targetReportEntry {
 			RunRunner:               runRunner,
 			RunSupported:            runSupported,
 			RunUnsupportedReason:    runUnsupportedReason,
+			PointerWidthBits:        tgt.PointerWidthBits,
+			RegisterWidthBits:       tgt.RegisterWidthBits,
+			NativeIntWidthBits:      tgt.NativeIntWidthBits,
+			Endian:                  tgt.Endian.String(),
+			StackAlignmentBytes:     tgt.StackAlignmentBytes,
+			MaxAtomicWidthBits:      tgt.MaxAtomicWidthBits,
+			AtomicWidthBits:         tgt.AtomicWidthBits(),
+			AtomicPointerWidthBits:  atomicPointerWidthBits(tgt),
+			UnsupportedReason:       tgt.UnsupportedReason,
 			SupportsDebugInfo:       tgt.SupportsDebugInfo,
 			SupportsReleaseOptimize: tgt.SupportsReleaseOptimize,
 		})
 	}
 	return out
+}
+
+func atomicPointerWidthBits(tgt ctarget.Target) int {
+	layout, err := tgt.AtomicPointerLayout()
+	if err != nil {
+		return 0
+	}
+	return layout.WidthBits
 }
 
 func targetRunSupport(tgt ctarget.Target, host string, hostOK bool) (bool, string, string) {
@@ -222,6 +250,14 @@ func targetRunSupport(tgt ctarget.Target, host string, hostOK bool) (bool, strin
 			return true, "", ""
 		}
 		return false, "", fmt.Sprintf("%s cannot run on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH)
+	case ctarget.RunModeHostProbed:
+		if !ctarget.IsBuildOnlyTarget(tgt.Triple) {
+			return false, "", fmt.Sprintf("%s host_probed run mode is only valid for build-only native targets", tgt.Triple)
+		}
+		if canRunBuildOnlyNativeTargetOnHost(tgt) {
+			return true, "", ""
+		}
+		return false, "", buildOnlyNativeRunUnsupportedReason(tgt)
 	case ctarget.RunModeWASIRunner:
 		runner, err := discoverWASIRunner("")
 		if err != nil {
@@ -234,6 +270,11 @@ func targetRunSupport(tgt ctarget.Target, host string, hostOK bool) (bool, strin
 			return false, "", err.Error()
 		}
 		return true, runner.Name, ""
+	case ctarget.RunModeUnsupported:
+		if tgt.UnsupportedReason != "" {
+			return false, "", tgt.UnsupportedReason
+		}
+		return false, "", fmt.Sprintf("%s has unsupported runtime mode", tgt.Triple)
 	default:
 		return false, "", fmt.Sprintf("%s has unknown runtime mode %s", tgt.Triple, tgt.RunMode.String())
 	}
@@ -249,7 +290,12 @@ func describeTargetForText(triple string) string {
 		"os=" + tgt.OS.String(),
 		"arch=" + tgt.Arch.String(),
 		"abi=" + tgt.ABI.String(),
+		"data_model=" + tgt.DataModel.String(),
 		"format=" + tgt.Format.String(),
+		fmt.Sprintf("ptr=%d", tgt.PointerWidthBits),
+		fmt.Sprintf("reg=%d", tgt.RegisterWidthBits),
+		fmt.Sprintf("native_int=%d", tgt.NativeIntWidthBits),
+		"endian=" + tgt.Endian.String(),
 	}
 	if tgt.ExeExt != "" {
 		parts = append(parts, "exe_ext="+tgt.ExeExt)
@@ -259,6 +305,9 @@ func describeTargetForText(triple string) string {
 	}
 	if tgt.RunMode != ctarget.RunModeUnknown {
 		parts = append(parts, "run_mode="+tgt.RunMode.String())
+	}
+	if tgt.UnsupportedReason != "" {
+		parts = append(parts, "unsupported_reason="+tgt.UnsupportedReason)
 	}
 	return strings.Join(parts, " ")
 }

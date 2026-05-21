@@ -1,0 +1,21 @@
+// Zero-length derived-helper memory microservice smoke.
+//
+// The service proves that zero-length stdlib byte helpers are non-accessing
+// even when the caller passes derived source and destination windows.
+module examples.microservices.memory_zero_length_derived_helper_service
+
+import lib.core.capability as cap
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let source: ptr = core.alloc_bytes(4)
+        let target: ptr = core.alloc_bytes(4)
+        let source_one: ptr = core.ptr_add(source, 1, memory_cap)
+        let target_one: ptr = core.ptr_add(target, 1, memory_cap)
+        let copy_status: Int = memory.memcpy_u8(target_one, source_one, 0, memory_cap)
+        let set_status: Int = memory.memset_u8(target_one, 7, 0, memory_cap)
+        return copy_status + set_status
+    return 99

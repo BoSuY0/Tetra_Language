@@ -38,6 +38,7 @@ type ownershipJoinConflict struct {
 
 type scopeInfo struct {
 	localScopes     map[string]int
+	localScopeSets  map[string]map[int]struct{}
 	islandScopes    map[string]int
 	ifScopes        map[*frontend.IfStmt]branchScopeInfo
 	ifLetScopes     map[*frontend.IfLetStmt]branchScopeInfo
@@ -55,6 +56,7 @@ type scopeInfo struct {
 func newScopeInfo() *scopeInfo {
 	return &scopeInfo{
 		localScopes:     make(map[string]int),
+		localScopeSets:  make(map[string]map[int]struct{}),
 		islandScopes:    make(map[string]int),
 		ifScopes:        make(map[*frontend.IfStmt]branchScopeInfo),
 		ifLetScopes:     make(map[*frontend.IfLetStmt]branchScopeInfo),
@@ -91,6 +93,7 @@ func (s *scopeInfo) exitScope() {
 
 type regionState struct {
 	localScopes           map[string]int
+	localScopeSets        map[string]map[int]struct{}
 	islandScopes          map[string]int
 	ifScopes              map[*frontend.IfStmt]branchScopeInfo
 	ifLetScopes           map[*frontend.IfLetStmt]branchScopeInfo
@@ -149,6 +152,7 @@ type regionState struct {
 
 func newRegionState(scopes *scopeInfo) *regionState {
 	localScopes := make(map[string]int)
+	localScopeSets := make(map[string]map[int]struct{})
 	islandScopes := make(map[string]int)
 	var ifScopes map[*frontend.IfStmt]branchScopeInfo
 	var ifLetScopes map[*frontend.IfLetStmt]branchScopeInfo
@@ -161,6 +165,7 @@ func newRegionState(scopes *scopeInfo) *regionState {
 	var deferScopes map[*frontend.DeferStmt]int
 	if scopes != nil {
 		localScopes = scopes.localScopes
+		localScopeSets = scopes.localScopeSets
 		islandScopes = scopes.islandScopes
 		ifScopes = scopes.ifScopes
 		ifLetScopes = scopes.ifLetScopes
@@ -178,6 +183,7 @@ func newRegionState(scopes *scopeInfo) *regionState {
 	}
 	return &regionState{
 		localScopes:         localScopes,
+		localScopeSets:      localScopeSets,
 		islandScopes:        islandScopes,
 		ifScopes:            ifScopes,
 		ifLetScopes:         ifLetScopes,
@@ -391,6 +397,33 @@ func (s *regionState) checkNoConsumedDescendants(name string, pos frontend.Posit
 			reportName = source
 		}
 		if reportName != queryName && !ownershipPathPrefix(queryName, reportName) {
+			continue
+		}
+		if conflict, maybe := s.maybeConsumedVars[consumedName]; maybe {
+			return ownershipDiagnosticf(pos, "cannot use consumed value '%s': value '%s' may have been consumed after ownership join (%s: %s, %s: %s)", reportName, reportName, conflict.leftLabel, formatOwnershipJoinState(conflict.leftConsumed, conflict.leftPos), conflict.rightLabel, formatOwnershipJoinState(conflict.rightConsumed, conflict.rightPos))
+		}
+		if conflict, maybe := s.maybeConsumedVars[reportName]; maybe {
+			return ownershipDiagnosticf(pos, "cannot use consumed value '%s': value '%s' may have been consumed after ownership join (%s: %s, %s: %s)", reportName, reportName, conflict.leftLabel, formatOwnershipJoinState(conflict.leftConsumed, conflict.leftPos), conflict.rightLabel, formatOwnershipJoinState(conflict.rightConsumed, conflict.rightPos))
+		}
+		return ownershipDiagnosticf(pos, "cannot use consumed value '%s' (consumed at %s)", reportName, frontend.FormatPos(consumedAt))
+	}
+	return nil
+}
+
+func (s *regionState) checkNoConsumedProperDescendants(name string, pos frontend.Position) error {
+	if s == nil || name == "" {
+		return nil
+	}
+	queryName := name
+	if source, ok := s.ownershipAliasSource(name); ok {
+		queryName = source
+	}
+	for consumedName, consumedAt := range s.consumedVars {
+		reportName := consumedName
+		if source, ok := s.ownershipAliasSource(consumedName); ok {
+			reportName = source
+		}
+		if reportName == queryName || !ownershipPathPrefix(queryName, reportName) {
 			continue
 		}
 		if conflict, maybe := s.maybeConsumedVars[consumedName]; maybe {
@@ -1698,6 +1731,16 @@ func localScopeID(name string, state *regionState) int {
 }
 
 func checkLocalScope(name string, state *regionState, pos frontend.Position) error {
+	if state != nil {
+		if ids := state.localScopeSets[name]; len(ids) > 0 {
+			for id := range ids {
+				if state.isScopeActive(id) {
+					return nil
+				}
+			}
+			return fmt.Errorf("%s: identifier '%s' is out of scope", frontend.FormatPos(pos), name)
+		}
+	}
 	scopeID := localScopeID(name, state)
 	if scopeID == regionNone {
 		return nil

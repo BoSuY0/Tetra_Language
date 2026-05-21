@@ -1,0 +1,48 @@
+module lib.waits
+
+func delayed_value_sender() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    let _sent: Int = core.send(core.sender(), 4)
+    return 0
+
+func delayed_tagged_sender() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    let _sent: Int = core.send_msg(core.sender(), 4, 9)
+    return 0
+
+func recv_error_offset() -> Int
+uses actors, runtime:
+    let _actor: actor = core.spawn("delayed_value_sender")
+    let early: actor.recv_result_i32 = core.recv_until(core.deadline_ms(1))
+    if early.error != 2:
+        return 70 + early.error
+    let final: actor.recv_result_i32 = core.recv_until(core.deadline_ms(10))
+    if final.error != 0:
+        return 80 + final.error
+    if final.value != 4:
+        return 90 + final.value
+    return early.error
+
+func poll_error_offset() -> Int
+uses actors:
+    let empty: actor.recv_result_i32 = core.recv_poll()
+    if empty.error != 2:
+        return 100 + empty.error
+    return empty.error
+
+func recv_msg_error_offset() -> Int
+uses actors, runtime:
+    let _actor: actor = core.spawn("delayed_tagged_sender")
+    let early: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(1))
+    if early.error != 2:
+        return 110 + early.error
+    let final: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(10))
+    if final.error != 0:
+        return 120 + final.error
+    if final.value != 4:
+        return 130 + final.value
+    if final.tag != 9:
+        return 140 + final.tag
+    return early.error

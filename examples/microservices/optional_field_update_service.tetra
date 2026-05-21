@@ -1,0 +1,18 @@
+// Optional field update microservice smoke.
+//
+// The service updates an optional struct field through an explicitly typed
+// optional local and then unwraps the stored payload.
+module examples.microservices.optional_field_update_service
+
+struct Cell:
+    value: Int?
+
+func main() -> Int:
+    var cell: Cell = Cell(value: none)
+    let maybe: Int? = 42
+    cell.value = maybe
+    if let value = cell.value:
+        if value == 42:
+            return 0
+        return value
+    return 99

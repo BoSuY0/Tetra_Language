@@ -1,0 +1,10 @@
+module app.main
+
+import lib.callbacks as callbacks
+
+func main() -> Int:
+    let cb: fn(Int) -> Int = callbacks.make_delta(2)
+    let result: Int = callbacks.apply(cb, 40)
+    if result == 42:
+        return 0
+    return result

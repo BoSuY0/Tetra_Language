@@ -1,0 +1,11 @@
+module app.main
+
+import lib.route as route
+
+func main() -> Int:
+    let empty: route.Route = route.empty()
+    let ready: route.Route = route.ready(42)
+    let total: Int = route.score(empty) + route.score(ready)
+    if total == 42:
+        return 0
+    return total

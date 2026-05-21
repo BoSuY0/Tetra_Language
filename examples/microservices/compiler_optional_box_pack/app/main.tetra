@@ -1,0 +1,11 @@
+module app.main
+
+import lib.box as box
+
+func main() -> Int:
+    let empty: box.MaybeBox<Int> = box.empty()
+    let filled: box.MaybeBox<Int> = box.filled(42)
+    let status: Int = box.score(empty) + box.score(filled)
+    if status == 42:
+        return 0
+    return status

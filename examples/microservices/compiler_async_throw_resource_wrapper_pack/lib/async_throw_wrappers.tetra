@@ -1,0 +1,100 @@
+module lib.async_throw_wrappers
+
+enum AsyncWrapperErr:
+    case failed
+
+enum TaskSlot:
+    case ready(task.i32)
+    case missing
+
+enum ActorSlot:
+    case ready(actor)
+    case missing
+
+enum GroupSlot:
+    case ready(task.group)
+    case missing
+
+struct TaskBox:
+    handle: task.i32
+
+struct ActorBox:
+    peer: actor
+
+struct GroupBox:
+    group: task.group
+
+async func box_task(handle: task.i32, fail: Bool) -> TaskBox throws AsyncWrapperErr:
+    if fail:
+        throw AsyncWrapperErr.failed
+    return TaskBox(handle: handle)
+
+async func relay_task_box(handle: task.i32) -> TaskBox throws AsyncWrapperErr:
+    return try await box_task(handle, false)
+
+async func slot_task(handle: task.i32, fail: Bool) -> TaskSlot throws AsyncWrapperErr:
+    if fail:
+        throw AsyncWrapperErr.failed
+    return TaskSlot.ready(handle)
+
+async func relay_task_slot(handle: task.i32) -> TaskSlot throws AsyncWrapperErr:
+    return try await slot_task(handle, false)
+
+async func box_actor(peer: actor, fail: Bool) -> ActorBox throws AsyncWrapperErr:
+    if fail:
+        throw AsyncWrapperErr.failed
+    return ActorBox(peer: peer)
+
+async func relay_actor_box(peer: actor) -> ActorBox throws AsyncWrapperErr:
+    return try await box_actor(peer, false)
+
+async func slot_actor(peer: actor, fail: Bool) -> ActorSlot throws AsyncWrapperErr:
+    if fail:
+        throw AsyncWrapperErr.failed
+    return ActorSlot.ready(peer)
+
+async func relay_actor_slot(peer: actor) -> ActorSlot throws AsyncWrapperErr:
+    return try await slot_actor(peer, false)
+
+async func box_group(group: task.group, fail: Bool) -> GroupBox throws AsyncWrapperErr:
+    if fail:
+        throw AsyncWrapperErr.failed
+    return GroupBox(group: group)
+
+async func relay_group_box(group: task.group) -> GroupBox throws AsyncWrapperErr:
+    return try await box_group(group, false)
+
+async func slot_group(group: task.group, fail: Bool) -> GroupSlot throws AsyncWrapperErr:
+    if fail:
+        throw AsyncWrapperErr.failed
+    return GroupSlot.ready(group)
+
+async func relay_group_slot(group: task.group) -> GroupSlot throws AsyncWrapperErr:
+    return try await slot_group(group, false)
+
+func task_worker() -> Int:
+    return 4
+
+func group_worker() -> Int:
+    return 4
+
+func fallback() -> Int
+uses alloc, capability, mem, runtime:
+    let task: task.i32 = core.task_spawn_i32("task_worker")
+    let group: task.group = core.task_group_open()
+    let grouped: task.i32 = core.task_spawn_group_i32(group, "group_worker")
+    let left_offset: Int = core.task_join_i32(task)
+    let right_offset: Int = core.task_join_i32(grouped)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let left_cell: ptr = core.ptr_add(left_base, left_offset, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, right_offset, memory_cap)
+        let _left_store: Int = core.store_i32(left_cell, 16, memory_cap)
+        let _right_store: Int = core.store_i32(right_cell, 26, memory_cap)
+        return core.load_i32(left_cell, memory_cap) + core.load_i32(right_cell, memory_cap)
+    return 99

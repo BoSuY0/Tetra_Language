@@ -1,0 +1,23 @@
+// Optional task-group alias-close microservice smoke.
+//
+// The service unwraps an optional task group, sends it through a non-generic
+// alias helper, checks status, and closes the returned handle.
+module examples.microservices.parallel_group_optional_alias_close_service
+
+func alias_group(group: task.group) -> task.group:
+    return group
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let maybe: task.group? = group
+    if let handle = maybe:
+        let returned: task.group = alias_group(handle)
+        let status: Int = core.task_group_status(returned)
+        let close_error: Int = core.task_group_close(returned)
+        if close_error != 0:
+            return 10 + close_error
+        if status == 1:
+            return 0
+        return status
+    return 99

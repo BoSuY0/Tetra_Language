@@ -340,8 +340,20 @@ func targetMetadataCheck() doctorCheck {
 		if err != nil {
 			return failCheck("target metadata", err.Error())
 		}
-		if entry.OS != tgt.OS.String() || entry.Arch != tgt.Arch.String() || entry.ABI != tgt.ABI.String() || entry.Format != tgt.Format.String() {
+		if entry.OS != tgt.OS.String() || entry.Arch != tgt.Arch.String() || entry.ABI != tgt.ABI.String() || entry.DataModel != tgt.DataModel.String() || entry.Format != tgt.Format.String() {
 			return failCheck("target metadata", fmt.Sprintf("%s metadata mismatch", entry.Triple))
+		}
+		if entry.PointerWidthBits != tgt.PointerWidthBits || entry.RegisterWidthBits != tgt.RegisterWidthBits || entry.NativeIntWidthBits != tgt.NativeIntWidthBits {
+			return failCheck("target metadata", fmt.Sprintf("%s width metadata mismatch", entry.Triple))
+		}
+		if entry.Endian != tgt.Endian.String() || entry.StackAlignmentBytes != tgt.StackAlignmentBytes || entry.MaxAtomicWidthBits != tgt.MaxAtomicWidthBits {
+			return failCheck("target metadata", fmt.Sprintf("%s layout metadata mismatch", entry.Triple))
+		}
+		if !sameDoctorInts(entry.AtomicWidthBits, tgt.AtomicWidthBits()) || entry.AtomicPointerWidthBits != atomicPointerWidthBits(tgt) {
+			return failCheck("target metadata", fmt.Sprintf("%s atomic metadata mismatch", entry.Triple))
+		}
+		if entry.UnsupportedReason != tgt.UnsupportedReason {
+			return failCheck("target metadata", fmt.Sprintf("%s unsupported_reason got %q want %q", entry.Triple, entry.UnsupportedReason, tgt.UnsupportedReason))
 		}
 		if entry.ExeExt != tgt.ExeExt {
 			return failCheck("target metadata", fmt.Sprintf("%s exe_ext got %q want %q", entry.Triple, entry.ExeExt, tgt.ExeExt))
@@ -378,6 +390,22 @@ func validateDoctorTargetRunMetadata(entry targetReportEntry, tgt ctarget.Target
 		}
 		if !entry.RunSupported && entry.RunUnsupportedReason == "" {
 			return fmt.Errorf("%s run_unsupported_reason is required when run_supported is false", entry.Triple)
+		}
+	case ctarget.RunModeHostProbed:
+		if !buildOnly {
+			return fmt.Errorf("%s host_probed run mode must be build-only", entry.Triple)
+		}
+		if entry.RunRunner != "" {
+			return fmt.Errorf("%s run_runner got %q want empty", entry.Triple, entry.RunRunner)
+		}
+		if entry.RunSupported {
+			if entry.RunUnsupportedReason != "" {
+				return fmt.Errorf("%s run_unsupported_reason got %q want empty when host probe is supported", entry.Triple, entry.RunUnsupportedReason)
+			}
+			return nil
+		}
+		if !strings.Contains(entry.RunUnsupportedReason, "no host fallback") {
+			return fmt.Errorf("%s run_unsupported_reason must explain host probe failure and no fallback", entry.Triple)
 		}
 	case ctarget.RunModeWASIRunner:
 		if entry.Triple != "wasm32-wasi" || buildOnly {
@@ -420,10 +448,35 @@ func validateDoctorTargetRunMetadata(entry targetReportEntry, tgt ctarget.Target
 			!strings.Contains(entry.RunUnsupportedReason, "missing web node helper") {
 			return fmt.Errorf("%s run_unsupported_reason must explain missing web runner", entry.Triple)
 		}
+	case ctarget.RunModeUnsupported:
+		if !buildOnly {
+			return fmt.Errorf("%s unsupported run mode must be build-only", entry.Triple)
+		}
+		if entry.RunSupported {
+			return fmt.Errorf("%s run_supported got true for unsupported run mode", entry.Triple)
+		}
+		if entry.RunRunner != "" {
+			return fmt.Errorf("%s run_runner got %q want empty", entry.Triple, entry.RunRunner)
+		}
+		if entry.RunUnsupportedReason == "" {
+			return fmt.Errorf("%s run_unsupported_reason is required for unsupported run mode", entry.Triple)
+		}
 	default:
 		return fmt.Errorf("%s has unsupported run_mode %q", entry.Triple, tgt.RunMode.String())
 	}
 	return nil
+}
+
+func sameDoctorInts(a []int, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func toolingCommandsCheck() doctorCheck {

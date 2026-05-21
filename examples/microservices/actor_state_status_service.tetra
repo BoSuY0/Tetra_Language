@@ -1,0 +1,31 @@
+// Actor state status microservice smoke.
+//
+// The service mixes supported actor state slots: Int, UInt8, UInt16, Bool, and
+// task.error.
+module examples.microservices.actor_state_status_service
+
+actor StatusCounter:
+    var total: Int = 0
+    val step: UInt8 = 2
+    const boost: UInt16 = 20
+    val enabled: Bool = true
+    var err: task.error = 0
+    func run() -> Int
+    uses actors:
+        let request: actor.msg = core.recv_msg()
+        err = request.tag
+        if enabled:
+            total = total + step + boost + err + request.value
+        let _reply: Int = core.send_msg(core.sender(), total, err + 1)
+        return 0
+
+func main() -> Int
+uses actors:
+    let counter: actor = core.spawn("StatusCounter.run")
+    let _sent: Int = core.send_msg(counter, 18, 2)
+    let reply: actor.msg = core.recv_msg()
+    if reply.tag != 3:
+        return 70 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

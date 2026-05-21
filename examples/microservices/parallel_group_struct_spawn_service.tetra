@@ -1,0 +1,26 @@
+// Task-group struct spawn microservice smoke.
+//
+// The service carries a task group through a struct field, spawns a grouped
+// worker from the recovered handle, joins it, and closes the same handle.
+module examples.microservices.parallel_group_struct_spawn_service
+
+struct GroupBox:
+    group: task.group
+
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let box: GroupBox = GroupBox(group: group)
+    let task: task.i32 = core.task_spawn_group_i32(box.group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let close_error: Int = core.task_group_close(box.group)
+    if result.error != 0:
+        return 10 + result.error
+    if close_error != 0:
+        return 20 + close_error
+    if result.value == 42:
+        return 0
+    return result.value

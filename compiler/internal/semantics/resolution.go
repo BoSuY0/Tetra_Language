@@ -191,6 +191,8 @@ func canonicalBuiltinType(name string) (string, bool) {
 	switch name {
 	case "i32", "Int":
 		return "i32", true
+	case "i64", "Int64":
+		return "i64", true
 	case "u8", "UInt8", "Byte":
 		return "u8", true
 	case "u16", "UInt16":
@@ -381,6 +383,26 @@ func resolveCallName(name string, module string, imports map[string]string, pos 
 	}
 	modPath := strings.Join(parts[:len(parts)-1], ".")
 	return modPath + "." + parts[len(parts)-1], nil
+}
+
+func resolveKnownCallName(name string, funcs map[string]FuncSig, module string, imports map[string]string, pos frontend.Position) (string, error) {
+	if _, ok := funcs[name]; ok {
+		return name, nil
+	}
+	resolved, err := resolveCallName(name, module, imports, pos)
+	if err != nil {
+		return "", err
+	}
+	if _, ok := funcs[resolved]; ok {
+		return resolved, nil
+	}
+	if module != "" && strings.Contains(name, ".") {
+		moduleLocal := qualifyName(module, name)
+		if _, ok := funcs[moduleLocal]; ok {
+			return moduleLocal, nil
+		}
+	}
+	return resolved, nil
 }
 
 type assignTargetInfo struct {

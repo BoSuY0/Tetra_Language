@@ -273,7 +273,7 @@ uses actors, runtime:
 		typed.SourceNodeID != 1 ||
 		typed.DestNodeID != 2 ||
 		typed.ActorID == 0 ||
-		typed.Tag != 0 ||
+		typed.Tag != actorwire.TypedMessageTag("RemoteMsg", 0) ||
 		len(typed.Payload) != 1 ||
 		typed.Payload[0] != 11 {
 		t.Fatalf("typed frame = %+v, want send_typed ping(11) to node 2", typed)
@@ -582,7 +582,7 @@ uses actors, runtime:
 			DestNodeID:   1,
 			SequenceID:   1,
 			ActorID:      0,
-			Tag:          0,
+			Tag:          actorwire.TypedMessageTag("RemoteMsg", 0),
 		},
 	)
 
@@ -691,7 +691,7 @@ uses actors, runtime:
 			DestNodeID:   1,
 			SequenceID:   1,
 			ActorID:      0,
-			Tag:          0,
+			Tag:          actorwire.TypedMessageTag("RemoteMsg", 0),
 			Payload:      []int32{20, 22},
 		},
 	)

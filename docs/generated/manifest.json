@@ -67,48 +67,193 @@
   "targets": [
     {
       "triple": "linux-x64",
+      "status": "supported",
       "os": "linux",
       "arch": "x64",
       "abi": "sysv",
+      "data_model": "lp64",
       "format": "elf",
       "exe_ext": "",
-      "collect_imports": false
+      "collect_imports": false,
+      "run_mode": "host_native",
+      "pointer_width_bits": 64,
+      "register_width_bits": 64,
+      "native_int_width_bits": 64,
+      "endian": "little",
+      "stack_alignment_bytes": 16,
+      "max_atomic_width_bits": 64,
+      "atomic_width_bits": [
+        8,
+        16,
+        32,
+        64
+      ],
+      "atomic_pointer_width_bits": 64,
+      "supports_debug_info": true,
+      "supports_release_optimize": true
     },
     {
       "triple": "windows-x64",
+      "status": "supported",
       "os": "windows",
       "arch": "x64",
       "abi": "win64",
+      "data_model": "llp64",
       "format": "pe",
       "exe_ext": ".exe",
-      "collect_imports": true
+      "collect_imports": true,
+      "run_mode": "host_native",
+      "pointer_width_bits": 64,
+      "register_width_bits": 64,
+      "native_int_width_bits": 64,
+      "endian": "little",
+      "stack_alignment_bytes": 16,
+      "max_atomic_width_bits": 64,
+      "atomic_width_bits": [
+        8,
+        16,
+        32,
+        64
+      ],
+      "atomic_pointer_width_bits": 64,
+      "supports_debug_info": true,
+      "supports_release_optimize": true
     },
     {
       "triple": "macos-x64",
+      "status": "supported",
       "os": "macos",
       "arch": "x64",
       "abi": "sysv",
+      "data_model": "lp64",
       "format": "macho",
       "exe_ext": "",
-      "collect_imports": false
+      "collect_imports": false,
+      "run_mode": "host_native",
+      "pointer_width_bits": 64,
+      "register_width_bits": 64,
+      "native_int_width_bits": 64,
+      "endian": "little",
+      "stack_alignment_bytes": 16,
+      "max_atomic_width_bits": 64,
+      "atomic_width_bits": [
+        8,
+        16,
+        32,
+        64
+      ],
+      "atomic_pointer_width_bits": 64,
+      "supports_debug_info": true,
+      "supports_release_optimize": true
     },
     {
       "triple": "wasm32-wasi",
+      "status": "supported",
       "os": "wasi",
       "arch": "wasm32",
       "abi": "wasi",
+      "data_model": "ilp32",
       "format": "wasm",
       "exe_ext": ".wasm",
-      "collect_imports": false
+      "collect_imports": false,
+      "run_mode": "wasi_runner",
+      "pointer_width_bits": 32,
+      "register_width_bits": 32,
+      "native_int_width_bits": 32,
+      "endian": "little",
+      "stack_alignment_bytes": 16,
+      "max_atomic_width_bits": 64,
+      "atomic_width_bits": [
+        8,
+        16,
+        32,
+        64
+      ],
+      "atomic_pointer_width_bits": 32,
+      "supports_debug_info": false,
+      "supports_release_optimize": true
     },
     {
       "triple": "wasm32-web",
+      "status": "supported",
       "os": "web",
       "arch": "wasm32",
       "abi": "web",
+      "data_model": "ilp32",
       "format": "wasm",
       "exe_ext": ".wasm",
-      "collect_imports": false
+      "collect_imports": false,
+      "run_mode": "web_runner",
+      "pointer_width_bits": 32,
+      "register_width_bits": 32,
+      "native_int_width_bits": 32,
+      "endian": "little",
+      "stack_alignment_bytes": 16,
+      "max_atomic_width_bits": 64,
+      "atomic_width_bits": [
+        8,
+        16,
+        32,
+        64
+      ],
+      "atomic_pointer_width_bits": 32,
+      "supports_debug_info": false,
+      "supports_release_optimize": true
+    },
+    {
+      "triple": "linux-x86",
+      "status": "build_only",
+      "os": "linux",
+      "arch": "x86",
+      "abi": "i386-sysv",
+      "data_model": "ilp32",
+      "format": "elf",
+      "exe_ext": "",
+      "collect_imports": false,
+      "run_mode": "host_probed",
+      "pointer_width_bits": 32,
+      "register_width_bits": 32,
+      "native_int_width_bits": 32,
+      "endian": "little",
+      "stack_alignment_bytes": 16,
+      "max_atomic_width_bits": 32,
+      "atomic_width_bits": [
+        8,
+        16,
+        32
+      ],
+      "atomic_pointer_width_bits": 32,
+      "unsupported_reason": "full linux-x86 runtime/stdlib/FFI support is not implemented yet; no-runtime executable build/link, i386-compatible Linux run/test execution, stdout write/string literal data, stack-argument, scalar global, symbol-backed callback, heap-backed slice allocation/indexing, raw ptr_add/load/store, MMIO read/write, scoped island bump allocation/free plus debug double-free guard/page-protect object codegen, ELF/linker primitives, i386 SysV ABI classifier, explicit filesystem/networking stdlib plus time/task/actors target-runtime boundary diagnostics, x86 pointer/native-libc/function-pointer @export diagnostics, source native scalar diagnostics, pointer-only atomic ABI-width object check, source-level atomic diagnostics, and full 8/16/32-bit atomic/fuzz object checks are available",
+      "supports_debug_info": false,
+      "supports_release_optimize": false
+    },
+    {
+      "triple": "linux-x32",
+      "status": "build_only",
+      "os": "linux",
+      "arch": "x64",
+      "abi": "x32-sysv",
+      "data_model": "x32",
+      "format": "elf",
+      "exe_ext": "",
+      "collect_imports": false,
+      "run_mode": "host_probed",
+      "pointer_width_bits": 32,
+      "register_width_bits": 64,
+      "native_int_width_bits": 32,
+      "endian": "little",
+      "stack_alignment_bytes": 16,
+      "max_atomic_width_bits": 64,
+      "atomic_width_bits": [
+        8,
+        16,
+        32,
+        64
+      ],
+      "atomic_pointer_width_bits": 32,
+      "unsupported_reason": "full linux-x32 runtime/stdlib/FFI support is not implemented yet; executable build/link, object codegen, ELF/linker primitives, no-runtime programs, raw ptr_add/load/store, pointer load/store, MMIO read/write, scoped island bump allocation/free, self-host runtime builds, compiler-owned target suites, x32 SysV ABI classifier, explicit filesystem/networking stdlib plus x32 multi-spawn actors/task, task-group, and typed-task runtime boundary diagnostics, scalar i32 @export object smoke, x32 pointer/native-libc/function-pointer @export diagnostics, source native scalar diagnostics, x32 syscall numbers, pointer-only atomic ABI-width object check, dword pointer atomics, and host-probed source run/test execution are available when the Linux kernel supports the x32 ABI",
+      "supports_debug_info": false,
+      "supports_release_optimize": false
     }
   ],
   "builtins": [
@@ -173,6 +318,3086 @@
       "return_type": "ptr",
       "effects": [
         "alloc",
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i32_acq_rel",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i32_acquire",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i64_acq_rel",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i64_acquire",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_ptr_acq_rel",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u16_acq_rel",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u16_acquire",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u8_acq_rel",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u8_acquire",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i32_acq_rel",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i32_acquire",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i64_acq_rel",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i64_acquire",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_ptr_acq_rel",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u16_acq_rel",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u16_acquire",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u8_acq_rel",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u8_acquire",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_compare_exchange_weak_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i32_acq_rel",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i32_acquire",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i64_acq_rel",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i64_acquire",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_ptr_acq_rel",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u16_acq_rel",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u16_acquire",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u8_acq_rel",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u8_acquire",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_exchange_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fence_acq_rel",
+      "param_types": [
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fence_acquire",
+      "param_types": [
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fence_relaxed",
+      "param_types": [
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fence_release",
+      "param_types": [
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fence_seq_cst",
+      "param_types": [
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i32_acq_rel",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i32_acquire",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i64_acq_rel",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i64_acquire",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_ptr_acq_rel",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u16_acq_rel",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u16_acquire",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u8_acq_rel",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u8_acquire",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_add_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i32_acq_rel",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i32_acquire",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i64_acq_rel",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i64_acquire",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_ptr_acq_rel",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u16_acq_rel",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u16_acquire",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u8_acq_rel",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u8_acquire",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_and_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i32_acq_rel",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i32_acquire",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i64_acq_rel",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i64_acquire",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_ptr_acq_rel",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u16_acq_rel",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u16_acquire",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u8_acq_rel",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u8_acquire",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_or_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i32_acq_rel",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i32_acquire",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i64_acq_rel",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i64_acquire",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_ptr_acq_rel",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u16_acq_rel",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u16_acquire",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u8_acq_rel",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u8_acquire",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_sub_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i32_acq_rel",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i32_acquire",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i64_acq_rel",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i64_acquire",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_ptr_acq_rel",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u16_acq_rel",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u16_acquire",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u8_acq_rel",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u8_acquire",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_fetch_xor_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_i32_acquire",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_i64_acquire",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_ptr_acquire",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_u16_acquire",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_u8_acquire",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_load_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_i32_relaxed",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_i32_release",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_i32_seq_cst",
+      "param_types": [
+        "ptr",
+        "i32",
+        "cap.mem"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_i64_relaxed",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_i64_release",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_i64_seq_cst",
+      "param_types": [
+        "ptr",
+        "i64",
+        "cap.mem"
+      ],
+      "return_type": "i64",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_ptr_relaxed",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_ptr_release",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_ptr_seq_cst",
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_u16_relaxed",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_u16_release",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_u16_seq_cst",
+      "param_types": [
+        "ptr",
+        "u16",
+        "cap.mem"
+      ],
+      "return_type": "u16",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_u8_relaxed",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_u8_release",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
+      "name": "core.atomic_store_u8_seq_cst",
+      "param_types": [
+        "ptr",
+        "u8",
+        "cap.mem"
+      ],
+      "return_type": "u8",
+      "effects": [
         "mem"
       ],
       "unsafe_policy": "always"
@@ -464,6 +3689,285 @@
       "unsafe_policy": "always"
     },
     {
+      "name": "core.net_accept4",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_bind_tcp4_loopback",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_close",
+      "param_types": [
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_connect_tcp4_loopback",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_epoll_create",
+      "param_types": [
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_epoll_ctl_add_read",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_epoll_ctl_add_read_write",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_epoll_ctl_delete",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_epoll_ctl_mod_read",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_epoll_ctl_mod_read_write",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_epoll_wait_one",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_epoll_wait_one_into",
+      "param_types": [
+        "i32",
+        "[]i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_listen",
+      "param_types": [
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_read",
+      "param_types": [
+        "i32",
+        "[]u8",
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_recv",
+      "param_types": [
+        "i32",
+        "[]u8",
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_send",
+      "param_types": [
+        "i32",
+        "[]u8",
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_set_nonblocking",
+      "param_types": [
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_set_reuseport",
+      "param_types": [
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_set_tcp_nodelay",
+      "param_types": [
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_socket_tcp4",
+      "param_types": [
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
+      "name": "core.net_write",
+      "param_types": [
+        "i32",
+        "[]u8",
+        "i32",
+        "i32",
+        "cap.io"
+      ],
+      "return_type": "i32",
+      "effects": [
+        "io",
+        "mem"
+      ],
+      "unsafe_policy": "never"
+    },
+    {
       "name": "core.ptr_add",
       "param_types": [
         "ptr",
@@ -702,6 +4206,22 @@
         "runtime"
       ],
       "unsafe_policy": "never"
+    },
+    {
+      "name": "core.store_arch_ptr",
+      "aliases": [
+        "store_arch_ptr"
+      ],
+      "param_types": [
+        "ptr",
+        "ptr",
+        "cap.mem"
+      ],
+      "return_type": "ptr",
+      "effects": [
+        "mem"
+      ],
+      "unsafe_policy": "always"
     },
     {
       "name": "core.store_i32",
@@ -1096,6 +4616,29 @@
     "filesystem_required_symbols": [
       "__tetra_fs_exists"
     ],
+    "net_required_symbols": [
+      "__tetra_net_socket_tcp4",
+      "__tetra_net_bind_tcp4_loopback",
+      "__tetra_net_connect_tcp4_loopback",
+      "__tetra_net_listen",
+      "__tetra_net_accept4",
+      "__tetra_net_read",
+      "__tetra_net_recv",
+      "__tetra_net_write",
+      "__tetra_net_send",
+      "__tetra_net_epoll_create",
+      "__tetra_net_epoll_ctl_add_read",
+      "__tetra_net_epoll_ctl_add_read_write",
+      "__tetra_net_epoll_ctl_mod_read",
+      "__tetra_net_epoll_ctl_mod_read_write",
+      "__tetra_net_epoll_ctl_delete",
+      "__tetra_net_epoll_wait_one",
+      "__tetra_net_epoll_wait_one_into",
+      "__tetra_net_set_nonblocking",
+      "__tetra_net_set_reuseport",
+      "__tetra_net_set_tcp_nodelay",
+      "__tetra_net_close"
+    ],
     "actors_program_glue_symbols": [
       "__tetra_actor_dispatch",
       "__tetra_actor_main_entry_id"
@@ -1400,8 +4943,8 @@
       "name": "Core standard library current profile",
       "status": "current",
       "since": "v0.2.0",
-      "scope": "release-covered lib.core helper modules with a capability-gated linux-x64 filesystem exists slice, stable crypto interface helpers, and stable networking endpoint policy helpers",
-      "stability": "current import paths and smoke coverage; filesystem exists is host-backed on linux-x64, crypto exposes deterministic interface helpers, and networking exposes deterministic endpoint policy helpers",
+      "scope": "release-covered lib.core helper modules with a capability-gated linux-x64 filesystem exists slice, executable Linux TCP socket client/server I/O helpers with recv/send, SO_REUSEPORT, TCP_NODELAY, nonblocking accept convenience, and epoll add/mod/delete plus wait-one readiness flag capture and predicates, stable crypto interface helpers, stable networking endpoint policy helpers, executable HTTP/1.1 String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers, and executable JSON byte-buffer response helpers",
+      "stability": "current import paths and smoke coverage; filesystem exists is host-backed on linux-x64, net socket open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close plus SO_REUSEPORT, TCP_NODELAY, SOCK_NONBLOCK/SOCK_CLOEXEC accept helpers, and epoll create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one/wait-one-into helpers with EPOLLIN/EPOLLOUT/EPOLLERR/EPOLLHUP predicates are host-backed on linux-x64, crypto exposes deterministic interface helpers, networking exposes deterministic endpoint policy helpers, HTTP helpers classify TechEmpower request lines from String text or caller-owned byte buffers, locate CRLFCRLF request-head boundaries for pipelined buffers, and write compact response payloads into caller-owned buffers, and JSON helpers write compact response bodies into caller-owned buffers",
       "docs": [
         "docs/spec/current_supported_surface.md",
         "docs/spec/stdlib.md",

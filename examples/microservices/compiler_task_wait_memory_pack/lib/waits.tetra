@@ -1,0 +1,37 @@
+module lib.waits
+
+func fast_worker() -> Int:
+    return 4
+
+func slow_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 4
+
+func join_until_offset() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("fast_worker")
+    let result: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(5))
+    if result.error != 0:
+        return 70 + result.error
+    return result.value
+
+func poll_offset() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("slow_worker")
+    let early: task.result_i32 = core.task_poll_i32(task)
+    if early.error != 2:
+        return 80 + early.error
+    let _sleep: Int = core.sleep_ms(2)
+    let result: task.result_i32 = core.task_poll_i32(task)
+    if result.error != 0:
+        return 90 + result.error
+    return result.value
+
+func select_offset() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("fast_worker")
+    let result: task.result_i32 = core.select2_i32(task, core.deadline_ms(5))
+    if result.error != 0:
+        return 100 + result.error
+    return result.value

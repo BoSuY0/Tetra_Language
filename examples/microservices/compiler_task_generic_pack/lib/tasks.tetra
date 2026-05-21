@@ -1,0 +1,16 @@
+module lib.tasks
+
+struct Box<T>:
+    value: T
+
+func wrap_task(task: task.i32) -> Box<task.i32>:
+    return Box<task.i32>(value: task)
+
+func pass_task(box: Box<task.i32>) -> Box<task.i32>:
+    return box
+
+func alias_task(task: task.i32) -> task.i32:
+    return task
+
+func id<T>(value: T) -> T:
+    return value

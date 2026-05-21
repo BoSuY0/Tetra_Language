@@ -1,0 +1,51 @@
+module app.main
+
+import lib.resources as resources
+
+func actor_worker() -> Int
+uses actors:
+    let request: Int = core.recv()
+    let _reply: Int = core.send(core.sender(), request + 1)
+    return 0
+
+func task_worker() -> Int:
+    return 21
+
+func main() -> Int
+uses actors, runtime:
+    let peer: actor = core.spawn("actor_worker")
+    let maybe_peer: actor? = resources.maybe_actor(peer)
+    if let actor_handle = maybe_peer:
+        let returned_peer: actor = resources.alias_actor(actor_handle)
+        let _sent: Int = core.send(returned_peer, 20)
+        let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+        if reply.error != 0:
+            return 100 + reply.error
+        if reply.value != 21:
+            return reply.value
+    else:
+        return 90
+    let task: task.i32 = core.task_spawn_i32("task_worker")
+    let maybe_task: task.i32? = resources.maybe_task(task)
+    if let task_handle = maybe_task:
+        let returned_task: task.i32 = resources.alias_task(task_handle)
+        let result: task.result_i32 = core.task_join_result_i32(returned_task)
+        if result.error != 0:
+            return 110 + result.error
+        if result.value != 21:
+            return result.value
+    else:
+        return 91
+    let group: task.group = core.task_group_open()
+    let maybe_group: task.group? = resources.maybe_group(group)
+    if let group_handle = maybe_group:
+        let returned_group: task.group = resources.alias_group(group_handle)
+        let status: Int = core.task_group_status(returned_group)
+        let close_error: Int = core.task_group_close(returned_group)
+        if close_error != 0:
+            return 120 + close_error
+        if status == 1:
+            return 0
+        return status
+    else:
+        return 92

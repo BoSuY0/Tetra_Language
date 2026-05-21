@@ -1,0 +1,14 @@
+module app.main
+
+import lib.route as route
+import lib.worker as worker
+
+func main() -> Int
+uses runtime:
+    let direct: Int = route.score(route.Packet.ready(20))
+    let task: task.i32 = core.task_spawn_i32("worker.task_worker")
+    let async_value: Int = core.task_join_i32(task)
+    let total: Int = direct + async_value
+    if total == 42:
+        return 0
+    return total

@@ -1,0 +1,35 @@
+// Optional generic bool slice box memory microservice smoke.
+//
+// The service carries a heap-backed []bool through a generic box wrapped in an
+// optional payload and verifies indexed reads after unwrapping.
+module examples.microservices.memory_optional_generic_bool_box_service
+
+struct Box<T>:
+    value: T
+
+func wrap<T>(value: T) -> Box<T>:
+    return Box<T>(value: value)
+
+func main() -> Int
+uses alloc, mem:
+    var flags: []bool = core.make_bool(4)
+    flags[0] = true
+    flags[1] = false
+    flags[2] = true
+    flags[3] = true
+    let box: Box<[]bool> = wrap(flags)
+    let maybe: Box<[]bool>? = box
+    if let returned = maybe:
+        var score: Int = 0
+        if returned.value[0]:
+            score = score + 10
+        if returned.value[1]:
+            score = score + 20
+        if returned.value[2]:
+            score = score + 14
+        if returned.value[3]:
+            score = score + 18
+        if score == 42:
+            return 0
+        return score
+    return 99

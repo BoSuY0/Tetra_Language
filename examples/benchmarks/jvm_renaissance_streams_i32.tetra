@@ -1,0 +1,20 @@
+// Renaissance-inspired map/filter/reduce stream kernel over Int slices.
+module examples.benchmarks.jvm_renaissance_streams_i32
+
+func main() -> Int
+uses alloc, mem:
+    var values: []i32 = core.make_i32(16)
+    var i: Int = 0
+    while i < 16:
+        values[i] = i + 1
+        i = i + 1
+    var total: Int = 0
+    i = 0
+    while i < 16:
+        let mapped: Int = values[i] * values[i] + 3
+        if mapped % 2 == 1:
+            total = total + mapped
+        i = i + 1
+    if total == 840:
+        return 0
+    return total

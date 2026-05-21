@@ -1,0 +1,676 @@
+// Stable core HTTP/1.1 byte-buffer response helpers.
+// Effects: mem
+// Runtime boundary: request-line classification and response serialization
+// only. This module does not open sockets, accept clients, parse full HTTP
+// messages, schedule event loops, or talk to PostgreSQL. Transport runtime
+// work belongs in `lib.core.net`; database runtime work belongs in
+// `lib.core.postgres`.
+// ```tetra doctest
+// func http_doctest() -> Int
+// uses alloc, mem:
+//     var buf: []u8 = core.make_u8(160)
+//     let written: Int = lib.core.http.write_plaintext_response(buf, "Tetra", "Mon, 01 Jan 2024 00:00:00 GMT", true)
+//     return written
+// ```
+module lib.core.http
+
+import lib.core.json as json
+import lib.core.strings as strings
+
+func route_bad_request() -> Int:
+    return -1
+
+func route_not_found() -> Int:
+    return 0
+
+func route_plaintext() -> Int:
+    return 1
+
+func route_json() -> Int:
+    return 2
+
+func route_db() -> Int:
+    return 3
+
+func route_queries() -> Int:
+    return 4
+
+func route_updates() -> Int:
+    return 5
+
+func route_fortunes() -> Int:
+    return 6
+
+func route_tech_empower(request: String) -> Int:
+    if !contains_http11_marker(request):
+        return route_bad_request()
+    var pos: Int = 0
+    var path_pos: Int = 0
+    var saw_target_end: Bool = false
+    var match_plaintext: Bool = true
+    var match_json: Bool = true
+    var match_db: Bool = true
+    var match_queries: Bool = true
+    var match_updates: Bool = true
+    var match_fortunes: Bool = true
+    for ch in request:
+        if saw_target_end:
+            break
+        if pos == 0:
+            if ch != 71:
+                return route_bad_request()
+        else if pos == 1:
+            if ch != 69:
+                return route_bad_request()
+        else if pos == 2:
+            if ch != 84:
+                return route_bad_request()
+        else if pos == 3:
+            if ch != 32:
+                return route_bad_request()
+        else:
+            if ch == 32 || ch == 63:
+                saw_target_end = true
+                break
+            if path_pos == 0 && ch != 47:
+                return route_bad_request()
+            if route_path_char(route_plaintext(), path_pos) != ch:
+                match_plaintext = false
+            if route_path_char(route_json(), path_pos) != ch:
+                match_json = false
+            if route_path_char(route_db(), path_pos) != ch:
+                match_db = false
+            if route_path_char(route_queries(), path_pos) != ch:
+                match_queries = false
+            if route_path_char(route_updates(), path_pos) != ch:
+                match_updates = false
+            if route_path_char(route_fortunes(), path_pos) != ch:
+                match_fortunes = false
+            path_pos = path_pos + 1
+        pos = pos + 1
+    if !saw_target_end:
+        return route_bad_request()
+    if match_plaintext && path_pos == route_path_len(route_plaintext()):
+        return route_plaintext()
+    if match_json && path_pos == route_path_len(route_json()):
+        return route_json()
+    if match_db && path_pos == route_path_len(route_db()):
+        return route_db()
+    if match_queries && path_pos == route_path_len(route_queries()):
+        return route_queries()
+    if match_updates && path_pos == route_path_len(route_updates()):
+        return route_updates()
+    if match_fortunes && path_pos == route_path_len(route_fortunes()):
+        return route_fortunes()
+    return route_not_found()
+
+func route_tech_empower_bytes(request: []u8, request_len: Int) -> Int
+uses mem:
+    return route_tech_empower_bytes_at(request, 0, request_len)
+
+func route_tech_empower_bytes_at(request: []u8, start: Int, request_len: Int) -> Int
+uses mem:
+    if !contains_http11_marker_bytes_at(request, start, request_len):
+        return route_bad_request()
+    var pos: Int = 0
+    var path_pos: Int = 0
+    var saw_target_end: Bool = false
+    var match_plaintext: Bool = true
+    var match_json: Bool = true
+    var match_db: Bool = true
+    var match_queries: Bool = true
+    var match_updates: Bool = true
+    var match_fortunes: Bool = true
+    while pos < request_len:
+        let absolute: Int = start + pos
+        let ch: Int = request[absolute]
+        if saw_target_end:
+            break
+        if pos == 0:
+            if ch != 71:
+                return route_bad_request()
+        else if pos == 1:
+            if ch != 69:
+                return route_bad_request()
+        else if pos == 2:
+            if ch != 84:
+                return route_bad_request()
+        else if pos == 3:
+            if ch != 32:
+                return route_bad_request()
+        else:
+            if ch == 32 || ch == 63:
+                saw_target_end = true
+                break
+            if path_pos == 0 && ch != 47:
+                return route_bad_request()
+            if route_path_char(route_plaintext(), path_pos) != ch:
+                match_plaintext = false
+            if route_path_char(route_json(), path_pos) != ch:
+                match_json = false
+            if route_path_char(route_db(), path_pos) != ch:
+                match_db = false
+            if route_path_char(route_queries(), path_pos) != ch:
+                match_queries = false
+            if route_path_char(route_updates(), path_pos) != ch:
+                match_updates = false
+            if route_path_char(route_fortunes(), path_pos) != ch:
+                match_fortunes = false
+            path_pos = path_pos + 1
+        pos = pos + 1
+    if !saw_target_end:
+        return route_bad_request()
+    if match_plaintext && path_pos == route_path_len(route_plaintext()):
+        return route_plaintext()
+    if match_json && path_pos == route_path_len(route_json()):
+        return route_json()
+    if match_db && path_pos == route_path_len(route_db()):
+        return route_db()
+    if match_queries && path_pos == route_path_len(route_queries()):
+        return route_queries()
+    if match_updates && path_pos == route_path_len(route_updates()):
+        return route_updates()
+    if match_fortunes && path_pos == route_path_len(route_fortunes()):
+        return route_fortunes()
+    return route_not_found()
+
+func request_keep_alive(request: String) -> Bool:
+    return contains_http11_marker(request) && !contains_connection_close(request)
+
+func request_keep_alive_bytes(request: []u8, request_len: Int) -> Bool
+uses mem:
+    return request_keep_alive_bytes_at(request, 0, request_len)
+
+func request_keep_alive_bytes_at(request: []u8, start: Int, request_len: Int) -> Bool
+uses mem:
+    return contains_http11_marker_bytes_at(request, start, request_len) && !contains_connection_close_bytes_at(request, start, request_len)
+
+func request_head_len_bytes(request: []u8, request_len: Int) -> Int
+uses mem:
+    return request_head_len_bytes_at(request, 0, request_len)
+
+func request_head_len_bytes_at(request: []u8, start: Int, request_len: Int) -> Int
+uses mem:
+    var pos: Int = 0
+    var state: Int = 0
+    while pos < request_len:
+        let absolute: Int = start + pos
+        let ch: Int = request[absolute]
+        if state == 0:
+            if ch == 13:
+                state = 1
+        else if state == 1:
+            if ch == 10:
+                state = 2
+            else if ch == 13:
+                state = 1
+            else:
+                state = 0
+        else if state == 2:
+            if ch == 13:
+                state = 3
+            else:
+                state = 0
+        else if state == 3:
+            if ch == 10:
+                return pos + 1
+            else if ch == 13:
+                state = 1
+            else:
+                state = 0
+        pos = pos + 1
+    return 0
+
+func plaintext_body_len() -> Int:
+    return 13
+
+func response_head_len(status: Int, reason: String, server: String, date: String, content_type: String, content_len: Int, keep_alive: Bool) -> Int:
+    var total: Int = 9 + digits_i32(status) + 1 + strings.ascii_len(reason) + 2
+    total = total + header_line_len("Server", server)
+    total = total + header_line_len("Date", date)
+    total = total + header_line_len("Content-Type", content_type)
+    total = total + 18 + digits_i32(content_len)
+    if keep_alive:
+        total = total + header_line_len("Connection", "keep-alive")
+    else:
+        total = total + header_line_len("Connection", "close")
+    return total + 2
+
+func plaintext_response_len(server: String, date: String, keep_alive: Bool) -> Int:
+    return response_head_len(200, "OK", server, date, "text/plain", plaintext_body_len(), keep_alive) + plaintext_body_len()
+
+func json_message_response_len(server: String, date: String, message: String, keep_alive: Bool) -> Int:
+    let body_len: Int = json.message_object_len(message)
+    return response_head_len(200, "OK", server, date, "application/json", body_len, keep_alive) + body_len
+
+func write_plaintext_response(dst: inout []u8, server: String, date: String, keep_alive: Bool) -> Int
+uses mem:
+    var i: Int = write_response_head(dst, 200, "OK", server, date, "text/plain", plaintext_body_len(), keep_alive)
+    i = write_ascii_at(dst, i, "Hello, World!")
+    return i
+
+func write_json_message_response(dst: inout []u8, server: String, date: String, message: String, keep_alive: Bool) -> Int
+uses mem:
+    let body_len: Int = json.message_object_len(message)
+    var i: Int = write_response_head(dst, 200, "OK", server, date, "application/json", body_len, keep_alive)
+    return json.write_message_object_at(dst, i, message)
+
+func write_response_head(dst: inout []u8, status: Int, reason: String, server: String, date: String, content_type: String, content_len: Int, keep_alive: Bool) -> Int
+uses mem:
+    var i: Int = write_ascii_at(dst, 0, "HTTP/1.1 ")
+    i = write_decimal_i32_at(dst, i, status)
+    dst[i] = 32
+    i = i + 1
+    i = write_ascii_at(dst, i, reason)
+    i = write_crlf_at(dst, i)
+    i = write_header_at(dst, i, "Server", server)
+    i = write_header_at(dst, i, "Date", date)
+    i = write_header_at(dst, i, "Content-Type", content_type)
+    i = write_ascii_at(dst, i, "Content-Length: ")
+    i = write_decimal_i32_at(dst, i, content_len)
+    i = write_crlf_at(dst, i)
+    if keep_alive:
+        i = write_header_at(dst, i, "Connection", "keep-alive")
+    else:
+        i = write_header_at(dst, i, "Connection", "close")
+    return write_crlf_at(dst, i)
+
+func header_line_len(name: String, value: String) -> Int:
+    return strings.ascii_len(name) + 2 + strings.ascii_len(value) + 2
+
+func write_header_at(dst: inout []u8, start: Int, name: String, value: String) -> Int
+uses mem:
+    var i: Int = write_ascii_at(dst, start, name)
+    dst[i] = 58
+    dst[i + 1] = 32
+    i = i + 2
+    i = write_ascii_at(dst, i, value)
+    return write_crlf_at(dst, i)
+
+func write_crlf_at(dst: inout []u8, start: Int) -> Int
+uses mem:
+    dst[start] = 13
+    dst[start + 1] = 10
+    return start + 2
+
+func write_ascii_at(dst: inout []u8, start: Int, text: String) -> Int
+uses mem:
+    var i: Int = start
+    for ch in text:
+        dst[i] = ch
+        i = i + 1
+    return i
+
+func write_decimal_i32_at(dst: inout []u8, start: Int, value: Int) -> Int
+uses mem:
+    var i: Int = start
+    var n: Int = value
+    if n == 0:
+        dst[i] = 48
+        return i + 1
+    if n < 0:
+        dst[i] = 45
+        i = i + 1
+        n = 0 - n
+    var divisor: Int = 1
+    var scan: Int = n
+    while scan >= 10:
+        divisor = divisor * 10
+        scan = scan / 10
+    while divisor > 0:
+        let digit: Int = n / divisor
+        dst[i] = 48 + digit
+        i = i + 1
+        n = n % divisor
+        divisor = divisor / 10
+    return i
+
+func digits_i32(value: Int) -> Int:
+    if value == 0:
+        return 1
+    var n: Int = value
+    var digits: Int = 0
+    if n < 0:
+        digits = 1
+        n = 0 - n
+    while n > 0:
+        digits = digits + 1
+        n = n / 10
+    return digits
+
+func route_path_len(route: Int) -> Int:
+    if route == route_plaintext():
+        return 10
+    if route == route_json():
+        return 5
+    if route == route_db():
+        return 3
+    if route == route_queries():
+        return 8
+    if route == route_updates():
+        return 8
+    if route == route_fortunes():
+        return 9
+    return 0
+
+func route_path_char(route: Int, pos: Int) -> Int:
+    if route == route_plaintext():
+        return plaintext_path_char(pos)
+    if route == route_json():
+        return json_path_char(pos)
+    if route == route_db():
+        return db_path_char(pos)
+    if route == route_queries():
+        return queries_path_char(pos)
+    if route == route_updates():
+        return updates_path_char(pos)
+    if route == route_fortunes():
+        return fortunes_path_char(pos)
+    return -1
+
+func plaintext_path_char(pos: Int) -> Int:
+    if pos == 0:
+        return 47
+    if pos == 1:
+        return 112
+    if pos == 2:
+        return 108
+    if pos == 3:
+        return 97
+    if pos == 4:
+        return 105
+    if pos == 5:
+        return 110
+    if pos == 6:
+        return 116
+    if pos == 7:
+        return 101
+    if pos == 8:
+        return 120
+    if pos == 9:
+        return 116
+    return -1
+
+func json_path_char(pos: Int) -> Int:
+    if pos == 0:
+        return 47
+    if pos == 1:
+        return 106
+    if pos == 2:
+        return 115
+    if pos == 3:
+        return 111
+    if pos == 4:
+        return 110
+    return -1
+
+func db_path_char(pos: Int) -> Int:
+    if pos == 0:
+        return 47
+    if pos == 1:
+        return 100
+    if pos == 2:
+        return 98
+    return -1
+
+func queries_path_char(pos: Int) -> Int:
+    if pos == 0:
+        return 47
+    if pos == 1:
+        return 113
+    if pos == 2:
+        return 117
+    if pos == 3:
+        return 101
+    if pos == 4:
+        return 114
+    if pos == 5:
+        return 105
+    if pos == 6:
+        return 101
+    if pos == 7:
+        return 115
+    return -1
+
+func updates_path_char(pos: Int) -> Int:
+    if pos == 0:
+        return 47
+    if pos == 1:
+        return 117
+    if pos == 2:
+        return 112
+    if pos == 3:
+        return 100
+    if pos == 4:
+        return 97
+    if pos == 5:
+        return 116
+    if pos == 6:
+        return 101
+    if pos == 7:
+        return 115
+    return -1
+
+func fortunes_path_char(pos: Int) -> Int:
+    if pos == 0:
+        return 47
+    if pos == 1:
+        return 102
+    if pos == 2:
+        return 111
+    if pos == 3:
+        return 114
+    if pos == 4:
+        return 116
+    if pos == 5:
+        return 117
+    if pos == 6:
+        return 110
+    if pos == 7:
+        return 101
+    if pos == 8:
+        return 115
+    return -1
+
+func contains_http11_marker(request: String) -> Bool:
+    var state: Int = 0
+    for ch in request:
+        if state == 0:
+            if ch == 32:
+                state = 1
+        else if state == 1:
+            if ch == 72:
+                state = 2
+            else if ch == 32:
+                state = 1
+            else:
+                state = 0
+        else if state == 2:
+            if ch == 84:
+                state = 3
+            else:
+                state = 0
+        else if state == 3:
+            if ch == 84:
+                state = 4
+            else:
+                state = 0
+        else if state == 4:
+            if ch == 80:
+                state = 5
+            else:
+                state = 0
+        else if state == 5:
+            if ch == 47:
+                state = 6
+            else:
+                state = 0
+        else if state == 6:
+            if ch == 49:
+                state = 7
+            else:
+                state = 0
+        else if state == 7:
+            if ch == 46:
+                state = 8
+            else:
+                state = 0
+        else if state == 8:
+            if ch == 49:
+                return true
+            state = 0
+    return false
+
+func contains_http11_marker_bytes(request: []u8, request_len: Int) -> Bool
+uses mem:
+    return contains_http11_marker_bytes_at(request, 0, request_len)
+
+func contains_http11_marker_bytes_at(request: []u8, start: Int, request_len: Int) -> Bool
+uses mem:
+    var state: Int = 0
+    var pos: Int = 0
+    while pos < request_len:
+        let absolute: Int = start + pos
+        let ch: Int = request[absolute]
+        if state == 0:
+            if ch == 32:
+                state = 1
+        else if state == 1:
+            if ch == 72:
+                state = 2
+            else if ch == 32:
+                state = 1
+            else:
+                state = 0
+        else if state == 2:
+            if ch == 84:
+                state = 3
+            else:
+                state = 0
+        else if state == 3:
+            if ch == 84:
+                state = 4
+            else:
+                state = 0
+        else if state == 4:
+            if ch == 80:
+                state = 5
+            else:
+                state = 0
+        else if state == 5:
+            if ch == 47:
+                state = 6
+            else:
+                state = 0
+        else if state == 6:
+            if ch == 49:
+                state = 7
+            else:
+                state = 0
+        else if state == 7:
+            if ch == 46:
+                state = 8
+            else:
+                state = 0
+        else if state == 8:
+            if ch == 49:
+                return true
+            state = 0
+        pos = pos + 1
+    return false
+
+func contains_connection_close(request: String) -> Bool:
+    var state: Int = 0
+    for ch in request:
+        state = connection_close_next_state(state, ch)
+        if state == 17:
+            return true
+    return false
+
+func contains_connection_close_bytes(request: []u8, request_len: Int) -> Bool
+uses mem:
+    return contains_connection_close_bytes_at(request, 0, request_len)
+
+func contains_connection_close_bytes_at(request: []u8, start: Int, request_len: Int) -> Bool
+uses mem:
+    var state: Int = 0
+    var pos: Int = 0
+    while pos < request_len:
+        let absolute: Int = start + pos
+        let ch: Int = request[absolute]
+        state = connection_close_next_state(state, ch)
+        if state == 17:
+            return true
+        pos = pos + 1
+    return false
+
+func connection_close_next_state(state: Int, ch: Int) -> Int:
+    if state == 0:
+        if ch == 67:
+            return 1
+        return 0
+    if state == 1:
+        if ch == 111:
+            return 2
+        return 0
+    if state == 2:
+        if ch == 110:
+            return 3
+        return 0
+    if state == 3:
+        if ch == 110:
+            return 4
+        return 0
+    if state == 4:
+        if ch == 101:
+            return 5
+        return 0
+    if state == 5:
+        if ch == 99:
+            return 6
+        return 0
+    if state == 6:
+        if ch == 116:
+            return 7
+        return 0
+    if state == 7:
+        if ch == 105:
+            return 8
+        return 0
+    if state == 8:
+        if ch == 111:
+            return 9
+        return 0
+    if state == 9:
+        if ch == 110:
+            return 10
+        return 0
+    if state == 10:
+        if ch == 58:
+            return 11
+        return 0
+    if state == 11:
+        if ch == 32:
+            return 12
+        return 0
+    if state == 12:
+        if ch == 99:
+            return 13
+        return 0
+    if state == 13:
+        if ch == 108:
+            return 14
+        return 0
+    if state == 14:
+        if ch == 111:
+            return 15
+        return 0
+    if state == 15:
+        if ch == 115:
+            return 16
+        return 0
+    if state == 16:
+        if ch == 101:
+            return 17
+        return 0
+    return state

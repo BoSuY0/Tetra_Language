@@ -1,0 +1,66 @@
+module lib.async_enum_memory
+
+enum EnumPtrErr:
+    case failed
+
+enum PtrRoute:
+    case raw(ptr)
+    case empty
+
+enum IntRoute:
+    case raw(Int)
+    case empty
+
+async func make_route(base: ptr) -> PtrRoute:
+    return PtrRoute.raw(base)
+
+async func make_route_throw(base: ptr, fail: Bool) -> PtrRoute throws EnumPtrErr:
+    if fail:
+        throw EnumPtrErr.failed
+    return PtrRoute.raw(base)
+
+async func make_int_route(value: Int) -> IntRoute:
+    return IntRoute.raw(value)
+
+async func load_route_local(base: ptr, memory_cap: cap.mem) -> Int
+uses mem:
+    let route: PtrRoute = await make_route(base)
+    match route:
+    case PtrRoute.raw(unwrapped):
+        unsafe:
+            let cell: ptr = core.ptr_add(unwrapped, 4, memory_cap)
+            return core.load_i32(cell, memory_cap)
+    case PtrRoute.empty:
+        return 98
+    return 99
+
+async func load_throw_route_local(base: ptr, memory_cap: cap.mem) -> Int throws EnumPtrErr
+uses mem:
+    let route: PtrRoute = try await make_route_throw(base, false)
+    match route:
+    case PtrRoute.raw(unwrapped):
+        unsafe:
+            let cell: ptr = core.ptr_add(unwrapped, 4, memory_cap)
+            return core.load_i32(cell, memory_cap)
+    case PtrRoute.empty:
+        return 98
+    return 99
+
+async func relay_int_route(value: Int) -> IntRoute:
+    return await make_int_route(value)
+
+func fallback() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(12)
+        let cell: ptr = core.ptr_add(base, 4, memory_cap)
+        let _store: Int = core.store_i32(cell, 42, memory_cap)
+        let route: PtrRoute = PtrRoute.raw(base)
+        match route:
+        case PtrRoute.raw(unwrapped):
+            let loaded: ptr = core.ptr_add(unwrapped, 4, memory_cap)
+            return core.load_i32(loaded, memory_cap)
+        case PtrRoute.empty:
+            return 98
+    return 99

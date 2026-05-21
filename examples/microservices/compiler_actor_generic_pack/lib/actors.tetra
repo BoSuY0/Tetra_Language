@@ -1,0 +1,16 @@
+module lib.actors
+
+struct Box<T>:
+    value: T
+
+func wrap_actor(peer: actor) -> Box<actor>:
+    return Box<actor>(value: peer)
+
+func pass_actor(box: Box<actor>) -> Box<actor>:
+    return box
+
+func alias_actor(peer: actor) -> actor:
+    return peer
+
+func id<T>(value: T) -> T:
+    return value

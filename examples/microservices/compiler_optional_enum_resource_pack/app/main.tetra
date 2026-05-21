@@ -1,0 +1,60 @@
+module app.main
+
+import lib.resources as resources
+
+func actor_worker() -> Int
+uses actors:
+    let request: Int = core.recv()
+    let _reply: Int = core.send(core.sender(), request + 1)
+    return 0
+
+func task_worker() -> Int:
+    return 4
+
+func main() -> Int
+uses actors, alloc, capability, mem, runtime:
+    let peer: actor = core.spawn("actor_worker")
+    let maybe_peer: resources.ActorSlot? = resources.actor_slot(peer)
+    if let actor_slot = maybe_peer:
+        match actor_slot:
+        case resources.ActorSlot.ready(actor_handle):
+            let _sent: Int = core.send(actor_handle, 20)
+            let reply: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+            if reply.error != 0:
+                return 100 + reply.error
+            if reply.value != 21:
+                return reply.value
+        case resources.ActorSlot.missing:
+            return 91
+    else:
+        return 90
+    let task: task.i32 = core.task_spawn_i32("task_worker")
+    let maybe_task: resources.TaskSlot? = resources.task_slot(task)
+    if let task_slot = maybe_task:
+        match task_slot:
+        case resources.TaskSlot.ready(task_handle):
+            let result: task.result_i32 = core.task_join_result_i32(task_handle)
+            if result.error != 0:
+                return 110 + result.error
+            let maybe_result: resources.ResultSlot? = resources.result_slot(result)
+            if let result_slot = maybe_result:
+                match result_slot:
+                case resources.ResultSlot.done(joined):
+                    let offset: Int = joined.value
+                    unsafe:
+                        let memory_cap: cap.mem = core.cap_mem()
+                        let base: ptr = core.alloc_bytes(8)
+                        let cell: ptr = core.ptr_add(base, offset, memory_cap)
+                        let _write: Int = core.store_i32(cell, 21, memory_cap)
+                        if core.load_i32(cell, memory_cap) == 21:
+                            return 0
+                        return 92
+                    return 93
+                case resources.ResultSlot.missing:
+                    return 94
+            else:
+                return 95
+        case resources.TaskSlot.missing:
+            return 96
+    else:
+        return 97

@@ -46,7 +46,11 @@ generated docs run.
 | Collection scans over `[]i32` | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
 | Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core_serialization_smoke.tetra` | `mem` |
 | Filesystem path helpers and host-backed `exists` | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | `io` |
+| Linux TCP socket client/server I/O helpers | `import lib.core.net as net` | `examples/core_net_smoke.tetra` | `io, mem` |
 | Networking endpoint policy helpers | `import lib.core.networking as networking` | `examples/core_networking_smoke.tetra` | none |
+| HTTP/1.1 String/byte-buffer request routing, request-head framing, and response byte-buffer helpers | `import lib.core.http as http` | `examples/core_http_smoke.tetra` | `mem` |
+| JSON byte-buffer response helpers | `import lib.core.json as json` | `examples/core_json_smoke.tetra` | `mem` |
+| PostgreSQL wire-frame byte-buffer helpers | `import lib.core.postgres as pg` | `examples/core_postgres_smoke.tetra`, `examples/core_postgres_prepared_smoke.tetra`, `examples/core_postgres_result_smoke.tetra` | `mem` |
 | Async helper functions | `import lib.core.async as async` | `examples/core_async_smoke.tetra` | none |
 | Synchronization status helpers | `import lib.core.sync as sync` | `examples/core_sync_smoke.tetra` | none |
 | Time duration/status helpers | `import lib.core.time as time` | `examples/core_time_smoke.tetra` | none |
@@ -58,11 +62,61 @@ Call-shape reminders used by generated docs and smoke examples:
 `strings.ascii_sum(value)`, `strings.is_empty(value)`,
 `collections.len_i32(values)`, `collections.contains_i32(values, needle)`,
 `collections.count_i32(values, needle)`, and
-`collections.first_or_i32(values, fallback)`.
+`collections.first_or_i32(values, fallback)`,
+`json.write_message_object(buffer, message)`, and
+`json.write_json_string(buffer, value)`,
+`http.write_plaintext_response(buffer, server, date, keep_alive)`, and
+`http.write_json_message_response(buffer, server, date, message, keep_alive)`,
+`http.request_head_len_bytes(buffer, length)`,
+`http.route_tech_empower_bytes_at(buffer, start, length)`, and
+`http.request_keep_alive_bytes_at(buffer, start, length)`,
+and `net.socket_tcp4(io_cap)`, `net.bind_tcp4_loopback(fd, port, io_cap)`,
+`net.connect_tcp4_loopback(fd, port, io_cap)`,
+`net.listen(fd, backlog, io_cap)`, `net.accept4(fd, flags, io_cap)`,
+`net.accept_nonblocking(fd, io_cap)`,
+`net.read(fd, buffer, start, count, io_cap)`,
+`net.recv(fd, buffer, start, count, io_cap)`,
+`net.write(fd, buffer, start, count, io_cap)`,
+`net.send(fd, buffer, start, count, io_cap)`,
+`net.epoll_create(io_cap)`, `net.epoll_ctl_add_read(epfd, fd, io_cap)`,
+`net.epoll_ctl_add_read_write(epfd, fd, io_cap)`,
+`net.epoll_ctl_mod_read(epfd, fd, io_cap)`,
+`net.epoll_ctl_mod_read_write(epfd, fd, io_cap)`,
+`net.epoll_ctl_delete(epfd, fd, io_cap)`,
+`net.epoll_wait_one(epfd, timeout_ms, io_cap)`,
+`net.epoll_wait_one_into(epfd, event, timeout_ms, io_cap)`,
+`net.epoll_event_fd(event)`, `net.epoll_event_flags(event)`,
+`net.epoll_event_readable(flags)`, `net.epoll_event_writable(flags)`,
+`net.epoll_event_has_error(flags)`, `net.epoll_event_hung_up(flags)`,
+`net.set_nonblocking(fd, io_cap)`, `net.set_reuseport(fd, io_cap)`,
+`net.set_tcp_nodelay(fd, io_cap)`, and `net.close(fd, io_cap)`.
+For TechEmpower request-line classification, use
+`http.route_tech_empower(request)` for request text or
+`http.route_tech_empower_bytes(buffer, length)` for bytes read from a socket,
+then compare the result with route sentinels such as `http.route_plaintext()`
+or `http.route_queries()`. For pipelined buffers, first split complete
+request heads with `http.request_head_len_bytes(buffer, length)` and then use
+the `_at` helpers for each request window.
 
 `lib.core.filesystem` now has a capability-gated linux-x64 `exists` slice plus
 pure path-shape helpers. `lib.core.crypto` is a stable crypto interface-helper
 surface. `lib.core.networking` is a stable endpoint policy-helper surface.
+`lib.core.net` is a stable linux-x64 TCP socket client/server I/O slice for
+open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close, `SO_REUSEPORT`,
+`TCP_NODELAY`, plus epoll
+create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one
+and wait-one-into readiness flags, nonblocking accept convenience, and
+read/write/error/hangup flag predicates through a caller-provided `cap.io` token.
+`lib.core.http` is a stable executable helper surface for TechEmpower
+String and byte-buffer request-line routing, request-head framing for pipelined
+buffers, keep-alive policy, compact HTTP/1.1 response heads, and
+TechEmpower-style plaintext/JSON responses.
+`lib.core.postgres` is a stable executable helper surface for PostgreSQL
+startup, Simple Query, extended-query Parse/Bind/Describe/Execute/Sync,
+RowDescription/DataRow/CommandComplete/ReadyForQuery inspection, Terminate,
+and big-endian wire-frame byte buffers.
+`lib.core.json` is a stable executable byte-buffer helper surface for compact
+JSON response bodies.
 
 ## Capability Unsafe Boundary Recipe
 
@@ -349,6 +403,24 @@ Host transport APIs should layer sockets, DNS, HTTP, and timers behind a
 separate capability boundary. This module promises deterministic endpoint
 policy helpers only.
 
+### Networking Runtime Boundary
+
+`lib.core.networking` remains endpoint policy only. It is intentionally separate
+from the Tetra-source transport/database surface for the TechEmpower-compatible web stack:
+the current `lib.core.net` slice provides real linux-x64 TCP socket
+open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close helpers,
+`SO_REUSEPORT`/`TCP_NODELAY`, plus epoll add/mod/delete and wait-one readiness,
+including `epoll_wait_one_into` fd/flags capture and event flag predicates, while full event-loop abstractions, broader socket-option APIs, and
+full PostgreSQL access and pooling belong behind future `lib.core.net`
+expansion and higher-level `lib.core.postgres` driver layers above the current
+startup/simple-query/prepared-frame byte-buffer helpers. Importing
+`lib.core.networking` is therefore safe for configuration defaults, but it must
+not be used as evidence that the current stdlib can run a production TCP
+server, parse full HTTP header maps or request bodies, or talk to a database.
+HTTP String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers are available separately through
+`lib.core.http`; JSON response byte-buffer helpers are available separately
+through `lib.core.json`.
+
 ## Crypto Interface Contract
 
 `lib.core.crypto` is a stable interface-helper surface for deterministic
@@ -486,9 +558,12 @@ mkdir -p reports
   examples/core_collections_smoke.tetra \
   examples/core_crypto_smoke.tetra \
   examples/core_filesystem_smoke.tetra \
+  examples/core_http_smoke.tetra \
   examples/core_io_smoke.tetra \
+  examples/core_json_smoke.tetra \
   examples/core_math_smoke.tetra \
   examples/core_memory_smoke.tetra \
+  examples/core_net_smoke.tetra \
   examples/core_networking_smoke.tetra \
   examples/core_serialization_smoke.tetra \
   examples/core_slices_smoke.tetra \

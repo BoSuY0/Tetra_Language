@@ -1,0 +1,25 @@
+// Actor sender snapshot microservice smoke.
+//
+// The service snapshots core.sender() after receiving a message, waits, and
+// replies through the stored actor handle.
+actor SnapshotWorker:
+    func run() -> Int
+    uses actors, runtime:
+        let request: actor.msg = core.recv_msg()
+        let reply_to: actor = core.sender()
+        let _sleep: Int = core.sleep_ms(1)
+        let _reply: Int = core.send_msg(reply_to, request.value + 1, request.tag + 1)
+        return 0
+
+func main() -> Int
+uses actors, runtime:
+    let worker: actor = core.spawn("SnapshotWorker.run")
+    let _request: Int = core.send_msg(worker, 41, 80)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(5))
+    if reply.error != 0:
+        return 20 + reply.error
+    if reply.tag != 81:
+        return reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

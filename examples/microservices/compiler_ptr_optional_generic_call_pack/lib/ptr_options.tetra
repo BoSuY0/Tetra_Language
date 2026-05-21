@@ -1,0 +1,11 @@
+module lib.ptr_options
+
+func id<T>(value: T) -> T:
+    return value
+
+func keep_consume<T>(value: consume T) -> T:
+    return value
+
+func replace(slot: inout ptr?, value: ptr?) -> ptr?:
+    slot = value
+    return value

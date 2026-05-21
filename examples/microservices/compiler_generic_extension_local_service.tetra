@@ -1,0 +1,17 @@
+// Compiler generic extension local microservice smoke.
+//
+// This same-file control confirms generic extension static calls monomorphize
+// when no import boundary is involved.
+struct Vec2:
+    x: Int
+
+extension Vec2:
+    func map<T>(self: Vec2, value: T) -> T:
+        return value
+
+func main() -> Int:
+    let value: Vec2 = Vec2(x: 7)
+    let total: Int = Vec2.map(value, 42)
+    if total == 42:
+        return 0
+    return total

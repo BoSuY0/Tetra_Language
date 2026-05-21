@@ -1,0 +1,27 @@
+// Memory memset stride microservice smoke.
+//
+// The service fills a raw allocation with a byte value and verifies a bounded
+// checksum through allocation-base pointer offsets.
+module examples.microservices.memory_memset_stride_service
+
+import lib.core.capability as cap
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let page: ptr = core.alloc_bytes(6)
+        let fill_status: Int = memory.memset_u8(page, 7, 6, memory_cap)
+        if fill_status != 0:
+            return 10 + fill_status
+        let cell_one: ptr = core.ptr_add(page, 1, memory_cap)
+        let cell_two: ptr = core.ptr_add(page, 2, memory_cap)
+        let cell_three: ptr = core.ptr_add(page, 3, memory_cap)
+        let cell_four: ptr = core.ptr_add(page, 4, memory_cap)
+        let cell_five: ptr = core.ptr_add(page, 5, memory_cap)
+        let total: Int = core.load_u8(page, memory_cap) + core.load_u8(cell_one, memory_cap) + core.load_u8(cell_two, memory_cap) + core.load_u8(cell_three, memory_cap) + core.load_u8(cell_four, memory_cap) + core.load_u8(cell_five, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 97

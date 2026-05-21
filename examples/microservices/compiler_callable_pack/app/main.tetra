@@ -1,0 +1,17 @@
+module app.main
+
+import lib.pack as pack
+
+func configure() -> Int:
+    let box: pack.Box = pack.make_box()
+    match box.choice:
+    case pack.MaybeCallback.some(local):
+        return local(40)
+    case pack.MaybeCallback.empty:
+        return 1
+
+func main() -> Int:
+    let routed: Int = configure()
+    if routed == 42:
+        return 0
+    return routed

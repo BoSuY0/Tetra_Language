@@ -1,0 +1,15 @@
+module app.main
+
+import lib.callbacks as callbacks
+import lib.maker as maker
+
+func caller() -> Int throws maker.Boom:
+    return try callbacks.apply(maker.make(), 40)
+
+func main() -> Int:
+    let routed: Int = catch caller():
+    case maker.Boom.bad:
+        0
+    if routed == 42:
+        return 0
+    return routed

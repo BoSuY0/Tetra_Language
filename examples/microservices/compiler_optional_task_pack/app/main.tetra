@@ -1,0 +1,19 @@
+module app.main
+
+import lib.tasks as tasks
+
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let returned: task.i32? = tasks.maybe(task)
+    if let handle = returned:
+        let result: task.result_i32 = core.task_join_result_i32(handle)
+        if result.error != 0:
+            return 10 + result.error
+        if result.value == 42:
+            return 0
+        return result.value
+    return 99

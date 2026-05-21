@@ -1,0 +1,25 @@
+// Enum slice memory microservice smoke.
+//
+// The service stores a heap-backed []u8 in an enum payload and reads through a
+// match payload binding.
+module examples.microservices.memory_slice_enum_service
+
+enum Buffer:
+    case bytes([]u8)
+    case empty
+
+func main() -> Int
+uses alloc, mem:
+    var raw: []u8 = core.make_u8(3)
+    raw[0] = 7
+    raw[1] = 14
+    raw[2] = 21
+    let box: Buffer = Buffer.bytes(raw)
+    match box:
+    case Buffer.bytes(payload):
+        let total: Int = payload[0] + payload[1] + payload[2]
+        if total == 42:
+            return 0
+        return total
+    case Buffer.empty:
+        return 99

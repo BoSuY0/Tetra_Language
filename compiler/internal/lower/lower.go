@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"tetra_language/compiler/actorwire"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/semantics"
@@ -91,17 +92,69 @@ var budgetChargeTable = []budgetCharge{
 	{kind: ir.IRMemWriteU8, cost: 1},
 	{kind: ir.IRMemReadPtr, cost: 1},
 	{kind: ir.IRMemWritePtr, cost: 1},
+	{kind: ir.IRMemWriteArchPtr, cost: 1},
 	{kind: ir.IRMemReadI32Offset, cost: 1},
 	{kind: ir.IRMemWriteI32Offset, cost: 1},
 	{kind: ir.IRMemReadU8Offset, cost: 1},
 	{kind: ir.IRMemWriteU8Offset, cost: 1},
 	{kind: ir.IRMemReadPtrOffset, cost: 1},
 	{kind: ir.IRMemWritePtrOffset, cost: 1},
+	{kind: ir.IRMemWriteArchPtrOffset, cost: 1},
 	{kind: ir.IRPtrAdd, cost: 1},
 	{kind: ir.IRMmioReadI32, cost: 1},
 	{kind: ir.IRMmioWriteI32, cost: 1},
 	{kind: ir.IRSymAddr, cost: 1},
 	{kind: ir.IRCtxSwitch, cost: 1},
+	{kind: ir.IRAtomicLoadPtr, cost: 1},
+	{kind: ir.IRAtomicStorePtr, cost: 1},
+	{kind: ir.IRAtomicExchangePtr, cost: 1},
+	{kind: ir.IRAtomicFetchAddPtr, cost: 1},
+	{kind: ir.IRAtomicFetchSubPtr, cost: 1},
+	{kind: ir.IRAtomicFetchAndPtr, cost: 1},
+	{kind: ir.IRAtomicFetchOrPtr, cost: 1},
+	{kind: ir.IRAtomicFetchXorPtr, cost: 1},
+	{kind: ir.IRAtomicCompareExchangePtr, cost: 1},
+	{kind: ir.IRAtomicFenceSeqCst, cost: 1},
+	{kind: ir.IRAtomicFenceRelaxed, cost: 1},
+	{kind: ir.IRAtomicFenceAcquire, cost: 1},
+	{kind: ir.IRAtomicFenceRelease, cost: 1},
+	{kind: ir.IRAtomicFenceAcqRel, cost: 1},
+	{kind: ir.IRAtomicLoadI32, cost: 1},
+	{kind: ir.IRAtomicStoreI32, cost: 1},
+	{kind: ir.IRAtomicExchangeI32, cost: 1},
+	{kind: ir.IRAtomicCompareExchangeI32, cost: 1},
+	{kind: ir.IRAtomicFetchAddI32, cost: 1},
+	{kind: ir.IRAtomicFetchSubI32, cost: 1},
+	{kind: ir.IRAtomicFetchAndI32, cost: 1},
+	{kind: ir.IRAtomicFetchOrI32, cost: 1},
+	{kind: ir.IRAtomicFetchXorI32, cost: 1},
+	{kind: ir.IRAtomicLoadI64, cost: 1},
+	{kind: ir.IRAtomicStoreI64, cost: 1},
+	{kind: ir.IRAtomicExchangeI64, cost: 1},
+	{kind: ir.IRAtomicCompareExchangeI64, cost: 1},
+	{kind: ir.IRAtomicFetchAddI64, cost: 1},
+	{kind: ir.IRAtomicFetchSubI64, cost: 1},
+	{kind: ir.IRAtomicFetchAndI64, cost: 1},
+	{kind: ir.IRAtomicFetchOrI64, cost: 1},
+	{kind: ir.IRAtomicFetchXorI64, cost: 1},
+	{kind: ir.IRAtomicLoadI8, cost: 1},
+	{kind: ir.IRAtomicStoreI8, cost: 1},
+	{kind: ir.IRAtomicExchangeI8, cost: 1},
+	{kind: ir.IRAtomicCompareExchangeI8, cost: 1},
+	{kind: ir.IRAtomicFetchAddI8, cost: 1},
+	{kind: ir.IRAtomicFetchSubI8, cost: 1},
+	{kind: ir.IRAtomicFetchAndI8, cost: 1},
+	{kind: ir.IRAtomicFetchOrI8, cost: 1},
+	{kind: ir.IRAtomicFetchXorI8, cost: 1},
+	{kind: ir.IRAtomicLoadI16, cost: 1},
+	{kind: ir.IRAtomicStoreI16, cost: 1},
+	{kind: ir.IRAtomicExchangeI16, cost: 1},
+	{kind: ir.IRAtomicCompareExchangeI16, cost: 1},
+	{kind: ir.IRAtomicFetchAddI16, cost: 1},
+	{kind: ir.IRAtomicFetchSubI16, cost: 1},
+	{kind: ir.IRAtomicFetchAndI16, cost: 1},
+	{kind: ir.IRAtomicFetchOrI16, cost: 1},
+	{kind: ir.IRAtomicFetchXorI16, cost: 1},
 }
 
 func budgetChargeForInstr(kind ir.IRInstrKind) (int32, bool) {
@@ -248,6 +301,15 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 	if stagedTarget.SlotCount > 4 {
 		effectiveReturnSlots = 1
 	}
+	inoutReturnLocals := []inoutReturnLocal(nil)
+	if fn.ThrowsType == "" && stagedTarget.SlotCount <= 4 {
+		var err error
+		inoutReturnLocals, err = collectInoutReturnLocals(fn)
+		if err != nil {
+			return ir.IRFunc{}, err
+		}
+	}
+	abiReturnSlots := effectiveReturnSlots + inoutReturnSlotCount(inoutReturnLocals)
 	l := &lowerer{
 		locals:               fn.Locals,
 		actorState:           fn.ActorState,
@@ -260,6 +322,8 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 		returnType:           fn.ReturnType,
 		throwsType:           fn.ThrowsType,
 		returnSlots:          effectiveReturnSlots,
+		abiReturnSlots:       abiReturnSlots,
+		inoutReturnLocals:    inoutReturnLocals,
 		throwSuccessSlots:    throwSuccessSlots,
 		throwErrorSlots:      throwErrorSlots,
 		throwCompact:         throwCompact,
@@ -315,7 +379,7 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 		ExportName:  fn.Decl.ExportName,
 		ParamSlots:  fn.ParamSlots,
 		LocalSlots:  l.localSlots,
-		ReturnSlots: l.returnSlots,
+		ReturnSlots: l.abiReturnSlots,
 		Policy:      irPolicy,
 		Instrs:      l.instrs,
 	}, nil
@@ -337,6 +401,8 @@ type lowerer struct {
 	returnType           string
 	throwsType           string
 	returnSlots          int
+	abiReturnSlots       int
+	inoutReturnLocals    []inoutReturnLocal
 	throwSuccessSlots    int
 	throwErrorSlots      int
 	throwCompact         bool
@@ -381,12 +447,58 @@ type typedTaskStagedTarget struct {
 	ErrorType string
 }
 
+type inoutReturnLocal struct {
+	Base      int
+	SlotCount int
+}
+
+type inoutWriteback struct {
+	Base      int
+	SlotCount int
+	Global    bool
+}
+
+func collectInoutReturnLocals(fn semantics.CheckedFunc) ([]inoutReturnLocal, error) {
+	locals := make([]inoutReturnLocal, 0)
+	for _, param := range fn.Decl.Params {
+		if param.Ownership != "inout" {
+			continue
+		}
+		info, ok := fn.Locals[param.Name]
+		if !ok {
+			return nil, fmt.Errorf("%s: inout parameter '%s' is missing lowering local metadata", frontend.FormatPos(param.At), param.Name)
+		}
+		locals = append(locals, inoutReturnLocal{Base: info.Base, SlotCount: info.SlotCount})
+	}
+	return locals, nil
+}
+
+func inoutReturnSlotCount(locals []inoutReturnLocal) int {
+	total := 0
+	for _, local := range locals {
+		total += local.SlotCount
+	}
+	return total
+}
+
+func inoutWritebackSlotCount(writebacks []inoutWriteback) int {
+	total := 0
+	for _, writeback := range writebacks {
+		total += writeback.SlotCount
+	}
+	return total
+}
+
 func typedTaskWrapperName(target, errorType string) string {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(target))
 	_, _ = h.Write([]byte{0})
 	_, _ = h.Write([]byte(errorType))
 	return fmt.Sprintf("__tetra_task_typed_%08x", h.Sum32())
+}
+
+func typedActorMessageTagBase(typeName string) int32 {
+	return actorwire.TypedMessageTagBase(typeName)
 }
 
 func collectTypedTaskWrappers(checked *semantics.CheckedProgram, module string) []typedTaskWrapper {
@@ -523,6 +635,17 @@ func collectTypedTaskWrappers(checked *semantics.CheckedProgram, module string) 
 			for _, inner := range s.Else {
 				walkStmt(inner)
 			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
 		case *frontend.WhileStmt:
 			walkExpr(s.Cond)
 			for _, inner := range s.Body {
@@ -559,6 +682,8 @@ func collectTypedTaskWrappers(checked *semantics.CheckedProgram, module string) 
 			for _, inner := range s.Body {
 				walkStmt(inner)
 			}
+		case *frontend.ExprStmt:
+			walkExpr(s.Expr)
 		}
 	}
 
@@ -836,6 +961,55 @@ func (l *lowerer) emitZeroSlotsRaw(count int, pos frontend.Position) {
 	}
 }
 
+func (l *lowerer) emitInoutReturnSlots(pos frontend.Position) {
+	for _, local := range l.inoutReturnLocals {
+		for slot := 0; slot < local.SlotCount; slot++ {
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: local.Base + slot, Pos: pos})
+		}
+	}
+}
+
+func (l *lowerer) collectInoutWritebacks(args []frontend.Expr, ownership []string) ([]inoutWriteback, error) {
+	if len(ownership) == 0 {
+		return nil, nil
+	}
+	writebacks := make([]inoutWriteback, 0)
+	for i, owner := range ownership {
+		if owner != "inout" {
+			continue
+		}
+		if i >= len(args) {
+			break
+		}
+		target, err := l.resolveLValue(args[i])
+		if err != nil {
+			return nil, err
+		}
+		if !target.Global && target.Base < 0 {
+			return nil, fmt.Errorf("%s: inout writeback target cannot be lowered", frontend.FormatPos(args[i].Pos()))
+		}
+		writebacks = append(writebacks, inoutWriteback{
+			Base:      target.Base,
+			SlotCount: target.SlotCount,
+			Global:    target.Global,
+		})
+	}
+	return writebacks, nil
+}
+
+func (l *lowerer) emitInoutWritebacks(writebacks []inoutWriteback, pos frontend.Position) {
+	for i := len(writebacks) - 1; i >= 0; i-- {
+		writeback := writebacks[i]
+		storeKind := ir.IRStoreLocal
+		if writeback.Global {
+			storeKind = ir.IRStoreGlobal
+		}
+		for slot := writeback.SlotCount - 1; slot >= 0; slot-- {
+			l.emit(ir.IRInstr{Kind: storeKind, Local: writeback.Base + slot, Pos: pos})
+		}
+	}
+}
+
 // emitPolicyFailureHandler is the public lowering ABI for budget exhaustion and
 // the current local policy-failure path. Non-throwing functions return their
 // normal result shape filled with zero/default slots. Throwing functions return
@@ -860,7 +1034,7 @@ func (l *lowerer) emitPolicyFailureHandler(pos frontend.Position) {
 		}
 		l.emitRaw(ir.IRInstr{Kind: ir.IRConstI32, Imm: policyFailureStatusTrap, Pos: pos})
 	} else {
-		l.emitZeroSlotsRaw(l.returnSlots, pos)
+		l.emitZeroSlotsRaw(l.abiReturnSlots, pos)
 	}
 	l.emitCleanupRaw(pos)
 	l.emitRaw(ir.IRInstr{Kind: ir.IRReturn, Pos: pos})
@@ -895,14 +1069,7 @@ func (l *lowerer) lowerTypedTaskJoin(call *frontend.CallExpr, pos frontend.Posit
 	if len(call.Args) != 1 {
 		return 0, fmt.Errorf("%s: task_join_i32_typed expects 1 argument", frontend.FormatPos(call.At))
 	}
-	argType, err := l.inferExprType(call.Args[0])
-	if err != nil {
-		return 0, err
-	}
-	if argType != handleType {
-		return 0, fmt.Errorf("%s: task_join_i32_typed expects a %s handle", frontend.FormatPos(call.Args[0].Pos()), handleType)
-	}
-	slots, err := l.lowerExpr(call.Args[0])
+	slots, err := l.lowerTypedTaskJoinHandleArg(call.Args[0], handleType, handleInfo)
 	if err != nil {
 		return 0, err
 	}
@@ -1009,14 +1176,7 @@ func (l *lowerer) lowerTypedTaskJoinForCatch(call *frontend.CallExpr, pos fronte
 	if len(call.Args) != 1 {
 		return 0, fmt.Errorf("%s: task_join_i32_typed expects 1 argument", frontend.FormatPos(call.At))
 	}
-	argType, err := l.inferExprType(call.Args[0])
-	if err != nil {
-		return 0, err
-	}
-	if argType != handleType {
-		return 0, fmt.Errorf("%s: task_join_i32_typed expects a %s handle", frontend.FormatPos(call.Args[0].Pos()), handleType)
-	}
-	slots, err := l.lowerExpr(call.Args[0])
+	slots, err := l.lowerTypedTaskJoinHandleArg(call.Args[0], handleType, handleInfo)
 	if err != nil {
 		return 0, err
 	}
@@ -1043,6 +1203,41 @@ func isTypedTaskJoinCall(name string) bool {
 
 func typedTaskJoinRuntimeSymbol(slotCount int) string {
 	return fmt.Sprintf("__tetra_task_join_typed_%d", slotCount)
+}
+
+func (l *lowerer) lowerTypedTaskJoinHandleArg(expr frontend.Expr, handleType string, handleInfo *semantics.TypeInfo) (int, error) {
+	argType, err := l.inferExprType(expr)
+	if err != nil {
+		return 0, err
+	}
+	if argType != handleType && !semantics.TypedTaskHandleTypesCompatible(handleType, argType) {
+		return 0, fmt.Errorf("%s: task_join_i32_typed expects a %s handle", frontend.FormatPos(expr.Pos()), handleType)
+	}
+	slots, err := l.lowerExpr(expr)
+	if err != nil {
+		return 0, err
+	}
+	if slots == handleInfo.SlotCount {
+		return slots, nil
+	}
+	if argType == "task.i32" && semantics.IsTypedTaskHandleTypeName(handleType) && slots == 2 {
+		return l.expandPublicTypedTaskHandleSlots(expr.Pos(), handleInfo.SlotCount), nil
+	}
+	return slots, nil
+}
+
+func (l *lowerer) expandPublicTypedTaskHandleSlots(pos frontend.Position, targetSlots int) int {
+	if targetSlots <= 2 {
+		return 2
+	}
+	statusLocal := l.allocScratchSlots(1)
+	handleLocal := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: statusLocal, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: handleLocal, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: handleLocal, Pos: pos})
+	l.emitZeroSlots(targetSlots-2, pos)
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: statusLocal, Pos: pos})
+	return targetSlots
 }
 
 func (l *lowerer) emitLoadTypedTaskResultSlots(count int, pos frontend.Position) error {
@@ -1427,6 +1622,9 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			return err
 		}
 		l.emitCleanup(s.At)
+		if l.throwsType == "" {
+			l.emitInoutReturnSlots(s.At)
+		}
 		l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: s.At})
 	case *frontend.ThrowStmt:
 		if l.stagedTaskTarget.SlotCount > 4 {
@@ -2597,11 +2795,23 @@ func (l *lowerer) rawPtrOffsetAliasFromExpr(expr frontend.Expr) (rawPtrOffsetLoc
 		return rawPtrOffsetLocal{}, false
 	}
 	alias := rawPtrOffsetLocal{BaseLocal: baseInfo.Base, OffsetLocal: -1}
+	if prior, ok := l.rawPtrOffsetLocals[baseInfo.Base]; ok {
+		alias = prior
+	}
 	switch offset := call.Args[1].(type) {
 	case *frontend.NumberExpr:
-		alias.OffsetImm = offset.Value
-		alias.HasOffsetImm = true
+		if alias.HasOffsetImm {
+			alias.OffsetImm += offset.Value
+		} else if alias.OffsetLocal < 0 {
+			alias.OffsetImm = offset.Value
+			alias.HasOffsetImm = true
+		} else {
+			return rawPtrOffsetLocal{}, false
+		}
 	case *frontend.IdentExpr:
+		if alias.HasOffsetImm || alias.OffsetLocal >= 0 {
+			return rawPtrOffsetLocal{}, false
+		}
 		offsetInfo, ok := l.locals[offset.Name]
 		if !ok || offsetInfo.SlotCount != 1 {
 			return rawPtrOffsetLocal{}, false
@@ -2709,7 +2919,7 @@ func (l *lowerer) lowerRawOffsetCall(e *frontend.CallExpr) (int, bool, error) {
 			l.emit(ir.IRInstr{Kind: ir.IRMemReadPtrOffset, Pos: e.At})
 		}
 		return 1, true, nil
-	case "core.store_i32", "core.store_u8", "core.store_ptr":
+	case "core.store_i32", "core.store_u8", "core.store_ptr", "core.store_arch_ptr":
 		if len(e.Args) != 3 {
 			return 0, true, fmt.Errorf("%s: %s expects 3 arguments", frontend.FormatPos(e.At), strings.TrimPrefix(e.Name, "core."))
 		}
@@ -2736,6 +2946,8 @@ func (l *lowerer) lowerRawOffsetCall(e *frontend.CallExpr) (int, bool, error) {
 			l.emit(ir.IRInstr{Kind: ir.IRMemWriteI32Offset, Pos: e.At})
 		case "core.store_u8":
 			l.emit(ir.IRInstr{Kind: ir.IRMemWriteU8Offset, Pos: e.At})
+		case "core.store_arch_ptr":
+			l.emit(ir.IRInstr{Kind: ir.IRMemWriteArchPtrOffset, Pos: e.At})
 		default:
 			l.emit(ir.IRInstr{Kind: ir.IRMemWritePtrOffset, Pos: e.At})
 		}
@@ -2743,6 +2955,29 @@ func (l *lowerer) lowerRawOffsetCall(e *frontend.CallExpr) (int, bool, error) {
 	default:
 		return 0, false, nil
 	}
+}
+
+func (l *lowerer) lowerPtrAddValueCall(e *frontend.CallExpr) (int, bool, error) {
+	if e.Name != "core.ptr_add" {
+		return 0, false, nil
+	}
+	if len(e.Args) != 3 {
+		return 0, true, fmt.Errorf("%s: ptr_add expects 3 arguments", frontend.FormatPos(e.At))
+	}
+	alias, ok := l.rawPtrOffsetAliasFromExpr(e)
+	if !ok {
+		return 0, false, nil
+	}
+	l.lowerRawOffsetAlias(alias, e.At)
+	memSlots, err := l.lowerExpr(e.Args[2])
+	if err != nil {
+		return 0, true, err
+	}
+	if memSlots != 1 {
+		return 0, true, fmt.Errorf("%s: ptr_add expects a 1-slot memory capability", frontend.FormatPos(e.Args[2].Pos()))
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRPtrAdd, Pos: e.At})
+	return 1, true, nil
 }
 
 func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
@@ -2786,6 +3021,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				if g.TypeName == "str" && g.HasStringLiteralInit {
 					l.emitGlobalStringLiteralInitIfNeeded(g, e.At)
 				}
+				l.emitGlobalArrayBackingsInitIfNeeded(g, e.At)
 				slotCount := gSlotCount(g.TypeName, l.types)
 				for i := 0; i < slotCount; i++ {
 					l.emit(ir.IRInstr{Kind: ir.IRLoadGlobal, Local: g.DataIndex + i, Pos: e.At})
@@ -2829,10 +3065,13 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			return 0, err
 		}
 		if target.Global {
-			if g, ok := l.globals[target.Name]; ok && g.TypeName == "str" && g.HasStringLiteralInit {
-				if !l.preparedStringFields[target.Name] {
-					l.emitGlobalStringLiteralInitIfNeeded(g, e.At)
+			if g, ok := l.globals[target.Name]; ok {
+				if g.TypeName == "str" && g.HasStringLiteralInit {
+					if !l.preparedStringFields[target.Name] {
+						l.emitGlobalStringLiteralInitIfNeeded(g, e.At)
+					}
 				}
+				l.emitGlobalArrayBackingsInitIfNeeded(g, e.At)
 			}
 			for i := 0; i < target.SlotCount; i++ {
 				l.emit(ir.IRInstr{Kind: ir.IRLoadGlobal, Local: target.Base + i, Pos: e.At})
@@ -3036,6 +3275,12 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			e.Name = builtin
 		}
 		if slots, ok, err := l.lowerRawOffsetCall(e); ok {
+			return slots, err
+		}
+		if slots, ok, err := l.lowerPtrAddValueCall(e); ok {
+			return slots, err
+		}
+		if slots, ok, err := l.lowerAtomicBuiltinCall(e); ok {
 			return slots, err
 		}
 		switch e.Name {
@@ -3304,13 +3549,41 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				return 0, fmt.Errorf("%s: recv_typed expects an enum type argument", frontend.FormatPos(e.At))
 			}
 			base := l.allocScratchSlots(info.SlotCount)
+			tagBase := typedActorMessageTagBase(msgType)
+			nonNegativeLabel := l.newLabel()
+			mismatchLabel := l.newLabel()
+			endLabel := l.newLabel()
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_recv_begin", ArgSlots: 0, RetSlots: 1, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: tagBase, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRSubI32, Pos: e.At})
 			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base, Pos: e.At})
+
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRCmpLtI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: nonNegativeLabel, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: mismatchLabel, Pos: e.At})
+
+			l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: nonNegativeLabel, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(len(info.EnumCases)), Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRCmpLtI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: mismatchLabel, Pos: e.At})
 			for slot := 0; slot < info.SlotCount-1; slot++ {
 				l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(slot), Pos: e.At})
 				l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_recv_slot", ArgSlots: 1, RetSlots: 1, Pos: e.At})
 				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base + 1 + slot, Pos: e.At})
 			}
+			l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: endLabel, Pos: e.At})
+
+			l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: mismatchLabel, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base, Pos: e.At})
+			for slot := 0; slot < info.SlotCount-1; slot++ {
+				l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: -1, Pos: e.At})
+				l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base + 1 + slot, Pos: e.At})
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: endLabel, Pos: e.At})
 			for slot := 0; slot < info.SlotCount; slot++ {
 				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slot, Pos: e.At})
 			}
@@ -3349,6 +3622,8 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: targetLocal, Pos: e.At})
 			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: msgBase, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: typedActorMessageTagBase(msgType), Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRAddI32, Pos: e.At})
 			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(info.SlotCount - 1), Pos: e.At})
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_actor_send_begin", ArgSlots: 3, RetSlots: 1, Pos: e.At})
 			discard := l.ensureDiscardLocal()
@@ -3496,6 +3771,132 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_fs_exists", ArgSlots: 3, RetSlots: 1, Pos: e.At})
 			return 1, nil
+		case "core.net_socket_tcp4":
+			if total != 1 {
+				return 0, fmt.Errorf("%s: net_socket_tcp4 expects 1 argument slot", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_socket_tcp4", ArgSlots: 1, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_bind_tcp4_loopback":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_bind_tcp4_loopback expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_bind_tcp4_loopback", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_connect_tcp4_loopback":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_connect_tcp4_loopback expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_connect_tcp4_loopback", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_listen":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_listen expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_listen", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_accept4":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_accept4 expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_accept4", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_read":
+			if total != 6 {
+				return 0, fmt.Errorf("%s: net_read expects 6 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_read", ArgSlots: 6, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_recv":
+			if total != 6 {
+				return 0, fmt.Errorf("%s: net_recv expects 6 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_recv", ArgSlots: 6, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_write":
+			if total != 6 {
+				return 0, fmt.Errorf("%s: net_write expects 6 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_write", ArgSlots: 6, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_send":
+			if total != 6 {
+				return 0, fmt.Errorf("%s: net_send expects 6 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_send", ArgSlots: 6, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_epoll_create":
+			if total != 1 {
+				return 0, fmt.Errorf("%s: net_epoll_create expects 1 argument slot", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_epoll_create", ArgSlots: 1, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_epoll_ctl_add_read":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_epoll_ctl_add_read expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_epoll_ctl_add_read", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_epoll_ctl_add_read_write":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_epoll_ctl_add_read_write expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_epoll_ctl_add_read_write", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_epoll_ctl_mod_read":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_epoll_ctl_mod_read expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_epoll_ctl_mod_read", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_epoll_ctl_mod_read_write":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_epoll_ctl_mod_read_write expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_epoll_ctl_mod_read_write", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_epoll_ctl_delete":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_epoll_ctl_delete expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_epoll_ctl_delete", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_epoll_wait_one":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: net_epoll_wait_one expects 3 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_epoll_wait_one", ArgSlots: 3, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_epoll_wait_one_into":
+			if total != 5 {
+				return 0, fmt.Errorf("%s: net_epoll_wait_one_into expects 5 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_epoll_wait_one_into", ArgSlots: 5, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_set_nonblocking":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: net_set_nonblocking expects 2 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_set_nonblocking", ArgSlots: 2, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_set_reuseport":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: net_set_reuseport expects 2 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_set_reuseport", ArgSlots: 2, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_set_tcp_nodelay":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: net_set_tcp_nodelay expects 2 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_set_tcp_nodelay", ArgSlots: 2, RetSlots: 1, Pos: e.At})
+			return 1, nil
+		case "core.net_close":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: net_close expects 2 argument slots", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: "__tetra_net_close", ArgSlots: 2, RetSlots: 1, Pos: e.At})
+			return 1, nil
 		case "core.load_i32":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: load_i32 expects 2 arguments", frontend.FormatPos(e.At))
@@ -3531,6 +3932,12 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				return 0, fmt.Errorf("%s: store_ptr expects 3 arguments", frontend.FormatPos(e.At))
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRMemWritePtr, Pos: e.At})
+			return 1, nil
+		case "core.store_arch_ptr":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: store_arch_ptr expects 3 arguments", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRMemWriteArchPtr, Pos: e.At})
 			return 1, nil
 		case "core.ptr_add":
 			if total != 3 {
@@ -3737,7 +4144,17 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			if !ok {
 				return 0, fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(e.At), e.Name)
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: e.Name, ArgSlots: total, RetSlots: sig.ReturnSlots, Pos: e.At})
+			writebacks := []inoutWriteback(nil)
+			if sig.ThrowsType == "" {
+				var err error
+				writebacks, err = l.collectInoutWritebacks(e.Args, sig.ParamOwnership)
+				if err != nil {
+					return 0, err
+				}
+			}
+			abiReturnSlots := sig.ReturnSlots + inoutWritebackSlotCount(writebacks)
+			l.emit(ir.IRInstr{Kind: ir.IRCall, Name: e.Name, ArgSlots: total, RetSlots: abiReturnSlots, Pos: e.At})
+			l.emitInoutWritebacks(writebacks, e.At)
 			return sig.ReturnSlots, nil
 		}
 	case *frontend.ClosureExpr:
@@ -3907,6 +4324,11 @@ func (l *lowerer) lowerExprAs(expr frontend.Expr, expectedType string) (int, err
 			return 1, nil
 		}
 	}
+	if expectedType == "task.i32" {
+		if actualType, err := l.inferExprType(expr); err == nil && semantics.IsTypedTaskHandleTypeName(actualType) {
+			return l.lowerTypedTaskPublicHandle(expr)
+		}
+	}
 	expectedInfo, ok := l.types[expectedType]
 	if !ok || expectedInfo.Kind != semantics.TypeOptional {
 		return l.lowerExpr(expr)
@@ -3941,6 +4363,9 @@ func (l *lowerer) optionalPayloadSlotCompatible(expected, actual string) bool {
 	if expected == actual {
 		return true
 	}
+	if semantics.TypedTaskHandleTypesCompatible(expected, actual) {
+		return true
+	}
 	if lowerInt32LikeType(expected) && lowerInt32LikeType(actual) {
 		return true
 	}
@@ -3948,6 +4373,26 @@ func (l *lowerer) optionalPayloadSlotCompatible(expected, actual string) bool {
 		return l.optionalPayloadSlotCompatible(expectedInfo.ElemType, actual)
 	}
 	return false
+}
+
+func (l *lowerer) lowerTypedTaskPublicHandle(expr frontend.Expr) (int, error) {
+	slots, err := l.lowerExpr(expr)
+	if err != nil {
+		return 0, err
+	}
+	if slots == 2 {
+		return slots, nil
+	}
+	if slots < 2 {
+		return 0, fmt.Errorf("%s: typed task handle slot mismatch", frontend.FormatPos(expr.Pos()))
+	}
+	base := l.allocScratchSlots(slots)
+	for slot := slots - 1; slot >= 0; slot-- {
+		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: base + slot, Pos: expr.Pos()})
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base, Pos: expr.Pos()})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slots - 1, Pos: expr.Pos()})
+	return 2, nil
 }
 
 func lowerInt32LikeType(typeName string) bool {
@@ -3979,6 +4424,46 @@ func (l *lowerer) emitGlobalStringLiteralInitIfNeeded(g semantics.GlobalInfo, po
 	l.emit(ir.IRInstr{Kind: ir.IRStoreGlobal, Local: g.DataIndex + 1, Pos: pos})
 	l.emit(ir.IRInstr{Kind: ir.IRStoreGlobal, Local: g.DataIndex, Pos: pos})
 	l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: readyLabel, Pos: pos})
+}
+
+func (l *lowerer) emitGlobalArrayBackingsInitIfNeeded(g semantics.GlobalInfo, pos frontend.Position) {
+	for _, backing := range g.ArrayBackings {
+		byteLen := globalArrayBackingByteLen(backing.ElemType, backing.Len, l.types)
+		if byteLen <= 0 {
+			continue
+		}
+		ptrSlot := g.DataIndex + backing.HeaderOffset
+		lenSlot := ptrSlot + 1
+		readyLabel := l.newLabel()
+		l.emit(ir.IRInstr{Kind: ir.IRLoadGlobal, Local: ptrSlot, Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRCmpEqI32, Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: readyLabel, Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRStrLit, Str: make([]byte, byteLen), Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: l.ensureDiscardLocal(), Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRStoreGlobal, Local: ptrSlot, Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(backing.Len), Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRStoreGlobal, Local: lenSlot, Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: readyLabel, Pos: pos})
+	}
+}
+
+func globalArrayBackingByteLen(elemType string, n int, types map[string]*semantics.TypeInfo) int {
+	if n <= 0 {
+		return 0
+	}
+	switch elemType {
+	case "u8":
+		return n
+	case "u16":
+		return n * 2
+	case "i32", "bool":
+		return n * 4
+	}
+	if info, ok := types[elemType]; ok && info.Kind == semantics.TypeStruct && info.SlotCount == 1 {
+		return n * 4
+	}
+	return 0
 }
 
 func (l *lowerer) emitGlobalFunctionValueInitIfNeeded(g semantics.GlobalInfo, pos frontend.Position) {
@@ -4233,8 +4718,16 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 		if tname, ok, err := l.inferStructConstructorCallType(e); ok {
 			return tname, err
 		}
-		if local, ok := l.locals[e.Name]; ok && local.FunctionTypeValue && local.FunctionValue == "" {
+		if fieldInfo, _, ok, err := l.functionFieldCallSource(e.Name, e.At); err != nil {
+			return "", err
+		} else if ok {
+			return fieldInfo.FunctionReturnType, nil
+		}
+		if local, ok := l.locals[e.Name]; ok && local.FunctionTypeValue {
 			return local.FunctionReturnType, nil
+		}
+		if global, ok := l.globals[e.Name]; ok && global.FunctionTypeValue {
+			return global.FunctionReturnType, nil
 		}
 		if builtin, ok := semantics.ResolveBuiltinAlias(e.Name); ok {
 			e.Name = builtin
@@ -4376,6 +4869,10 @@ func (l *lowerer) lowerStructConstructorCall(e *frontend.CallExpr, functionField
 						slots = field.SlotCount
 					}
 				}
+			} else if copied, ok, err := l.emitFunctionFieldValueFromExpr(expr); err != nil {
+				return 0, true, err
+			} else if ok {
+				slots = copied
 			} else if target, ok := functionFieldTargetFromExpr(expr, l.locals); ok {
 				slots = l.emitFunctionSymbolValue(target, nil, expr.Pos())
 			} else if target, ok := functionTypedGlobalFieldTargetFromExpr(expr, l.globals); ok {
@@ -4389,7 +4886,7 @@ func (l *lowerer) lowerStructConstructorCall(e *frontend.CallExpr, functionField
 			if field.FunctionTypeValue {
 				slots, err = l.lowerExprAs(expr, field.TypeName)
 			} else {
-				slots, err = l.lowerExpr(expr)
+				slots, err = l.lowerExprAs(expr, field.TypeName)
 			}
 			if err != nil {
 				return 0, true, err
@@ -4401,6 +4898,21 @@ func (l *lowerer) lowerStructConstructorCall(e *frontend.CallExpr, functionField
 		total += slots
 	}
 	return total, true, nil
+}
+
+func (l *lowerer) emitFunctionFieldValueFromExpr(expr frontend.Expr) (int, bool, error) {
+	name := functionTypedFieldNameFromExpr(expr)
+	if name == "" {
+		return 0, false, nil
+	}
+	_, base, ok, err := l.functionFieldCallSource(name, expr.Pos())
+	if err != nil || !ok {
+		return 0, ok, err
+	}
+	for slot := 0; slot < semantics.FnPtrSlotCount; slot++ {
+		l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: base + slot, Pos: expr.Pos()})
+	}
+	return semantics.FnPtrSlotCount, true, nil
 }
 
 func (l *lowerer) lowerStructLiteralExpr(e *frontend.StructLitExpr, functionFields map[string]semantics.FunctionFieldInfo) (int, error) {
@@ -4455,6 +4967,10 @@ func (l *lowerer) lowerStructLiteralExpr(e *frontend.StructLitExpr, functionFiel
 						slots = field.SlotCount
 					}
 				}
+			} else if copied, ok, err := l.emitFunctionFieldValueFromExpr(expr); err != nil {
+				return 0, err
+			} else if ok {
+				slots = copied
 			} else if target, ok := functionFieldTargetFromExpr(expr, l.locals); ok {
 				slots = l.emitFunctionSymbolValue(target, nil, expr.Pos())
 			} else if target, ok := functionTypedGlobalFieldTargetFromExpr(expr, l.globals); ok {
@@ -4468,7 +4984,7 @@ func (l *lowerer) lowerStructLiteralExpr(e *frontend.StructLitExpr, functionFiel
 			if field.FunctionTypeValue {
 				slots, err = l.lowerExprAs(expr, field.TypeName)
 			} else {
-				slots, err = l.lowerExpr(expr)
+				slots, err = l.lowerExprAs(expr, field.TypeName)
 			}
 			if err != nil {
 				return 0, err
@@ -4527,6 +5043,10 @@ func (l *lowerer) lowerEnumCaseConstructorCall(e *frontend.CallExpr, enumPayload
 						slots = caseInfo.PayloadSlots[i]
 					}
 				}
+			} else if copied, ok, err := l.emitFunctionFieldValueFromExpr(arg); err != nil {
+				return 0, true, err
+			} else if ok {
+				slots = copied
 			} else if target, ok := functionFieldTargetFromExpr(arg, l.locals); ok {
 				slots = l.emitFunctionSymbolValue(target, nil, arg.Pos())
 			} else if target, ok := functionTypedGlobalFieldTargetFromExpr(arg, l.globals); ok {
@@ -4540,7 +5060,7 @@ func (l *lowerer) lowerEnumCaseConstructorCall(e *frontend.CallExpr, enumPayload
 			if i < len(caseInfo.PayloadFunctionTypes) && caseInfo.PayloadFunctionTypes[i] {
 				slots, err = l.lowerExprAs(arg, caseInfo.PayloadTypes[i])
 			} else {
-				slots, err = l.lowerExpr(arg)
+				slots, err = l.lowerExprAs(arg, caseInfo.PayloadTypes[i])
 			}
 			if err != nil {
 				return 0, true, err

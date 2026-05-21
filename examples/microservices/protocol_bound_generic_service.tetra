@@ -1,0 +1,25 @@
+// Protocol-bound generic microservice smoke.
+//
+// The service routes a status struct through a static protocol-bound generic
+// helper in the same file.
+struct Status:
+    value: Int
+
+protocol Routable:
+    func route(self: Status) -> Status
+
+extension Status:
+    func route(self: Status) -> Status:
+        return self
+
+impl Status: Routable
+
+func keep<T>(value: T) -> T:
+    return value
+
+func main() -> Int:
+    let status: Status = Status(value: 42)
+    let routed: Status = keep(status)
+    if routed.value == 42:
+        return 0
+    return routed.value

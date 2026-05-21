@@ -1,0 +1,31 @@
+module app.main
+
+import lib.resources as resources
+
+func worker() -> Int
+uses actors:
+    let request: actor.msg = core.recv_msg()
+    let _reply: Int = core.send_msg(core.sender(), request.value + 1, request.tag + 1)
+    return 0
+
+func main() -> Int
+uses actors:
+    let first: actor = core.spawn("worker")
+    let box: resources.ActorBox = resources.wrap(first)
+    let boxed: actor = resources.unwrap(box)
+    let _sent_boxed: Int = core.send_msg(boxed, 20, 4)
+    let boxed_reply: actor.msg = core.recv_msg()
+    if boxed_reply.value != 21 || boxed_reply.tag != 5:
+        return boxed_reply.value
+    let second: actor = core.spawn("worker")
+    let msg: resources.MoveMsg = resources.MoveMsg.handoff(second)
+    let returned: resources.MoveMsg = resources.pass(msg)
+    match returned:
+    case resources.MoveMsg.handoff(other):
+        let _sent_other: Int = core.send_msg(other, 41, 8)
+        let reply: actor.msg = core.recv_msg()
+        if reply.value == 42 && reply.tag == 9:
+            return 0
+        return reply.value
+    case resources.MoveMsg.empty:
+        return 99

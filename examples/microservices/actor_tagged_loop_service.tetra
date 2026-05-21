@@ -1,0 +1,33 @@
+// Actor tagged loop microservice smoke.
+//
+// The service sends a bounded stream of tagged messages to one actor and
+// verifies the reply tag/value drift across the loop.
+actor Router:
+    func run() -> Int
+    uses actors:
+        var index: Int = 0
+        let iterations: Int = 32
+        while index < iterations:
+            var request: actor.msg = core.recv_msg()
+            if request.tag != 31:
+                return 10 + request.tag
+            let _reply: Int = core.send_msg(core.sender(), request.value + 1, 32)
+            index = index + 1
+        return 0
+
+func main() -> Int
+uses actors:
+    let router: actor = core.spawn("Router.run")
+    var index: Int = 0
+    var drift: Int = 0
+    let iterations: Int = 32
+    while index < iterations:
+        let _request: Int = core.send_msg(router, index, 31)
+        var reply: actor.msg = core.recv_msg()
+        if reply.tag != 32:
+            return reply.tag
+        drift = drift + (reply.value - (index + 1))
+        index = index + 1
+    if drift == 0:
+        return 0
+    return drift

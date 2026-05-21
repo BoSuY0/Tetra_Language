@@ -1,0 +1,35 @@
+// Actor task-result window microservice smoke.
+//
+// The service polls a task from inside an actor, then blocks for the final
+// result and replies through a deadline-aware actor receive path.
+module examples.microservices.actor_task_result_window_service
+
+actor ResultWindowRouter:
+    func run() -> Int
+    uses actors, runtime:
+        let reply_to: actor = core.sender()
+        let task: task.i32 = core.task_spawn_i32("result_window_worker")
+        let early: task.result_i32 = core.task_poll_i32(task)
+        if early.error != 2:
+            let _bad: Int = core.send_msg(reply_to, early.error, 11)
+            return 0
+        let result: task.result_i32 = core.task_join_result_i32(task)
+        let _reply: Int = core.send_msg(reply_to, result.value + 21, result.error)
+        return 0
+
+func result_window_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 21
+
+func main() -> Int
+uses actors, runtime:
+    let _router: actor = core.spawn("ResultWindowRouter.run")
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(5))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 0:
+        return 40 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

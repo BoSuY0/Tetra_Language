@@ -1,0 +1,242 @@
+{
+  "schema": "tetra.techempower.single_query_matrix.v1",
+  "status": "pass",
+  "generated_at": "2026-05-20T23:23:17Z",
+  "generated_local_at": "2026-05-21T02:23:17+03:00",
+  "command": "GOWORK=off go run ./benchmarks/techempower/tetra/cmd/scram-local-bench --duration 30s --warmup 5s --repeats 2 --levels 8:8,16:16,32:32 --semantic-requests 64 --semantic-concurrency 8 --workers 2 --pool 64 --semantic-report docs/benchmarks/techempower_scram_single_query_local_report.json --matrix-report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json",
+  "environment": {
+    "os": "linux",
+    "arch": "amd64",
+    "go_version": "go1.26.3-X:nodwarf5",
+    "hostname": "tetra-4"
+  },
+  "git": {
+    "head": "3e05876ce57c",
+    "worktree_status": "dirty"
+  },
+  "build": {
+    "app_binary": "/tmp/tetra-techempower-scram-3366742835/bin/tetra-techempower",
+    "bench_binary": "/tmp/tetra-techempower-scram-3366742835/bin/tetra-techempower-bench",
+    "mode": "release",
+    "build_command": "go build -trimpath -ldflags=-s -w",
+    "go_build_trimpath": true,
+    "stripped": true
+  },
+  "postgres": {
+    "version": "16.9.0",
+    "auth_method": "scram-sha-256",
+    "password_encryption": "scram-sha-256",
+    "verifier_prefix": "SCRAM-SHA-256",
+    "world_rows": 10000,
+    "fortune_rows": 12,
+    "host": "127.0.0.1",
+    "port": 34319,
+    "database": "hello_world",
+    "user": "benchmarkdbuser",
+    "max_connections": "256"
+  },
+  "server": {
+    "base_url": "http://127.0.0.1:36813",
+    "workers": 2,
+    "pool_size": 64
+  },
+  "semantic_probe": [
+    {
+      "name": "plaintext headers/body",
+      "status": "pass",
+      "evidence": "status, text/plain body, Date, and Server headers validated"
+    },
+    {
+      "name": "json headers/body",
+      "status": "pass",
+      "evidence": "JSON object shape and content type validated"
+    },
+    {
+      "name": "db real read",
+      "status": "pass",
+      "evidence": "/db World[4585] matched PostgreSQL randomNumber=4585"
+    },
+    {
+      "name": "query clamping",
+      "status": "pass",
+      "evidence": "queries parameter clamps to 1..500"
+    },
+    {
+      "name": "updates persistence",
+      "status": "pass",
+      "evidence": "updates response persisted changed randomNumber values"
+    },
+    {
+      "name": "fortunes insertion escaping sorting",
+      "status": "pass",
+      "evidence": "request-time fortune, HTML escaping, and sorted message order validated"
+    }
+  ],
+  "warmup": {
+    "level": {
+      "concurrency": 8,
+      "connections": 8
+    },
+    "repeat": 0,
+    "duration_seconds": 5,
+    "elapsed_seconds": 5.003831331,
+    "requests": 122927,
+    "successes": 122927,
+    "failures": 0,
+    "bytes": 3783681,
+    "rps": 24566.575463572517,
+    "avg_latency_ms": 0.3244077649336598,
+    "p50_latency_ms": 0.266418,
+    "p90_latency_ms": 0.62522,
+    "p95_latency_ms": 0.769237,
+    "p99_latency_ms": 1.090222,
+    "max_latency_ms": 3.96997,
+    "validation": "real HTTP GET /db responses validated as TechEmpower World JSON objects"
+  },
+  "runs": [
+    {
+      "level": {
+        "concurrency": 8,
+        "connections": 8
+      },
+      "repeat": 1,
+      "duration_seconds": 30,
+      "elapsed_seconds": 30.003857867,
+      "requests": 814616,
+      "successes": 814616,
+      "failures": 0,
+      "bytes": 25073085,
+      "rps": 27150.375248776338,
+      "avg_latency_ms": 0.2936001588318914,
+      "p50_latency_ms": 0.253,
+      "p90_latency_ms": 0.499403,
+      "p95_latency_ms": 0.601574,
+      "p99_latency_ms": 0.860682,
+      "max_latency_ms": 9.508594,
+      "validation": "real HTTP GET /db responses validated as TechEmpower World JSON objects"
+    },
+    {
+      "level": {
+        "concurrency": 8,
+        "connections": 8
+      },
+      "repeat": 2,
+      "duration_seconds": 30,
+      "elapsed_seconds": 30.005873776,
+      "requests": 677786,
+      "successes": 677786,
+      "failures": 0,
+      "bytes": 20861488,
+      "rps": 22588.444017988324,
+      "avg_latency_ms": 0.3530138290330576,
+      "p50_latency_ms": 0.286056,
+      "p90_latency_ms": 0.689841,
+      "p95_latency_ms": 0.856731,
+      "p99_latency_ms": 1.216591,
+      "max_latency_ms": 5.976536,
+      "validation": "real HTTP GET /db responses validated as TechEmpower World JSON objects"
+    },
+    {
+      "level": {
+        "concurrency": 16,
+        "connections": 16
+      },
+      "repeat": 1,
+      "duration_seconds": 30,
+      "elapsed_seconds": 30.004722912,
+      "requests": 982137,
+      "successes": 982137,
+      "failures": 0,
+      "bytes": 30228974,
+      "rps": 32732.74687056707,
+      "avg_latency_ms": 0.48762544871642144,
+      "p50_latency_ms": 0.424644,
+      "p90_latency_ms": 0.817225,
+      "p95_latency_ms": 0.973643,
+      "p99_latency_ms": 1.326662,
+      "max_latency_ms": 11.032773,
+      "validation": "real HTTP GET /db responses validated as TechEmpower World JSON objects"
+    },
+    {
+      "level": {
+        "concurrency": 16,
+        "connections": 16
+      },
+      "repeat": 2,
+      "duration_seconds": 30,
+      "elapsed_seconds": 30.011475338,
+      "requests": 872185,
+      "successes": 872185,
+      "failures": 0,
+      "bytes": 26845729,
+      "rps": 29061.716899190717,
+      "avg_latency_ms": 0.5492649015335049,
+      "p50_latency_ms": 0.460469,
+      "p90_latency_ms": 1.01207,
+      "p95_latency_ms": 1.246018,
+      "p99_latency_ms": 1.706856,
+      "max_latency_ms": 12.719807,
+      "validation": "real HTTP GET /db responses validated as TechEmpower World JSON objects"
+    },
+    {
+      "level": {
+        "concurrency": 32,
+        "connections": 32
+      },
+      "repeat": 1,
+      "duration_seconds": 30,
+      "elapsed_seconds": 30.011930934,
+      "requests": 968270,
+      "successes": 968270,
+      "failures": 0,
+      "bytes": 29801572,
+      "rps": 32262.835807844127,
+      "avg_latency_ms": 0.990240790736055,
+      "p50_latency_ms": 0.865499,
+      "p90_latency_ms": 1.684569,
+      "p95_latency_ms": 2.01555,
+      "p99_latency_ms": 2.643674,
+      "max_latency_ms": 13.504081,
+      "validation": "real HTTP GET /db responses validated as TechEmpower World JSON objects"
+    },
+    {
+      "level": {
+        "concurrency": 32,
+        "connections": 32
+      },
+      "repeat": 2,
+      "duration_seconds": 30,
+      "elapsed_seconds": 30.016669475,
+      "requests": 948989,
+      "successes": 948989,
+      "failures": 0,
+      "bytes": 29208011,
+      "rps": 31615.399596227187,
+      "avg_latency_ms": 1.0104209492365033,
+      "p50_latency_ms": 0.886638,
+      "p90_latency_ms": 1.783239,
+      "p95_latency_ms": 2.147836,
+      "p99_latency_ms": 2.826155,
+      "max_latency_ms": 17.278418,
+      "validation": "real HTTP GET /db responses validated as TechEmpower World JSON objects"
+    }
+  ],
+  "summary": {
+    "run_count": 6,
+    "total_requests": 5263983,
+    "total_failures": 0,
+    "best_rps": 32732.74687056707,
+    "worst_p99_ms": 2.826155,
+    "decision": "pass"
+  },
+  "artifacts": {
+    "levels": "8:8,16:16,32:32",
+    "matrix_report": "docs/benchmarks/techempower_scram_single_query_matrix_local_report.json",
+    "semantic_report": "docs/benchmarks/techempower_scram_single_query_local_report.json"
+  },
+  "limitations": [
+    "local embedded PostgreSQL harness; official TechEmpower publication is not implied",
+    "SCRAM-SHA-256-PLUS channel binding and SASLprep are not implemented in the Tetra PostgreSQL runtime",
+    "matrix duration and concurrency are caller controlled; use --duration 30s or --duration 60s for release gates"
+  ]
+}

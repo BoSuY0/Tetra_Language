@@ -150,6 +150,109 @@ func TestManifestDescribeBuiltinsIncludesFilesystemExists(t *testing.T) {
 	t.Fatalf("manifest missing core.fs_exists")
 }
 
+func TestManifestDescribeBuiltinsIncludesAtomicSurface(t *testing.T) {
+	got, err := DescribeBuiltins()
+	if err != nil {
+		t.Fatalf("DescribeBuiltins: %v", err)
+	}
+	byName := map[string]BuiltinManifest{}
+	for _, entry := range got {
+		byName[entry.Name] = entry
+	}
+
+	tests := []struct {
+		name       string
+		params     []string
+		returnType string
+	}{
+		{name: "core.atomic_load_i32_acquire", params: []string{"ptr", "cap.mem"}, returnType: "i32"},
+		{name: "core.atomic_store_i32_release", params: []string{"ptr", "i32", "cap.mem"}, returnType: "i32"},
+		{name: "core.atomic_compare_exchange_i32_acq_rel", params: []string{"ptr", "i32", "i32", "cap.mem"}, returnType: "i32"},
+		{name: "core.atomic_compare_exchange_weak_i32_seq_cst", params: []string{"ptr", "i32", "i32", "cap.mem"}, returnType: "i32"},
+		{name: "core.atomic_load_i64_acquire", params: []string{"ptr", "cap.mem"}, returnType: "i64"},
+		{name: "core.atomic_compare_exchange_weak_i64_seq_cst", params: []string{"ptr", "i64", "i64", "cap.mem"}, returnType: "i64"},
+		{name: "core.atomic_exchange_u8_seq_cst", params: []string{"ptr", "u8", "cap.mem"}, returnType: "u8"},
+		{name: "core.atomic_exchange_u16_seq_cst", params: []string{"ptr", "u16", "cap.mem"}, returnType: "u16"},
+		{name: "core.atomic_fetch_add_ptr_relaxed", params: []string{"ptr", "ptr", "cap.mem"}, returnType: "ptr"},
+		{name: "core.atomic_fence_seq_cst", params: []string{"cap.mem"}, returnType: "i32"},
+	}
+	for _, tt := range tests {
+		entry, ok := byName[tt.name]
+		if !ok {
+			t.Fatalf("manifest missing %s", tt.name)
+		}
+		if !reflect.DeepEqual(entry.ParamTypes, tt.params) {
+			t.Fatalf("%s param types = %#v, want %#v", tt.name, entry.ParamTypes, tt.params)
+		}
+		if entry.ReturnType != tt.returnType {
+			t.Fatalf("%s return type = %q, want %q", tt.name, entry.ReturnType, tt.returnType)
+		}
+		if strings.Join(entry.Effects, ",") != "mem" {
+			t.Fatalf("%s effects = %q, want mem", tt.name, strings.Join(entry.Effects, ","))
+		}
+		if entry.UnsafePolicy != "always" {
+			t.Fatalf("%s unsafe policy = %q, want always", tt.name, entry.UnsafePolicy)
+		}
+	}
+}
+
+func TestManifestDescribeBuiltinsIncludesNetSocketLifecycle(t *testing.T) {
+	got, err := DescribeBuiltins()
+	if err != nil {
+		t.Fatalf("DescribeBuiltins: %v", err)
+	}
+	byName := map[string]BuiltinManifest{}
+	for _, entry := range got {
+		byName[entry.Name] = entry
+	}
+	tests := []struct {
+		name       string
+		params     []string
+		returnType string
+		effects    string
+	}{
+		{name: "core.net_socket_tcp4", params: []string{"cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_bind_tcp4_loopback", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_connect_tcp4_loopback", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_listen", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_accept4", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_read", params: []string{"i32", "[]u8", "i32", "i32", "cap.io"}, returnType: "i32", effects: "io,mem"},
+		{name: "core.net_recv", params: []string{"i32", "[]u8", "i32", "i32", "cap.io"}, returnType: "i32", effects: "io,mem"},
+		{name: "core.net_write", params: []string{"i32", "[]u8", "i32", "i32", "cap.io"}, returnType: "i32", effects: "io,mem"},
+		{name: "core.net_send", params: []string{"i32", "[]u8", "i32", "i32", "cap.io"}, returnType: "i32", effects: "io,mem"},
+		{name: "core.net_epoll_create", params: []string{"cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_epoll_ctl_add_read", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_epoll_ctl_add_read_write", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_epoll_ctl_mod_read", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_epoll_ctl_mod_read_write", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_epoll_ctl_delete", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_epoll_wait_one", params: []string{"i32", "i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_epoll_wait_one_into", params: []string{"i32", "[]i32", "i32", "cap.io"}, returnType: "i32", effects: "io,mem"},
+		{name: "core.net_set_nonblocking", params: []string{"i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_set_reuseport", params: []string{"i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_set_tcp_nodelay", params: []string{"i32", "cap.io"}, returnType: "i32", effects: "io"},
+		{name: "core.net_close", params: []string{"i32", "cap.io"}, returnType: "i32", effects: "io"},
+	}
+	for _, tt := range tests {
+		entry, ok := byName[tt.name]
+		if !ok {
+			t.Fatalf("manifest missing %s", tt.name)
+		}
+		if !reflect.DeepEqual(entry.ParamTypes, tt.params) {
+			t.Fatalf("%s param types = %#v, want %#v", tt.name, entry.ParamTypes, tt.params)
+		}
+		if entry.ReturnType != tt.returnType {
+			t.Fatalf("%s return type = %q, want %q", tt.name, entry.ReturnType, tt.returnType)
+		}
+		if strings.Join(entry.Effects, ",") != tt.effects {
+			t.Fatalf("%s effects = %q, want %q", tt.name, strings.Join(entry.Effects, ","), tt.effects)
+		}
+		if entry.UnsafePolicy != "never" {
+			t.Fatalf("%s unsafe policy = %q, want never", tt.name, entry.UnsafePolicy)
+		}
+	}
+}
+
 func TestManifestDriftProofAgainstBuiltinPolicySources(t *testing.T) {
 	got, err := DescribeBuiltins()
 	if err != nil {

@@ -1,0 +1,15 @@
+module lib.resources
+
+func maybe_actor(peer: actor) -> actor?:
+    let out: actor? = peer
+    return out
+
+func alias_actor(peer: actor) -> actor:
+    return peer
+
+func maybe_group(group: task.group) -> task.group?:
+    let out: task.group? = group
+    return out
+
+func alias_group(group: task.group) -> task.group:
+    return group

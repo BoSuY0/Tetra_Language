@@ -1,0 +1,26 @@
+// Nested task spawn microservice smoke.
+//
+// The service starts a task whose worker starts and joins a child task before
+// returning to the parent.
+module examples.microservices.parallel_nested_task_spawn_service
+
+func child() -> Int:
+    return 20
+
+func parent() -> Int
+uses runtime:
+    let child_task: task.i32 = core.task_spawn_i32("child")
+    let child_result: task.result_i32 = core.task_join_result_i32(child_task)
+    if child_result.error != 0:
+        return 10 + child_result.error
+    return child_result.value + 22
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("parent")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    if result.error != 0:
+        return 30 + result.error
+    if result.value == 42:
+        return 0
+    return result.value

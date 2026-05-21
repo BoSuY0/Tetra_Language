@@ -1,0 +1,26 @@
+module app.main
+
+import lib.tasks as tasks
+
+func first_worker() -> Int:
+    return 19
+
+func second_worker() -> Int:
+    return 23
+
+func main() -> Int
+uses runtime:
+    let first_task: task.i32 = core.task_spawn_i32("first_worker")
+    let boxed: tasks.Box<task.i32> = tasks.pass_task(tasks.wrap_task(first_task))
+    let first: task.result_i32 = core.task_join_result_i32(boxed.value)
+    let second_task: task.i32 = core.task_spawn_i32("second_worker")
+    let returned: task.i32 = tasks.alias_task(second_task)
+    let second: task.result_i32 = core.task_join_result_i32(returned)
+    if first.error != 0:
+        return 40 + first.error
+    if second.error != 0:
+        return 50 + second.error
+    let total: Int = first.value + second.value
+    if total == 42:
+        return 0
+    return total

@@ -1,0 +1,31 @@
+// Memory copy window microservice smoke.
+//
+// The service writes four raw bytes, copies them into a second raw allocation,
+// and verifies the copied checksum.
+module examples.microservices.memory_copy_window_service
+
+import lib.core.capability as cap
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let source: ptr = core.alloc_bytes(4)
+        let target: ptr = core.alloc_bytes(4)
+        let src_one: ptr = core.ptr_add(source, 1, memory_cap)
+        let src_two: ptr = core.ptr_add(source, 2, memory_cap)
+        let src_three: ptr = core.ptr_add(source, 3, memory_cap)
+        let target_one: ptr = core.ptr_add(target, 1, memory_cap)
+        let target_two: ptr = core.ptr_add(target, 2, memory_cap)
+        let target_three: ptr = core.ptr_add(target, 3, memory_cap)
+        let _write_zero: u8 = core.store_u8(source, 9, memory_cap)
+        let _write_one: u8 = core.store_u8(src_one, 10, memory_cap)
+        let _write_two: u8 = core.store_u8(src_two, 11, memory_cap)
+        let _write_three: u8 = core.store_u8(src_three, 12, memory_cap)
+        let _copy: Int = memory.memcpy_u8(target, source, 4, memory_cap)
+        let total: Int = core.load_u8(target, memory_cap) + core.load_u8(target_one, memory_cap) + core.load_u8(target_two, memory_cap) + core.load_u8(target_three, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 96

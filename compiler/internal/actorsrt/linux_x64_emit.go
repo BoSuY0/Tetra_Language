@@ -19,12 +19,22 @@ const (
 )
 
 const (
-	linuxSysRead    = 0
-	linuxSysWrite   = 1
-	linuxSysClose   = 3
-	linuxSysPoll    = 7
-	linuxSysSocket  = 41
-	linuxSysConnect = 42
+	linuxSysRead         = 0
+	linuxSysWrite        = 1
+	linuxSysClose        = 3
+	linuxSysFcntl        = 72
+	linuxSysPoll         = 7
+	linuxSysSocket       = 41
+	linuxSysConnect      = 42
+	linuxSysSendto       = 44
+	linuxSysRecvfrom     = 45
+	linuxSysBind         = 49
+	linuxSysListen       = 50
+	linuxSysSetSockOpt   = 54
+	linuxSysEpollCtl     = 233
+	linuxSysEpollWait    = 232
+	linuxSysAccept4      = 288
+	linuxSysEpollCreate1 = 291
 
 	actorWireMagic          = 0x52444154
 	actorWireVersion        = 1
@@ -1120,6 +1130,439 @@ func emitFilesystemExists(e *x64.Emitter) error {
 	}
 	e.XorEaxEax()
 	e.Leave()
+	e.Ret()
+	return nil
+}
+
+func emitNetSocketTCP4(e *x64.Emitter) error {
+	// Arguments: rdi=cap.io token (ignored).
+	e.MovEdiImm32(2)            // AF_INET
+	e.Emit(0xBE, 0x01, 0, 0, 0) // mov esi, SOCK_STREAM
+	e.Emit(0x31, 0xD2)          // xor edx, edx
+	e.MovR10dImm32(0)
+	e.MovR8dImm32(0)
+	e.MovR9dImm32(0)
+	e.MovEaxImm32(linuxSysSocket)
+	e.Syscall()
+	e.Ret()
+	return nil
+}
+
+func emitNetBindTCP4Loopback(e *x64.Emitter) error {
+	// Arguments: rdi=fd, rsi=port, rdx=cap.io token (ignored).
+	e.PushRbp()
+	e.MovRbpRsp()
+	e.SubRspImm32(32)
+	e.Emit(0x89, 0x7C, 0x24, 0x10) // mov [rsp+16], edi
+
+	emitMovMem16RspDispImm16(e, 0, 2)          // AF_INET
+	e.MovEaxEsi()                              // port
+	e.Emit(0x86, 0xE0)                         // xchg al, ah
+	emitMovMem16RspDispAx(e, 2)                // sin_port
+	emitMovMem32RspDispImm32(e, 4, 0x0100007f) // 127.0.0.1 bytes
+	emitMovMem32RspDispImm32(e, 8, 0)          // sin_zero
+	emitMovMem32RspDispImm32(e, 12, 0)         // sin_zero
+	e.Emit(0x8B, 0x7C, 0x24, 0x10)             // mov edi, [rsp+16]
+	e.Emit(0x48, 0x8D, 0x34, 0x24)             // lea rsi, [rsp]
+	e.MovEdxImm32(16)                          // sizeof(sockaddr_in)
+	e.MovEaxImm32(linuxSysBind)
+	e.Syscall()
+	e.Leave()
+	e.Ret()
+	return nil
+}
+
+func emitNetConnectTCP4Loopback(e *x64.Emitter) error {
+	// Arguments: rdi=fd, rsi=port, rdx=cap.io token (ignored).
+	e.PushRbp()
+	e.MovRbpRsp()
+	e.SubRspImm32(32)
+	e.Emit(0x89, 0x7C, 0x24, 0x10) // mov [rsp+16], edi
+
+	emitMovMem16RspDispImm16(e, 0, 2)          // AF_INET
+	e.MovEaxEsi()                              // port
+	e.Emit(0x86, 0xE0)                         // xchg al, ah
+	emitMovMem16RspDispAx(e, 2)                // sin_port
+	emitMovMem32RspDispImm32(e, 4, 0x0100007f) // 127.0.0.1 bytes
+	emitMovMem32RspDispImm32(e, 8, 0)          // sin_zero
+	emitMovMem32RspDispImm32(e, 12, 0)         // sin_zero
+	e.Emit(0x8B, 0x7C, 0x24, 0x10)             // mov edi, [rsp+16]
+	e.Emit(0x48, 0x8D, 0x34, 0x24)             // lea rsi, [rsp]
+	e.MovEdxImm32(16)                          // sizeof(sockaddr_in)
+	e.MovEaxImm32(linuxSysConnect)
+	e.Syscall()
+	e.Leave()
+	e.Ret()
+	return nil
+}
+
+func emitNetListen(e *x64.Emitter) error {
+	// Arguments: rdi=fd, rsi=backlog, rdx=cap.io token (ignored).
+	e.MovEaxImm32(linuxSysListen)
+	e.Syscall()
+	e.Ret()
+	return nil
+}
+
+func emitNetAccept4(e *x64.Emitter) error {
+	// Arguments: rdi=fd, rsi=flags, rdx=cap.io token (ignored).
+	e.Emit(0x41, 0x89, 0xF2) // mov r10d, esi
+	e.Emit(0x31, 0xF6)       // xor esi, esi (addr=NULL)
+	e.Emit(0x31, 0xD2)       // xor edx, edx (addrlen=NULL)
+	e.MovEaxImm32(linuxSysAccept4)
+	e.Syscall()
+	e.Ret()
+	return nil
+}
+
+func emitNetRead(e *x64.Emitter) error {
+	return emitNetReadWrite(e, linuxSysRead)
+}
+
+func emitNetRecv(e *x64.Emitter) error {
+	return emitNetRecvSend(e, linuxSysRecvfrom)
+}
+
+func emitNetWrite(e *x64.Emitter) error {
+	return emitNetReadWrite(e, linuxSysWrite)
+}
+
+func emitNetSend(e *x64.Emitter) error {
+	return emitNetRecvSend(e, linuxSysSendto)
+}
+
+func emitNetReadWrite(e *x64.Emitter, syscall uint32) error {
+	var failJumps []int
+
+	// Arguments: rdi=fd, rsi=slice_ptr, rdx=slice_len, rcx=start, r8=count, r9=cap.io token (ignored).
+	e.Emit(0x85, 0xC9) // test ecx, ecx
+	startOK := e.JgeRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	startOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, startOK, startOKTo); err != nil {
+		return err
+	}
+	e.Emit(0x45, 0x85, 0xC0) // test r8d, r8d
+	countOK := e.JgeRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	countOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, countOK, countOKTo); err != nil {
+		return err
+	}
+	e.Emit(0x39, 0xCA) // cmp edx, ecx
+	startInRange := e.JgeRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	startInRangeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, startInRange, startInRangeTo); err != nil {
+		return err
+	}
+
+	e.Emit(0x29, 0xCA)       // sub edx, ecx (available = len - start)
+	e.Emit(0x44, 0x39, 0xC2) // cmp edx, r8d
+	useRequestedCount := e.JgeRel32()
+	e.Emit(0x41, 0x89, 0xD0) // mov r8d, edx
+	useRequestedCountTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, useRequestedCount, useRequestedCountTo); err != nil {
+		return err
+	}
+	e.Emit(0x48, 0x63, 0xC9) // movsxd rcx, ecx
+	e.Emit(0x48, 0x01, 0xCE) // add rsi, rcx
+	e.MovRdxR8()
+	e.MovEaxImm32(syscall)
+	e.Syscall()
+	e.Ret()
+
+	failTo := len(e.Buf)
+	for _, at := range failJumps {
+		if err := x64.PatchRel32(e.Buf, at, failTo); err != nil {
+			return err
+		}
+	}
+	e.MovEaxImm32(0xFFFFFFFF)
+	e.Ret()
+	return nil
+}
+
+func emitNetRecvSend(e *x64.Emitter, syscall uint32) error {
+	var failJumps []int
+
+	// Arguments: rdi=fd, rsi=slice_ptr, rdx=slice_len, rcx=start, r8=count, r9=cap.io token (ignored).
+	// Emits recvfrom/sendto with flags=0 and NULL address operands.
+	e.Emit(0x85, 0xC9) // test ecx, ecx
+	startOK := e.JgeRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	startOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, startOK, startOKTo); err != nil {
+		return err
+	}
+	e.Emit(0x45, 0x85, 0xC0) // test r8d, r8d
+	countOK := e.JgeRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	countOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, countOK, countOKTo); err != nil {
+		return err
+	}
+	e.Emit(0x39, 0xCA) // cmp edx, ecx
+	startInRange := e.JgeRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	startInRangeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, startInRange, startInRangeTo); err != nil {
+		return err
+	}
+
+	e.Emit(0x29, 0xCA)       // sub edx, ecx (available = len - start)
+	e.Emit(0x44, 0x39, 0xC2) // cmp edx, r8d
+	useRequestedCount := e.JgeRel32()
+	e.Emit(0x41, 0x89, 0xD0) // mov r8d, edx
+	useRequestedCountTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, useRequestedCount, useRequestedCountTo); err != nil {
+		return err
+	}
+	e.Emit(0x48, 0x63, 0xC9) // movsxd rcx, ecx
+	e.Emit(0x48, 0x01, 0xCE) // add rsi, rcx
+	e.MovRdxR8()
+	e.MovR10dImm32(0) // flags=0
+	e.MovR8dImm32(0)  // addr=NULL
+	e.MovR9dImm32(0)  // addrlen=NULL
+	e.MovEaxImm32(syscall)
+	e.Syscall()
+	e.Ret()
+
+	failTo := len(e.Buf)
+	for _, at := range failJumps {
+		if err := x64.PatchRel32(e.Buf, at, failTo); err != nil {
+			return err
+		}
+	}
+	e.MovEaxImm32(0xFFFFFFFF)
+	e.Ret()
+	return nil
+}
+
+func emitNetEpollCreate(e *x64.Emitter) error {
+	// Arguments: rdi=cap.io token (ignored).
+	e.MovEdiImm32(0) // flags=0
+	e.MovEaxImm32(linuxSysEpollCreate1)
+	e.Syscall()
+	e.Ret()
+	return nil
+}
+
+func emitNetEpollCtlAddRead(e *x64.Emitter) error {
+	const (
+		epollCtlAdd = 1
+		epollIn     = 1
+	)
+	return emitNetEpollCtl(e, epollCtlAdd, epollIn)
+}
+
+func emitNetEpollCtlAddReadWrite(e *x64.Emitter) error {
+	const (
+		epollCtlAdd = 1
+		epollIn     = 1
+		epollOut    = 4
+	)
+	return emitNetEpollCtl(e, epollCtlAdd, epollIn|epollOut)
+}
+
+func emitNetEpollCtlModRead(e *x64.Emitter) error {
+	const (
+		epollCtlMod = 3
+		epollIn     = 1
+	)
+	return emitNetEpollCtl(e, epollCtlMod, epollIn)
+}
+
+func emitNetEpollCtlModReadWrite(e *x64.Emitter) error {
+	const (
+		epollCtlMod = 3
+		epollIn     = 1
+		epollOut    = 4
+	)
+	return emitNetEpollCtl(e, epollCtlMod, epollIn|epollOut)
+}
+
+func emitNetEpollCtlDelete(e *x64.Emitter) error {
+	const epollCtlDel = 2
+	return emitNetEpollCtl(e, epollCtlDel, 0)
+}
+
+func emitNetEpollCtl(e *x64.Emitter, op uint32, events uint32) error {
+	// Arguments: rdi=epfd, rsi=fd, rdx=cap.io token (ignored).
+	e.PushRbp()
+	e.MovRbpRsp()
+	e.SubRspImm32(16)
+	emitMovMem32RspDispImm32(e, 0, events)
+	e.Emit(0x48, 0x89, 0x74, 0x24, 0x04)                                                      // mov [rsp+4], rsi (event.data.u64)
+	e.Emit(0x48, 0x89, 0xF2)                                                                  // mov rdx, rsi (fd)
+	e.Emit(0xBE, byte(op&0xff), byte((op>>8)&0xff), byte((op>>16)&0xff), byte((op>>24)&0xff)) // mov esi, op
+	e.Emit(0x49, 0x89, 0xE2)                                                                  // mov r10, rsp
+	e.MovEaxImm32(linuxSysEpollCtl)
+	e.Syscall()
+	e.Leave()
+	e.Ret()
+	return nil
+}
+
+func emitNetEpollWaitOne(e *x64.Emitter) error {
+	// Arguments: rdi=epfd, rsi=timeout_ms, rdx=cap.io token (ignored).
+	e.PushRbp()
+	e.MovRbpRsp()
+	e.SubRspImm32(16)
+	e.Emit(0x41, 0x89, 0xF2) // mov r10d, esi
+	e.Emit(0x48, 0x89, 0xE6) // mov rsi, rsp
+	e.MovEdxImm32(1)         // maxevents=1
+	e.MovEaxImm32(linuxSysEpollWait)
+	e.Syscall()
+	e.TestEaxEax()
+	nonNegativeAt := e.JgeRel32()
+	e.Leave()
+	e.Ret()
+
+	nonNegativeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, nonNegativeAt, nonNegativeTo); err != nil {
+		return err
+	}
+	e.TestEaxEax()
+	readyAt := e.JnzRel32()
+	e.Leave()
+	e.Ret()
+
+	readyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, readyAt, readyTo); err != nil {
+		return err
+	}
+	e.Emit(0x8B, 0x44, 0x24, 0x04) // mov eax, [rsp+4] (event.data lower i32)
+	e.Leave()
+	e.Ret()
+	return nil
+}
+
+func emitNetEpollWaitOneInto(e *x64.Emitter) error {
+	// Arguments: rdi=epfd, rsi=[]i32 ptr, rdx=[]i32 len, rcx=timeout_ms, r8=cap.io token (ignored).
+	e.PushRbp()
+	e.MovRbpRsp()
+	e.SubRspImm32(32)
+	e.Emit(0x83, 0xFA, 0x02) // cmp edx, 2
+	lenOKAt := e.JgeRel32()
+	e.MovEaxImm32(0xFFFFFFFF)
+	e.Leave()
+	e.Ret()
+
+	lenOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, lenOKAt, lenOKTo); err != nil {
+		return err
+	}
+	e.Emit(0x48, 0x89, 0x74, 0x24, 0x10) // mov [rsp+16], rsi (out ptr)
+	e.Emit(0x41, 0x89, 0xCA)             // mov r10d, ecx (timeout_ms)
+	e.Emit(0x48, 0x89, 0xE6)             // mov rsi, rsp (events)
+	e.MovEdxImm32(1)                     // maxevents=1
+	e.MovEaxImm32(linuxSysEpollWait)
+	e.Syscall()
+	e.TestEaxEax()
+	nonNegativeAt := e.JgeRel32()
+	e.Leave()
+	e.Ret()
+
+	nonNegativeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, nonNegativeAt, nonNegativeTo); err != nil {
+		return err
+	}
+	e.TestEaxEax()
+	readyAt := e.JnzRel32()
+	e.Leave()
+	e.Ret()
+
+	readyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, readyAt, readyTo); err != nil {
+		return err
+	}
+	e.Emit(0x48, 0x8B, 0x54, 0x24, 0x10) // mov rdx, [rsp+16] (out ptr)
+	e.MovEaxFromRspDisp(4)               // event.data lower i32
+	e.Emit(0x89, 0x02)                   // mov [rdx], eax
+	e.MovEaxFromRspDisp(0)               // event.events
+	e.Emit(0x89, 0x42, 0x04)             // mov [rdx+4], eax
+	e.MovEaxImm32(1)
+	e.Leave()
+	e.Ret()
+	return nil
+}
+
+func emitNetSetNonblocking(e *x64.Emitter) error {
+	const (
+		linuxFGetFL    = 3
+		linuxFSetFL    = 4
+		linuxONonblock = 2048
+	)
+
+	// Arguments: rdi=fd, rsi=cap.io token (ignored).
+	e.PushRbp()
+	e.MovRbpRsp()
+	e.SubRspImm32(16)
+	e.Emit(0x89, 0x3C, 0x24) // mov [rsp], edi
+
+	e.Emit(0xBE, byte(linuxFGetFL), 0, 0, 0) // mov esi, F_GETFL
+	e.Emit(0x31, 0xD2)                       // xor edx, edx
+	e.MovEaxImm32(linuxSysFcntl)
+	e.Syscall()
+	e.TestEaxEax()
+	okAt := e.JgeRel32()
+	e.Leave()
+	e.Ret()
+
+	okTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, okAt, okTo); err != nil {
+		return err
+	}
+	e.Emit(0x0D, byte(linuxONonblock&0xff), byte((linuxONonblock>>8)&0xff), byte((linuxONonblock>>16)&0xff), byte((linuxONonblock>>24)&0xff)) // or eax, O_NONBLOCK
+	e.Emit(0x89, 0xC2)                                                                                                                        // mov edx, eax
+	e.Emit(0x8B, 0x3C, 0x24)                                                                                                                  // mov edi, [rsp]
+	e.Emit(0xBE, byte(linuxFSetFL), 0, 0, 0)                                                                                                  // mov esi, F_SETFL
+	e.MovEaxImm32(linuxSysFcntl)
+	e.Syscall()
+	e.Leave()
+	e.Ret()
+	return nil
+}
+
+func emitNetSetReusePort(e *x64.Emitter) error {
+	const (
+		linuxSolSocket   = 1
+		linuxSoReusePort = 15
+	)
+	return emitNetSetIntSockOpt(e, linuxSolSocket, linuxSoReusePort)
+}
+
+func emitNetSetTCPNoDelay(e *x64.Emitter) error {
+	const (
+		linuxIPProtoTCP = 6
+		linuxTCPNoDelay = 1
+	)
+	return emitNetSetIntSockOpt(e, linuxIPProtoTCP, linuxTCPNoDelay)
+}
+
+func emitNetSetIntSockOpt(e *x64.Emitter, level uint32, optname uint32) error {
+	// Arguments: rdi=fd, rsi=cap.io token (ignored).
+	e.PushRbp()
+	e.MovRbpRsp()
+	e.SubRspImm32(16)
+	emitMovMem32RspDispImm32(e, 0, 1)
+	e.Emit(0xBE, byte(level&0xff), byte((level>>8)&0xff), byte((level>>16)&0xff), byte((level>>24)&0xff)) // mov esi, level
+	e.MovEdxImm32(optname)
+	e.Emit(0x49, 0x89, 0xE2) // mov r10, rsp (optval=&one)
+	e.MovR8dImm32(4)         // optlen=sizeof(i32)
+	e.MovR9dImm32(0)
+	e.MovEaxImm32(linuxSysSetSockOpt)
+	e.Syscall()
+	e.Leave()
+	e.Ret()
+	return nil
+}
+
+func emitNetClose(e *x64.Emitter) error {
+	// Arguments: rdi=fd, rsi=cap.io token (ignored).
+	e.MovEaxImm32(linuxSysClose)
+	e.Syscall()
 	e.Ret()
 	return nil
 }

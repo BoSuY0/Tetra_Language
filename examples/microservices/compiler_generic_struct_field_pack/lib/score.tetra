@@ -1,0 +1,17 @@
+module lib.score
+
+struct Box<T>:
+    value: T
+
+struct Holder:
+    box: Box<Int>
+
+func id<T>(value: T) -> T:
+    return value
+
+func make(value: Int) -> Holder:
+    let box: Box<Int> = Box<Int>(value: id(value))
+    return Holder(box: box)
+
+func score(holder: Holder) -> Int:
+    return holder.box.value

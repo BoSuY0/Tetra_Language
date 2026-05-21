@@ -52,7 +52,7 @@ func TestDoctorCommandJSON(t *testing.T) {
 		if check.Name == "runtime exports" && check.Status == "pass" && strings.Contains(check.Detail, "symbols") {
 			sawRuntimeExports = true
 		}
-		if check.Name == "target metadata" && check.Status == "pass" && strings.Contains(check.Detail, "5 targets") && strings.Contains(check.Detail, "0 build-only") {
+		if check.Name == "target metadata" && check.Status == "pass" && strings.Contains(check.Detail, "7 targets") && strings.Contains(check.Detail, "2 build-only") {
 			sawTargetMetadata = true
 		}
 		if check.Name == "tooling commands" && check.Status == "pass" && strings.Contains(check.Detail, "fmt") && strings.Contains(check.Detail, "test") {
@@ -88,6 +88,16 @@ func TestTargetMetadataCheck(t *testing.T) {
 		web := targetReportEntryForTest(t, buildTargetReportEntries(), "wasm32-web")
 		if web.BuildOnly || web.RunMode != "web_runner" || !web.RunSupported || web.RunRunner == "" || web.RunUnsupportedReason != "" {
 			t.Fatalf("wasm32-web target metadata = %#v", web)
+		}
+		x32 := targetReportEntryForTest(t, buildTargetReportEntries(), "linux-x32")
+		if !x32.BuildOnly || x32.RunMode != "host_probed" || x32.PointerWidthBits != 32 || x32.RegisterWidthBits != 64 || !strings.Contains(x32.UnsupportedReason, "host-probed source run/test execution") || !strings.Contains(x32.UnsupportedReason, "Linux kernel supports the x32 ABI") {
+			t.Fatalf("linux-x32 target metadata = %#v", x32)
+		} else if x32.RunSupported {
+			if x32.RunUnsupportedReason != "" {
+				t.Fatalf("linux-x32 supported host-probed metadata = %#v", x32)
+			}
+		} else if !strings.Contains(x32.RunUnsupportedReason, "host does not support Linux x32 ABI execution") || !strings.Contains(x32.RunUnsupportedReason, "no host fallback") {
+			t.Fatalf("linux-x32 unsupported host-probed metadata = %#v", x32)
 		}
 	})
 

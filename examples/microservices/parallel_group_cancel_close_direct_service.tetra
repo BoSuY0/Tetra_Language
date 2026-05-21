@@ -1,0 +1,13 @@
+// Task-group direct cancel-close microservice smoke.
+//
+// The service closes the task-group handle returned directly from
+// `task_group_cancel`, covering nested task-group lifecycle builtin calls.
+module examples.microservices.parallel_group_cancel_close_direct_service
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let close_error: Int = core.task_group_close(core.task_group_cancel(group))
+    if close_error == 0:
+        return 0
+    return close_error

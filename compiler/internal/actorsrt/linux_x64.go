@@ -223,6 +223,69 @@ func buildSysVUnixX64(entries []string, sysMmap uint32, mapFlags uint32, distrib
 	if err := emitFunc("__tetra_fs_exists", func() error { return emitFilesystemExists(e) }); err != nil {
 		return nil, err
 	}
+	if err := emitFunc("__tetra_net_socket_tcp4", func() error { return emitNetSocketTCP4(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_bind_tcp4_loopback", func() error { return emitNetBindTCP4Loopback(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_connect_tcp4_loopback", func() error { return emitNetConnectTCP4Loopback(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_listen", func() error { return emitNetListen(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_accept4", func() error { return emitNetAccept4(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_read", func() error { return emitNetRead(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_recv", func() error { return emitNetRecv(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_write", func() error { return emitNetWrite(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_send", func() error { return emitNetSend(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_epoll_create", func() error { return emitNetEpollCreate(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_epoll_ctl_add_read", func() error { return emitNetEpollCtlAddRead(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_epoll_ctl_add_read_write", func() error { return emitNetEpollCtlAddReadWrite(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_epoll_ctl_mod_read", func() error { return emitNetEpollCtlModRead(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_epoll_ctl_mod_read_write", func() error { return emitNetEpollCtlModReadWrite(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_epoll_ctl_delete", func() error { return emitNetEpollCtlDelete(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_epoll_wait_one", func() error { return emitNetEpollWaitOne(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_epoll_wait_one_into", func() error { return emitNetEpollWaitOneInto(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_set_nonblocking", func() error { return emitNetSetNonblocking(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_set_reuseport", func() error { return emitNetSetReusePort(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_set_tcp_nodelay", func() error { return emitNetSetTCPNoDelay(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_net_close", func() error { return emitNetClose(e) }); err != nil {
+		return nil, err
+	}
 	if distributedActorNet {
 		if err := emitFunc("__tetra_actor_node_connect", func() error { return emitActorNodeConnect(e) }); err != nil {
 			return nil, err

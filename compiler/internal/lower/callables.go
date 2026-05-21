@@ -2110,8 +2110,17 @@ func (l *lowerer) lowerFunctionTypedParamCall(e *frontend.CallExpr, local semant
 		}
 		expectedRetSlots = throwingReturnSlotCount(returnInfo.SlotCount, errorSlots)
 	}
+	writebacks := []inoutWriteback(nil)
+	if local.FunctionThrowsType == "" {
+		var err error
+		writebacks, err = l.collectInoutWritebacks(e.Args, local.FunctionParamOwnership)
+		if err != nil {
+			return 0, err
+		}
+	}
+	abiRetSlots := expectedRetSlots + inoutWritebackSlotCount(writebacks)
 	if local.FunctionHandleValue {
-		return l.lowerCallableHandleLocalCall(e, local, targets, total, argScratch, expectedRetSlots)
+		return l.lowerCallableHandleLocalCall(e, local, targets, total, argScratch, expectedRetSlots, abiRetSlots, writebacks)
 	}
 	for _, target := range targets {
 		sig, ok := l.funcs[target]
@@ -2146,7 +2155,8 @@ func (l *lowerer) lowerFunctionTypedParamCall(e *frontend.CallExpr, local semant
 			}
 			targetArgSlots = sig.ParamSlots
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: targetArgSlots, RetSlots: expectedRetSlots, Pos: e.At})
+		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: targetArgSlots, RetSlots: abiRetSlots, Pos: e.At})
+		l.emitInoutWritebacks(writebacks, e.At)
 		return expectedRetSlots, nil
 	}
 
@@ -2173,7 +2183,8 @@ func (l *lowerer) lowerFunctionTypedParamCall(e *frontend.CallExpr, local semant
 			}
 			targetArgSlots = sig.ParamSlots
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: targetArgSlots, RetSlots: expectedRetSlots, Pos: e.At})
+		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: targetArgSlots, RetSlots: abiRetSlots, Pos: e.At})
+		l.emitInoutWritebacks(writebacks, e.At)
 		for slot := expectedRetSlots - 1; slot >= 0; slot-- {
 			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: resultScratch + slot, Pos: e.At})
 		}
@@ -2198,6 +2209,8 @@ func (l *lowerer) lowerCallableHandleLocalCall(
 	total int,
 	argScratch int,
 	expectedRetSlots int,
+	abiRetSlots int,
+	writebacks []inoutWriteback,
 ) (int, error) {
 	if len(targets) != 1 {
 		return 0, fmt.Errorf("%s: callable handle '%s' requires a single stable target for current handle lowering", frontend.FormatPos(e.At), e.Name)
@@ -2223,7 +2236,8 @@ func (l *lowerer) lowerCallableHandleLocalCall(
 	for slot := 0; slot < hiddenSlots; slot++ {
 		l.emitCallableHandleEnvLoad(local.Base+1, slot, e.At)
 	}
-	l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: sig.ParamSlots, RetSlots: expectedRetSlots, Pos: e.At})
+	l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: sig.ParamSlots, RetSlots: abiRetSlots, Pos: e.At})
+	l.emitInoutWritebacks(writebacks, e.At)
 	return expectedRetSlots, nil
 }
 
@@ -2266,6 +2280,15 @@ func (l *lowerer) lowerStoredFunctionCall(e *frontend.CallExpr, fieldInfo semant
 		}
 		expectedReturnSlots = throwingReturnSlotCount(returnInfo.SlotCount, errorSlots)
 	}
+	writebacks := []inoutWriteback(nil)
+	if fieldInfo.FunctionThrowsType == "" {
+		var err error
+		writebacks, err = l.collectInoutWritebacks(e.Args, fieldInfo.FunctionParamOwnership)
+		if err != nil {
+			return 0, err
+		}
+	}
+	abiReturnSlots := expectedReturnSlots + inoutWritebackSlotCount(writebacks)
 	for _, target := range targets {
 		sig, ok := l.funcs[target]
 		if !ok {
@@ -2296,7 +2319,8 @@ func (l *lowerer) lowerStoredFunctionCall(e *frontend.CallExpr, fieldInfo semant
 				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: fnptrBase + 1 + slot, Pos: e.At})
 			}
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: sig.ParamSlots, RetSlots: expectedReturnSlots, Pos: e.At})
+		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: sig.ParamSlots, RetSlots: abiReturnSlots, Pos: e.At})
+		l.emitInoutWritebacks(writebacks, e.At)
 		return expectedReturnSlots, nil
 	}
 	resultScratch := l.ensureCallableScratchBase(expectedReturnSlots)
@@ -2319,7 +2343,8 @@ func (l *lowerer) lowerStoredFunctionCall(e *frontend.CallExpr, fieldInfo semant
 				l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: fnptrBase + 1 + slot, Pos: e.At})
 			}
 		}
-		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: sig.ParamSlots, RetSlots: expectedReturnSlots, Pos: e.At})
+		l.emit(ir.IRInstr{Kind: ir.IRCall, Name: target, ArgSlots: sig.ParamSlots, RetSlots: abiReturnSlots, Pos: e.At})
+		l.emitInoutWritebacks(writebacks, e.At)
 		for slot := expectedReturnSlots - 1; slot >= 0; slot-- {
 			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: resultScratch + slot, Pos: e.At})
 		}

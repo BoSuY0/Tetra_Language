@@ -1,0 +1,29 @@
+// Optional enum router microservice smoke.
+//
+// The service routes an optional payload through an enum state and unwraps it
+// through match plus if-let.
+module examples.microservices.optional_enum_router_service
+
+enum Route:
+    case ready(Int?)
+    case empty
+
+func make_ready(value: Int) -> Route:
+    let maybe: Int? = value
+    return Route.ready(maybe)
+
+func score(route: Route) -> Int:
+    match route:
+    case Route.ready(maybe):
+        if let value = maybe:
+            return value
+        return 0
+    case Route.empty:
+        return 0
+
+func main() -> Int:
+    let route: Route = make_ready(42)
+    let status: Int = score(route)
+    if status == 42:
+        return 0
+    return status

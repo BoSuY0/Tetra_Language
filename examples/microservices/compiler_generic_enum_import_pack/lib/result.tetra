@@ -1,0 +1,18 @@
+module lib.result
+
+enum Status:
+    case ready(Int)
+    case empty
+
+func id<T>(value: T) -> T:
+    return value
+
+func make(value: Int) -> Status:
+    return Status.ready(id(value))
+
+func score(status: Status) -> Int:
+    match status:
+    case Status.ready(value):
+        return value
+    case Status.empty:
+        return 0

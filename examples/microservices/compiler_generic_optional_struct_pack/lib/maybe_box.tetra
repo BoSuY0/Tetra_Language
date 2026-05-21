@@ -1,0 +1,12 @@
+module lib.maybe_box
+
+struct Box<T>:
+    value: T
+
+func wrap<T>(value: T) -> Box<T>?:
+    return Box<T>(value: value)
+
+func score(box: Box<Int>?) -> Int:
+    if let payload = box:
+        return payload.value
+    return 0

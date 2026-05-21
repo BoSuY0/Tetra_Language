@@ -1,0 +1,33 @@
+// Task dual-deadline microservice smoke.
+//
+// The service times out a slow task, joins an independent fast task, and then
+// recovers the slow task through the full result path.
+module examples.microservices.task_dual_deadline_service
+
+func fast_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 17
+
+func slow_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return 25
+
+func main() -> Int
+uses runtime:
+    let slow: task.i32 = core.task_spawn_i32("slow_worker")
+    let fast: task.i32 = core.task_spawn_i32("fast_worker")
+    let early: task.result_i32 = core.task_join_until_i32(slow, core.deadline_ms(1))
+    if early.error != 2:
+        return 10 + early.error
+    let fast_result: task.result_i32 = core.task_join_result_i32(fast)
+    if fast_result.error != 0:
+        return 20 + fast_result.error
+    let slow_result: task.result_i32 = core.task_join_result_i32(slow)
+    if slow_result.error != 0:
+        return 30 + slow_result.error
+    let total: Int = fast_result.value + slow_result.value
+    if total == 42:
+        return 0
+    return total

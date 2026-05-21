@@ -1,0 +1,16 @@
+module engine.core
+
+struct Status:
+    value: Int
+
+protocol Routable:
+    func route(self: Status) -> Status
+
+extension Status:
+    func route(self: Status) -> Status:
+        return self
+
+impl Status: Routable
+
+func keep<T>(value: T) -> T:
+    return value

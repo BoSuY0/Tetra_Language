@@ -1,0 +1,30 @@
+{
+  "framework": "tetra",
+  "tests": [
+    {
+      "default": {
+        "json_url": "/json",
+        "db_url": "/db",
+        "query_url": "/queries?queries=",
+        "fortune_url": "/fortunes",
+        "update_url": "/updates?queries=",
+        "plaintext_url": "/plaintext",
+        "port": 8080,
+        "approach": "Realistic",
+        "classification": "Platform",
+        "database": "Postgres",
+        "framework": "tetra",
+        "language": "Tetra",
+        "flavor": "None",
+        "orm": "Raw",
+        "platform": "Tetra Runtime",
+        "webserver": "Tetra",
+        "os": "Linux",
+        "database_os": "Linux",
+        "display_name": "Tetra",
+        "notes": "Local TechEmpower-compatible config for the in-repo v0.4.0 web runtime; not an official upstream submission yet.",
+        "versus": ""
+      }
+    }
+  ]
+}

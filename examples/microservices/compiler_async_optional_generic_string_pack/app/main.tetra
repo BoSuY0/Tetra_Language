@@ -1,0 +1,9 @@
+module app.main
+
+import lib.async_string_shapes as async_string_shapes
+
+func main() -> Int:
+    let value: Int = async_string_shapes.fallback()
+    if value == 42:
+        return 0
+    return value

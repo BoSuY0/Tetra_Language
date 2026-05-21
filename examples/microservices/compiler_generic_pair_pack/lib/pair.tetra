@@ -1,0 +1,13 @@
+module lib.pair
+
+struct Pair<T, U>:
+    left: T
+    right: U
+
+func make(left: Int, right: Bool) -> Pair<Int, Bool>:
+    return Pair<Int, Bool>(left: left, right: right)
+
+func score(pair: Pair<Int, Bool>) -> Int:
+    if pair.right:
+        return pair.left + 2
+    return pair.left

@@ -1,0 +1,19 @@
+// I32 slice for-loop memory microservice smoke.
+//
+// The service fills a heap-backed []i32 and sums it through collection-loop
+// lowering.
+module examples.microservices.memory_i32_for_loop_service
+
+func main() -> Int
+uses alloc, mem:
+    var nums: []i32 = core.make_i32(4)
+    nums[0] = 4
+    nums[1] = 8
+    nums[2] = 12
+    nums[3] = 18
+    var total: Int = 0
+    for n in nums:
+        total = total + n
+    if total == 42:
+        return 0
+    return total

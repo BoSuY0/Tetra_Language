@@ -37,6 +37,7 @@ func DescribeBuiltins() ([]BuiltinManifest, error) {
 		"island_make_bool",
 		"load_ptr",
 		"store_ptr",
+		"store_arch_ptr",
 		"sym_addr",
 		"ctx_switch",
 		"time_now_ms",
@@ -146,6 +147,9 @@ func validateBuiltinManifestEntry(entry BuiltinManifest) error {
 }
 
 func builtinEffects(name string) []string {
+	if isCoreAtomicBuiltin(name) {
+		return []string{"mem"}
+	}
 	var effects []string
 	switch name {
 	case "core.alloc_bytes":
@@ -162,13 +166,21 @@ func builtinEffects(name string) []string {
 		effects = []string{"capability", "mem"}
 	case "core.load_i32", "core.store_i32",
 		"core.load_u8", "core.store_u8",
-		"core.load_ptr", "core.store_ptr",
+		"core.load_ptr", "core.store_ptr", "core.store_arch_ptr",
 		"core.ptr_add":
 		effects = []string{"mem"}
 	case "core.mmio_read_i32", "core.mmio_write_i32":
 		effects = []string{"io", "mmio"}
 	case "core.fs_exists":
 		effects = []string{"io"}
+	case "core.net_socket_tcp4", "core.net_bind_tcp4_loopback", "core.net_connect_tcp4_loopback", "core.net_listen", "core.net_accept4",
+		"core.net_epoll_create", "core.net_epoll_ctl_add_read", "core.net_epoll_wait_one",
+		"core.net_epoll_ctl_add_read_write", "core.net_epoll_ctl_mod_read",
+		"core.net_epoll_ctl_mod_read_write", "core.net_epoll_ctl_delete",
+		"core.net_set_nonblocking", "core.net_set_reuseport", "core.net_set_tcp_nodelay", "core.net_close":
+		effects = []string{"io"}
+	case "core.net_read", "core.net_recv", "core.net_write", "core.net_send", "core.net_epoll_wait_one_into":
+		effects = []string{"io", "mem"}
 	case "core.sym_addr":
 		effects = []string{"link"}
 	case "core.ctx_switch":

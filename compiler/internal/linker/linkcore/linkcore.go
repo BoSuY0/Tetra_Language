@@ -13,6 +13,16 @@ type DataDisp32Reloc struct {
 	TargetOff int
 }
 
+type DataAbs32Reloc struct {
+	At        int
+	TargetOff int
+}
+
+type FuncAbs32Reloc struct {
+	At        int
+	TargetOff int
+}
+
 type IATDisp32Reloc struct {
 	At   int
 	Name string
@@ -22,10 +32,12 @@ type Result struct {
 	Text []byte
 	Data []byte
 
-	Symbols     map[string]int
-	DataRelocs  []DataDisp32Reloc
-	IATRelocs   []IATDisp32Reloc
-	EntryOffset int
+	Symbols       map[string]int
+	DataRelocs    []DataDisp32Reloc
+	DataAbsRelocs []DataAbs32Reloc
+	FuncAbsRelocs []FuncAbs32Reloc
+	IATRelocs     []IATDisp32Reloc
+	EntryOffset   int
 }
 
 func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, entryStubCallAt int, entryOffset int) (*Result, error) {
@@ -117,6 +129,8 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 	}
 
 	var dataRelocs []DataDisp32Reloc
+	var dataAbsRelocs []DataAbs32Reloc
+	var funcAbsRelocs []FuncAbs32Reloc
 	var iatRelocs []IATDisp32Reloc
 
 	for _, obj := range objs {
@@ -142,6 +156,43 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 				if err := x64.PatchRel32(text, at, target); err != nil {
 					return nil, err
 				}
+			case tobj.RelocFuncAddrDisp32:
+				if reloc.Name == "" {
+					return nil, fmt.Errorf("function address relocation with empty symbol name in module '%s'", obj.Module)
+				}
+				if reloc.Addend != 0 {
+					return nil, fmt.Errorf("function address relocation addend must be zero in module '%s'", obj.Module)
+				}
+				target, ok := symbols[reloc.Name]
+				if !ok {
+					return nil, fmt.Errorf("unresolved symbol '%s'", reloc.Name)
+				}
+				at := textBase + int(reloc.At)
+				if at < 0 || at+4 > len(text) {
+					return nil, fmt.Errorf("function address relocation out of range for '%s'", reloc.Name)
+				}
+				if err := x64.PatchRel32(text, at, target); err != nil {
+					return nil, err
+				}
+			case tobj.RelocFuncAddrAbs32:
+				if reloc.Name == "" {
+					return nil, fmt.Errorf("function address relocation with empty symbol name in module '%s'", obj.Module)
+				}
+				if reloc.Addend != 0 {
+					return nil, fmt.Errorf("function address relocation addend must be zero in module '%s'", obj.Module)
+				}
+				target, ok := symbols[reloc.Name]
+				if !ok {
+					return nil, fmt.Errorf("unresolved symbol '%s'", reloc.Name)
+				}
+				at := textBase + int(reloc.At)
+				if at < 0 || at+4 > len(text) {
+					return nil, fmt.Errorf("function address relocation out of range for '%s'", reloc.Name)
+				}
+				funcAbsRelocs = append(funcAbsRelocs, FuncAbs32Reloc{
+					At:        at,
+					TargetOff: target,
+				})
 			case tobj.RelocDataDisp32:
 				if reloc.Name != "" {
 					return nil, fmt.Errorf("data relocation symbol name must be empty in module '%s'", obj.Module)
@@ -157,6 +208,24 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 					return nil, fmt.Errorf("data relocation out of range for '%s'", obj.Module)
 				}
 				dataRelocs = append(dataRelocs, DataDisp32Reloc{
+					At:        at,
+					TargetOff: dataBase + int(reloc.Addend),
+				})
+			case tobj.RelocDataAbs32:
+				if reloc.Name != "" {
+					return nil, fmt.Errorf("data relocation symbol name must be empty in module '%s'", obj.Module)
+				}
+				if len(obj.Data) == 0 {
+					return nil, fmt.Errorf("data relocation in empty data section for '%s'", obj.Module)
+				}
+				if reloc.Addend >= uint32(len(obj.Data)) {
+					return nil, fmt.Errorf("data relocation out of range in '%s'", obj.Module)
+				}
+				at := textBase + int(reloc.At)
+				if at < 0 || at+4 > len(text) {
+					return nil, fmt.Errorf("data relocation out of range for '%s'", obj.Module)
+				}
+				dataAbsRelocs = append(dataAbsRelocs, DataAbs32Reloc{
 					At:        at,
 					TargetOff: dataBase + int(reloc.Addend),
 				})
@@ -179,12 +248,14 @@ func LinkX64Objects(objects []*tobj.Object, mainName string, entryStub []byte, e
 	}
 
 	return &Result{
-		Text:        text,
-		Data:        data,
-		Symbols:     symbols,
-		DataRelocs:  dataRelocs,
-		IATRelocs:   iatRelocs,
-		EntryOffset: entryOffset,
+		Text:          text,
+		Data:          data,
+		Symbols:       symbols,
+		DataRelocs:    dataRelocs,
+		DataAbsRelocs: dataAbsRelocs,
+		FuncAbsRelocs: funcAbsRelocs,
+		IATRelocs:     iatRelocs,
+		EntryOffset:   entryOffset,
 	}, nil
 }
 

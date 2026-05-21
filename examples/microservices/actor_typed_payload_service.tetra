@@ -1,0 +1,32 @@
+// Actor typed-payload microservice smoke.
+//
+// The service sends an enum payload through the actor typed-message ABI and
+// validates the returned enum payload.
+enum CounterMsg:
+    case inc(Int, Int)
+    case reset
+
+func typed_worker() -> Int
+uses actors:
+    let msg: CounterMsg = core.recv_typed<CounterMsg>()
+    match msg:
+    case CounterMsg.inc(lhs, rhs):
+        let _reply: Int = core.send_typed(core.sender(), CounterMsg.inc(lhs + 1, rhs + 1))
+        return 0
+    case CounterMsg.reset:
+        let _reset: Int = core.send_typed(core.sender(), CounterMsg.reset)
+        return 0
+
+func main() -> Int
+uses actors:
+    let worker: actor = core.spawn("typed_worker")
+    let _sent: Int = core.send_typed(worker, CounterMsg.inc(20, 20))
+    let reply: CounterMsg = core.recv_typed<CounterMsg>()
+    match reply:
+    case CounterMsg.inc(lhs, rhs):
+        let total: Int = lhs + rhs
+        if total == 42:
+            return 0
+        return total
+    case CounterMsg.reset:
+        return 90

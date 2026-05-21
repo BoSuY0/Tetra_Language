@@ -1,0 +1,41 @@
+// Memory derived-copy microservice smoke.
+//
+// The service copies a byte window between derived source and target pointers
+// with unrolled loads/stores and verifies the copied checksum.
+module examples.microservices.memory_derived_copy_service
+
+import lib.core.capability as cap
+import lib.core.memory as memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let source: ptr = core.alloc_bytes(8)
+        let target: ptr = core.alloc_bytes(8)
+        let source_two: ptr = core.ptr_add(source, 2, memory_cap)
+        let source_three: ptr = core.ptr_add(source, 3, memory_cap)
+        let source_four: ptr = core.ptr_add(source, 4, memory_cap)
+        let source_five: ptr = core.ptr_add(source, 5, memory_cap)
+        let target_one: ptr = core.ptr_add(target, 1, memory_cap)
+        let target_two: ptr = core.ptr_add(target, 2, memory_cap)
+        let target_three: ptr = core.ptr_add(target, 3, memory_cap)
+        let target_four: ptr = core.ptr_add(target, 4, memory_cap)
+        let _write_two: u8 = core.store_u8(source_two, 9, memory_cap)
+        let _write_three: u8 = core.store_u8(source_three, 10, memory_cap)
+        let _write_four: u8 = core.store_u8(source_four, 11, memory_cap)
+        let _write_five: u8 = core.store_u8(source_five, 12, memory_cap)
+        let _clear: Int = memory.memset_u8(target, 0, 8, memory_cap)
+        let source_two_value: u8 = core.load_u8(source_two, memory_cap)
+        let source_three_value: u8 = core.load_u8(source_three, memory_cap)
+        let source_four_value: u8 = core.load_u8(source_four, memory_cap)
+        let source_five_value: u8 = core.load_u8(source_five, memory_cap)
+        let _copy_one: u8 = core.store_u8(target_one, source_two_value, memory_cap)
+        let _copy_two: u8 = core.store_u8(target_two, source_three_value, memory_cap)
+        let _copy_three: u8 = core.store_u8(target_three, source_four_value, memory_cap)
+        let _copy_four: u8 = core.store_u8(target_four, source_five_value, memory_cap)
+        let total: Int = core.load_u8(target_one, memory_cap) + core.load_u8(target_two, memory_cap) + core.load_u8(target_three, memory_cap) + core.load_u8(target_four, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

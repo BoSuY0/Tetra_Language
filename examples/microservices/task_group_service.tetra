@@ -1,0 +1,34 @@
+// Task group microservice smoke.
+//
+// The service opens a task group, schedules two workers in that group, joins
+// both result records, and closes the group after all work is observed.
+module examples.microservices.task_group_service
+
+func worker() -> Int
+uses runtime:
+    return 21
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let open_status: Int = core.task_group_status(group)
+    if open_status != 1:
+        return 10 + open_status
+    let left_task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let right_task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let left_result: task.result_i32 = core.task_join_result_i32(left_task)
+    let right_result: task.result_i32 = core.task_join_result_i32(right_task)
+    if left_result.error != 0:
+        return 20 + left_result.error
+    if right_result.error != 0:
+        return 30 + right_result.error
+    let total: Int = left_result.value + right_result.value
+    let joined_status: Int = core.task_group_status(group)
+    if joined_status != 1:
+        return 40 + joined_status
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 50 + close_error
+    if total == 42:
+        return 0
+    return total

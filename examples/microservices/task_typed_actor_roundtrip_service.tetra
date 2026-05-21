@@ -1,0 +1,43 @@
+// Task typed-actor roundtrip microservice smoke.
+//
+// A task worker spawns a typed actor, exchanges an enum payload, and returns
+// the typed actor reply through the task runtime.
+enum TypedPing:
+    case request(Int)
+    case reply(Int)
+    case failed(Int)
+
+func typed_ping_actor() -> Int
+uses actors:
+    let msg: TypedPing = core.recv_typed<TypedPing>()
+    match msg:
+    case TypedPing.request(request_value):
+        let _reply: Int = core.send_typed(core.sender(), TypedPing.reply(request_value + 21))
+        return 0
+    case TypedPing.reply(reply_value):
+        let _bad_reply: Int = core.send_typed(core.sender(), TypedPing.failed(reply_value))
+        return 0
+    case TypedPing.failed(failed_code):
+        let _bad_failed: Int = core.send_typed(core.sender(), TypedPing.failed(failed_code))
+        return 0
+
+func typed_actor_roundtrip_worker() -> Int
+uses actors:
+    let actor_ref: actor = core.spawn("typed_ping_actor")
+    let _sent: Int = core.send_typed(actor_ref, TypedPing.request(21))
+    let reply: TypedPing = core.recv_typed<TypedPing>()
+    match reply:
+    case TypedPing.reply(done_value):
+        return done_value
+    case TypedPing.request(work_value):
+        return 40 + work_value
+    case TypedPing.failed(code):
+        return 80 + code
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("typed_actor_roundtrip_worker")
+    let value: Int = core.task_join_i32(task)
+    if value == 42:
+        return 0
+    return value

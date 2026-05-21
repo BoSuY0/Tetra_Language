@@ -1,0 +1,26 @@
+module lib.jobs
+
+enum Reply:
+    case value(Int)
+    case failed(Int)
+
+func task_worker() -> Int:
+    return 20
+
+func actor_worker() -> Int
+uses actors:
+    let request: Reply = core.recv_typed<Reply>()
+    match request:
+    case Reply.value(value):
+        let _reply: Int = core.send_typed(core.sender(), Reply.value(value + 2))
+        return 0
+    case Reply.failed(code):
+        let _failed: Int = core.send_typed(core.sender(), Reply.failed(code))
+        return 0
+
+func score(reply: Reply) -> Int:
+    match reply:
+    case Reply.value(value):
+        return value
+    case Reply.failed(code):
+        return 80 + code

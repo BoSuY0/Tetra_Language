@@ -39,9 +39,12 @@ type Symbol struct {
 type RelocKind uint8
 
 const (
-	RelocCallRel32  RelocKind = 1
-	RelocIATDisp32  RelocKind = 2
-	RelocDataDisp32 RelocKind = 3
+	RelocCallRel32      RelocKind = 1
+	RelocIATDisp32      RelocKind = 2
+	RelocDataDisp32     RelocKind = 3
+	RelocFuncAddrDisp32 RelocKind = 4
+	RelocDataAbs32      RelocKind = 5
+	RelocFuncAddrAbs32  RelocKind = 6
 )
 
 type Reloc struct {
@@ -330,6 +333,13 @@ func validateRelocRecord(reloc Reloc, codeLen, dataLen int) error {
 		if reloc.Addend != 0 {
 			return fmt.Errorf("call relocation addend must be zero")
 		}
+	case RelocFuncAddrDisp32, RelocFuncAddrAbs32:
+		if reloc.Name == "" {
+			return fmt.Errorf("function address relocation with empty symbol name")
+		}
+		if reloc.Addend != 0 {
+			return fmt.Errorf("function address relocation addend must be zero")
+		}
 	case RelocIATDisp32:
 		if reloc.Name == "" {
 			return fmt.Errorf("IAT relocation with empty symbol name")
@@ -337,7 +347,7 @@ func validateRelocRecord(reloc Reloc, codeLen, dataLen int) error {
 		if reloc.Addend != 0 {
 			return fmt.Errorf("IAT relocation addend must be zero")
 		}
-	case RelocDataDisp32:
+	case RelocDataDisp32, RelocDataAbs32:
 		if reloc.Name != "" {
 			return fmt.Errorf("data relocation symbol name must be empty")
 		}
@@ -347,7 +357,7 @@ func validateRelocRecord(reloc Reloc, codeLen, dataLen int) error {
 	if uint64(reloc.At)+4 > uint64(codeLen) {
 		return fmt.Errorf("relocation offset out of range for kind %d", reloc.Kind)
 	}
-	if reloc.Kind == RelocDataDisp32 {
+	if reloc.Kind == RelocDataDisp32 || reloc.Kind == RelocDataAbs32 {
 		if dataLen == 0 {
 			return fmt.Errorf("data relocation in empty data section")
 		}

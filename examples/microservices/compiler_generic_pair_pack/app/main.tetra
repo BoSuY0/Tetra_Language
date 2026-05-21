@@ -1,0 +1,10 @@
+module app.main
+
+import lib.pair as pair
+
+func main() -> Int:
+    let routed: pair.Pair<Int, Bool> = pair.make(40, true)
+    let score: Int = pair.score(routed)
+    if score == 42:
+        return 0
+    return score

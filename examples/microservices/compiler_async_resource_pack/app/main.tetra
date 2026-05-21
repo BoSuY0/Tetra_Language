@@ -1,0 +1,10 @@
+module app.main
+
+import lib.async_resources as async_resources
+
+func main() -> Int
+uses alloc, capability, mem, runtime:
+    let value: Int = async_resources.fallback()
+    if value == 42:
+        return 0
+    return value

@@ -1,0 +1,18 @@
+// Task-group close-before-join microservice smoke.
+//
+// The service closes a group before joining its already scheduled worker and
+// verifies the child result remains observable.
+module examples.microservices.parallel_group_close_before_join_service
+
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let close_error: Int = core.task_group_close(group)
+    let value: Int = core.task_join_i32(task)
+    if close_error == 0 && value == 42:
+        return 0
+    return close_error + value

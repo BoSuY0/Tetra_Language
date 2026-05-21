@@ -79,17 +79,69 @@ const (
 	IRMemWriteU8
 	IRMemReadPtr
 	IRMemWritePtr
+	IRMemWriteArchPtr
 	IRMemReadI32Offset
 	IRMemWriteI32Offset
 	IRMemReadU8Offset
 	IRMemWriteU8Offset
 	IRMemReadPtrOffset
 	IRMemWritePtrOffset
+	IRMemWriteArchPtrOffset
 	IRPtrAdd
 	IRMmioReadI32
 	IRMmioWriteI32
 	IRSymAddr
 	IRCtxSwitch
+	IRAtomicLoadPtr
+	IRAtomicStorePtr
+	IRAtomicExchangePtr
+	IRAtomicFetchAddPtr
+	IRAtomicFetchSubPtr
+	IRAtomicFetchAndPtr
+	IRAtomicFetchOrPtr
+	IRAtomicFetchXorPtr
+	IRAtomicCompareExchangePtr
+	IRAtomicFenceSeqCst
+	IRAtomicFenceRelaxed
+	IRAtomicFenceAcquire
+	IRAtomicFenceRelease
+	IRAtomicFenceAcqRel
+	IRAtomicLoadI32
+	IRAtomicStoreI32
+	IRAtomicExchangeI32
+	IRAtomicCompareExchangeI32
+	IRAtomicFetchAddI32
+	IRAtomicFetchSubI32
+	IRAtomicFetchAndI32
+	IRAtomicFetchOrI32
+	IRAtomicFetchXorI32
+	IRAtomicLoadI64
+	IRAtomicStoreI64
+	IRAtomicExchangeI64
+	IRAtomicCompareExchangeI64
+	IRAtomicFetchAddI64
+	IRAtomicFetchSubI64
+	IRAtomicFetchAndI64
+	IRAtomicFetchOrI64
+	IRAtomicFetchXorI64
+	IRAtomicLoadI8
+	IRAtomicStoreI8
+	IRAtomicExchangeI8
+	IRAtomicCompareExchangeI8
+	IRAtomicFetchAddI8
+	IRAtomicFetchSubI8
+	IRAtomicFetchAndI8
+	IRAtomicFetchOrI8
+	IRAtomicFetchXorI8
+	IRAtomicLoadI16
+	IRAtomicStoreI16
+	IRAtomicExchangeI16
+	IRAtomicCompareExchangeI16
+	IRAtomicFetchAddI16
+	IRAtomicFetchSubI16
+	IRAtomicFetchAndI16
+	IRAtomicFetchOrI16
+	IRAtomicFetchXorI16
 	// IRInstrKindCount is a sentinel for exhaustive IR kind coverage checks.
 	IRInstrKindCount
 )
@@ -120,17 +172,45 @@ const (
 // MEM_WRITE_U8 -> pop3 push1
 // MEM_READ_PTR -> pop2 push1
 // MEM_WRITE_PTR -> pop3 push1
+// MEM_WRITE_ARCH_PTR -> pop3 push1
 // MEM_READ_I32_OFFSET -> pop3 push1
 // MEM_WRITE_I32_OFFSET -> pop4 push1
 // MEM_READ_U8_OFFSET -> pop3 push1
 // MEM_WRITE_U8_OFFSET -> pop4 push1
 // MEM_READ_PTR_OFFSET -> pop3 push1
 // MEM_WRITE_PTR_OFFSET -> pop4 push1
+// MEM_WRITE_ARCH_PTR_OFFSET -> pop4 push1
 // PTR_ADD -> pop3 push1
 // MMIO_READ -> pop2 push1
 // MMIO_WRITE -> pop3 push1
 // SYM_ADDR -> push1
 // CTX_SWITCH -> pop3 push1
+// ATOMIC_LOAD_PTR -> pop2 push1
+// ATOMIC_STORE_PTR -> pop3 push1
+// ATOMIC_EXCHANGE_PTR -> pop3 push1
+// ATOMIC_FETCH_ADD_PTR -> pop3 push1
+// ATOMIC_FETCH_SUB_PTR -> pop3 push1
+// ATOMIC_FETCH_AND_PTR -> pop3 push1
+// ATOMIC_FETCH_OR_PTR -> pop3 push1
+// ATOMIC_FETCH_XOR_PTR -> pop3 push1
+// ATOMIC_COMPARE_EXCHANGE_PTR -> pop4 push1
+// ATOMIC_FENCE_SEQ_CST -> no stack effect
+// ATOMIC_FENCE_RELAXED/ACQUIRE/RELEASE/ACQ_REL -> no stack effect
+// ATOMIC_LOAD_I32 -> pop2 push1
+// ATOMIC_STORE_I32 -> pop3 push1
+// ATOMIC_EXCHANGE_I32 -> pop3 push1
+// ATOMIC_COMPARE_EXCHANGE_I32 -> pop4 push1
+// ATOMIC_FETCH_*_I32 -> pop3 push1
+// ATOMIC_LOAD_I64 -> pop2 push1
+// ATOMIC_STORE_I64 -> pop3 push1
+// ATOMIC_EXCHANGE_I64 -> pop3 push1
+// ATOMIC_COMPARE_EXCHANGE_I64 -> pop4 push1
+// ATOMIC_FETCH_*_I64 -> pop3 push1
+// ATOMIC_LOAD_I8/I16 -> pop2 push1
+// ATOMIC_STORE_I8/I16 -> pop3 push1
+// ATOMIC_EXCHANGE_I8/I16 -> pop3 push1
+// ATOMIC_COMPARE_EXCHANGE_I8/I16 -> pop4 push1
+// ATOMIC_FETCH_*_I8/I16 -> pop3 push1
 
 type IRInstr struct {
 	Kind     IRInstrKind

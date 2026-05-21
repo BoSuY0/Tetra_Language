@@ -1,0 +1,9 @@
+module app.main
+
+import lib.asyncs as asyncs
+
+func main() -> Int:
+    let value: Int = asyncs.fallback()
+    if value == 42:
+        return 0
+    return value

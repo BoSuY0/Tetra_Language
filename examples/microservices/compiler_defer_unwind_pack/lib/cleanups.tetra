@@ -1,0 +1,28 @@
+module lib.cleanups
+
+enum CleanupErr:
+    case failed(Int)
+
+func throw_defer_store(base: ptr, memory_cap: cap.mem) -> Int throws CleanupErr
+uses mem:
+    unsafe:
+        defer:
+            let cell: ptr = core.ptr_add(base, 4, memory_cap)
+            let _write: Int = core.store_i32(cell, 20, memory_cap)
+        throw CleanupErr.failed(7)
+    return 99
+
+func return_defer_store(base: ptr, memory_cap: cap.mem) -> Int
+uses mem:
+    unsafe:
+        defer:
+            let cell: ptr = core.ptr_add(base, 4, memory_cap)
+            let _write: Int = core.store_i32(cell, 22, memory_cap)
+        return 8
+    return 99
+
+func actor_worker() -> Int throws CleanupErr
+uses actors:
+    defer:
+        let _sent: Int = core.send(core.sender(), 13)
+    throw CleanupErr.failed(9)

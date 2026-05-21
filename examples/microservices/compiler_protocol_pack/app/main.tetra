@@ -1,0 +1,10 @@
+module app.main
+
+import engine.core as core
+
+func main() -> Int:
+    let status: core.Status = core.Status(value: 42)
+    let routed: core.Status = core.keep(status)
+    if routed.value == 42:
+        return 0
+    return routed.value

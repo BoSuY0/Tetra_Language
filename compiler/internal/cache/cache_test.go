@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/version"
 )
 
@@ -67,6 +68,18 @@ func TestLoadCachedObjectTreatsCorruptEntryAsMissAndRemovesIt(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatalf("corrupt cache entry should be removed, stat err=%v", err)
+	}
+}
+
+func TestBuildTypeSigMapIncludesI64Scalar(t *testing.T) {
+	got, err := BuildTypeSigMap(map[string]*semantics.TypeInfo{
+		"i64": {Name: "i64", Kind: semantics.TypeI64, SlotCount: 1},
+	})
+	if err != nil {
+		t.Fatalf("BuildTypeSigMap: %v", err)
+	}
+	if got["i64"] != "i64" {
+		t.Fatalf("i64 type signature = %q, want i64", got["i64"])
 	}
 }
 

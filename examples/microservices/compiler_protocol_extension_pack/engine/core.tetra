@@ -1,0 +1,8 @@
+module engine.core
+
+struct Vec2:
+    x: Int
+    y: Int
+
+protocol Score:
+    func score(self: Vec2) -> Int

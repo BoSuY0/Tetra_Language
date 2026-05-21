@@ -1,0 +1,38 @@
+// Actor state counter microservice smoke.
+//
+// The service reads scalar actor state across a bounded tagged-message loop and
+// keeps the mutable request counter local while the formatter preserves state.
+actor Counter:
+    val step: Int = 2
+    const expected_tag: Int = 40
+    func run() -> Int
+    uses actors:
+        var count: Int = 0
+        var index: Int = 0
+        while index < 3:
+            let request: actor.msg = core.recv_msg()
+            if request.tag != expected_tag:
+                return request.tag
+            count = count + step + request.value
+            let _reply: Int = core.send_msg(core.sender(), count, request.tag + 1)
+            index = index + 1
+        return 0
+
+func main() -> Int
+uses actors:
+    let counter: actor = core.spawn("Counter.run")
+    let _first_request: Int = core.send_msg(counter, 1, 40)
+    let first_reply: actor.msg = core.recv_msg()
+    if first_reply.value != 3:
+        return first_reply.value
+    if first_reply.tag != 41:
+        return first_reply.tag
+    let _second_request: Int = core.send_msg(counter, 2, 40)
+    let second_reply: actor.msg = core.recv_msg()
+    if second_reply.value != 7:
+        return second_reply.value
+    let _third_request: Int = core.send_msg(counter, 3, 40)
+    let third_reply: actor.msg = core.recv_msg()
+    if third_reply.value == 12:
+        return 0
+    return third_reply.value

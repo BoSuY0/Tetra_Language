@@ -1,0 +1,11 @@
+module lib.slices
+
+struct Box<T>:
+    value: T
+
+func wrap<T>(value: T) -> Box<T>:
+    return Box<T>(value: value)
+
+func score(bytes: []u8) -> Int:
+    let box: Box<[]u8> = wrap(bytes)
+    return box.value[0] + box.value[1] + box.value[2] + box.value[3]

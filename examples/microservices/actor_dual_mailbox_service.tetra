@@ -1,0 +1,37 @@
+// Actor dual-mailbox microservice smoke.
+//
+// The service sends requests to two actors and verifies the combined
+// deadline-aware replies without depending on mailbox delivery order.
+actor Adder:
+    func run() -> Int
+    uses actors:
+        let request: actor.msg = core.recv_msg()
+        let _reply: Int = core.send_msg(core.sender(), request.value + 1, request.tag + 10)
+        return 0
+
+actor Multiplier:
+    func run() -> Int
+    uses actors:
+        let request: actor.msg = core.recv_msg()
+        let _reply: Int = core.send_msg(core.sender(), request.value * 2, request.tag + 20)
+        return 0
+
+func main() -> Int
+uses actors, runtime:
+    let adder: actor = core.spawn("Adder.run")
+    let multiplier: actor = core.spawn("Multiplier.run")
+    let _left: Int = core.send_msg(adder, 20, 1)
+    let _right: Int = core.send_msg(multiplier, 21, 2)
+    let first: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(5))
+    if first.error != 0:
+        return 10 + first.error
+    let second: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(5))
+    if second.error != 0:
+        return 20 + second.error
+    let value_total: Int = first.value + second.value
+    let tag_total: Int = first.tag + second.tag
+    if tag_total != 33:
+        return tag_total
+    if value_total == 63:
+        return 0
+    return value_total

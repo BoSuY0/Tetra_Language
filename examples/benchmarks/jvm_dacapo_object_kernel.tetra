@@ -1,0 +1,20 @@
+// DaCapo-inspired object-shape allocation and method-like dispatch kernel.
+module examples.benchmarks.jvm_dacapo_object_kernel
+
+struct Node:
+    weight: Int
+    tag: Int
+
+func score(node: Node, bias: Int) -> Int:
+    return node.weight * 3 + node.tag + bias
+
+func main() -> Int:
+    var i: Int = 0
+    var total: Int = 0
+    while i < 32:
+        let node: Node = Node(weight: i % 11, tag: i % 5)
+        total = total + score(node, 7)
+        i = i + 1
+    if total == 750:
+        return 0
+    return total

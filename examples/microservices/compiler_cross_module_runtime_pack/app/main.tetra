@@ -1,0 +1,16 @@
+module app.main
+
+import lib.jobs as jobs
+
+func main() -> Int
+uses actors, runtime:
+    let task: task.i32 = core.task_spawn_i32("jobs.task_worker")
+    let left: Int = core.task_join_i32(task)
+    let actor_worker: actor = core.spawn("jobs.actor_worker")
+    let _sent: Int = core.send_typed(actor_worker, jobs.Reply.value(20))
+    let reply: jobs.Reply = core.recv_typed<jobs.Reply>()
+    let right: Int = jobs.score(reply)
+    let total: Int = left + right
+    if total == 42:
+        return 0
+    return total

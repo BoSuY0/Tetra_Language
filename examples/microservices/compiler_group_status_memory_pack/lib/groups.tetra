@@ -1,0 +1,35 @@
+module lib.groups
+
+func open_status_offset() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let status: Int = core.task_group_status(group)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 70 + close_error
+    if status == 1:
+        return status
+    return 80 + status
+
+func canceled_status_offset() -> Int
+uses runtime:
+    var group: task.group = core.task_group_open()
+    group = core.task_group_cancel(group)
+    let status: Int = core.task_group_status(group)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    if status == 2:
+        return status
+    return 100 + status
+
+func closed_status_offset() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 110 + close_error
+    let status: Int = core.task_group_status(group)
+    if status == 3:
+        return status
+    return 120 + status

@@ -1,0 +1,77 @@
+{
+  "schema": "tetra.techempower.benchmark.v1",
+  "status": "pass",
+  "generated_at": "2026-05-20T23:16:32Z",
+  "generated_local_at": "2026-05-21T02:16:32+03:00",
+  "base_url": "http://127.0.0.1:18080",
+  "command": "tetra-techempower-bench --base-url http://127.0.0.1:18080 --requests 32 --concurrency 4 --min-rps 1.00 --skip-db",
+  "environment": {
+    "os": "linux",
+    "arch": "amd64",
+    "go_version": "go1.26.3-X:nodwarf5",
+    "hostname": "tetra-4"
+  },
+  "git": {
+    "head": "3e05876ce57c",
+    "worktree_status": "dirty"
+  },
+  "endpoints": [
+    {
+      "name": "plaintext",
+      "path": "/plaintext",
+      "kind": "plaintext",
+      "status": "pass",
+      "http_status": 200,
+      "requests": 32,
+      "successes": 32,
+      "failures": 0,
+      "bytes": 416,
+      "rps": 24436.43472417374,
+      "avg_latency_ms": 0.1337731875,
+      "p50_latency_ms": 0.082899,
+      "p90_latency_ms": 0.351008,
+      "p95_latency_ms": 0.42871,
+      "p99_latency_ms": 0.476703,
+      "max_latency_ms": 0.476703,
+      "threshold": "min_rps \u003e= 1.00",
+      "threshold_pass": true,
+      "validation": "HTTP status, content type, and endpoint body contract checked",
+      "evidence": "real HTTP request/response validation and concurrent load completed"
+    },
+    {
+      "name": "json",
+      "path": "/json",
+      "kind": "json",
+      "status": "pass",
+      "http_status": 200,
+      "requests": 32,
+      "successes": 32,
+      "failures": 0,
+      "bytes": 864,
+      "rps": 43627.87603139025,
+      "avg_latency_ms": 0.0821688125,
+      "p50_latency_ms": 0.067619,
+      "p90_latency_ms": 0.131251,
+      "p95_latency_ms": 0.194712,
+      "p99_latency_ms": 0.244017,
+      "max_latency_ms": 0.244017,
+      "threshold": "min_rps \u003e= 1.00",
+      "threshold_pass": true,
+      "validation": "HTTP status, content type, and endpoint body contract checked",
+      "evidence": "real HTTP request/response validation and concurrent load completed"
+    }
+  ],
+  "summary": {
+    "endpoint_count": 2,
+    "total_requests": 64,
+    "total_successes": 64,
+    "total_failures": 0,
+    "min_rps": 1,
+    "decision": "pass"
+  },
+  "limitations": [
+    "local harness evidence; official TechEmpower publication is not implied",
+    "duration/request counts are caller controlled and should be raised for release gates",
+    "skip-db enabled: report covers only /plaintext and /json"
+  ]
+}

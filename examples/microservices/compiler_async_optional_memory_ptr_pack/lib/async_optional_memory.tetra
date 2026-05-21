@@ -1,0 +1,62 @@
+module lib.async_optional_memory
+
+enum OptionalPtrErr:
+    case failed
+
+async func maybe_base(base: ptr) -> ptr?:
+    let out: ptr? = base
+    return out
+
+async func maybe_base_throw(base: ptr, fail: Bool) -> ptr? throws OptionalPtrErr:
+    if fail:
+        throw OptionalPtrErr.failed
+    let out: ptr? = base
+    return out
+
+async func maybe_value(value: Int) -> Int?:
+    let out: Int? = value
+    return out
+
+async func maybe_value_throw(value: Int, fail: Bool) -> Int? throws OptionalPtrErr:
+    if fail:
+        throw OptionalPtrErr.failed
+    let out: Int? = value
+    return out
+
+async func load_optional_local(base: ptr, memory_cap: cap.mem) -> Int
+uses mem:
+    let maybe: ptr? = await maybe_base(base)
+    if let unwrapped = maybe:
+        unsafe:
+            let cell: ptr = core.ptr_add(unwrapped, 4, memory_cap)
+            return core.load_i32(cell, memory_cap)
+    return 0
+
+async func load_throw_optional_local(base: ptr, memory_cap: cap.mem) -> Int throws OptionalPtrErr
+uses mem:
+    let maybe: ptr? = try await maybe_base_throw(base, false)
+    if let unwrapped = maybe:
+        unsafe:
+            let cell: ptr = core.ptr_add(unwrapped, 4, memory_cap)
+            return core.load_i32(cell, memory_cap)
+    return 0
+
+async func relay_value(value: Int) -> Int?:
+    return await maybe_value(value)
+
+async func relay_value_throw(value: Int) -> Int? throws OptionalPtrErr:
+    return try await maybe_value_throw(value, false)
+
+func fallback() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(12)
+        let cell: ptr = core.ptr_add(base, 4, memory_cap)
+        let _store: Int = core.store_i32(cell, 42, memory_cap)
+        let maybe: ptr? = base
+        if let unwrapped = maybe:
+            let loaded: ptr = core.ptr_add(unwrapped, 4, memory_cap)
+            return core.load_i32(loaded, memory_cap)
+        return 98
+    return 99

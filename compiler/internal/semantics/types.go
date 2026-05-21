@@ -127,6 +127,13 @@ type GlobalInfo struct {
 	FunctionHandleValue    bool
 	HasStringLiteralInit   bool
 	StringLiteralInit      []byte
+	ArrayBackings          []GlobalArrayBackingInfo
+}
+
+type GlobalArrayBackingInfo struct {
+	HeaderOffset int
+	ElemType     string
+	Len          int
 }
 
 type FuncSig struct {
@@ -219,6 +226,7 @@ type TypeKind int
 
 const (
 	TypeI32 TypeKind = iota
+	TypeI64
 	TypeU8
 	TypeBool
 	TypePtr
@@ -350,6 +358,7 @@ func makeStructTypeInfo(name string, fields []FieldInfo) *TypeInfo {
 func baseTypes() map[string]*TypeInfo {
 	types := map[string]*TypeInfo{
 		"i32":           {Name: "i32", Kind: TypeI32, SlotCount: 1},
+		"i64":           {Name: "i64", Kind: TypeI64, SlotCount: 1, Public: true},
 		"u8":            {Name: "u8", Kind: TypeU8, SlotCount: 1, Public: true},
 		"u16":           {Name: "u16", Kind: TypeU8, SlotCount: 1, Public: true},
 		"bool":          {Name: "bool", Kind: TypeBool, SlotCount: 1, Public: true},
@@ -395,6 +404,20 @@ func TypedTaskHandleTypeName(errorType string, types map[string]*TypeInfo) strin
 		return "task.i32"
 	}
 	return "task.i32.throws." + errorType
+}
+
+func IsTypedTaskHandleTypeName(typeName string) bool {
+	return strings.HasPrefix(typeName, "task.i32.throws.")
+}
+
+func TypedTaskHandleTypesCompatible(expected, actual string) bool {
+	if expected == "task.i32" && IsTypedTaskHandleTypeName(actual) {
+		return true
+	}
+	if IsTypedTaskHandleTypeName(expected) && actual == "task.i32" {
+		return true
+	}
+	return false
 }
 
 func EnsureTypedTaskHandleType(errorType string, types map[string]*TypeInfo) (string, *TypeInfo, error) {
@@ -473,11 +496,32 @@ func ensureTypeInfo(name string, types map[string]*TypeInfo) (*TypeInfo, error) 
 	if isArrayTypeName(name) {
 		return nil, fmt.Errorf("invalid array type '%s'", name)
 	}
+	if isTargetLayoutOnlyScalar(name) {
+		return nil, targetLayoutOnlyScalarError(name)
+	}
 	return nil, fmt.Errorf("unknown type '%s'", name)
+}
+
+func targetLayoutOnlyScalarError(name string) error {
+	return fmt.Errorf("target-layout scalar type '%s' is not supported in source-level Tetra yet; it is reserved for compiler target layout/ABI classifiers until native-int/codegen support is implemented", name)
+}
+
+func isTargetLayoutOnlyScalar(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "i8", "i16", "u32", "u64", "uint", "c_int", "c_uint",
+		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint",
+		"c_long", "c_ulong", "f32", "f64", "ref", "nullable_ptr", "rawptr":
+		return true
+	default:
+		return false
+	}
 }
 
 func typesCompatible(expected, actual string) bool {
 	if expected == actual {
+		return true
+	}
+	if TypedTaskHandleTypesCompatible(expected, actual) {
 		return true
 	}
 	if expected == "none" || actual == "none" {
@@ -629,7 +673,7 @@ func isConditionType(name string) bool {
 
 func isReservedTypeName(name string) bool {
 	switch name {
-	case "i32", "u8", "u16", "bool", "Bool", "ptr", "fnptr", "str", "String",
+	case "i32", "i64", "Int64", "u8", "u16", "bool", "Bool", "ptr", "fnptr", "str", "String",
 		"actor", "actor.msg", "actor.recv_result_i32", "actor.recv_msg_result",
 		"task.error", "task.group", "task.i32", "task.result_i32",
 		"island", "cap.io", "cap.mem", "consent.token", "secret.i32":
@@ -753,7 +797,7 @@ func typeActorTaskSendable(typeName string, types map[string]*TypeInfo, seen map
 		return false
 	}
 	switch info.Kind {
-	case TypeI32, TypeU8, TypeBool, TypeActor:
+	case TypeI32, TypeI64, TypeU8, TypeBool, TypeActor:
 		return true
 	case TypeEnum:
 		for _, c := range info.EnumCases {
@@ -788,7 +832,7 @@ func typeActorTaskSendabilityUnsafeReason(typeName string, types map[string]*Typ
 		return fmt.Sprintf("unknown type '%s'", typeName)
 	}
 	switch info.Kind {
-	case TypeI32, TypeU8, TypeBool, TypeActor:
+	case TypeI32, TypeI64, TypeU8, TypeBool, TypeActor:
 		return ""
 	case TypeEnum:
 		for _, c := range info.EnumCases {

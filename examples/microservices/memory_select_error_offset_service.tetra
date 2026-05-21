@@ -1,0 +1,31 @@
+// Select task-error memory-offset microservice smoke.
+//
+// The service observes a select timeout, uses the direct selected error field
+// as a byte offset, and then joins the task after the memory path succeeds.
+module examples.microservices.memory_select_error_offset_service
+
+func slow_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return 4
+
+func main() -> Int
+uses alloc, capability, mem, runtime:
+    let task: task.i32 = core.task_spawn_i32("slow_worker")
+    let selected: task.result_i32 = core.select2_i32(task, core.deadline_ms(1))
+    if selected.error != 2:
+        return 10 + selected.error
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(4)
+        let cell: ptr = core.ptr_add(base, selected.error, memory_cap)
+        let _write: u8 = core.store_u8(cell, 42, memory_cap)
+        let value: Int = core.load_u8(cell, memory_cap)
+        if value != 42:
+            return value
+    let final: task.result_i32 = core.task_join_result_i32(task)
+    if final.error != 0:
+        return 20 + final.error
+    if final.value != 4:
+        return 30 + final.value
+    return 0

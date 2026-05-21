@@ -1,0 +1,6 @@
+module lib.callbacks
+
+import lib.maker as maker
+
+func apply(cb: fn(Int) -> Int throws maker.Boom, value: Int) -> Int throws maker.Boom:
+    return try cb(value)

@@ -1,0 +1,36 @@
+module lib.async_memory
+
+async func read_offset(base: ptr, offset: Int, memory_cap: cap.mem) -> Int
+uses mem:
+    unsafe:
+        let cell: ptr = core.ptr_add(base, offset, memory_cap)
+        return core.load_i32(cell, memory_cap)
+    return 0
+
+async func write_then_read(base: ptr, offset: Int, value: Int, memory_cap: cap.mem) -> Int
+uses mem:
+    unsafe:
+        let cell: ptr = core.ptr_add(base, offset, memory_cap)
+        let _store: Int = core.store_i32(cell, value, memory_cap)
+        return core.load_i32(cell, memory_cap)
+    return 0
+
+async func relay_sum(left_base: ptr, right_base: ptr, memory_cap: cap.mem, out: inout Int) -> Int
+uses mem:
+    let left: Int = await read_offset(left_base, 4, memory_cap)
+    let right: Int = await read_offset(right_base, 4, memory_cap)
+    out = left + right
+    return out
+
+func fallback() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let left_cell: ptr = core.ptr_add(left_base, 4, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, 4, memory_cap)
+        let _left_store: Int = core.store_i32(left_cell, 19, memory_cap)
+        let _right_store: Int = core.store_i32(right_cell, 23, memory_cap)
+        return core.load_i32(left_cell, memory_cap) + core.load_i32(right_cell, memory_cap)
+    return 99

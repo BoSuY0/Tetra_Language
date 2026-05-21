@@ -265,6 +265,7 @@ type sourcePrinter struct {
 
 type actorMethodGroup struct {
 	Name    string
+	Public  bool
 	Fields  []frontend.StateFieldDecl
 	Methods []*frontend.FuncDecl
 }
@@ -283,7 +284,14 @@ func (p *sourcePrinter) file(file *frontend.FileAST) {
 		p.blank()
 	}
 	for _, imp := range file.Imports {
-		p.line(0, "import "+imp.Path+" as "+imp.Alias)
+		line := publicPrefix(imp.Public) + "import " + imp.Path
+		if len(imp.Items) > 0 {
+			line += ".{" + strings.Join(imp.Items, ", ") + "}"
+		}
+		if imp.Alias != "" {
+			line += " as " + imp.Alias
+		}
+		p.line(0, line)
 	}
 	if len(file.Imports) > 0 {
 		p.blank()
@@ -374,6 +382,7 @@ func collectActorMethodGroups(file *frontend.FileAST) ([]actorMethodGroup, map[s
 			groupIndex[actor.Name] = idx
 			groups = append(groups, actorMethodGroup{
 				Name:   actor.Name,
+				Public: actor.Public,
 				Fields: append([]frontend.StateFieldDecl(nil), actor.Fields...),
 			})
 			for _, fn := range actor.Methods {
@@ -416,11 +425,20 @@ func actorMethodName(fn *frontend.FuncDecl) (string, string, bool) {
 	return parts[0], parts[1], true
 }
 
+func publicPrefix(public bool) string {
+	if public {
+		return "pub "
+	}
+	return ""
+}
+
 func (p *sourcePrinter) actorDecl(group actorMethodGroup) {
-	p.line(0, "actor "+group.Name+":")
+	p.line(0, publicPrefix(group.Public)+"actor "+group.Name+":")
 	for _, field := range group.Fields {
 		kw := "val"
-		if field.Const {
+		if field.Mutable {
+			kw = "var"
+		} else if field.Const {
 			kw = "const"
 		}
 		line := kw + " " + field.Name + ": " + formatTypeRef(field.Type)
@@ -436,21 +454,21 @@ func (p *sourcePrinter) actorDecl(group actorMethodGroup) {
 }
 
 func (p *sourcePrinter) protocolDecl(proto *frontend.ProtocolDecl) {
-	p.line(0, "protocol "+proto.Name+":")
+	p.line(0, publicPrefix(proto.Public)+"protocol "+proto.Name+":")
 	for _, req := range proto.Requirements {
 		p.line(1, formatFuncSigDecl(req))
 	}
 }
 
 func (p *sourcePrinter) capsuleDecl(capsule *frontend.CapsuleDecl) {
-	p.line(0, "capsule "+capsule.Name+":")
+	p.line(0, publicPrefix(capsule.Public)+"capsule "+capsule.Name+":")
 	for _, entry := range capsule.Entries {
 		p.line(1, entry.Key+": "+p.formatExpr(entry.Value))
 	}
 }
 
 func (p *sourcePrinter) enumDecl(en *frontend.EnumDecl) {
-	p.line(0, "enum "+en.Name+":")
+	p.line(0, publicPrefix(en.Public)+"enum "+en.Name+":")
 	for _, c := range en.Cases {
 		line := "case " + c.Name
 		if len(c.Payload) > 0 {
@@ -469,14 +487,14 @@ func (p *sourcePrinter) structDecl(st *frontend.StructDecl) {
 	if len(st.TypeParams) > 0 {
 		typeParams = "<" + strings.Join(st.TypeParams, ", ") + ">"
 	}
-	p.line(0, "struct "+st.Name+typeParams+":")
+	p.line(0, publicPrefix(st.Public)+"struct "+st.Name+typeParams+":")
 	for _, f := range st.Fields {
 		p.line(1, f.Name+": "+formatTypeRef(f.Type))
 	}
 }
 
 func (p *sourcePrinter) stateDecl(st *frontend.StateDecl) {
-	p.line(0, "state "+st.Name+":")
+	p.line(0, publicPrefix(st.Public)+"state "+st.Name+":")
 	for _, field := range st.Fields {
 		kw := "val"
 		if field.Mutable {
@@ -489,7 +507,7 @@ func (p *sourcePrinter) stateDecl(st *frontend.StateDecl) {
 }
 
 func (p *sourcePrinter) viewDecl(view *frontend.ViewDecl) {
-	p.line(0, "view "+view.Name+"(state: "+formatTypeRef(view.StateName)+"):")
+	p.line(0, publicPrefix(view.Public)+"view "+view.Name+"(state: "+formatTypeRef(view.StateName)+"):")
 	for _, binding := range view.Bindings {
 		p.line(1, "bind "+binding.Name+": "+formatTypeRef(binding.Type)+" = "+p.formatExpr(binding.Value))
 	}
@@ -509,7 +527,7 @@ func (p *sourcePrinter) viewDecl(view *frontend.ViewDecl) {
 }
 
 func (p *sourcePrinter) extensionDecl(ext *frontend.ExtensionDecl) {
-	p.line(0, "extension "+formatTypeRef(ext.Target)+":")
+	p.line(0, publicPrefix(ext.Public)+"extension "+formatTypeRef(ext.Target)+":")
 	for _, fn := range ext.Methods {
 		p.funcDeclWithNameAt(fn, strings.TrimPrefix(fn.Name, fn.ExtensionOf+"."), 1)
 	}
@@ -527,7 +545,8 @@ func (p *sourcePrinter) globalDecl(g *frontend.GlobalDecl) {
 		kw = "const"
 	}
 	line := kw + " " + g.Name
-	if g.Type.Name != "" || g.Type.Elem != nil {
+	line = publicPrefix(g.Public) + line
+	if formatTypeRefPresent(g.Type) {
 		line += ": " + formatTypeRef(g.Type)
 	}
 	if g.Init != nil {
@@ -557,6 +576,9 @@ func (p *sourcePrinter) funcDeclWithNameAt(fn *frontend.FuncDecl, name string, i
 		keyword = "closure"
 	}
 	header := p.functionHeader(keyword, fn.Async, name+typeParams, fn.Params, fn.ReturnType, fn.HasThrows, fn.Throws)
+	if fn.Public {
+		header = "pub " + header
+	}
 	p.emitHeaderWithModifiers(indent, header, fn.Uses, fn.SemanticClauses)
 	p.stmts(fn.Body, indent+1)
 }
@@ -574,7 +596,11 @@ func formatFuncSigDecl(sig frontend.FuncSigDecl) string {
 	if sig.Async {
 		prefix = "async func "
 	}
-	out := prefix + sig.Name + "(" + strings.Join(params, ", ") + ") -> " + formatTypeRef(sig.ReturnType)
+	typeParams := ""
+	if len(sig.TypeParams) > 0 {
+		typeParams = "<" + strings.Join(sig.TypeParams, ", ") + ">"
+	}
+	out := prefix + sig.Name + typeParams + "(" + strings.Join(params, ", ") + ") -> " + formatTypeRef(sig.ReturnType)
 	if sig.HasThrows {
 		out += " throws " + formatTypeRef(sig.Throws)
 	}
@@ -647,7 +673,7 @@ func (p *sourcePrinter) emitMatchExprStatement(indent int, prefix string, expr f
 		} else {
 			p.line(indent, "case "+p.formatExpr(c.Pattern)+guard+":")
 		}
-		p.line(indent+1, p.formatExpr(c.Value))
+		p.exprBlock(indent+1, c.Value)
 	}
 	return true
 }
@@ -668,7 +694,7 @@ func (p *sourcePrinter) emitCatchExprStatement(indent int, prefix string, expr f
 		} else {
 			p.line(indent, "case "+p.formatExpr(c.Pattern)+guard+":")
 		}
-		p.line(indent+1, p.formatExpr(c.Value))
+		p.exprBlock(indent+1, c.Value)
 	}
 	return true
 }
@@ -710,7 +736,7 @@ func (p *sourcePrinter) stmt(stmt frontend.Stmt, indent int) {
 			kw = "const"
 		}
 		line := kw + " " + s.Name
-		if s.Type.Name != "" || s.Type.Elem != nil {
+		if formatTypeRefPresent(s.Type) {
 			line += ": " + formatTypeRef(s.Type)
 		}
 		line += " = "
@@ -790,8 +816,29 @@ func (p *sourcePrinter) line(indent int, s string) {
 	p.b.WriteByte('\n')
 }
 
+func (p *sourcePrinter) exprBlock(indent int, expr frontend.Expr) {
+	for _, line := range strings.Split(p.formatExpr(expr), "\n") {
+		p.line(indent, line)
+	}
+}
+
 func (p *sourcePrinter) blank() {
 	p.b.WriteByte('\n')
+}
+
+func formatTypeRefPresent(ref frontend.TypeRef) bool {
+	if ref.Name != "" || ref.Elem != nil || ref.Return != nil {
+		return true
+	}
+	if len(ref.Params) > 0 || len(ref.TypeArgs) > 0 {
+		return true
+	}
+	switch ref.Kind {
+	case frontend.TypeRefSlice, frontend.TypeRefArray, frontend.TypeRefOptional, frontend.TypeRefFunction:
+		return true
+	default:
+		return false
+	}
 }
 
 func formatTypeRef(ref frontend.TypeRef) string {

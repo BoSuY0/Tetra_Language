@@ -1,0 +1,25 @@
+module lib.pipeline
+
+enum Stage:
+    case parsed(Int)
+    case emitted(Int)
+
+func id<T>(x: T) -> T:
+    return x
+
+func parse(seed: Int) -> Stage:
+    return Stage.parsed(seed + 8)
+
+func emit(stage: Stage) -> Stage:
+    match stage:
+    case Stage.parsed(parsed_payload):
+        return Stage.emitted(parsed_payload + 14)
+    case Stage.emitted(emitted_payload):
+        return Stage.emitted(emitted_payload)
+
+func value(stage: Stage) -> Int:
+    match stage:
+    case Stage.parsed(parsed_value):
+        return parsed_value
+    case Stage.emitted(emitted_value):
+        return emitted_value

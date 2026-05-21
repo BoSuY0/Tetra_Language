@@ -1,0 +1,36 @@
+module app.main
+
+import lib.jobs as jobs
+
+enum Route:
+    case direct
+    case grouped
+
+func main() -> Int
+uses runtime:
+    let route: Route = Route.direct
+    let seed: Int = match route:
+    case Route.direct:
+        20
+    case Route.grouped:
+        99
+    let direct = core.task_spawn_i32_typed<jobs.MatchErr>("jobs.worker")
+    let direct_score: Int = catch core.task_join_i32_typed<jobs.MatchErr>(direct):
+    case jobs.MatchErr.stopped:
+        70
+    case jobs.MatchErr.wide(a, b, c, d, e):
+        a + b + c + d + e
+    let group: task.group = core.task_group_open()
+    let grouped = core.task_spawn_group_i32_typed<jobs.MatchErr>(group, "jobs.group_worker")
+    let group_score: Int = catch core.task_join_group_i32_typed<jobs.MatchErr>(grouped):
+    case jobs.MatchErr.stopped:
+        80
+    case jobs.MatchErr.wide(f, g, h, i, j):
+        f + g + h + i + j
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    let total: Int = seed + direct_score + group_score
+    if total == 62:
+        return 0
+    return total

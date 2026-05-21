@@ -1,0 +1,10 @@
+module lib.maybe
+
+struct MaybeBox<T>:
+    value: T?
+
+func keep_ptr(box: MaybeBox<ptr>) -> MaybeBox<ptr>:
+    return box
+
+func keep_result(box: MaybeBox<task.result_i32>) -> MaybeBox<task.result_i32>:
+    return box

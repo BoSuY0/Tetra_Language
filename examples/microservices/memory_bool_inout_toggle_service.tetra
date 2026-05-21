@@ -1,0 +1,21 @@
+// Bool slice inout mutation memory microservice smoke.
+//
+// The service mutates a heap-backed []bool through an inout parameter and
+// verifies the caller-visible lanes afterwards.
+module examples.microservices.memory_bool_inout_toggle_service
+
+func toggle(flags: inout []bool) -> Int:
+    flags[0] = true
+    flags[1] = false
+    flags[2] = true
+    if flags[0] && flags[2]:
+        return 42
+    return 7
+
+func main() -> Int
+uses alloc, mem:
+    var flags: []bool = core.make_bool(3)
+    let score: Int = toggle(flags)
+    if score == 42 && flags[0] && flags[2]:
+        return 0
+    return score

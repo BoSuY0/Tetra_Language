@@ -61,6 +61,71 @@ func TestLinkX64ObjectsPatchesEntryAndCalls(t *testing.T) {
 	}
 }
 
+func TestLinkX64ObjectsPatchesFunctionAddressRelocs(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+
+	objMain := &tobj.Object{
+		Target:  "linux-x64",
+		Module:  "a",
+		Code:    []byte{0xC3},
+		Symbols: []tobj.Symbol{{Name: "main", Offset: 0}},
+	}
+	objAddr := &tobj.Object{
+		Target:  "linux-x64",
+		Module:  "b",
+		Code:    []byte{0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xC3}, // lea rax, [rip+disp32]; ret
+		Symbols: []tobj.Symbol{{Name: "addr_user", Offset: 0}},
+		Relocs:  []tobj.Reloc{{Kind: tobj.RelocFuncAddrDisp32, At: 3, Name: "main"}},
+	}
+
+	res, err := LinkX64Objects([]*tobj.Object{objAddr, objMain}, "main", stub, stubCallAt, 0)
+	if err != nil {
+		t.Fatalf("LinkX64Objects: %v", err)
+	}
+
+	mainOff := res.Symbols["main"]
+	funcAddrAt := len(stub) + len(objMain.Code) + 3
+	disp := readI32LE(res.Text[funcAddrAt : funcAddrAt+4])
+	want := int32(mainOff - (funcAddrAt + 4))
+	if disp != want {
+		t.Fatalf("function address rel32 mismatch: got=%d want=%d", disp, want)
+	}
+}
+
+func TestLinkX64ObjectsCollectsAbsoluteFunctionAddressRelocs(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+
+	objMain := &tobj.Object{
+		Target:  "linux-x86",
+		Module:  "a",
+		Code:    []byte{0xC3},
+		Symbols: []tobj.Symbol{{Name: "main", Offset: 0}},
+	}
+	objAddr := &tobj.Object{
+		Target:  "linux-x86",
+		Module:  "b",
+		Code:    []byte{0xB8, 0, 0, 0, 0, 0xC3}, // mov eax, imm32; ret
+		Symbols: []tobj.Symbol{{Name: "addr_user", Offset: 0}},
+		Relocs:  []tobj.Reloc{{Kind: tobj.RelocFuncAddrAbs32, At: 1, Name: "main"}},
+	}
+
+	res, err := LinkX64Objects([]*tobj.Object{objAddr, objMain}, "main", stub, stubCallAt, 0)
+	if err != nil {
+		t.Fatalf("LinkX64Objects: %v", err)
+	}
+	if len(res.FuncAbsRelocs) != 1 {
+		t.Fatalf("expected 1 absolute function reloc, got %d", len(res.FuncAbsRelocs))
+	}
+	if res.FuncAbsRelocs[0].At != len(stub)+len(objMain.Code)+1 {
+		t.Fatalf("absolute function reloc at mismatch: got=%d want=%d", res.FuncAbsRelocs[0].At, len(stub)+len(objMain.Code)+1)
+	}
+	if res.FuncAbsRelocs[0].TargetOff != len(stub) {
+		t.Fatalf("absolute function reloc target mismatch: got=%d want=%d", res.FuncAbsRelocs[0].TargetOff, len(stub))
+	}
+}
+
 func TestLinkX64ObjectsCollectsDataRelocs(t *testing.T) {
 	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
 	stubCallAt := 1
@@ -89,6 +154,37 @@ func TestLinkX64ObjectsCollectsDataRelocs(t *testing.T) {
 	}
 	if res.DataRelocs[0].TargetOff != 1 {
 		t.Fatalf("data reloc target mismatch: got=%d want=%d", res.DataRelocs[0].TargetOff, 1)
+	}
+}
+
+func TestLinkX64ObjectsCollectsAbsoluteDataRelocs(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+
+	obj := &tobj.Object{
+		Target:  "linux-x86",
+		Module:  "m",
+		Code:    []byte{0xA1, 0, 0, 0, 0, 0xC3}, // mov eax, moffs32; ret
+		Data:    []byte("ABCDEFGH"),
+		Symbols: []tobj.Symbol{{Name: "main", Offset: 0}},
+		Relocs:  []tobj.Reloc{{Kind: tobj.RelocDataAbs32, At: 1, Addend: 4}},
+	}
+
+	res, err := LinkX64Objects([]*tobj.Object{obj}, "main", stub, stubCallAt, 0)
+	if err != nil {
+		t.Fatalf("LinkX64Objects: %v", err)
+	}
+	if len(res.DataRelocs) != 0 {
+		t.Fatalf("pc-relative data relocs = %#v, want none", res.DataRelocs)
+	}
+	if len(res.DataAbsRelocs) != 1 {
+		t.Fatalf("expected 1 absolute data reloc, got %d", len(res.DataAbsRelocs))
+	}
+	if res.DataAbsRelocs[0].At != len(stub)+1 {
+		t.Fatalf("absolute data reloc at mismatch: got=%d want=%d", res.DataAbsRelocs[0].At, len(stub)+1)
+	}
+	if res.DataAbsRelocs[0].TargetOff != 4 {
+		t.Fatalf("absolute data reloc target mismatch: got=%d want=%d", res.DataAbsRelocs[0].TargetOff, 4)
 	}
 }
 
@@ -279,6 +375,46 @@ func TestLinkX64ObjectsRejectsEmptyIATRelocName(t *testing.T) {
 	}
 }
 
+func TestLinkX64ObjectsRejectsEmptyFunctionAddressRelocName(t *testing.T) {
+	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
+	stubCallAt := 1
+	tests := []struct {
+		name  string
+		code  []byte
+		reloc tobj.Reloc
+	}{
+		{
+			name:  "pc_relative",
+			code:  []byte{0x48, 0x8D, 0x05, 0, 0, 0, 0, 0xC3},
+			reloc: tobj.Reloc{Kind: tobj.RelocFuncAddrDisp32, At: 3, Name: ""},
+		},
+		{
+			name:  "absolute",
+			code:  []byte{0xB8, 0, 0, 0, 0, 0xC3},
+			reloc: tobj.Reloc{Kind: tobj.RelocFuncAddrAbs32, At: 1, Name: ""},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := LinkX64Objects([]*tobj.Object{
+				{
+					Target:  "linux-x64",
+					Module:  "m",
+					Code:    tt.code,
+					Symbols: []tobj.Symbol{{Name: "main", Offset: 0}},
+					Relocs:  []tobj.Reloc{tt.reloc},
+				},
+			}, "main", stub, stubCallAt, 0)
+			if err == nil {
+				t.Fatalf("expected empty function address relocation symbol name error, got nil")
+			}
+			if !strings.Contains(err.Error(), "function address relocation with empty symbol name") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestLinkX64ObjectsRejectsNonDataRelocationAddends(t *testing.T) {
 	stub := []byte{0xE8, 0, 0, 0, 0, 0xC3}
 	stubCallAt := 1
@@ -296,6 +432,16 @@ func TestLinkX64ObjectsRejectsNonDataRelocationAddends(t *testing.T) {
 			name:  "iat",
 			reloc: tobj.Reloc{Kind: tobj.RelocIATDisp32, At: 2, Name: "kernel32.VirtualAlloc", Addend: 7},
 			want:  "IAT relocation addend must be zero",
+		},
+		{
+			name:  "function_address",
+			reloc: tobj.Reloc{Kind: tobj.RelocFuncAddrDisp32, At: 1, Name: "main", Addend: 7},
+			want:  "function address relocation addend must be zero",
+		},
+		{
+			name:  "absolute_function_address",
+			reloc: tobj.Reloc{Kind: tobj.RelocFuncAddrAbs32, At: 1, Name: "main", Addend: 7},
+			want:  "function address relocation addend must be zero",
 		},
 	}
 	for _, tt := range tests {

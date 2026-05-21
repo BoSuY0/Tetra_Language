@@ -37,13 +37,27 @@ type formatManifest struct {
 }
 
 type targetManifest struct {
-	Triple         string `json:"triple"`
-	OS             string `json:"os"`
-	Arch           string `json:"arch"`
-	ABI            string `json:"abi"`
-	Format         string `json:"format"`
-	ExeExt         string `json:"exe_ext"`
-	CollectImports bool   `json:"collect_imports"`
+	Triple                  string `json:"triple"`
+	Status                  string `json:"status,omitempty"`
+	OS                      string `json:"os"`
+	Arch                    string `json:"arch"`
+	ABI                     string `json:"abi"`
+	DataModel               string `json:"data_model,omitempty"`
+	Format                  string `json:"format"`
+	ExeExt                  string `json:"exe_ext"`
+	CollectImports          bool   `json:"collect_imports"`
+	RunMode                 string `json:"run_mode,omitempty"`
+	PointerWidthBits        int    `json:"pointer_width_bits,omitempty"`
+	RegisterWidthBits       int    `json:"register_width_bits,omitempty"`
+	NativeIntWidthBits      int    `json:"native_int_width_bits,omitempty"`
+	Endian                  string `json:"endian,omitempty"`
+	StackAlignmentBytes     int    `json:"stack_alignment_bytes,omitempty"`
+	MaxAtomicWidthBits      int    `json:"max_atomic_width_bits,omitempty"`
+	AtomicWidthBits         []int  `json:"atomic_width_bits,omitempty"`
+	AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits,omitempty"`
+	UnsupportedReason       string `json:"unsupported_reason,omitempty"`
+	SupportsDebugInfo       bool   `json:"supports_debug_info,omitempty"`
+	SupportsReleaseOptimize bool   `json:"supports_release_optimize,omitempty"`
 }
 
 type builtinManifest struct {
@@ -66,6 +80,7 @@ type runtimeABIManifest struct {
 	TypedTaskRequiredSymbols  []string `json:"typed_task_required_symbols,omitempty"`
 	TimeRequiredSymbols       []string `json:"time_required_symbols,omitempty"`
 	FilesystemRequiredSymbols []string `json:"filesystem_required_symbols,omitempty"`
+	NetRequiredSymbols        []string `json:"net_required_symbols,omitempty"`
 	ActorsProgramGlueSymbols  []string `json:"actors_program_glue_symbols"`
 }
 
@@ -293,7 +308,63 @@ func validateTarget(target targetManifest) error {
 	if target.Format == "" {
 		return fmt.Errorf("target %s missing format", target.Triple)
 	}
+	if tgt, err := ctarget.Parse(target.Triple); err == nil {
+		if target.Status != "" && target.Status != tgt.Status.String() {
+			return fmt.Errorf("target %s status = %s, want %s", target.Triple, target.Status, tgt.Status.String())
+		}
+		if target.DataModel != "" && target.DataModel != tgt.DataModel.String() {
+			return fmt.Errorf("target %s data_model = %s, want %s", target.Triple, target.DataModel, tgt.DataModel.String())
+		}
+		if target.RunMode != "" && target.RunMode != tgt.RunMode.String() {
+			return fmt.Errorf("target %s run_mode = %s, want %s", target.Triple, target.RunMode, tgt.RunMode.String())
+		}
+		if target.PointerWidthBits != 0 && target.PointerWidthBits != tgt.PointerWidthBits {
+			return fmt.Errorf("target %s pointer_width_bits = %d, want %d", target.Triple, target.PointerWidthBits, tgt.PointerWidthBits)
+		}
+		if target.RegisterWidthBits != 0 && target.RegisterWidthBits != tgt.RegisterWidthBits {
+			return fmt.Errorf("target %s register_width_bits = %d, want %d", target.Triple, target.RegisterWidthBits, tgt.RegisterWidthBits)
+		}
+		if target.NativeIntWidthBits != 0 && target.NativeIntWidthBits != tgt.NativeIntWidthBits {
+			return fmt.Errorf("target %s native_int_width_bits = %d, want %d", target.Triple, target.NativeIntWidthBits, tgt.NativeIntWidthBits)
+		}
+		if target.Endian != "" && target.Endian != tgt.Endian.String() {
+			return fmt.Errorf("target %s endian = %s, want %s", target.Triple, target.Endian, tgt.Endian.String())
+		}
+		if target.StackAlignmentBytes != 0 && target.StackAlignmentBytes != tgt.StackAlignmentBytes {
+			return fmt.Errorf("target %s stack_alignment_bytes = %d, want %d", target.Triple, target.StackAlignmentBytes, tgt.StackAlignmentBytes)
+		}
+		if target.MaxAtomicWidthBits != 0 && target.MaxAtomicWidthBits != tgt.MaxAtomicWidthBits {
+			return fmt.Errorf("target %s max_atomic_width_bits = %d, want %d", target.Triple, target.MaxAtomicWidthBits, tgt.MaxAtomicWidthBits)
+		}
+		if len(target.AtomicWidthBits) > 0 && !sameInts(target.AtomicWidthBits, tgt.AtomicWidthBits()) {
+			return fmt.Errorf("target %s atomic_width_bits = %v, want %v", target.Triple, target.AtomicWidthBits, tgt.AtomicWidthBits())
+		}
+		if target.AtomicPointerWidthBits != 0 {
+			ptr, err := tgt.AtomicPointerLayout()
+			if err != nil {
+				return fmt.Errorf("target %s atomic_pointer_width_bits unsupported: %v", target.Triple, err)
+			}
+			if target.AtomicPointerWidthBits != ptr.WidthBits {
+				return fmt.Errorf("target %s atomic_pointer_width_bits = %d, want %d", target.Triple, target.AtomicPointerWidthBits, ptr.WidthBits)
+			}
+		}
+		if target.UnsupportedReason != "" && target.UnsupportedReason != tgt.UnsupportedReason {
+			return fmt.Errorf("target %s unsupported_reason = %q, want %q", target.Triple, target.UnsupportedReason, tgt.UnsupportedReason)
+		}
+	}
 	return nil
+}
+
+func sameInts(a []int, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func validateBuiltin(builtin builtinManifest) error {

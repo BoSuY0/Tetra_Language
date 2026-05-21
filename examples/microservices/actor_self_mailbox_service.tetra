@@ -1,0 +1,23 @@
+// Actor self-mailbox microservice smoke.
+//
+// The service uses core.self() as a local actor handle, sends two tagged
+// messages to itself, and verifies the mailbox ordering.
+func main() -> Int
+uses actors, runtime:
+    let me: actor = core.self()
+    let _first: Int = core.send_msg(me, 20, 1)
+    let _second: Int = core.send_msg(me, 22, 2)
+    let first: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(2))
+    if first.error != 0:
+        return 10 + first.error
+    let second: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(2))
+    if second.error != 0:
+        return 20 + second.error
+    if first.tag != 1:
+        return 30 + first.tag
+    if second.tag != 2:
+        return 40 + second.tag
+    let total: Int = first.value + second.value
+    if total == 42:
+        return 0
+    return total

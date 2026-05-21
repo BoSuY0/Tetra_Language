@@ -1,0 +1,22 @@
+// Actor timeout retry microservice smoke.
+//
+// The service observes an empty receive deadline, then retries with a later
+// deadline and receives the delayed actor response.
+func delayed_sender() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(3)
+    let _sent: Int = core.send(core.sender(), 42)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let _actor: actor = core.spawn("delayed_sender")
+    let early: actor.recv_result_i32 = core.recv_until(core.deadline_ms(1))
+    if early.error != 2:
+        return 10 + early.error
+    let final: actor.recv_result_i32 = core.recv_until(core.deadline_ms(5))
+    if final.error != 0:
+        return 20 + final.error
+    if final.value == 42:
+        return 0
+    return final.value

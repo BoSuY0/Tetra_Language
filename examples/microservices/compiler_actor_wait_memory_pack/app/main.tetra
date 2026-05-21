@@ -1,0 +1,25 @@
+module app.main
+
+import lib.waits as waits
+
+func main() -> Int
+uses actors, alloc, capability, mem, runtime:
+    let first: Int = waits.recv_value_offset()
+    let second: Int = waits.poll_value_offset()
+    let third: Int = waits.tag_offset()
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let mid_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let left_cell: ptr = core.ptr_add(left_base, first, memory_cap)
+        let mid_cell: ptr = core.ptr_add(mid_base, second, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, third, memory_cap)
+        let _left_write: Int = core.store_i32(left_cell, 13, memory_cap)
+        let _mid_write: Int = core.store_i32(mid_cell, 14, memory_cap)
+        let _right_write: Int = core.store_i32(right_cell, 15, memory_cap)
+        let total: Int = core.load_i32(left_cell, memory_cap) + core.load_i32(mid_cell, memory_cap) + core.load_i32(right_cell, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

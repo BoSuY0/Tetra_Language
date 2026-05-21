@@ -48,3 +48,24 @@ func TestEnsureTypeInfoArrayRejectsUnsupportedSubset(t *testing.T) {
 		t.Fatalf("expected unsupported-element error, got: %v", err)
 	}
 }
+
+func TestEnsureTypeInfoRejectsTargetLayoutOnlyNativeIntegers(t *testing.T) {
+	types := baseTypes()
+	for _, name := range []string{"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong"} {
+		t.Run(name, func(t *testing.T) {
+			_, err := ensureTypeInfo(name, types)
+			if err == nil {
+				t.Fatalf("ensureTypeInfo(%q) succeeded; target-layout-only scalar must not become a source type implicitly", name)
+			}
+			for _, want := range []string{
+				"target-layout scalar type '" + name + "'",
+				"not supported in source-level Tetra yet",
+				"native-int/codegen support",
+			} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("ensureTypeInfo(%q) error = %v, want substring %q", name, err, want)
+				}
+			}
+		})
+	}
+}

@@ -1,0 +1,21 @@
+// U16 slice inout stride memory microservice smoke.
+//
+// The service mutates a heap-backed []u16 through an inout parameter and
+// verifies caller-visible cells after dependent indexed writes.
+module examples.microservices.memory_u16_inout_stride_service
+
+func fill(lane: inout []u16) -> Int:
+    lane[0] = 7
+    lane[1] = 11
+    lane[2] = lane[0] + lane[1]
+    lane[3] = lane[2] + 6
+    return lane[3]
+
+func main() -> Int
+uses alloc, mem:
+    var lane: []u16 = core.make_u16(4)
+    let edge: Int = fill(lane)
+    let total: Int = edge + lane[0] + lane[1]
+    if total == 42:
+        return 0
+    return total

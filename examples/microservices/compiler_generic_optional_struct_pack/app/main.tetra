@@ -1,0 +1,10 @@
+module app.main
+
+import lib.maybe_box as maybe_box
+
+func main() -> Int:
+    let box: maybe_box.Box<Int>? = maybe_box.wrap(42)
+    let value: Int = maybe_box.score(box)
+    if value == 42:
+        return 0
+    return value

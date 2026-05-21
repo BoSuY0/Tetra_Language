@@ -1,0 +1,12 @@
+module app.main
+
+import lib.actors as actors
+
+func main() -> Int
+uses actors:
+    let worker: actor = core.spawn("actors.Worker.run")
+    let _sent: Int = core.send_msg(worker, 41, 7)
+    let reply: actor.msg = core.recv_msg()
+    if reply.value == 42 && reply.tag == 8:
+        return 0
+    return reply.value

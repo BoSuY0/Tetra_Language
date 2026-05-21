@@ -1,0 +1,45 @@
+module lib.waits
+
+func slow_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return 4
+
+func join_until_error_offset() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("slow_worker")
+    let result: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(1))
+    if result.error != 2:
+        return 70 + result.error
+    let final: task.result_i32 = core.task_join_result_i32(task)
+    if final.error != 0:
+        return 80 + final.error
+    if final.value != 4:
+        return 90 + final.value
+    return result.error
+
+func poll_error_offset() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("slow_worker")
+    let early: task.result_i32 = core.task_poll_i32(task)
+    if early.error != 2:
+        return 100 + early.error
+    let final: task.result_i32 = core.task_join_result_i32(task)
+    if final.error != 0:
+        return 110 + final.error
+    if final.value != 4:
+        return 120 + final.value
+    return early.error
+
+func select_error_offset() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("slow_worker")
+    let selected: task.result_i32 = core.select2_i32(task, core.deadline_ms(1))
+    if selected.error != 2:
+        return 130 + selected.error
+    let final: task.result_i32 = core.task_join_result_i32(task)
+    if final.error != 0:
+        return 140 + final.error
+    if final.value != 4:
+        return 150 + final.value
+    return selected.error

@@ -1,0 +1,49 @@
+module app.main
+
+import lib.workers as workers
+
+func run_grouped() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    defer:
+        let _closed: Int = core.task_group_close(group)
+    let task: task.i32 = core.task_spawn_group_i32(group, "workers.grouped_worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    if result.error != 0:
+        return 10 + result.error
+    return result.value
+
+func run_cancel_checkpoint() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let task: task.i32 = core.task_spawn_group_i32(group, "workers.cancel_worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 20 + close_error
+    if result.error != 0:
+        return 30 + result.error
+    return result.value
+
+func main() -> Int
+uses alloc, capability, mem, runtime:
+    let grouped: Int = run_grouped()
+    let canceled: Int = run_cancel_checkpoint()
+    let task: task.i32 = core.task_spawn_i32("workers.offset_worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    if result.error != 0:
+        return 40 + result.error
+    let offset: Int = result.value
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(8)
+        let cell: ptr = core.ptr_add(base, offset, memory_cap)
+        if true:
+            defer:
+                let _write: Int = core.store_i32(cell, grouped, memory_cap)
+        let value: Int = core.load_i32(cell, memory_cap)
+        let total: Int = value + canceled
+        if total == 141:
+            return 0
+        return total
+    return 99

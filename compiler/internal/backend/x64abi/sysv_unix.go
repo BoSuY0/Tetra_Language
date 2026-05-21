@@ -26,6 +26,17 @@ func LinuxSysV() *SysVUnix {
 	}
 }
 
+func LinuxX32SysV() *SysVUnix {
+	const x32SyscallBit = 0x40000000
+	return &SysVUnix{
+		SysExit:     x32SyscallBit + 60,
+		SysWrite:    x32SyscallBit + 1,
+		SysMmap:     x32SyscallBit + 9,
+		SysMunmap:   x32SyscallBit + 11,
+		SysMprotect: x32SyscallBit + 10,
+	}
+}
+
 func MacSysV() *SysVUnix {
 	return &SysVUnix{
 		SysExit:     0x2000001,

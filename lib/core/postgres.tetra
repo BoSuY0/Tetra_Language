@@ -1,0 +1,455 @@
+// Stable core PostgreSQL wire-frame byte-buffer helpers.
+// Effects: mem
+// Runtime boundary: this module builds and inspects PostgreSQL protocol
+// frames in caller-owned byte buffers. It does not open sockets, authenticate,
+// own connection state, manage prepared statement state, or pool connections.
+// TCP transport belongs in `lib.core.net`; the production driver/pool remains
+// a broader TechEmpower stack layer.
+// ```tetra doctest
+// func postgres_doctest() -> Int
+// uses alloc, mem:
+//     var buf: []u8 = core.make_u8(lib.core.postgres.simple_query_frame_len("SELECT 1"))
+//     return lib.core.postgres.write_simple_query(buf, "SELECT 1")
+// ```
+module lib.core.postgres
+
+import lib.core.strings as strings
+
+func protocol_version_3() -> Int:
+    return 196608
+
+func int4_oid() -> Int:
+    return 23
+
+func text_oid() -> Int:
+    return 25
+
+func frame_parse() -> Int:
+    return 80
+
+func frame_bind() -> Int:
+    return 66
+
+func frame_describe() -> Int:
+    return 68
+
+func frame_execute() -> Int:
+    return 69
+
+func frame_simple_query() -> Int:
+    return 81
+
+func frame_sync() -> Int:
+    return 83
+
+func frame_terminate() -> Int:
+    return 88
+
+func frame_authentication() -> Int:
+    return 82
+
+func frame_bind_complete() -> Int:
+    return 50
+
+func frame_command_complete() -> Int:
+    return 67
+
+func frame_data_row() -> Int:
+    return 68
+
+func frame_error_response() -> Int:
+    return 69
+
+func frame_no_data() -> Int:
+    return 110
+
+func frame_parse_complete() -> Int:
+    return 49
+
+func frame_parameter_status() -> Int:
+    return 83
+
+func frame_ready_for_query() -> Int:
+    return 90
+
+func frame_row_description() -> Int:
+    return 84
+
+func ready_for_query_idle_status() -> Int:
+    return 73
+
+func ready_for_query_in_transaction_status() -> Int:
+    return 84
+
+func ready_for_query_failed_transaction_status() -> Int:
+    return 69
+
+func describe_kind_portal() -> Int:
+    return 80
+
+func describe_kind_statement() -> Int:
+    return 83
+
+func startup_message_len(user: String, database: String, application_name: String) -> Int:
+    return 8 + cstring_pair_len("user", user) + cstring_pair_len("database", database) + cstring_pair_len("application_name", application_name) + 1
+
+func write_startup_message(dst: inout []u8, user: String, database: String, application_name: String) -> Int
+uses mem:
+    let total: Int = startup_message_len(user, database, application_name)
+    var i: Int = write_i32_be_at(dst, 0, total)
+    i = write_i32_be_at(dst, i, protocol_version_3())
+    i = write_cstring_pair_at(dst, i, "user", user)
+    i = write_cstring_pair_at(dst, i, "database", database)
+    i = write_cstring_pair_at(dst, i, "application_name", application_name)
+    dst[i] = 0
+    return i + 1
+
+func simple_query_payload_len(query: String) -> Int:
+    return 5 + strings.ascii_len(query)
+
+func simple_query_frame_len(query: String) -> Int:
+    return 1 + simple_query_payload_len(query)
+
+func write_simple_query(dst: inout []u8, query: String) -> Int
+uses mem:
+    dst[0] = frame_simple_query()
+    var i: Int = write_i32_be_at(dst, 1, simple_query_payload_len(query))
+    return write_cstring_at(dst, i, query)
+
+func parse_payload_len(statement: String, query: String, param_type_oids: []i32) -> Int
+uses mem:
+    var total: Int = 4 + cstring_len(statement) + cstring_len(query) + 2
+    for oid in param_type_oids:
+        total = total + 4
+    return total
+
+func parse_frame_len(statement: String, query: String, param_type_oids: []i32) -> Int
+uses mem:
+    return 1 + parse_payload_len(statement, query, param_type_oids)
+
+func write_parse(dst: inout []u8, statement: String, query: String, param_type_oids: []i32) -> Int
+uses mem:
+    dst[0] = frame_parse()
+    var i: Int = write_i32_be_at(dst, 1, parse_payload_len(statement, query, param_type_oids))
+    i = write_cstring_at(dst, i, statement)
+    i = write_cstring_at(dst, i, query)
+    var count: Int = 0
+    for oid in param_type_oids:
+        count = count + 1
+    i = write_i16_be_at(dst, i, count)
+    for param_oid in param_type_oids:
+        i = write_i32_be_at(dst, i, param_oid)
+    return i
+
+func bind_text_0_payload_len(portal: String, statement: String) -> Int:
+    return 4 + cstring_len(portal) + cstring_len(statement) + 2 + 2 + 2
+
+func bind_text_0_frame_len(portal: String, statement: String) -> Int:
+    return 1 + bind_text_0_payload_len(portal, statement)
+
+func write_bind_text_0(dst: inout []u8, portal: String, statement: String) -> Int
+uses mem:
+    dst[0] = frame_bind()
+    var i: Int = write_i32_be_at(dst, 1, bind_text_0_payload_len(portal, statement))
+    i = write_cstring_at(dst, i, portal)
+    i = write_cstring_at(dst, i, statement)
+    i = write_i16_be_at(dst, i, 0)
+    i = write_i16_be_at(dst, i, 0)
+    return write_i16_be_at(dst, i, 0)
+
+func bind_text_1_payload_len(portal: String, statement: String, value0: String) -> Int:
+    return bind_text_0_payload_len(portal, statement) + 4 + strings.ascii_len(value0)
+
+func bind_text_1_frame_len(portal: String, statement: String, value0: String) -> Int:
+    return 1 + bind_text_1_payload_len(portal, statement, value0)
+
+func write_bind_text_1(dst: inout []u8, portal: String, statement: String, value0: String) -> Int
+uses mem:
+    dst[0] = frame_bind()
+    var i: Int = write_i32_be_at(dst, 1, bind_text_1_payload_len(portal, statement, value0))
+    i = write_cstring_at(dst, i, portal)
+    i = write_cstring_at(dst, i, statement)
+    i = write_i16_be_at(dst, i, 0)
+    i = write_i16_be_at(dst, i, 1)
+    i = write_i32_be_at(dst, i, strings.ascii_len(value0))
+    i = write_ascii_at(dst, i, value0)
+    return write_i16_be_at(dst, i, 0)
+
+func bind_text_2_payload_len(portal: String, statement: String, value0: String, value1: String) -> Int:
+    return bind_text_0_payload_len(portal, statement) + 8 + strings.ascii_len(value0) + strings.ascii_len(value1)
+
+func bind_text_2_frame_len(portal: String, statement: String, value0: String, value1: String) -> Int:
+    return 1 + bind_text_2_payload_len(portal, statement, value0, value1)
+
+func write_bind_text_2(dst: inout []u8, portal: String, statement: String, value0: String, value1: String) -> Int
+uses mem:
+    dst[0] = frame_bind()
+    var i: Int = write_i32_be_at(dst, 1, bind_text_2_payload_len(portal, statement, value0, value1))
+    i = write_cstring_at(dst, i, portal)
+    i = write_cstring_at(dst, i, statement)
+    i = write_i16_be_at(dst, i, 0)
+    i = write_i16_be_at(dst, i, 2)
+    i = write_i32_be_at(dst, i, strings.ascii_len(value0))
+    i = write_ascii_at(dst, i, value0)
+    i = write_i32_be_at(dst, i, strings.ascii_len(value1))
+    i = write_ascii_at(dst, i, value1)
+    return write_i16_be_at(dst, i, 0)
+
+func describe_portal_payload_len(portal: String) -> Int:
+    return 4 + 1 + cstring_len(portal)
+
+func describe_portal_frame_len(portal: String) -> Int:
+    return 1 + describe_portal_payload_len(portal)
+
+func write_describe_portal(dst: inout []u8, portal: String) -> Int
+uses mem:
+    dst[0] = frame_describe()
+    var i: Int = write_i32_be_at(dst, 1, describe_portal_payload_len(portal))
+    dst[i] = describe_kind_portal()
+    i = i + 1
+    return write_cstring_at(dst, i, portal)
+
+func describe_statement_payload_len(statement: String) -> Int:
+    return 4 + 1 + cstring_len(statement)
+
+func describe_statement_frame_len(statement: String) -> Int:
+    return 1 + describe_statement_payload_len(statement)
+
+func write_describe_statement(dst: inout []u8, statement: String) -> Int
+uses mem:
+    dst[0] = frame_describe()
+    var i: Int = write_i32_be_at(dst, 1, describe_statement_payload_len(statement))
+    dst[i] = describe_kind_statement()
+    i = i + 1
+    return write_cstring_at(dst, i, statement)
+
+func execute_payload_len(portal: String, max_rows: Int) -> Int:
+    return 4 + cstring_len(portal) + 4
+
+func execute_frame_len(portal: String, max_rows: Int) -> Int:
+    return 1 + execute_payload_len(portal, max_rows)
+
+func write_execute(dst: inout []u8, portal: String, max_rows: Int) -> Int
+uses mem:
+    dst[0] = frame_execute()
+    var i: Int = write_i32_be_at(dst, 1, execute_payload_len(portal, max_rows))
+    i = write_cstring_at(dst, i, portal)
+    return write_i32_be_at(dst, i, max_rows)
+
+func sync_frame_len() -> Int:
+    return 5
+
+func write_sync(dst: inout []u8) -> Int
+uses mem:
+    dst[0] = frame_sync()
+    return write_i32_be_at(dst, 1, 4)
+
+func terminate_frame_len() -> Int:
+    return 5
+
+func write_terminate(dst: inout []u8) -> Int
+uses mem:
+    dst[0] = frame_terminate()
+    return write_i32_be_at(dst, 1, 4)
+
+func frame_type_at(frame: []u8, start: Int) -> Int
+uses mem:
+    return frame[start]
+
+func frame_length_at(frame: []u8, start: Int) -> Int
+uses mem:
+    return read_i32_be(frame, start + 1)
+
+func frame_payload_len_at(frame: []u8, start: Int) -> Int
+uses mem:
+    return frame_length_at(frame, start) - 4
+
+func frame_total_len_at(frame: []u8, start: Int) -> Int
+uses mem:
+    return frame_length_at(frame, start) + 1
+
+func frame_payload_start(start: Int) -> Int:
+    return start + 5
+
+func row_description_column_count(payload: []u8, start: Int) -> Int
+uses mem:
+    return read_i16_be(payload, start)
+
+func row_description_type_oid_at(payload: []u8, start: Int, payload_len: Int, column_index: Int) -> Int
+uses mem:
+    let count: Int = row_description_column_count(payload, start)
+    if column_index < 0 || column_index >= count:
+        return -1
+    let limit: Int = start + payload_len
+    var pos: Int = start + 2
+    var index: Int = 0
+    while index < count:
+        let name_end: Int = cstring_end_at(payload, pos, limit)
+        if name_end < 0:
+            return -1
+        let type_oid_pos: Int = name_end + 1 + 4 + 2
+        if type_oid_pos + 4 > limit:
+            return -1
+        if index == column_index:
+            return read_i32_be(payload, type_oid_pos)
+        pos = type_oid_pos + 4 + 2 + 4 + 2
+        index = index + 1
+    return -1
+
+func data_row_column_count(payload: []u8, start: Int) -> Int
+uses mem:
+    return read_i16_be(payload, start)
+
+func data_row_value_len_at(payload: []u8, start: Int, column_index: Int) -> Int
+uses mem:
+    let count: Int = data_row_column_count(payload, start)
+    if column_index < 0 || column_index >= count:
+        return -1
+    var pos: Int = start + 2
+    var index: Int = 0
+    while index < count:
+        let value_len: Int = read_i32_be_signed(payload, pos)
+        if index == column_index:
+            return value_len
+        pos = pos + 4
+        if value_len > 0:
+            pos = pos + value_len
+        index = index + 1
+    return -1
+
+func data_row_value_start_at(payload: []u8, start: Int, column_index: Int) -> Int
+uses mem:
+    let count: Int = data_row_column_count(payload, start)
+    if column_index < 0 || column_index >= count:
+        return -1
+    var pos: Int = start + 2
+    var index: Int = 0
+    while index < count:
+        let value_len: Int = read_i32_be_signed(payload, pos)
+        let value_start: Int = pos + 4
+        if index == column_index:
+            if value_len < 0:
+                return -1
+            return value_start
+        pos = value_start
+        if value_len > 0:
+            pos = pos + value_len
+        index = index + 1
+    return -1
+
+func data_row_i32_at(payload: []u8, start: Int, column_index: Int) -> Int
+uses mem:
+    let value_len: Int = data_row_value_len_at(payload, start, column_index)
+    if value_len <= 0:
+        return 0
+    let value_start: Int = data_row_value_start_at(payload, start, column_index)
+    if value_start < 0:
+        return 0
+    return parse_ascii_i32_at(payload, value_start, value_len)
+
+func command_complete_affected_rows(payload: []u8, start: Int, payload_len: Int) -> Int
+uses mem:
+    let limit: Int = start + payload_len
+    var pos: Int = start
+    var current: Int = 0
+    var last: Int = 0
+    var have_digits: Bool = false
+    while pos < limit && payload[pos] != 0:
+        let ch: Int = payload[pos]
+        if ch >= 48 && ch <= 57:
+            current = current * 10 + ch - 48
+            have_digits = true
+        else:
+            if have_digits:
+                last = current
+            current = 0
+            have_digits = false
+        pos = pos + 1
+    if have_digits:
+        return current
+    return last
+
+func ready_for_query_status(payload: []u8, start: Int) -> Int
+uses mem:
+    return payload[start]
+
+func cstring_end_at(src: []u8, start: Int, limit: Int) -> Int
+uses mem:
+    var pos: Int = start
+    while pos < limit:
+        if src[pos] == 0:
+            return pos
+        pos = pos + 1
+    return -1
+
+func parse_ascii_i32_at(src: []u8, start: Int, count: Int) -> Int
+uses mem:
+    if count <= 0:
+        return 0
+    var pos: Int = start
+    let limit: Int = start + count
+    var sign: Int = 1
+    if src[pos] == 45:
+        sign = -1
+        pos = pos + 1
+    var value: Int = 0
+    while pos < limit:
+        let ch: Int = src[pos]
+        if ch < 48 || ch > 57:
+            return sign * value
+        value = value * 10 + ch - 48
+        pos = pos + 1
+    return sign * value
+
+func cstring_pair_len(name: String, value: String) -> Int:
+    return strings.ascii_len(name) + 1 + strings.ascii_len(value) + 1
+
+func cstring_len(value: String) -> Int:
+    return strings.ascii_len(value) + 1
+
+func write_cstring_pair_at(dst: inout []u8, start: Int, name: String, value: String) -> Int
+uses mem:
+    var i: Int = write_cstring_at(dst, start, name)
+    return write_cstring_at(dst, i, value)
+
+func write_cstring_at(dst: inout []u8, start: Int, value: String) -> Int
+uses mem:
+    var i: Int = write_ascii_at(dst, start, value)
+    dst[i] = 0
+    return i + 1
+
+func write_ascii_at(dst: inout []u8, start: Int, text: String) -> Int
+uses mem:
+    var i: Int = start
+    for ch in text:
+        dst[i] = ch
+        i = i + 1
+    return i
+
+func write_i32_be_at(dst: inout []u8, start: Int, value: Int) -> Int
+uses mem:
+    dst[start] = (value / 16777216) % 256
+    dst[start + 1] = (value / 65536) % 256
+    dst[start + 2] = (value / 256) % 256
+    dst[start + 3] = value % 256
+    return start + 4
+
+func write_i16_be_at(dst: inout []u8, start: Int, value: Int) -> Int
+uses mem:
+    dst[start] = (value / 256) % 256
+    dst[start + 1] = value % 256
+    return start + 2
+
+func read_i32_be(src: []u8, start: Int) -> Int
+uses mem:
+    return src[start] * 16777216 + src[start + 1] * 65536 + src[start + 2] * 256 + src[start + 3]
+
+func read_i32_be_signed(src: []u8, start: Int) -> Int
+uses mem:
+    if src[start] == 255 && src[start + 1] == 255 && src[start + 2] == 255 && src[start + 3] == 255:
+        return -1
+    return read_i32_be(src, start)
+
+func read_i16_be(src: []u8, start: Int) -> Int
+uses mem:
+    return src[start] * 256 + src[start + 1]

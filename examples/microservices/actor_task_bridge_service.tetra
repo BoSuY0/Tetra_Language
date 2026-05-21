@@ -1,0 +1,34 @@
+// Actor task-bridge microservice smoke.
+//
+actor Bridge:
+    func run() -> Int
+    uses actors, runtime:
+        let request: actor.msg = core.recv_msg()
+        let reply_to: actor = core.sender()
+        let task: task.i32 = core.task_spawn_i32("bridge_worker")
+        let result: task.result_i32 = core.task_join_result_i32(task)
+        if result.error != 0:
+            let _error_reply: Int = core.send_msg(reply_to, result.error, 90)
+            return 0
+        let _reply: Int = core.send_msg(reply_to, request.value + result.value, request.tag + 1)
+        return 0
+
+// A router actor joins a task worker and combines the task result with the
+// actor request before replying to the main service.
+func bridge_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 21
+
+func main() -> Int
+uses actors, runtime:
+    let bridge: actor = core.spawn("Bridge.run")
+    let _sent: Int = core.send_msg(bridge, 21, 10)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(8))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 11:
+        return 20 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

@@ -1,0 +1,40 @@
+module lib.async_throw_memory
+
+enum MemoryAsyncErr:
+    case failed
+
+struct IntBox:
+    value: Int
+
+async func derive(base: ptr, offset: Int, memory_cap: cap.mem, fail: Bool) -> ptr throws MemoryAsyncErr
+uses mem:
+    if fail:
+        throw MemoryAsyncErr.failed
+    unsafe:
+        return core.ptr_add(base, offset, memory_cap)
+    return base
+
+async func box_int(value: Int, fail: Bool) -> IntBox throws MemoryAsyncErr:
+    if fail:
+        throw MemoryAsyncErr.failed
+    return IntBox(value: value)
+
+async func load_local(base: ptr, memory_cap: cap.mem) -> Int throws MemoryAsyncErr
+uses mem:
+    let cell: ptr = try await derive(base, 4, memory_cap, false)
+    unsafe:
+        return core.load_i32(cell, memory_cap)
+    return 0
+
+async func relay_int(value: Int) -> IntBox throws MemoryAsyncErr:
+    return try await box_int(value, false)
+
+func fallback() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(12)
+        let cell: ptr = core.ptr_add(base, 4, memory_cap)
+        let _store: Int = core.store_i32(cell, 42, memory_cap)
+        return core.load_i32(cell, memory_cap)
+    return 99

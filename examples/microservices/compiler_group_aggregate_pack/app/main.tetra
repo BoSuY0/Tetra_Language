@@ -1,0 +1,40 @@
+module app.main
+
+import lib.groups as groups
+
+enum GroupErr:
+    case stopped
+    case code(Int)
+
+func worker() -> Int:
+    return 20
+
+func typed_worker() -> Int throws GroupErr:
+    return 22
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let box: groups.GroupBox = groups.wrap(group)
+    let boxed: task.group = groups.unwrap(box)
+    let task: task.i32 = core.task_spawn_group_i32(boxed, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let slot: groups.GroupSlot = groups.pass(groups.slot(boxed))
+    match slot:
+    case groups.GroupSlot.ready(handle):
+        let typed = core.task_spawn_group_i32_typed<GroupErr>(handle, "typed_worker")
+        let status: Int = catch core.task_join_group_i32_typed<GroupErr>(typed):
+        case GroupErr.stopped:
+            7
+        case GroupErr.code(code):
+            code
+        let close_error: Int = core.task_group_close(handle)
+        if result.error != 0:
+            return 40 + result.error
+        if close_error != 0:
+            return 50 + close_error
+        if result.value + status == 42:
+            return 0
+        return result.value + status
+    case groups.GroupSlot.missing:
+        return 99

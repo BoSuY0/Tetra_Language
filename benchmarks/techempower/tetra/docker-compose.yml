@@ -1,0 +1,63 @@
+services:
+  tfb-database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: hello_world
+      POSTGRES_USER: benchmarkdbuser
+      POSTGRES_PASSWORD: benchmarkdbpass
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    command:
+      - "postgres"
+      - "-c"
+      - "password_encryption=scram-sha-256"
+      - "-c"
+      - "max_connections=256"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./setup-postgres.sql:/docker-entrypoint-initdb.d/001-setup-postgres.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchmarkdbuser -d hello_world"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  tetra-techempower:
+    build:
+      context: ../../..
+      dockerfile: benchmarks/techempower/tetra/Dockerfile
+    environment:
+      TETRA_TE_HOST: 0.0.0.0
+      TETRA_TE_PORT: "8080"
+      TETRA_TE_WORKERS: ${TETRA_TE_WORKERS:-}
+      TETRA_TE_PG_HOST: tfb-database
+      TETRA_TE_PG_PORT: "5432"
+      TETRA_TE_PG_USER: benchmarkdbuser
+      TETRA_TE_PG_DATABASE: hello_world
+      TETRA_TE_PG_PASSWORD: ${TETRA_TE_PG_PASSWORD:-benchmarkdbpass}
+      TETRA_TE_PG_POOL: "256"
+    ports:
+      - "8080:8080"
+    depends_on:
+      tfb-database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/plaintext >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  tetra-benchmark:
+    image: golang:1.20-bookworm
+    profiles:
+      - benchmark
+    working_dir: /src
+    volumes:
+      - ../../..:/src
+    command:
+      - "sh"
+      - "-lc"
+      - "mkdir -p reports/techempower && go run ./compiler/cmd/tetra-techempower-bench --base-url http://tetra-techempower:8080 --report reports/techempower/tetra-compose-benchmark.json --requests ${TETRA_TE_BENCH_REQUESTS:-256} --concurrency ${TETRA_TE_BENCH_CONCURRENCY:-32} --min-rps ${TETRA_TE_BENCH_MIN_RPS:-1}"
+    depends_on:
+      tetra-techempower:
+        condition: service_healthy

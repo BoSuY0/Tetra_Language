@@ -1,0 +1,5 @@
+module lib.groups
+
+func maybe(group: task.group) -> task.group?:
+    let out: task.group? = group
+    return out

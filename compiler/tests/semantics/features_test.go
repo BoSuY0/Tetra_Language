@@ -44,6 +44,7 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 		"language.protocol-conformance-mvp":       compiler.FeatureStatusCurrent,
 		"language.callable-mvp":                   compiler.FeatureStatusCurrent,
 		"language.callable-level1":                compiler.FeatureStatusCurrent,
+		"stdlib.core-current":                     compiler.FeatureStatusCurrent,
 		"stdlib.experimental-mirrors":             compiler.FeatureStatusCurrent,
 		"language.enum-payload-match":             compiler.FeatureStatusCurrent,
 		"language.protocol-bound-generics-static": compiler.FeatureStatusCurrent,
@@ -83,6 +84,12 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	for _, want := range []string{"Level 0 callable surface", "legacy ptr closure local direct calls", "captured closure escape", "full first-class function values remain out of scope"} {
 		if !strings.Contains(callableMVP.Scope+" "+callableMVP.Stability, want) {
 			t.Fatalf("callable MVP feature missing %q boundary: %#v", want, callableMVP)
+		}
+	}
+	stdlibCore := seenFeature["stdlib.core-current"]
+	for _, want := range []string{"executable HTTP/1.1 String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers", "classify TechEmpower request lines from String text or caller-owned byte buffers", "locate CRLFCRLF request-head boundaries for pipelined buffers", "executable JSON byte-buffer response helpers", "caller-owned buffers", "networking exposes deterministic endpoint policy helpers", "executable Linux TCP socket client/server I/O helpers with recv/send, SO_REUSEPORT, TCP_NODELAY, nonblocking accept convenience, and epoll add/mod/delete plus wait-one readiness flag capture and predicates", "net socket open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close plus SO_REUSEPORT, TCP_NODELAY, SOCK_NONBLOCK/SOCK_CLOEXEC accept helpers, and epoll create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one/wait-one-into helpers with EPOLLIN/EPOLLOUT/EPOLLERR/EPOLLHUP predicates are host-backed on linux-x64"} {
+		if !strings.Contains(stdlibCore.Scope+" "+stdlibCore.Stability, want) {
+			t.Fatalf("stdlib core feature missing %q boundary: %#v", want, stdlibCore)
 		}
 	}
 	callableLevel1 := seenFeature["language.callable-level1"]

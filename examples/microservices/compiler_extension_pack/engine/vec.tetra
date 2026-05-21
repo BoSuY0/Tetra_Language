@@ -1,0 +1,9 @@
+module engine.vec
+
+struct Vec2:
+    x: Int
+    y: Int
+
+extension Vec2:
+    func sum(self: Vec2) -> Int:
+        return self.x + self.y

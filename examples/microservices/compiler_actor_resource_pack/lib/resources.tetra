@@ -1,0 +1,17 @@
+module lib.resources
+
+enum MoveMsg:
+    case handoff(actor)
+    case empty
+
+struct ActorBox:
+    peer: actor
+
+func wrap(peer: actor) -> ActorBox:
+    return ActorBox(peer: peer)
+
+func unwrap(box: ActorBox) -> actor:
+    return box.peer
+
+func pass(msg: MoveMsg) -> MoveMsg:
+    return msg

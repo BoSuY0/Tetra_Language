@@ -1,0 +1,21 @@
+// pyperformance-inspired call-heavy Int loop.
+module examples.benchmarks.pyperformance_call_mix
+
+func f0(x: Int) -> Int:
+    return x + 1
+
+func f1(x: Int) -> Int:
+    return x * 2 + 3
+
+func f2(x: Int) -> Int:
+    return (x + 5) % 97
+
+func main() -> Int:
+    var i: Int = 0
+    var total: Int = 0
+    while i < 80:
+        total = total + f2(f1(f0(i)))
+        i = i + 1
+    if total == 3628:
+        return 0
+    return total

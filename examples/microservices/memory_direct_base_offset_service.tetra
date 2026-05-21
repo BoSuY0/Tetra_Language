@@ -1,0 +1,33 @@
+// Direct-base offset memory microservice smoke.
+//
+// The service aliases allocation, function-returned, and loaded pointer bases
+// into local ptr bindings before deriving raw pointer cells.
+module examples.microservices.memory_direct_base_offset_service
+
+func make_payload() -> ptr
+uses alloc, mem:
+    unsafe:
+        return core.alloc_bytes(8)
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let direct_base: ptr = core.alloc_bytes(8)
+        let direct_cell: ptr = core.ptr_add(direct_base, 4, memory_cap)
+        let _direct_write: Int = core.store_i32(direct_cell, 10, memory_cap)
+        let returned_base: ptr = make_payload()
+        let returned_cell: ptr = core.ptr_add(returned_base, 4, memory_cap)
+        let _returned_write: Int = core.store_i32(returned_cell, 11, memory_cap)
+        let stored_base: ptr = core.alloc_bytes(8)
+        let table: ptr = core.alloc_bytes(8)
+        let _saved: ptr = core.store_ptr(table, stored_base, memory_cap)
+        let loaded_base: ptr = core.load_ptr(table, memory_cap)
+        let loaded_cell: ptr = core.ptr_add(loaded_base, 4, memory_cap)
+        let _loaded_write: Int = core.store_i32(loaded_cell, 21, memory_cap)
+        let total: Int = core.load_i32(direct_cell, memory_cap) + core.load_i32(returned_cell, memory_cap) + core.load_i32(loaded_cell, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

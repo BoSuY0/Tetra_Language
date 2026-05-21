@@ -1,0 +1,20 @@
+// Select rejoin microservice smoke.
+//
+// The service verifies that a successful select2_i32 wait follows the same
+// non-consuming handle model as task_join_until_i32 under the current runtime.
+module examples.microservices.parallel_select_rejoin_service
+
+func worker() -> Int:
+    return 21
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let selected: task.result_i32 = core.select2_i32(task, core.deadline_ms(5))
+    if selected.error != 0:
+        return 10 + selected.error
+    let joined: Int = core.task_join_i32(task)
+    let total: Int = selected.value + joined
+    if total == 42:
+        return 0
+    return total

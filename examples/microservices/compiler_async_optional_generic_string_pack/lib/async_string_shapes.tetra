@@ -1,0 +1,59 @@
+module lib.async_string_shapes
+
+enum StringShapeErr:
+    case failed
+
+struct Box<T>:
+    value: T
+
+async func maybe_text(text: String) -> String?:
+    let out: String? = text
+    return out
+
+async func maybe_text_throw(text: String, fail: Bool) -> String? throws StringShapeErr:
+    if fail:
+        throw StringShapeErr.failed
+    let out: String? = text
+    return out
+
+async func id<T>(value: T) -> T:
+    return value
+
+async func id_throw<T>(value: T, fail: Bool) -> T throws StringShapeErr:
+    if fail:
+        throw StringShapeErr.failed
+    return value
+
+async func wrap<T>(value: T) -> Box<T>:
+    return Box<T>(value: value)
+
+async func score_optional_local(text: String) -> Int:
+    let maybe: String? = await maybe_text(text)
+    if let unwrapped = maybe:
+        return unwrapped.len
+    return 0
+
+async func score_optional_throw_local(text: String) -> Int throws StringShapeErr:
+    let maybe: String? = try await maybe_text_throw(text, false)
+    if let unwrapped = maybe:
+        return unwrapped.len
+    return 0
+
+async func score_generic_local(text: String) -> Int:
+    let out: String = await id(text)
+    return out.len
+
+async func score_generic_throw_local(text: String) -> Int throws StringShapeErr:
+    let out: String = try await id_throw(text, false)
+    return out.len
+
+async func score_box_local(text: String) -> Int:
+    let boxed: Box<String> = await wrap(text)
+    return boxed.value.len
+
+async func relay_int(value: Int) -> Int:
+    return await id(value)
+
+func fallback() -> Int:
+    let label: String = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnop"
+    return label.len

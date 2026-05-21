@@ -1,0 +1,30 @@
+module app.main
+
+import lib.groups as groups
+
+func first_worker() -> Int:
+    return 19
+
+func second_worker() -> Int:
+    return 23
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let boxed: groups.Box<task.group> = groups.pass_group(groups.wrap_group(group))
+    let first: task.i32 = core.task_spawn_group_i32(boxed.value, "first_worker")
+    let returned: task.group = groups.alias_group(boxed.value)
+    let second: task.i32 = core.task_spawn_group_i32(returned, "second_worker")
+    let first_result: task.result_i32 = core.task_join_result_i32(first)
+    let second_result: task.result_i32 = core.task_join_result_i32(second)
+    let close_error: Int = core.task_group_close(returned)
+    if first_result.error != 0:
+        return 40 + first_result.error
+    if second_result.error != 0:
+        return 50 + second_result.error
+    if close_error != 0:
+        return 60 + close_error
+    let total: Int = first_result.value + second_result.value
+    if total == 42:
+        return 0
+    return total

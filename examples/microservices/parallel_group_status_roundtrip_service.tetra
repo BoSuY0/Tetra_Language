@@ -1,0 +1,26 @@
+// Task-group status roundtrip microservice smoke.
+//
+// The service verifies that a grouped worker sees the open current group and
+// that the parent can observe the closed status after joining the child.
+module examples.microservices.parallel_group_status_roundtrip_service
+
+func worker() -> Int
+uses runtime:
+    let group: task.group = core.task_group_current()
+    return core.task_group_status(group)
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let before: Int = core.task_group_status(group)
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let close_error: Int = core.task_group_close(group)
+    let after: Int = core.task_group_status(group)
+    if result.error != 0:
+        return 20 + result.error
+    if close_error != 0:
+        return 30 + close_error
+    if before == 1 && result.value == 1 && after == 3:
+        return 0
+    return before + result.value + after

@@ -1,0 +1,45 @@
+// Actor task cancel/select microservice smoke.
+//
+// An actor observes a grouped task timeout, cancels the group, joins the
+// stopped result, and replies with the combined runtime status.
+actor CancelSelectBridge:
+    func run() -> Int
+    uses actors, runtime:
+        let request: actor.msg = core.recv_msg()
+        let reply_to: actor = core.sender()
+        var group: task.group = core.task_group_open()
+        let task: task.i32 = core.task_spawn_group_i32(group, "cancel_select_slow_worker")
+        let early: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(1))
+        if early.error != 2:
+            let _early_reply: Int = core.send_msg(reply_to, early.error, 70)
+            return 0
+        group = core.task_group_cancel(group)
+        let final: task.result_i32 = core.task_join_result_i32(task)
+        if final.error != 1:
+            let _final_reply: Int = core.send_msg(reply_to, final.error, 71)
+            return 0
+        let close_error: Int = core.task_group_close(group)
+        if close_error != 0:
+            let _close_reply: Int = core.send_msg(reply_to, close_error, 72)
+            return 0
+        let total: Int = request.value + final.error + early.error
+        let _reply: Int = core.send_msg(reply_to, total, request.tag + 1)
+        return 0
+
+func cancel_select_slow_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(8)
+    return 40
+
+func main() -> Int
+uses actors, runtime:
+    let bridge: actor = core.spawn("CancelSelectBridge.run")
+    let _sent: Int = core.send_msg(bridge, 39, 3)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(20))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 4:
+        return 20 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

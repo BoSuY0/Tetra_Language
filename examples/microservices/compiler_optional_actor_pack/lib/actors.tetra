@@ -1,0 +1,5 @@
+module lib.actors
+
+func maybe(peer: actor) -> actor?:
+    let out: actor? = peer
+    return out

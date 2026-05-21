@@ -20,13 +20,27 @@ type Manifest struct {
 type FormatManifest = formats.Info
 
 type TargetManifest struct {
-	Triple         string `json:"triple"`
-	OS             string `json:"os"`
-	Arch           string `json:"arch"`
-	ABI            string `json:"abi"`
-	Format         string `json:"format"`
-	ExeExt         string `json:"exe_ext"`
-	CollectImports bool   `json:"collect_imports"`
+	Triple                  string `json:"triple"`
+	Status                  string `json:"status"`
+	OS                      string `json:"os"`
+	Arch                    string `json:"arch"`
+	ABI                     string `json:"abi"`
+	DataModel               string `json:"data_model"`
+	Format                  string `json:"format"`
+	ExeExt                  string `json:"exe_ext"`
+	CollectImports          bool   `json:"collect_imports"`
+	RunMode                 string `json:"run_mode"`
+	PointerWidthBits        int    `json:"pointer_width_bits"`
+	RegisterWidthBits       int    `json:"register_width_bits"`
+	NativeIntWidthBits      int    `json:"native_int_width_bits"`
+	Endian                  string `json:"endian"`
+	StackAlignmentBytes     int    `json:"stack_alignment_bytes"`
+	MaxAtomicWidthBits      int    `json:"max_atomic_width_bits"`
+	AtomicWidthBits         []int  `json:"atomic_width_bits"`
+	AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits"`
+	UnsupportedReason       string `json:"unsupported_reason,omitempty"`
+	SupportsDebugInfo       bool   `json:"supports_debug_info"`
+	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 }
 
 type BuiltinManifest struct {
@@ -49,6 +63,7 @@ type RuntimeManifest struct {
 	TypedTaskRequiredSymbols  []string `json:"typed_task_required_symbols"`
 	TimeRequiredSymbols       []string `json:"time_required_symbols,omitempty"`
 	FilesystemRequiredSymbols []string `json:"filesystem_required_symbols,omitempty"`
+	NetRequiredSymbols        []string `json:"net_required_symbols,omitempty"`
 	ActorsProgramGlueSymbols  []string `json:"actors_program_glue_symbols"`
 }
 
@@ -74,13 +89,27 @@ func GetManifest() (Manifest, error) {
 	targetOut := make([]TargetManifest, 0, len(targets))
 	for _, t := range targets {
 		targetOut = append(targetOut, TargetManifest{
-			Triple:         t.Triple,
-			OS:             fmt.Sprint(t.OS),
-			Arch:           fmt.Sprint(t.Arch),
-			ABI:            fmt.Sprint(t.ABI),
-			Format:         fmt.Sprint(t.Format),
-			ExeExt:         t.ExeExt,
-			CollectImports: t.CollectImports,
+			Triple:                  t.Triple,
+			Status:                  fmt.Sprint(t.Status),
+			OS:                      fmt.Sprint(t.OS),
+			Arch:                    fmt.Sprint(t.Arch),
+			ABI:                     fmt.Sprint(t.ABI),
+			DataModel:               fmt.Sprint(t.DataModel),
+			Format:                  fmt.Sprint(t.Format),
+			ExeExt:                  t.ExeExt,
+			CollectImports:          t.CollectImports,
+			RunMode:                 fmt.Sprint(t.RunMode),
+			PointerWidthBits:        t.PointerWidthBits,
+			RegisterWidthBits:       t.RegisterWidthBits,
+			NativeIntWidthBits:      t.NativeIntWidthBits,
+			Endian:                  fmt.Sprint(t.Endian),
+			StackAlignmentBytes:     t.StackAlignmentBytes,
+			MaxAtomicWidthBits:      t.MaxAtomicWidthBits,
+			AtomicWidthBits:         t.AtomicWidthBits(),
+			AtomicPointerWidthBits:  manifestAtomicPointerWidthBits(t),
+			UnsupportedReason:       t.UnsupportedReason,
+			SupportsDebugInfo:       t.SupportsDebugInfo,
+			SupportsReleaseOptimize: t.SupportsReleaseOptimize,
 		})
 	}
 
@@ -99,6 +128,7 @@ func GetManifest() (Manifest, error) {
 			TypedTaskRequiredSymbols:  requiredTypedTaskRuntimeSymbols(8),
 			TimeRequiredSymbols:       requiredTimeRuntimeSymbols(),
 			FilesystemRequiredSymbols: requiredFilesystemRuntimeSymbols(),
+			NetRequiredSymbols:        requiredNetRuntimeSymbols(),
 			ActorsProgramGlueSymbols: []string{
 				"__tetra_actor_dispatch",
 				"__tetra_actor_main_entry_id",
@@ -106,4 +136,12 @@ func GetManifest() (Manifest, error) {
 		},
 		Features: FeatureRegistry(),
 	}, nil
+}
+
+func manifestAtomicPointerWidthBits(t ctarget.Target) int {
+	layout, err := t.AtomicPointerLayout()
+	if err != nil {
+		return 0
+	}
+	return layout.WidthBits
 }

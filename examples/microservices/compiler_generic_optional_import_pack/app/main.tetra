@@ -1,0 +1,11 @@
+module app.main
+
+import lib.route as route
+
+func main() -> Int:
+    let maybe: Int? = 42
+    let routed: Int? = route.id(maybe)
+    let direct: Int = route.choose(routed)
+    if direct == 42:
+        return 0
+    return direct

@@ -1,0 +1,35 @@
+// PLB2 bedcov-inspired interval coverage scan.
+module examples.benchmarks.plb2_bedcov_scan
+
+func main() -> Int
+uses alloc, mem:
+    var starts: []i32 = core.make_i32(4)
+    var ends: []i32 = core.make_i32(4)
+    var queries: []i32 = core.make_i32(4)
+    starts[0] = 0
+    starts[1] = 10
+    starts[2] = 20
+    starts[3] = 30
+    ends[0] = 5
+    ends[1] = 25
+    ends[2] = 35
+    ends[3] = 45
+    queries[0] = 3
+    queries[1] = 12
+    queries[2] = 22
+    queries[3] = 40
+
+    var q: Int = 0
+    var checksum: Int = 0
+    while q < 4:
+        var i: Int = 0
+        var covered: Int = 0
+        while i < 4:
+            if queries[q] >= starts[i] && queries[q] < ends[i]:
+                covered = covered + 1
+            i = i + 1
+        checksum = checksum + covered * (q + 1)
+        q = q + 1
+    if checksum == 13:
+        return 0
+    return checksum

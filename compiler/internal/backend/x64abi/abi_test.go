@@ -2,6 +2,7 @@ package x64abi
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ func TestSysVSpillParamsZeroThroughTenArgs(t *testing.T) {
 		abi  *SysVUnix
 	}{
 		{name: "linux", abi: LinuxSysV()},
+		{name: "linux-x32", abi: LinuxX32SysV()},
 		{name: "macos", abi: MacSysV()},
 	}
 
@@ -55,6 +57,42 @@ func TestSysVSpillParamsZeroThroughTenArgs(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestLinuxX32SysVUsesX32SyscallNumbers(t *testing.T) {
+	const x32Bit = uint32(0x40000000)
+
+	e := &x64.Emitter{}
+	stackDepth := 2
+	if err := LinuxX32SysV().EmitWriteStdout(e, &stackDepth, nil); err != nil {
+		t.Fatalf("EmitWriteStdout: %v", err)
+	}
+	if !containsMovEaxImm32(e.Buf, x32Bit+1) {
+		t.Fatalf("x32 write syscall number missing from bytes: % x", e.Buf)
+	}
+	if containsMovEaxImm32(e.Buf, 1) {
+		t.Fatalf("x32 write emitted plain x64 syscall number: % x", e.Buf)
+	}
+
+	e = &x64.Emitter{}
+	if err := LinuxX32SysV().EmitExit(e, 0, 0, nil); err != nil {
+		t.Fatalf("EmitExit: %v", err)
+	}
+	if !containsMovEaxImm32(e.Buf, x32Bit+60) {
+		t.Fatalf("x32 exit syscall number missing from bytes: % x", e.Buf)
+	}
+	if containsMovEaxImm32(e.Buf, 60) {
+		t.Fatalf("x32 exit emitted plain x64 syscall number: % x", e.Buf)
+	}
+}
+
+func containsMovEaxImm32(buf []byte, imm uint32) bool {
+	for i := 0; i+5 <= len(buf); i++ {
+		if buf[i] == 0xB8 && binary.LittleEndian.Uint32(buf[i+1:i+5]) == imm {
+			return true
+		}
+	}
+	return false
 }
 
 func TestWin64SpillParamsZeroThroughTenArgs(t *testing.T) {

@@ -423,15 +423,35 @@ func stackEffect(instr ir.IRInstr) (pop int, push int, known bool) {
 		return 1, 0, true
 	case ir.IRCapIO, ir.IRCapMem, ir.IRSymAddr:
 		return 0, 1, true
-	case ir.IRMemReadI32, ir.IRMemReadU8, ir.IRMemReadPtr, ir.IRMmioReadI32:
+	case ir.IRMemReadI32, ir.IRMemReadU8, ir.IRMemReadPtr, ir.IRMmioReadI32,
+		ir.IRAtomicLoadPtr, ir.IRAtomicLoadI32, ir.IRAtomicLoadI64,
+		ir.IRAtomicLoadI8, ir.IRAtomicLoadI16:
 		return 2, 1, true
-	case ir.IRMemWriteI32, ir.IRMemWriteU8, ir.IRMemWritePtr, ir.IRPtrAdd,
-		ir.IRMmioWriteI32, ir.IRCtxSwitch:
+	case ir.IRMemWriteI32, ir.IRMemWriteU8, ir.IRMemWritePtr, ir.IRMemWriteArchPtr, ir.IRPtrAdd,
+		ir.IRMmioWriteI32, ir.IRCtxSwitch, ir.IRAtomicStorePtr,
+		ir.IRAtomicExchangePtr, ir.IRAtomicFetchAddPtr, ir.IRAtomicFetchSubPtr,
+		ir.IRAtomicFetchAndPtr, ir.IRAtomicFetchOrPtr, ir.IRAtomicFetchXorPtr,
+		ir.IRAtomicStoreI32, ir.IRAtomicExchangeI32, ir.IRAtomicFetchAddI32,
+		ir.IRAtomicFetchSubI32, ir.IRAtomicFetchAndI32, ir.IRAtomicFetchOrI32,
+		ir.IRAtomicFetchXorI32, ir.IRAtomicStoreI64, ir.IRAtomicExchangeI64,
+		ir.IRAtomicFetchAddI64, ir.IRAtomicFetchSubI64, ir.IRAtomicFetchAndI64,
+		ir.IRAtomicFetchOrI64, ir.IRAtomicFetchXorI64, ir.IRAtomicStoreI8,
+		ir.IRAtomicExchangeI8, ir.IRAtomicFetchAddI8, ir.IRAtomicFetchSubI8,
+		ir.IRAtomicFetchAndI8, ir.IRAtomicFetchOrI8, ir.IRAtomicFetchXorI8,
+		ir.IRAtomicStoreI16, ir.IRAtomicExchangeI16, ir.IRAtomicFetchAddI16,
+		ir.IRAtomicFetchSubI16, ir.IRAtomicFetchAndI16, ir.IRAtomicFetchOrI16,
+		ir.IRAtomicFetchXorI16:
 		return 3, 1, true
+	case ir.IRAtomicCompareExchangePtr, ir.IRAtomicCompareExchangeI32, ir.IRAtomicCompareExchangeI64,
+		ir.IRAtomicCompareExchangeI8, ir.IRAtomicCompareExchangeI16:
+		return 4, 1, true
 	case ir.IRMemReadI32Offset, ir.IRMemReadU8Offset, ir.IRMemReadPtrOffset:
 		return 3, 1, true
-	case ir.IRMemWriteI32Offset, ir.IRMemWriteU8Offset, ir.IRMemWritePtrOffset:
+	case ir.IRMemWriteI32Offset, ir.IRMemWriteU8Offset, ir.IRMemWritePtrOffset, ir.IRMemWriteArchPtrOffset:
 		return 4, 1, true
+	case ir.IRAtomicFenceSeqCst, ir.IRAtomicFenceRelaxed, ir.IRAtomicFenceAcquire,
+		ir.IRAtomicFenceRelease, ir.IRAtomicFenceAcqRel:
+		return 0, 0, true
 	default:
 		return 0, 0, false
 	}

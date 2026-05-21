@@ -1,0 +1,25 @@
+module app.main
+
+import lib.actors as actors
+
+func worker() -> Int
+uses actors:
+    let request: actor.msg = core.recv_msg()
+    let _reply: Int = core.send_msg(core.sender(), request.value + 1, request.tag + 1)
+    return 0
+
+func main() -> Int
+uses actors:
+    let first: actor = core.spawn("worker")
+    let boxed: actors.Box<actor> = actors.pass_actor(actors.wrap_actor(first))
+    let _sent_first: Int = core.send_msg(boxed.value, 20, 4)
+    let first_reply: actor.msg = core.recv_msg()
+    if first_reply.value != 21 || first_reply.tag != 5:
+        return first_reply.value
+    let second: actor = core.spawn("worker")
+    let returned: actor = actors.alias_actor(second)
+    let _sent_second: Int = core.send_msg(returned, 41, 8)
+    let second_reply: actor.msg = core.recv_msg()
+    if second_reply.value == 42 && second_reply.tag == 9:
+        return 0
+    return second_reply.value

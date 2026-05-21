@@ -1,0 +1,20 @@
+// Join-until rejoin microservice smoke.
+//
+// The service records that a successful deadline-aware join leaves the task
+// handle available for a later full join under the current resource model.
+module examples.microservices.parallel_join_until_rejoin_service
+
+func worker() -> Int:
+    return 21
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let first: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(5))
+    if first.error != 0:
+        return 10 + first.error
+    let second: Int = core.task_join_i32(task)
+    let total: Int = first.value + second
+    if total == 42:
+        return 0
+    return total

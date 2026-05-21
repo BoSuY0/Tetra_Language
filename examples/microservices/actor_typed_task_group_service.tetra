@@ -1,0 +1,44 @@
+// Actor typed task-group microservice smoke.
+//
+// An actor opens a typed task group, catches the typed join result, and replies
+// through the tagged actor mailbox.
+enum GroupBridgeErr:
+    case stopped
+    case boom(Int)
+
+actor TypedGroupBridge:
+    func run() -> Int
+    uses actors, runtime:
+        let request: actor.msg = core.recv_msg()
+        let reply_to: actor = core.sender()
+        let group: task.group = core.task_group_open()
+        let task = core.task_spawn_group_i32_typed<GroupBridgeErr>(group, "typed_group_bridge_worker")
+        let value: Int = catch core.task_join_group_i32_typed<GroupBridgeErr>(task):
+        case GroupBridgeErr.stopped:
+            70
+        case GroupBridgeErr.boom(code):
+            code
+        let close_error: Int = core.task_group_close(group)
+        if close_error != 0:
+            let _close_reply: Int = core.send_msg(reply_to, close_error, 80)
+            return 0
+        let _reply: Int = core.send_msg(reply_to, request.value + value, request.tag + 1)
+        return 0
+
+func typed_group_bridge_worker() -> Int throws GroupBridgeErr
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 21
+
+func main() -> Int
+uses actors, runtime:
+    let bridge: actor = core.spawn("TypedGroupBridge.run")
+    let _sent: Int = core.send_msg(bridge, 21, 9)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(8))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 10:
+        return 20 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

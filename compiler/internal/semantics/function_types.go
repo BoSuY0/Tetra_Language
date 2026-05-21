@@ -1458,11 +1458,15 @@ func validateFunctionTypeEnumPayloadBinding(
 	case *frontend.FieldAccessExpr:
 		fieldInfo, ok, err := resolveFunctionFieldArgument(value, locals)
 		target := ""
+		fieldTargetInfo := FunctionFieldInfo{}
+		fieldTargetInfoOK := false
 		if err != nil {
 			return FunctionFieldInfo{}, err
 		}
 		if ok && fieldInfo.FunctionValue != "" {
 			target = fieldInfo.FunctionValue
+			fieldTargetInfo = fieldInfo
+			fieldTargetInfoOK = true
 			captures = append([]frontend.ClosureCapture(nil), fieldInfo.FunctionCaptures...)
 			escapeCaptures = append([]frontend.ClosureCapture(nil), fieldInfo.FunctionEscapeCaptures...)
 			directSnapshotAlias = fieldInfo.FunctionDirectSnapshotAlias
@@ -1495,8 +1499,14 @@ func validateFunctionTypeEnumPayloadBinding(
 			if targetSig.Generic {
 				return FunctionFieldInfo{}, unsupportedGenericFunctionTypedEnumPayloadInitializerError(value.At, callbackArgumentName(value), label)
 			}
-			if err := validateFunctionTypeSymbolSignature(label, caseInfo.PayloadFunctionRefs[index], targetSig, module, imports, value.At); err != nil {
-				return FunctionFieldInfo{}, err
+			if fieldTargetInfoOK {
+				if err := validateFunctionInfoAssignable(label, enumPayloadLocalInfo(caseInfo, index), functionFieldInfoSig(fieldTargetInfo), value.At); err != nil {
+					return FunctionFieldInfo{}, err
+				}
+			} else {
+				if err := validateFunctionTypeSymbolSignature(label, caseInfo.PayloadFunctionRefs[index], targetSig, module, imports, value.At); err != nil {
+					return FunctionFieldInfo{}, err
+				}
 			}
 			resolved = target
 		}

@@ -1,0 +1,42 @@
+// Actor task-group error-recovery microservice smoke.
+//
+// An actor catches a typed grouped-task error, closes the group, starts a
+// recovery task, and replies with the combined result.
+enum GroupRecoveryErr:
+    case failed(Int)
+
+actor GroupRecoveryBridge:
+    func run() -> Int
+    uses actors, runtime:
+        let reply_to: actor = core.sender()
+        let group: task.group = core.task_group_open()
+        let failing = core.task_spawn_group_i32_typed<GroupRecoveryErr>(group, "group_failing_worker")
+        let failed: Int = catch core.task_join_group_i32_typed<GroupRecoveryErr>(failing):
+        case GroupRecoveryErr.failed(code):
+            code
+        let close_error: Int = core.task_group_close(group)
+        if close_error != 0:
+            let _bad: Int = core.send_msg(reply_to, close_error, 80)
+            return 0
+        let recovery: task.i32 = core.task_spawn_i32("group_recovery_worker")
+        let recovered: Int = core.task_join_i32(recovery)
+        let _reply: Int = core.send_msg(reply_to, failed + recovered, 1)
+        return 0
+
+func group_failing_worker() -> Int throws GroupRecoveryErr:
+    throw GroupRecoveryErr.failed(20)
+
+func group_recovery_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 22
+
+func main() -> Int
+uses actors, runtime:
+    let bridge: actor = core.spawn("GroupRecoveryBridge.run")
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(10))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.value == 42:
+        return 0
+    return reply.value

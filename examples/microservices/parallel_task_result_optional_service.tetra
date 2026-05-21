@@ -1,0 +1,25 @@
+// Optional task-result microservice smoke.
+//
+// The service stores a joined task result in an optional field and unwraps the
+// payload before checking the result shape.
+module examples.microservices.parallel_task_result_optional_service
+
+struct MaybeResult:
+    result: task.result_i32?
+
+func worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let joined: task.result_i32 = core.task_join_result_i32(task)
+    let maybe: task.result_i32? = joined
+    let box: MaybeResult = MaybeResult(result: maybe)
+    if let result = box.result:
+        if result.error != 0:
+            return 10 + result.error
+        if result.value == 42:
+            return 0
+        return result.value
+    return 99

@@ -1,0 +1,21 @@
+// Typed task success microservice smoke.
+//
+// The service uses the typed task ABI on a successful worker path and keeps the
+// catch payload path available for the same typed error surface.
+module examples.microservices.typed_task_success_service
+
+enum TaskErr:
+    case stopped
+
+func worker() -> Int throws TaskErr:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    let status: Int = catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.stopped:
+        7
+    if status == 42:
+        return 0
+    return status

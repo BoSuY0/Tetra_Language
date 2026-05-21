@@ -1,0 +1,29 @@
+// Callable pointer-base microservice smoke.
+//
+// The service routes allocation-base pointers through function-typed callable
+// values, then derives raw-memory offsets only after the base returns.
+module examples.microservices.memory_callable_ptr_base_service
+
+func keep_ptr(value: ptr) -> ptr:
+    return value
+
+func apply_ptr(cb: fn(ptr) -> ptr, value: ptr) -> ptr:
+    return cb(value)
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let payload: ptr = core.alloc_bytes(8)
+        let cell: ptr = core.ptr_add(payload, 4, memory_cap)
+        let _write: Int = core.store_i32(cell, 42, memory_cap)
+        let local_keep: fn(ptr) -> ptr = fn(value: ptr) -> ptr:
+            return value
+        let via_local: ptr = local_keep(payload)
+        let via_named: ptr = apply_ptr(keep_ptr, via_local)
+        let loaded_cell: ptr = core.ptr_add(via_named, 4, memory_cap)
+        let value: Int = core.load_i32(loaded_cell, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 99

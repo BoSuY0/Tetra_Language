@@ -1,0 +1,10 @@
+module app.main
+
+import lib.result as result
+
+func main() -> Int:
+    let status: result.Status = result.make(42)
+    let score: Int = result.score(status)
+    if score == 42:
+        return 0
+    return score

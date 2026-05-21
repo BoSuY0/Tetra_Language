@@ -169,6 +169,117 @@ func TestELFExecutableModeAndHeaderContract(t *testing.T) {
 	}
 }
 
+func TestELF32LinuxX32ExecutableBuildHeaderContract(t *testing.T) {
+	tmp := t.TempDir()
+	src := "fun main(): i32 {\n  return 0\n}\n"
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "app-x32")
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := compiler.BuildFile(srcPath, outPath, "x32"); err != nil {
+		t.Fatalf("build x32 ELF: %v", err)
+	}
+
+	st, err := os.Stat(outPath)
+	if err != nil {
+		t.Fatalf("stat x32 ELF: %v", err)
+	}
+	if st.Mode()&0o111 == 0 {
+		t.Fatalf("x32 ELF output is not executable: mode=%v", st.Mode())
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x32 ELF: %v", err)
+	}
+	if len(data) < 52 {
+		t.Fatalf("x32 ELF too small: %d bytes", len(data))
+	}
+	if !bytes.Equal(data[:4], []byte{0x7f, 'E', 'L', 'F'}) {
+		t.Fatalf("missing ELF magic")
+	}
+	if data[4] != 1 {
+		t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if data[5] != 1 {
+		t.Fatalf("x32 executable must be little-endian, got %d", data[5])
+	}
+	if got := binary.LittleEndian.Uint16(data[18:20]); got != 0x3e {
+		t.Fatalf("e_machine = %#x, want EM_X86_64", got)
+	}
+	layout := elf.LinuxX32Layout(0, 0)
+	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(elf.LinuxX32BaseVaddr+layout.CodeOffset) {
+		t.Fatalf("e_entry = %#x, want %#x", got, elf.LinuxX32BaseVaddr+layout.CodeOffset)
+	}
+	if got := binary.LittleEndian.Uint32(data[28:32]); got != 52 {
+		t.Fatalf("e_phoff = %d, want 52", got)
+	}
+	if got := binary.LittleEndian.Uint16(data[40:42]); got != 52 {
+		t.Fatalf("e_ehsize = %d, want 52", got)
+	}
+	if got := binary.LittleEndian.Uint16(data[42:44]); got != 32 {
+		t.Fatalf("e_phentsize = %d, want 32", got)
+	}
+	if got := binary.LittleEndian.Uint16(data[44:46]); got != 2 {
+		t.Fatalf("e_phnum = %d, want 2", got)
+	}
+	if !containsMovEaxImm32(data, 0x40000000+60) {
+		t.Fatalf("missing x32 exit syscall number in executable: % x", data)
+	}
+	if containsMovEaxImm32(data, 60) {
+		t.Fatalf("x32 executable emitted plain x64 exit syscall number: % x", data)
+	}
+}
+
+func TestELF32LinuxX86ExecutableBuildHeaderContract(t *testing.T) {
+	tmp := t.TempDir()
+	src := "fun main(): i32 {\n  return 0\n}\n"
+	srcPath := filepath.Join(tmp, "main.tetra")
+	outPath := filepath.Join(tmp, "app-x86")
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := compiler.BuildFile(srcPath, outPath, "x86"); err != nil {
+		t.Fatalf("build x86 ELF: %v", err)
+	}
+
+	st, err := os.Stat(outPath)
+	if err != nil {
+		t.Fatalf("stat x86 ELF: %v", err)
+	}
+	if st.Mode()&0o111 == 0 {
+		t.Fatalf("x86 ELF output is not executable: mode=%v", st.Mode())
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x86 ELF: %v", err)
+	}
+	if len(data) < 52 {
+		t.Fatalf("x86 ELF too small: %d bytes", len(data))
+	}
+	if !bytes.Equal(data[:4], []byte{0x7f, 'E', 'L', 'F'}) {
+		t.Fatalf("missing ELF magic")
+	}
+	if data[4] != 1 {
+		t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := binary.LittleEndian.Uint16(data[18:20]); got != 3 {
+		t.Fatalf("e_machine = %#x, want EM_386", got)
+	}
+	layout := elf.LinuxX86Layout(0, 0)
+	if got := binary.LittleEndian.Uint32(data[24:28]); got != uint32(elf.LinuxX86BaseVaddr+layout.CodeOffset) {
+		t.Fatalf("e_entry = %#x, want %#x", got, elf.LinuxX86BaseVaddr+layout.CodeOffset)
+	}
+	if !bytes.Contains(data, []byte{0x89, 0xC3, 0xB8, 0x01, 0x00, 0x00, 0x00, 0xCD, 0x80}) {
+		t.Fatalf("missing i386 exit int 0x80 stub in executable: % x", data)
+	}
+	if containsMovEaxImm32(data, 60) {
+		t.Fatalf("x86 executable emitted x64 exit syscall number: % x", data)
+	}
+}
+
 func TestELFDataRelocPointsToDataMarker(t *testing.T) {
 	tmp := t.TempDir()
 	marker := "ELF_RELOC_MARKER"
@@ -234,6 +345,15 @@ func TestELFDataRelocPointsToDataMarker(t *testing.T) {
 	if !found {
 		t.Fatalf("missing lea relocation to data marker")
 	}
+}
+
+func containsMovEaxImm32(buf []byte, imm uint32) bool {
+	for i := 0; i+5 <= len(buf); i++ {
+		if buf[i] == 0xB8 && binary.LittleEndian.Uint32(buf[i+1:i+5]) == imm {
+			return true
+		}
+	}
+	return false
 }
 
 func TestELFBuildsHighArityCallSurface(t *testing.T) {

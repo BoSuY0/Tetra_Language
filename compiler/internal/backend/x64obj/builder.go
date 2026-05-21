@@ -18,9 +18,17 @@ type LeaPatch struct {
 	DataIndex int
 }
 
+type PatchKind uint8
+
+const (
+	PatchCallRel32 PatchKind = iota
+	PatchFuncAddrRel32
+)
+
 type CallPatch struct {
 	At   int
 	Name string
+	Kind PatchKind
 }
 
 type ImportPatch struct {
@@ -115,11 +123,21 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 	}
 
 	for _, patch := range callPatches {
-		if err := validatePatchOffset("call", patch.At); err != nil {
+		patchLabel := "call"
+		relocKind := tobj.RelocCallRel32
+		switch patch.Kind {
+		case PatchCallRel32:
+		case PatchFuncAddrRel32:
+			patchLabel = "function address"
+			relocKind = tobj.RelocFuncAddrDisp32
+		default:
+			return nil, fmt.Errorf("unsupported symbol patch kind %d for %q", patch.Kind, patch.Name)
+		}
+		if err := validatePatchOffset(patchLabel, patch.At); err != nil {
 			return nil, err
 		}
 		if patch.Name == "" {
-			return nil, fmt.Errorf("call patch name is empty")
+			return nil, fmt.Errorf("%s patch name is empty", patchLabel)
 		}
 		if target, ok := funcOffsets[patch.Name]; ok {
 			if err := x64.PatchRel32(code, patch.At, target); err != nil {
@@ -127,7 +145,7 @@ func BuildObjectWithDataPrefix(funcs []ir.IRFunc, dataPrefix [][]byte, emit Emit
 			}
 			continue
 		}
-		relocs = append(relocs, tobj.Reloc{Kind: tobj.RelocCallRel32, At: uint32(patch.At), Name: patch.Name, Addend: 0})
+		relocs = append(relocs, tobj.Reloc{Kind: relocKind, At: uint32(patch.At), Name: patch.Name, Addend: 0})
 	}
 	for _, patch := range importPatches {
 		if err := validatePatchOffset("import", patch.At); err != nil {

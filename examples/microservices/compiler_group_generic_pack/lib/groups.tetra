@@ -1,0 +1,16 @@
+module lib.groups
+
+struct Box<T>:
+    value: T
+
+func wrap_group(group: task.group) -> Box<task.group>:
+    return Box<task.group>(value: group)
+
+func pass_group(box: Box<task.group>) -> Box<task.group>:
+    return box
+
+func alias_group(group: task.group) -> task.group:
+    return group
+
+func id<T>(value: T) -> T:
+    return value

@@ -34,7 +34,7 @@ func TestRuntimeObjectOverrideActorsPingPong(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	actorsUsed, actorEntries, err := collectActorEntries(checked)
+	actorsUsed, actorEntries, _, err := collectActorEntries(checked)
 	if err != nil {
 		t.Fatalf("collect actor entries: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestRuntimeObjectOverrideRelinksWhenRuntimeObjectChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	actorsUsed, actorEntries, err := collectActorEntries(checked)
+	actorsUsed, actorEntries, _, err := collectActorEntries(checked)
 	if err != nil {
 		t.Fatalf("collect actor entries: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestRuntimeObjectOverrideRejectsSignatureMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	actorsUsed, actorEntries, err := collectActorEntries(checked)
+	actorsUsed, actorEntries, _, err := collectActorEntries(checked)
 	if err != nil {
 		t.Fatalf("collect actor entries: %v", err)
 	}
@@ -463,7 +463,7 @@ func TestRuntimeObjectOverrideBuildsForAllX64Targets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	actorsUsed, actorEntries, err := collectActorEntries(checked)
+	actorsUsed, actorEntries, _, err := collectActorEntries(checked)
 	if err != nil {
 		t.Fatalf("collect actor entries: %v", err)
 	}

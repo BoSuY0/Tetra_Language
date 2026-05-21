@@ -1,0 +1,45 @@
+// Actor task-select microservice smoke.
+//
+// An actor runs two task workers, selects the fast worker through a deadline,
+// joins the slow worker, and replies with the combined result.
+actor SelectBridge:
+    func run() -> Int
+    uses actors, runtime:
+        let request: actor.msg = core.recv_msg()
+        let reply_to: actor = core.sender()
+        let slow: task.i32 = core.task_spawn_i32("select_slow_worker")
+        let fast: task.i32 = core.task_spawn_i32("select_fast_worker")
+        let selected: task.result_i32 = core.select2_i32(fast, core.deadline_ms(6))
+        if selected.error != 0:
+            let _error_reply: Int = core.send_msg(reply_to, selected.error, 70)
+            return 0
+        let slow_result: task.result_i32 = core.task_join_result_i32(slow)
+        if slow_result.error != 0:
+            let _slow_reply: Int = core.send_msg(reply_to, slow_result.error, 71)
+            return 0
+        let total: Int = request.value + selected.value + slow_result.value
+        let _reply: Int = core.send_msg(reply_to, total, request.tag + 1)
+        return 0
+
+func select_fast_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 20
+
+func select_slow_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(3)
+    return 22
+
+func main() -> Int
+uses actors, runtime:
+    let bridge: actor = core.spawn("SelectBridge.run")
+    let _sent: Int = core.send_msg(bridge, 0, 12)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(10))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 13:
+        return 20 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

@@ -135,6 +135,12 @@ func NewTestRunnerReport(results []TestRunnerResult) TestRunnerReport {
 		Files:   []TestRunnerFileReport{},
 		Results: append([]TestRunnerResult{}, results...),
 	}
+	sort.SliceStable(report.Results, func(i, j int) bool {
+		if report.Results[i].Filename != report.Results[j].Filename {
+			return report.Results[i].Filename < report.Results[j].Filename
+		}
+		return report.Results[i].Index < report.Results[j].Index
+	})
 	byFile := map[string]*TestRunnerFileReport{}
 	for _, result := range results {
 		if result.Passed {

@@ -1,0 +1,40 @@
+module lib.async_string_memory
+
+enum StringErr:
+    case failed
+
+struct StringBox:
+    text: String
+
+async func pass(text: String) -> String:
+    return text
+
+async func pass_throw(text: String, fail: Bool) -> String throws StringErr:
+    if fail:
+        throw StringErr.failed
+    return text
+
+async func box(text: String) -> StringBox:
+    return StringBox(text: text)
+
+async func pass_int(value: Int) -> Int:
+    return value
+
+async func score_local(text: String) -> Int:
+    let out: String = await pass(text)
+    return out.len
+
+async func score_throw_local(text: String) -> Int throws StringErr:
+    let out: String = try await pass_throw(text, false)
+    return out.len
+
+async func score_box_local(text: String) -> Int:
+    let boxed: StringBox = await box(text)
+    return boxed.text.len
+
+async func relay_int(value: Int) -> Int:
+    return await pass_int(value)
+
+func fallback() -> Int:
+    let label: String = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnop"
+    return label.len

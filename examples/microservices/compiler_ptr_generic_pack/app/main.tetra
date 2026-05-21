@@ -1,0 +1,21 @@
+module app.main
+
+import lib.ptrs as ptrs
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let first_payload: ptr = core.alloc_bytes(8)
+        let first_base: ptr = ptrs.id(first_payload)
+        let first_cell: ptr = core.ptr_add(first_base, 4, memory_cap)
+        let _first_store: Int = core.store_i32(first_cell, 19, memory_cap)
+        let second_payload: ptr = core.alloc_bytes(8)
+        let second_base: ptr = ptrs.alias_base(second_payload)
+        let second_cell: ptr = core.ptr_add(second_base, 4, memory_cap)
+        let _second_store: Int = core.store_i32(second_cell, 23, memory_cap)
+        let total: Int = core.load_i32(first_cell, memory_cap) + core.load_i32(second_cell, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

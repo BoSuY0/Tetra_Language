@@ -1,0 +1,10 @@
+module app.main
+
+import lib.async_slice_lanes as async_slice_lanes
+
+func main() -> Int
+uses alloc, mem:
+    let value: Int = async_slice_lanes.fallback()
+    if value == 42:
+        return 0
+    return value

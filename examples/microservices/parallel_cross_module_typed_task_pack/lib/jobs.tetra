@@ -1,0 +1,11 @@
+module lib.jobs
+
+enum JobErr:
+    case failed(Int)
+    case stopped
+
+func worker() -> Int throws JobErr:
+    throw JobErr.failed(20)
+
+func group_worker() -> Int throws JobErr:
+    throw JobErr.failed(22)

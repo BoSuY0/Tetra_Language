@@ -1,0 +1,25 @@
+// Memory expression-offset microservice smoke.
+//
+// The service computes raw pointer offsets from arithmetic expressions and
+// aliases them into locals before using them in pointer arithmetic.
+module examples.microservices.memory_expression_offset_service
+
+import lib.core.capability as cap
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let left_base: ptr = core.alloc_bytes(8)
+        let right_base: ptr = core.alloc_bytes(8)
+        let left_offset: Int = 2 + 2
+        let right_offset: Int = 2 * 2
+        let left_cell: ptr = core.ptr_add(left_base, left_offset, memory_cap)
+        let right_cell: ptr = core.ptr_add(right_base, right_offset, memory_cap)
+        let _left_write: Int = core.store_i32(left_cell, 20, memory_cap)
+        let _right_write: Int = core.store_i32(right_cell, 22, memory_cap)
+        let total: Int = core.load_i32(left_cell, memory_cap) + core.load_i32(right_cell, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

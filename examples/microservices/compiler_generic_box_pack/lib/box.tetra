@@ -1,0 +1,7 @@
+module lib.box
+
+struct Box<T>:
+    value: T
+
+func wrap(value: Int) -> Box<Int>:
+    return Box<Int>(value: value)

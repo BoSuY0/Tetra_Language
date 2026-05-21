@@ -1,0 +1,11 @@
+module lib.errors
+
+enum ServiceErr:
+    case code(Int)
+
+func raise<T>(err: T) -> Int throws T:
+    throw err
+
+func handler() -> Int throws ServiceErr:
+    let err: ServiceErr = ServiceErr.code(42)
+    return try raise(err)

@@ -1,0 +1,33 @@
+module app.main
+
+import lib.maybe as maybe
+
+func worker() -> Int:
+    return 4
+
+func main() -> Int
+uses alloc, capability, mem, runtime:
+    let task: task.i32 = core.task_spawn_i32("worker")
+    let joined: task.result_i32 = core.task_join_result_i32(task)
+    let maybe_result: task.result_i32? = joined
+    let result_box: maybe.MaybeBox<task.result_i32> = maybe.keep_result(maybe.MaybeBox<task.result_i32>(value: maybe_result))
+    if let result = result_box.value:
+        if result.error != 0:
+            return 10 + result.error
+        let offset: Int = result.value
+        unsafe:
+            let memory_cap = core.cap_mem()
+            let payload: ptr = core.alloc_bytes(8)
+            let cell: ptr = core.ptr_add(payload, offset, memory_cap)
+            let _stored: Int = core.store_i32(cell, 42, memory_cap)
+            let maybe_base: ptr? = payload
+            let ptr_box: maybe.MaybeBox<ptr> = maybe.keep_ptr(maybe.MaybeBox<ptr>(value: maybe_base))
+            if let base = ptr_box.value:
+                let loaded_cell: ptr = core.ptr_add(base, offset, memory_cap)
+                let value: Int = core.load_i32(loaded_cell, memory_cap)
+                if value == 42:
+                    return 0
+                return value
+            return 97
+        return 98
+    return 99

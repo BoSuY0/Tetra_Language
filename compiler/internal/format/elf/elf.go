@@ -14,8 +14,22 @@ type Image struct {
 }
 
 const LinuxX64BaseVaddr = 0x400000
+const LinuxX32BaseVaddr = 0x400000
+const LinuxX86BaseVaddr = 0x08048000
 
 type LinuxX64LayoutInfo struct {
+	CodeOffset int
+	DataOffset int
+	FileSize   int
+}
+
+type LinuxX32LayoutInfo struct {
+	CodeOffset int
+	DataOffset int
+	FileSize   int
+}
+
+type LinuxX86LayoutInfo struct {
 	CodeOffset int
 	DataOffset int
 	FileSize   int
@@ -34,6 +48,36 @@ func LinuxX64Layout(codeSize, dataSize int) LinuxX64LayoutInfo {
 	dataOffset := alignUp(textEnd, pageAlign)
 	fileSize := dataOffset + dataSize
 	return LinuxX64LayoutInfo{CodeOffset: codeOffset, DataOffset: dataOffset, FileSize: fileSize}
+}
+
+func LinuxX32Layout(codeSize, dataSize int) LinuxX32LayoutInfo {
+	const (
+		elfHeaderSize  = 52
+		programHdrSize = 32
+		programHdrNum  = 2
+		pageAlign      = 0x1000
+	)
+
+	codeOffset := elfHeaderSize + (programHdrSize * programHdrNum)
+	textEnd := codeOffset + codeSize
+	dataOffset := alignUp(textEnd, pageAlign)
+	fileSize := dataOffset + dataSize
+	return LinuxX32LayoutInfo{CodeOffset: codeOffset, DataOffset: dataOffset, FileSize: fileSize}
+}
+
+func LinuxX86Layout(codeSize, dataSize int) LinuxX86LayoutInfo {
+	const (
+		elfHeaderSize  = 52
+		programHdrSize = 32
+		programHdrNum  = 2
+		pageAlign      = 0x1000
+	)
+
+	codeOffset := elfHeaderSize + (programHdrSize * programHdrNum)
+	textEnd := codeOffset + codeSize
+	dataOffset := alignUp(textEnd, pageAlign)
+	fileSize := dataOffset + dataSize
+	return LinuxX86LayoutInfo{CodeOffset: codeOffset, DataOffset: dataOffset, FileSize: fileSize}
 }
 
 func WriteELF64LinuxX64(path string, img *Image) error {
@@ -146,6 +190,298 @@ func WriteELF64LinuxX64(path string, img *Image) error {
 		return err
 	}
 	if err := writeLE(&buf, uint64(0x1000)); err != nil {
+		return err
+	}
+
+	if buf.Len() > layout.CodeOffset {
+		return fmt.Errorf("unexpected header size")
+	}
+	pad := make([]byte, layout.CodeOffset-buf.Len())
+	if _, err := buf.Write(pad); err != nil {
+		return err
+	}
+	if _, err := buf.Write(img.Code); err != nil {
+		return err
+	}
+	if buf.Len() > layout.DataOffset {
+		return fmt.Errorf("unexpected text size")
+	}
+	dataPad := make([]byte, layout.DataOffset-buf.Len())
+	if _, err := buf.Write(dataPad); err != nil {
+		return err
+	}
+	if len(img.Data) > 0 {
+		if _, err := buf.Write(img.Data); err != nil {
+			return err
+		}
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0o755); err != nil {
+		return err
+	}
+	return nil
+}
+
+func WriteELF32LinuxX32(path string, img *Image) error {
+	if img == nil {
+		return fmt.Errorf("missing ELF image")
+	}
+	if img.EntryOffset > uint64(len(img.Code)) {
+		return fmt.Errorf("entry offset out of range")
+	}
+
+	layout := LinuxX32Layout(len(img.Code), len(img.Data))
+	entry := uint64(LinuxX32BaseVaddr+layout.CodeOffset) + img.EntryOffset
+	const maxUint32 = uint64(^uint32(0))
+	if entry > maxUint32 || uint64(layout.FileSize) > maxUint32 {
+		return fmt.Errorf("x32 ELF image exceeds 32-bit addressable range")
+	}
+
+	var buf bytes.Buffer
+	eIdent := [16]byte{0x7f, 'E', 'L', 'F', 1, 1, 1, 0}
+	if _, err := buf.Write(eIdent[:]); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(2)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(0x3E)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(1)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(entry)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(52)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(52)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(32)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(2)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(0)); err != nil {
+		return err
+	}
+
+	const (
+		ptLoad = 1
+		pfX    = 1
+		pfW    = 2
+		pfR    = 4
+	)
+
+	if err := writeLE(&buf, uint32(ptLoad)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(LinuxX32BaseVaddr)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(LinuxX32BaseVaddr)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(pfR|pfX)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0x1000)); err != nil {
+		return err
+	}
+
+	if err := writeLE(&buf, uint32(ptLoad)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(LinuxX32BaseVaddr+layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(LinuxX32BaseVaddr+layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(len(img.Data))); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(len(img.Data))); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(pfR|pfW)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0x1000)); err != nil {
+		return err
+	}
+
+	if buf.Len() > layout.CodeOffset {
+		return fmt.Errorf("unexpected header size")
+	}
+	pad := make([]byte, layout.CodeOffset-buf.Len())
+	if _, err := buf.Write(pad); err != nil {
+		return err
+	}
+	if _, err := buf.Write(img.Code); err != nil {
+		return err
+	}
+	if buf.Len() > layout.DataOffset {
+		return fmt.Errorf("unexpected text size")
+	}
+	dataPad := make([]byte, layout.DataOffset-buf.Len())
+	if _, err := buf.Write(dataPad); err != nil {
+		return err
+	}
+	if len(img.Data) > 0 {
+		if _, err := buf.Write(img.Data); err != nil {
+			return err
+		}
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0o755); err != nil {
+		return err
+	}
+	return nil
+}
+
+func WriteELF32LinuxX86(path string, img *Image) error {
+	if img == nil {
+		return fmt.Errorf("missing ELF image")
+	}
+	if img.EntryOffset > uint64(len(img.Code)) {
+		return fmt.Errorf("entry offset out of range")
+	}
+
+	layout := LinuxX86Layout(len(img.Code), len(img.Data))
+	entry := uint64(LinuxX86BaseVaddr+layout.CodeOffset) + img.EntryOffset
+	const maxUint32 = uint64(^uint32(0))
+	if entry > maxUint32 || uint64(layout.FileSize) > maxUint32 {
+		return fmt.Errorf("x86 ELF image exceeds 32-bit addressable range")
+	}
+
+	var buf bytes.Buffer
+	eIdent := [16]byte{0x7f, 'E', 'L', 'F', 1, 1, 1, 0}
+	if _, err := buf.Write(eIdent[:]); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(2)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(3)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(1)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(entry)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(52)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(52)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(32)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(2)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint16(0)); err != nil {
+		return err
+	}
+
+	const (
+		ptLoad = 1
+		pfX    = 1
+		pfW    = 2
+		pfR    = 4
+	)
+
+	if err := writeLE(&buf, uint32(ptLoad)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(LinuxX86BaseVaddr)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(LinuxX86BaseVaddr)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(pfR|pfX)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0x1000)); err != nil {
+		return err
+	}
+
+	if err := writeLE(&buf, uint32(ptLoad)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(LinuxX86BaseVaddr+layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(LinuxX86BaseVaddr+layout.DataOffset)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(len(img.Data))); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(len(img.Data))); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(pfR|pfW)); err != nil {
+		return err
+	}
+	if err := writeLE(&buf, uint32(0x1000)); err != nil {
 		return err
 	}
 

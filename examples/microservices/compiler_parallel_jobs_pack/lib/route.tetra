@@ -1,0 +1,12 @@
+module lib.route
+
+enum Packet:
+    case ready(Int)
+    case failed(Int)
+
+func score(packet: Packet) -> Int:
+    match packet:
+    case Packet.ready(value):
+        return value
+    case Packet.failed(code):
+        return 80 + code

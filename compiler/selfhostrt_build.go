@@ -10,7 +10,7 @@ import (
 
 func embeddedSelfHostActorsRuntimeSource(target string) ([]byte, string, error) {
 	switch target {
-	case "linux-x64", "macos-x64":
+	case "linux-x64", "macos-x64", "linux-x32":
 		return embeddedActorsSysV, "<embedded selfhostrt actors_sysv>", nil
 	case "windows-x64":
 		return embeddedActorsWin64, "<embedded selfhostrt actors_win64>", nil

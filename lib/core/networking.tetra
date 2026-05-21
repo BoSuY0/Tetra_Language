@@ -1,5 +1,13 @@
 // Stable v1 core networking helpers promoted from lib.experimental.networking.
 // Effects: none
+// Runtime boundary: endpoint policy only.
+// This module does not perform socket, TCP, DNS, HTTP request, PostgreSQL, or database I/O.
+// Real socket open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close helpers,
+// SO_REUSEPORT/TCP_NODELAY helpers, and epoll add/mod/delete plus wait-one
+// fd/readiness flag capture and predicates live in `lib.core.net`; full event-loop abstractions and broader socket-option APIs
+// remain future transport work. Database work belongs in
+// planned `lib.core.postgres`. HTTP response byte-buffer helpers live in
+// `lib.core.http`; JSON byte-buffer helpers live in `lib.core.json`.
 // ```tetra doctest
 // func networking_doctest() -> Int:
 //     let selected: Int = lib.core.networking.choose_port(8080, lib.core.networking.default_port_https())

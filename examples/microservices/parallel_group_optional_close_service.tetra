@@ -1,0 +1,19 @@
+// Optional task-group close microservice smoke.
+//
+// The service carries a task group through an optional payload and closes only
+// the recovered handle.
+module examples.microservices.parallel_group_optional_close_service
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let maybe: task.group? = group
+    if let handle = maybe:
+        let status: Int = core.task_group_status(handle)
+        let close_error: Int = core.task_group_close(handle)
+        if close_error != 0:
+            return 10 + close_error
+        if status == 1:
+            return 0
+        return status
+    return 99

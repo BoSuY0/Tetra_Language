@@ -1,0 +1,7 @@
+module lib.ptrs
+
+func alias_base(base: ptr) -> ptr:
+    return base
+
+func id<T>(value: T) -> T:
+    return value

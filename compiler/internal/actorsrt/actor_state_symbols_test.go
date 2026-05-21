@@ -45,6 +45,40 @@ func TestLinuxRuntimeExportsFilesystemSymbol(t *testing.T) {
 	}
 }
 
+func TestLinuxRuntimeExportsNetSymbols(t *testing.T) {
+	obj, err := BuildLinuxX64([]string{"main"})
+	if err != nil {
+		t.Fatalf("build runtime: %v", err)
+	}
+	for _, name := range []string{
+		"__tetra_net_socket_tcp4",
+		"__tetra_net_bind_tcp4_loopback",
+		"__tetra_net_connect_tcp4_loopback",
+		"__tetra_net_listen",
+		"__tetra_net_accept4",
+		"__tetra_net_read",
+		"__tetra_net_recv",
+		"__tetra_net_write",
+		"__tetra_net_send",
+		"__tetra_net_epoll_create",
+		"__tetra_net_epoll_ctl_add_read",
+		"__tetra_net_epoll_ctl_add_read_write",
+		"__tetra_net_epoll_ctl_mod_read",
+		"__tetra_net_epoll_ctl_mod_read_write",
+		"__tetra_net_epoll_ctl_delete",
+		"__tetra_net_epoll_wait_one",
+		"__tetra_net_epoll_wait_one_into",
+		"__tetra_net_set_nonblocking",
+		"__tetra_net_set_reuseport",
+		"__tetra_net_set_tcp_nodelay",
+		"__tetra_net_close",
+	} {
+		if !hasSymbol(obj.Symbols, name) {
+			t.Fatalf("linux runtime missing %s", name)
+		}
+	}
+}
+
 func TestLinuxRuntimeExportsDistributedActorSymbols(t *testing.T) {
 	obj, err := BuildLinuxX64([]string{"main", "worker"})
 	if err != nil {

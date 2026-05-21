@@ -43,6 +43,15 @@ func TestEncodeDecodeRoundTripSendTypedFrame(t *testing.T) {
 	}
 }
 
+func TestTypedMessageTagDerivesStableTypeBase(t *testing.T) {
+	if got, want := TypedMessageTagBase("RemoteMsg"), int32(0x31b33200); got != want {
+		t.Fatalf("TypedMessageTagBase(RemoteMsg) = %#x, want %#x", uint32(got), uint32(want))
+	}
+	if got, want := TypedMessageTag("RemoteMsg", 7), int32(0x31b33207); got != want {
+		t.Fatalf("TypedMessageTag(RemoteMsg, 7) = %#x, want %#x", uint32(got), uint32(want))
+	}
+}
+
 func TestDecodeRejectsBadHeaderAndInvalidSlotCount(t *testing.T) {
 	frame := Frame{
 		Type:         FrameSendI32,

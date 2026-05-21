@@ -1,0 +1,43 @@
+// Typed-task error nested-enum memory microservice smoke.
+//
+// The service catches a typed task error carrying a nested enum payload,
+// resolves the nested scalar into a local offset, and uses it for checked
+// raw-memory access.
+module examples.microservices.memory_typed_task_error_nested_enum_offset_service
+
+enum OffsetKind:
+    case value(Int)
+    case empty
+
+enum OffsetErr:
+    case stopped
+    case nested(OffsetKind)
+
+func worker() -> Int throws OffsetErr:
+    throw OffsetErr.nested(OffsetKind.value(4))
+
+func resolve_kind(kind: OffsetKind) -> Int:
+    match kind:
+    case OffsetKind.value(code):
+        return code
+    case OffsetKind.empty:
+        return 80
+
+func main() -> Int
+uses alloc, capability, mem, runtime:
+    let task = core.task_spawn_i32_typed<OffsetErr>("worker")
+    let offset: Int = catch core.task_join_i32_typed<OffsetErr>(task):
+    case OffsetErr.stopped:
+        70
+    case OffsetErr.nested(kind):
+        resolve_kind(kind)
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let base: ptr = core.alloc_bytes(8)
+        let cell: ptr = core.ptr_add(base, offset, memory_cap)
+        let _write: Int = core.store_i32(cell, 42, memory_cap)
+        let value: Int = core.load_i32(cell, memory_cap)
+        if value == 42:
+            return 0
+        return value
+    return 99

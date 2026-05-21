@@ -1,0 +1,63 @@
+// Compiler pipeline microservice smoke.
+//
+// This service models parse/check/codegen pipeline stages using enum payloads,
+// a generic identity helper, and static protocol dispatch.
+enum Stage:
+    case parsed(Int)
+    case checked(Int)
+    case emitted(Int)
+
+struct Unit:
+    value: Int
+
+protocol Score:
+    func score(self: Unit) -> Int
+
+extension Unit:
+    func score(self: Unit) -> Int:
+        return self.value
+
+impl Unit: Score
+
+func id<T>(x: T) -> T:
+    return x
+
+func parse(seed: Int) -> Stage:
+    return Stage.parsed(seed + 10)
+
+func check(stage: Stage) -> Stage:
+    match stage:
+    case Stage.parsed(parsed_value):
+        return Stage.checked(parsed_value + 11)
+    case Stage.checked(checked_value):
+        return Stage.checked(checked_value)
+    case Stage.emitted(emitted_value):
+        return Stage.checked(emitted_value)
+
+func emit(stage: Stage) -> Stage:
+    match stage:
+    case Stage.checked(checked_value):
+        return Stage.emitted(checked_value + 12)
+    case Stage.parsed(parsed_value):
+        return Stage.emitted(parsed_value)
+    case Stage.emitted(emitted_value):
+        return Stage.emitted(emitted_value)
+
+func stage_value(stage: Stage) -> Int:
+    match stage:
+    case Stage.parsed(parsed_value):
+        return parsed_value
+    case Stage.checked(checked_value):
+        return checked_value
+    case Stage.emitted(emitted_value):
+        return emitted_value
+
+func main() -> Int:
+    let parsed: Stage = parse(9)
+    let checked: Stage = check(parsed)
+    let emitted: Stage = emit(checked)
+    let emitted_value: Int = stage_value(emitted)
+    let unit: Unit = Unit(value: id(emitted_value))
+    if Unit.score(unit) == 42:
+        return 0
+    return Unit.score(unit)

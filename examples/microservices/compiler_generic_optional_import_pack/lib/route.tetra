@@ -1,0 +1,10 @@
+module lib.route
+
+func id<T>(value: T) -> T:
+    return value
+
+func choose(value: Int?) -> Int:
+    let routed: Int? = id(value)
+    if let inner = routed:
+        return inner
+    return 0

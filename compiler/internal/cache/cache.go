@@ -16,7 +16,7 @@ import (
 	"tetra_language/compiler/internal/version"
 )
 
-const compilerCacheABIVersion = "linux-x64-memory-runtime-abi-v3"
+const compilerCacheABIVersion = "linux-x64-memory-runtime-abi-v4"
 
 func cacheDir(root, target string) string {
 	return filepath.Join(root, ".tetra_cache", target)
@@ -185,6 +185,8 @@ func BuildTypeSigMap(types map[string]*semantics.TypeInfo) (map[string]string, e
 		switch info.Kind {
 		case semantics.TypeI32:
 			sig = "i32"
+		case semantics.TypeI64:
+			sig = "i64"
 		case semantics.TypeU8:
 			sig = "u8"
 		case semantics.TypeBool:

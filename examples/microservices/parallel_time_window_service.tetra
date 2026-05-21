@@ -1,0 +1,31 @@
+// Parallel time-window microservice smoke.
+//
+// The service checks logical sleep, immediate negative deadlines, and a
+// deadline-aware task join in one deterministic runtime window.
+module examples.microservices.parallel_time_window_service
+
+func fast_worker() -> Int:
+    return 42
+
+func main() -> Int
+uses runtime:
+    let start: Int = core.time_now_ms()
+    let deadline: Int = core.deadline_ms(3)
+    let _slept: Int = core.sleep_until(deadline)
+    let elapsed: Int = core.time_now_ms() - start
+    if elapsed != 3:
+        return 10 + elapsed
+    let immediate: Int = core.deadline_ms(0 - 5)
+    if !core.timer_ready(immediate):
+        return 20
+    let _past: Int = core.sleep_until(immediate)
+    let after_past: Int = core.time_now_ms() - start
+    if after_past != 3:
+        return 30 + after_past
+    let task: task.i32 = core.task_spawn_i32("fast_worker")
+    let result: task.result_i32 = core.task_join_until_i32(task, core.deadline_ms(5))
+    if result.error != 0:
+        return 40 + result.error
+    if result.value == 42:
+        return 0
+    return result.value

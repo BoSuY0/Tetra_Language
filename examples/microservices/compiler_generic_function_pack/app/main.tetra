@@ -1,0 +1,13 @@
+module app.main
+
+import lib.pipe as pipe
+
+func value() -> Int:
+    return 42
+
+func main() -> Int:
+    let raw: Int = value()
+    let routed: Int = pipe.keep(raw)
+    if routed == 42:
+        return 0
+    return routed

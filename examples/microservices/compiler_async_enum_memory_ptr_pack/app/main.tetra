@@ -1,0 +1,10 @@
+module app.main
+
+import lib.async_enum_memory as async_enum_memory
+
+func main() -> Int
+uses alloc, capability, mem:
+    let value: Int = async_enum_memory.fallback()
+    if value == 42:
+        return 0
+    return value

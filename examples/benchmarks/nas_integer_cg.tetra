@@ -1,0 +1,61 @@
+// NAS-CG-inspired sparse matrix vector multiply with Int values.
+module examples.benchmarks.nas_integer_cg
+
+func main() -> Int
+uses alloc, mem:
+    var row: []i32 = core.make_i32(5)
+    var col: []i32 = core.make_i32(10)
+    var weights: []i32 = core.make_i32(10)
+    var x: []i32 = core.make_i32(4)
+    var y: []i32 = core.make_i32(4)
+    row[0] = 0
+    row[1] = 2
+    row[2] = 5
+    row[3] = 8
+    row[4] = 10
+    col[0] = 0
+    col[1] = 1
+    col[2] = 0
+    col[3] = 1
+    col[4] = 2
+    col[5] = 1
+    col[6] = 2
+    col[7] = 3
+    col[8] = 2
+    col[9] = 3
+    weights[0] = 4
+    weights[1] = 1
+    weights[2] = 1
+    weights[3] = 4
+    weights[4] = 1
+    weights[5] = 1
+    weights[6] = 4
+    weights[7] = 1
+    weights[8] = 1
+    weights[9] = 4
+    x[0] = 1
+    x[1] = 2
+    x[2] = 3
+    x[3] = 4
+
+    var iter: Int = 0
+    while iter < 3:
+        var r: Int = 0
+        while r < 4:
+            var p: Int = row[r]
+            var total: Int = 0
+            while p < row[r + 1]:
+                total = total + weights[p] * x[col[p]]
+                p = p + 1
+            y[r] = total
+            r = r + 1
+        r = 0
+        while r < 4:
+            x[r] = y[r] % 1000
+            r = r + 1
+        iter = iter + 1
+
+    let checksum: Int = x[0] + x[1] * 2 + x[2] * 3 + x[3] * 4
+    if checksum == 4720:
+        return 0
+    return checksum % 251

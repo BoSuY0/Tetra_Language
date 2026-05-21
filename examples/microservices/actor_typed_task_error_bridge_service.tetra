@@ -1,0 +1,39 @@
+// Actor typed task-error bridge microservice smoke.
+//
+// An actor joins a typed task that throws a payload and forwards the caught
+// typed error as a typed actor reply.
+enum ErrorBridgeMsg:
+    case ok(Int)
+    case failed(Int)
+
+enum ErrorBridgeErr:
+    case stopped
+    case denied(Int)
+
+actor ErrorBridge:
+    func run() -> Int
+    uses actors, runtime:
+        let reply_to: actor = core.sender()
+        let task = core.task_spawn_i32_typed<ErrorBridgeErr>("error_bridge_worker")
+        let status: Int = catch core.task_join_i32_typed<ErrorBridgeErr>(task):
+        case ErrorBridgeErr.stopped:
+            70
+        case ErrorBridgeErr.denied(code):
+            code
+        let _reply: Int = core.send_typed(reply_to, ErrorBridgeMsg.failed(status))
+        return 0
+
+func error_bridge_worker() -> Int throws ErrorBridgeErr:
+    throw ErrorBridgeErr.denied(42)
+
+func main() -> Int
+uses actors:
+    let bridge: actor = core.spawn("ErrorBridge.run")
+    let reply: ErrorBridgeMsg = core.recv_typed<ErrorBridgeMsg>()
+    match reply:
+    case ErrorBridgeMsg.failed(code):
+        if code == 42:
+            return 0
+        return code
+    case ErrorBridgeMsg.ok(value):
+        return 80 + value

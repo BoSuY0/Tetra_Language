@@ -523,6 +523,28 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
 - Non-Linux-x64 distributed actor targets, multi-threaded scheduling, and
   broader structured-concurrency guarantees beyond the documented cooperative
   task group handles remain outside this claim unless separately promoted.
+- A full TechEmpower-compatible web stack is still broader than the current
+  stable Tetra source surface: no production HTTP server, full HTTP header/body
+  parser, full event-loop abstraction, io_uring path, per-core worker runtime,
+  broad socket-option API, or PostgreSQL socket/database runtime is supported by the current
+  `v0.4.0` profile. `lib.core.net` now provides executable linux-x64 TCP socket
+  open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close helpers,
+  `SO_REUSEPORT` and `TCP_NODELAY` helpers, plus epoll
+  create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one
+  and wait-one-into readiness flag helpers, `SOCK_NONBLOCK`/`SOCK_CLOEXEC`
+  accept helpers, and `EPOLLIN`/`EPOLLOUT`/`EPOLLERR`/`EPOLLHUP` predicates for
+  local client/server slices.
+  `lib.core.http` now provides executable HTTP/1.1 String and byte-buffer
+  request-line routing, byte-buffer request-head framing for pipelined local
+  server slices, and response byte-buffer helpers.
+  `lib.core.json` provides executable JSON byte-buffer helpers for response
+  body construction. `lib.core.postgres` now provides executable PostgreSQL
+  wire-frame byte-buffer helpers for startup, simple query, extended-query
+  Parse/Bind/Describe/Execute/Sync, RowDescription/DataRow/CommandComplete/ReadyForQuery
+  inspection, and terminate messages. Real transport and full database APIs remain separate from
+  `lib.core.networking` policy helpers and still require broader
+  `lib.core.net` event-loop/socket-option expansion and `lib.core.postgres`
+  driver/pool layers.
 - Callable Level 1 is current since `v0.4.0`: the production claim covers
   non-capturing, symbol-backed function-typed locals, immutable aliases,
   target-set-backed aliases of function-typed parameters, callback parameters,
@@ -832,6 +854,12 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `targets --format=json`; Linux-x64 native UI runtime evidence remains a
   separate `ui.native-runtime` release artifact and does not promote
   macOS/Windows native UI claims.
+- Build-only Linux x86/x32 target metadata uses `run_mode: "host_probed"`:
+  `run_supported` is true only when the current host can execute that exact
+  ABI (`i386` compatibility for x86, Linux x32 ABI support for x32), and
+  false results must carry an explicit no-host-fallback
+  `run_unsupported_reason`. Their broader runtime/stdlib/FFI limitations remain
+  in `unsupported_reason`.
 - Any feature labeled `planned`, `beta`, `deferred-post-v1`, or
   `blocked-by-prerequisite` in release docs must not be marketed as stable.
 

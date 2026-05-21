@@ -1,0 +1,10 @@
+module app.main
+
+import lib.nested as nested
+
+func main() -> Int:
+    let box: nested.Box<Int> = nested.make(42)
+    let status: Int = nested.score(box)
+    if status == 42:
+        return 0
+    return status

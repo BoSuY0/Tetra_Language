@@ -1,0 +1,15 @@
+module lib.workers
+
+func grouped_worker() -> Int:
+    return 42
+
+func offset_worker() -> Int:
+    return 4
+
+func cancel_worker() -> Int
+uses runtime:
+    let group: task.group = core.task_group_current()
+    defer:
+        let _checkpoint: task.error = core.task_checkpoint()
+    let _canceled: task.group = core.task_group_cancel(group)
+    return 99

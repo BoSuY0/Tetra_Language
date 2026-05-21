@@ -21,13 +21,68 @@ part of the ABI: target mismatches are hard errors, duplicate link object paths
 are hard errors, and link objects carrying a non-matching compiler version are
 rejected before linking.
 
+## User `@export` FFI boundary
+
+Non-runtime `@export` functions are part of the native FFI surface, so target
+ABI gaps must fail before object code is written. On native targets, exported
+parameters or return types that require aggregate C ABI handling, such as
+structs, arrays, slices, strings, enums, and optionals, are rejected with a
+target-aware diagnostic until the target has verified aggregate C ABI lowering.
+Export a scalar wrapper or provide a target-specific runtime object with a
+verified ABI instead.
+
+Scalar `@export` wrappers are build-verified in the x86/x64/x32 target suites:
+the emitted TOBJ must contain the exported symbol with signature metadata for
+the selected target and must not collect relocations from a different platform
+ABI. The same suites also build target-specific atomic object smoke tests so
+the scalar FFI surface is checked alongside the target's lock-free atomic code
+generation contract.
+The OS-specific x64 ABI suite cells also build object smoke tests for
+`macos-x64` and `windows-x64`, keeping SysV Mach-O-style relocation evidence
+separate from Win64 PE/COFF IAT relocation evidence.
+On `linux-x32`, non-runtime `@export` signatures that expose pointer-like
+spellings (`ptr`, `ref`, `nullable_ptr`, `rawptr`, `fnptr`,
+`fn(...) -> ...`) or native/libc integer spellings (`usize`, `isize`,
+`size_t`, `ssize_t`, `native_int`, `native_uint`, `c_long`, `c_ulong`) are
+rejected until the pointer C ABI boundary has a verified wrapper. This keeps
+x32's 32-bit pointer/libc ABI and the compiler-owned callable slot ABI from
+silently passing through the current x64-family internal 64-bit slot ABI.
+
+Internal runtime exports are separate: modules `__rt` and `__rt.*` may export
+reserved `__tetra_*` symbols using the compiler-owned slot ABI documented
+below. That exemption does not make arbitrary user aggregate FFI valid on native
+targets.
+
 ## Calling convention per target
 
 - `linux-x64`, `macos-x64`: SysV AMD64 ABI (first args in `rdi, rsi, rdx, rcx, r8, r9`)
 - `windows-x64`: Windows x64 ABI (first args in `rcx, rdx, r8, r9`, plus 32-byte shadow space)
+- `linux-x86`: i386 SysV ABI for no-runtime executable/object paths (stack
+  arguments, caller cleanup, scalar returns in `eax`/`edx:eax` as applicable)
+- `linux-x32`: x32 SysV ABI for no-runtime executable/object paths (x86_64
+  registers with 32-bit pointer/native-integer ABI facts)
 
-All functions in this document return the first slot in `rax`/`eax`. Native x64 internal returns currently support
-direct internal register returns with 0 through 10 slots: slot 1 in `rax`/`eax`, slot 2 in `rdx`/`edx`, slot 3 in `r8`/`r8d`,
+Target layout size checks follow the target native integer model rather than
+the host compiler process. Fixed arrays whose byte size cannot be represented in
+the target `usize` are rejected with an explicit diagnostic; in particular,
+`linux-x86` and `linux-x32` reject layouts larger than `u32::MAX` bytes while
+`linux-x64` keeps the LP64 limit.
+
+The target layout names `usize`, `isize`, `size_t`, `ssize_t`, `native_int`,
+`native_uint`, `c_long`, and `c_ulong` are compiler target-layout/ABI scalar
+spellings today. They are not source-level Tetra types until native-integer
+semantics, casts, arithmetic, and per-target codegen are implemented; source
+programs that name them receive an explicit target-layout-only diagnostic.
+
+All functions in this document return the first slot in `rax`/`eax`. Linux x86
+uses the i386 SysV C ABI at the external scalar boundary, but Tetra's internal
+slot ABI for no-runtime x86 calls supports 0 through 3 direct register return
+slots: slot 1 in `eax`, slot 2 in `edx`, and slot 3 in `ecx`. Wider x86
+internal returns remain explicit backend errors until a hidden return-area
+protocol is implemented.
+
+Native x64-family internal returns currently support direct internal register
+returns with 0 through 10 slots: slot 1 in `rax`/`eax`, slot 2 in `rdx`/`edx`, slot 3 in `r8`/`r8d`,
 slot 4 in `r9`/`r9d`, slot 5 in `r10`/`r10d`, slot 6 in `r11`/`r11d`, slot 7 in `r12`/`r12d`, slot 8 in `r13`/`r13d`, slot 9 in `r14`/`r14d`, and slot 10 in `r15`/`r15d`. Runtime surfaces that need 3-slot returns, such as
 `actor.recv_msg_result`, use that same register order; 4-slot direct returns are supported for the current typed runtime
 envelopes, 9-slot direct returns support the current eight-environment-slot `fnptr` callable payload slice, and 10-slot direct returns
@@ -475,6 +530,152 @@ filesystem host builtins:
 
 - `__tetra_fs_exists`
 
+## Networking runtime ABI
+
+The current networking runtime ABI is a linux-x64 TCP socket client/server I/O slice
+with one-event epoll readiness helpers. It is intentionally smaller than a
+production HTTP server transport: full event-loop abstractions, io_uring,
+per-core workers, socket options, DNS, TLS, and PostgreSQL/database protocols
+remain outside this ABI slice.
+
+### `__tetra_net_socket_tcp4(io_cap: cap.io) -> i32`
+
+Opens an IPv4 TCP stream socket and returns the fd, or the negative Linux
+syscall result on failure. The `cap.io` slot is required by the semantic
+builtin and reserved for future runtime-side capability validation.
+
+### `__tetra_net_bind_tcp4_loopback(fd: i32, port: i32, io_cap: cap.io) -> i32`
+
+Binds `fd` to `127.0.0.1:port` using a runtime-constructed `sockaddr_in` and
+returns the Linux `bind` syscall status. Passing `0` asks the kernel to choose
+an ephemeral port.
+
+### `__tetra_net_connect_tcp4_loopback(fd: i32, port: i32, io_cap: cap.io) -> i32`
+
+Connects caller-owned `fd` to `127.0.0.1:port` using a runtime-constructed
+`sockaddr_in` and returns the Linux `connect` syscall status.
+
+### `__tetra_net_listen(fd: i32, backlog: i32, io_cap: cap.io) -> i32`
+
+Calls Linux `listen(fd, backlog)` and returns the syscall status.
+
+### `__tetra_net_accept4(fd: i32, flags: i32, io_cap: cap.io) -> i32`
+
+Calls Linux `accept4(fd, NULL, NULL, flags)` and returns the accepted fd or the
+negative syscall result.
+
+### `__tetra_net_read(fd: i32, dst_ptr: ptr, dst_len: i32, start: i32, count: i32, io_cap: cap.io) -> i32`
+
+Reads from `fd` into `dst_ptr + start`, after rejecting negative `start` or
+`count` and rejecting `start > dst_len`. The runtime clamps `count` to the
+remaining slice length and returns the Linux `read` syscall result.
+
+### `__tetra_net_recv(fd: i32, dst_ptr: ptr, dst_len: i32, start: i32, count: i32, io_cap: cap.io) -> i32`
+
+Receives from `fd` into `dst_ptr + start` via Linux `recvfrom` with flags `0`
+and `NULL` address operands, after rejecting negative `start` or `count` and
+rejecting `start > dst_len`. The runtime clamps `count` to the remaining slice
+length and returns the Linux syscall result.
+
+### `__tetra_net_write(fd: i32, src_ptr: ptr, src_len: i32, start: i32, count: i32, io_cap: cap.io) -> i32`
+
+Writes to `fd` from `src_ptr + start`, after rejecting negative `start` or
+`count` and rejecting `start > src_len`. The runtime clamps `count` to the
+remaining slice length and returns the Linux `write` syscall result.
+
+### `__tetra_net_send(fd: i32, src_ptr: ptr, src_len: i32, start: i32, count: i32, io_cap: cap.io) -> i32`
+
+Sends from `fd` using `src_ptr + start` via Linux `sendto` with flags `0` and
+`NULL` address operands, after rejecting negative `start` or `count` and
+rejecting `start > src_len`. The runtime clamps `count` to the remaining slice
+length and returns the Linux syscall result.
+
+### `__tetra_net_epoll_create(io_cap: cap.io) -> i32`
+
+Calls `epoll_create1(0)` and returns the epoll fd or the negative syscall
+result.
+
+### `__tetra_net_epoll_ctl_add_read(epfd: i32, fd: i32, io_cap: cap.io) -> i32`
+
+Registers `fd` with `epfd` for `EPOLLIN` readiness using `event.data.u64 = fd`
+and returns the Linux `epoll_ctl` syscall status.
+
+### `__tetra_net_epoll_ctl_add_read_write(epfd: i32, fd: i32, io_cap: cap.io) -> i32`
+
+Registers `fd` with `epfd` for `EPOLLIN | EPOLLOUT` readiness using
+`event.data.u64 = fd` and returns the Linux `epoll_ctl` syscall status.
+
+### `__tetra_net_epoll_ctl_mod_read(epfd: i32, fd: i32, io_cap: cap.io) -> i32`
+
+Modifies an existing epoll registration to `EPOLLIN` readiness using
+`event.data.u64 = fd` and returns the Linux `epoll_ctl` syscall status.
+
+### `__tetra_net_epoll_ctl_mod_read_write(epfd: i32, fd: i32, io_cap: cap.io) -> i32`
+
+Modifies an existing epoll registration to `EPOLLIN | EPOLLOUT` readiness using
+`event.data.u64 = fd` and returns the Linux `epoll_ctl` syscall status.
+
+### `__tetra_net_epoll_ctl_delete(epfd: i32, fd: i32, io_cap: cap.io) -> i32`
+
+Removes `fd` from `epfd` and returns the Linux `epoll_ctl` syscall status.
+
+### `__tetra_net_epoll_wait_one(epfd: i32, timeout_ms: i32, io_cap: cap.io) -> i32`
+
+Calls `epoll_wait` for one event. It returns the ready fd from event data when
+one event is available, `0` on timeout, or the negative syscall result.
+
+### `__tetra_net_epoll_wait_one_into(epfd: i32, event_ptr: ptr, event_len: i32, timeout_ms: i32, io_cap: cap.io) -> i32`
+
+Calls `epoll_wait` for one event after requiring `event_len >= 2`. When one
+event is available, it writes the ready fd to `event[0]`, writes the Linux
+`epoll_event.events` flag word to `event[1]`, and returns `1`. It returns `0`
+on timeout or the negative syscall result on error.
+
+### `__tetra_net_set_nonblocking(fd: i32, io_cap: cap.io) -> i32`
+
+Reads the current fd flags with `fcntl(F_GETFL)`, sets `O_NONBLOCK` with
+`fcntl(F_SETFL)`, and returns the syscall status. Negative syscall results are
+returned unchanged.
+
+### `__tetra_net_set_reuseport(fd: i32, io_cap: cap.io) -> i32`
+
+Enables `SO_REUSEPORT` with `setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &one, 4)`
+and returns the Linux syscall status.
+
+### `__tetra_net_set_tcp_nodelay(fd: i32, io_cap: cap.io) -> i32`
+
+Enables `TCP_NODELAY` with `setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, 4)`
+and returns the Linux syscall status.
+
+### `__tetra_net_close(fd: i32, io_cap: cap.io) -> i32`
+
+Closes a caller-owned fd and returns the Linux `close` syscall status.
+
+The compiler validates these networking runtime exports when a program uses
+networking host builtins:
+
+- `__tetra_net_socket_tcp4`
+- `__tetra_net_bind_tcp4_loopback`
+- `__tetra_net_connect_tcp4_loopback`
+- `__tetra_net_listen`
+- `__tetra_net_accept4`
+- `__tetra_net_read`
+- `__tetra_net_recv`
+- `__tetra_net_write`
+- `__tetra_net_send`
+- `__tetra_net_epoll_create`
+- `__tetra_net_epoll_ctl_add_read`
+- `__tetra_net_epoll_ctl_add_read_write`
+- `__tetra_net_epoll_ctl_mod_read`
+- `__tetra_net_epoll_ctl_mod_read_write`
+- `__tetra_net_epoll_ctl_delete`
+- `__tetra_net_epoll_wait_one`
+- `__tetra_net_epoll_wait_one_into`
+- `__tetra_net_set_nonblocking`
+- `__tetra_net_set_reuseport`
+- `__tetra_net_set_tcp_nodelay`
+- `__tetra_net_close`
+
 ## Program-provided symbols
 
 When actors are used, the compiler links (or generates) a small “glue” object that provides:
@@ -528,7 +729,16 @@ used by the program: actor runtime symbols, actor-state symbols
 used, task/task-group/typed-task symbols when those builtins are used, and time
 runtime symbols when the program calls `core.time_now_ms`, `core.sleep_ms`,
 `core.sleep_until`, or `core.deadline_ms`, and filesystem runtime symbols when
-the program calls `core.fs_exists`. The compiler rejects missing targets,
+the program calls `core.fs_exists`, and networking runtime symbols when the
+program calls `core.net_socket_tcp4`, `core.net_bind_tcp4_loopback`,
+`core.net_connect_tcp4_loopback`, `core.net_listen`, `core.net_accept4`, `core.net_read`, `core.net_recv`, `core.net_write`, `core.net_send`,
+`core.net_epoll_create`, `core.net_epoll_ctl_add_read`,
+`core.net_epoll_ctl_add_read_write`, `core.net_epoll_ctl_mod_read`,
+`core.net_epoll_ctl_mod_read_write`, `core.net_epoll_ctl_delete`,
+`core.net_epoll_wait_one`, `core.net_epoll_wait_one_into`,
+`core.net_set_nonblocking`,
+`core.net_set_reuseport`, `core.net_set_tcp_nodelay`, or `core.net_close`.
+The compiler rejects missing targets,
 target mismatches, missing runtime exports, and runtime export signature
 metadata whose slot counts do not match the ABI before platform linking.
 Runtime objects without per-symbol signature metadata remain name-validated for
@@ -536,12 +746,21 @@ compatibility with earlier TOBJ producers.
 
 `--runtime=auto` currently selects the embedded self-host runtime only for the
 mailbox-only actor surface, and switches to the built-in runtime when actor
-state, task/task-group, typed-task, time, or filesystem builtins are used. For
-typed task handles specifically, `--runtime=selfhost` is an explicit build error
-(`self-host runtime does not support typed task handles`); `--runtime=auto` and
-`--runtime=builtin` select the Go-emitted builtin runtime for the supported
-`2..8` typed-task envelope. `--runtime=builtin` keeps the Go-emitted runtime
-available as a compatibility fallback.
+state, task/task-group, typed-task, time, filesystem, or networking builtins are
+used. For typed task handles specifically, `--runtime=selfhost` is an explicit
+build error (`self-host runtime does not support typed task handles`);
+`--runtime=auto` and `--runtime=builtin` select the Go-emitted builtin runtime
+for the supported `2..8` typed-task envelope. `--runtime=builtin` keeps the
+Go-emitted runtime available as a compatibility fallback.
+
+Linux x32 is stricter because the builtin runtime is not yet available for the
+x32 ABI. `--runtime=auto` may use the SysV self-host runtime for x32 surfaces
+that fit that contract, including a single spawned actor/task, but multi-spawn
+actor/task programs, task groups, and typed task handles fail before runtime
+selection with target-aware diagnostics (`multi-spawn actors runtime not
+supported on linux-x32`, `task group runtime not supported on linux-x32`, or
+`typed task runtime not supported on linux-x32`) instead of falling through to a
+generic builtin-runtime error.
 
 Native execution is only supported when `host == target`; cross-target builds are build-verified but not run on
 non-matching hosts.

@@ -1,0 +1,23 @@
+module lib.messages
+
+enum OffsetMsg:
+    case request(OffsetBox)
+    case reply(OffsetBox)
+    case failed(Int)
+
+struct OffsetBox:
+    offset: Int
+
+func worker() -> Int
+uses actors:
+    let msg: OffsetMsg = core.recv_typed<OffsetMsg>()
+    match msg:
+    case OffsetMsg.request(request_box):
+        let _reply: Int = core.send_typed(core.sender(), OffsetMsg.reply(request_box))
+        return 0
+    case OffsetMsg.reply(reply_box):
+        let _failed: Int = core.send_typed(core.sender(), OffsetMsg.failed(reply_box.offset))
+        return 0
+    case OffsetMsg.failed(code):
+        let _failed_again: Int = core.send_typed(core.sender(), OffsetMsg.failed(code))
+        return 0

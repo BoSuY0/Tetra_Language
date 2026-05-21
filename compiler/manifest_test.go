@@ -19,6 +19,7 @@ func TestManifestRuntimeABIIncludesFullRequiredSymbolSets(t *testing.T) {
 	assertSymbolSequence(t, "typed_task_required_symbols", manifest.RuntimeABI.TypedTaskRequiredSymbols, requiredTypedTaskRuntimeSymbols(8))
 	assertSymbolSequence(t, "time_required_symbols", manifest.RuntimeABI.TimeRequiredSymbols, requiredTimeRuntimeSymbols())
 	assertSymbolSequence(t, "filesystem_required_symbols", manifest.RuntimeABI.FilesystemRequiredSymbols, requiredFilesystemRuntimeSymbols())
+	assertSymbolSequence(t, "net_required_symbols", manifest.RuntimeABI.NetRequiredSymbols, requiredNetRuntimeSymbols())
 }
 
 func assertSymbolSequence(t *testing.T, field string, got []string, want []string) {

@@ -1,0 +1,9 @@
+module app.main
+
+import lib.async_string_memory as async_string_memory
+
+func main() -> Int:
+    let value: Int = async_string_memory.fallback()
+    if value == 42:
+        return 0
+    return value

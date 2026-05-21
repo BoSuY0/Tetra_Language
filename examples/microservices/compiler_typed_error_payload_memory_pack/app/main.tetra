@@ -1,0 +1,103 @@
+module app.main
+
+import lib.errors as errors
+
+func unwrap_offset(maybe: Int?) -> Int:
+    if let value = maybe:
+        return value
+    return 80
+
+func resolve_kind(kind: errors.OffsetKind) -> Int:
+    match kind:
+    case errors.OffsetKind.value(code):
+        return code
+    case errors.OffsetKind.empty:
+        return 80
+
+func boxed_offset() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<errors.OffsetErr>("errors.boxed_worker")
+    return catch core.task_join_i32_typed<errors.OffsetErr>(task):
+    case errors.OffsetErr.stopped:
+        70
+    case errors.OffsetErr.boxed(box):
+        box.offset
+    case errors.OffsetErr.nested(kind):
+        resolve_kind(kind)
+    case errors.OffsetErr.maybe(maybe_offset):
+        unwrap_offset(maybe_offset)
+    case errors.OffsetErr.guarded(code):
+        code
+
+func nested_offset() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<errors.OffsetErr>("errors.nested_worker")
+    return catch core.task_join_i32_typed<errors.OffsetErr>(task):
+    case errors.OffsetErr.stopped:
+        70
+    case errors.OffsetErr.boxed(nested_box):
+        nested_box.offset
+    case errors.OffsetErr.nested(nested_kind):
+        resolve_kind(nested_kind)
+    case errors.OffsetErr.maybe(nested_maybe):
+        unwrap_offset(nested_maybe)
+    case errors.OffsetErr.guarded(nested_code):
+        nested_code
+
+func optional_offset() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<errors.OffsetErr>("errors.optional_worker")
+    return catch core.task_join_i32_typed<errors.OffsetErr>(task):
+    case errors.OffsetErr.stopped:
+        70
+    case errors.OffsetErr.boxed(optional_box):
+        optional_box.offset
+    case errors.OffsetErr.nested(optional_kind):
+        resolve_kind(optional_kind)
+    case errors.OffsetErr.maybe(optional_maybe):
+        unwrap_offset(optional_maybe)
+    case errors.OffsetErr.guarded(optional_code):
+        optional_code
+
+func guarded_offset() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<errors.OffsetErr>("errors.guarded_worker")
+    return catch core.task_join_i32_typed<errors.OffsetErr>(task):
+    case errors.OffsetErr.stopped:
+        70
+    case errors.OffsetErr.boxed(guarded_box):
+        guarded_box.offset
+    case errors.OffsetErr.nested(guarded_kind):
+        resolve_kind(guarded_kind)
+    case errors.OffsetErr.maybe(guarded_maybe):
+        unwrap_offset(guarded_maybe)
+    case errors.OffsetErr.guarded(guarded_code) if guarded_code > 0:
+        guarded_code
+    case errors.OffsetErr.guarded(guarded_other):
+        guarded_other + 80
+
+func main() -> Int
+uses alloc, capability, mem, runtime:
+    let first: Int = boxed_offset()
+    let second: Int = nested_offset()
+    let third: Int = optional_offset()
+    let fourth: Int = guarded_offset()
+    unsafe:
+        let memory_cap: cap.mem = core.cap_mem()
+        let first_base: ptr = core.alloc_bytes(8)
+        let second_base: ptr = core.alloc_bytes(8)
+        let third_base: ptr = core.alloc_bytes(8)
+        let fourth_base: ptr = core.alloc_bytes(8)
+        let first_cell: ptr = core.ptr_add(first_base, first, memory_cap)
+        let second_cell: ptr = core.ptr_add(second_base, second, memory_cap)
+        let third_cell: ptr = core.ptr_add(third_base, third, memory_cap)
+        let fourth_cell: ptr = core.ptr_add(fourth_base, fourth, memory_cap)
+        let _first_write: Int = core.store_i32(first_cell, 10, memory_cap)
+        let _second_write: Int = core.store_i32(second_cell, 11, memory_cap)
+        let _third_write: Int = core.store_i32(third_cell, 10, memory_cap)
+        let _fourth_write: Int = core.store_i32(fourth_cell, 11, memory_cap)
+        let total: Int = core.load_i32(first_cell, memory_cap) + core.load_i32(second_cell, memory_cap) + core.load_i32(third_cell, memory_cap) + core.load_i32(fourth_cell, memory_cap)
+        if total == 42:
+            return 0
+        return total
+    return 99

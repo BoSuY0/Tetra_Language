@@ -1,0 +1,50 @@
+// Task-group actor fanout microservice smoke.
+//
+// An actor opens a task group, joins two grouped workers, and replies with a
+// tagged message after closing the group.
+actor GroupFanout:
+    func run() -> Int
+    uses actors, runtime:
+        let request: actor.msg = core.recv_msg()
+        let reply_to: actor = core.sender()
+        let group: task.group = core.task_group_open()
+        let left: task.i32 = core.task_spawn_group_i32(group, "group_left_worker")
+        let right: task.i32 = core.task_spawn_group_i32(group, "group_right_worker")
+        let left_result: task.result_i32 = core.task_join_result_i32(left)
+        let right_result: task.result_i32 = core.task_join_result_i32(right)
+        let close_error: Int = core.task_group_close(group)
+        if close_error != 0:
+            let _close_reply: Int = core.send_msg(reply_to, close_error, 80)
+            return 0
+        if left_result.error != 0:
+            let _left_reply: Int = core.send_msg(reply_to, left_result.error, 81)
+            return 0
+        if right_result.error != 0:
+            let _right_reply: Int = core.send_msg(reply_to, right_result.error, 82)
+            return 0
+        let total: Int = request.value + left_result.value + right_result.value
+        let _reply: Int = core.send_msg(reply_to, total, request.tag + 1)
+        return 0
+
+func group_left_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 20
+
+func group_right_worker() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    return 22
+
+func main() -> Int
+uses actors, runtime:
+    let service: actor = core.spawn("GroupFanout.run")
+    let _sent: Int = core.send_msg(service, 0, 7)
+    let reply: actor.recv_msg_result = core.recv_msg_until(core.deadline_ms(8))
+    if reply.error != 0:
+        return 10 + reply.error
+    if reply.tag != 8:
+        return 20 + reply.tag
+    if reply.value == 42:
+        return 0
+    return reply.value

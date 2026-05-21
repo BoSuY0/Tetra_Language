@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"tetra_language/compiler"
@@ -22,6 +23,12 @@ import (
 
 var commandLookPath = exec.LookPath
 var webRunnerProbe = probeWebRunner
+var execNativeProgram = execProgram
+var linuxX86HostSupport = canRunLinuxX86OnHost
+var linuxX32HostSupport = canRunLinuxX32OnHost
+
+var linuxX32ProbeOnce sync.Once
+var linuxX32ProbeResult bool
 
 type multiFlag []string
 
@@ -34,7 +41,7 @@ func (m *multiFlag) Set(v string) error {
 	return nil
 }
 
-const supportedTargetsHelp = "linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web"
+const supportedTargetsHelp = "linux-x64, windows-x64, macos-x64, wasm32-wasi, wasm32-web; build-only: linux-x86, linux-x32"
 
 func main() {
 	os.Exit(runCLI(os.Args[1:], os.Stdout, os.Stderr))
@@ -309,13 +316,12 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	isWASI := tgt.Triple == "wasm32-wasi"
 	isWeb := tgt.Triple == "wasm32-web"
-	if ctarget.IsBuildOnlyTarget(tgt.Triple) && !isWASI {
-		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run target %s: build-only target emits artifacts only; unsupported runtime execution because the CLI does not provide a production runtime runner", tgt.Triple))
+	if ctarget.IsBuildOnlyTarget(tgt.Triple) && !isWASI && !canRunBuildOnlyNativeTargetOnHost(tgt) {
+		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run target %s: %s", tgt.Triple, buildOnlyNativeRunUnsupportedReason(tgt)))
 		return 2
 	}
 	if !isWASI && !isWeb {
-		host, ok := hostTarget()
-		if !ok || host != tgt.Triple {
+		if !canRunNativeExecutableTargetOnHost(tgt) {
 			writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run target %s on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH))
 			return 2
 		}
@@ -369,7 +375,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		return exit
 	}
-	return execProgram(output, stdout, stderr)
+	return execNativeProgram(output, stdout, stderr)
 }
 
 func runClean(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -456,6 +462,70 @@ func hostTarget() (string, bool) {
 		return "", false
 	}
 	return tgt.Triple, true
+}
+
+func canRunBuildOnlyNativeTargetOnHost(tgt ctarget.Target) bool {
+	switch tgt.Triple {
+	case "linux-x86":
+		return linuxX86HostSupport()
+	case "linux-x32":
+		return linuxX32HostSupport()
+	default:
+		return false
+	}
+}
+
+func canRunNativeExecutableTargetOnHost(tgt ctarget.Target) bool {
+	if canRunBuildOnlyNativeTargetOnHost(tgt) {
+		return true
+	}
+	host, ok := hostTarget()
+	return ok && host == tgt.Triple
+}
+
+func canRunLinuxX86OnHost() bool {
+	return runtime.GOOS == "linux" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "386")
+}
+
+func canRunLinuxX32OnHost() bool {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		return false
+	}
+	linuxX32ProbeOnce.Do(func() {
+		linuxX32ProbeResult = probeLinuxX32Execution()
+	})
+	return linuxX32ProbeResult
+}
+
+func probeLinuxX32Execution() bool {
+	dir, err := os.MkdirTemp("", "tetra-x32-probe-*")
+	if err != nil {
+		return false
+	}
+	defer os.RemoveAll(dir)
+	srcPath := filepath.Join(dir, "probe.tetra")
+	outPath := filepath.Join(dir, "probe")
+	if err := os.WriteFile(srcPath, []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+		return false
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "x32", compiler.BuildOptions{Jobs: 1}); err != nil {
+		return false
+	}
+	return execProgram(outPath, io.Discard, io.Discard) == 0
+}
+
+func buildOnlyNativeRunUnsupportedReason(tgt ctarget.Target) string {
+	switch tgt.Triple {
+	case "linux-x86":
+		return "host does not support Linux i386 execution; no host fallback is allowed"
+	case "linux-x32":
+		return "host does not support Linux x32 ABI execution; no host fallback is allowed"
+	default:
+		if tgt.UnsupportedReason != "" {
+			return tgt.UnsupportedReason
+		}
+		return "build-only target emits artifacts only; unsupported runtime execution because the CLI does not provide a production runtime runner"
+	}
 }
 
 func defaultOutput(tgt ctarget.Target, emit string) string {

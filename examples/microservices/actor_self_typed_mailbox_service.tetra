@@ -1,0 +1,21 @@
+// Actor self typed-mailbox microservice smoke.
+//
+// The service sends typed enum payloads to core.self() and verifies the local
+// typed mailbox path without spawning another actor.
+enum SelfMsg:
+    case add(Int, Int)
+    case done(Int)
+
+func main() -> Int
+uses actors:
+    let me: actor = core.self()
+    let _sent: Int = core.send_typed(me, SelfMsg.add(20, 22))
+    let msg: SelfMsg = core.recv_typed<SelfMsg>()
+    match msg:
+    case SelfMsg.add(lhs, rhs):
+        let total: Int = lhs + rhs
+        if total == 42:
+            return 0
+        return total
+    case SelfMsg.done(done_value):
+        return done_value
