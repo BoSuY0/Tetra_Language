@@ -1504,12 +1504,12 @@
     "hash": "e5aa1792c98ef7ce2014299ef8110854"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/compiler-production-smoke/main.go": {
-    "mtime": 1779365127.185115,
-    "hash": "a49f40728d062ec043d5f9139cb5e36b"
+    "mtime": 1779369322.245734,
+    "hash": "7d3d4c9cf69894130c00b775b08e014b"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/compiler-production-smoke/main_test.go": {
-    "mtime": 1779365127.18521,
-    "hash": "743a3c6834fe2e0bc2a465b81fe0093b"
+    "mtime": 1779369326.6786199,
+    "hash": "558c3bc68f27619bf9df590751f0ed60"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/distributed-actor-runtime-smoke/main.go": {
     "mtime": 1779365127.18521,
@@ -1604,8 +1604,8 @@
     "hash": "dbc1125dd9feecc3a8dab6d896b1f47d"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/validate-compiler-production/main_test.go": {
-    "mtime": 1779365127.1866348,
-    "hash": "8ab36f11bd8652c45658571cfd6d6b7d"
+    "mtime": 1779369340.346269,
+    "hash": "d08b8c98951d08c35752191d1c410f37"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/validate-diagnostic/main.go": {
     "mtime": 1779365127.1866348,
@@ -2224,12 +2224,12 @@
     "hash": "76ab510dd0dd8210d67ae256882c9d37"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/validators/compilerprod/report.go": {
-    "mtime": 1779365127.1953666,
-    "hash": "bfe7e3224f3be5e07a8827bcc19f0897"
+    "mtime": 1779369311.7880042,
+    "hash": "220b43829d004b4f058cf4beed3dd4a0"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/validators/compilerprod/report_test.go": {
-    "mtime": 1779365127.1953666,
-    "hash": "b293177884647ce11dddbc2a5688a73f"
+    "mtime": 1779369336.3053725,
+    "hash": "acf3b353365f00d904861d994a6d5c24"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/validators/memoryprod/report.go": {
     "mtime": 1779365127.195528,
@@ -3618,5 +3618,13 @@
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/release-v1.0.0-gate-20260521-130206/summary.md": {
     "mtime": 1779368526.0936255,
     "hash": "c4d98d0bd1076253e691ba4a2ad9a61c"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/release-v1.0.0-gate-20260521-131130/summary.md": {
+    "mtime": 1779369090.513012,
+    "hash": "228011d523a6b2ca53ed637975b771cc"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/release-v1.0.0-gate-20260521-131248/summary.md": {
+    "mtime": 1779369169.069809,
+    "hash": "7588825c2ad808b126f4a2552754e296"
   }
 }

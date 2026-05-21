@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-const SchemaV1 = "tetra.compiler.production.v1"
+const (
+	SchemaV1        = "tetra.compiler.production.v1"
+	VersionCaseName = "version reports current compiler version"
+)
 
 type Report struct {
 	Schema    string           `json:"schema"`
@@ -196,7 +199,7 @@ func validateContracts(contracts []ContractReport) []string {
 func validateCases(cases []CaseReport) []string {
 	required := map[string]bool{
 		"fresh CLI compiler build":              false,
-		"version reports v0.4.0":                false,
+		VersionCaseName:                         false,
 		"linux-x64 native compile and run":      false,
 		"linux-x64 object emission":             false,
 		"interface-only compile":                false,

@@ -24,6 +24,7 @@ func TestRequiredPassingCasesIncludeCompilerProductionEdgeCases(t *testing.T) {
 	cases := requiredPassingCases()
 	for _, name := range []string{
 		"fresh CLI compiler build",
+		"version reports current compiler version",
 		"linux-x64 native compile and run",
 		"linux-x64 object emission",
 		"interface-only compile",
@@ -40,12 +41,15 @@ func TestRequiredPassingCasesIncludeCompilerProductionEdgeCases(t *testing.T) {
 			t.Fatalf("requiredPassingCases missing %q", name)
 		}
 	}
+	if hasCase(cases, "version reports v0.4.0") {
+		t.Fatalf("requiredPassingCases must not pin compiler production evidence to v0.4.0")
+	}
 }
 
 func requiredPassingCases() []compilerprod.CaseReport {
 	return []compilerprod.CaseReport{
 		{Name: "fresh CLI compiler build", Kind: "positive", Ran: true, Pass: true},
-		{Name: "version reports v0.4.0", Kind: "positive", Ran: true, Pass: true},
+		{Name: compilerprod.VersionCaseName, Kind: "positive", Ran: true, Pass: true},
 		{Name: "linux-x64 native compile and run", Kind: "positive", Ran: true, Pass: true},
 		{Name: "linux-x64 object emission", Kind: "positive", Ran: true, Pass: true},
 		{Name: "interface-only compile", Kind: "positive", Ran: true, Pass: true},

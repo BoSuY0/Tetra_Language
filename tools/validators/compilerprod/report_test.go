@@ -43,6 +43,19 @@ func TestValidateReportRejectsMissingWASMWebCompilerCoverage(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsVersionPinnedCompilerCase(t *testing.T) {
+	report := validReport()
+	report.Cases = replaceCaseName(report.Cases, VersionCaseName, "version reports v0.4.0")
+	raw := mustJSON(t, report)
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected v0.4.0-pinned version coverage to fail")
+	}
+	if !strings.Contains(err.Error(), VersionCaseName) {
+		t.Fatalf("error = %v, want current-version case rejection", err)
+	}
+}
+
 func TestValidateReportRejectsMissingCompilerAudit(t *testing.T) {
 	report := validReport()
 	report.Audit = nil
@@ -83,7 +96,7 @@ func validReport() Report {
 		},
 		Cases: []CaseReport{
 			{Name: "fresh CLI compiler build", Kind: "positive", Ran: true, Pass: true},
-			{Name: "version reports v0.4.0", Kind: "positive", Ran: true, Pass: true},
+			{Name: VersionCaseName, Kind: "positive", Ran: true, Pass: true},
 			{Name: "linux-x64 native compile and run", Kind: "positive", Ran: true, Pass: true},
 			{Name: "linux-x64 object emission", Kind: "positive", Ran: true, Pass: true},
 			{Name: "interface-only compile", Kind: "positive", Ran: true, Pass: true},
@@ -109,6 +122,17 @@ func validReport() Report {
 			{Requirement: "release-gate entrypoint", Artifact: "scripts/release/post_v0_4/compiler-production-linux-x64-smoke.sh", Evidence: "compiler gate writes and validates tetra.compiler.production.v1 evidence", Result: "pass"},
 		},
 	}
+}
+
+func replaceCaseName(cases []CaseReport, oldName, newName string) []CaseReport {
+	var out []CaseReport
+	for _, c := range cases {
+		if c.Name == oldName {
+			c.Name = newName
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 func filterCases(cases []CaseReport, drop string) []CaseReport {
