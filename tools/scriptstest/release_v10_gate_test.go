@@ -24,6 +24,7 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 		`release_version="v1.0.0"`,
 		`release_artifact="tetra.release.v1_0.gate-report.v1"`,
 		`bash scripts/dev/bootstrap.sh`,
+		`run_step "bootstrap tetra binaries" bash scripts/dev/bootstrap.sh`,
 		`if [[ "$version" != "$release_version" ]]`,
 		`expected ./tetra version to be $release_version`,
 		`release_gate_command="bash scripts/release/v1_0/gate.sh"`,
@@ -133,6 +134,7 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
+		"bootstrap tetra binaries",
 		"WASI runner smoke",
 		"Web runtime browser smoke",
 		"WASI artifact/import smoke",
@@ -150,6 +152,7 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 		}
 	}
 	for _, artifact := range []string{
+		"logs/01-bootstrap-tetra-binaries.log",
 		"artifacts/wasi-smoke.json",
 		"artifacts/web-ui-smoke.json",
 		"artifacts/backend-summary.md",

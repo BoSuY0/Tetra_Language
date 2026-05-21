@@ -450,7 +450,11 @@ check_artifact_hash_manifest() {
 }
 
 echo "release/v1_0/gate: bootstrapping local binaries before v1 version preflight" >&2
-bash scripts/dev/bootstrap.sh >&2
+run_step "bootstrap tetra binaries" bash scripts/dev/bootstrap.sh
+if [[ "$failed_count" -gt 0 ]]; then
+  write_summary "blocked"
+  exit 1
+fi
 
 version="$(./tetra version 2>/dev/null || true)"
 if [[ "$version" != "$release_version" ]]; then

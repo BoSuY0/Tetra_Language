@@ -38,7 +38,7 @@ Do not copy rows from older candidate runs.
 | Check | Command or gate step | Evidence path | Required result |
 | --- | --- | --- | --- |
 | Bootstrap binaries | `bash scripts/dev/bootstrap.sh` | `REPORT_DIR/logs/01-bootstrap-tetra-binaries.log` | Pass with exit code 0. |
-| Version preflight | `./tetra version`; `./t version`; gate version preflight | `REPORT_DIR/logs/version-preflight.log` | Pass and exact version `v1.0.0`. |
+| Version preflight | `./tetra version`; `./t version`; gate version preflight | `REPORT_DIR/logs/02-version-preflight-v1-0-0-required.log`; `REPORT_DIR/logs/03-short-alias-version-parity.log` | Pass and exact version `v1.0.0`. |
 | Final v1 gate | `bash scripts/release/v1_0/gate.sh --report-dir REPORT_DIR` | `REPORT_DIR/summary.json`; `REPORT_DIR/summary.md` | Pass with `failed_count: 0`. |
 | Go workspace tests | `go test ./compiler/... ./cli/... ./tools/... -count=1` | `REPORT_DIR/logs/go-test-all.log` | Pass with exit code 0. |
 | v1 language scope | Commands from `docs/spec/v1_scope.md` mandatory language table | `REPORT_DIR/logs/scope-language.log` | Pass or explicit blocker list. |
