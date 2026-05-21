@@ -83,6 +83,13 @@ func TestReleaseFullPlatformActionsAvailabilityPreflightIsNotRuntimeEvidence(t *
 		"Usage: bash scripts/release/full_platform/actions-availability-preflight.sh [--repo OWNER/REPO] [--branch BRANCH] [--report FILE]",
 		"tetra.actions.availability.v1",
 		"gh run list",
+		"s#\\.git$##",
+		"exact_workflow_run_path",
+		"exact_workflow_current_head_run_path",
+		"fallback_workflow_run_path",
+		"fallback_workflow_current_head_run_path",
+		"expected_git_head",
+		"run_selection",
 		"gh api \"repos/$repo/actions/runs/$run_id\"",
 		"gh api \"repos/$repo/actions/runs/$run_id/jobs\"",
 		"gh api \"repos/$repo/actions/runs/$run_id/logs\"",
@@ -109,6 +116,9 @@ func TestReleaseFullPlatformActionsAvailabilityPreflightIsNotRuntimeEvidence(t *
 		"zero jobs",
 		"`BuildFailed`",
 		"active workflow registry",
+		"`expected_git_head`",
+		"`run_selection`",
+		"current Git HEAD",
 		"`macos-15-intel`",
 	} {
 		if !strings.Contains(readme, want) {

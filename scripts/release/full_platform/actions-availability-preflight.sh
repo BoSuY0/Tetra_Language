@@ -93,11 +93,12 @@ cd "$repo_root"
 
 if [[ -z "$repo" ]]; then
   remote_url="$(git remote get-url origin 2>/dev/null || true)"
-  repo="$(printf '%s' "$remote_url" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\\.git$##')"
+  repo="$(printf '%s' "$remote_url" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\.git$##')"
 fi
 if [[ -z "$branch" ]]; then
   branch="$(git rev-parse --abbrev-ref HEAD)"
 fi
+expected_git_head="$(git rev-parse HEAD)"
 if [[ -z "$repo" || "$repo" == "$remote_url" ]]; then
   echo "error: could not infer GitHub repo; pass --repo OWNER/REPO" >&2
   exit 2
@@ -120,6 +121,10 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 runs_path="$tmp_dir/runs.json"
 run_path="$tmp_dir/run.json"
+exact_workflow_run_path="$tmp_dir/run-exact-workflow.json"
+fallback_workflow_run_path="$tmp_dir/run-empty-workflow.json"
+exact_workflow_current_head_run_path="$tmp_dir/run-exact-workflow-current-head.json"
+fallback_workflow_current_head_run_path="$tmp_dir/run-empty-workflow-current-head.json"
 run_details_path="$tmp_dir/run-details.json"
 permissions_path="$tmp_dir/permissions.json"
 runners_path="$tmp_dir/runners.json"
@@ -137,17 +142,35 @@ gh run list \
   --json databaseId,event,status,conclusion,headSha,workflowName \
   >"$runs_path"
 
-jq -e \
-  --arg workflow "$workflow" \
-  '[.[] | select(.workflowName == $workflow or .workflowName == "" or .workflowName == null)][0] // {
+jq -e --arg workflow "$workflow" '[.[] | select(.workflowName == $workflow)][0] // empty' "$runs_path" >"$exact_workflow_run_path" || true
+jq -e '[.[] | select(.workflowName == "" or .workflowName == null)][0] // empty' "$runs_path" >"$fallback_workflow_run_path" || true
+jq -e --arg workflow "$workflow" --arg head "$expected_git_head" '[.[] | select(.workflowName == $workflow and .headSha == $head)][0] // empty' "$runs_path" >"$exact_workflow_current_head_run_path" || true
+jq -e --arg head "$expected_git_head" '[.[] | select((.workflowName == "" or .workflowName == null) and .headSha == $head)][0] // empty' "$runs_path" >"$fallback_workflow_current_head_run_path" || true
+
+run_selection="none"
+if [[ -s "$exact_workflow_current_head_run_path" ]]; then
+  cp "$exact_workflow_current_head_run_path" "$run_path"
+  run_selection="workflow_name"
+elif [[ -s "$fallback_workflow_current_head_run_path" ]]; then
+  cp "$fallback_workflow_current_head_run_path" "$run_path"
+  run_selection="empty_workflow_fallback"
+elif [[ -s "$exact_workflow_run_path" ]]; then
+  cp "$exact_workflow_run_path" "$run_path"
+  run_selection="workflow_name_stale"
+elif [[ -s "$fallback_workflow_run_path" ]]; then
+  cp "$fallback_workflow_run_path" "$run_path"
+  run_selection="empty_workflow_fallback_stale"
+else
+  jq -n \
+    '{
     databaseId: 0,
     event: "",
     status: "",
     conclusion: "",
     headSha: "",
     workflowName: ""
-  }' \
-  "$runs_path" >"$run_path"
+  }' >"$run_path"
+fi
 
 run_id="$(jq -r '.databaseId // 0' "$run_path")"
 run_event="$(jq -r '.event // ""' "$run_path")"
@@ -228,6 +251,8 @@ fi
 availability_status="blocked"
 summary="GitHub Actions did not prove job-backed availability."
 if [[ "$repo_actions_enabled" == "true" &&
+      "$run_selection" == "workflow_name" &&
+      "$run_head_sha" == "$expected_git_head" &&
       "$run_status" == "completed" &&
       "$run_conclusion" == "success" &&
       "$run_jobs" -gt 0 &&
@@ -239,6 +264,7 @@ if [[ "$repo_actions_enabled" == "true" &&
       "$run_check_suite_status" == "completed" &&
       "$run_check_suite_conclusion" == "success" &&
       "$run_check_suite_latest_check_runs_count" -gt 0 &&
+      "$run_check_suite_head_sha" == "$expected_git_head" &&
       "$billing_actions_status" != "unavailable_missing_user_scope" ]]; then
   availability_status="pass"
   summary="GitHub Actions can start jobs and expose logs."
@@ -248,6 +274,8 @@ jq -n \
   --arg repo "$repo" \
   --arg branch "$branch" \
   --arg workflow "$workflow" \
+  --arg expectedGitHead "$expected_git_head" \
+  --arg runSelection "$run_selection" \
   --arg status "$availability_status" \
   --arg summary "$summary" \
   --argjson repoActionsEnabled "$repo_actions_enabled" \
@@ -280,6 +308,8 @@ jq -n \
     repo: $repo,
     branch: $branch,
     workflow: $workflow,
+    expected_git_head: $expectedGitHead,
+    run_selection: $runSelection,
     summary: $summary,
     production_evidence: false,
     repo_actions_enabled: $repoActionsEnabled,

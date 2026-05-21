@@ -12,6 +12,8 @@ func TestValidateActionsAvailabilityAcceptsJobBackedSuccess(t *testing.T) {
   "repo": "BoSuY0/Tetra_Language",
   "branch": "codex/full-platform-ui-runtime",
   "workflow": "ci",
+  "expected_git_head": "abcdef1234567890",
+  "run_selection": "workflow_name",
   "summary": "GitHub Actions can start jobs and expose logs.",
   "production_evidence": false,
   "repo_actions_enabled": true,
@@ -66,6 +68,8 @@ func TestValidateActionsAvailabilityRejectsZeroJobStartupFailure(t *testing.T) {
   "repo": "BoSuY0/Tetra_Language",
   "branch": "codex/full-platform-ui-runtime",
   "workflow": "ci",
+  "expected_git_head": "ecd8e2fcd06d26b4e79f603788ecb8842f641a32",
+  "run_selection": "empty_workflow_fallback",
   "summary": "GitHub Actions cannot start jobs.",
   "production_evidence": false,
   "repo_actions_enabled": true,
@@ -125,6 +129,68 @@ func TestValidateActionsAvailabilityRejectsZeroJobStartupFailure(t *testing.T) {
 	}
 }
 
+func TestValidateActionsAvailabilityRejectsStaleWorkflowRun(t *testing.T) {
+	raw := []byte(`{
+  "schema": "tetra.actions.availability.v1",
+  "status": "pass",
+  "repo": "BoSuY0/Tetra_Language",
+  "branch": "codex/full-platform-ui-runtime",
+  "workflow": "ci",
+  "expected_git_head": "current1234567890",
+  "run_selection": "workflow_name_stale",
+  "summary": "GitHub Actions can start jobs and expose logs.",
+  "production_evidence": false,
+  "repo_actions_enabled": true,
+  "repo_allowed_actions": "all",
+  "self_hosted_runner_count": 0,
+  "billing_actions_status": "available",
+  "billing_actions_detail": "billing API available",
+  "workflows": {
+    "total_count": 1,
+    "active_count": 1,
+    "entries": [
+      {
+        "id": 220876851,
+        "name": "ci",
+        "path": ".github/workflows/ci.yml",
+        "state": "active"
+      }
+    ]
+  },
+  "run": {
+    "id": 26250000001,
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "stale1234567890",
+    "workflow_name": "ci",
+    "workflow_path": ".github/workflows/ci.yml",
+    "workflow_id": 220876851,
+    "check_suite_id": 70197691298,
+    "check_suite": {
+      "id": 70197691298,
+      "app": "github-actions",
+      "status": "completed",
+      "conclusion": "success",
+      "latest_check_runs_count": 1,
+      "head_sha": "stale1234567890"
+    },
+    "jobs": 1,
+    "logs_available": true
+  },
+  "next_action": "Proceed to target-host Windows/macOS UI runtime reports; this is not runtime evidence."
+}`)
+	err := validateActionsAvailability(raw)
+	if err == nil {
+		t.Fatalf("expected stale workflow run to fail")
+	}
+	for _, want := range []string{"run_selection", "workflow_name_stale", "run.head_sha", "run.check_suite.head_sha", "expected_git_head"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("availability error missing %q: %v", want, err)
+		}
+	}
+}
+
 func TestValidateActionsAvailabilityRejectsProductionEvidenceClaim(t *testing.T) {
 	raw := []byte(`{
   "schema": "tetra.actions.availability.v1",
@@ -132,6 +198,8 @@ func TestValidateActionsAvailabilityRejectsProductionEvidenceClaim(t *testing.T)
   "repo": "BoSuY0/Tetra_Language",
   "branch": "codex/full-platform-ui-runtime",
   "workflow": "ci",
+  "expected_git_head": "abcdef1234567890",
+  "run_selection": "workflow_name",
   "summary": "READY production evidence",
   "production_evidence": true,
   "repo_actions_enabled": true,

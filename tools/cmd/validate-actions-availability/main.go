@@ -19,6 +19,8 @@ type actionsAvailabilityReport struct {
 	Repo                  string                 `json:"repo"`
 	Branch                string                 `json:"branch"`
 	Workflow              string                 `json:"workflow"`
+	ExpectedGitHead       string                 `json:"expected_git_head"`
+	RunSelection          string                 `json:"run_selection"`
 	Summary               string                 `json:"summary"`
 	ProductionEvidence    bool                   `json:"production_evidence"`
 	RepoActionsEnabled    bool                   `json:"repo_actions_enabled"`
@@ -102,6 +104,8 @@ func validateActionsAvailability(raw []byte) error {
 		"repo":                   report.Repo,
 		"branch":                 report.Branch,
 		"workflow":               report.Workflow,
+		"expected_git_head":      report.ExpectedGitHead,
+		"run_selection":          report.RunSelection,
 		"summary":                report.Summary,
 		"repo_allowed_actions":   report.RepoAllowedActions,
 		"billing_actions_status": report.BillingActionsStatus,
@@ -127,6 +131,20 @@ func validateActionsAvailability(raw []byte) error {
 	}
 	if report.BillingActionsStatus == "unavailable_missing_user_scope" {
 		issues = append(issues, "billing_actions_status is unavailable_missing_user_scope; refresh gh auth with user scope before availability can pass")
+	}
+	switch report.RunSelection {
+	case "workflow_name", "empty_workflow_fallback", "workflow_name_stale", "empty_workflow_fallback_stale", "none":
+	default:
+		issues = append(issues, fmt.Sprintf("run_selection is %q, want workflow_name, empty_workflow_fallback, workflow_name_stale, empty_workflow_fallback_stale, or none", report.RunSelection))
+	}
+	if report.Status == "pass" && report.RunSelection != "workflow_name" {
+		issues = append(issues, fmt.Sprintf("passing Actions availability requires run_selection workflow_name, got %q", report.RunSelection))
+	}
+	if report.Run.HeadSHA != "" && report.ExpectedGitHead != "" && report.Run.HeadSHA != report.ExpectedGitHead {
+		issues = append(issues, fmt.Sprintf("run.head_sha is %q, want expected_git_head %q", report.Run.HeadSHA, report.ExpectedGitHead))
+	}
+	if report.Run.CheckSuite.HeadSHA != "" && report.ExpectedGitHead != "" && report.Run.CheckSuite.HeadSHA != report.ExpectedGitHead {
+		issues = append(issues, fmt.Sprintf("run.check_suite.head_sha is %q, want expected_git_head %q", report.Run.CheckSuite.HeadSHA, report.ExpectedGitHead))
 	}
 	issues = append(issues, validateActionsWorkflows(report.Workflows, report.Workflow)...)
 	issues = append(issues, validateAvailabilityRun(report.Run)...)
