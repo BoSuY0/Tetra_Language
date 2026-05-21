@@ -76,9 +76,15 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 	if artifactIdx == -1 || releaseStateIdx == -1 || artifactIdx > releaseStateIdx {
 		t.Fatalf("v1.0 release gate must build artifact hash manifest before release-state audit")
 	}
-	if !strings.Contains(text, `write_summary "pass"
-if ! check_release_state; then`) {
-		t.Fatalf("v1.0 release gate must final-refresh release-state after pass summary")
+	for _, want := range []string{
+		`write_summary "pass"
+if ! check_artifact_hash_manifest; then`,
+		`if ! check_release_state; then`,
+		`release/v1_0/gate: blocked: final artifact hash refresh failed`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("v1.0 release gate final refresh sequence missing %q", want)
+		}
 	}
 }
 
@@ -187,6 +193,28 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 	}
 	if releaseState.LastGateEvidence.FailedCount != 0 {
 		t.Fatalf("release-state failed_count = %d, want 0", releaseState.LastGateEvidence.FailedCount)
+	}
+
+	hashRaw, err := os.ReadFile(filepath.Join(reportDir, "artifacts", "artifact-hashes.json"))
+	if err != nil {
+		t.Fatalf("read v1.0 artifact hash manifest: %v", err)
+	}
+	var hashManifest struct {
+		Artifacts []struct {
+			Path string `json:"path"`
+		} `json:"artifacts"`
+	}
+	if err := json.Unmarshal(hashRaw, &hashManifest); err != nil {
+		t.Fatalf("decode v1.0 artifact hash manifest: %v\n%s", err, hashRaw)
+	}
+	hashed := map[string]bool{}
+	for _, artifact := range hashManifest.Artifacts {
+		hashed[artifact.Path] = true
+	}
+	for _, want := range []string{"release-state.json", "release-state.txt"} {
+		if !hashed[want] {
+			t.Fatalf("artifact-hashes.json must include %s after final release-state refresh:\n%s", want, hashRaw)
+		}
 	}
 }
 

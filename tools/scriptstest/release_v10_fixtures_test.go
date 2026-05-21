@@ -294,8 +294,13 @@ if [[ "${1:-}" == "run" ]]; then
       ;;
     ./tools/cmd/validate-artifact-hashes)
       out=""
+      root=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
+          --root)
+            root="$2"
+            shift 2
+            ;;
           --out)
             out="$2"
             shift 2
@@ -306,8 +311,28 @@ if [[ "${1:-}" == "run" ]]; then
         esac
       done
       if [[ -n "$out" ]]; then
+        if [[ -z "$root" ]]; then
+          root="$(dirname "$out")"
+        fi
         mkdir -p "$(dirname "$out")"
-        printf '{"schema":"tetra.release-artifact-hashes.v1alpha1","root":".","artifacts":[{"path":"known_issues.md","sha256":"sha256:0000000000000000000000000000000000000000000000000000000000000000","size":0}]}\n' >"$out"
+        {
+          printf '{"schema":"tetra.release-artifact-hashes.v1alpha1","root":".","artifacts":['
+          first="true"
+          while IFS= read -r file; do
+            rel="${file#"$root"/}"
+            if [[ "$rel" == "artifact-hashes.json" ]]; then
+              continue
+            fi
+            if [[ "$first" == "true" ]]; then
+              first="false"
+            else
+              printf ','
+            fi
+            size="$(wc -c <"$file" | tr -d ' ')"
+            printf '{"path":"%s","sha256":"sha256:0000000000000000000000000000000000000000000000000000000000000000","size":%s}' "$rel" "$size"
+          done < <(find "$root" -type f | sort)
+          printf ']}\n'
+        } >"$out"
       fi
       ;;
   esac

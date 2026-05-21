@@ -535,7 +535,9 @@ run_step "release state audit" check_release_state
 
 if [[ "$failed_count" -gt 0 ]]; then
   write_summary "blocked"
+  check_artifact_hash_manifest || true
   check_release_state || true
+  check_artifact_hash_manifest || true
   echo >&2
   echo "release/v1_0/gate: blocked: $failed_count step(s) failed" >&2
   echo "summary: $summary_md" >&2
@@ -544,12 +546,32 @@ if [[ "$failed_count" -gt 0 ]]; then
 fi
 
 write_summary "pass"
+if ! check_artifact_hash_manifest; then
+  rc="$?"
+  failed_count=$((failed_count + 1))
+  write_summary "blocked"
+  echo "release/v1_0/gate: blocked: final pre-release-state artifact hash refresh failed with exit $rc" >&2
+  echo "summary: $summary_md" >&2
+  echo "json: $summary_json" >&2
+  exit 1
+fi
 if ! check_release_state; then
   rc="$?"
   failed_count=$((failed_count + 1))
   write_summary "blocked"
+  check_artifact_hash_manifest || true
   check_release_state || true
   echo "release/v1_0/gate: blocked: final release-state refresh failed with exit $rc" >&2
+  echo "summary: $summary_md" >&2
+  echo "json: $summary_json" >&2
+  exit 1
+fi
+if ! check_artifact_hash_manifest; then
+  rc="$?"
+  failed_count=$((failed_count + 1))
+  write_summary "blocked"
+  check_release_state || true
+  echo "release/v1_0/gate: blocked: final artifact hash refresh failed with exit $rc" >&2
   echo "summary: $summary_md" >&2
   echo "json: $summary_json" >&2
   exit 1
