@@ -202,6 +202,7 @@ func TestReleaseFullPlatformTargetHostHelperDocumentsManualEvidence(t *testing.T
 	for _, want := range []string{
 		"Manual target-host evidence",
 		"target-host-evidence-request.sh",
+		"validate-target-host-evidence-request",
 		"bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
 		"pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1",
 		"TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json",
@@ -237,6 +238,11 @@ func TestReleaseFullPlatformTargetHostEvidenceRequestBundle(t *testing.T) {
 		"target-host-ui-runtime-smoke.sh --target macos-x64",
 		"TETRA_WINDOWS_UI_RUNTIME_REPORT",
 		"TETRA_MACOS_UI_RUNTIME_REPORT",
+		"go run ./tools/cmd/validate-target-host-evidence-request",
+		"--expected-repo \"$repo\"",
+		"--expected-branch \"$branch\"",
+		"--expected-version \"$version\"",
+		"--expected-git-head \"$git_head\"",
 		"not runtime evidence",
 	} {
 		if !strings.Contains(script, want) {

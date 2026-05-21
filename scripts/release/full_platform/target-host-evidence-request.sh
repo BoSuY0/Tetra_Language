@@ -163,4 +163,11 @@ evidence. Build-only, metadata-only, runtime-less, fake, placeholder, or stale
 reports remain blockers.
 EOF
 
+go run ./tools/cmd/validate-target-host-evidence-request \
+  --report "$request_json" \
+  --expected-repo "$repo" \
+  --expected-branch "$branch" \
+  --expected-version "$version" \
+  --expected-git-head "$git_head"
+
 echo "target-host evidence request bundle: $out_dir"

@@ -24,6 +24,7 @@ Manual target-host evidence:
 - To prepare a request bundle with the exact commit, version, and target-host
   commands, run `bash scripts/release/full_platform/target-host-evidence-request.sh
   --out-dir reports/full-platform-ui-runtime/target-host-request`. The bundle is
+  validated by `go run ./tools/cmd/validate-target-host-evidence-request` but is
   not runtime evidence; it is only a handoff for collecting real Windows/macOS
   reports from the same Git commit.
 - Check out the same Git commit on a real Windows amd64 host and run
