@@ -241,7 +241,7 @@ jobs:
           - os: windows-2025
             target: windows-x64
             report: windows-ui-runtime.json
-          - os: macos-15-intel
+          - os: macos-13
             target: macos-x64
             report: macos-ui-runtime.json
     steps:

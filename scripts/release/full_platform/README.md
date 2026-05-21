@@ -81,7 +81,7 @@ timers, redraw, and error recovery.
 
 The repository workflow `.github/workflows/full-platform-ui-runtime.yml`
 automates that contract for GitHub Actions: `windows-2025` produces the
-`windows-x64` report, `macos-15-intel` produces the `macos-x64` report, and an
+`windows-x64` report, `macos-13` produces the `macos-x64` report, and an
 `ubuntu-24.04` aggregation job downloads those reports and runs
 `scripts/release/full_platform/ui-runtime-gate.sh`. The local Linux aggregation
 gate remains intentionally strict: without target-host reports from those real

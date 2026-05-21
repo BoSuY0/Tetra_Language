@@ -2,11 +2,3 @@ self-hosted-runner:
   labels: []
 
 config-variables: null
-
-paths:
-  .github/workflows/ci.yml:
-    ignore:
-      - 'label "macos-15-intel" is unknown'
-  .github/workflows/full-platform-ui-runtime.yml:
-    ignore:
-      - 'label "macos-15-intel" is unknown'
