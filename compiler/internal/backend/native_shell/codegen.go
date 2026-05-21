@@ -84,7 +84,7 @@ func Render(bundle *lower.UILoweredBundle) []byte {
 	if bundle == nil {
 		return []byte("Tetra Native UI Shell\n(no UI metadata)\n")
 	}
-	if bundle.Schema != "tetra.ui.v1" {
+	if bundle.Schema != lower.UIBundleSchema {
 		return []byte("Tetra Native UI Shell\nunsupported UI schema: " + bundle.Schema + "\nruntime: unavailable\n")
 	}
 	state := initialState(bundle)
@@ -151,7 +151,7 @@ func buildReport(bundle *lower.UILoweredBundle) shellReport {
 		return report
 	}
 	report.UISchema = bundle.Schema
-	if bundle.Schema != "tetra.ui.v1" {
+	if bundle.Schema != lower.UIBundleSchema {
 		report.Runtime = "unavailable"
 		return report
 	}

@@ -2,6 +2,8 @@ package wasm32_web
 
 import "strings"
 
+const uiBundleSchema = "tetra.ui.v0.4.0"
+
 func UIModule(uiJSONFile string) []byte {
 	if uiJSONFile == "" {
 		uiJSONFile = "app.ui.json"
@@ -144,7 +146,7 @@ func UIModule(uiJSONFile string) []byte {
 		"    throw new Error(\"tetra_ui: failed to fetch metadata: \" + response.status);",
 		"  }",
 		"  const bundle = await response.json();",
-		"  if (!bundle || bundle.schema !== \"tetra.ui.v1\") {",
+		"  if (!bundle || bundle.schema !== \"" + uiBundleSchema + "\") {",
 		"    throw new Error(\"tetra_ui: unsupported schema: \" + String(bundle && bundle.schema));",
 		"  }",
 		"  const host = document.createElement(\"section\");",

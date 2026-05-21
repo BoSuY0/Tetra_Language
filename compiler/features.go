@@ -272,12 +272,12 @@ func FeatureRegistry() []FeatureInfo {
 		},
 		{
 			ID:        "ui.metadata-v1",
-			Name:      "UI metadata v1 surface",
+			Name:      "UI metadata v0.4.0 surface",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.4.0",
-			Scope:     "production UI metadata contract for checked view/state declarations, deterministic tetra.ui.v1 JSON, browser-backed web command-dispatch runtime artifacts, style metadata preview attributes, accessibility metadata preview attributes, and native shell command-dispatch text plus JSON trace sidecars with deterministic widget-tree artifacts",
+			Scope:     "production UI metadata contract for checked view/state declarations, deterministic tetra.ui.v0.4.0 JSON, browser-backed web command-dispatch runtime artifacts, style metadata preview attributes, accessibility metadata preview attributes, and native shell command-dispatch text plus JSON trace sidecars with deterministic widget-tree artifacts",
 			Stability: "current metadata plus wasm32-web command dispatch covered by post-v0.4 Web UI runtime smoke and native shell command dispatch/widget-tree traces for lowered scalar state operations; style and accessibility metadata are preview attributes only, while executable Linux-x64 native runtime evidence is tracked by ui.native-runtime",
-			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/spec/v1_feature_status.md", "docs/user/wasm_ui_guide.md"},
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v0.4.0.md", "docs/spec/v1_feature_status.md", "docs/user/wasm_ui_guide.md"},
 		},
 		{
 			ID:        "wasm.runtime-execution",
@@ -327,9 +327,9 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Linux-x64 native UI runtime",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.4.0",
-			Scope:     "production Linux-x64 native UI runtime path that loads the checked tetra.ui.v1/native-shell widget tree, creates native runtime widget instances with IDs, hierarchy, bounds, text/value, enabled, and visible state, dispatches click/activate events to lowered command operations, propagates state and widget updates, records lifecycle close, and reports negative invalid widget, malformed metadata, unsupported event, and command failure cases",
+			Scope:     "production Linux-x64 native UI runtime path that loads the checked tetra.ui.v0.4.0/native-shell widget tree, creates native runtime widget instances with IDs, hierarchy, bounds, text/value, enabled, and visible state, dispatches click/activate events to lowered command operations, propagates state and widget updates, records lifecycle close, and reports negative invalid widget, malformed metadata, unsupported event, and command failure cases",
 			Stability: "current Linux-x64 deterministic native runtime slice with executable tetra.ui.native-runtime.v1 smoke evidence and strict validator rejection for metadata-only, web-only, native-shell sidecar-only, fake, mock, or placeholder evidence; macOS/Windows, GTK/Qt/OS widget backend claims, platform accessibility integration, and broad input/change/focus behavior remain outside this claim until host-native reports exist",
-			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v0.4.0.md", "docs/user/wasm_ui_guide.md"},
 		},
 	}
 	out := make([]FeatureInfo, len(features))

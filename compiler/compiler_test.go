@@ -3051,7 +3051,7 @@ func TestBuildWASMHelloWritesModule(t *testing.T) {
 				t.Fatalf("read web loader: %v", err)
 			}
 			loader := string(loaderRaw)
-			if !strings.Contains(loader, "tetra_web_v1") || !strings.Contains(loader, "tetra_main") {
+			if !strings.Contains(loader, "tetra_web_v0.4.0") || !strings.Contains(loader, "tetra_main") {
 				t.Fatalf("unexpected web loader content:\n%s", loader)
 			}
 		}
@@ -3091,7 +3091,7 @@ func main() -> Int:
 	if err != nil {
 		t.Fatalf("read ui json: %v", err)
 	}
-	if !strings.Contains(string(jsonRaw), `"schema": "tetra.ui.v1"`) || !strings.Contains(string(jsonRaw), "CounterView") {
+	if !strings.Contains(string(jsonRaw), `"schema": "tetra.ui.v0.4.0"`) || !strings.Contains(string(jsonRaw), "CounterView") {
 		t.Fatalf("unexpected ui json:\n%s", string(jsonRaw))
 	}
 	moduleRaw, err := os.ReadFile(uiModule)

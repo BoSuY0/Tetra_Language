@@ -222,7 +222,7 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	if uiMetadata.Status != compiler.FeatureStatusCurrent || uiMetadata.Since != "v0.4.0" {
 		t.Fatalf("ui.metadata-v1 lifecycle = status %q since %q, want current since v0.4.0", uiMetadata.Status, uiMetadata.Since)
 	}
-	for _, want := range []string{"production UI metadata contract", "deterministic tetra.ui.v1 JSON", "browser-backed web command-dispatch runtime", "wasm32-web command dispatch", "post-v0.4 Web UI runtime smoke", "native shell command dispatch", "widget-tree traces", "JSON trace sidecars", "style metadata preview attributes", "accessibility metadata preview attributes"} {
+	for _, want := range []string{"production UI metadata contract", "deterministic tetra.ui.v0.4.0 JSON", "browser-backed web command-dispatch runtime", "wasm32-web command dispatch", "post-v0.4 Web UI runtime smoke", "native shell command dispatch", "widget-tree traces", "JSON trace sidecars", "style metadata preview attributes", "accessibility metadata preview attributes"} {
 		if !strings.Contains(uiMetadata.Scope+" "+uiMetadata.Stability, want) {
 			t.Fatalf("UI metadata feature missing %q boundary: %#v", want, uiMetadata)
 		}

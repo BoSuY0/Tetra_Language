@@ -335,7 +335,7 @@ JS
       }
       try {
         const bundle = await mountTetraUI(document.body);
-        if (!bundle || bundle.schema !== 'tetra.ui.v1') {
+        if (!bundle || bundle.schema !== 'tetra.ui.v0.4.0') {
           throw new Error(`ui-schema:${String(bundle && bundle.schema)}`);
         }
         const host = document.querySelector('[data-tetra-ui="v1"]');
@@ -595,7 +595,7 @@ HTML
             if [[ "$scope_active" == "true" ]]; then
               if [[ "$status" == "fail" ]]; then
                 :
-              elif [[ "$ui_schema" != "tetra.ui.v1" ]]; then
+              elif [[ "$ui_schema" != "tetra.ui.v0.4.0" ]]; then
                 status="fail"
                 blocker="unexpected UI schema '${ui_schema}'"
               elif [[ "$result" != ok:*:ui=* ]]; then

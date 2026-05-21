@@ -111,7 +111,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 mkdir -p "$(dirname "$report")"
-printf '{"status":"pass","ui_schema":"tetra.ui.v1","cases":[]}\n' >"$report"
+printf '{"status":"pass","ui_schema":"tetra.ui.v0.4.0","cases":[]}\n' >"$report"
 `)
 	writeScript("scripts/release/v1_0/api-diff.sh", `#!/usr/bin/env bash
 set -euo pipefail
@@ -445,7 +445,7 @@ case "$cmd" in
     fi
     printf 'wasm:%s\n' "$src" >"$out"
     if [[ "$src" == "examples/ui_web_smoke.tetra" ]]; then
-      printf '{"schema":"tetra.ui.v1"}\n' >"$out.ui.json"
+      printf '{"schema":"tetra.ui.v0.4.0"}\n' >"$out.ui.json"
     fi
     ;;
   *)

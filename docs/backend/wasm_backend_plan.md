@@ -9,7 +9,7 @@ supports `wasm32-wasi` through `wasmtime` or the Node WASI fallback and supports
 `wasm32-web` through a discovered Chromium-compatible browser runner. Both
 targets still keep explicit missing-runner diagnostics. Browser UI event
 dispatch is production evidence only when the dedicated Web UI smoke report
-loads real WASM, mounts DOM from `tetra.ui.v1`, dispatches events, and passes
+loads real WASM, mounts DOM from `tetra.ui.v0.4.0`, dispatches events, and passes
 `go run ./tools/cmd/validate-web-ui-smoke`.
 
 v0.4.0 checkpoint (current behavior in this repository):
@@ -25,7 +25,8 @@ v0.4.0 checkpoint (current behavior in this repository):
   (`IRMakeSliceI32/U8/U16`, `IRIndexLoadI32/U8/U16`, `IRIndexStoreI32/U8/U16`).
 - Unsupported IR remains explicit and fails with stable backend diagnostics
   instead of silent behavior changes.
-- UI output is metadata-first (`tetra.ui.v1`) with preview artifacts.
+- UI output is metadata-first (`tetra.ui.v0.4.0`) with deterministic runtime
+  glue artifacts for the selected web/native smoke paths.
 - Web UI production smoke validates metadata, instantiates real WASM in a
   Chromium-compatible browser runner, mounts DOM, dispatches lowered scalar
   state command operations for supported events, verifies state/render changes,

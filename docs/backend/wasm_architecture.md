@@ -15,11 +15,11 @@ This document defines the concrete WASM backend architecture that must be used b
 - Internal object model: the backend builds a deterministic in-memory WASM object (`WOBJ`) and serializes it directly to `.wasm`.
 - Runtime model: single-threaded, single linear memory, explicit host imports only, and target-specific entry wrappers (`_start` for WASI, JS-called export for web).
 - Packaging: `wasm32-wasi` emits one `.wasm`; `wasm32-web` emits `.wasm` plus a deterministic JS loader module.
-- Host bindings: WASI imports only from `wasi_snapshot_preview1`; web imports only from `tetra_web_v1`.
+- Host bindings: WASI imports only from `wasi_snapshot_preview1`; web imports only from `tetra_web_v0.4.0`.
 - Release gates: WASM support is blocked until the gate commands in this document are real and green.
-- UI boundary in this architecture wave: `tetra.ui.v1` metadata plus the
+- UI boundary in this architecture wave: `tetra.ui.v0.4.0` metadata plus the
   bounded browser-backed Web UI runtime smoke. `wasm32-web` may mount
-  `tetra.ui.v1` metadata, dispatch lowered scalar state command operations,
+  `tetra.ui.v0.4.0` metadata, dispatch lowered scalar state command operations,
   and validate the required DOM/state/runtime trace evidence. Full layout
   engines, native widgets, and platform accessibility APIs remain out of
   this WASM production claim.
@@ -104,7 +104,7 @@ Global rules:
 - Host imports must be functions only; imported memories, tables, globals, or
   additional namespaces are rejected.
 - Target imports are allowlisted per target. A WASI module must not import
-  `tetra_web_v1`, and a web module must not import `wasi_snapshot_preview1`.
+  `tetra_web_v0.4.0`, and a web module must not import `wasi_snapshot_preview1`.
 - Safe code must not gain host access by lowering around effects, capabilities,
   or unsafe diagnostics. Blocked host/capability paths fail before backend
   emission.
@@ -113,7 +113,7 @@ Global rules:
 
 ### `wasm32-wasi`
 
-Allowed imports (v1):
+Allowed imports (post-v0.4 current contract):
 
 - `wasi_snapshot_preview1.fd_write`
 - `wasi_snapshot_preview1.proc_exit`
@@ -125,7 +125,7 @@ Policy:
 
 ### `wasm32-web`
 
-Allowed imports (v1), module `tetra_web_v1`:
+Allowed imports (post-v0.4 current contract), module `tetra_web_v0.4.0`:
 
 - `console_log(ptr:i32, len:i32) -> void`
 - `panic(code:i32, ptr:i32, len:i32) -> void`
@@ -137,7 +137,7 @@ Policy:
   not expand the `.wasm` import surface without updating this contract and
   validator.
 - UI sidecar behavior: `.ui.web.mjs` and `.ui.html` are deterministic Web UI
-  runtime artifacts and must validate `tetra.ui.v1` schema before rendering.
+  runtime artifacts and must validate `tetra.ui.v0.4.0` schema before rendering.
 
 ### UI Sidecar Boundary
 

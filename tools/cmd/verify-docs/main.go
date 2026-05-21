@@ -104,7 +104,7 @@ func main() {
 	if err := verifyStableModuleDocs(stableModulePaths); err != nil {
 		errs = append(errs, err.Error())
 	}
-	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md", "docs/spec/ui_v1.md"}); err != nil {
+	if err := verifyDoctestBlocks([]string{"README.md", "docs/spec/flow_syntax_mvp.md", "docs/spec/ui_v0.4.0.md"}); err != nil {
 		errs = append(errs, err.Error())
 	}
 	if err := verifySpecCodeBlocks(currentSpecMarkdownPaths()); err != nil {
@@ -699,7 +699,7 @@ func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
 		"language.lifetime-ssa":                   {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
 		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
 		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
-		"ui.native-runtime":                       {"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
+		"ui.native-runtime":                       {"docs/spec/current_supported_surface.md", "docs/spec/ui_v0.4.0.md", "docs/user/wasm_ui_guide.md"},
 	}
 	for id, required := range checks {
 		feature, ok := features[id]

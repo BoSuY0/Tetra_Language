@@ -12,7 +12,7 @@ func TestValidateReportAcceptsExecutableLinuxX64NativeRuntimeEvidence(t *testing
   "target": "linux-x64",
   "host": "linux-x64",
   "runtime": "native-ui-linux-x64",
-  "ui_schema": "tetra.ui.v1",
+  "ui_schema": "tetra.ui.v0.4.0",
   "source": "examples/ui_native_shell_smoke.tetra",
   "processes": [
     {"name":"tetra build","kind":"build","path":"/tmp/tetra","ran":true,"pass":true,"exit_code":0},
@@ -46,7 +46,7 @@ func TestValidateReportAcceptsExecutableLinuxX64NativeRuntimeEvidence(t *testing
 }
 
 func TestValidateReportRejectsNativeShellSidecarOnlyEvidence(t *testing.T) {
-	raw := []byte(`{"schema":"tetra.ui.native-shell.v1","ui_schema":"tetra.ui.v1","runtime":"native shell command dispatch","states":[{"name":"ShellState","fields":[{"name":"count","type":"i32","value":"0"}]}],"views":[{"name":"ShellView","state_type":"ShellState","bindings":[{"name":"count","type":"i32","value":"0"}],"widgets":[{"id":"ShellView.count","kind":"value","binding":"count","type":"i32","value":"0"}],"events":[{"name":"submit","command":"increment","operations":[{"kind":"state_add","target":"state.count","value":"1","state_field":"count","state_value":"1"}],"bindings":[{"name":"count","type":"i32","value":"1"}]}]}]}`)
+	raw := []byte(`{"schema":"tetra.ui.native-shell.v1","ui_schema":"tetra.ui.v0.4.0","runtime":"native shell command dispatch","states":[{"name":"ShellState","fields":[{"name":"count","type":"i32","value":"0"}]}],"views":[{"name":"ShellView","state_type":"ShellState","bindings":[{"name":"count","type":"i32","value":"0"}],"widgets":[{"id":"ShellView.count","kind":"value","binding":"count","type":"i32","value":"0"}],"events":[{"name":"submit","command":"increment","operations":[{"kind":"state_add","target":"state.count","value":"1","state_field":"count","state_value":"1"}],"bindings":[{"name":"count","type":"i32","value":"1"}]}]}]}`)
 	err := ValidateReport(raw)
 	if err == nil {
 		t.Fatalf("expected native shell sidecar-only report to fail")
@@ -57,7 +57,7 @@ func TestValidateReportRejectsNativeShellSidecarOnlyEvidence(t *testing.T) {
 }
 
 func TestValidateReportRejectsMissingStateTransition(t *testing.T) {
-	raw := []byte(`{"schema":"tetra.ui.native-runtime.v1","status":"pass","target":"linux-x64","host":"linux-x64","runtime":"native-ui-linux-x64","ui_schema":"tetra.ui.v1","processes":[{"name":"native app","kind":"app","ran":true,"pass":true,"exit_code":0},{"name":"native ui runtime","kind":"runtime","ran":true,"pass":true,"exit_code":0}],"widgets":[{"id":"ShellView","kind":"view","enabled":true,"visible":true,"bounds":{"width":320,"height":96}}],"cases":[{"name":"load widget tree","ran":true,"pass":true}]}`)
+	raw := []byte(`{"schema":"tetra.ui.native-runtime.v1","status":"pass","target":"linux-x64","host":"linux-x64","runtime":"native-ui-linux-x64","ui_schema":"tetra.ui.v0.4.0","processes":[{"name":"native app","kind":"app","ran":true,"pass":true,"exit_code":0},{"name":"native ui runtime","kind":"runtime","ran":true,"pass":true,"exit_code":0}],"widgets":[{"id":"ShellView","kind":"view","enabled":true,"visible":true,"bounds":{"width":320,"height":96}}],"cases":[{"name":"load widget tree","ran":true,"pass":true}]}`)
 	err := ValidateReport(raw)
 	if err == nil {
 		t.Fatalf("expected missing event transition to fail")

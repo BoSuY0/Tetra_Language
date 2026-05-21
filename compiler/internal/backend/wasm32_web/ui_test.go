@@ -19,7 +19,7 @@ func TestUIModuleIncludesSchemaGuardAndRuntimeDispatch(t *testing.T) {
 	src := string(wasm32_web.UIModule("app.ui.json"))
 	for _, want := range []string{
 		"tetra_ui: unsupported schema",
-		`bundle.schema !== "tetra.ui.v1"`,
+		`bundle.schema !== "tetra.ui.v0.4.0"`,
 		"runtime: web command dispatch",
 		"function applyTetraCommand(state, view, command)",
 		"function parseOperationValue(viewState, value)",
@@ -102,7 +102,7 @@ func main() -> Int:
 				t.Fatalf("read %s native shell sidecar: %v", target.triple, err)
 			}
 			for _, want := range []string{
-				"schema: tetra.ui.v1",
+				"schema: tetra.ui.v0.4.0",
 				"runtime: native shell command dispatch",
 				"view ShellView (state: ShellState)",
 				"dispatch submit -> toggle",
@@ -151,7 +151,7 @@ func main() -> Int:
 		t.Fatalf("read wasi ui json sidecar: %v", err)
 	}
 	for _, want := range []string{
-		`"schema": "tetra.ui.v1"`,
+		`"schema": "tetra.ui.v0.4.0"`,
 		`"name": "PanelView"`,
 		`"state_type": "PanelState"`,
 	} {
@@ -201,7 +201,7 @@ func main() -> Int:
 		t.Fatalf("lowered UI JSON is not deterministic\nfirst:\n%s\nsecond:\n%s", first, second)
 	}
 	for _, want := range []string{
-		`"schema":"tetra.ui.v1"`,
+		`"schema":"tetra.ui.v0.4.0"`,
 		`"name":"app.main.CounterView"`,
 		`"styles":[{"name":"width","type":"i32","value":"320"},{"name":"visible","type":"bool","value":"true"}]`,
 		`"accessibility":[{"name":"label","type":"str","value":"\"Increment\""},{"name":"enabled","type":"bool","value":"true"}]`,

@@ -26,8 +26,8 @@ func TestValidateWASMImportsAcceptsTargetAllowlists(t *testing.T) {
 			name:   "web",
 			target: "wasm32-web",
 			imports: []wasmImport{
-				{Module: "tetra_web_v1", Name: "console_log"},
-				{Module: "tetra_web_v1", Name: "panic"},
+				{Module: "tetra_web_v0.4.0", Name: "console_log"},
+				{Module: "tetra_web_v0.4.0", Name: "panic"},
 			},
 		},
 		{
@@ -58,15 +58,15 @@ func TestValidateWASMImportsRejectsExtraImports(t *testing.T) {
 			target: "wasm32-wasi",
 			imports: []wasmImport{
 				{Module: "wasi_snapshot_preview1", Name: "fd_write"},
-				{Module: "tetra_web_v1", Name: "panic"},
+				{Module: "tetra_web_v0.4.0", Name: "panic"},
 			},
-			want: "disallowed import tetra_web_v1.panic",
+			want: "disallowed import tetra_web_v0.4.0.panic",
 		},
 		{
 			name:   "web rejects wasi namespace",
 			target: "wasm32-web",
 			imports: []wasmImport{
-				{Module: "tetra_web_v1", Name: "console_log"},
+				{Module: "tetra_web_v0.4.0", Name: "console_log"},
 				{Module: "wasi_snapshot_preview1", Name: "fd_write"},
 			},
 			want: "disallowed import wasi_snapshot_preview1.fd_write",
@@ -84,10 +84,10 @@ func TestValidateWASMImportsRejectsExtraImports(t *testing.T) {
 			name:   "web rejects extra host function",
 			target: "wasm32-web",
 			imports: []wasmImport{
-				{Module: "tetra_web_v1", Name: "console_log"},
-				{Module: "tetra_web_v1", Name: "fetch"},
+				{Module: "tetra_web_v0.4.0", Name: "console_log"},
+				{Module: "tetra_web_v0.4.0", Name: "fetch"},
 			},
-			want: "disallowed import tetra_web_v1.fetch",
+			want: "disallowed import tetra_web_v0.4.0.fetch",
 		},
 	}
 
@@ -121,7 +121,7 @@ func TestValidateWASMImportReportValidatesCaseOutPaths(t *testing.T) {
 	dir := t.TempDir()
 	wasmPath := filepath.Join(dir, "ok.wasm")
 	if err := os.WriteFile(wasmPath, buildWASMModule([]wasmImport{
-		{Module: "tetra_web_v1", Name: "console_log"},
+		{Module: "tetra_web_v0.4.0", Name: "console_log"},
 	}), 0o644); err != nil {
 		t.Fatalf("write wasm: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestValidateWASMImportReportRejectsCaseExtraImport(t *testing.T) {
 	dir := t.TempDir()
 	wasmPath := filepath.Join(dir, "bad.wasm")
 	if err := os.WriteFile(wasmPath, buildWASMModule([]wasmImport{
-		{Module: "tetra_web_v1", Name: "console_log"},
+		{Module: "tetra_web_v0.4.0", Name: "console_log"},
 		{Module: "wasi_snapshot_preview1", Name: "fd_write"},
 	}), 0o644); err != nil {
 		t.Fatalf("write wasm: %v", err)

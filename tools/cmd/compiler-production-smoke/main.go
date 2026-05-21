@@ -159,7 +159,7 @@ func (r *smokeRunner) runCompileMatrix(ctx context.Context) error {
 		return err
 	}
 	loaderRaw, err := os.ReadFile(strings.TrimSuffix(webOut, ".wasm") + ".mjs")
-	if err != nil || !strings.Contains(string(loaderRaw), "tetra_web_v1") {
+	if err != nil || !strings.Contains(string(loaderRaw), "tetra_web_v0.4.0") {
 		r.cases = append(r.cases, failedCase("wasm32-web module and loader emission", "positive", "", fmt.Sprintf("web loader invalid: %v", err)))
 		return fmt.Errorf("wasm32-web loader invalid: %w", err)
 	}

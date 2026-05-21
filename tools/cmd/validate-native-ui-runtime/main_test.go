@@ -19,7 +19,7 @@ func TestValidateNativeUIRuntimeReportAcceptsExecutableEvidence(t *testing.T) {
 
 func TestValidateNativeUIRuntimeReportRejectsSidecarOnlyEvidence(t *testing.T) {
 	reportPath := filepath.Join(t.TempDir(), "native-ui.json")
-	raw := []byte(`{"schema":"tetra.ui.native-shell.v1","ui_schema":"tetra.ui.v1","runtime":"native shell command dispatch"}`)
+	raw := []byte(`{"schema":"tetra.ui.native-shell.v1","ui_schema":"tetra.ui.v0.4.0","runtime":"native shell command dispatch"}`)
 	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
@@ -39,7 +39,7 @@ func validNativeUIRuntimeReportJSON() []byte {
   "target": "linux-x64",
   "host": "linux-x64",
   "runtime": "native-ui-linux-x64",
-  "ui_schema": "tetra.ui.v1",
+  "ui_schema": "tetra.ui.v0.4.0",
   "source": "examples/ui_native_shell_smoke.tetra",
   "processes": [
     {"name":"tetra build","kind":"build","path":"/tmp/tetra","ran":true,"pass":true,"exit_code":0},

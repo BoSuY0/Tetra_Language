@@ -12,7 +12,7 @@ import (
 
 const (
 	nativeUISmokeSchemaV1   = "tetra.ui.native-shell.v1"
-	uiBundleSchemaV1        = "tetra.ui.v1"
+	uiBundleSchemaV1        = "tetra.ui.v0.4.0"
 	nativeUIRuntimeDispatch = "native shell command dispatch"
 )
 

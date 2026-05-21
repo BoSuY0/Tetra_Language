@@ -24,7 +24,7 @@ func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
 		Result:             "ok:0",
 		RuntimeTrace:       validWebUIRuntimeTrace,
 		DOMSnapshot:        domSnapshotPath,
-		UISchema:           "tetra.ui.v1",
+		UISchema:           "tetra.ui.v0.4.0",
 		UIBundlePath:       uiBundlePath,
 		UIModulePath:       uiModulePath,
 	}
@@ -56,7 +56,7 @@ func TestValidateWebUISmokeReportAcceptsRootModuleUIBundle(t *testing.T) {
 		Result:             "ok:0:ui=1",
 		RuntimeTrace:       validWebUIRuntimeTrace,
 		DOMSnapshot:        domSnapshotPath,
-		UISchema:           "tetra.ui.v1",
+		UISchema:           "tetra.ui.v0.4.0",
 		UIBundlePath:       uiBundlePath,
 		UIModulePath:       uiModulePath,
 	}
@@ -88,12 +88,12 @@ func TestValidateWebUISmokeReportAcceptsCommandOperations(t *testing.T) {
 		Result:             "ok:0:ui=1",
 		RuntimeTrace:       validWebUIRuntimeTrace,
 		DOMSnapshot:        domSnapshotPath,
-		UISchema:           "tetra.ui.v1",
+		UISchema:           "tetra.ui.v0.4.0",
 		UIBundlePath:       uiBundlePath,
 		UIModulePath:       uiModulePath,
 	}
 	if err := validateWebUISmokeReport(report); err != nil {
-		t.Fatalf("command operations should be valid tetra.ui.v1 evidence: %v", err)
+		t.Fatalf("command operations should be valid tetra.ui.v0.4.0 evidence: %v", err)
 	}
 }
 
@@ -128,7 +128,7 @@ func TestValidateWebUISmokeReportRejectsFallbackPass(t *testing.T) {
 		Result:             "ok:0",
 		RuntimeTrace:       validWebUIRuntimeTrace,
 		DOMSnapshot:        domSnapshotPath,
-		UISchema:           "tetra.ui.v1",
+		UISchema:           "tetra.ui.v0.4.0",
 		UIBundlePath:       uiBundlePath,
 		UIModulePath:       uiModulePath,
 	}
@@ -190,7 +190,7 @@ func TestValidateWebUISmokeReportRejectsPassWithoutOKResult(t *testing.T) {
 		Result:        "pending",
 		RuntimeTrace:  validWebUIRuntimeTrace,
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -232,7 +232,7 @@ func TestValidateWebUISmokeReportRejectsPassWithMissingUISidecarArtifact(t *test
 		Result:        "ok:0",
 		RuntimeTrace:  validWebUIRuntimeTrace,
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  filepath.Join(t.TempDir(), "missing.ui.json"),
 		UIModulePath:  filepath.Join(t.TempDir(), "missing.ui.web.mjs"),
 	}
@@ -255,7 +255,7 @@ func TestValidateWebUISmokeReportRejectsPassWithMissingDOMSnapshot(t *testing.T)
 		Result:        "ok:0",
 		RuntimeTrace:  validWebUIRuntimeTrace,
 		DOMSnapshot:   filepath.Join(t.TempDir(), "missing.dom.html"),
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -279,7 +279,7 @@ func TestValidateWebUISmokeReportRejectsPassWithMissingMountedDOMMarker(t *testi
 		Result:        "ok:0",
 		RuntimeTrace:  validWebUIRuntimeTrace,
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -321,7 +321,7 @@ func TestValidateWebUISmokeReportRejectsPassWithMissingDOMBindingMarker(t *testi
 		Result:        "ok:0",
 		RuntimeTrace:  validWebUIRuntimeTrace,
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -353,7 +353,7 @@ func TestValidateWebUISmokeReportAcceptsPassWithoutUIAccessibilityRole(t *testin
 		Result:        "ok:0",
 		RuntimeTrace:  validWebUIRuntimeTrace,
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -385,7 +385,7 @@ func TestValidateWebUISmokeReportRejectsPassWithUnknownUIBundleFields(t *testing
 		Result:        "ok:0",
 		RuntimeTrace:  validWebUIRuntimeTrace,
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -408,7 +408,7 @@ func TestValidateWebUISmokeReportRejectsPassWithoutRuntimeTrace(t *testing.T) {
 		Status:        "pass",
 		Result:        "ok:0",
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -432,7 +432,7 @@ func TestValidateWebUISmokeReportRejectsPassWithIncompleteRuntimeTrace(t *testin
 		Result:        "ok:0",
 		RuntimeTrace:  "main-exit:ok;stdout:ok;nonzero-exit:ok;repeated-instantiation:ok",
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -456,7 +456,7 @@ func TestValidateWebUISmokeReportRejectsPassWithoutUIEventDispatchBoundaryTrace(
 		Result:        "ok:0",
 		RuntimeTrace:  "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok",
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -480,7 +480,7 @@ func TestValidateWebUISmokeReportRejectsPassWithoutProductionUITrace(t *testing.
 		Result:        "ok:0",
 		RuntimeTrace:  "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch",
 		DOMSnapshot:   domSnapshotPath,
-		UISchema:      "tetra.ui.v1",
+		UISchema:      "tetra.ui.v0.4.0",
 		UIBundlePath:  uiBundlePath,
 		UIModulePath:  uiModulePath,
 	}
@@ -491,20 +491,20 @@ func TestValidateWebUISmokeReportRejectsPassWithoutProductionUITrace(t *testing.
 }
 
 func TestValidateUIBundleSchemaArtifactAcceptsCheckedInSchema(t *testing.T) {
-	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v1.schema.json")
+	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v0.4.0.schema.json")
 	if err := validateUIBundleSchemaArtifact(schemaPath); err != nil {
 		t.Fatalf("checked-in UI metadata schema artifact should be valid: %v", err)
 	}
 }
 
 func TestValidateUIBundleSchemaArtifactRejectsInvalidID(t *testing.T) {
-	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v1.schema.json")
+	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v0.4.0.schema.json")
 	raw, err := os.ReadFile(schemaPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw = []byte(strings.Replace(string(raw), `"tetra.ui.v1.schema.json"`, `"tetra.ui.v2.schema.json"`, 1))
-	invalidPath := filepath.Join(t.TempDir(), "tetra.ui.v1.schema.json")
+	raw = []byte(strings.Replace(string(raw), `"tetra.ui.v0.4.0.schema.json"`, `"tetra.ui.v2.schema.json"`, 1))
+	invalidPath := filepath.Join(t.TempDir(), "tetra.ui.v0.4.0.schema.json")
 	if err := os.WriteFile(invalidPath, raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -515,13 +515,13 @@ func TestValidateUIBundleSchemaArtifactRejectsInvalidID(t *testing.T) {
 }
 
 func TestValidateUIBundleSchemaArtifactRejectsTrailingJSONPayload(t *testing.T) {
-	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v1.schema.json")
+	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v0.4.0.schema.json")
 	raw, err := os.ReadFile(schemaPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	trailingPath := filepath.Join(t.TempDir(), "tetra.ui.v1.schema.json")
-	if err := os.WriteFile(trailingPath, append(raw, []byte(`{"$id":"tetra.ui.v1.schema.json"}`)...), 0o644); err != nil {
+	trailingPath := filepath.Join(t.TempDir(), "tetra.ui.v0.4.0.schema.json")
+	if err := os.WriteFile(trailingPath, append(raw, []byte(`{"$id":"tetra.ui.v0.4.0.schema.json"}`)...), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err = validateUIBundleSchemaArtifact(trailingPath)
@@ -552,7 +552,7 @@ func TestValidateUIBundleArtifactRejectsTrailingJSONPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(uiBundlePath, append(raw, []byte(`{"schema":"tetra.ui.v1"}`)...), 0o644); err != nil {
+	if err := os.WriteFile(uiBundlePath, append(raw, []byte(`{"schema":"tetra.ui.v0.4.0"}`)...), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, err = validateUIBundleArtifact(uiBundlePath)
@@ -583,7 +583,7 @@ func writeWebUISidecarArtifacts(t *testing.T) (string, string) {
 	uiBundlePath := filepath.Join(dir, "app.ui.json")
 	uiModulePath := filepath.Join(dir, "app.ui.web.mjs")
 	if err := os.WriteFile(uiBundlePath, []byte(`{
-  "schema":"tetra.ui.v1",
+  "schema":"tetra.ui.v0.4.0",
   "states":[{"name":"CounterState","module":"main","fields":[{"name":"count","type":"i32","mutable":true,"const":false,"init":"0"}]}],
   "views":[{
     "name":"CounterView",

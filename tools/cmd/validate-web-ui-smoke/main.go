@@ -14,10 +14,10 @@ import (
 )
 
 const webUISmokeSchema = "tetra.web-ui-smoke.v1alpha1"
-const uiBundleSchema = "tetra.ui.v1"
+const uiBundleSchema = "tetra.ui.v0.4.0"
 const uiEventDispatchBoundaryTrace = "ui-event-dispatch:web-command-dispatch"
-const uiBundleSchemaArtifactID = "tetra.ui.v1.schema.json"
-const defaultUIBundleSchemaArtifactPath = "docs/schemas/tetra.ui.v1.schema.json"
+const uiBundleSchemaArtifactID = "tetra.ui.v0.4.0.schema.json"
+const defaultUIBundleSchemaArtifactPath = "docs/schemas/tetra.ui.v0.4.0.schema.json"
 
 type webUISmokeReport struct {
 	Schema             string `json:"schema"`
@@ -119,7 +119,7 @@ func main() {
 	var reportPath string
 	var uiSchemaArtifactPath string
 	flag.StringVar(&reportPath, "report", "", "path to web UI smoke JSON report")
-	flag.StringVar(&uiSchemaArtifactPath, "ui-schema-artifact", defaultUIBundleSchemaArtifactPath, "path to tetra.ui.v1 JSON Schema artifact")
+	flag.StringVar(&uiSchemaArtifactPath, "ui-schema-artifact", defaultUIBundleSchemaArtifactPath, "path to tetra.ui.v0.4.0 JSON Schema artifact")
 	flag.Parse()
 	if reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -345,7 +345,7 @@ func validateUIBundleArtifact(path string) (uiBundleArtifact, error) {
 	}
 	var bundle uiBundleArtifact
 	if err := decodeStrictJSON(raw, &bundle); err != nil {
-		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui_bundle_path is not strict tetra.ui.v1 metadata: %w", err)
+		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui_bundle_path is not strict %s metadata: %w", uiBundleSchema, err)
 	}
 	if bundle.Schema != uiBundleSchema {
 		return uiBundleArtifact{}, fmt.Errorf("web UI smoke ui bundle schema = %q, want %q", bundle.Schema, uiBundleSchema)

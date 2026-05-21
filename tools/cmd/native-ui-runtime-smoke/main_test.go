@@ -61,7 +61,7 @@ func TestNativeRuntimeRejectsInvalidDispatchPaths(t *testing.T) {
 func nativeRuntimeSmokeFixture() []byte {
 	return []byte(`{
   "schema": "tetra.ui.native-shell.v1",
-  "ui_schema": "tetra.ui.v1",
+  "ui_schema": "tetra.ui.v0.4.0",
   "runtime": "native shell command dispatch",
   "states": [
     {"name":"ShellState","fields":[{"name":"toggles","type":"i32","mutable":true,"value":"0"}]}

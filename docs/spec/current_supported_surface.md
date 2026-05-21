@@ -823,19 +823,19 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   concurrency, GTK/Qt/OS UI toolkit backends, broad native UI input/change/focus
   behavior, and platform accessibility integration remain outside the current
   `v0.4.0` support claim.
-- UI metadata v1 (`ui.metadata-v1`) is promoted for the `v0.4.0` metadata
-  contract: checked state/view declarations, deterministic `tetra.ui.v1` JSON,
-  wasm32-web command-dispatch preview sidecars for lowered scalar state
+- UI metadata v0.4.0 (`ui.metadata-v1`) is promoted for the `v0.4.0` metadata
+  contract: checked state/view declarations, deterministic `tetra.ui.v0.4.0` JSON,
+  wasm32-web command-dispatch runtime artifacts for lowered scalar state
   operations, and native shell command-dispatch text plus
   `tetra.ui.native-shell.v1` JSON trace sidecars for lowered scalar state
   operations and deterministic native shell widget-tree artifacts, including
   direct assignment and integer increment/decrement updates, including
   supported `+=`/`-=` compound assignments, with scalar assignment hydration
   and same-state field-copy assignment in command order.
-  The web preview mirrors supported style and accessibility metadata into DOM
-  preview attributes, but this is not platform-native widgets, a full
-  styling/layout engine, platform accessibility API integration, or `v1.0.0`
-  readiness without the full release gate.
+  The web runtime mirrors supported style and accessibility metadata into DOM
+  attributes, but this is not platform-native widgets, a full styling/layout
+  engine, platform accessibility API integration, or cross-platform GUI
+  production readiness without separate host-native gates.
 - UI native runtime (`ui.native-runtime`) is promoted only for the Linux-x64
   production slice. The release gate runs
   `bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh`, which builds the
@@ -854,7 +854,7 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `wasmtime` or the Node WASI fallback. `wasm32-web` uses
   `run_mode: "web_runner"` and runs through a discovered Chromium-compatible
   browser runner. Browser automation is also the required Web UI runtime smoke
-  evidence when it instantiates real WASM, mounts DOM from `tetra.ui.v1`, and
+  evidence when it instantiates real WASM, mounts DOM from `tetra.ui.v0.4.0`, and
   passes `go run ./tools/cmd/validate-web-ui-smoke`. Missing runners are explicit environment blockers in
   `targets --format=json`; Linux-x64 native UI runtime evidence remains a
   separate `ui.native-runtime` release artifact and does not promote

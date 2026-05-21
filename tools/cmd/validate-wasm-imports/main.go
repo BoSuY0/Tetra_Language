@@ -141,8 +141,8 @@ func importPolicy(target string) (map[string]bool, error) {
 		}, nil
 	case "wasm32-web":
 		return map[string]bool{
-			"tetra_web_v1.console_log": true,
-			"tetra_web_v1.panic":       true,
+			"tetra_web_v0.4.0.console_log": true,
+			"tetra_web_v0.4.0.panic":       true,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported target %q", target)

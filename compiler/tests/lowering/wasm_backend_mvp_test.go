@@ -286,7 +286,7 @@ func runWasmWebMainWithNode(t *testing.T, src string, stem string, want int) {
 (async () => {
   const bytes = fs.readFileSync(process.argv[1]);
   const imports = {
-    tetra_web_v1: {
+    "tetra_web_v0.4.0": {
       console_log() {},
       panic(code) { throw new Error("tetra panic(" + (code | 0) + ")"); },
     },

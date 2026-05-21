@@ -22,7 +22,7 @@ import (
 
 const (
 	nativeShellSchemaV1        = "tetra.ui.native-shell.v1"
-	uiBundleSchemaV1           = "tetra.ui.v1"
+	uiBundleSchemaV1           = "tetra.ui.v0.4.0"
 	nativeShellRuntimeDispatch = "native shell command dispatch"
 )
 

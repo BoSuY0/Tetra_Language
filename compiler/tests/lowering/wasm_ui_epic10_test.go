@@ -76,7 +76,7 @@ func TestWebUIDogfoodBuildWritesSchemaCheckedArtifacts(t *testing.T) {
 		t.Fatalf("read web ui bundle: %v", err)
 	}
 	for _, want := range []string{
-		`"schema": "tetra.ui.v1"`,
+		`"schema": "tetra.ui.v0.4.0"`,
 		`"name": "TodoView"`,
 		`"state_type": "TodoState"`,
 	} {
@@ -160,7 +160,7 @@ func TestWASMUIExamplesBuildWithDeterministicMetadataSidecars(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read ui bundle: %v", err)
 			}
-			if !strings.Contains(string(uiJSON), `"schema": "tetra.ui.v1"`) || !strings.Contains(string(uiJSON), tc.viewName) {
+			if !strings.Contains(string(uiJSON), `"schema": "tetra.ui.v0.4.0"`) || !strings.Contains(string(uiJSON), tc.viewName) {
 				t.Fatalf("unexpected ui bundle for %s:\n%s", tc.name, uiJSON)
 			}
 			for _, want := range tc.accessibility {
@@ -222,7 +222,7 @@ func TestNativeShellUIExampleWritesMetadataPreviewSidecar(t *testing.T) {
 		t.Fatalf("read native shell trace: %v", err)
 	}
 	for _, want := range []string{
-		"schema: tetra.ui.v1",
+		"schema: tetra.ui.v0.4.0",
 		"runtime: native shell command dispatch",
 		"view ShellView (state: ShellState)",
 		"dispatch submit -> toggle",
@@ -253,7 +253,7 @@ func TestNativeShellUIExampleWritesMetadataPreviewSidecar(t *testing.T) {
 	}
 	for _, want := range []string{
 		`"schema": "tetra.ui.native-shell.v1"`,
-		`"ui_schema": "tetra.ui.v1"`,
+		`"ui_schema": "tetra.ui.v0.4.0"`,
 		`"runtime": "native shell command dispatch"`,
 		`"widgets":`,
 		`"id": "ShellView.labelText"`,

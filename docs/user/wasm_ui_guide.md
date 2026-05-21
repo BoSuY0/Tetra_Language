@@ -12,12 +12,12 @@ UI runtime proof comes from `tetra.ui.native-runtime.v1` smoke evidence.
 The target plan is documented in `docs/backend/wasm_backend_plan.md` and
 `docs/backend/wasm_architecture.md`.
 
-Required v1.0 targets:
+Required post-v0.4 WASM targets:
 
 - `wasm32-wasi`
 - `wasm32-web`
 
-Required release checks:
+Required post-v0.4 release checks:
 
 ```sh
 ./tetra smoke --target wasm32-wasi --run=false --report /tmp/tetra-wasi-artifact.json
@@ -42,7 +42,7 @@ validated `blocked` report and remains a release blocker for web UI evidence.
 
 For a `pass` web UI smoke report, validator-enforced evidence now includes:
 
-- `ui_schema: "tetra.ui.v1"`
+- `ui_schema: "tetra.ui.v0.4.0"`
 - `ui_bundle_path` ending in `.ui.json`
 - `ui_module_path` ending in `.ui.web.mjs`
 - `dom_snapshot` ending in `.html`
@@ -76,7 +76,7 @@ state and widget updates, covers invalid widget/malformed metadata/unsupported
 event/command failure negatives, closes the runtime, and writes
 `native-ui-linux-x64.json` under the selected report directory.
 
-Do not use `tetra.ui.v1` metadata, wasm/web UI reports, or
+Do not use `tetra.ui.v0.4.0` metadata, wasm/web UI reports, or
 `tetra.ui.native-shell.v1` sidecars alone as native runtime proof. macOS and
 Windows native UI runtime support still need their own host-native reports.
 

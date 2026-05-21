@@ -472,7 +472,7 @@ func TestFeaturesCommandJSON(t *testing.T) {
 			if feature.Status != "current" || feature.Since != "v0.4.0" {
 				t.Fatalf("ui.metadata-v1 lifecycle = status %q since %q, want current since v0.4.0", feature.Status, feature.Since)
 			}
-			for _, want := range []string{"production UI metadata contract", "deterministic tetra.ui.v1 JSON", "browser-backed web command-dispatch runtime", "wasm32-web command dispatch", "post-v0.4 Web UI runtime smoke"} {
+			for _, want := range []string{"production UI metadata contract", "deterministic tetra.ui.v0.4.0 JSON", "browser-backed web command-dispatch runtime", "wasm32-web command dispatch", "post-v0.4 Web UI runtime smoke"} {
 				if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
 					t.Fatalf("ui.metadata-v1 feature missing %q boundary: %#v", want, feature)
 				}

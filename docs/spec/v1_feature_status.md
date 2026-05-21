@@ -32,7 +32,7 @@ retain their registry-limited scope and do not imply full v1.0 closure.
 | Semantic clauses (`noalloc`, `noblock`, `realtime`, `nothrow`) | `implement in v1` | `nothrow` validation remains static. `noalloc`/`noblock`/`realtime` now have phase-1 checker enforcement on resolved direct calls, closure-symbol calls, function-typed callback arguments, callback parameters, and target-set-backed function-typed values using declared function-type effects when no single concrete callback symbol is available; `realtime` requires `noalloc`+`noblock`. Full whole-program/proof-level guarantees remain post-v1. |
 | Budget clauses (`budget`) | `implement in v1` | Static v1 MVP: `uses budget` plus `budget(<non-negative integer constant>)` is checked and lowered to deterministic local guards. Cross-function/runtime-wide and distributed budget accounting remains post-v1 in `v1_scope.md`. |
 | Privacy clauses (checked privacy + consent/privacy types) | `implement in v1` | Static v1 MVP: privacy clauses, `secret.i32`/`SecretInt`, consent-token signatures, and privacy builtins are checked. Cryptographic isolation and distributed consent enforcement remain post-v1 in `v1_scope.md`. |
-| UI syntax (`view`, `state`, binding/events/commands, typed style, accessibility metadata) | `implement in v1` | Scope is the current metadata UI surface in `ui_v1.md`: checked declarations, deterministic UI JSON, web command-dispatch preview artifacts, native shell command-dispatch text sidecar, and smoke evidence. The post-v0.4 Linux-x64 desktop runtime evidence is tracked separately and does not promote macOS, Windows, browser UI, full platform-native widgets, or platform accessibility integration into v1 closure. |
+| UI syntax (`view`, `state`, binding/events/commands, typed style, accessibility metadata) | `implement in v1` | Scope is the current metadata UI surface in `ui_v0.4.0.md`: checked declarations, deterministic UI JSON, web command-dispatch preview artifacts, native shell command-dispatch text sidecar, and smoke evidence. The post-v0.4 Linux-x64 desktop runtime evidence is tracked separately and does not promote macOS, Windows, browser UI, full platform-native widgets, or platform accessibility integration into v1 closure. |
 
 ## Spec Alignment
 
@@ -40,7 +40,7 @@ retain their registry-limited scope and do not imply full v1.0 closure.
   [flow_syntax_v1.md](./flow_syntax_v1.md). The previous
   [flow_syntax_mvp.md](./flow_syntax_mvp.md) path is retained only as an alias.
 - UI syntax, lowered metadata, web preview artifacts, and native shell sidecars
-  are documented in [ui_v1.md](./ui_v1.md).
+  are documented in [ui_v0.4.0.md](./ui_v0.4.0.md).
 - `unsafe`, capability, privacy, consent, and budget behavior remain as
   documented in [unsafe.md](./unsafe.md), [capabilities.md](./capabilities.md),
   and [effects_capabilities_privacy_v1.md](./effects_capabilities_privacy_v1.md).

@@ -66,3 +66,22 @@ func TestReleasePostV04READMEAdvertisesWASMUIGUIGate(t *testing.T) {
 		}
 	}
 }
+
+func TestReleaseV0400GateDelegatesToPostV04WASMUIGUIGate(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "scripts", "release", "v0.4.0_0", "gate.sh")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read v0.4.0_0 gate wrapper: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"post_v0_4/wasm-ui-gui-production-gate.sh",
+		`exec bash`,
+		`"$@"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("v0.4.0_0 gate wrapper missing %q", want)
+		}
+	}
+}
