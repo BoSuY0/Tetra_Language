@@ -19,6 +19,18 @@ func TestValidateActionsAvailabilityAcceptsJobBackedSuccess(t *testing.T) {
   "self_hosted_runner_count": 0,
   "billing_actions_status": "available",
   "billing_actions_detail": "billing API available",
+  "workflows": {
+    "total_count": 1,
+    "active_count": 1,
+    "entries": [
+      {
+        "id": 220876851,
+        "name": "ci",
+        "path": ".github/workflows/ci.yml",
+        "state": "active"
+      }
+    ]
+  },
   "run": {
     "id": 26250000001,
     "event": "workflow_dispatch",
@@ -61,6 +73,24 @@ func TestValidateActionsAvailabilityRejectsZeroJobStartupFailure(t *testing.T) {
   "self_hosted_runner_count": 0,
   "billing_actions_status": "unavailable_missing_user_scope",
   "billing_actions_detail": "requires gh auth refresh -h github.com -s user",
+  "workflows": {
+    "total_count": 2,
+    "active_count": 1,
+    "entries": [
+      {
+        "id": 220876851,
+        "name": "ci",
+        "path": ".github/workflows/ci.yml",
+        "state": "active"
+      },
+      {
+        "id": 220876857,
+        "name": "",
+        "path": "BuildFailed",
+        "state": "deleted"
+      }
+    ]
+  },
   "run": {
     "id": 26248635631,
     "event": "push",
@@ -109,6 +139,18 @@ func TestValidateActionsAvailabilityRejectsProductionEvidenceClaim(t *testing.T)
   "self_hosted_runner_count": 0,
   "billing_actions_status": "available",
   "billing_actions_detail": "billing API available",
+  "workflows": {
+    "total_count": 1,
+    "active_count": 1,
+    "entries": [
+      {
+        "id": 220876851,
+        "name": "ci",
+        "path": ".github/workflows/ci.yml",
+        "state": "active"
+      }
+    ]
+  },
   "run": {
     "id": 26250000001,
     "event": "workflow_dispatch",

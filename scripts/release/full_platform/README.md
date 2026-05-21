@@ -56,7 +56,9 @@ Manual target-host evidence:
   must prove a job-backed successful Actions run with logs. This is not runtime evidence;
   zero jobs, missing logs, `startup_failure`, `BuildFailed`, or unavailable
   billing visibility remain CI availability blockers before target-host reports
-  can be gathered through Actions.
+  can be gathered through Actions. The report also records the active workflow registry
+  so stale or deleted workflow records can be separated from the
+  currently active `ci` workflow.
 - To record that blocker as diagnostic only evidence, run
   `bash scripts/release/full_platform/github-actions-startup-diagnostic.sh
   --repo OWNER/REPO --branch BRANCH --canary-branch codex/actions-canary --report

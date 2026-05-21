@@ -26,8 +26,22 @@ type actionsAvailabilityReport struct {
 	SelfHostedRunnerCount int                    `json:"self_hosted_runner_count"`
 	BillingActionsStatus  string                 `json:"billing_actions_status"`
 	BillingActionsDetail  string                 `json:"billing_actions_detail"`
+	Workflows             actionsWorkflows       `json:"workflows"`
 	Run                   actionsAvailabilityRun `json:"run"`
 	NextAction            string                 `json:"next_action"`
+}
+
+type actionsWorkflows struct {
+	TotalCount  int                       `json:"total_count"`
+	ActiveCount int                       `json:"active_count"`
+	Entries     []actionsWorkflowRegistry `json:"entries"`
+}
+
+type actionsWorkflowRegistry struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	State string `json:"state"`
 }
 
 type actionsAvailabilityRun struct {
@@ -114,11 +128,52 @@ func validateActionsAvailability(raw []byte) error {
 	if report.BillingActionsStatus == "unavailable_missing_user_scope" {
 		issues = append(issues, "billing_actions_status is unavailable_missing_user_scope; refresh gh auth with user scope before availability can pass")
 	}
+	issues = append(issues, validateActionsWorkflows(report.Workflows, report.Workflow)...)
 	issues = append(issues, validateAvailabilityRun(report.Run)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateActionsWorkflows(workflows actionsWorkflows, expectedWorkflow string) []string {
+	var issues []string
+	if workflows.TotalCount <= 0 {
+		issues = append(issues, "workflows.total_count must be positive")
+	}
+	if workflows.ActiveCount <= 0 {
+		issues = append(issues, "workflows.active_count must be positive")
+	}
+	if len(workflows.Entries) == 0 {
+		issues = append(issues, "workflows.entries must not be empty")
+	}
+	actualActive := 0
+	hasExpectedActive := false
+	for i, entry := range workflows.Entries {
+		prefix := fmt.Sprintf("workflows.entries[%d]", i)
+		if entry.ID <= 0 {
+			issues = append(issues, prefix+".id must be positive")
+		}
+		if strings.TrimSpace(entry.Path) == "" {
+			issues = append(issues, prefix+".path is required")
+		}
+		if strings.TrimSpace(entry.State) == "" {
+			issues = append(issues, prefix+".state is required")
+		}
+		if entry.State == "active" {
+			actualActive++
+			if entry.Name == expectedWorkflow || strings.HasSuffix(entry.Path, "/"+expectedWorkflow+".yml") || strings.HasSuffix(entry.Path, "/"+expectedWorkflow+".yaml") {
+				hasExpectedActive = true
+			}
+		}
+	}
+	if workflows.ActiveCount != actualActive {
+		issues = append(issues, fmt.Sprintf("workflows.active_count is %d, computed %d", workflows.ActiveCount, actualActive))
+	}
+	if expectedWorkflow != "" && !hasExpectedActive {
+		issues = append(issues, fmt.Sprintf("workflows missing active workflow %q", expectedWorkflow))
+	}
+	return issues
 }
 
 func validateAvailabilityRun(run actionsAvailabilityRun) []string {

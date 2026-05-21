@@ -127,6 +127,7 @@ jobs_path="$tmp_dir/jobs.json"
 check_suite_path="$tmp_dir/check-suite.json"
 billing_path="$tmp_dir/billing.json"
 billing_err_path="$tmp_dir/billing.err"
+workflows_path="$tmp_dir/workflows.json"
 logs_path="$tmp_dir/logs.zip"
 
 gh run list \
@@ -200,6 +201,15 @@ if gh api "repos/$repo/actions/runners" >"$runners_path"; then
   self_hosted_runner_count="$(jq -r '.total_count // 0' "$runners_path")"
 fi
 
+workflows_total_count=0
+workflows_active_count=0
+workflows_entries='[]'
+if gh api "repos/$repo/actions/workflows" >"$workflows_path"; then
+  workflows_total_count="$(jq -r '.total_count // 0' "$workflows_path")"
+  workflows_active_count="$(jq -r '[.workflows[]? | select(.state == "active")] | length' "$workflows_path")"
+  workflows_entries="$(jq -c '[.workflows[]? | {id, name, path, state}]' "$workflows_path")"
+fi
+
 billing_actions_status="unavailable"
 billing_actions_detail="billing API unavailable"
 if gh api "users/$billing_owner/settings/billing/actions" >"$billing_path" 2>"$billing_err_path"; then
@@ -245,6 +255,9 @@ jq -n \
   --argjson selfHostedRunnerCount "$self_hosted_runner_count" \
   --arg billingActionsStatus "$billing_actions_status" \
   --arg billingActionsDetail "$billing_actions_detail" \
+  --argjson workflowsTotalCount "$workflows_total_count" \
+  --argjson workflowsActiveCount "$workflows_active_count" \
+  --argjson workflowsEntries "$workflows_entries" \
   --argjson runID "$run_id" \
   --arg runEvent "$run_event" \
   --arg runStatus "$run_status" \
@@ -274,6 +287,11 @@ jq -n \
     self_hosted_runner_count: $selfHostedRunnerCount,
     billing_actions_status: $billingActionsStatus,
     billing_actions_detail: $billingActionsDetail,
+    workflows: {
+      total_count: $workflowsTotalCount,
+      active_count: $workflowsActiveCount,
+      entries: $workflowsEntries
+    },
     run: {
       id: $runID,
       event: $runEvent,

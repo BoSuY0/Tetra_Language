@@ -87,6 +87,7 @@ func TestReleaseFullPlatformActionsAvailabilityPreflightIsNotRuntimeEvidence(t *
 		"gh api \"repos/$repo/actions/runs/$run_id/jobs\"",
 		"gh api \"repos/$repo/actions/runs/$run_id/logs\"",
 		"gh api \"repos/$repo/check-suites/$run_check_suite_id\"",
+		"gh api \"repos/$repo/actions/workflows\"",
 		"production_evidence: false",
 		"go run ./tools/cmd/validate-actions-availability --report \"$report_path\"",
 	} {
@@ -107,6 +108,7 @@ func TestReleaseFullPlatformActionsAvailabilityPreflightIsNotRuntimeEvidence(t *
 		"not runtime evidence",
 		"zero jobs",
 		"`BuildFailed`",
+		"active workflow registry",
 		"`macos-15-intel`",
 	} {
 		if !strings.Contains(readme, want) {
