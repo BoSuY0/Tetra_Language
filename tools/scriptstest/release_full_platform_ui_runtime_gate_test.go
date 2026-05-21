@@ -34,6 +34,8 @@ func TestReleaseFullPlatformUIRuntimeGateRunsMandatoryEvidence(t *testing.T) {
 		`go run ./tools/cmd/validate-web-ui-smoke --report "$report_dir/web-smoke.json"`,
 		"go run ./tools/cmd/validate-cross-platform-ui-runtime",
 		"TETRA_ACTIONS_STARTUP_BLOCKER_REPORT",
+		"actions_startup_blocker_report_snapshot",
+		"mktemp -d",
 		"actions-startup-blocker-validate",
 		`go run ./tools/cmd/validate-actions-startup-blocker --report "$report_dir/github-actions-startup-blocker.json"`,
 		`go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"`,
@@ -73,8 +75,12 @@ func TestReleaseFullPlatformGitHubActionsStartupDiagnosticIsBlockedOnly(t *testi
 	}
 	script := string(raw)
 	for _, want := range []string{
-		"Usage: bash scripts/release/full_platform/github-actions-startup-diagnostic.sh [--repo OWNER/REPO] [--branch BRANCH] [--report FILE]",
+		"Usage: bash scripts/release/full_platform/github-actions-startup-diagnostic.sh [--repo OWNER/REPO] [--branch BRANCH] [--report FILE] [--canary-branch BRANCH]",
 		"gh run list",
+		"gh api \"repos/$repo/actions/permissions\"",
+		"gh api \"repos/$repo/actions/runners\"",
+		"gh api \"users/$billing_owner/settings/billing/actions\"",
+		"minimal_canary",
 		"startup_failure",
 		"tetra.actions.startup-blocker.v1",
 		"remote_url=\"\"",
@@ -96,6 +102,8 @@ func TestReleaseFullPlatformGitHubActionsStartupDiagnosticIsBlockedOnly(t *testi
 		"github-actions-startup-diagnostic.sh",
 		"validate-actions-startup-blocker",
 		"diagnostic only",
+		"--canary-branch codex/actions-canary",
+		"billing_actions_status",
 	} {
 		if !strings.Contains(readme, want) {
 			t.Fatalf("full-platform README missing startup diagnostic detail %q", want)

@@ -51,6 +51,22 @@ done
 
 cd "$repo_root"
 
+tmp_dir=""
+cleanup() {
+  if [[ -n "$tmp_dir" ]]; then
+    rm -rf "$tmp_dir"
+  fi
+}
+trap cleanup EXIT
+
+actions_startup_blocker_report="${TETRA_ACTIONS_STARTUP_BLOCKER_REPORT:-}"
+actions_startup_blocker_report_snapshot=""
+if [[ -n "$actions_startup_blocker_report" && -f "$actions_startup_blocker_report" ]]; then
+  tmp_dir="$(mktemp -d)"
+  actions_startup_blocker_report_snapshot="$tmp_dir/github-actions-startup-blocker.json"
+  cp -- "$actions_startup_blocker_report" "$actions_startup_blocker_report_snapshot"
+fi
+
 prepare_report_dir() {
   mkdir -p "$report_dir"
   rm -f "$report_dir/native-ui-linux-x64.json"
@@ -136,9 +152,12 @@ run_step cross-platform-ui-validate go run ./tools/cmd/validate-cross-platform-u
   --macos "$report_dir/macos-ui-runtime.json" \
   --web "$report_dir/web-smoke.json"
 
-actions_startup_blocker_report="${TETRA_ACTIONS_STARTUP_BLOCKER_REPORT:-}"
 if [[ -n "$actions_startup_blocker_report" ]]; then
-  run_step actions-startup-blocker-import cp -- "$actions_startup_blocker_report" "$report_dir/github-actions-startup-blocker.json"
+  actions_startup_blocker_import_source="$actions_startup_blocker_report"
+  if [[ -n "$actions_startup_blocker_report_snapshot" ]]; then
+    actions_startup_blocker_import_source="$actions_startup_blocker_report_snapshot"
+  fi
+  run_step actions-startup-blocker-import cp -- "$actions_startup_blocker_import_source" "$report_dir/github-actions-startup-blocker.json"
   run_step actions-startup-blocker-validate go run ./tools/cmd/validate-actions-startup-blocker --report "$report_dir/github-actions-startup-blocker.json"
 fi
 

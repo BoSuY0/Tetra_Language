@@ -38,12 +38,18 @@ Manual target-host evidence:
   target-host reports produced from the same Git commit.
 - To record that blocker as diagnostic only evidence, run
   `bash scripts/release/full_platform/github-actions-startup-diagnostic.sh
-  --repo OWNER/REPO --branch BRANCH --report
+  --repo OWNER/REPO --branch BRANCH --canary-branch codex/actions-canary --report
   reports/full-platform-ui-runtime/github-actions-startup-blocker.json`, then
   `go run ./tools/cmd/validate-actions-startup-blocker --report
   reports/full-platform-ui-runtime/github-actions-startup-blocker.json`.
-  This report proves only that CI did not start jobs; it never replaces
-  Windows/macOS runtime reports.
+  This report records repository Actions permissions, self-hosted runner count,
+  `billing_actions_status`, the latest branch startup failures, and a minimal
+  canary workflow startup failure when provided. It proves only that CI did not
+  start jobs; it never replaces Windows/macOS runtime reports. If
+  `billing_actions_status` is `unavailable_missing_user_scope`, refresh the
+  GitHub CLI token with `gh auth refresh -h github.com -s user` before checking
+  whether private-repository Actions minutes or billing availability are the
+  actual account-level blocker.
 
 The wrappers copy those reports into the fresh report directory and re-run the
 strict validators before the cross-platform gate accepts them. The validators

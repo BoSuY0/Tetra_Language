@@ -13,6 +13,23 @@ func TestValidateStartupBlockerAcceptsZeroJobStartupFailure(t *testing.T) {
   "branch": "codex/full-platform-ui-runtime",
   "workflow": "ci",
   "summary": "GitHub Actions created runs but no jobs or logs were available.",
+  "diagnostics": {
+    "repo_actions_enabled": true,
+    "repo_allowed_actions": "all",
+    "self_hosted_runner_count": 0,
+    "billing_actions_status": "unavailable_missing_user_scope",
+    "billing_actions_detail": "requires gh auth refresh -h github.com -s user",
+    "minimal_canary": {
+      "branch": "codex/actions-canary",
+      "workflow": "ci",
+      "id": 26246587622,
+      "event": "workflow_dispatch",
+      "conclusion": "startup_failure",
+      "head_sha": "57650e5324754acc828dad90adcc67bc0dd2499b",
+      "jobs": 0,
+      "logs_available": false
+    }
+  },
   "runs": [
     {
       "id": 26246281021,
@@ -38,6 +55,35 @@ func TestValidateStartupBlockerAcceptsZeroJobStartupFailure(t *testing.T) {
 	}
 }
 
+func TestValidateStartupBlockerRequiresRepositoryDiagnostics(t *testing.T) {
+	raw := []byte(`{
+  "schema": "tetra.actions.startup-blocker.v1",
+  "status": "blocked",
+  "repo": "BoSuY0/Tetra_Language",
+  "branch": "codex/full-platform-ui-runtime",
+  "workflow": "ci",
+  "summary": "GitHub Actions created runs but no jobs or logs were available.",
+  "runs": [
+    {
+      "id": 26246281021,
+      "event": "workflow_dispatch",
+      "conclusion": "startup_failure",
+      "head_sha": "160a68184fd779bcc3797acf2bed65a6c9c83d78",
+      "jobs": 0,
+      "logs_available": false
+    }
+  ],
+  "next_action": "Use manual or self-hosted target-host Windows/macOS reports; do not count startup_failure as runtime evidence."
+}`)
+	err := validateStartupBlocker(raw)
+	if err == nil {
+		t.Fatalf("expected missing diagnostics to fail")
+	}
+	if !strings.Contains(err.Error(), "diagnostics") {
+		t.Fatalf("error missing diagnostics detail: %v", err)
+	}
+}
+
 func TestValidateStartupBlockerRejectsPassingOrJobBackedEvidence(t *testing.T) {
 	raw := []byte(`{
   "schema": "tetra.actions.startup-blocker.v1",
@@ -46,6 +92,14 @@ func TestValidateStartupBlockerRejectsPassingOrJobBackedEvidence(t *testing.T) {
   "branch": "codex/full-platform-ui-runtime",
   "workflow": "ci",
   "summary": "fake pass",
+  "diagnostics": {
+    "repo_actions_enabled": true,
+    "repo_allowed_actions": "all",
+    "self_hosted_runner_count": 0,
+    "billing_actions_status": "available",
+    "billing_actions_detail": "billing API available",
+    "minimal_canary": null
+  },
   "runs": [
     {
       "id": 1,
