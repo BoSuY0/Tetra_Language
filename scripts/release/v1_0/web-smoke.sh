@@ -329,6 +329,7 @@ JS
       };
       function mark(name, ok, detail = '') {
         trace.push(`${name}:${ok ? 'ok' : `fail:${detail}`}`);
+        traceEl.textContent = trace.join(';');
         if (!ok) {
           throw new Error(`runtime-${name}:${detail}`);
         }
@@ -337,6 +338,48 @@ JS
         const bundle = await mountTetraUI(document.body);
         if (!bundle || bundle.schema !== 'tetra.ui.v1') {
           throw new Error(`ui-schema:${String(bundle && bundle.schema)}`);
+        }
+        const host = document.querySelector('[data-tetra-ui="v1"]');
+        mark('window-mount', typeof window === 'object' && typeof document === 'object', 'missing browser globals');
+        mark('root-mount', !!host && document.body.contains(host), 'missing mounted root');
+        const rect = host.getBoundingClientRect();
+        mark('layout', rect.width >= 0 && rect.height >= 0 && host.style.minWidth === '320px', `rect=${rect.width}x${rect.height}`);
+        mark('panel', host.getAttribute('data-tetra-widget') === 'panel', 'missing panel widget');
+        const binding = host.querySelector('[data-tetra-binding]');
+        mark('text', !!binding && host.textContent.includes('Tetra UI Shell'), 'missing text/binding node');
+        const button = host.querySelector('button');
+        mark('button', !!button && button.textContent.includes('event'), 'missing button widget');
+        const input = host.querySelector('input[data-tetra-widget="input"]');
+        mark('input', !!input, 'missing input widget');
+        const select = host.querySelector('select[data-tetra-widget="list"]');
+        mark('list', !!select, 'missing list/select widget');
+        input.focus();
+        mark('focus', document.activeElement === input, 'input did not focus');
+        input.value = '5';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        mark('input-event', binding.textContent.includes('5'), binding.textContent);
+        input.value = '6';
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        mark('change', binding.textContent.includes('6'), binding.textContent);
+        select.value = 'item-2';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        mark('select', host.getAttribute('data-tetra-selected') === 'item-2', host.getAttribute('data-tetra-selected') || 'missing');
+        const beforeClick = binding.textContent;
+        button.click();
+        mark('click', binding.textContent !== beforeClick, `${beforeClick} -> ${binding.textContent}`);
+        await Promise.resolve();
+        mark('async-command', host.getAttribute('data-tetra-async') === 'complete', host.getAttribute('data-tetra-async') || 'missing');
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        mark('timer', host.getAttribute('data-tetra-timer') === 'tick', host.getAttribute('data-tetra-timer') || 'missing');
+        mark('redraw-update', Number.parseInt(host.getAttribute('data-tetra-redraw-count') || '0', 10) >= 3, host.getAttribute('data-tetra-redraw-count') || '0');
+        const invalidUIURL = URL.createObjectURL(new Blob(['{"schema":"tetra.ui.invalid"}'], { type: 'application/json' }));
+        try {
+          await mountTetraUI(document.body, invalidUIURL);
+          mark('error-recovery', false, 'missing UI metadata unexpectedly mounted');
+        } catch (err) {
+          mark('error-recovery', document.body.contains(host), String(err && err.message ? err.message : err));
+        } finally {
+          URL.revokeObjectURL(invalidUIURL);
         }
         trace.push('ui-event-dispatch:web-command-dispatch');
         const code = await runMainProbe();
@@ -462,7 +505,7 @@ HTML
           result="$(sed -n 's/.*id="result">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
           runtime_trace="$(sed -n 's/.*id="runtime-trace">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
           if [[ "$result" == ok:* ]]; then
-            for marker in main-exit:ok stdout:ok nonzero-exit:ok failure-propagation:ok repeated-instantiation:ok ui-event-dispatch:web-command-dispatch; do
+            for marker in window-mount:ok root-mount:ok layout:ok text:ok button:ok input:ok list:ok panel:ok focus:ok input-event:ok change:ok select:ok click:ok timer:ok async-command:ok redraw-update:ok error-recovery:ok main-exit:ok stdout:ok nonzero-exit:ok failure-propagation:ok repeated-instantiation:ok ui-event-dispatch:web-command-dispatch; do
               if [[ "$runtime_trace" != *"$marker"* ]]; then
                 status="fail"
                 blocker="browser runtime trace missing ${marker}"

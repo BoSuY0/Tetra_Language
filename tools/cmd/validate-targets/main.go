@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 )
@@ -44,15 +45,16 @@ type targetReportEntry struct {
 	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
 }
 
+var runTargetsCommand = func() ([]byte, error) {
+	cmd := exec.Command("go", "run", "./cli/cmd/tetra", "targets", "--format=json")
+	return cmd.CombinedOutput()
+}
+
 func main() {
 	var path string
 	flag.StringVar(&path, "report", "", "path to tetra targets --format=json output")
 	flag.Parse()
-	if path == "" {
-		fmt.Fprintln(os.Stderr, "error: --report is required")
-		os.Exit(2)
-	}
-	raw, err := os.ReadFile(path)
+	raw, err := readTargetsReport(path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -61,6 +63,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func readTargetsReport(path string) ([]byte, error) {
+	if path != "" {
+		return os.ReadFile(path)
+	}
+	raw, err := runTargetsCommand()
+	if err != nil {
+		return nil, fmt.Errorf("go run ./cli/cmd/tetra targets --format=json failed: %w: %s", err, strings.TrimSpace(string(raw)))
+	}
+	return raw, nil
 }
 
 func validateTargetsReport(raw []byte) error {

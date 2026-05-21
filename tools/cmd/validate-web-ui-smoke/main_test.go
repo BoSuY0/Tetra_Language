@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const validWebUIRuntimeTrace = "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch"
+const validWebUIRuntimeTrace = "window-mount:ok;root-mount:ok;layout:ok;text:ok;button:ok;input:ok;list:ok;panel:ok;focus:ok;input-event:ok;change:ok;select:ok;click:ok;timer:ok;async-command:ok;redraw-update:ok;error-recovery:ok;main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch"
 
 func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
 	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
@@ -428,7 +428,7 @@ func TestValidateWebUISmokeReportRejectsPassWithIncompleteRuntimeTrace(t *testin
 		UIModulePath:  uiModulePath,
 	}
 	err := validateWebUISmokeReport(report)
-	if err == nil || !strings.Contains(err.Error(), "failure-propagation:ok") {
+	if err == nil || !strings.Contains(err.Error(), "window-mount:ok") {
 		t.Fatalf("expected missing runtime marker rejection, got %v", err)
 	}
 }
@@ -445,7 +445,7 @@ func TestValidateWebUISmokeReportRejectsPassWithoutUIEventDispatchBoundaryTrace(
 		Automation:    "chromium --headless --dump-dom",
 		Status:        "pass",
 		Result:        "ok:0",
-		RuntimeTrace:  "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok",
+		RuntimeTrace:  strings.Replace(validWebUIRuntimeTrace, ";ui-event-dispatch:web-command-dispatch", "", 1),
 		DOMSnapshot:   domSnapshotPath,
 		UISchema:      "tetra.ui.v1",
 		UIBundlePath:  uiBundlePath,

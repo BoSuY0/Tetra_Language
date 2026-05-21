@@ -828,10 +828,13 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   direct assignment and integer increment/decrement updates, including
   supported `+=`/`-=` compound assignments, with scalar assignment hydration
   and same-state field-copy assignment in command order.
-  The web preview mirrors supported style and accessibility metadata into DOM
-  preview attributes, but this is not platform-native widgets, a full
-  styling/layout engine, platform accessibility API integration, or `v1.0.0`
-  readiness without the full release gate.
+  The web preview mounts deterministic DOM controls for panel, text, button,
+  input, and list/select smoke coverage, mirrors supported style and
+  accessibility metadata into DOM preview attributes, and records focus, input,
+  change, select, click, timer, async, redraw/update, and error-recovery markers
+  in the production browser smoke trace. This is not platform-native widgets, a
+  full styling/layout engine, platform accessibility API integration, or
+  `v1.0.0` readiness without the full release gate.
 - UI native runtime (`ui.native-runtime`) is promoted only for the Linux-x64
   production slice. The release gate runs
   `bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh`, which builds the
@@ -845,6 +848,19 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `tetra.ui.native-runtime.v1` schema. The validator rejects metadata-only,
   web-only, native-shell sidecar-only, fake/mock/placeholder, missing event
   execution, and missing state-transition evidence.
+- Cross-platform UI runtime promotion is tracked by the post-v0.4 full-platform
+  gate `scripts/release/full_platform/ui-runtime-gate.sh` and the
+  `tetra.ui.platform-runtime.v1` report contract. That gate is allowed to use
+  the Linux and Web runtime reports as regression evidence, but Windows and
+  macOS only become production UI targets when their own target-host reports
+  pass `validate-windows-ui-runtime` and `validate-macos-ui-runtime`. A blocked
+  report from a Linux host, build-only artifact, metadata-only bundle,
+  native-shell sidecar, fake/mock/placeholder report, or runtime-less report is
+  an explicit release blocker, not production evidence. CI fan-in may provide
+  real target-host reports through `TETRA_WINDOWS_UI_RUNTIME_REPORT` and
+  `TETRA_MACOS_UI_RUNTIME_REPORT`; the aggregation gate copies those reports
+  into the fresh report directory and reruns the strict validators before
+  accepting them.
 - WASM runtime execution is supported when the required host runner is
   discoverable. `wasm32-wasi` uses `run_mode: "wasi_runner"` and runs through
   `wasmtime` or the Node WASI fallback. `wasm32-web` uses

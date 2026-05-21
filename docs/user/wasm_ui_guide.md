@@ -43,12 +43,16 @@ For a `pass` web UI smoke report, validator-enforced evidence now includes:
 - `ui_bundle_path` ending in `.ui.json`
 - `ui_module_path` ending in `.ui.web.mjs`
 - `dom_snapshot` ending in `.html`
-- `runtime_trace` containing `ui-event-dispatch:web-command-dispatch`
+- `runtime_trace` containing window/root mount, layout, text, button, input,
+  list, panel, focus, input, change, select, click, timer, async command,
+  redraw/update, error recovery, and
+  `ui-event-dispatch:web-command-dispatch`
 
-Support boundary for v0.3.0:
+Current support boundary:
 
-- Web UI validates metadata, mounts a DOM preview shell, and dispatches
-  supported events to lowered scalar state command operations.
+- Web UI validates metadata, mounts a DOM preview shell with panel, text,
+  button, input, and list/select controls, and dispatches supported events to
+  lowered scalar state command operations.
 - `event click -> increment`/`decrement` style handlers are validated,
   rendered, and dispatched when the generated command operations describe
   supported direct assignment or integer `+/-` state updates, including
@@ -59,6 +63,9 @@ Support boundary for v0.3.0:
   accessibility metadata is mirrored into preview DOM attributes such as
   `data-tetra-style-*`, role, and aria-label; this is not a full layout engine
   or platform accessibility API integration.
+- The production browser smoke exercises focus, input, change, select, click,
+  timer, async, redraw/update, and error-recovery paths and records those
+  markers in `runtime_trace`.
 - WASI dogfood (`examples/projects/dogfood_wasi/src/main.tetra`) remains non-UI
   and should not emit UI runtime sidecars.
 
@@ -74,6 +81,15 @@ event/command failure negatives, closes the runtime, and writes
 Do not use `tetra.ui.v1` metadata, wasm/web UI reports, or
 `tetra.ui.native-shell.v1` sidecars alone as native runtime proof. macOS and
 Windows native UI runtime support still need their own host-native reports.
+
+The full-platform UI runtime gate is
+`scripts/release/full_platform/ui-runtime-gate.sh`. It writes fresh evidence in
+one report directory and requires Linux, Windows, macOS, and Web reports plus
+artifact hashes. On a Linux-only host, the Windows and macOS smoke wrappers
+write blocked `tetra.ui.platform-runtime.v1` reports and fail; that is the
+expected production blocker until real target-host runner evidence exists. CI
+fan-in can pass real runner reports back to the Linux aggregation gate with
+`TETRA_WINDOWS_UI_RUNTIME_REPORT` and `TETRA_MACOS_UI_RUNTIME_REPORT`.
 
 ## Plan250 Smoke Snapshot
 

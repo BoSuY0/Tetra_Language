@@ -231,6 +231,23 @@ func validateRuntimeTrace(trace string) error {
 		return fmt.Errorf("web UI smoke pass missing runtime_trace")
 	}
 	for _, marker := range []string{
+		"window-mount:ok",
+		"root-mount:ok",
+		"layout:ok",
+		"text:ok",
+		"button:ok",
+		"input:ok",
+		"list:ok",
+		"panel:ok",
+		"focus:ok",
+		"input-event:ok",
+		"change:ok",
+		"select:ok",
+		"click:ok",
+		"timer:ok",
+		"async-command:ok",
+		"redraw-update:ok",
+		"error-recovery:ok",
 		"main-exit:ok",
 		"stdout:ok",
 		"nonzero-exit:ok",

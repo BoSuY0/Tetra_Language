@@ -72,11 +72,15 @@ When a build contains a view:
 ## Backend Status
 
 `wasm32-web` is the browser command-dispatch preview backend. The generated web
-module reads the UI JSON bundle, mounts a simple DOM representation before
-running `tetra_main`, dispatches supported DOM events to lowered command
-operations, and refreshes scalar state bindings. The current lowered scalar
-operation set includes direct state assignment plus integer increment and
-decrement patterns of the form `state.field = state.field +/- <integer>`.
+module reads the UI JSON bundle, mounts a deterministic DOM representation
+before running `tetra_main`, dispatches supported DOM events to lowered command
+operations, and refreshes scalar state bindings. The mounted runtime includes a
+panel root, text/binding nodes, event buttons, an input control bound to the
+first mutable state field, and a list/select control used by the production
+smoke to exercise focus, input, change, select, click, timer, async, redraw, and
+error-recovery paths. The current lowered scalar operation set includes direct
+state assignment plus integer increment and decrement patterns of the form
+`state.field = state.field +/- <integer>`.
 The same integer delta operations are emitted for supported `+=` and `-=`
 compound assignments.
 String, boolean, and integer-like assignments are hydrated as scalar runtime
@@ -86,8 +90,12 @@ The web preview also mirrors supported style and accessibility metadata into
 DOM preview attributes such as `data-tetra-style-*`,
 `data-tetra-accessibility-*`, `role`, and `aria-label`; full styling/layout
 engines and platform accessibility API integration remain outside this surface.
-Passing web UI smoke evidence must carry the runtime trace marker
-`ui-event-dispatch:web-command-dispatch`.
+Passing production web UI smoke evidence must carry runtime trace markers for
+window/root mount, layout, text, button, input, list, panel, focus, input,
+change, select, click, timer, async command, redraw/update, error recovery, and
+the command-dispatch boundary `ui-event-dispatch:web-command-dispatch`. A
+browser report that only proves WASM instantiation or metadata mounting is not
+full web UI runtime evidence.
 
 Native shell UI is a deterministic text-mode command-dispatch preview backend.
 It renders the same validated state/view metadata into a sidecar, hydrates
@@ -135,6 +143,20 @@ sidecar-only, fake/mock/placeholder, missing event execution, and missing state
 transition evidence. macOS/Windows native UI runtime claims require separate
 host-native reports and are not promoted by the Linux-x64 report.
 
+Full-platform UI runtime promotion uses the separate
+`tetra.ui.platform-runtime.v1` contract and
+`scripts/release/full_platform/ui-runtime-gate.sh`. The contract keeps
+`tetra.ui.v1` as the compiler-to-runtime metadata schema while requiring
+target-host runtime evidence for platform UI execution: real process/window
+lifecycle, widget tree, layout bounds, event dispatch, state update, redraw,
+timer/async behavior, and negative diagnostics. `windows-x64` and `macos-x64`
+reports produced on a Linux host are written as blocked prerequisite reports and
+must not be counted as production evidence. Linux aggregation jobs can import
+reports produced on real Windows/macOS runners with
+`TETRA_WINDOWS_UI_RUNTIME_REPORT` and `TETRA_MACOS_UI_RUNTIME_REPORT`; imported
+reports are copied into the fresh report directory and validated before the
+cross-platform gate uses them.
+
 `wasm32-wasi` in this wave remains non-UI runtime: it may compile UI metadata
 for artifact inspection, but it does not ship web/native UI preview sidecars
 and does not provide UI event dispatch behavior.
@@ -174,7 +196,8 @@ commands that must back the promotion.
 
 ## Post-v1
 
-GTK/Qt/OS widget toolkit backends, macOS/Windows native UI runtime reports,
-richer event payloads, broad input/change/focus behavior, full styling/layout
-systems, and accessibility integration with platform APIs remain post-v1 unless
-promoted by a reviewed scope update.
+GTK/Qt/OS widget toolkit backends, passing macOS/Windows target-host native UI
+runtime reports, richer event payloads beyond the current web smoke controls,
+full styling/layout systems, and accessibility integration with platform APIs
+remain post-v1 unless promoted by a reviewed scope update and a passing
+full-platform gate.
