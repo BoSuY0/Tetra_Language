@@ -120,9 +120,11 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 runs_path="$tmp_dir/runs.json"
 run_path="$tmp_dir/run.json"
+run_details_path="$tmp_dir/run-details.json"
 permissions_path="$tmp_dir/permissions.json"
 runners_path="$tmp_dir/runners.json"
 jobs_path="$tmp_dir/jobs.json"
+check_suite_path="$tmp_dir/check-suite.json"
 billing_path="$tmp_dir/billing.json"
 billing_err_path="$tmp_dir/billing.err"
 logs_path="$tmp_dir/logs.zip"
@@ -152,10 +154,32 @@ run_status="$(jq -r '.status // ""' "$run_path")"
 run_conclusion="$(jq -r '.conclusion // ""' "$run_path")"
 run_head_sha="$(jq -r '.headSha // ""' "$run_path")"
 run_workflow_name="$(jq -r '.workflowName // ""' "$run_path")"
+run_workflow_path=""
+run_workflow_id=0
+run_check_suite_id=0
+run_check_suite_app=""
+run_check_suite_status=""
+run_check_suite_conclusion=""
+run_check_suite_latest_check_runs_count=0
+run_check_suite_head_sha=""
 run_jobs=0
 logs_available="false"
 
 if [[ "$run_id" =~ ^[0-9]+$ && "$run_id" -gt 0 ]]; then
+  if gh api "repos/$repo/actions/runs/$run_id" >"$run_details_path"; then
+    run_workflow_name="$(jq -r '.name // ""' "$run_details_path")"
+    run_workflow_path="$(jq -r '.path // ""' "$run_details_path")"
+    run_workflow_id="$(jq -r '.workflow_id // 0' "$run_details_path")"
+    run_check_suite_id="$(jq -r '.check_suite_id // 0' "$run_details_path")"
+  fi
+  if [[ "$run_check_suite_id" =~ ^[0-9]+$ && "$run_check_suite_id" -gt 0 ]] &&
+     gh api "repos/$repo/check-suites/$run_check_suite_id" >"$check_suite_path"; then
+    run_check_suite_app="$(jq -r '.app.slug // ""' "$check_suite_path")"
+    run_check_suite_status="$(jq -r '.status // ""' "$check_suite_path")"
+    run_check_suite_conclusion="$(jq -r '.conclusion // ""' "$check_suite_path")"
+    run_check_suite_latest_check_runs_count="$(jq -r '.latest_check_runs_count // 0' "$check_suite_path")"
+    run_check_suite_head_sha="$(jq -r '.head_sha // ""' "$check_suite_path")"
+  fi
   if gh api "repos/$repo/actions/runs/$run_id/jobs" >"$jobs_path"; then
     run_jobs="$(jq -r '.total_count // 0' "$jobs_path")"
   fi
@@ -198,6 +222,13 @@ if [[ "$repo_actions_enabled" == "true" &&
       "$run_conclusion" == "success" &&
       "$run_jobs" -gt 0 &&
       "$logs_available" == "true" &&
+      "$run_workflow_path" != "BuildFailed" &&
+      "$run_workflow_id" -gt 0 &&
+      "$run_check_suite_id" -gt 0 &&
+      "$run_check_suite_app" == "github-actions" &&
+      "$run_check_suite_status" == "completed" &&
+      "$run_check_suite_conclusion" == "success" &&
+      "$run_check_suite_latest_check_runs_count" -gt 0 &&
       "$billing_actions_status" != "unavailable_missing_user_scope" ]]; then
   availability_status="pass"
   summary="GitHub Actions can start jobs and expose logs."
@@ -220,6 +251,14 @@ jq -n \
   --arg runConclusion "$run_conclusion" \
   --arg runHeadSHA "$run_head_sha" \
   --arg runWorkflowName "$run_workflow_name" \
+  --arg runWorkflowPath "$run_workflow_path" \
+  --argjson runWorkflowID "$run_workflow_id" \
+  --argjson runCheckSuiteID "$run_check_suite_id" \
+  --arg runCheckSuiteApp "$run_check_suite_app" \
+  --arg runCheckSuiteStatus "$run_check_suite_status" \
+  --arg runCheckSuiteConclusion "$run_check_suite_conclusion" \
+  --argjson runCheckSuiteLatestCheckRunsCount "$run_check_suite_latest_check_runs_count" \
+  --arg runCheckSuiteHeadSHA "$run_check_suite_head_sha" \
   --argjson runJobs "$run_jobs" \
   --argjson logsAvailable "$logs_available" \
   '{
@@ -242,6 +281,17 @@ jq -n \
       conclusion: $runConclusion,
       head_sha: $runHeadSHA,
       workflow_name: $runWorkflowName,
+      workflow_path: $runWorkflowPath,
+      workflow_id: $runWorkflowID,
+      check_suite_id: $runCheckSuiteID,
+      check_suite: {
+        id: $runCheckSuiteID,
+        app: $runCheckSuiteApp,
+        status: $runCheckSuiteStatus,
+        conclusion: $runCheckSuiteConclusion,
+        latest_check_runs_count: $runCheckSuiteLatestCheckRunsCount,
+        head_sha: $runCheckSuiteHeadSHA
+      },
       jobs: $runJobs,
       logs_available: $logsAvailable
     },

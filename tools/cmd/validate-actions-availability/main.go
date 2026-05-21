@@ -31,14 +31,27 @@ type actionsAvailabilityReport struct {
 }
 
 type actionsAvailabilityRun struct {
-	ID            int64  `json:"id"`
-	Event         string `json:"event"`
-	Status        string `json:"status"`
-	Conclusion    string `json:"conclusion"`
-	HeadSHA       string `json:"head_sha"`
-	WorkflowName  string `json:"workflow_name"`
-	Jobs          int    `json:"jobs"`
-	LogsAvailable bool   `json:"logs_available"`
+	ID            int64                         `json:"id"`
+	Event         string                        `json:"event"`
+	Status        string                        `json:"status"`
+	Conclusion    string                        `json:"conclusion"`
+	HeadSHA       string                        `json:"head_sha"`
+	WorkflowName  string                        `json:"workflow_name"`
+	WorkflowPath  string                        `json:"workflow_path"`
+	WorkflowID    int64                         `json:"workflow_id"`
+	CheckSuiteID  int64                         `json:"check_suite_id"`
+	CheckSuite    actionsAvailabilityCheckSuite `json:"check_suite"`
+	Jobs          int                           `json:"jobs"`
+	LogsAvailable bool                          `json:"logs_available"`
+}
+
+type actionsAvailabilityCheckSuite struct {
+	ID                   int64  `json:"id"`
+	App                  string `json:"app"`
+	Status               string `json:"status"`
+	Conclusion           string `json:"conclusion"`
+	LatestCheckRunsCount int    `json:"latest_check_runs_count"`
+	HeadSHA              string `json:"head_sha"`
 }
 
 func main() {
@@ -116,6 +129,18 @@ func validateAvailabilityRun(run actionsAvailabilityRun) []string {
 	if strings.TrimSpace(run.Event) == "" {
 		issues = append(issues, "run.event is required")
 	}
+	if strings.TrimSpace(run.WorkflowPath) == "" {
+		issues = append(issues, "run.workflow_path is required")
+	}
+	if run.WorkflowPath == "BuildFailed" {
+		issues = append(issues, "run.workflow_path is BuildFailed; workflow did not build jobs")
+	}
+	if run.WorkflowID <= 0 {
+		issues = append(issues, "run.workflow_id must be positive")
+	}
+	if run.CheckSuiteID <= 0 {
+		issues = append(issues, "run.check_suite_id must be positive")
+	}
 	if run.Status != "completed" {
 		issues = append(issues, fmt.Sprintf("run.status is %q, want completed", run.Status))
 	}
@@ -125,11 +150,35 @@ func validateAvailabilityRun(run actionsAvailabilityRun) []string {
 	if strings.TrimSpace(run.HeadSHA) == "" {
 		issues = append(issues, "run.head_sha is required")
 	}
+	issues = append(issues, validateAvailabilityCheckSuite(run.CheckSuite)...)
 	if run.Jobs <= 0 {
 		issues = append(issues, fmt.Sprintf("run.jobs is %d, want at least 1", run.Jobs))
 	}
 	if !run.LogsAvailable {
 		issues = append(issues, "run.logs_available must be true")
+	}
+	return issues
+}
+
+func validateAvailabilityCheckSuite(suite actionsAvailabilityCheckSuite) []string {
+	var issues []string
+	if suite.ID <= 0 {
+		issues = append(issues, "run.check_suite.id must be positive")
+	}
+	if suite.App != "github-actions" {
+		issues = append(issues, fmt.Sprintf("run.check_suite.app is %q, want github-actions", suite.App))
+	}
+	if suite.Status != "completed" {
+		issues = append(issues, fmt.Sprintf("run.check_suite.status is %q, want completed", suite.Status))
+	}
+	if suite.Conclusion != "success" {
+		issues = append(issues, fmt.Sprintf("run.check_suite.conclusion is %q, want success", suite.Conclusion))
+	}
+	if suite.LatestCheckRunsCount <= 0 {
+		issues = append(issues, fmt.Sprintf("run.check_suite.latest_check_runs_count is %d, want at least 1", suite.LatestCheckRunsCount))
+	}
+	if strings.TrimSpace(suite.HeadSHA) == "" {
+		issues = append(issues, "run.check_suite.head_sha is required")
 	}
 	return issues
 }

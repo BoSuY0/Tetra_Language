@@ -79,8 +79,10 @@ func TestReleaseFullPlatformActionsAvailabilityPreflightIsNotRuntimeEvidence(t *
 		"Usage: bash scripts/release/full_platform/actions-availability-preflight.sh [--repo OWNER/REPO] [--branch BRANCH] [--report FILE]",
 		"tetra.actions.availability.v1",
 		"gh run list",
+		"gh api \"repos/$repo/actions/runs/$run_id\"",
 		"gh api \"repos/$repo/actions/runs/$run_id/jobs\"",
 		"gh api \"repos/$repo/actions/runs/$run_id/logs\"",
+		"gh api \"repos/$repo/check-suites/$run_check_suite_id\"",
 		"production_evidence: false",
 		"go run ./tools/cmd/validate-actions-availability --report \"$report_path\"",
 	} {
@@ -100,6 +102,7 @@ func TestReleaseFullPlatformActionsAvailabilityPreflightIsNotRuntimeEvidence(t *
 		"validate-actions-availability",
 		"not runtime evidence",
 		"zero jobs",
+		"`BuildFailed`",
 	} {
 		if !strings.Contains(readme, want) {
 			t.Fatalf("full-platform README missing Actions availability detail %q", want)

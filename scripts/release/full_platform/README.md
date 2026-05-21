@@ -43,9 +43,9 @@ Manual target-host evidence:
   `go run ./tools/cmd/validate-actions-availability --report
   reports/full-platform-ui-runtime/actions-availability.json`. This preflight
   must prove a job-backed successful Actions run with logs. This is not runtime evidence;
-  zero jobs, missing logs, `startup_failure`, or unavailable billing
-  visibility remain CI availability blockers before target-host reports can be
-  gathered through Actions.
+  zero jobs, missing logs, `startup_failure`, `BuildFailed`, or unavailable
+  billing visibility remain CI availability blockers before target-host reports
+  can be gathered through Actions.
 - To record that blocker as diagnostic only evidence, run
   `bash scripts/release/full_platform/github-actions-startup-diagnostic.sh
   --repo OWNER/REPO --branch BRANCH --canary-branch codex/actions-canary --report

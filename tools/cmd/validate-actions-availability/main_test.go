@@ -26,6 +26,17 @@ func TestValidateActionsAvailabilityAcceptsJobBackedSuccess(t *testing.T) {
     "conclusion": "success",
     "head_sha": "abcdef1234567890",
     "workflow_name": "ci",
+    "workflow_path": ".github/workflows/ci.yml",
+    "workflow_id": 220876851,
+    "check_suite_id": 70197691298,
+    "check_suite": {
+      "id": 70197691298,
+      "app": "github-actions",
+      "status": "completed",
+      "conclusion": "success",
+      "latest_check_runs_count": 1,
+      "head_sha": "abcdef1234567890"
+    },
     "jobs": 1,
     "logs_available": true
   },
@@ -57,6 +68,17 @@ func TestValidateActionsAvailabilityRejectsZeroJobStartupFailure(t *testing.T) {
     "conclusion": "startup_failure",
     "head_sha": "ecd8e2fcd06d26b4e79f603788ecb8842f641a32",
     "workflow_name": "",
+    "workflow_path": "BuildFailed",
+    "workflow_id": 220876857,
+    "check_suite_id": 70197691298,
+    "check_suite": {
+      "id": 70197691298,
+      "app": "github-actions",
+      "status": "completed",
+      "conclusion": "startup_failure",
+      "latest_check_runs_count": 0,
+      "head_sha": "ecd8e2fcd06d26b4e79f603788ecb8842f641a32"
+    },
     "jobs": 0,
     "logs_available": false
   },
@@ -66,7 +88,7 @@ func TestValidateActionsAvailabilityRejectsZeroJobStartupFailure(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected startup_failure availability report to fail")
 	}
-	for _, want := range []string{"status", "success", "jobs", "logs_available", "billing_actions_status"} {
+	for _, want := range []string{"status", "success", "jobs", "logs_available", "billing_actions_status", "BuildFailed", "check_suite"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("availability error missing %q: %v", want, err)
 		}
@@ -94,6 +116,17 @@ func TestValidateActionsAvailabilityRejectsProductionEvidenceClaim(t *testing.T)
     "conclusion": "success",
     "head_sha": "abcdef1234567890",
     "workflow_name": "ci",
+    "workflow_path": ".github/workflows/ci.yml",
+    "workflow_id": 220876851,
+    "check_suite_id": 70197691298,
+    "check_suite": {
+      "id": 70197691298,
+      "app": "github-actions",
+      "status": "completed",
+      "conclusion": "success",
+      "latest_check_runs_count": 1,
+      "head_sha": "abcdef1234567890"
+    },
     "jobs": 1,
     "logs_available": true
   },
