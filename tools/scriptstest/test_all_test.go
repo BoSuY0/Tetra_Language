@@ -771,7 +771,7 @@ func TestTestAllTopLevelGoTestBypassesCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
-	want := `run_step "go test all packages" go test ./compiler/... ./cli/... ./tools/... -count=1`
+	want := `run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT go test ./compiler/... ./cli/... ./tools/... -count=1`
 	if !strings.Contains(string(raw), want) {
 		t.Fatalf("test_all top-level go test should bypass cache with %q", want)
 	}

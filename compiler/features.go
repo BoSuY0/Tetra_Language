@@ -33,7 +33,7 @@ func FeatureRegistry() []FeatureInfo {
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.2.0",
 			Scope:     "check/build/run/fmt/test/doc/doctor/targets/features/formats/new/interface/project/workspace/smoke/eco/clean/version/lsp local workflows",
-			Stability: "supported in the current v0.4.0 local profile",
+			Stability: "supported in the current bounded release profile",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/cli_contracts.md", "docs/user/cli_cheatsheet.md"},
 		},
 		{
@@ -293,7 +293,7 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Full v1.0 language guarantees",
 			Status:    FeatureStatusPlanned,
 			Scope:     "complete v1.0 release contract after mandatory release-gate evidence",
-			Stability: "future label while repository remains on the v0.4.0 profile",
+			Stability: "planned full-language guarantee set; not implied by the bounded v1.0.0 release profile",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/v1_scope.md"},
 		},
 		{

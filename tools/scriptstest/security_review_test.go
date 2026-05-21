@@ -120,8 +120,8 @@ Decision: approved for ` + version + ` release
 - ` + "`go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1`: pass" + `
 - ` + "`go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1`: pass" + `
 - ` + "`go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1`: pass" + `
-- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report <path>`: pass" + `
-- ` + "`bash scripts/release/v1_0/web-smoke.sh --report <path>`: pass" + `
+- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report reports/v1-security/wasi-smoke.json`: pass" + `
+- ` + "`bash scripts/release/v1_0/web-smoke.sh --report reports/v1-security/web-smoke.json`: pass" + `
 
 ## Artifact Hashes
 
@@ -141,6 +141,29 @@ Decision: approved for ` + version + ` release
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("security review signoff should validate: %v\n%s", err, out)
+	}
+}
+
+func TestSecurityReviewSignoffValidatorRejectsPlaceholderSmokePaths(t *testing.T) {
+	dir := t.TempDir()
+	signoff := filepath.Join(dir, "security-review.md")
+	head := currentGitHead(t)
+	version := currentReleaseVersion(t)
+	raw := validReleaseV10SecuritySignoff(version, head)
+	raw = strings.ReplaceAll(raw, "--report reports/v1-security/wasi-smoke.json", "--report <path>")
+	raw = strings.ReplaceAll(raw, "--report reports/v1-security/web-smoke.json", "--report <path>")
+	if err := os.WriteFile(signoff, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command("bash", "scripts/release/v1_0/security-review.sh", "--signoff", signoff)
+	cmd.Dir = repoRoot(t)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("signoff with placeholder smoke report paths should fail\n%s", out)
+	}
+	if !strings.Contains(string(out), "placeholder") {
+		t.Fatalf("validator should explain placeholder smoke path failure:\n%s", out)
 	}
 }
 
@@ -345,8 +368,8 @@ Decision: approved for ` + version + ` release
 - ` + "`go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1`: pass" + `
 - ` + "`go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1`: pass" + `
 - ` + "`go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1`: pass" + `
-- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report <path>`: pass" + `
-- ` + "`bash scripts/release/v1_0/web-smoke.sh --report <path>`: pass" + `
+- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report reports/v1-security/wasi-smoke.json`: pass" + `
+- ` + "`bash scripts/release/v1_0/web-smoke.sh --report reports/v1-security/web-smoke.json`: pass" + `
 
 ## Artifact Hashes
 
@@ -389,8 +412,8 @@ Decision: approved for v0.1.2 release
 - ` + "`go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1`: pass" + `
 - ` + "`go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1`: pass" + `
 - ` + "`go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1`: pass" + `
-- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report <path>`: pass" + `
-- ` + "`bash scripts/release/v1_0/web-smoke.sh --report <path>`: pass" + `
+- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report reports/v1-security/wasi-smoke.json`: pass" + `
+- ` + "`bash scripts/release/v1_0/web-smoke.sh --report reports/v1-security/web-smoke.json`: pass" + `
 
 ## Artifact Hashes
 
@@ -432,8 +455,8 @@ Decision: approved for ` + version + ` release
 - ` + "`go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1`: pass" + `
 - ` + "`go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1`: pass" + `
 - ` + "`go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1`: pass" + `
-- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report <path>`: pass" + `
-- ` + "`bash scripts/release/v1_0/web-smoke.sh --report <path>`: pass" + `
+- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report reports/v1-security/wasi-smoke.json`: pass" + `
+- ` + "`bash scripts/release/v1_0/web-smoke.sh --report reports/v1-security/web-smoke.json`: pass" + `
 
 ## Artifact Hashes
 
@@ -848,8 +871,8 @@ Decision: approved for ` + version + ` release
 - ` + "`go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1`: pass" + `
 - ` + "`go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1`: pass" + `
 - ` + "`go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1`: pass" + `
-- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report <path>`: pass" + `
-- ` + "`bash scripts/release/v1_0/web-smoke.sh --report <path>`: pass" + `
+- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report reports/v1-security/wasi-smoke.json`: pass" + `
+- ` + "`bash scripts/release/v1_0/web-smoke.sh --report reports/v1-security/web-smoke.json`: pass" + `
 
 ## Artifact Hashes
 

@@ -5,7 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 cd "$repo_root"
 
-release_artifact="tetra.release.v0_4_0.bootstrap-binaries.v1"
+release_artifact="tetra.release.v1_0_0.bootstrap-binaries.v1"
 
 usage() {
   cat <<'USAGE'

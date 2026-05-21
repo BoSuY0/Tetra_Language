@@ -1,26 +1,29 @@
-# Tetra Language (v0.4.0)
+# Tetra Language (v1.0.0)
 
 Tetra is a systems programming language with region-based memory management
 through Islands. This repository is the working local compiler/toolchain, not
 the full future Tetra platform.
 
-The current public profile is **v0.4.0**. It keeps the verified local compiler,
+The current public profile is **v1.0.0**. It keeps the verified local compiler,
 tooling, T4 source format, interface, runtime, validator, release-gate
-foundation, and the promoted v0.4 language/tooling slices. Older v0.5/v0.6
-labels are historical checkpoints, and `v1.0.0` is a future release label.
+foundation, the promoted v0.4 language/tooling slices, and the post-v0.4
+WASM/UI/GUI production slices that have runner-backed evidence. Older v0.5/v0.6
+labels are historical checkpoints, and full platform guarantees remain governed
+by the explicit feature registry and scope documents.
 
 ## Current Truth
 
 - Current supported surface: `docs/spec/current_supported_surface.md`
-- Previous minor scope: `docs/spec/v0_3_scope.md`
-- Current minor scope: `docs/spec/v0_4_scope.md`
-- Future v1 contract: `docs/spec/v1_scope.md`
-- Current release checklist: `docs/checklists/v0_4_0_release_gate.md`
-- Current release gate: `scripts/release/v0_4_0/gate.sh`
-- Current release handoff: `docs/release/v0_4_0_final_handoff.md`
+- Previous minor scope: `docs/spec/v0_4_scope.md`
+- Current major scope: `docs/spec/v1_scope.md`
+- Bounded v1 contract: `docs/spec/v1_scope.md`
+- Current release checklist: `docs/checklists/v1_0_release_gate.md`
+- Current release gate: `scripts/release/v1_0/gate.sh`
+- Current release handoff: `docs/release/v1_0_final_handoff.md`
 
-Do not treat future or compatibility `v1_0` filenames as proof that this branch
-is ready for the `v1.0.0` label.
+Do not treat this bounded `v1.0.0` profile as a claim for EcoNet, hosted
+TetraHub, non-Linux desktop GUI runtime, WebAssembly host features outside the
+documented runners, or full first-class language guarantees.
 
 ## Quick Start
 

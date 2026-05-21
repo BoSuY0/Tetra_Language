@@ -157,7 +157,7 @@ require_line() {
   fi
 }
 
-if grep -Eq "<(name and contact|git commit sha|release report directory|approved for ${release_version_re} release \| blocked|pass/fail, date, log path|artifact file name|64 lowercase hex chars|accepted residual risk or \"None\")>|TODO|TBD" -- "$signoff_path"; then
+if grep -Eq "<(name and contact|git commit sha|release report directory|approved for ${release_version_re} release \| blocked|pass/fail, date, log path|artifact file name|64 lowercase hex chars|accepted residual risk or \"None\")>|<[A-Za-z0-9_ ./:-]+>|TODO|TBD" -- "$signoff_path"; then
   echo "security_review: signoff contains template placeholder text" >&2
   exit 1
 fi
@@ -174,15 +174,15 @@ for command in \
   'go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json' \
   "go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1" \
   "go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1" \
-  "go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1" \
-  'bash scripts/release/v1_0/wasi-smoke.sh --report <path>' \
-  'bash scripts/release/v1_0/web-smoke.sh --report <path>'
+  "go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1"
 do
   if [[ "$text" != *"\`$command\`: pass"* ]]; then
     echo "security_review: missing passing evidence command: $command" >&2
     exit 1
   fi
 done
+require_line '^- `bash scripts/release/v1_0/wasi-smoke\.sh --report [^`<>]+`: pass$' 'passing WASI smoke evidence command with concrete report path'
+require_line '^- `bash scripts/release/v1_0/web-smoke\.sh --report [^`<>]+`: pass$' 'passing Web smoke evidence command with concrete report path'
 
 artifact_hash_lines="$(awk '
   /^## Artifact Hashes$/ { in_hashes=1; next }

@@ -2,18 +2,18 @@
 
 Status: user-facing release status summary for the current branch.
 
-The current public profile is `v0.4.0`. Treat this page as a navigation layer;
+The current public profile is `v1.0.0`. Treat this page as a navigation layer;
 the release-truth documents remain `docs/spec/current_supported_surface.md` and
-`docs/spec/v0_4_scope.md`.
+`docs/spec/v1_scope.md`.
 
 ## Candidate Status
 
-The current branch has a `v0.4.0` Linux-x64 release gate path plus separate
-post-v0.4 WASM/UI/GUI promotion evidence.
+The current branch has a bounded `v1.0.0` release gate path with fresh
+Linux-x64, WASI, web, and post-v0.4 WASM/UI/GUI promotion evidence.
 
 This candidate is verified for local Linux development and testing. For the
-current Linux-x64 objective, macOS and Windows runtime evidence are out of
-scope. The post-v0.4 WASM/UI/GUI gate is not full `v1.0.0` readiness.
+current bounded objective, macOS and Windows runtime evidence are out of scope;
+their checked surface remains build-only cross-target smoke.
 
 ## Supported Today
 
@@ -32,13 +32,14 @@ scope. The post-v0.4 WASM/UI/GUI gate is not full `v1.0.0` readiness.
 
 ## Preview Boundaries
 
-`docs/spec/current_supported_surface.md` explains the promoted `v0.4.0` slices
+`docs/spec/current_supported_surface.md` explains the promoted bounded profile
 and the areas that remain experimental, planned, or reporting-only.
 
 ## Future Work
 
-`docs/spec/v1_scope.md` is the future major-release contract. It must not be
-read as current `v1.0.0` readiness while the branch remains on `v0.4.0`.
+`docs/spec/v1_scope.md` is the current bounded major-release contract. It must
+not be read as a claim for features that the feature registry still marks
+planned, post-v1, or outside target evidence.
 
 ## Where To Go Next
 
