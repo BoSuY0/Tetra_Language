@@ -15,6 +15,7 @@ func releaseV10GateFakeRepo(t *testing.T) string {
 		"bin",
 		"docs/baselines",
 		"docs/generated/v1_0",
+		"docs/release",
 		"examples",
 		"scripts",
 		"scripts/ci",
@@ -41,6 +42,9 @@ func releaseV10GateFakeRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "docs", "baselines", "api-diff-baseline.v1alpha1.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "release", "v1_0_final_handoff.md"), []byte("# Tetra v1.0 Final Handoff\n\nStatus: ready for lint fixture.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "security-review.md"), []byte("# Security Review\n"), 0o644); err != nil {

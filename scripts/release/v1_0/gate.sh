@@ -402,6 +402,30 @@ write_security_review_detached_hash() {
   printf '%s  artifacts/security-review.md\n' "$review_hash" >"$detached_hash_path"
 }
 
+check_handoff_signoff_lint() {
+  local review_path="$artifacts_dir/security-review.md"
+  local lint_output
+  if [[ ! -f "$review_path" ]]; then
+    echo "release/v1_0/gate: missing security review for handoff/signoff lint: $review_path" >&2
+    return 1
+  fi
+  if ! command -v rg >/dev/null 2>&1; then
+    echo "release/v1_0/gate: rg is required for handoff/signoff lint" >&2
+    return 1
+  fi
+  if lint_output="$(rg -n 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' docs/release/v1_0_final_handoff.md "$review_path" 2>&1)"; then
+    printf '%s\n' "$lint_output" >&2
+    echo "release/v1_0/gate: handoff/signoff lint found unresolved placeholders" >&2
+    return 1
+  fi
+  local rc="$?"
+  if [[ "$rc" -eq 1 ]]; then
+    return 0
+  fi
+  printf '%s\n' "$lint_output" >&2
+  return "$rc"
+}
+
 check_release_state() {
   if [[ "$failed_count" -gt 0 ]]; then
     write_summary "blocked"
@@ -499,6 +523,7 @@ run_step "Web runtime browser smoke" check_web_runtime_smoke
 run_step "backend summary artifact" check_backend_summary
 run_step "security review signoff" check_security_review_signoff
 run_step "security review detached hash" write_security_review_detached_hash
+run_step "handoff signoff lint" check_handoff_signoff_lint
 run_step "API diff gate" check_api_diff
 run_step "performance regression evidence" check_performance_regression_artifact
 run_step "binary size thresholds" check_binary_size_thresholds

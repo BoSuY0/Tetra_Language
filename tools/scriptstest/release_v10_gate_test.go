@@ -31,6 +31,7 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 		`run_step "WASI runner smoke" check_wasi_runner_smoke`,
 		`run_step "Web runtime browser smoke" check_web_runtime_smoke`,
 		`run_step "security review detached hash" write_security_review_detached_hash`,
+		`run_step "handoff signoff lint" check_handoff_signoff_lint`,
 		`run_step "WASI artifact/import smoke"`,
 		`go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$1"`,
 		`run_step "Web artifact/import smoke"`,
@@ -143,6 +144,7 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 		"build-only smoke macos-x64",
 		"build-only smoke windows-x64",
 		"backend summary artifact",
+		"handoff signoff lint",
 		"API diff gate",
 		"reproducible build proof",
 		"release state audit",
@@ -396,6 +398,29 @@ func TestReleaseV10GateWritesBlockedSecurityArtifactWhenSignoffMissing(t *testin
 	wantHash := fmt.Sprintf("%x  artifacts/security-review.md\n", sha256.Sum256(reviewRaw))
 	if string(hashRaw) != wantHash {
 		t.Fatalf("blocked security review detached hash = %q, want %q", string(hashRaw), wantHash)
+	}
+}
+
+func TestReleaseV10GateRejectsSecuritySignoffPlaceholders(t *testing.T) {
+	root := releaseV10GateFakeRepo(t)
+	reportDir := filepath.Join(root, "report")
+	signoffPath := filepath.Join(root, "security-review.md")
+	if err := os.WriteFile(signoffPath, []byte("# Security Review\n\nDecision: approved\nEvidence: <fill-me>\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command("bash", "scripts/release/v1_0/gate.sh", "--report-dir", reportDir)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(),
+		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TETRA_SECURITY_REVIEW_SIGNOFF="+signoffPath,
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("v1.0 gate should reject placeholder security signoff\n%s", out)
+	}
+	if !strings.Contains(string(out), "handoff/signoff lint found unresolved placeholders") {
+		t.Fatalf("placeholder signoff output did not explain lint blocker:\n%s", out)
 	}
 }
 
