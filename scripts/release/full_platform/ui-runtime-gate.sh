@@ -18,6 +18,11 @@ evidence and artifact hashes validate.
 For CI fan-in, set TETRA_WINDOWS_UI_RUNTIME_REPORT and
 TETRA_MACOS_UI_RUNTIME_REPORT to validated target-host reports produced on real
 Windows and macOS runners.
+
+For diagnostic-only GitHub Actions startup blockers, set
+TETRA_ACTIONS_STARTUP_BLOCKER_REPORT to a report validated by
+tools/cmd/validate-actions-startup-blocker. This never replaces Windows/macOS
+runtime evidence.
 USAGE
 }
 
@@ -58,6 +63,7 @@ prepare_report_dir() {
   rm -f "$report_dir/web-smoke.chromium.err"
   rm -f "$report_dir/web-smoke.ui.json"
   rm -f "$report_dir/web-smoke.ui.web.mjs"
+  rm -f "$report_dir/github-actions-startup-blocker.json"
   rm -f "$report_dir/artifact-hashes.json"
   rm -f "$report_dir/full-platform-ui-runtime-gate.json"
 }
@@ -129,6 +135,12 @@ run_step cross-platform-ui-validate go run ./tools/cmd/validate-cross-platform-u
   --windows "$report_dir/windows-ui-runtime.json" \
   --macos "$report_dir/macos-ui-runtime.json" \
   --web "$report_dir/web-smoke.json"
+
+actions_startup_blocker_report="${TETRA_ACTIONS_STARTUP_BLOCKER_REPORT:-}"
+if [[ -n "$actions_startup_blocker_report" ]]; then
+  run_step actions-startup-blocker-import cp -- "$actions_startup_blocker_report" "$report_dir/github-actions-startup-blocker.json"
+  run_step actions-startup-blocker-validate go run ./tools/cmd/validate-actions-startup-blocker --report "$report_dir/github-actions-startup-blocker.json"
+fi
 
 write_gate_report
 
