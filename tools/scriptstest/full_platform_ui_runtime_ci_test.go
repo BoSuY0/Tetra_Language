@@ -105,3 +105,29 @@ func TestFullPlatformUIRuntimeWorkflowDocumentsCurrentActionlintRunnerLabel(t *t
 		}
 	}
 }
+
+func TestMainCIWorkflowRunsFullPlatformUIRuntimeFanIn(t *testing.T) {
+	path := filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read CI workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"full-platform-ui-runtime-target-host:",
+		"full-platform-ui-runtime-gate-linux:",
+		"needs: full-platform-ui-runtime-target-host",
+		"os: windows-2025",
+		"target: windows-x64",
+		"os: macos-15-intel",
+		"target: macos-x64",
+		"go run ./tools/cmd/platform-ui-runtime-smoke --target \"${{ matrix.target }}\" --report \"${{ matrix.report }}\"",
+		"TETRA_WINDOWS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-windows-x64/windows-ui-runtime.json",
+		"TETRA_MACOS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/macos-ui-runtime.json",
+		"bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("CI workflow missing full-platform UI runtime detail %q", want)
+		}
+	}
+}
