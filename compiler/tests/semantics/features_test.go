@@ -59,6 +59,7 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 		"language.lifetime-ssa":                   compiler.FeatureStatusCurrent,
 		"language.callable-level2":                compiler.FeatureStatusCurrent,
 		"wasm.runtime-execution":                  compiler.FeatureStatusCurrent,
+		"ui.toolkit-core":                         compiler.FeatureStatusCurrent,
 		"actors.distributed-runtime":              compiler.FeatureStatusCurrent,
 		"eco.distributed-network":                 compiler.FeatureStatusPostV1,
 		"ui.native-runtime":                       compiler.FeatureStatusCurrent,
@@ -225,6 +226,27 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	for _, want := range []string{"production UI metadata contract", "deterministic tetra.ui.v0.4.0 JSON", "browser-backed web command-dispatch runtime", "wasm32-web command dispatch", "post-v0.4 Web UI runtime smoke", "native shell command dispatch", "widget-tree traces", "JSON trace sidecars", "style metadata preview attributes", "accessibility metadata preview attributes"} {
 		if !strings.Contains(uiMetadata.Scope+" "+uiMetadata.Stability, want) {
 			t.Fatalf("UI metadata feature missing %q boundary: %#v", want, uiMetadata)
+		}
+	}
+	uiToolkit := seenFeature["ui.toolkit-core"]
+	if uiToolkit.Status != compiler.FeatureStatusCurrent || uiToolkit.Since != "v0.4.0" {
+		t.Fatalf("ui.toolkit-core lifecycle = status %q since %q, want current since v0.4.0", uiToolkit.Status, uiToolkit.Since)
+	}
+	for _, want := range []string{"production platform-independent UI Toolkit Core contract", "tetra.ui.toolkit.v1", "widget model", "layout model", "accessibility model", "event dispatch", "state binding/update", "runtime trace artifacts", "metadata-only", "runtime-less", "native-shell sidecar-only", "web-only", "GTK/Qt/OS platform backend production", "full cross-platform UI"} {
+		if !strings.Contains(uiToolkit.Scope+" "+uiToolkit.Stability, want) {
+			t.Fatalf("UI toolkit core feature missing %q boundary: %#v", want, uiToolkit)
+		}
+	}
+	for _, wantDoc := range []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_toolkit_core.md", "docs/spec/ui_v0.4.0.md"} {
+		found := false
+		for _, doc := range uiToolkit.Docs {
+			if doc == wantDoc {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("ui.toolkit-core missing doc %s: %#v", wantDoc, uiToolkit.Docs)
 		}
 	}
 	distributedActors := seenFeature["actors.distributed-runtime"]

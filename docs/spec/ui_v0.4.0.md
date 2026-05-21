@@ -66,6 +66,8 @@ accessibility metadata.
 When a build contains a view:
 
 - all targets emit `<output>.ui.json`;
+- all targets also emit `<output>.ui.toolkit.json` for the
+  platform-independent `tetra.ui.toolkit.v1` compatibility lowering;
 - `wasm32-web` also emits `<output>.ui.web.mjs` and `<output>.ui.html`;
 - native targets emit `<output>.ui.shell.txt`.
 
@@ -188,6 +190,15 @@ runs browser-backed Web UI smoke, validates `tetra.ui.v0.4.0` runtime evidence,
 runs Linux-x64 native UI runtime smoke, validates `tetra.ui.native-runtime.v1`,
 and writes artifact hashes. This does not promote macOS/Windows GUI or full
 toolkit/runtime guarantees.
+
+The separate UI Toolkit Core production gate is:
+
+`bash scripts/release/post_v0_4/ui-toolkit-core-production-gate.sh --report-dir reports/ui-toolkit-core`
+
+It validates fresh `tetra.ui.toolkit.v1` runtime-core evidence and artifact
+hashes. This promotes only the backend-independent toolkit core described in
+`docs/spec/ui_toolkit_core.md`; it does not promote GTK/Qt/OS platform backends,
+Windows/macOS GUI production, or full cross-platform UI.
 
 ## Post-v1
 

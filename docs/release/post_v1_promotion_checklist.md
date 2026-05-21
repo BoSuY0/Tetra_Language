@@ -5,6 +5,11 @@ Status: required checklist before post-v1 features move into release scope.
 Use this checklist for closures, enum payloads, structured concurrency, full UI
 runtime work, EcoNet, and any feature listed as post-v1 in `docs/spec/v1_scope.md`.
 
+The post-v0.4 UI Toolkit Core promotion is a narrower internal-runtime wave:
+it is gated by `scripts/release/post_v0_4/ui-toolkit-core-production-gate.sh`
+and `tetra.ui.toolkit.v1` evidence, but it does not close the full UI runtime
+or platform-backend checklist item below.
+
 ## Required Promotion Evidence
 
 - [ ] Design note names the feature, owner, compatibility story, and explicit
@@ -37,4 +42,3 @@ runtime work, EcoNet, and any feature listed as post-v1 in `docs/spec/v1_scope.m
 Do not mark a post-v1 feature release-covered until this checklist, the security
 review gate when applicable, and the release evidence artifact all reference the
 same branch state.
-

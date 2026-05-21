@@ -280,6 +280,15 @@ func FeatureRegistry() []FeatureInfo {
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v0.4.0.md", "docs/spec/v1_feature_status.md", "docs/user/wasm_ui_guide.md"},
 		},
 		{
+			ID:        "ui.toolkit-core",
+			Name:      "UI Toolkit Core contract runtime",
+			Status:    FeatureStatusCurrent,
+			Since:     "v0.4.0",
+			Scope:     "production platform-independent UI Toolkit Core contract for tetra.ui.toolkit.v1 with widget model, layout model, style model, accessibility model, event model, state binding model, widget tree construction, layout measurement and placement, event dispatch, state binding/update, focus traversal, timer/async command/redraw/error recovery evidence, deterministic compiler .ui.toolkit.json emission, and validator-gated runtime trace artifacts",
+			Stability: "current toolkit core only; validators reject metadata-only, preview-only, runtime-less, native-shell sidecar-only, web-only, docs-only, build-only, fake/mock/placeholder evidence, and this does not claim GTK/Qt/OS platform backend production, Windows/macOS GUI production, or full cross-platform UI",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_toolkit_core.md", "docs/spec/ui_v0.4.0.md"},
+		},
+		{
 			ID:        "wasm.runtime-execution",
 			Name:      "WASM runtime execution",
 			Status:    FeatureStatusCurrent,

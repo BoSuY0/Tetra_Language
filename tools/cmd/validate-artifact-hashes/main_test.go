@@ -37,6 +37,16 @@ func TestArtifactHashManifestValidatesGeneratedFiles(t *testing.T) {
 	}
 }
 
+func TestResolveHashManifestPathAcceptsRootOutValidationForm(t *testing.T) {
+	got, err := resolveHashManifestPath("", "reports/ui-toolkit-core", "reports/ui-toolkit-core/artifact-hashes.json")
+	if err != nil {
+		t.Fatalf("resolveHashManifestPath: %v", err)
+	}
+	if got != "reports/ui-toolkit-core/artifact-hashes.json" {
+		t.Fatalf("manifest path = %q", got)
+	}
+}
+
 func TestArtifactHashManifestRejectsModifiedArtifact(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "known_issues.md")

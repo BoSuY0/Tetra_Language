@@ -3084,6 +3084,7 @@ func main() -> Int:
 		t.Fatalf("build wasm32-web: %v", err)
 	}
 	uiJSON := strings.TrimSuffix(outPath, ".wasm") + ".ui.json"
+	uiToolkitJSON := strings.TrimSuffix(outPath, ".wasm") + ".ui.toolkit.json"
 	uiModule := strings.TrimSuffix(outPath, ".wasm") + ".ui.web.mjs"
 	uiHTML := strings.TrimSuffix(outPath, ".wasm") + ".ui.html"
 
@@ -3093,6 +3094,13 @@ func main() -> Int:
 	}
 	if !strings.Contains(string(jsonRaw), `"schema": "tetra.ui.v0.4.0"`) || !strings.Contains(string(jsonRaw), "CounterView") {
 		t.Fatalf("unexpected ui json:\n%s", string(jsonRaw))
+	}
+	toolkitRaw, err := os.ReadFile(uiToolkitJSON)
+	if err != nil {
+		t.Fatalf("read ui toolkit json: %v", err)
+	}
+	if !strings.Contains(string(toolkitRaw), `"schema": "tetra.ui.toolkit.v1"`) || !strings.Contains(string(toolkitRaw), `"compatibility_schema": "tetra.ui.v0.4.0"`) {
+		t.Fatalf("unexpected ui toolkit json:\n%s", string(toolkitRaw))
 	}
 	moduleRaw, err := os.ReadFile(uiModule)
 	if err != nil {

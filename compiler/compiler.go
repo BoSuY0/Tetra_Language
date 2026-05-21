@@ -1405,6 +1405,21 @@ func emitUIArtifacts(outputPath string, target string, checked *semantics.Checke
 	if err := os.WriteFile(uiJSONPath, raw, 0o644); err != nil {
 		return err
 	}
+	toolkitBundle, err := lower.LowerUIToolkit(bundle)
+	if err != nil {
+		return err
+	}
+	if toolkitBundle != nil {
+		toolkitPath := base + ".ui.toolkit.json"
+		toolkitRaw, err := json.MarshalIndent(toolkitBundle, "", "  ")
+		if err != nil {
+			return err
+		}
+		toolkitRaw = append(toolkitRaw, '\n')
+		if err := os.WriteFile(toolkitPath, toolkitRaw, 0o644); err != nil {
+			return err
+		}
+	}
 	if target == "wasm32-web" {
 		uiModulePath := base + ".ui.web.mjs"
 		uiModule := wasm32_web.UIModule(filepath.Base(uiJSONPath))

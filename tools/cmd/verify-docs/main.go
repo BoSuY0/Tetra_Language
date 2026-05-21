@@ -550,6 +550,7 @@ func verifyFeatureRegistry(features []featureManifest) error {
 		"language.lifetime-ssa":                   "current",
 		"language.callable-level2":                "current",
 		"ui.metadata-v1":                          "current",
+		"ui.toolkit-core":                         "current",
 		"wasm.runtime-execution":                  "current",
 		"actors.distributed-runtime":              "current",
 		"ui.native-runtime":                       "current",
@@ -689,6 +690,22 @@ func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"native-shell sidecar-only",
 			"macOS/Windows",
 		},
+		"ui.toolkit-core": {
+			"production platform-independent UI Toolkit Core contract",
+			"tetra.ui.toolkit.v1",
+			"widget model",
+			"layout model",
+			"accessibility model",
+			"event dispatch",
+			"state binding/update",
+			"runtime trace artifacts",
+			"metadata-only",
+			"runtime-less",
+			"native-shell sidecar-only",
+			"web-only",
+			"GTK/Qt/OS platform backend production",
+			"full cross-platform UI",
+		},
 	}
 	docChecks := map[string][]string{
 		"language.generics-mvp":                   {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
@@ -700,6 +717,7 @@ func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
 		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
 		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
 		"ui.native-runtime":                       {"docs/spec/current_supported_surface.md", "docs/spec/ui_v0.4.0.md", "docs/user/wasm_ui_guide.md"},
+		"ui.toolkit-core":                         {"docs/spec/current_supported_surface.md", "docs/spec/ui_toolkit_core.md", "docs/spec/ui_v0.4.0.md"},
 	}
 	for id, required := range checks {
 		feature, ok := features[id]

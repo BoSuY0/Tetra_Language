@@ -67,14 +67,25 @@ func main() {
 		}
 		return
 	}
-	if manifestPath == "" {
-		fmt.Fprintln(os.Stderr, "error: --manifest is required unless --write is set")
+	manifestPath, err := resolveHashManifestPath(manifestPath, root, out)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 	if err := validateHashManifest(manifestPath); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func resolveHashManifestPath(manifestPath string, root string, out string) (string, error) {
+	if manifestPath != "" {
+		return manifestPath, nil
+	}
+	if root != "" && out != "" {
+		return out, nil
+	}
+	return "", fmt.Errorf("error: --manifest is required unless --write is set; --root and --out may be used as the validation manifest path")
 }
 
 func buildHashManifest(root string, manifestName string) (hashManifest, error) {

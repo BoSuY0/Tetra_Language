@@ -48,6 +48,11 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   lives under `scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh` and
   writes fresh reports under `reports/wasm-ui-gui` when requested. This does
   not rewrite the `v0.4.0` release gate or claim full `v1.0.0` readiness.
+- Separately gated post-v0.4 UI Toolkit Core evidence lives under
+  `scripts/release/post_v0_4/ui-toolkit-core-production-gate.sh` and writes
+  fresh reports under `reports/ui-toolkit-core`. This promotes only the
+  platform-independent `tetra.ui.toolkit.v1` runtime core and does not claim
+  GTK/Qt/OS backends, Windows/macOS GUI, or full cross-platform UI.
 
 ## Supported Now
 
@@ -836,6 +841,13 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   attributes, but this is not platform-native widgets, a full styling/layout
   engine, platform accessibility API integration, or cross-platform GUI
   production readiness without separate host-native gates.
+- UI Toolkit Core (`ui.toolkit-core`) is a platform-independent
+  `tetra.ui.toolkit.v1` contract/validator slice for selected widget, layout,
+  event, state binding, timer/async, redraw, accessibility metadata, and
+  negative-diagnostic evidence. It is validated by
+  `go run ./tools/cmd/validate-ui-toolkit-core` and can be smoked with
+  `go run ./tools/cmd/ui-toolkit-core-smoke`. This does not claim GTK/Qt/OS
+  backend production, Windows/macOS GUI production, or full cross-platform UI.
 - UI native runtime (`ui.native-runtime`) is promoted only for the Linux-x64
   production slice. The release gate runs
   `bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh`, which builds the
