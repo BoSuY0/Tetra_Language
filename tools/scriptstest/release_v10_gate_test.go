@@ -43,6 +43,7 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 		`run_step "build-only smoke windows-x64"`,
 		`run_step "backend summary artifact" check_backend_summary`,
 		`run_step "API diff gate" check_api_diff`,
+		`go run ./tools/cmd/validate-performance-report --report "$dst" --stamp-git-head "$current_head"`,
 		`run_step "reproducible build proof" check_repro_build`,
 		`run_step "release state audit" check_release_state`,
 	} {

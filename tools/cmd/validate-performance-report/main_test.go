@@ -98,6 +98,38 @@ func TestValidatePerformanceReportRejectsSummaryHashMismatch(t *testing.T) {
 	}
 }
 
+func TestStampPerformanceReportGitHeadUpdatesEvidence(t *testing.T) {
+	raw := mustReportJSON(t, performanceReport{
+		Schema:            "tetra.performance-regression.v1",
+		GitHead:           "stale-head",
+		Host:              "linux amd64",
+		GoVersion:         "go1.20",
+		Command:           "go test ./compiler -bench=. -run '^$' -count=1",
+		BaselineArtifact:  "docs/performance/v1_0_thresholds.md",
+		ThresholdDecision: "baseline capture approved",
+		Metrics: []performanceMetric{
+			{Name: "BenchmarkBinarySize/foo-8", Iterations: 10, NsPerOp: 1000, ArtifactBytes: 4096, Threshold: "compile <= 15 percent slower", Decision: "accepted"},
+			{Name: "BenchmarkCompile/foo-8", Iterations: 12, NsPerOp: 1200, Threshold: "compile <= 15 percent slower", Decision: "accepted"},
+		},
+		ResidualRisk: "single host",
+	})
+
+	stamped, err := stampPerformanceReportGitHead(raw, "6ef27d0")
+	if err != nil {
+		t.Fatalf("stampPerformanceReportGitHead: %v", err)
+	}
+	if err := validatePerformanceReport(stamped); err != nil {
+		t.Fatalf("stamped report should still validate: %v", err)
+	}
+	var report performanceReport
+	if err := json.Unmarshal(stamped, &report); err != nil {
+		t.Fatalf("unmarshal stamped report: %v", err)
+	}
+	if report.GitHead != "6ef27d0" {
+		t.Fatalf("GitHead = %q, want 6ef27d0", report.GitHead)
+	}
+}
+
 func mustReportJSON(t *testing.T, report performanceReport) []byte {
 	t.Helper()
 	totalIterations := 0

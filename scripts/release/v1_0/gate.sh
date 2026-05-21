@@ -342,12 +342,14 @@ check_api_diff() {
 check_performance_regression_artifact() {
   local src="docs/generated/v1_0/performance-regression.json"
   local dst="$artifacts_dir/performance-regression.json"
+  local current_head
   if [[ ! -f "$src" ]]; then
     echo "release/v1_0/gate: missing performance artifact $src" >&2
     return 1
   fi
   cp -- "$src" "$dst"
-  go run ./tools/cmd/validate-performance-report --report "$dst"
+  current_head="$(git rev-parse --short HEAD)"
+  go run ./tools/cmd/validate-performance-report --report "$dst" --stamp-git-head "$current_head"
 }
 
 check_binary_size_thresholds() {
