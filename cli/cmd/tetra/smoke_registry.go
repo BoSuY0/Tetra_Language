@@ -127,5 +127,14 @@ func smokeCasesForTarget(islandsDebug bool, tgt ctarget.Target) []smokeCase {
 	if tgt.Triple == "wasm32-web" {
 		return smokeRegistryCases(smokeSourceSetWasmBuildOnly)
 	}
-	return smokeCases(islandsDebug)
+	cases := smokeCases(islandsDebug)
+	switch tgt.Triple {
+	case "macos-x64", "windows-x64":
+		for i := range cases {
+			if cases[i].name == "core_filesystem_smoke" {
+				cases[i].expectedDiagnostic = "filesystem runtime not supported on " + tgt.Triple
+			}
+		}
+	}
+	return cases
 }

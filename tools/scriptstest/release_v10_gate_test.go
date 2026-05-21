@@ -28,6 +28,7 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 		`if [[ "$version" != "$release_version" ]]`,
 		`expected ./tetra version to be $release_version`,
 		`release_gate_command="bash scripts/release/v1_0/gate.sh"`,
+		`TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1"`,
 		`run_step "WASI runner smoke" check_wasi_runner_smoke`,
 		`run_step "Web runtime browser smoke" check_web_runtime_smoke`,
 		`run_step "security review detached hash" write_security_review_detached_hash`,

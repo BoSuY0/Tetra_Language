@@ -52,6 +52,59 @@ func TestSmokeCommandWritesReport(t *testing.T) {
 	}
 }
 
+func TestSmokeCommandBuildOnlyNativeTargetsMarkUnsupportedFilesystem(t *testing.T) {
+	for _, target := range []string{"macos-x64", "windows-x64"} {
+		t.Run(target, func(t *testing.T) {
+			reportPath := filepath.Join(t.TempDir(), target+"-smoke.json")
+			var stdout, stderr bytes.Buffer
+			code := runCLI([]string{"smoke", "--target", target, "--run=false", "--report", reportPath}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("smoke %s exit code = %d, stdout=%q stderr=%q", target, code, stdout.String(), stderr.String())
+			}
+			raw, err := os.ReadFile(reportPath)
+			if err != nil {
+				t.Fatalf("read smoke report: %v", err)
+			}
+			var report struct {
+				Target string `json:"target"`
+				Total  int    `json:"total"`
+				Passed int    `json:"passed"`
+				Failed int    `json:"failed"`
+				Cases  []struct {
+					Name               string `json:"name"`
+					Unsupported        bool   `json:"unsupported"`
+					ExpectedDiagnostic string `json:"expected_diagnostic"`
+					Diagnostic         string `json:"diagnostic"`
+					OutPath            string `json:"out_path"`
+					Ran                bool   `json:"ran"`
+					Pass               bool   `json:"pass"`
+					Error              string `json:"error"`
+				} `json:"cases"`
+			}
+			if err := json.Unmarshal(raw, &report); err != nil {
+				t.Fatalf("decode smoke report: %v\n%s", err, raw)
+			}
+			if report.Target != target || report.Total == 0 || report.Passed != report.Total || report.Failed != 0 {
+				t.Fatalf("unexpected smoke report counts for %s: %#v", target, report)
+			}
+			found := false
+			for _, c := range report.Cases {
+				if c.Name != "core_filesystem_smoke" {
+					continue
+				}
+				found = true
+				want := "filesystem runtime not supported on " + target
+				if !c.Unsupported || c.ExpectedDiagnostic != want || !strings.Contains(c.Diagnostic, want) || c.OutPath != "" || c.Ran || !c.Pass || c.Error != "" {
+					t.Fatalf("unexpected filesystem smoke case for %s: %#v", target, c)
+				}
+			}
+			if !found {
+				t.Fatalf("smoke report missing core_filesystem_smoke for %s", target)
+			}
+		})
+	}
+}
+
 func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	var report struct {
 		Target       string `json:"target"`
