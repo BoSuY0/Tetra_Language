@@ -2,13 +2,13 @@
   "schema": "tetra.api.diff-baseline.v1alpha1",
   "created_at": "1970-01-01T00:00:00Z",
   "timestamp_policy": "deterministic (SOURCE_DATE_EPOCH, fallback 1970-01-01T00:00:00Z)",
-  "source_docs": "/tmp/tetra-api-baseline-refresh-20260429/api-docs.md",
-  "source_docs_sha256": "sha256:d4fc8e4edeb3930a3af30535589d12076ea73f7ae6f79179f3825fd540943200",
+  "source_docs": "docs/generated/v1_0/api-diff/api-docs.md",
+  "source_docs_sha256": "sha256:1d0a1c443fbba74f1f082ba53178841114e75ad9fb5bd25443a566453fcbf4f4",
   "api_metadata": {
     "schema": "tetra.api.v1alpha1",
-    "api_hash": "sha256:0966ebbb412ee53a91f9737731d7e4f786bf3dfc3a5400723a5de8d8039ca390",
-    "module_count": 81,
-    "entry_count": 226
+    "api_hash": "sha256:4f36009e9450d9b077878d165c3ceda83d75923408a8fead580f7a57b140aee3",
+    "module_count": 91,
+    "entry_count": 290
   },
   "symbols": [
     {
@@ -24,6 +24,13 @@
       "section": "Functions",
       "entry": "func main() -> i32",
       "symbol_hash": "sha256:c25f6bc7cbb51ffcee4046792f3ae01ee39f9237743092320e60508d1aad345d"
+    },
+    {
+      "id": "examples.core_capability_smoke::Functions::func main",
+      "module": "examples.core_capability_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, io, mem, mmio",
+      "symbol_hash": "sha256:ece38bcb44fe83a29c9f3a8eb03ec6db8599afe2875e8dce9bdc39aadd613bbd"
     },
     {
       "id": "examples.core_collections_smoke::Functions::func main",
@@ -43,8 +50,15 @@
       "id": "examples.core_filesystem_smoke::Functions::func main",
       "module": "examples.core_filesystem_smoke",
       "section": "Functions",
-      "entry": "func main() -> i32",
-      "symbol_hash": "sha256:34a9ace43ac7d2e04fd0a195356c3d3e24d20ff37127126f4329ea8104b8aec4"
+      "entry": "func main() -> i32 uses capability, io",
+      "symbol_hash": "sha256:63fc749b80a8a5aa63dfba895b6c23230e7705b382e82c8580cb2dd9f76147e6"
+    },
+    {
+      "id": "examples.core_http_smoke::Functions::func main",
+      "module": "examples.core_http_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ad2aff9ec2b69dad3b28dda0dc073e45cfcfc1275247b7e446c8b60747352e6f"
     },
     {
       "id": "examples.core_io_smoke::Functions::func main",
@@ -54,11 +68,25 @@
       "symbol_hash": "sha256:8e12725cdd6a5ea9b1ff08dcf60c106093bc54eac928571dd3b1c2043d098dee"
     },
     {
+      "id": "examples.core_json_smoke::Functions::func main",
+      "module": "examples.core_json_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4b0d4c30fffaf0485ed92f2b4712f4d51ff261dc82fc633eb31c864f644d5555"
+    },
+    {
       "id": "examples.core_math_smoke::Functions::func main",
       "module": "examples.core_math_smoke",
       "section": "Functions",
       "entry": "func main() -> i32",
       "symbol_hash": "sha256:064ccf41e202c7c8d833d69d0392fd061cda1dc94546eefb318e6e2981b501db"
+    },
+    {
+      "id": "examples.core_memory_negative_length_smoke::Functions::func main",
+      "module": "examples.core_memory_negative_length_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, mem",
+      "symbol_hash": "sha256:6be77ff577518eb50140b4565a596f095ba7637fe1020c45c3c7cf2158f4ec15"
     },
     {
       "id": "examples.core_memory_smoke::Functions::func main",
@@ -68,11 +96,116 @@
       "symbol_hash": "sha256:7683110f1b760a5fc9d75a2e48150a8c7aff67b83f8f6fe4c5b62664969dc894"
     },
     {
+      "id": "examples.core_net_smoke::Functions::func main",
+      "module": "examples.core_net_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, io, mem",
+      "symbol_hash": "sha256:289da89970865d068f0337fc709997174382a9f90d6131985568487843d8e50d"
+    },
+    {
       "id": "examples.core_networking_smoke::Functions::func main",
       "module": "examples.core_networking_smoke",
       "section": "Functions",
       "entry": "func main() -> i32",
       "symbol_hash": "sha256:79ec1d6bec8ab57a93fa78b87c69d2d50a170695b4801b39aed7bbcd8538582d"
+    },
+    {
+      "id": "examples.core_postgres_prepared_smoke::Functions::func check_bind",
+      "module": "examples.core_postgres_prepared_smoke",
+      "section": "Functions",
+      "entry": "func check_bind() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:0b2b753bb110de3ac8a444e45fa7d725b70f34cddfec30149d070112daf58ef6"
+    },
+    {
+      "id": "examples.core_postgres_prepared_smoke::Functions::func check_bind_two_params",
+      "module": "examples.core_postgres_prepared_smoke",
+      "section": "Functions",
+      "entry": "func check_bind_two_params() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:19da6e1ce06c5151d581e7dc8364ada885acffeaa0e5e36f84c1e7048555f461"
+    },
+    {
+      "id": "examples.core_postgres_prepared_smoke::Functions::func check_describe_execute_sync",
+      "module": "examples.core_postgres_prepared_smoke",
+      "section": "Functions",
+      "entry": "func check_describe_execute_sync() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:0a52e6e60a27f2c7a5ef0eb38a6cabf89c36ad2baed5f6d5a902ccc89a5538d3"
+    },
+    {
+      "id": "examples.core_postgres_prepared_smoke::Functions::func check_parse",
+      "module": "examples.core_postgres_prepared_smoke",
+      "section": "Functions",
+      "entry": "func check_parse() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:0ae3adb6dc6c1307961d4d880c5bc74a1c8f313a06bd256226ab5de21926c6a4"
+    },
+    {
+      "id": "examples.core_postgres_prepared_smoke::Functions::func main",
+      "module": "examples.core_postgres_prepared_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:cc7865aab9e743cae3daeddeb7d34ec964057886efd2d5cd6775e45a3ae02d1c"
+    },
+    {
+      "id": "examples.core_postgres_result_smoke::Functions::func check_command_and_ready",
+      "module": "examples.core_postgres_result_smoke",
+      "section": "Functions",
+      "entry": "func check_command_and_ready() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:603433561187a385cdfab24fa03d1e99a76f06a00cb7725fc6d215b9c0548ebd"
+    },
+    {
+      "id": "examples.core_postgres_result_smoke::Functions::func check_data_row",
+      "module": "examples.core_postgres_result_smoke",
+      "section": "Functions",
+      "entry": "func check_data_row() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4bce600c09a26c64e08051c000fa9120a397ab137afbea3c51a4e45ec340f119"
+    },
+    {
+      "id": "examples.core_postgres_result_smoke::Functions::func check_row_description",
+      "module": "examples.core_postgres_result_smoke",
+      "section": "Functions",
+      "entry": "func check_row_description() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:005d93cfc4a7646c88fbf8e517117f74adc4578e9bb45ff01347852798ef9079"
+    },
+    {
+      "id": "examples.core_postgres_result_smoke::Functions::func check_typed_frame_header",
+      "module": "examples.core_postgres_result_smoke",
+      "section": "Functions",
+      "entry": "func check_typed_frame_header() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:c8ce170536a4ca376591e4598291367d5ba1af53f3d66f6922a4d5933dc0f503"
+    },
+    {
+      "id": "examples.core_postgres_result_smoke::Functions::func main",
+      "module": "examples.core_postgres_result_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6e7ef930c2d84f468f32eb17a97827b5277bbda513763092574e02a49772f558"
+    },
+    {
+      "id": "examples.core_postgres_result_smoke::Functions::func write_column",
+      "module": "examples.core_postgres_result_smoke",
+      "section": "Functions",
+      "entry": "func write_column(dst: inout []u8, start: i32, name: str, type_oid: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:b4b89775062b5175e9557867472de65e0cc27589af36087ad303f5cbf6dadb18"
+    },
+    {
+      "id": "examples.core_postgres_result_smoke::Functions::func write_world_data_row",
+      "module": "examples.core_postgres_result_smoke",
+      "section": "Functions",
+      "entry": "func write_world_data_row(dst: inout []u8) -> i32 uses mem",
+      "symbol_hash": "sha256:f7bcfd115a1b219447cf0e3b4bcb18bd9de55ba76cc13a8647401e864e9c58f5"
+    },
+    {
+      "id": "examples.core_postgres_result_smoke::Functions::func write_world_row_description",
+      "module": "examples.core_postgres_result_smoke",
+      "section": "Functions",
+      "entry": "func write_world_row_description(dst: inout []u8) -> i32 uses mem",
+      "symbol_hash": "sha256:0d75e0e76cb86a625afd4eb8b62d3bf3042dba7b333a32ecdaa812600dc409a7"
+    },
+    {
+      "id": "examples.core_postgres_smoke::Functions::func main",
+      "module": "examples.core_postgres_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ba8ff6d1a28f52dbcf6fe6b43aa6fe53bc584106582f25544289ef8ba5663af4"
     },
     {
       "id": "examples.core_serialization_smoke::Functions::func main",
@@ -355,27 +488,6 @@
       "symbol_hash": "sha256:3e6758a0abf2b05dc21bd720bd90a7e5a4eedb1fa2d20dd8be7b1c45ba882240"
     },
     {
-      "id": "examples.projects.dogfood_cli.src.main::Functions::func main",
-      "module": "examples.projects.dogfood_cli.src.main",
-      "section": "Functions",
-      "entry": "func main() -> i32 uses io",
-      "symbol_hash": "sha256:5c73c04b22c4c19c9b8676e0932df406c2f6ec4d0c58742f02be10a3744c73e8"
-    },
-    {
-      "id": "examples.projects.dogfood_cli.src.main::Functions::func status_code",
-      "module": "examples.projects.dogfood_cli.src.main",
-      "section": "Functions",
-      "entry": "func status_code() -> i32",
-      "symbol_hash": "sha256:d0a9c4435a1b98d20c16062f2b2ea0e501d42fc084a4853852c412e90f623465"
-    },
-    {
-      "id": "examples.projects.dogfood_cli.src.main::Tests::cli status code",
-      "module": "examples.projects.dogfood_cli.src.main",
-      "section": "Tests",
-      "entry": "cli status code",
-      "symbol_hash": "sha256:3b1145d7ea3a3ede2bf93b574e1af3f2579db883e494a768b0484ec0a74f3602"
-    },
-    {
       "id": "examples.struct_ctor_smoke::Functions::func main",
       "module": "examples.struct_ctor_smoke",
       "section": "Functions",
@@ -402,6 +514,111 @@
       "section": "Structs",
       "entry": "y: i32",
       "symbol_hash": "sha256:ea1a92b89a342ba3636d872e8dde2f60687e52687d2c6ef1bd268cbacfe8a649"
+    },
+    {
+      "id": "examples.wasm_multi_return_2_smoke::Functions::func main",
+      "module": "examples.wasm_multi_return_2_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:43d5aa06a63c8e128b39de993942bc9d1260b8913fe45562919025421561ec51"
+    },
+    {
+      "id": "examples.wasm_multi_return_2_smoke::Functions::func make_pair",
+      "module": "examples.wasm_multi_return_2_smoke",
+      "section": "Functions",
+      "entry": "func make_pair() -> Pair",
+      "symbol_hash": "sha256:064bfe37a759606429bf2f20e77c65281a45e4a4b048dc8ba8e501052351c199"
+    },
+    {
+      "id": "examples.wasm_multi_return_2_smoke::Structs::left: i32",
+      "module": "examples.wasm_multi_return_2_smoke",
+      "section": "Structs",
+      "entry": "left: i32",
+      "symbol_hash": "sha256:add980877b1528faa14b268e9dd3dddc9b7ab6e9603bc813c5938669a0761045"
+    },
+    {
+      "id": "examples.wasm_multi_return_2_smoke::Structs::Pair",
+      "module": "examples.wasm_multi_return_2_smoke",
+      "section": "Structs",
+      "entry": "Pair",
+      "symbol_hash": "sha256:a73e4f56e5d5896f53cd63e9f446998f57125e89eea0cc8fa66dae2fef2610d7"
+    },
+    {
+      "id": "examples.wasm_multi_return_2_smoke::Structs::right: i32",
+      "module": "examples.wasm_multi_return_2_smoke",
+      "section": "Structs",
+      "entry": "right: i32",
+      "symbol_hash": "sha256:74d8cdcd44835eb23035f213ed3f7a66ff6c4681d1177e3b90cd6faa8f3f3ab6"
+    },
+    {
+      "id": "examples.wasm_multi_return_3_smoke::Enums::`Packet`: data, empty",
+      "module": "examples.wasm_multi_return_3_smoke",
+      "section": "Enums",
+      "entry": "`Packet`: data, empty",
+      "symbol_hash": "sha256:32b05455686f38ce884ac79de4600bf7431275b7dc6899ba8d7989889b22020d"
+    },
+    {
+      "id": "examples.wasm_multi_return_3_smoke::Functions::func main",
+      "module": "examples.wasm_multi_return_3_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:3ba6890fa4fd7bfc5ac86168d82bf88396e61a7ec90ea9f60f711b6bf0127e7a"
+    },
+    {
+      "id": "examples.wasm_multi_return_3_smoke::Functions::func make_packet",
+      "module": "examples.wasm_multi_return_3_smoke",
+      "section": "Functions",
+      "entry": "func make_packet() -> Packet",
+      "symbol_hash": "sha256:ba54cfb0da836135a25ba82ca96858b0d2ce7d53c1b57b0e5618ca9f65145430"
+    },
+    {
+      "id": "examples.wasm_multi_return_4_smoke::Functions::func main",
+      "module": "examples.wasm_multi_return_4_smoke",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:dbd893f370b95cea784416d4806cbc25bf42fc16fbf2ef1cb3324426b66a7345"
+    },
+    {
+      "id": "examples.wasm_multi_return_4_smoke::Functions::func make_quad",
+      "module": "examples.wasm_multi_return_4_smoke",
+      "section": "Functions",
+      "entry": "func make_quad() -> Quad",
+      "symbol_hash": "sha256:ef39093e08c357d29d5caa899432cb15a83d889a178e0ce80fe2b53b825e357e"
+    },
+    {
+      "id": "examples.wasm_multi_return_4_smoke::Structs::a: i32",
+      "module": "examples.wasm_multi_return_4_smoke",
+      "section": "Structs",
+      "entry": "a: i32",
+      "symbol_hash": "sha256:5f482eda8bc1f71bc75bc2e2570f3ba645fc913bc6c9dee8c87c83b60b1732e9"
+    },
+    {
+      "id": "examples.wasm_multi_return_4_smoke::Structs::b: i32",
+      "module": "examples.wasm_multi_return_4_smoke",
+      "section": "Structs",
+      "entry": "b: i32",
+      "symbol_hash": "sha256:a1314823b6d7dbe84487f68e408f4d783f645389f98e5d1f65bb4d3a890b0535"
+    },
+    {
+      "id": "examples.wasm_multi_return_4_smoke::Structs::c: i32",
+      "module": "examples.wasm_multi_return_4_smoke",
+      "section": "Structs",
+      "entry": "c: i32",
+      "symbol_hash": "sha256:8391939af21325aad3f3c6cbac36885b1534fd8b4bf6a041b9f86dd405e1673e"
+    },
+    {
+      "id": "examples.wasm_multi_return_4_smoke::Structs::d: i32",
+      "module": "examples.wasm_multi_return_4_smoke",
+      "section": "Structs",
+      "entry": "d: i32",
+      "symbol_hash": "sha256:02f74f9bdce6c6e551824032a403b77a6c66cbfaf82c1b5268f0b84fc2a9e6e3"
+    },
+    {
+      "id": "examples.wasm_multi_return_4_smoke::Structs::Quad",
+      "module": "examples.wasm_multi_return_4_smoke",
+      "section": "Structs",
+      "entry": "Quad",
+      "symbol_hash": "sha256:3275c5f52fd6eb66830041349a79f554d22b0f02dbbb2143e49ca579f20f831f"
     },
     {
       "id": "examples/actor_sleep_pingpong.tetra::Functions::func delayed_pong",
@@ -1062,6 +1279,27 @@
       "symbol_hash": "sha256:945b42954ba7d83ba358df94307449149e2e8c1dfadc781fe985519e78fc295d"
     },
     {
+      "id": "examples/ownership_smoke.tetra::Enums::`PairMsg`: both, empty",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Enums",
+      "entry": "`PairMsg`: both, empty",
+      "symbol_hash": "sha256:e1d33aa5e6818366359a59594dc98549d5db3839326cc505bcff04f5a6a29d42"
+    },
+    {
+      "id": "examples/ownership_smoke.tetra::Extensions::func Pair.sink(self: consume Pair) -> i32",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Extensions",
+      "entry": "func Pair.sink(self: consume Pair) -> i32",
+      "symbol_hash": "sha256:44790c2cc202051087e5784f455570bcbd27af134c7638faff2ba0af98760de8"
+    },
+    {
+      "id": "examples/ownership_smoke.tetra::Extensions::Pair",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Extensions",
+      "entry": "Pair",
+      "symbol_hash": "sha256:ababe4c0236b272e6809efd49c4325412ec62c9fb215b59df8b508ad7fc1c051"
+    },
+    {
       "id": "examples/ownership_smoke.tetra::Functions::func add_one",
       "module": "examples/ownership_smoke.tetra",
       "section": "Functions",
@@ -1076,11 +1314,25 @@
       "symbol_hash": "sha256:45740ae24b8749f99f9c3b36b379aaf975db7c4525092ebd6d7b5e5fde31a25b"
     },
     {
+      "id": "examples/ownership_smoke.tetra::Functions::func enum_score",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Functions",
+      "entry": "func enum_score() -> i32",
+      "symbol_hash": "sha256:15844de66a6dbe6192817851bfb172a41b3574d167a417ac3eec7599a0cda34c"
+    },
+    {
       "id": "examples/ownership_smoke.tetra::Functions::func main",
       "module": "examples/ownership_smoke.tetra",
       "section": "Functions",
       "entry": "func main() -> i32",
       "symbol_hash": "sha256:47d568d8b29e3cfee9c3526ad86406af4db8b61bdd6f877af1c49c1c8d91fde0"
+    },
+    {
+      "id": "examples/ownership_smoke.tetra::Functions::func optional_ptr_score",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Functions",
+      "entry": "func optional_ptr_score(value: borrow ptr?) -> i32",
+      "symbol_hash": "sha256:f5729ed2fb70b6a11f97c0b4f5724fee278f6fae30915980811586f8a98b71e3"
     },
     {
       "id": "examples/ownership_smoke.tetra::Functions::func take",
@@ -1090,130 +1342,46 @@
       "symbol_hash": "sha256:33e7d581459a0c3f2b746b5438685bf2f9ebbe281f79132cd965c6656f53e31f"
     },
     {
-      "id": "examples/projects/dogfood_actor_task/src/main.tetra::Functions::func echo",
-      "module": "examples/projects/dogfood_actor_task/src/main.tetra",
-      "section": "Functions",
-      "entry": "func echo() -> i32 uses actors",
-      "symbol_hash": "sha256:8cef0c7a82b10ba173a9195d09e2a2cb85f8d02d8e1f41847b797e18c41cce47"
+      "id": "examples/ownership_smoke.tetra::Implementations::impl Pair",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Implementations",
+      "entry": "impl Pair: Sink",
+      "symbol_hash": "sha256:3c24deba641ead22e18827f20ed2a34303fead2282aab57f929f86d46917035b"
     },
     {
-      "id": "examples/projects/dogfood_actor_task/src/main.tetra::Functions::func main",
-      "module": "examples/projects/dogfood_actor_task/src/main.tetra",
-      "section": "Functions",
-      "entry": "func main() -> i32 uses actors, runtime",
-      "symbol_hash": "sha256:617285d4fd828e1f5cf3bc1fd78b4378bde84e838e6be9c93af3180cfb68dc49"
+      "id": "examples/ownership_smoke.tetra::Protocols::func sink(self: consume Pair) -> i32",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Protocols",
+      "entry": "func sink(self: consume Pair) -> i32",
+      "symbol_hash": "sha256:2e7cb15a5be9c61cb0c64db0ff58150f7de31b2e2915aa926268ca63ebf7fa43"
     },
     {
-      "id": "examples/projects/dogfood_actor_task/src/main.tetra::Functions::func worker",
-      "module": "examples/projects/dogfood_actor_task/src/main.tetra",
-      "section": "Functions",
-      "entry": "func worker() -> i32",
-      "symbol_hash": "sha256:0977652c9fb43c8228da585264c62f07900f1786dd4fba97c9dbbe13809f4bdd"
+      "id": "examples/ownership_smoke.tetra::Protocols::protocol Sink",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Protocols",
+      "entry": "protocol Sink",
+      "symbol_hash": "sha256:7821f15402e369cd0b085a657de70a36e2b6a582357c118ddaf3b6d69ee78b06"
     },
     {
-      "id": "examples/projects/dogfood_wasi/src/main.tetra::Functions::func main",
-      "module": "examples/projects/dogfood_wasi/src/main.tetra",
-      "section": "Functions",
-      "entry": "func main() -> i32 uses io",
-      "symbol_hash": "sha256:453fe72e1d04e226e2ddfab6e075f010a87ed8a2ca2a57f3e767cd6902597bc3"
+      "id": "examples/ownership_smoke.tetra::Structs::left: i32",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Structs",
+      "entry": "left: i32",
+      "symbol_hash": "sha256:e6f06a970bf8b1858ffcfda3b00c810ecc5e3316430213fc5d029edcfdd11b5b"
     },
     {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Functions::func main",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Functions",
-      "entry": "func main() -> i32",
-      "symbol_hash": "sha256:bb8023ce4202ed31b350e96e1cea52c353ff8d54a1b82a7ddf2571ba426fdcb1"
+      "id": "examples/ownership_smoke.tetra::Structs::Pair",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Structs",
+      "entry": "Pair",
+      "symbol_hash": "sha256:dc292aba6a5ef84a4fd12b7f73f43b71d1100e7b9cb0346899360080211982cb"
     },
     {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::States::state TodoState",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "States",
-      "entry": "state TodoState",
-      "symbol_hash": "sha256:3342bdead0fe168943185a70b3e65d7f0f1e88c8c46424a81842ebdd76878108"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::States::val title",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "States",
-      "entry": "val title: str",
-      "symbol_hash": "sha256:177b24169ebd4fc536f7ab98a64cc26441eeea4fd03d2eab9e931136407db352"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::States::var count",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "States",
-      "entry": "var count: i32",
-      "symbol_hash": "sha256:771d3aa2f76d3dfe53782c37983c5180b51a952a9cf7bfcf13987114c9821496"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::accessibility label: str",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "accessibility label: str",
-      "symbol_hash": "sha256:66832d817ba31d8da160d4b20bf3781cb928c8739bfc52b3ef5e67a6065e4721"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::accessibility role: str",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "accessibility role: str",
-      "symbol_hash": "sha256:fdc6e397c3d28b4e685f0df394813ff25745e2ae454a32b78caec90698dfb30d"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::bind countValue: i32",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "bind countValue: i32",
-      "symbol_hash": "sha256:40f16433b8f87515f6d06d24fccc14629ff3b33ee8080eb703194596268b13a5"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::bind titleText: str",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "bind titleText: str",
-      "symbol_hash": "sha256:4c650508b09d763ade0e76ecbe03cb1adacbcf7605e3efd49017ab13ad1ad605"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::command increment",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "command increment",
-      "symbol_hash": "sha256:24e2495509b418f86fa8694cf74e0735ced694ba9d8b243f9fefd3a2767b6d13"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::event click -> increment",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "event click -> increment",
-      "symbol_hash": "sha256:7627bf685ae7daab6ed6e624eaea661ba02720deffc5af014833f14b95586eb6"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::style theme: str",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "style theme: str",
-      "symbol_hash": "sha256:83e97d98aab081b2476b40670195edcb8e95676e2ef40f3b6aadbf6ba3529e9d"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::style width: i32",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "style width: i32",
-      "symbol_hash": "sha256:2cb7ea653ab625611e8a5b58e6e0d60f86b637107dc94cea2f53cf33e1c30175"
-    },
-    {
-      "id": "examples/projects/dogfood_web_ui/src/main.tetra::Views::view TodoView",
-      "module": "examples/projects/dogfood_web_ui/src/main.tetra",
-      "section": "Views",
-      "entry": "view TodoView(state: TodoState)",
-      "symbol_hash": "sha256:009ffe3630c53c2c14e53b240ca1764eb435348d1b3b7a699b81981da5defbf3"
-    },
-    {
-      "id": "examples/projects/eco_dogfood/src/main.tetra::Functions::func main",
-      "module": "examples/projects/eco_dogfood/src/main.tetra",
-      "section": "Functions",
-      "entry": "func main() -> i32 uses io",
-      "symbol_hash": "sha256:1d683ef0dd53bca858229b9f181bc9a1b3c106ef402dae3e62bb0a84768a3296"
+      "id": "examples/ownership_smoke.tetra::Structs::right: i32",
+      "module": "examples/ownership_smoke.tetra",
+      "section": "Structs",
+      "entry": "right: i32",
+      "symbol_hash": "sha256:4b4d3e6bd5c08b248763a98aa4c443b2aab0c88e517cd63b6ccec2889f818a07"
     },
     {
       "id": "examples/protocol_impl_smoke.tetra::Extensions::func Vec2.draw(self: Vec2) -> i32",
@@ -1307,6 +1475,34 @@
       "symbol_hash": "sha256:ba824d41329672555d11ed8009c8edf79f295c6442c4fe2a2d884eb15c23c3d1"
     },
     {
+      "id": "examples/task_group_cancel_smoke.tetra::Functions::func main",
+      "module": "examples/task_group_cancel_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses runtime",
+      "symbol_hash": "sha256:42bceafcf8128164855984066d8a481b7be3ae343eea5c29380b8a66a7fc2a2d"
+    },
+    {
+      "id": "examples/task_group_cancel_smoke.tetra::Functions::func worker",
+      "module": "examples/task_group_cancel_smoke.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> i32 uses runtime",
+      "symbol_hash": "sha256:04b7fd39c35cc3dca1061e264402e7d5fe2f9092e6b7111e1fdb07f1bdf366cc"
+    },
+    {
+      "id": "examples/task_group_lifecycle_smoke.tetra::Functions::func main",
+      "module": "examples/task_group_lifecycle_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses runtime",
+      "symbol_hash": "sha256:57d4a24ee67dcaa0d8486ea3f88681c434aa5f2b7fad13a2c74a3af0544b2acb"
+    },
+    {
+      "id": "examples/task_group_lifecycle_smoke.tetra::Functions::func worker",
+      "module": "examples/task_group_lifecycle_smoke.tetra",
+      "section": "Functions",
+      "entry": "func worker() -> i32 uses runtime",
+      "symbol_hash": "sha256:5d7571669f02a34fca4f0722af7ae986cf6e4a46011ab05d6e7c2c22ba941f86"
+    },
+    {
       "id": "examples/task_join_wait_smoke.tetra::Functions::func main",
       "module": "examples/task_join_wait_smoke.tetra",
       "section": "Functions",
@@ -1391,6 +1587,146 @@
       "symbol_hash": "sha256:3f237b2ef2c172889a052304a44345075aad9b29ce95eb5a8f481c976c141bc0"
     },
     {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Functions::func main",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:b114d2c30d6a2deb7150b169ef11d9fe838170cdc02d1182c59667de06cb7594"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::States::state DesktopState",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "States",
+      "entry": "state DesktopState",
+      "symbol_hash": "sha256:0335f2182959b3b9b6ebffac6309ef4e471cd5bcf3b8825e56bf408668f07c6b"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::States::var name",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "States",
+      "entry": "var name: str",
+      "symbol_hash": "sha256:0a1ec5733239d709c038582f5e850b055a29a0b570766e1ebffa020f306fb15b"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::States::var saves",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "States",
+      "entry": "var saves: i32",
+      "symbol_hash": "sha256:d390f1201d9d1eb671b3beb8b357e43323f3f2bdbdaa635d5d2d49df54c748cd"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::States::var selected",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "States",
+      "entry": "var selected: str",
+      "symbol_hash": "sha256:837931ae69917fb2fb7d9670132b3b1bef19bc1641ce0b0832ad2aeea70305bd"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::States::var title",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "States",
+      "entry": "var title: str",
+      "symbol_hash": "sha256:ffe98efe7d0cbc882d0e3d74fff3abb6c42640795f36c8e6757392ba51b7128e"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::accessibility description: str",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "accessibility description: str",
+      "symbol_hash": "sha256:1b9743cebb186773de9f157239079cf5bcb0f78aaf97e0e47e0b13a76b5ec228"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::accessibility role: str",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "accessibility role: str",
+      "symbol_hash": "sha256:bac352f4be5f5d1df6099c299d6fb336f310adf43db2c88314b583b7518360d8"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::bind nameText: str",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "bind nameText: str",
+      "symbol_hash": "sha256:f5ed7998a512433b1fc7487de2ca835c70d353f26c2b58aa417491b223ddf6cb"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::bind selectedText: str",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "bind selectedText: str",
+      "symbol_hash": "sha256:4e3b041054a7bc8b477977726a9a0c9817fbd8acea25de7d44e79b3b53d78a8b"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::bind titleText: str",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "bind titleText: str",
+      "symbol_hash": "sha256:acfda239bd6407f8503ceef26de320406819e43e6f7f21941cf9a2520ada919b"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::command rename",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "command rename",
+      "symbol_hash": "sha256:50da93a2158d35d029dc2525f7520839f6e1c1586d13340a3fc3f2bf87cda5a6"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::command save",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "command save",
+      "symbol_hash": "sha256:eb1af3322e80db643e2abb70dcf15a172a41bb30b264a108a02348850af8bcce"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::command selectSecond",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "command selectSecond",
+      "symbol_hash": "sha256:461bb74b885b9b497712ec68322ca1373e6f7b76248a00cc74d68b997810955c"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::event rename -> rename",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "event rename -> rename",
+      "symbol_hash": "sha256:07448984c4b2dc2cc6958b57cad063d4767330dae0e435958c92fe13d264cf32"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::event save -> save",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "event save -> save",
+      "symbol_hash": "sha256:e61b898695c291979d7d049c40d39c7271f8f9d422c0eaa46dc103b7289f6e72"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::event select -> selectSecond",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "event select -> selectSecond",
+      "symbol_hash": "sha256:b008a82e54b7646b0e1178ca7d698660671889ce0c6fe1e4d27d567c7da00b15"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::style height: i32",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "style height: i32",
+      "symbol_hash": "sha256:9896f1d3856901fed04a6b7cd1c004f7214f37b87c994ffefd608fd26ebb428a"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::style width: i32",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "style width: i32",
+      "symbol_hash": "sha256:a35179e728612042f0b5823c1b8d3a9c8db11b0b0ca3af9fc758f6e9787252b4"
+    },
+    {
+      "id": "examples/ui_desktop_runtime_smoke.tetra::Views::view DesktopView",
+      "module": "examples/ui_desktop_runtime_smoke.tetra",
+      "section": "Views",
+      "entry": "view DesktopView(state: DesktopState)",
+      "symbol_hash": "sha256:0afcf97513d7c783700f211a8015b6605b8e7d380e12259119d44fbcfc646762"
+    },
+    {
       "id": "examples/ui_native_shell_smoke.tetra::Functions::func main",
       "module": "examples/ui_native_shell_smoke.tetra",
       "section": "Functions",
@@ -1405,11 +1741,25 @@
       "symbol_hash": "sha256:5085973d64a0e3c6538f16cf49f7e064fc595ef006d57dd2e7da32f0db64f4c6"
     },
     {
-      "id": "examples/ui_native_shell_smoke.tetra::States::val label",
+      "id": "examples/ui_native_shell_smoke.tetra::States::var label",
       "module": "examples/ui_native_shell_smoke.tetra",
       "section": "States",
-      "entry": "val label: str",
-      "symbol_hash": "sha256:58f400437257b8663aef659e026dd7386bb68014aeaaee1e1cbc6c1b344bbc06"
+      "entry": "var label: str",
+      "symbol_hash": "sha256:579cc4278528d70b01ea9e02e11dce163bfc96565890cd00e8bf64bf6c5291aa"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::States::var source",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "States",
+      "entry": "var source: i32",
+      "symbol_hash": "sha256:7a186db3035191ec1b368f4ac62fe9e5266291ca0d7bfa21986efc04d308c9cb"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::States::var textSource",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "States",
+      "entry": "var textSource: str",
+      "symbol_hash": "sha256:14099fb11b5a259d0efe46123c658842c56ee6354b438d56e669b31e757dcd51"
     },
     {
       "id": "examples/ui_native_shell_smoke.tetra::States::var toggles",
@@ -1447,11 +1797,81 @@
       "symbol_hash": "sha256:2181e95f24f89d799dcead308533f5a2a7183144f3e3089168baf673c3574fa6"
     },
     {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::command compound",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "command compound",
+      "symbol_hash": "sha256:863f7d78fffcdedf4aafeac0c245fce631e4481da1e7df17eaac4844b16a1625"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::command copy",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "command copy",
+      "symbol_hash": "sha256:a974474e819b3e70e2820b7fe47c78322e7620657bcbed6eb2de24355d321804"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::command copyAfterToggle",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "command copyAfterToggle",
+      "symbol_hash": "sha256:99741b29405336349b077fb13cd929138e2c9ec3708bb8207766fc7ddc883076"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::command decrement",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "command decrement",
+      "symbol_hash": "sha256:0e6ca2dd306866239b71c2d824fe528060f7dbf0a36a9e596c5c598e89f1d76f"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::command rename",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "command rename",
+      "symbol_hash": "sha256:4094be5439c933cebf92c5560a712a8b005ce5c51b34ae2a09962a3cec273fde"
+    },
+    {
       "id": "examples/ui_native_shell_smoke.tetra::Views::command toggle",
       "module": "examples/ui_native_shell_smoke.tetra",
       "section": "Views",
       "entry": "command toggle",
       "symbol_hash": "sha256:3be04916c9af0978edef12ebfaa40a7cc558b41365532444777eaf02282c7377"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::event compound -> compound",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "event compound -> compound",
+      "symbol_hash": "sha256:9a8c35f52ca1dbd8ff418fcf40380894464c65de8cad094411cb728680dbbd2d"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::event copy -> copy",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "event copy -> copy",
+      "symbol_hash": "sha256:38f30d10ed6ad3a449a12271c668e6ba6ed726644cdc1f3b4f4f13edcce7d17d"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::event copyAfterToggle -> copyAfterToggle",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "event copyAfterToggle -> copyAfterToggle",
+      "symbol_hash": "sha256:6595c9ac750c4ccdee9980505a139cd15141ffd2deb8d5dfb47a93c83dedc3b4"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::event rename -> rename",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "event rename -> rename",
+      "symbol_hash": "sha256:ffb775692d74db40f2a1e682dd92a3903972f377a8e2f30a7d527c8ee590df3e"
+    },
+    {
+      "id": "examples/ui_native_shell_smoke.tetra::Views::event reset -> decrement",
+      "module": "examples/ui_native_shell_smoke.tetra",
+      "section": "Views",
+      "entry": "event reset -> decrement",
+      "symbol_hash": "sha256:cb2d84143853b2af98bc2c2cf4eb641563b3b6c280ae7a4370ebfbb24fe49843"
     },
     {
       "id": "examples/ui_native_shell_smoke.tetra::Views::event submit -> toggle",
@@ -1592,6 +2012,34 @@
       "section": "Functions",
       "entry": "func worker() -> i32 uses actors, runtime",
       "symbol_hash": "sha256:07cb13a75c8be7d7e73a74305ab2bb4914e5a849f67e51dc4205c8d7dad060e7"
+    },
+    {
+      "id": "examples/wasm_globals_smoke.tetra::Functions::func main",
+      "module": "examples/wasm_globals_smoke.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:dec5624d026e6ad1366dd0fd5d660f2226c1e57ebb1063617215a1a5b2b2c9d3"
+    },
+    {
+      "id": "examples/wasm_globals_smoke.tetra::Globals::const base",
+      "module": "examples/wasm_globals_smoke.tetra",
+      "section": "Globals",
+      "entry": "const base: i32",
+      "symbol_hash": "sha256:ea648607b253378cd9e35651c0d7aa8489189665adca74b2287f32b8d44ef02e"
+    },
+    {
+      "id": "examples/wasm_globals_smoke.tetra::Globals::val greeting",
+      "module": "examples/wasm_globals_smoke.tetra",
+      "section": "Globals",
+      "entry": "val greeting: str",
+      "symbol_hash": "sha256:378e439ca04c7e815c45933e1aa008378036d186a4e89cd40ac0f6a983ffaaa3"
+    },
+    {
+      "id": "examples/wasm_globals_smoke.tetra::Globals::var title",
+      "module": "examples/wasm_globals_smoke.tetra",
+      "section": "Globals",
+      "entry": "var title: str",
+      "symbol_hash": "sha256:0e992009c4524796ab268a8fc52e912c52a9ee179e26442a8a69ca82366176b9"
     }
   ]
 }

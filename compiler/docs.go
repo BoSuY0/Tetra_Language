@@ -31,8 +31,9 @@ func GenerateAPIDocs(paths []string) ([]byte, error) {
 		parsed = append(parsed, file)
 	}
 	var body bytes.Buffer
-	for _, file := range parsed {
-		writeFileAPIDocs(&body, file)
+	titles := disambiguatedAPIDocTitles(parsed)
+	for i, file := range parsed {
+		writeFileAPIDocsWithTitle(&body, file, titles[i])
 	}
 	var b bytes.Buffer
 	writeAPIDocsHeader(&b, len(parsed), body.String())
@@ -58,6 +59,34 @@ func writeAPIDocsHeader(b *bytes.Buffer, moduleCount int, body string) {
 	entryCount, hash := apiSurfaceMetadata(body)
 	b.WriteString("# Tetra API Docs\n\n")
 	fmt.Fprintf(b, "<!-- tetra-api-metadata: {\"schema\":\"tetra.api.v1alpha1\",\"api_hash\":\"sha256:%s\",\"module_count\":%d,\"entry_count\":%d} -->\n\n", hash, moduleCount, entryCount)
+}
+
+func disambiguatedAPIDocTitles(files []*frontend.FileAST) []string {
+	titles := make([]string, len(files))
+	counts := map[string]int{}
+	for i, file := range files {
+		title := apiDocTitle(file)
+		titles[i] = title
+		counts[title]++
+	}
+	for i, title := range titles {
+		if counts[title] <= 1 {
+			continue
+		}
+		titles[i] = fmt.Sprintf("%s (%s)", title, filepath.ToSlash(files[i].Path))
+	}
+	return titles
+}
+
+func apiDocTitle(file *frontend.FileAST) string {
+	title := file.Path
+	if file.Module != "" {
+		title = file.Module
+	}
+	if isExperimentalModuleTitle(title) {
+		title += " (experimental)"
+	}
+	return title
 }
 
 func apiSurfaceMetadata(body string) (int, string) {
@@ -130,14 +159,11 @@ func isDocSourceFile(path string) bool {
 }
 
 func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {
-	title := file.Path
-	if file.Module != "" {
-		title = file.Module
-	}
-	experimental := isExperimentalModuleTitle(title)
-	if experimental {
-		title += " (experimental)"
-	}
+	writeFileAPIDocsWithTitle(b, file, apiDocTitle(file))
+}
+
+func writeFileAPIDocsWithTitle(b *bytes.Buffer, file *frontend.FileAST, title string) {
+	experimental := strings.Contains(title, "lib.experimental")
 	fmt.Fprintf(b, "## %s\n\n", title)
 	if experimental {
 		b.WriteString("Experimental module: compatibility is not guaranteed for v1.x.\n\n")

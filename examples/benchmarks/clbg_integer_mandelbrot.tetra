@@ -7,7 +7,7 @@ func escape_iters(cx: Int, cy: Int) -> Int:
     var iter: Int = 0
     while iter < 20 && zx * zx + zy * zy <= 40000:
         let next_zx: Int = (zx * zx - zy * zy) / 100 + cx
-        zy = (2 * zx * zy) / 100 + cy
+        zy = 2 * zx * zy / 100 + cy
         zx = next_zx
         iter = iter + 1
     return iter

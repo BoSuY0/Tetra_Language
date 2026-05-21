@@ -28,7 +28,6 @@ uses alloc, mem:
         i = i + 1
     dist[0] = 0
     queue[0] = 0
-
     var head: Int = 0
     var tail: Int = 1
     while head < tail:
@@ -42,7 +41,6 @@ uses alloc, mem:
                 tail = tail + 1
             edge = edge + 1
         head = head + 1
-
     var checksum: Int = 0
     i = 0
     while i < 6:

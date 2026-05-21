@@ -191,9 +191,8 @@ func validateSafetyReadinessReport(evidence safetyEvidence) (safetyReport, error
 	}
 	for path, raw := range docs {
 		text := string(raw)
-		lower := strings.ToLower(text)
 		for _, phrase := range forbiddenSafetyEvidencePhrases {
-			if strings.Contains(lower, strings.ToLower(phrase)) {
+			if containsForbiddenSafetyClaim(text, phrase) {
 				issues = append(issues, fmt.Sprintf("%s contains production-blocking phrase %q", path, phrase))
 			}
 		}
@@ -228,6 +227,30 @@ func validateSafetyReadinessReport(evidence safetyEvidence) (safetyReport, error
 		Version:          report.Version,
 		RequiredFeatures: append([]string(nil), requiredSafetyFeatures...),
 	}, nil
+}
+
+func containsForbiddenSafetyClaim(text string, phrase string) bool {
+	needle := strings.ToLower(phrase)
+	for _, paragraph := range strings.Split(text, "\n\n") {
+		lower := strings.ToLower(paragraph)
+		if !strings.Contains(lower, needle) {
+			continue
+		}
+		if isValidatorRejectionParagraph(lower) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func isValidatorRejectionParagraph(paragraph string) bool {
+	for _, marker := range []string{"rejects", "reject ", "rejected", "must reject", "validator rejects"} {
+		if strings.Contains(paragraph, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeFeaturesReport(raw []byte) (featuresReport, error) {

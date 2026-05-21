@@ -59,6 +59,20 @@ func TestValidateSafetyReadinessAcceptsProductionEvidence(t *testing.T) {
 	}
 }
 
+func TestValidateSafetyReadinessAllowsValidatorRejectionLanguage(t *testing.T) {
+	evidence := productionSafetyEvidence()
+	evidence.CurrentSurface = []byte(`Safety production core is current.
+Lifetime SSA local join solver is current since ` + "`v0.4.0`" + ` for branch, match, and loop flow snapshots.
+Mutable by-reference captures, including callable mutable-capture global-escape, pointer/resource captures, and thread-boundary callable escape keep stable JSON diagnostics.
+The native runtime validator rejects metadata-only, web-only, native-shell sidecar-only,
+fake/mock/placeholder, missing event execution, and missing state-transition reports.
+`)
+
+	if err := validateSafetyReadiness(evidence); err != nil {
+		t.Fatalf("validateSafetyReadiness rejected negative validator wording: %v", err)
+	}
+}
+
 func TestValidateSafetyReadinessRejectsMissingProductionCore(t *testing.T) {
 	evidence := productionSafetyEvidence()
 	evidence.Features = []byte(`{"schema":"tetra.features.v1","version":"v0.4.0","features":[

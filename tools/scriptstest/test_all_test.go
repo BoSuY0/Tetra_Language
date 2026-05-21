@@ -1037,6 +1037,23 @@ func TestSmokeSourceSetsUseUnifiedRegistry(t *testing.T) {
 	}
 }
 
+func TestTestAllWASMSchemaChecksUseArtifactSmokeReports(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "scripts", "ci", "test-all.sh"))
+	if err != nil {
+		t.Fatalf("read test-all.sh: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`local report="$report_dir/$target-artifact-smoke.json"`,
+		`go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$report"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("test-all WASM schema check missing %q", want)
+		}
+	}
+}
+
 func TestTestAllValidatesDocsManifests(t *testing.T) {
 	raw, err := readTestAllScript(t)
 	if err != nil {

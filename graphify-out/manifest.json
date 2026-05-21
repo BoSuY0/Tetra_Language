@@ -336,8 +336,8 @@
     "hash": "91c67b4e3af6d6abece7647d63e47880"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/compiler/docs.go": {
-    "mtime": 1779365125.5280879,
-    "hash": "4e943f0625e12ec0ef4f56f77b3dd66d"
+    "mtime": 1779367139.990894,
+    "hash": "b03726ab0091b5c4187be21d7c452aea"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/compiler/features.go": {
     "mtime": 1779366348.3560317,
@@ -1188,8 +1188,8 @@
     "hash": "ec89722214c2e57be0e444a4a37df0bc"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/compiler/tests/frontend/docs_test.go": {
-    "mtime": 1779365125.5374935,
-    "hash": "f2f6350f1f45959871d1b6709c9495c1"
+    "mtime": 1779367139.988894,
+    "hash": "92e9cd8834f3d6e3a024dce7bbe0a27f"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/compiler/tests/frontend/flow_migration_test.go": {
     "mtime": 1779365125.5374935,
@@ -1892,12 +1892,12 @@
     "hash": "cd40d8e9d6c00610b2f1670f5ab7a059"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/validate-safety-readiness/main.go": {
-    "mtime": 1779365127.1907072,
-    "hash": "e01eef20a9b3d6261427465da284f27d"
+    "mtime": 1779367229.74747,
+    "hash": "2a82ddd8f375ce0b8d6316ed0cb571bc"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/validate-safety-readiness/main_test.go": {
-    "mtime": 1779365127.1908,
-    "hash": "859ef6d2399fe1ab8ab702c2abde6ae2"
+    "mtime": 1779367229.74747,
+    "hash": "16c164d069f238b5a1637de5ede6254b"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/validate-smoke-list/main.go": {
     "mtime": 1779365127.1908,
@@ -2036,8 +2036,8 @@
     "hash": "89ad3e1e25437fbee1e6e74446774a96"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/scriptstest/api_diff_report_test.go": {
-    "mtime": 1779365127.192909,
-    "hash": "07920e7dd1a445db7bb3a52c6529d209"
+    "mtime": 1779367457.4068544,
+    "hash": "363f68ea4a83248a3b85d353ca7d821a"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/scriptstest/ci_workflow_test.go": {
     "mtime": 1779365127.1931279,
@@ -2048,8 +2048,8 @@
     "hash": "a3dabfdf2a66d647649b7d366e7222fe"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/scriptstest/no_wrapper_structure_test.go": {
-    "mtime": 1779365127.1931279,
-    "hash": "285f57cf2cd57da78cd769b6ceeba760"
+    "mtime": 1779367153.4535213,
+    "hash": "589db2597c1d1fb7ceb118836d36128a"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/scriptstest/release_binary_size_test.go": {
     "mtime": 1779365127.1931279,
@@ -2200,8 +2200,8 @@
     "hash": "7f654909574e18e2d36f52df5f4de942"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/scriptstest/test_all_test.go": {
-    "mtime": 1779365127.193763,
-    "hash": "4860da86adc4f02387dae1ceb13e6e94"
+    "mtime": 1779367107.7758002,
+    "hash": "b7925f9fd854e440e3737ca26b29c2fd"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/scriptstest/test_script_test.go": {
     "mtime": 1779365127.193763,
@@ -2280,103 +2280,203 @@
     "hash": "e1107b630dcde4accc37946335309153"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-smoke.ui.web.mjs": {
-    "mtime": 1779366488.901649,
+    "mtime": 1779367683.951605,
     "hash": "7fed7101e3185a5c4d5a40ed5b6d12be"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/legacy_hello.mjs": {
-    "mtime": 1779366479.5171545,
+    "mtime": 1779367674.5390048,
     "hash": "6e9dae2670398b34447bdd28924fca2d"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/effects_io_smoke.mjs": {
-    "mtime": 1779366479.5181544,
+    "mtime": 1779367674.5390048,
     "hash": "eb7bd7da44390aa3b49062a28d85043c"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/ui_web_smoke.mjs": {
-    "mtime": 1779366479.5201545,
+    "mtime": 1779367674.5400047,
     "hash": "a87505a17c4ea936d0f920aed8c0d034"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/ui_web_smoke.ui.web.mjs": {
-    "mtime": 1779366479.5201545,
+    "mtime": 1779367674.5400047,
     "hash": "c9cd72063e6a290b39a82486d22c5d48"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/core_slices_smoke.mjs": {
-    "mtime": 1779366479.5241544,
+    "mtime": 1779367674.5410047,
     "hash": "a5bc72a3deb4a233ad420343cfca157e"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/wasm_globals_smoke.mjs": {
-    "mtime": 1779366479.5241544,
+    "mtime": 1779367674.5420048,
     "hash": "29e827ef7b7091208bc01f6f4ff3abd0"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/wasm_multi_return_2_smoke.mjs": {
-    "mtime": 1779366479.5261543,
+    "mtime": 1779367674.5420048,
     "hash": "1fee044d4e83b9b8170898fc1ee02c23"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/wasm_multi_return_3_smoke.mjs": {
-    "mtime": 1779366479.5261543,
+    "mtime": 1779367674.5430048,
     "hash": "41f6da3ef6ed27518d7b5d0e15ce5a01"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/wasm_multi_return_4_smoke.mjs": {
-    "mtime": 1779366479.5271542,
+    "mtime": 1779367674.5440047,
     "hash": "c2926727e3b48b0ea3dcdac534df105a"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/dogfood_wasi.mjs": {
-    "mtime": 1779366479.5281544,
+    "mtime": 1779367674.5440047,
     "hash": "08482b7c76648be41a7f67efb8ebd6e4"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/dogfood_web_ui.mjs": {
-    "mtime": 1779366479.5281544,
+    "mtime": 1779367674.5450046,
     "hash": "fbce4cb63d3a96244d97eca34c4ffd06"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/dogfood_web_ui.ui.web.mjs": {
-    "mtime": 1779366479.5281544,
+    "mtime": 1779367674.5450046,
     "hash": "c20e31f90fa5a2edd107a29ee127b879"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/legacy_hello.mjs": {
-    "mtime": 1779366479.83215,
+    "mtime": 1779367674.8739977,
     "hash": "6e9dae2670398b34447bdd28924fca2d"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/effects_io_smoke.mjs": {
-    "mtime": 1779366480.4261415,
+    "mtime": 1779367675.499984,
     "hash": "eb7bd7da44390aa3b49062a28d85043c"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/ui_web_smoke.mjs": {
-    "mtime": 1779366481.0331328,
+    "mtime": 1779367676.0999713,
     "hash": "a87505a17c4ea936d0f920aed8c0d034"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/ui_web_smoke.ui.web.mjs": {
-    "mtime": 1779366481.0331328,
+    "mtime": 1779367676.1009712,
     "hash": "c9cd72063e6a290b39a82486d22c5d48"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/core_slices_smoke.mjs": {
-    "mtime": 1779366481.6111245,
+    "mtime": 1779367676.720958,
     "hash": "a5bc72a3deb4a233ad420343cfca157e"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/wasm_globals_smoke.mjs": {
-    "mtime": 1779366482.218116,
+    "mtime": 1779367677.3159451,
     "hash": "29e827ef7b7091208bc01f6f4ff3abd0"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/wasm_multi_return_2_smoke.mjs": {
-    "mtime": 1779366482.8191073,
+    "mtime": 1779367677.931932,
     "hash": "1fee044d4e83b9b8170898fc1ee02c23"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/wasm_multi_return_3_smoke.mjs": {
-    "mtime": 1779366483.4200988,
+    "mtime": 1779367678.5479186,
     "hash": "41f6da3ef6ed27518d7b5d0e15ce5a01"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/wasm_multi_return_4_smoke.mjs": {
-    "mtime": 1779366484.03409,
+    "mtime": 1779367679.1579056,
     "hash": "c2926727e3b48b0ea3dcdac534df105a"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/dogfood_wasi.mjs": {
-    "mtime": 1779366484.6270816,
+    "mtime": 1779367679.7628925,
     "hash": "08482b7c76648be41a7f67efb8ebd6e4"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/dogfood_web_ui.mjs": {
-    "mtime": 1779366485.2210732,
+    "mtime": 1779367680.3708797,
     "hash": "fbce4cb63d3a96244d97eca34c4ffd06"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/dogfood_web_ui.ui.web.mjs": {
-    "mtime": 1779366485.222073,
+    "mtime": 1779367680.3708797,
+    "hash": "c20e31f90fa5a2edd107a29ee127b879"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/web-ui-smoke.ui.web.mjs": {
+    "mtime": 1779366853.2920463,
+    "hash": "7fed7101e3185a5c4d5a40ed5b6d12be"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/legacy_hello.mjs": {
+    "mtime": 1779366952.850478,
+    "hash": "6e9dae2670398b34447bdd28924fca2d"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/effects_io_smoke.mjs": {
+    "mtime": 1779366952.850478,
+    "hash": "eb7bd7da44390aa3b49062a28d85043c"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.mjs": {
+    "mtime": 1779366952.8514779,
+    "hash": "a87505a17c4ea936d0f920aed8c0d034"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.ui.web.mjs": {
+    "mtime": 1779366952.8524778,
+    "hash": "c9cd72063e6a290b39a82486d22c5d48"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/core_slices_smoke.mjs": {
+    "mtime": 1779366952.8554778,
+    "hash": "a5bc72a3deb4a233ad420343cfca157e"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/wasm_globals_smoke.mjs": {
+    "mtime": 1779366952.8564777,
+    "hash": "29e827ef7b7091208bc01f6f4ff3abd0"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_2_smoke.mjs": {
+    "mtime": 1779366952.8574777,
+    "hash": "1fee044d4e83b9b8170898fc1ee02c23"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_3_smoke.mjs": {
+    "mtime": 1779366952.8594778,
+    "hash": "41f6da3ef6ed27518d7b5d0e15ce5a01"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_4_smoke.mjs": {
+    "mtime": 1779366952.8604777,
+    "hash": "c2926727e3b48b0ea3dcdac534df105a"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/dogfood_wasi.mjs": {
+    "mtime": 1779366952.8614776,
+    "hash": "08482b7c76648be41a7f67efb8ebd6e4"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.mjs": {
+    "mtime": 1779366952.8624775,
+    "hash": "fbce4cb63d3a96244d97eca34c4ffd06"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.ui.web.mjs": {
+    "mtime": 1779366952.8624775,
+    "hash": "c20e31f90fa5a2edd107a29ee127b879"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/legacy_hello.mjs": {
+    "mtime": 1779367348.2204647,
+    "hash": "6e9dae2670398b34447bdd28924fca2d"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/effects_io_smoke.mjs": {
+    "mtime": 1779367348.2204647,
+    "hash": "eb7bd7da44390aa3b49062a28d85043c"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.mjs": {
+    "mtime": 1779367348.2214646,
+    "hash": "a87505a17c4ea936d0f920aed8c0d034"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.ui.web.mjs": {
+    "mtime": 1779367348.2224646,
+    "hash": "c9cd72063e6a290b39a82486d22c5d48"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/core_slices_smoke.mjs": {
+    "mtime": 1779367348.2254646,
+    "hash": "a5bc72a3deb4a233ad420343cfca157e"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/wasm_globals_smoke.mjs": {
+    "mtime": 1779367348.2254646,
+    "hash": "29e827ef7b7091208bc01f6f4ff3abd0"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_2_smoke.mjs": {
+    "mtime": 1779367348.2254646,
+    "hash": "1fee044d4e83b9b8170898fc1ee02c23"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_3_smoke.mjs": {
+    "mtime": 1779367348.2274644,
+    "hash": "41f6da3ef6ed27518d7b5d0e15ce5a01"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_4_smoke.mjs": {
+    "mtime": 1779367348.2284644,
+    "hash": "c2926727e3b48b0ea3dcdac534df105a"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/dogfood_wasi.mjs": {
+    "mtime": 1779367348.2284644,
+    "hash": "08482b7c76648be41a7f67efb8ebd6e4"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.mjs": {
+    "mtime": 1779367348.2294643,
+    "hash": "fbce4cb63d3a96244d97eca34c4ffd06"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.ui.web.mjs": {
+    "mtime": 1779367348.2294643,
     "hash": "c20e31f90fa5a2edd107a29ee127b879"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/AGENTS.md": {
@@ -2700,8 +2800,8 @@
     "hash": "65892ea97b5e00fc7940be4f959f4e69"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/docs/generated/v1_0/api-diff/api-docs.md": {
-    "mtime": 1779365125.5417354,
-    "hash": "4d60ed0af626c48bf5f76f8f18b628b1"
+    "mtime": 1779367522.2063649,
+    "hash": "0b71756c992461fd428aec2d31ebdb0e"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/docs/generated/v1_0/test-all/api-docs.md": {
     "mtime": 1779365125.541796,
@@ -3364,27 +3464,131 @@
     "hash": "c9772588d4ad832bd0b09d18f0aa2923"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-smoke.dom.html": {
-    "mtime": 1779366488.896021,
+    "mtime": 1779367683.9469554,
     "hash": "84071c8b31cf2d80492f48a6e58533ae"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/ui_web_smoke.ui.html": {
-    "mtime": 1779366479.5201545,
+    "mtime": 1779367674.5400047,
     "hash": "8326dfc93bd6f85ab651b03905c04a86"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-artifact-artifacts/dogfood_web_ui.ui.html": {
-    "mtime": 1779366479.5281544,
+    "mtime": 1779367674.5450046,
     "hash": "3f14e4d1eb648c5066a406aa79f295ad"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/ui_web_smoke.ui.html": {
-    "mtime": 1779366481.0331328,
+    "mtime": 1779367676.1009712,
     "hash": "8326dfc93bd6f85ab651b03905c04a86"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/wasm-ui-gui/web-runtime-artifacts/dogfood_web_ui.ui.html": {
-    "mtime": 1779366485.222073,
+    "mtime": 1779367680.3708797,
     "hash": "3f14e4d1eb648c5066a406aa79f295ad"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/release-v1.0.0-gate-20260521-121054/summary.md": {
     "mtime": 1779365455.0227427,
     "hash": "e090af550ffe331033548a304e2d6fcc"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/release-v1.0.0-gate-20260521-123014/summary.md": {
+    "mtime": 1779366614.9453137,
+    "hash": "55a34187302eeba64171e27282b4b0b2"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/release-v1.0.0-gate-20260521-123144/summary.md": {
+    "mtime": 1779366704.3774645,
+    "hash": "7bb14c107a1d9d4a55c5d09c76b0cb55"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/release-v1.0.0-gate-20260521-123248/summary.md": {
+    "mtime": 1779366768.8714533,
+    "hash": "660c9bee21e5abb3eae3037efcee4358"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/tracked-examples.txt": {
+    "mtime": 1779367237.7586513,
+    "hash": "bbbf4b1dd0cf79dea74b9e126e703a70"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/top-level-api-sources.txt": {
+    "mtime": 1779367522.1443663,
+    "hash": "80b9f215b430743691191319076bca21"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/web-ui-smoke.dom.html": {
+    "mtime": 1779366853.288959,
+    "hash": "84071c8b31cf2d80492f48a6e58533ae"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/tetra-docs.md": {
+    "mtime": 1779367237.7822595,
+    "hash": "4044151ebc496c4c08a4fcc701d617df"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/api-diff/api-docs.md": {
+    "mtime": 1779366868.0963051,
+    "hash": "79b04d3b19631364a4a374b3d5e1cd1c"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/tetra-docs.md": {
+    "mtime": 1779366951.633517,
+    "hash": "8a1de732d45d8e068b8167cbae7d214c"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/api-docs.md": {
+    "mtime": 1779366951.7395136,
+    "hash": "8a1de732d45d8e068b8167cbae7d214c"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/tooling-summary.md": {
+    "mtime": 1779366953.2884638,
+    "hash": "e9d11ab08fa85a58aa7bb6801c7fee41"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/summary.md": {
+    "mtime": 1779366953.2984636,
+    "hash": "a9ddc53776c57bd236c87ff146230274"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.ui.html": {
+    "mtime": 1779366952.8524778,
+    "hash": "8326dfc93bd6f85ab651b03905c04a86"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.ui.html": {
+    "mtime": 1779366952.8624775,
+    "hash": "3f14e4d1eb648c5066a406aa79f295ad"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/api-diff-rerun/api-docs.md": {
+    "mtime": 1779367273.3923392,
+    "hash": "4044151ebc496c4c08a4fcc701d617df"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/tetra-docs.md": {
+    "mtime": 1779367347.0544932,
+    "hash": "2a946d1b40df4754bdd4eb6f5c474709"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/api-docs.md": {
+    "mtime": 1779367347.1624906,
+    "hash": "2a946d1b40df4754bdd4eb6f5c474709"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/tooling-summary.md": {
+    "mtime": 1779367348.5244572,
+    "hash": "b1f6b0a98c8ca4c8ead2d11b8cbc2f41"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/summary.md": {
+    "mtime": 1779367348.5324569,
+    "hash": "a6355264703416d874c9d46a7602589f"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.ui.html": {
+    "mtime": 1779367348.2224646,
+    "hash": "8326dfc93bd6f85ab651b03905c04a86"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/test-all-rerun/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.ui.html": {
+    "mtime": 1779367348.2294643,
+    "hash": "3f14e4d1eb648c5066a406aa79f295ad"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/api-diff-top-level-probe/sources.txt": {
+    "mtime": 1779367432.2694435,
+    "hash": "80b9f215b430743691191319076bca21"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/api-diff-top-level-probe/api-docs.md": {
+    "mtime": 1779367432.334442,
+    "hash": "0b71756c992461fd428aec2d31ebdb0e"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/api-diff-baseline-refresh/api-docs.md": {
+    "mtime": 1779367476.3144155,
+    "hash": "0b71756c992461fd428aec2d31ebdb0e"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/api-diff-rerun-clean/api-docs.md": {
+    "mtime": 1779367480.6343157,
+    "hash": "0b71756c992461fd428aec2d31ebdb0e"
+  },
+  "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/reports/v1-preflight-audit/artifacts/api-diff-final-check/api-docs.md": {
+    "mtime": 1779367528.0752318,
+    "hash": "0b71756c992461fd428aec2d31ebdb0e"
   }
 }

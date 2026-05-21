@@ -20,7 +20,6 @@ uses alloc, mem:
         return 4
     if pg.read_i32_be(parse, parse_written - 4) != pg.int4_oid():
         return 5
-
     return 0
 
 func check_bind() -> Int
@@ -43,7 +42,6 @@ uses alloc, mem:
         return 10
     if bind[value_offset] != 52 || bind[value_offset + 1] != 50:
         return 11
-
     return 0
 
 func check_bind_two_params() -> Int
@@ -58,7 +56,6 @@ uses alloc, mem:
     let value_count_offset: Int = 1 + 4 + pg.cstring_pair_len("", statement) + 2
     if pg.read_i16_be(bind, value_count_offset) != 2:
         return 14
-
     return 0
 
 func check_describe_execute_sync() -> Int
@@ -70,7 +67,6 @@ uses alloc, mem:
         return 15
     if describe[0] != pg.frame_describe() || describe[5] != pg.describe_kind_portal():
         return 16
-
     var execute: []u8 = core.make_u8(pg.execute_frame_len(portal, 0))
     let execute_written: Int = pg.write_execute(execute, portal, 0)
     if execute_written != pg.execute_frame_len(portal, 0):
@@ -79,14 +75,12 @@ uses alloc, mem:
         return 18
     if pg.read_i32_be(execute, execute_written - 4) != 0:
         return 19
-
     var sync: []u8 = core.make_u8(pg.sync_frame_len())
     let sync_written: Int = pg.write_sync(sync)
     if sync_written != pg.sync_frame_len():
         return 20
     if sync[0] != pg.frame_sync() || pg.read_i32_be(sync, 1) != 4:
         return 21
-
     return 0
 
 func main() -> Int

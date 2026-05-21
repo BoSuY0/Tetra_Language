@@ -14,11 +14,7 @@ func safe_pair(row_a: Int, col_a: Int, row_b: Int, col_b: Int) -> Bool:
     return true
 
 func safe_6(a: Int, b: Int, c: Int, d: Int, e: Int, f: Int) -> Bool:
-    return safe_pair(0, a, 1, b) && safe_pair(0, a, 2, c) && safe_pair(0, a, 3, d) && safe_pair(0, a, 4, e) && safe_pair(0, a, 5, f) &&
-        safe_pair(1, b, 2, c) && safe_pair(1, b, 3, d) && safe_pair(1, b, 4, e) && safe_pair(1, b, 5, f) &&
-        safe_pair(2, c, 3, d) && safe_pair(2, c, 4, e) && safe_pair(2, c, 5, f) &&
-        safe_pair(3, d, 4, e) && safe_pair(3, d, 5, f) &&
-        safe_pair(4, e, 5, f)
+    return safe_pair(0, a, 1, b) && safe_pair(0, a, 2, c) && safe_pair(0, a, 3, d) && safe_pair(0, a, 4, e) && safe_pair(0, a, 5, f) && safe_pair(1, b, 2, c) && safe_pair(1, b, 3, d) && safe_pair(1, b, 4, e) && safe_pair(1, b, 5, f) && safe_pair(2, c, 3, d) && safe_pair(2, c, 4, e) && safe_pair(2, c, 5, f) && safe_pair(3, d, 4, e) && safe_pair(3, d, 5, f) && safe_pair(4, e, 5, f)
 
 func main() -> Int:
     var a: Int = 0

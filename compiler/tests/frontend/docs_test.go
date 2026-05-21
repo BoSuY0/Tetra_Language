@@ -97,6 +97,33 @@ capsule Demo:
 	}
 }
 
+func TestGenerateAPIDocsDisambiguatesDuplicateModuleHeadings(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "first.tetra")
+	second := filepath.Join(dir, "second.tetra")
+	if err := os.WriteFile(first, []byte("module app.main\n\nfunc first() -> Int:\n    return 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte("module app.main\n\nfunc second() -> Int:\n    return 2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := compiler.GenerateAPIDocs([]string{first, second})
+	if err != nil {
+		t.Fatalf("GenerateAPIDocs: %v", err)
+	}
+	out := string(docs)
+	for _, want := range []string{
+		"## app.main (" + filepath.ToSlash(first) + ")",
+		"## app.main (" + filepath.ToSlash(second) + ")",
+		"`func first() -> i32`",
+		"`func second() -> i32`",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("docs missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestGenerateAPIDocsLabelsExperimentalModules(t *testing.T) {
 	src := []byte(`module lib.experimental.math
 

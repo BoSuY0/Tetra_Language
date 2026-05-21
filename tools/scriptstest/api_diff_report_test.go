@@ -20,8 +20,8 @@ func TestReleaseV10APIDiffWorkflowLivesInVersionedReleaseScript(t *testing.T) {
 	versionedText := string(versionedRaw)
 	for _, want := range []string{
 		"Usage: bash scripts/release/v1_0/api-diff.sh",
-		`release_artifact="tetra.release.v0_3_0.api-diff-report.v1alpha1"`,
-		"git ls-files 'examples/*.tetra'",
+		`release_artifact="tetra.release.v1_0.api-diff-report.v1alpha1"`,
+		"git ls-files ':(glob)examples/*.tetra'",
 		"go run ./tools/cmd/gen-docs",
 		"node scripts/tools/api_diff_report.mjs",
 	} {

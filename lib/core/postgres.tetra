@@ -428,15 +428,15 @@ uses mem:
 
 func write_i32_be_at(dst: inout []u8, start: Int, value: Int) -> Int
 uses mem:
-    dst[start] = (value / 16777216) % 256
-    dst[start + 1] = (value / 65536) % 256
-    dst[start + 2] = (value / 256) % 256
+    dst[start] = value / 16777216 % 256
+    dst[start + 1] = value / 65536 % 256
+    dst[start + 2] = value / 256 % 256
     dst[start + 3] = value % 256
     return start + 4
 
 func write_i16_be_at(dst: inout []u8, start: Int, value: Int) -> Int
 uses mem:
-    dst[start] = (value / 256) % 256
+    dst[start] = value / 256 % 256
     dst[start + 1] = value % 256
     return start + 2
 
