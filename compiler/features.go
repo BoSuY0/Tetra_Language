@@ -331,6 +331,15 @@ func FeatureRegistry() []FeatureInfo {
 			Stability: "current Linux-x64 deterministic native runtime slice with executable tetra.ui.native-runtime.v1 smoke evidence and strict validator rejection for metadata-only, web-only, native-shell sidecar-only, fake, mock, or placeholder evidence; macOS/Windows, GTK/Qt/OS widget backend claims, platform accessibility integration, and broad input/change/focus behavior remain outside this claim until host-native reports exist",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
 		},
+		{
+			ID:        "ui.platform-runtime",
+			Name:      "Cross-platform UI runtime promotion gate",
+			Status:    FeatureStatusExperimental,
+			Since:     "v0.4.0",
+			Scope:     "tetra.ui.platform-runtime.v1 full-platform UI runtime promotion gate for Linux, Windows, macOS, and Web evidence; Windows/macOS require real Windows/macOS target-host reports before they can count as production UI runtime targets",
+			Stability: "not production until the full-platform UI runtime promotion gate passes with real Windows/macOS target-host reports and rejects metadata-only, runtime-less, build-only, sidecar-only, fake/mock/placeholder, and startup_failure evidence as blockers rather than platform runtime proof",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
+		},
 	}
 	out := make([]FeatureInfo, len(features))
 	copy(out, features)

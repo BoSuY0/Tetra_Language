@@ -62,6 +62,7 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 		"actors.distributed-runtime":              compiler.FeatureStatusCurrent,
 		"eco.distributed-network":                 compiler.FeatureStatusPostV1,
 		"ui.native-runtime":                       compiler.FeatureStatusCurrent,
+		"ui.platform-runtime":                     compiler.FeatureStatusExperimental,
 		"language.full-first-class-callables":     compiler.FeatureStatusCurrent,
 	} {
 		if gotStatus := seenID[id]; gotStatus != wantStatus {
@@ -243,6 +244,15 @@ func TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(t *testing.T) {
 	for _, want := range []string{"production Linux-x64 native UI runtime path", "native runtime widget instances", "click/activate events", "lowered command operations", "state and widget updates", "tetra.ui.native-runtime.v1 smoke evidence", "metadata-only", "web-only", "native-shell sidecar-only", "macOS/Windows", "platform accessibility integration"} {
 		if !strings.Contains(uiRuntime.Scope+" "+uiRuntime.Stability, want) {
 			t.Fatalf("UI runtime feature missing %q boundary: %#v", want, uiRuntime)
+		}
+	}
+	platformUI := seenFeature["ui.platform-runtime"]
+	if platformUI.Status != compiler.FeatureStatusExperimental || platformUI.Since != "v0.4.0" {
+		t.Fatalf("UI platform runtime lifecycle = status %q since %q, want experimental since v0.4.0", platformUI.Status, platformUI.Since)
+	}
+	for _, want := range []string{"tetra.ui.platform-runtime.v1", "full-platform UI runtime promotion gate", "real Windows/macOS target-host reports", "not production until", "metadata-only", "runtime-less", "startup_failure"} {
+		if !strings.Contains(platformUI.Scope+" "+platformUI.Stability, want) {
+			t.Fatalf("UI platform runtime feature missing %q boundary: %#v", want, platformUI)
 		}
 	}
 }

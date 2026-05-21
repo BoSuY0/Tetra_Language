@@ -5077,6 +5077,19 @@
         "docs/spec/ui_v1.md",
         "docs/user/wasm_ui_guide.md"
       ]
+    },
+    {
+      "id": "ui.platform-runtime",
+      "name": "Cross-platform UI runtime promotion gate",
+      "status": "experimental",
+      "since": "v0.4.0",
+      "scope": "tetra.ui.platform-runtime.v1 full-platform UI runtime promotion gate for Linux, Windows, macOS, and Web evidence; Windows/macOS require real Windows/macOS target-host reports before they can count as production UI runtime targets",
+      "stability": "not production until the full-platform UI runtime promotion gate passes with real Windows/macOS target-host reports and rejects metadata-only, runtime-less, build-only, sidecar-only, fake/mock/placeholder, and startup_failure evidence as blockers rather than platform runtime proof",
+      "docs": [
+        "docs/spec/current_supported_surface.md",
+        "docs/spec/ui_v1.md",
+        "docs/user/wasm_ui_guide.md"
+      ]
     }
   ]
 }

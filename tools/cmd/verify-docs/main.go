@@ -553,6 +553,7 @@ func verifyFeatureRegistry(features []featureManifest) error {
 		"wasm.runtime-execution":                  "current",
 		"actors.distributed-runtime":              "current",
 		"ui.native-runtime":                       "current",
+		"ui.platform-runtime":                     "experimental",
 		"language.full-v1-guarantees":             "planned",
 		"eco.distributed-network":                 "post-v1",
 		"language.full-first-class-callables":     "current",
@@ -689,6 +690,15 @@ func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"native-shell sidecar-only",
 			"macOS/Windows",
 		},
+		"ui.platform-runtime": {
+			"tetra.ui.platform-runtime.v1",
+			"full-platform UI runtime promotion gate",
+			"real Windows/macOS target-host reports",
+			"not production until",
+			"metadata-only",
+			"runtime-less",
+			"startup_failure",
+		},
 	}
 	docChecks := map[string][]string{
 		"language.generics-mvp":                   {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
@@ -700,6 +710,7 @@ func verifyFeatureTruthBoundaries(features map[string]featureManifest) error {
 		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
 		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
 		"ui.native-runtime":                       {"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
+		"ui.platform-runtime":                     {"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
 	}
 	for id, required := range checks {
 		feature, ok := features[id]
