@@ -1,42 +1,43 @@
 # Tetra Current Supported Surface
 
-Status: current for `v1.0.0`.
+Status: current for `v0.4.0`.
 
 This document is the short release-truth layer for the current public Tetra
 profile. It records what the repository may describe as supported now, and what
 must still be described as future or planned.
 
-The current major line is `v1.0.0`. The scope contract is
-`docs/spec/v1_scope.md`, but this is still a bounded release profile: it does
-not promote full platform guarantees, EcoNet, hosted TetraHub, non-Linux
-desktop GUI runtime, or full first-class language guarantees beyond the
-feature-registry entries marked current.
+`v1.0.0` is a future label. The future scope contract remains
+`docs/spec/v1_scope.md`, but the current user-facing and release-facing truth is
+the `v0.4.0` local compiler/tooling profile.
 
-## Current Major Scope
+## Current Minor Scope
 
-The current major line is `v1.0.0`. Its release identity and verification
+The current minor line is `v0.4.0`. Its release identity and verification
 surface are tracked here:
 
-- Scope contract: `docs/spec/v1_scope.md`
-- Release checklist: `docs/checklists/v1_0_release_gate.md`
-- Release gate script: `scripts/release/v1_0/gate.sh`
-- Release notes: `docs/release-notes/v1_0.md`
-- Final handoff: `docs/release/v1_0_final_handoff.md`
+- Scope contract: `docs/spec/v0_4_scope.md`
+- Release checklist: `docs/checklists/v0_4_0_release_gate.md`
+- Release gate script: `scripts/release/v0_4_0/gate.sh`
+- Release notes: `docs/release-notes/v0_4_0.md`
+- Final handoff: `docs/release/v0_4_0_final_handoff.md`
 
-The version metadata is promoted to `v1.0.0`. Tagging still requires a fresh
-green `scripts/release/v1_0/gate.sh` report and matching handoff evidence.
+The version metadata is promoted to `v0.4.0`. Tagging still requires a fresh
+green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
 
 ## Current Release Gate
 
-- Current gate: `scripts/release/v1_0/gate.sh`.
-- Current checklist: `docs/checklists/v1_0_release_gate.md`.
-- Previous gate: `scripts/release/v0_4_0/gate.sh` remains for the immutable
-  `v0.4.0` Linux-x64 release truth and must not be rewritten by this profile.
-- v1 safety evidence closure is documented in `docs/spec/v1_scope.md`
+- Current gate: `scripts/release/v0_4_0/gate.sh`.
+- Current checklist: `docs/checklists/v0_4_0_release_gate.md`.
+- Future gate: `scripts/release/v1_0/gate.sh` is blocked by a `v1.0.0`
+  version preflight before mandatory release checks run and must not be treated
+  as proof of `v1.0.0` readiness while the repository remains on `v0.4.0`.
+- Future v1 safety evidence closure is documented in `docs/spec/v1_scope.md`
   and `docs/checklists/v1_0_release_gate.md`. It requires the same-branch
   aggregate compiler command
   `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`
-  plus `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`.
+  plus `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`
+  before any `v1.0.0` safety claim can close; this is not additional current
+  `v0.4.0` support.
 - Previous gate: `scripts/release/v0_2_0/gate.sh` remains for the immutable
   `v0.2.0` tag.
 - Historical gate: `scripts/release/v0_1_3/gate.sh` remains for the immutable
@@ -45,9 +46,8 @@ green `scripts/release/v1_0/gate.sh` report and matching handoff evidence.
   `v0.1.1` tag.
 - Separately gated post-v0.4 promotion evidence for WASM/Web UI/Linux-x64 GUI
   lives under `scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh` and
-  writes fresh reports under `reports/wasm-ui-gui` when requested. The v1 gate
-  archives fresh WASM and web UI smoke artifacts rather than reusing stale
-  post-v0.4 evidence.
+  writes fresh reports under `reports/wasm-ui-gui` when requested. This does
+  not rewrite the `v0.4.0` release gate or claim full `v1.0.0` readiness.
 
 ## Supported Now
 

@@ -16,7 +16,7 @@ func TestBootstrapBuildsTetraAndTAlias(t *testing.T) {
 	devText := string(devRaw)
 	assertNoLegacyMention(t, devText, "scripts/bootstrap.sh", "scripts/dev/bootstrap.sh help")
 	for _, want := range []string{
-		`release_artifact="tetra.release.v1_0_0.bootstrap-binaries.v1"`,
+		`release_artifact="tetra.release.v0_4_0.bootstrap-binaries.v1"`,
 		`go build -o "./tetra${exe}" ./cli/cmd/tetra`,
 		`cp "./tetra${exe}" "./t${exe}"`,
 		`Built: ./tetra${exe} ./t${exe}`,

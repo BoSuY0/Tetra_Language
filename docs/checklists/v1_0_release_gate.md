@@ -1,10 +1,10 @@
 # v1.0 Release Gate Checklist
 
-Status: active release-gate checklist for the bounded `v1.0.0` release line.
+Status: active release-gate scaffold for the future `v1.0.0` release line.
 This checklist is not release proof until every unchecked row cites fresh
-evidence from the exact release branch state. `scripts/release/v1_0/gate.sh`
-must run against freshly bootstrapped `./tetra version` and `./t version`
-outputs that both report `v1.0.0`.
+evidence from the exact release branch state. The current public release line
+remains `v0.4.0`; `scripts/release/v1_0/gate.sh` must block at version
+preflight until freshly bootstrapped `./tetra version` reports `v1.0.0`.
 
 Scope contract: `docs/spec/v1_scope.md`.
 Current supported surface: `docs/spec/current_supported_surface.md`.
@@ -146,7 +146,7 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 - [ ] No checkbox is marked complete without a command result and artifact path.
 - [ ] No generated artifact, smoke report, signoff, or summary is reused from a
       different commit, branch, version, or report directory.
-- [ ] Version metadata and current-surface docs stay aligned with the same
-      `v1.0.0` candidate and final gate evidence.
+- [ ] Version metadata is not promoted from `v0.4.0` until the mandatory v1
+      scope evidence is ready.
 - [ ] The final handoff records command exit codes, changed release files,
       known issues, residual risks, and release decision.

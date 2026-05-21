@@ -1,20 +1,23 @@
 # Tetra v1.0 Canonical Scope
 
-Status: current bounded `v1.0.0` scope contract. This document defines the
-surface that may be claimed by the v1 release gate; it is not a claim for
-features that the feature registry still marks planned, post-v1, or outside
-target evidence.
+Status: pre-release scope contract. This document defines what must be true
+before a build can be labeled `v1.0.0`; it is not a claim that the current
+`v0.4.0` profile, or any separately gated post-v0.4 production evidence,
+already satisfies the scope.
 
-The current release gate is `scripts/release/v1_0/gate.sh`, with supporting
-post-v0.4 Linux-x64 Memory/Parallelism/UI/WASM evidence gates under
-`scripts/release/post_v0_4/`. The matching release checklist is
-`docs/checklists/v1_0_release_gate.md`, and the final evidence handoff schema is
-`docs/release/v1_0_final_handoff.md`.
+The current release gate is `scripts/release/v0_4_0/gate.sh`, with separate
+post-v0.4 Linux-x64 Memory/Parallelism/UI gates under
+`scripts/release/post_v0_4/`. A true `v1.0.0` gate remains
+`scripts/release/v1_0/gate.sh` and must close from this contract when the
+version is promoted to `v1.0.x` and every mandatory artifact below has fresh
+evidence. The matching release checklist is
+`docs/checklists/v1_0_release_gate.md`, and the final evidence handoff schema
+is `docs/release/v1_0_final_handoff.md`.
 
-In this document, `Required` means required before the `v1.0.0` release gate can
-close. It does not promote any `planned` feature-registry entry, such
+In this document, `Required` means required before a future `v1.0.0` release
+label can close. It does not promote any `planned` feature-registry entry, such
 as `language.full-v1-guarantees`, into current support. Entries that are
-already current in the manifest, such as `ui.metadata-v1` and
+already current in the `v0.4.0` manifest, such as `ui.metadata-v1` and
 `wasm.runtime-execution`, keep their registry-limited scope and do not close
 the full v1 target matrix.
 
