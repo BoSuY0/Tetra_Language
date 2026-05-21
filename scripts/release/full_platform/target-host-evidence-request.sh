@@ -84,8 +84,8 @@ git_head="$(git rev-parse HEAD)"
 request_json="$out_dir/target-host-evidence-request.json"
 request_readme="$out_dir/README.md"
 
-windows_command="git clone https://github.com/$repo.git tetra-ui-runtime && cd tetra-ui-runtime && git fetch origin $branch && git checkout $git_head && pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1 -Report windows-ui-runtime.json"
-macos_command="git clone https://github.com/$repo.git tetra-ui-runtime && cd tetra-ui-runtime && git fetch origin $branch && git checkout $git_head && bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh --target macos-x64 --report macos-ui-runtime.json"
+windows_command="git clone https://github.com/$repo.git tetra-ui-runtime && cd tetra-ui-runtime && git fetch origin $branch && git checkout $git_head && pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1 -Report windows-ui-runtime.json -ExpectedVersion $version -ExpectedGitHead $git_head"
+macos_command="git clone https://github.com/$repo.git tetra-ui-runtime && cd tetra-ui-runtime && git fetch origin $branch && git checkout $git_head && bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh --target macos-x64 --report macos-ui-runtime.json --expected-version $version --expected-git-head $git_head"
 aggregation_command="TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime"
 
 jq -n \

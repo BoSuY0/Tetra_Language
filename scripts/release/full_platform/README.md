@@ -28,13 +28,16 @@ Manual target-host evidence:
   reports from the same Git commit.
 - Check out the same Git commit on a real Windows amd64 host and run
   `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
-  --target windows-x64 --report windows-ui-runtime.json`.
+  --target windows-x64 --report windows-ui-runtime.json --expected-version
+  v0.4.0 --expected-git-head <commit-sha>`.
   On Windows hosts without Bash, run
   `pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1
-  -Report windows-ui-runtime.json`.
+  -Report windows-ui-runtime.json -ExpectedVersion v0.4.0 -ExpectedGitHead
+  <commit-sha>`.
 - Check out the same Git commit on a real macOS amd64 host and run
   `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
-  --target macos-x64 --report macos-ui-runtime.json`.
+  --target macos-x64 --report macos-ui-runtime.json --expected-version
+  v0.4.0 --expected-git-head <commit-sha>`.
 - Copy those JSON reports to the Linux aggregation host and run
   `TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json
   TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json

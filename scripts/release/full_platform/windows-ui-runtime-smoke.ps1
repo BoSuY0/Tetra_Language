@@ -1,6 +1,8 @@
 param(
   [string]$Report = "",
   [string]$ReportDir = "",
+  [string]$ExpectedVersion = "",
+  [string]$ExpectedGitHead = "",
   [switch]$Help
 )
 
@@ -8,7 +10,7 @@ $ErrorActionPreference = "Stop"
 
 function Show-Usage {
   @"
-Usage: pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1 [-Report FILE] [-ReportDir DIR]
+Usage: pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1 [-Report FILE] [-ReportDir DIR] [-ExpectedVersion VERSION] [-ExpectedGitHead SHA]
 
 Runs the Windows platform UI runtime smoke on a real Windows x64 target host and
 validates the report. The report is only production evidence when the host is
@@ -53,12 +55,22 @@ if (![string]::IsNullOrWhiteSpace($reportDirPath)) {
 
 Push-Location $repoRoot
 try {
+  if ([string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+    $ExpectedVersion = (& ./tetra version 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+      $ExpectedVersion = (& go run ./cli/cmd/tetra version).Trim()
+    }
+  }
+  if ([string]::IsNullOrWhiteSpace($ExpectedGitHead)) {
+    $ExpectedGitHead = (& git rev-parse HEAD).Trim()
+  }
+
   go run ./tools/cmd/platform-ui-runtime-smoke --target windows-x64 --report $Report
   if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
   }
 
-  go run ./tools/cmd/validate-windows-ui-runtime --report $Report
+  go run ./tools/cmd/validate-windows-ui-runtime --report $Report --expected-version $ExpectedVersion --expected-git-head $ExpectedGitHead
   if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
   }

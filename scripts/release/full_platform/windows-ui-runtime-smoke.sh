@@ -42,6 +42,8 @@ cd "$repo_root"
 mkdir -p "$report_dir"
 report_path="$report_dir/windows-ui-runtime.json"
 external_report="${TETRA_WINDOWS_UI_RUNTIME_REPORT:-}"
+expected_version="$("./tetra" version 2>/dev/null || go run ./cli/cmd/tetra version)"
+expected_git_head="$(git rev-parse HEAD)"
 
 if [[ -n "$external_report" ]]; then
   if [[ ! -f "$external_report" ]]; then
@@ -49,7 +51,7 @@ if [[ -n "$external_report" ]]; then
     exit 2
   fi
   cp -- "$external_report" "$report_path"
-  go run ./tools/cmd/validate-windows-ui-runtime --report "$report_path"
+  go run ./tools/cmd/validate-windows-ui-runtime --report "$report_path" --expected-version "$expected_version" --expected-git-head "$expected_git_head"
   echo "Windows platform UI runtime report imported from TETRA_WINDOWS_UI_RUNTIME_REPORT: $report_path"
   exit 0
 fi

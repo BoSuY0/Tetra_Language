@@ -193,6 +193,10 @@ func TestReleaseFullPlatformTargetHostHelperDocumentsManualEvidence(t *testing.T
 		"pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1",
 		"TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json",
 		"TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json",
+		"-ExpectedVersion",
+		"-ExpectedGitHead",
+		"--expected-version",
+		"--expected-git-head",
 		"same Git commit",
 		"startup_failure",
 		"does not relax",
@@ -214,6 +218,7 @@ func TestReleaseFullPlatformTargetHostEvidenceRequestBundle(t *testing.T) {
 		"Usage: bash scripts/release/full_platform/target-host-evidence-request.sh [--out-dir DIR] [--repo OWNER/REPO] [--branch BRANCH]",
 		"tetra.ui.target-host-evidence-request.v1",
 		"production_evidence: false",
+		"--expected-version $version --expected-git-head $git_head",
 		"windows-ui-runtime-smoke.ps1",
 		"target-host-ui-runtime-smoke.sh --target macos-x64",
 		"TETRA_WINDOWS_UI_RUNTIME_REPORT",
@@ -268,11 +273,33 @@ func TestReleaseFullPlatformTargetHostEvidenceRequestBundle(t *testing.T) {
 	if !strings.Contains(report.Aggregation.Command, "ui-runtime-gate.sh") {
 		t.Fatalf("aggregation command missing gate: %q", report.Aggregation.Command)
 	}
+	for _, target := range report.Targets {
+		wants := []string{}
+		switch target.Target {
+		case "windows-x64":
+			wants = []string{
+				"-ExpectedVersion v0.4.0",
+				"-ExpectedGitHead " + report.ExpectedGitHead,
+			}
+		case "macos-x64":
+			wants = []string{
+				"--expected-version v0.4.0",
+				"--expected-git-head " + report.ExpectedGitHead,
+			}
+		default:
+			t.Fatalf("unexpected target in request: %q", target.Target)
+		}
+		for _, want := range wants {
+			if !strings.Contains(target.Command, want) {
+				t.Fatalf("%s command missing %q: %q", target.Target, want, target.Command)
+			}
+		}
+	}
 	readmeRaw, err := os.ReadFile(filepath.Join(outDir, "README.md"))
 	if err != nil {
 		t.Fatalf("read generated README: %v", err)
 	}
-	for _, want := range []string{"not runtime evidence", "same Git commit", "windows-ui-runtime-smoke.ps1", "macos-ui-runtime.json"} {
+	for _, want := range []string{"not runtime evidence", "same Git commit", "--expected-version v0.4.0", "--expected-git-head", "windows-ui-runtime-smoke.ps1", "macos-ui-runtime.json"} {
 		if !strings.Contains(string(readmeRaw), want) {
 			t.Fatalf("generated README missing %q", want)
 		}
@@ -292,8 +319,10 @@ func TestReleaseFullPlatformWindowsPowerShellTargetHostHelper(t *testing.T) {
 		"OSArchitecture",
 		"IsPathRooted",
 		"windows-x64 UI runtime production evidence requires a real Windows x64 host",
+		"ExpectedVersion",
+		"ExpectedGitHead",
 		"go run ./tools/cmd/platform-ui-runtime-smoke --target windows-x64 --report",
-		"go run ./tools/cmd/validate-windows-ui-runtime --report",
+		"go run ./tools/cmd/validate-windows-ui-runtime --report $Report --expected-version $ExpectedVersion --expected-git-head $ExpectedGitHead",
 		"target-host UI runtime report",
 	} {
 		if !strings.Contains(script, want) {
@@ -311,12 +340,12 @@ func TestReleaseFullPlatformSmokeScriptsAcceptValidatedExternalEvidence(t *testi
 		{
 			path:      "scripts/release/full_platform/windows-ui-runtime-smoke.sh",
 			env:       "TETRA_WINDOWS_UI_RUNTIME_REPORT",
-			validator: `go run ./tools/cmd/validate-windows-ui-runtime --report "$report_path"`,
+			validator: `go run ./tools/cmd/validate-windows-ui-runtime --report "$report_path" --expected-version "$expected_version" --expected-git-head "$expected_git_head"`,
 		},
 		{
 			path:      "scripts/release/full_platform/macos-ui-runtime-smoke.sh",
 			env:       "TETRA_MACOS_UI_RUNTIME_REPORT",
-			validator: `go run ./tools/cmd/validate-macos-ui-runtime --report "$report_path"`,
+			validator: `go run ./tools/cmd/validate-macos-ui-runtime --report "$report_path" --expected-version "$expected_version" --expected-git-head "$expected_git_head"`,
 		},
 	} {
 		raw, err := os.ReadFile(filepath.Join(repoRoot(t), filepath.FromSlash(rel.path)))
