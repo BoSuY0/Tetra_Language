@@ -19,6 +19,24 @@ CI fan-in:
   `TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json` and
   `TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json`.
 
+Manual target-host evidence:
+
+- Check out the same Git commit on a real Windows amd64 host and run
+  `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
+  --target windows-x64 --report windows-ui-runtime.json`.
+- Check out the same Git commit on a real macOS amd64 host and run
+  `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
+  --target macos-x64 --report macos-ui-runtime.json`.
+- Copy those JSON reports to the Linux aggregation host and run
+  `TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json
+  TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json
+  bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir
+  reports/full-platform-ui-runtime`.
+- A GitHub Actions `startup_failure` with zero jobs is an infrastructure or
+  account/repository availability blocker. It does not relax the evidence
+  contract: use a working CI runner, self-hosted target-host runner, or manual
+  target-host reports produced from the same Git commit.
+
 The wrappers copy those reports into the fresh report directory and re-run the
 strict validators before the cross-platform gate accepts them. The validators
 also require the report `version` and `git_head` to match the source checkout

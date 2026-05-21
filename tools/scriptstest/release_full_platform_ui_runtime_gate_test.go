@@ -47,6 +47,7 @@ func TestReleaseFullPlatformUIRuntimeGateRunsMandatoryEvidence(t *testing.T) {
 func TestReleaseFullPlatformSmokeScriptsExist(t *testing.T) {
 	for _, rel := range []string{
 		"scripts/release/full_platform/README.md",
+		"scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
 		"scripts/release/full_platform/windows-ui-runtime-smoke.sh",
 		"scripts/release/full_platform/macos-ui-runtime-smoke.sh",
 	} {
@@ -56,6 +57,48 @@ func TestReleaseFullPlatformSmokeScriptsExist(t *testing.T) {
 		}
 		if info.IsDir() || info.Size() == 0 {
 			t.Fatalf("%s must be a non-empty file", rel)
+		}
+	}
+}
+
+func TestReleaseFullPlatformTargetHostHelperDocumentsManualEvidence(t *testing.T) {
+	scriptPath := filepath.Join(repoRoot(t), "scripts", "release", "full_platform", "target-host-ui-runtime-smoke.sh")
+	raw, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read target-host helper: %v", err)
+	}
+	script := string(raw)
+	for _, want := range []string{
+		"Usage: bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh [--target TARGET] [--report FILE]",
+		"windows-x64",
+		"macos-x64",
+		"go run ./tools/cmd/platform-ui-runtime-smoke",
+		"go run ./tools/cmd/validate-windows-ui-runtime --report \"$report_path\"",
+		"go run ./tools/cmd/validate-macos-ui-runtime --report \"$report_path\"",
+		"requires a real Windows or macOS target host",
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("target-host helper missing %q", want)
+		}
+	}
+
+	readmePath := filepath.Join(repoRoot(t), "scripts", "release", "full_platform", "README.md")
+	readmeRaw, err := os.ReadFile(readmePath)
+	if err != nil {
+		t.Fatalf("read full-platform README: %v", err)
+	}
+	readme := string(readmeRaw)
+	for _, want := range []string{
+		"Manual target-host evidence",
+		"bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
+		"TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json",
+		"TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json",
+		"same Git commit",
+		"startup_failure",
+		"does not relax",
+	} {
+		if !strings.Contains(readme, want) {
+			t.Fatalf("full-platform README missing manual evidence detail %q", want)
 		}
 	}
 }
