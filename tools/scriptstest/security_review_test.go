@@ -207,9 +207,9 @@ func TestReleaseV040SecurityReviewWritesV040Template(t *testing.T) {
 }
 
 func TestReleaseV040SecurityReviewValidatesScopedSignoff(t *testing.T) {
+	root, head := releaseV040SecurityReviewPathFakeRepo(t)
 	dir := t.TempDir()
 	signoff := filepath.Join(dir, "security-review.md")
-	head := currentGitHead(t)
 	raw := `# v0.4.0 Security Review Signoff
 
 Reviewer: Release Reviewer <security@example.invalid>
@@ -249,7 +249,8 @@ Decision: approved for v0.4.0 release
 	}
 
 	cmd := exec.Command("bash", "scripts/release/v0_4_0/security-review.sh", "--signoff", signoff)
-	cmd.Dir = repoRoot(t)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("valid scoped v0.4.0 signoff should pass: %v\n%s", err, out)
@@ -760,6 +761,38 @@ func sha256ForTest(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
+}
+
+func releaseV040SecurityReviewPathFakeRepo(t *testing.T) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	head := "0123456789abcdef0123456789abcdef01234567"
+	for _, dir := range []string{
+		"bin",
+		"compiler/internal/version",
+		"scripts/release/v0_4_0",
+	} {
+		if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(dir)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := copyFile(filepath.Join(repoRoot(t), "scripts", "release", "v0_4_0", "security-review.sh"), filepath.Join(root, "scripts", "release", "v0_4_0", "security-review.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "compiler", "internal", "version", "version.go"), []byte("package version\n\nconst CompilerVersion = \"v0.4.0\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "bin", "git"), []byte(`#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "rev-parse" && "${2:-}" == "HEAD" ]]; then
+  echo "0123456789abcdef0123456789abcdef01234567"
+  exit 0
+fi
+exit 0
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return root, head
 }
 
 func releaseV10SecurityReviewPathFakeRepo(t *testing.T) string {
