@@ -771,9 +771,13 @@ func TestTestAllTopLevelGoTestBypassesCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
-	want := `run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT go test ./compiler/... ./cli/... ./tools/... -count=1`
+	want := `run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF go test ./compiler/... ./cli/... ./tools/... -count=1`
 	if !strings.Contains(string(raw), want) {
 		t.Fatalf("test_all top-level go test should bypass cache with %q", want)
+	}
+	wantRepo := `run_step "repo test script" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF bash scripts/ci/test.sh`
+	if !strings.Contains(string(raw), wantRepo) {
+		t.Fatalf("test_all repo script should clear release signoff env with %q", wantRepo)
 	}
 }
 

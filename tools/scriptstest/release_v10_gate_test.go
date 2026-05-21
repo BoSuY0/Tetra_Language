@@ -25,6 +25,8 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 		`release_artifact="tetra.release.v1_0.gate-report.v1"`,
 		`bash scripts/dev/bootstrap.sh`,
 		`run_step "bootstrap tetra binaries" bash scripts/dev/bootstrap.sh`,
+		`run_step "go test packages" env -u TETRA_SECURITY_REVIEW_SIGNOFF -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT go test ./compiler/... ./cli/... ./tools/... -count=1`,
+		`run_step "full stabilization wrapper" env -u TETRA_SECURITY_REVIEW_SIGNOFF TETRA_TEST_ALL_RELEASE_VERSION="$release_version" TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1" bash scripts/ci/test-all.sh --full --keep-going --report-dir "$artifacts_dir/test-all"`,
 		`if [[ "$version" != "$release_version" ]]`,
 		`expected ./tetra version to be $release_version`,
 		`release_gate_command="bash scripts/release/v1_0/gate.sh"`,

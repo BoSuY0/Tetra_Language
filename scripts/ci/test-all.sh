@@ -634,10 +634,10 @@ if [[ "$json_only" != true ]]; then
   printf 'report_dir: %s\n\n' "$report_dir"
 fi
 
-run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF go test ./compiler/... ./cli/... ./tools/... -count=1
 
 if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
-  run_step "repo test script" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT bash scripts/ci/test.sh
+  run_step "repo test script" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF bash scripts/ci/test.sh
 fi
 
 run_step "bootstrap" bash scripts/dev/bootstrap.sh

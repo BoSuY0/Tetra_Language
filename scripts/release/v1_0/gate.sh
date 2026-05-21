@@ -497,8 +497,8 @@ echo "report_dir: $report_dir"
 run_step "version preflight ($release_version required)" check_release_version
 run_step "short alias version parity" check_short_alias_version
 capture_generated_artifact_state "$generated_state_before"
-run_step "go test packages" go test ./compiler/... ./cli/... ./tools/... -count=1
-run_step "full stabilization wrapper" env TETRA_TEST_ALL_RELEASE_VERSION="$release_version" TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1" bash scripts/ci/test-all.sh --full --keep-going --report-dir "$artifacts_dir/test-all"
+run_step "go test packages" env -u TETRA_SECURITY_REVIEW_SIGNOFF -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "full stabilization wrapper" env -u TETRA_SECURITY_REVIEW_SIGNOFF TETRA_TEST_ALL_RELEASE_VERSION="$release_version" TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1" bash scripts/ci/test-all.sh --full --keep-going --report-dir "$artifacts_dir/test-all"
 run_step "flow-only source scan" go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
 run_step "targets report validation" sh -c './tetra targets --format=json >"$1" && go run ./tools/cmd/validate-targets --report "$1"' sh "$artifacts_dir/targets.json"
 run_step "doctor report validation" sh -c './tetra doctor --format=json >"$1" && go run ./tools/cmd/validate-doctor --report "$1"' sh "$artifacts_dir/doctor.json"
