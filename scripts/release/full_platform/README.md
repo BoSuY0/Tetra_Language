@@ -36,6 +36,14 @@ Manual target-host evidence:
   account/repository availability blocker. It does not relax the evidence
   contract: use a working CI runner, self-hosted target-host runner, or manual
   target-host reports produced from the same Git commit.
+- To record that blocker as diagnostic only evidence, run
+  `bash scripts/release/full_platform/github-actions-startup-diagnostic.sh
+  --repo OWNER/REPO --branch BRANCH --report
+  reports/full-platform-ui-runtime/github-actions-startup-blocker.json`, then
+  `go run ./tools/cmd/validate-actions-startup-blocker --report
+  reports/full-platform-ui-runtime/github-actions-startup-blocker.json`.
+  This report proves only that CI did not start jobs; it never replaces
+  Windows/macOS runtime reports.
 
 The wrappers copy those reports into the fresh report directory and re-run the
 strict validators before the cross-platform gate accepts them. The validators

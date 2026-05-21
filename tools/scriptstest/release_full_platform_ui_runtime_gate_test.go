@@ -47,6 +47,7 @@ func TestReleaseFullPlatformUIRuntimeGateRunsMandatoryEvidence(t *testing.T) {
 func TestReleaseFullPlatformSmokeScriptsExist(t *testing.T) {
 	for _, rel := range []string{
 		"scripts/release/full_platform/README.md",
+		"scripts/release/full_platform/github-actions-startup-diagnostic.sh",
 		"scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
 		"scripts/release/full_platform/windows-ui-runtime-smoke.sh",
 		"scripts/release/full_platform/macos-ui-runtime-smoke.sh",
@@ -57,6 +58,44 @@ func TestReleaseFullPlatformSmokeScriptsExist(t *testing.T) {
 		}
 		if info.IsDir() || info.Size() == 0 {
 			t.Fatalf("%s must be a non-empty file", rel)
+		}
+	}
+}
+
+func TestReleaseFullPlatformGitHubActionsStartupDiagnosticIsBlockedOnly(t *testing.T) {
+	scriptPath := filepath.Join(repoRoot(t), "scripts", "release", "full_platform", "github-actions-startup-diagnostic.sh")
+	raw, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read GitHub Actions startup diagnostic: %v", err)
+	}
+	script := string(raw)
+	for _, want := range []string{
+		"Usage: bash scripts/release/full_platform/github-actions-startup-diagnostic.sh [--repo OWNER/REPO] [--branch BRANCH] [--report FILE]",
+		"gh run list",
+		"startup_failure",
+		"tetra.actions.startup-blocker.v1",
+		"remote_url=\"\"",
+		"go run ./tools/cmd/validate-actions-startup-blocker --report \"$report_path\"",
+		"manual or self-hosted target-host Windows/macOS reports",
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("GitHub Actions startup diagnostic missing %q", want)
+		}
+	}
+
+	readmePath := filepath.Join(repoRoot(t), "scripts", "release", "full_platform", "README.md")
+	readmeRaw, err := os.ReadFile(readmePath)
+	if err != nil {
+		t.Fatalf("read full-platform README: %v", err)
+	}
+	readme := string(readmeRaw)
+	for _, want := range []string{
+		"github-actions-startup-diagnostic.sh",
+		"validate-actions-startup-blocker",
+		"diagnostic only",
+	} {
+		if !strings.Contains(readme, want) {
+			t.Fatalf("full-platform README missing startup diagnostic detail %q", want)
 		}
 	}
 }
