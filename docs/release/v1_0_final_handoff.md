@@ -26,6 +26,7 @@ state:
 | Release archive path | Final report directory. |
 | Gate summary | `REPORT_DIR/summary.json`. |
 | Security signoff | `REPORT_DIR/artifacts/security-review.md`. |
+| Security signoff detached hash | `REPORT_DIR/artifacts/security-review.md.sha256`. |
 | Release-state audit | `REPORT_DIR/artifacts/release-state.txt`. |
 | Artifact hash manifest | `REPORT_DIR/artifacts/artifact-hashes.json`. |
 
@@ -47,7 +48,7 @@ Do not copy rows from older candidate runs.
 | LSP baseline | LSP stdio and smoke validator tests | `REPORT_DIR/logs/lsp.log` | Pass with exit code 0. |
 | Eco lifecycle | Eco command surface and package lifecycle validator evidence | `REPORT_DIR/logs/eco.log` | Pass with exit code 0. |
 | Target matrix | Linux host, macOS/Windows build-only, WASI, and web smoke | `REPORT_DIR/artifacts/*smoke*.json`; smoke logs | Pass or explicit platform blocker list. |
-| Security signoff | `bash scripts/release/v1_0/security-review.sh --signoff REPORT_DIR/artifacts/security-review.md` | `REPORT_DIR/artifacts/security-review.md`; security log | Approved or blocked. |
+| Security signoff | `bash scripts/release/v1_0/security-review.sh --signoff REPORT_DIR/artifacts/security-review.md` | `REPORT_DIR/artifacts/security-review.md`; `REPORT_DIR/artifacts/security-review.md.sha256`; security log | Approved or blocked. |
 | Performance regression | `go run ./tools/cmd/validate-performance-report --report REPORT_DIR/artifacts/performance-regression.json` | `REPORT_DIR/artifacts/performance-regression.json` | Pass with metric count. |
 | Binary size thresholds | `bash scripts/release/v1_0/binary-size.sh --report REPORT_DIR/artifacts/binary-size-thresholds.json` | `REPORT_DIR/artifacts/binary-size-thresholds.json` | Pass with fail count 0. |
 | Reproducible build proof | `bash scripts/release/v1_0/reproducible-build.sh --report REPORT_DIR/artifacts/reproducible-build.json` | `REPORT_DIR/artifacts/reproducible-build.json` | Pass with matched count. |

@@ -1,7 +1,9 @@
 package scriptstest
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +29,7 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 		`release_gate_command="bash scripts/release/v1_0/gate.sh"`,
 		`run_step "WASI runner smoke" check_wasi_runner_smoke`,
 		`run_step "Web runtime browser smoke" check_web_runtime_smoke`,
+		`run_step "security review detached hash" write_security_review_detached_hash`,
 		`run_step "WASI artifact/import smoke"`,
 		`go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$1"`,
 		`run_step "Web artifact/import smoke"`,
@@ -335,6 +338,18 @@ func TestReleaseV10GateAcceptsDashPrefixedSecuritySignoff(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(reportDir, "artifacts", "security-review.md")); err != nil {
 		t.Fatalf("security review artifact was not archived from dash-prefixed source: %v\n%s", err, out)
+	}
+	reviewRaw, err := os.ReadFile(filepath.Join(reportDir, "artifacts", "security-review.md"))
+	if err != nil {
+		t.Fatalf("read archived security review: %v", err)
+	}
+	hashRaw, err := os.ReadFile(filepath.Join(reportDir, "artifacts", "security-review.md.sha256"))
+	if err != nil {
+		t.Fatalf("security review detached hash was not archived: %v\n%s", err, out)
+	}
+	wantHash := fmt.Sprintf("%x  artifacts/security-review.md\n", sha256.Sum256(reviewRaw))
+	if string(hashRaw) != wantHash {
+		t.Fatalf("security review detached hash = %q, want %q", string(hashRaw), wantHash)
 	}
 }
 

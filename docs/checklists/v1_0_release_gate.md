@@ -98,6 +98,7 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 - [ ] `<report-dir>/artifacts/artifact-hashes.json`
 - [ ] `<report-dir>/artifacts/known_issues.md`
 - [ ] `<report-dir>/artifacts/security-review.md`
+- [ ] `<report-dir>/artifacts/security-review.md.sha256`
 - [ ] `<report-dir>/artifacts/reproducible-build.json`
 - [ ] `<report-dir>/artifacts/binary-size-thresholds.json`
 - [ ] `<report-dir>/artifacts/performance-regression.json`

@@ -343,6 +343,22 @@ check_security_review_signoff() {
   cp -- "$signoff_path" "$artifacts_dir/security-review.md"
 }
 
+write_security_review_detached_hash() {
+  local review_path="$artifacts_dir/security-review.md"
+  local detached_hash_path="$artifacts_dir/security-review.md.sha256"
+  local review_hash
+  if [[ ! -f "$review_path" ]]; then
+    echo "release/v1_0/gate: cannot hash missing security review: $review_path" >&2
+    return 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    review_hash="$(sha256sum "$review_path" | awk '{print $1}')"
+  else
+    review_hash="$(shasum -a 256 "$review_path" | awk '{print $1}')"
+  fi
+  printf '%s  artifacts/security-review.md\n' "$review_hash" >"$detached_hash_path"
+}
+
 check_release_state() {
   if [[ "$failed_count" -gt 0 ]]; then
     write_summary "blocked"
@@ -434,6 +450,7 @@ run_step "Web artifact/import smoke" sh -c './tetra smoke --target wasm32-web --
 run_step "WASI runner smoke" check_wasi_runner_smoke
 run_step "Web runtime browser smoke" check_web_runtime_smoke
 run_step "security review signoff" check_security_review_signoff
+run_step "security review detached hash" write_security_review_detached_hash
 run_step "API diff gate" check_api_diff
 run_step "performance regression evidence" check_performance_regression_artifact
 run_step "binary size thresholds" check_binary_size_thresholds
