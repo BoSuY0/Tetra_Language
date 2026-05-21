@@ -23,6 +23,10 @@ For diagnostic-only GitHub Actions startup blockers, set
 TETRA_ACTIONS_STARTUP_BLOCKER_REPORT to a report validated by
 tools/cmd/validate-actions-startup-blocker. This never replaces Windows/macOS
 runtime evidence.
+
+The gate also writes a diagnostic-only target-host request bundle under the
+report directory. It is a validated handoff for collecting Windows/macOS
+reports, not runtime evidence.
 USAGE
 }
 
@@ -82,6 +86,7 @@ prepare_report_dir() {
   rm -f "$report_dir/github-actions-startup-blocker.json"
   rm -f "$report_dir/artifact-hashes.json"
   rm -f "$report_dir/full-platform-ui-runtime-gate.json"
+  rm -rf "$report_dir/target-host-request"
 }
 
 run_step() {
@@ -137,6 +142,9 @@ run_step linux-native-ui-smoke bash scripts/release/v0_4_0/native-ui-linux-x64-s
 run_step linux-native-ui-validate go run ./tools/cmd/validate-native-ui-runtime --report "$report_dir/native-ui-linux-x64.json"
 run_step linux-ui-production-smoke bash scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh --report-dir "$report_dir"
 run_step linux-ui-production-validate go run ./tools/cmd/validate-ui-production-runtime --report "$report_dir/ui-production-runtime-linux-x64.json"
+
+run_step target-host-evidence-request-generate bash scripts/release/full_platform/target-host-evidence-request.sh --out-dir "$report_dir/target-host-request"
+run_step target-host-evidence-request-validate go run ./tools/cmd/validate-target-host-evidence-request --report "$report_dir/target-host-request/target-host-evidence-request.json"
 
 run_step windows-ui-runtime-smoke bash scripts/release/full_platform/windows-ui-runtime-smoke.sh --report-dir "$report_dir"
 run_step windows-ui-runtime-validate go run ./tools/cmd/validate-windows-ui-runtime --report "$report_dir/windows-ui-runtime.json"
