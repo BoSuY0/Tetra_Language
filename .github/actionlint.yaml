@@ -1,4 +1,5 @@
 self-hosted-runner:
-  labels: []
+  labels:
+    - macos-15-intel
 
 config-variables: null

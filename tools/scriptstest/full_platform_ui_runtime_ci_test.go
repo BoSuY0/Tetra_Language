@@ -29,7 +29,7 @@ func TestFullPlatformUIRuntimeWorkflowProducesTargetHostReports(t *testing.T) {
 		"os: windows-2025",
 		"target: windows-x64",
 		"report: windows-ui-runtime.json",
-		"os: macos-13",
+		"os: macos-15-intel",
 		"target: macos-x64",
 		"report: macos-ui-runtime.json",
 		"go run ./tools/cmd/platform-ui-runtime-smoke --target \"${{ matrix.target }}\" --report \"${{ matrix.report }}\"",
@@ -91,15 +91,15 @@ func TestFullPlatformUIRuntimeWorkflowAggregatesTargetHostReports(t *testing.T) 
 	}
 }
 
-func TestFullPlatformUIRuntimeWorkflowUsesActionlintKnownMacOSX64Label(t *testing.T) {
+func TestFullPlatformUIRuntimeWorkflowAllowsCurrentGitHubMacOSIntelLabel(t *testing.T) {
 	path := filepath.Join(repoRoot(t), ".github", "actionlint.yaml")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read actionlint config: %v", err)
 	}
 	text := string(raw)
-	if strings.Contains(text, "macos-15-intel") {
-		t.Fatalf("actionlint config must not ignore macos-15-intel runner-label errors")
+	if !strings.Contains(text, "macos-15-intel") {
+		t.Fatalf("actionlint config must allow GitHub's current Intel macOS runner label")
 	}
 }
 
@@ -116,7 +116,7 @@ func TestMainCIWorkflowRunsFullPlatformUIRuntimeFanIn(t *testing.T) {
 		"needs: full-platform-ui-runtime-target-host",
 		"os: windows-2025",
 		"target: windows-x64",
-		"os: macos-13",
+		"os: macos-15-intel",
 		"target: macos-x64",
 		"go run ./tools/cmd/platform-ui-runtime-smoke --target \"${{ matrix.target }}\" --report \"${{ matrix.report }}\"",
 		"expected_version=\"$(go run ./cli/cmd/tetra version)\"",

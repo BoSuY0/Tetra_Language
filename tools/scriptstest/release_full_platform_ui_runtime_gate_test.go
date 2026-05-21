@@ -107,7 +107,7 @@ func TestReleaseFullPlatformActionsAvailabilityPreflightIsNotRuntimeEvidence(t *
 		"not runtime evidence",
 		"zero jobs",
 		"`BuildFailed`",
-		"`macos-13`",
+		"`macos-15-intel`",
 	} {
 		if !strings.Contains(readme, want) {
 			t.Fatalf("full-platform README missing Actions availability detail %q", want)
