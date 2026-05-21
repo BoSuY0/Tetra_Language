@@ -231,6 +231,7 @@ func TestReleaseFullPlatformTargetHostEvidenceRequestBundle(t *testing.T) {
 		"Usage: bash scripts/release/full_platform/target-host-evidence-request.sh [--out-dir DIR] [--repo OWNER/REPO] [--branch BRANCH]",
 		"tetra.ui.target-host-evidence-request.v1",
 		"production_evidence: false",
+		"s#\\.git$##",
 		"--expected-version $version --expected-git-head $git_head",
 		"windows-ui-runtime-smoke.ps1",
 		"target-host-ui-runtime-smoke.sh --target macos-x64",
@@ -258,6 +259,7 @@ func TestReleaseFullPlatformTargetHostEvidenceRequestBundle(t *testing.T) {
 	var report struct {
 		Schema             string `json:"schema"`
 		ProductionEvidence bool   `json:"production_evidence"`
+		Repo               string `json:"repo"`
 		ExpectedVersion    string `json:"expected_version"`
 		ExpectedGitHead    string `json:"expected_git_head"`
 		Targets            []struct {
@@ -276,6 +278,9 @@ func TestReleaseFullPlatformTargetHostEvidenceRequestBundle(t *testing.T) {
 	}
 	if report.ProductionEvidence {
 		t.Fatalf("target-host evidence request must not be production evidence")
+	}
+	if report.Repo != "BoSuY0/Tetra_Language" {
+		t.Fatalf("repo = %q, want BoSuY0/Tetra_Language", report.Repo)
 	}
 	if report.ExpectedVersion != "v0.4.0" || strings.TrimSpace(report.ExpectedGitHead) == "" {
 		t.Fatalf("request missing expected version/head: %#v", report)
@@ -306,6 +311,35 @@ func TestReleaseFullPlatformTargetHostEvidenceRequestBundle(t *testing.T) {
 			if !strings.Contains(target.Command, want) {
 				t.Fatalf("%s command missing %q: %q", target.Target, want, target.Command)
 			}
+		}
+	}
+
+	inferredOutDir := t.TempDir()
+	inferredCmd := exec.Command("bash", scriptPath, "--out-dir", inferredOutDir, "--branch", "codex/full-platform-ui-runtime")
+	inferredCmd.Dir = repoRoot(t)
+	inferredOutput, err := inferredCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("target-host evidence request helper with inferred repo failed: %v\n%s", err, inferredOutput)
+	}
+	inferredRaw, err := os.ReadFile(filepath.Join(inferredOutDir, "target-host-evidence-request.json"))
+	if err != nil {
+		t.Fatalf("read inferred target-host evidence request json: %v", err)
+	}
+	var inferred struct {
+		Repo    string `json:"repo"`
+		Targets []struct {
+			Command string `json:"command"`
+		} `json:"targets"`
+	}
+	if err := json.Unmarshal(inferredRaw, &inferred); err != nil {
+		t.Fatalf("decode inferred target-host evidence request json: %v", err)
+	}
+	if inferred.Repo != "BoSuY0/Tetra_Language" {
+		t.Fatalf("inferred repo = %q, want BoSuY0/Tetra_Language", inferred.Repo)
+	}
+	for _, target := range inferred.Targets {
+		if strings.Contains(target.Command, ".git.git") {
+			t.Fatalf("inferred command contains duplicated .git suffix: %q", target.Command)
 		}
 	}
 	readmeRaw, err := os.ReadFile(filepath.Join(outDir, "README.md"))
