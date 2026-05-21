@@ -36,6 +36,16 @@ Manual target-host evidence:
   account/repository availability blocker. It does not relax the evidence
   contract: use a working CI runner, self-hosted target-host runner, or manual
   target-host reports produced from the same Git commit.
+- Before relying on GitHub-hosted Windows/macOS fan-in, run
+  `bash scripts/release/full_platform/actions-availability-preflight.sh
+  --repo OWNER/REPO --branch BRANCH --report
+  reports/full-platform-ui-runtime/actions-availability.json`, then
+  `go run ./tools/cmd/validate-actions-availability --report
+  reports/full-platform-ui-runtime/actions-availability.json`. This preflight
+  must prove a job-backed successful Actions run with logs. This is not runtime evidence;
+  zero jobs, missing logs, `startup_failure`, or unavailable billing
+  visibility remain CI availability blockers before target-host reports can be
+  gathered through Actions.
 - To record that blocker as diagnostic only evidence, run
   `bash scripts/release/full_platform/github-actions-startup-diagnostic.sh
   --repo OWNER/REPO --branch BRANCH --canary-branch codex/actions-canary --report

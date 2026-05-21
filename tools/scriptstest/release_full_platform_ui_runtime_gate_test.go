@@ -52,6 +52,7 @@ func TestReleaseFullPlatformUIRuntimeGateRunsMandatoryEvidence(t *testing.T) {
 func TestReleaseFullPlatformSmokeScriptsExist(t *testing.T) {
 	for _, rel := range []string{
 		"scripts/release/full_platform/README.md",
+		"scripts/release/full_platform/actions-availability-preflight.sh",
 		"scripts/release/full_platform/github-actions-startup-diagnostic.sh",
 		"scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
 		"scripts/release/full_platform/windows-ui-runtime-smoke.sh",
@@ -63,6 +64,45 @@ func TestReleaseFullPlatformSmokeScriptsExist(t *testing.T) {
 		}
 		if info.IsDir() || info.Size() == 0 {
 			t.Fatalf("%s must be a non-empty file", rel)
+		}
+	}
+}
+
+func TestReleaseFullPlatformActionsAvailabilityPreflightIsNotRuntimeEvidence(t *testing.T) {
+	scriptPath := filepath.Join(repoRoot(t), "scripts", "release", "full_platform", "actions-availability-preflight.sh")
+	raw, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read GitHub Actions availability preflight: %v", err)
+	}
+	script := string(raw)
+	for _, want := range []string{
+		"Usage: bash scripts/release/full_platform/actions-availability-preflight.sh [--repo OWNER/REPO] [--branch BRANCH] [--report FILE]",
+		"tetra.actions.availability.v1",
+		"gh run list",
+		"gh api \"repos/$repo/actions/runs/$run_id/jobs\"",
+		"gh api \"repos/$repo/actions/runs/$run_id/logs\"",
+		"production_evidence: false",
+		"go run ./tools/cmd/validate-actions-availability --report \"$report_path\"",
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("Actions availability preflight missing %q", want)
+		}
+	}
+
+	readmePath := filepath.Join(repoRoot(t), "scripts", "release", "full_platform", "README.md")
+	readmeRaw, err := os.ReadFile(readmePath)
+	if err != nil {
+		t.Fatalf("read full-platform README: %v", err)
+	}
+	readme := string(readmeRaw)
+	for _, want := range []string{
+		"actions-availability-preflight.sh",
+		"validate-actions-availability",
+		"not runtime evidence",
+		"zero jobs",
+	} {
+		if !strings.Contains(readme, want) {
+			t.Fatalf("full-platform README missing Actions availability detail %q", want)
 		}
 	}
 }

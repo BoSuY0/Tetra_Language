@@ -1,0 +1,147 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+)
+
+const actionsAvailabilitySchema = "tetra.actions.availability.v1"
+
+type actionsAvailabilityReport struct {
+	Schema                string                 `json:"schema"`
+	Status                string                 `json:"status"`
+	Repo                  string                 `json:"repo"`
+	Branch                string                 `json:"branch"`
+	Workflow              string                 `json:"workflow"`
+	Summary               string                 `json:"summary"`
+	ProductionEvidence    bool                   `json:"production_evidence"`
+	RepoActionsEnabled    bool                   `json:"repo_actions_enabled"`
+	RepoAllowedActions    string                 `json:"repo_allowed_actions"`
+	SelfHostedRunnerCount int                    `json:"self_hosted_runner_count"`
+	BillingActionsStatus  string                 `json:"billing_actions_status"`
+	BillingActionsDetail  string                 `json:"billing_actions_detail"`
+	Run                   actionsAvailabilityRun `json:"run"`
+	NextAction            string                 `json:"next_action"`
+}
+
+type actionsAvailabilityRun struct {
+	ID            int64  `json:"id"`
+	Event         string `json:"event"`
+	Status        string `json:"status"`
+	Conclusion    string `json:"conclusion"`
+	HeadSHA       string `json:"head_sha"`
+	WorkflowName  string `json:"workflow_name"`
+	Jobs          int    `json:"jobs"`
+	LogsAvailable bool   `json:"logs_available"`
+}
+
+func main() {
+	reportPath := flag.String("report", "", "path to tetra.actions.availability.v1 JSON report")
+	flag.Parse()
+	if strings.TrimSpace(*reportPath) == "" {
+		fmt.Fprintln(os.Stderr, "error: --report is required")
+		os.Exit(2)
+	}
+	raw, err := os.ReadFile(*reportPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := validateActionsAvailability(raw); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func validateActionsAvailability(raw []byte) error {
+	var report actionsAvailabilityReport
+	if err := decodeStrictJSON(raw, &report); err != nil {
+		return err
+	}
+	var issues []string
+	if report.Schema != actionsAvailabilitySchema {
+		issues = append(issues, fmt.Sprintf("schema is %q, want %q", report.Schema, actionsAvailabilitySchema))
+	}
+	if report.Status != "pass" {
+		issues = append(issues, fmt.Sprintf("status is %q, want pass", report.Status))
+	}
+	for name, value := range map[string]string{
+		"repo":                   report.Repo,
+		"branch":                 report.Branch,
+		"workflow":               report.Workflow,
+		"summary":                report.Summary,
+		"repo_allowed_actions":   report.RepoAllowedActions,
+		"billing_actions_status": report.BillingActionsStatus,
+		"billing_actions_detail": report.BillingActionsDetail,
+		"next_action":            report.NextAction,
+	} {
+		if strings.TrimSpace(value) == "" {
+			issues = append(issues, name+" is required")
+		}
+	}
+	if report.ProductionEvidence {
+		issues = append(issues, "production_evidence must be false; Actions availability is not runtime evidence")
+	}
+	claimText := strings.ToLower(report.Summary + " " + report.NextAction)
+	if strings.Contains(claimText, "ready") {
+		issues = append(issues, "Actions availability report must not claim READY")
+	}
+	if !report.RepoActionsEnabled {
+		issues = append(issues, "repo_actions_enabled must be true")
+	}
+	if report.SelfHostedRunnerCount < 0 {
+		issues = append(issues, "self_hosted_runner_count must be non-negative")
+	}
+	if report.BillingActionsStatus == "unavailable_missing_user_scope" {
+		issues = append(issues, "billing_actions_status is unavailable_missing_user_scope; refresh gh auth with user scope before availability can pass")
+	}
+	issues = append(issues, validateAvailabilityRun(report.Run)...)
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateAvailabilityRun(run actionsAvailabilityRun) []string {
+	var issues []string
+	if run.ID <= 0 {
+		issues = append(issues, "run.id must be positive")
+	}
+	if strings.TrimSpace(run.Event) == "" {
+		issues = append(issues, "run.event is required")
+	}
+	if run.Status != "completed" {
+		issues = append(issues, fmt.Sprintf("run.status is %q, want completed", run.Status))
+	}
+	if run.Conclusion != "success" {
+		issues = append(issues, fmt.Sprintf("run.conclusion is %q, want success", run.Conclusion))
+	}
+	if strings.TrimSpace(run.HeadSHA) == "" {
+		issues = append(issues, "run.head_sha is required")
+	}
+	if run.Jobs <= 0 {
+		issues = append(issues, fmt.Sprintf("run.jobs is %d, want at least 1", run.Jobs))
+	}
+	if !run.LogsAvailable {
+		issues = append(issues, "run.logs_available must be true")
+	}
+	return issues
+}
+
+func decodeStrictJSON(raw []byte, out any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(out); err != nil {
+		return err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return fmt.Errorf("trailing JSON content")
+	}
+	return nil
+}
