@@ -268,12 +268,14 @@ jobs:
       - name: Validate target-host UI runtime report
         shell: bash
         run: |
+          expected_version="$(go run ./cli/cmd/tetra version)"
+          expected_git_head="$(git rev-parse HEAD)"
           case "${{ matrix.target }}" in
             windows-x64)
-              go run ./tools/cmd/validate-windows-ui-runtime --report windows-ui-runtime.json
+              go run ./tools/cmd/validate-windows-ui-runtime --report windows-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
               ;;
             macos-x64)
-              go run ./tools/cmd/validate-macos-ui-runtime --report macos-ui-runtime.json
+              go run ./tools/cmd/validate-macos-ui-runtime --report macos-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
               ;;
             *)
               echo "unexpected target ${{ matrix.target }}" >&2
