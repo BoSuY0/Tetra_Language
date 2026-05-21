@@ -196,8 +196,8 @@ func main() {
 	statusRaw, statusErr := commandOutput(repoRoot, "git", "status", "--porcelain")
 	freshness := []freshnessCheck{
 		checkGeneratedManifestFreshness(repoRoot),
-		checkArtifactHashManifest(repoRoot),
-		checkGeneratedSmokeEvidenceFreshness(repoRoot),
+		checkArtifactHashManifest(repoRoot, reportDir),
+		checkSmokeEvidenceFreshness(repoRoot, reportDir),
 	}
 
 	inputs := releaseStateInputs{
@@ -247,15 +247,15 @@ func main() {
 
 func buildReleaseStateReport(input releaseStateInputs) releaseStateReport {
 	classified := classifyGitStatus(input.GitStatus)
-	generated := inspectRequiredArtifacts(input.StatFile)
-	issues := []string{}
 	expectedVersion := strings.TrimSpace(input.ExpectedVersion)
 	if expectedVersion == "" {
 		expectedVersion = defaultExpectedVersion
 	}
+	generated := inspectRequiredArtifacts(input.StatFile, requiredReleaseArtifactPaths(expectedVersion, input.ReportDir))
+	issues := []string{}
 	freshness := append([]freshnessCheck{}, input.Freshness...)
 	if expectedVersion == "v1.0.0" {
-		freshness = append(freshness, checkV1GeneratedEvidenceMetadata(input.ReadFile, expectedVersion, input.GitHead))
+		freshness = append(freshness, checkV1EvidenceMetadata(input.ReadFile, expectedVersion, input.GitHead, input.ReportDir))
 	}
 	runtimeExecution := inspectRuntimeExecutionEvidence(input.ReadFile, expectedVersion, input.ReportDir, input.GitHead)
 	securityReview := inspectSecurityReviewEvidence(input.ReadFile, expectedVersion, input.ReportDir, input.GitHead)
@@ -394,9 +394,9 @@ func isReleaseArtifactPath(path string) bool {
 		strings.HasPrefix(slash, "docs/release/")
 }
 
-func inspectRequiredArtifacts(statFile func(string) (fileInfo, error)) generatedArtifactsReport {
+func inspectRequiredArtifacts(statFile func(string) (fileInfo, error), paths []string) generatedArtifactsReport {
 	report := generatedArtifactsReport{}
-	for _, path := range requiredReleaseArtifacts {
+	for _, path := range paths {
 		info, err := statFile(path)
 		check := artifactCheck{Path: path}
 		if err == nil {
@@ -410,6 +410,51 @@ func inspectRequiredArtifacts(statFile func(string) (fileInfo, error)) generated
 		report.Required = append(report.Required, check)
 	}
 	return report
+}
+
+func requiredReleaseArtifactPaths(expectedVersion string, reportDir string) []string {
+	if expectedVersion == "v1.0.0" && strings.TrimSpace(reportDir) != "" {
+		return v1ReportDirRequiredArtifacts(reportDir)
+	}
+	return requiredReleaseArtifacts
+}
+
+func v1ReportDirRequiredArtifacts(reportDir string) []string {
+	prefix := filepath.ToSlash(filepath.Clean(reportDir))
+	join := func(parts ...string) string {
+		all := append([]string{prefix}, parts...)
+		return filepath.ToSlash(filepath.Join(all...))
+	}
+	return []string{
+		join("summary.json"),
+		join("summary.md"),
+		join("artifacts", "manifest.json"),
+		join("artifacts", "artifact-hashes.json"),
+		join("artifacts", "known_issues.md"),
+		join("artifacts", "security-review.md"),
+		join("artifacts", "security-review.md.sha256"),
+		join("artifacts", "reproducible-build.json"),
+		join("artifacts", "binary-size-thresholds.json"),
+		join("artifacts", "performance-regression.json"),
+		join("artifacts", "targets.json"),
+		join("artifacts", "doctor.json"),
+		join("artifacts", "tetra-test-report.json"),
+		join("artifacts", "smoke-list.json"),
+		join("artifacts", "host-smoke.json"),
+		join("artifacts", "linux-smoke.json"),
+		join("artifacts", "macos-smoke.json"),
+		join("artifacts", "windows-smoke.json"),
+		join("artifacts", "wasm32-wasi-artifact-smoke.json"),
+		join("artifacts", "wasm32-web-artifact-smoke.json"),
+		join("artifacts", "wasi-smoke.artifact.json"),
+		join("artifacts", "wasi-smoke.json"),
+		join("artifacts", "web-ui-smoke.json"),
+		join("artifacts", "api-diff", "api-docs.md"),
+		join("artifacts", "api-diff", "api-diff.json"),
+		join("artifacts", "tetra-docs.md"),
+		join("artifacts", "test-all", "summary.json"),
+		join("artifacts", "test-all", "summary.md"),
+	}
 }
 
 func inspectLastGateEvidence(readFile func(string) ([]byte, error), expectedVersion string, reportDir string) gateEvidenceReport {
@@ -824,15 +869,21 @@ var v1GeneratedEvidenceRules = []generatedEvidenceRule{
 	{Path: "docs/generated/v1_0/web-ui-smoke.json", Schema: "tetra.web-ui-smoke.v1alpha1", TimestampFields: []string{"generated_at"}},
 }
 
-func checkV1GeneratedEvidenceMetadata(readFile func(string) ([]byte, error), expectedVersion string, currentGitHead string) freshnessCheck {
-	check := freshnessCheck{Name: "docs/generated/v1_0 metadata", Status: "pass"}
+func checkV1EvidenceMetadata(readFile func(string) ([]byte, error), expectedVersion string, currentGitHead string, reportDir string) freshnessCheck {
+	name := "docs/generated/v1_0 metadata"
+	rules := v1GeneratedEvidenceRules
+	if strings.TrimSpace(reportDir) != "" {
+		name = "v1 report-dir metadata"
+		rules = v1ReportDirEvidenceRules(reportDir)
+	}
+	check := freshnessCheck{Name: name, Status: "pass"}
 	if readFile == nil {
 		check.Status = "fail"
 		check.Detail = "readFile is unavailable"
 		return check
 	}
 	var issues []string
-	for _, rule := range v1GeneratedEvidenceRules {
+	for _, rule := range rules {
 		raw, err := readFile(rule.Path)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("%s read failed: %v", rule.Path, err))
@@ -892,6 +943,33 @@ func checkV1GeneratedEvidenceMetadata(readFile func(string) ([]byte, error), exp
 		check.Detail = strings.Join(issues, "; ")
 	}
 	return check
+}
+
+func v1ReportDirEvidenceRules(reportDir string) []generatedEvidenceRule {
+	prefix := filepath.ToSlash(filepath.Clean(reportDir))
+	join := func(parts ...string) string {
+		all := append([]string{prefix}, parts...)
+		return filepath.ToSlash(filepath.Join(all...))
+	}
+	return []generatedEvidenceRule{
+		{Path: join("artifacts", "manifest.json"), VersionField: "compiler_version"},
+		{Path: join("artifacts", "binary-size-thresholds.json"), Schema: "tetra.binary-size-thresholds.v1alpha1", VersionField: "compiler_version"},
+		{Path: join("artifacts", "reproducible-build.json"), Schema: "tetra.reproducible-build-proof.v1alpha1", VersionField: "compiler_version"},
+		{Path: join("artifacts", "performance-regression.json"), Schema: "tetra.performance-regression.v1", RequireGitHead: true},
+		{Path: join("artifacts", "api-diff", "api-diff.json"), Schema: "tetra.api.diff.v1alpha1"},
+		{Path: join("summary.json"), StartEndFields: true, ReleaseSummary: true},
+		{Path: join("artifacts", "test-all", "summary.json"), StartEndFields: true},
+		{Path: join("artifacts", "host-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "linux-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "macos-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "windows-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "wasm32-wasi-artifact-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "wasm32-web-artifact-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "wasi-smoke.artifact.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "wasi-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "test-all", "host-smoke.json"), VersionField: "version", RequireGitHead: true, TimestampFields: []string{"timestamp"}},
+		{Path: join("artifacts", "web-ui-smoke.json"), Schema: "tetra.web-ui-smoke.v1alpha1", TimestampFields: []string{"generated_at"}},
+	}
 }
 
 func validateReleaseSummaryMetadata(obj map[string]json.RawMessage, path string, expectedVersion string) []string {
@@ -1039,8 +1117,12 @@ func checkGeneratedManifestFreshness(repoRoot string) freshnessCheck {
 	return freshnessCheck{Name: "docs/generated/manifest.json", Status: "pass"}
 }
 
-func checkArtifactHashManifest(repoRoot string) freshnessCheck {
-	cmd := exec.Command("go", "run", "./tools/cmd/validate-artifact-hashes", "--manifest", "docs/generated/v1_0/artifact-hashes.json")
+func checkArtifactHashManifest(repoRoot string, reportDir string) freshnessCheck {
+	manifestPath := "docs/generated/v1_0/artifact-hashes.json"
+	if strings.TrimSpace(reportDir) != "" {
+		manifestPath = filepath.ToSlash(filepath.Join(reportDir, "artifacts", "artifact-hashes.json"))
+	}
+	cmd := exec.Command("go", "run", "./tools/cmd/validate-artifact-hashes", "--manifest", manifestPath)
 	cmd.Dir = repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		detail := strings.TrimSpace(string(out))
@@ -1049,24 +1131,30 @@ func checkArtifactHashManifest(repoRoot string) freshnessCheck {
 		} else {
 			detail += ": " + err.Error()
 		}
-		return freshnessCheck{Name: "docs/generated/v1_0/artifact-hashes.json", Status: "fail", Detail: detail}
+		return freshnessCheck{Name: manifestPath, Status: "fail", Detail: detail}
 	}
-	return freshnessCheck{Name: "docs/generated/v1_0/artifact-hashes.json", Status: "pass"}
+	return freshnessCheck{Name: manifestPath, Status: "pass"}
 }
 
-func checkGeneratedSmokeEvidenceFreshness(repoRoot string) freshnessCheck {
-	return checkValidationCommands(repoRoot, "docs/generated/v1_0 smoke evidence", []validationCommand{
-		{Name: "go", Args: []string{"run", "./tools/cmd/validate-smoke-list", "--report", "docs/generated/v1_0/smoke-list.json", "--examples-root", "examples"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/validate-smoke-list", "--report", "docs/generated/v1_0/test-all/smoke-list.json", "--examples-root", "examples"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/host-smoke.json"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/linux-smoke.json"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/macos-smoke.json"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/windows-smoke.json"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/wasm32-wasi-artifact-smoke.json"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/wasm32-web-artifact-smoke.json"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/wasi-smoke.artifact.json"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/wasi-smoke.json"}},
-		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", "docs/generated/v1_0/test-all/host-smoke.json"}},
+func checkSmokeEvidenceFreshness(repoRoot string, reportDir string) freshnessCheck {
+	prefix := "docs/generated/v1_0"
+	name := "docs/generated/v1_0 smoke evidence"
+	if strings.TrimSpace(reportDir) != "" {
+		prefix = filepath.ToSlash(filepath.Join(reportDir, "artifacts"))
+		name = "v1 report-dir smoke evidence"
+	}
+	return checkValidationCommands(repoRoot, name, []validationCommand{
+		{Name: "go", Args: []string{"run", "./tools/cmd/validate-smoke-list", "--report", filepath.ToSlash(filepath.Join(prefix, "smoke-list.json")), "--examples-root", "examples"}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/validate-smoke-list", "--report", filepath.ToSlash(filepath.Join(prefix, "test-all", "smoke-list.json")), "--examples-root", "examples"}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "host-smoke.json"))}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "linux-smoke.json"))}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "macos-smoke.json"))}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "windows-smoke.json"))}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "wasm32-wasi-artifact-smoke.json"))}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "wasm32-web-artifact-smoke.json"))}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "wasi-smoke.artifact.json"))}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "wasi-smoke.json"))}},
+		{Name: "go", Args: []string{"run", "./tools/cmd/smoke-report-to-checklist", "--validate-only", "--report", filepath.ToSlash(filepath.Join(prefix, "test-all", "host-smoke.json"))}},
 	}, commandOutput)
 }
 

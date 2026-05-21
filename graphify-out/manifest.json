@@ -1876,12 +1876,12 @@
     "hash": "53882f80636a7ba02e5eb2553b62c059"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/validate-release-state/main.go": {
-    "mtime": 1779365127.1903937,
-    "hash": "33e35aaf96fad293064040ad94b87fed"
+    "mtime": 1779368920.1891315,
+    "hash": "b94c5c945fbff1c7b10806534ab88aac"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/validate-release-state/main_test.go": {
-    "mtime": 1779365127.190564,
-    "hash": "ac6f802d11c9004b3e17a4740f1b5479"
+    "mtime": 1779368941.883449,
+    "hash": "1fc8469d260cca2367787bb5e1235aa9"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/tools/cmd/validate-residual-risks/main.go": {
     "mtime": 1779365127.190564,
@@ -2752,8 +2752,8 @@
     "hash": "15b84242422f2084e6485ca868370e9f"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/docs/checklists/v1_0_release_gate.md": {
-    "mtime": 1779368136.9856083,
-    "hash": "9c79236efce4964466380e902fe59d34"
+    "mtime": 1779368968.270632,
+    "hash": "bbd6a8803298dac47b0ab6d8695e7327"
   },
   "/home/tetra/.codex/worktrees/Tetra_Language/post-v0.4-wasm-ui-gui/docs/contributing/compiler_and_release_guide.md": {
     "mtime": 1779365125.540796,
