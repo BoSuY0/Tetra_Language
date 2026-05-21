@@ -42,7 +42,29 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
-mkdir -p "$report_dir"
+
+prepare_report_dir() {
+  if [[ -z "$report_dir" || "$report_dir" == "/" || "$report_dir" == "." || "$report_dir" == ".." ]]; then
+    echo "error: refusing to clear unsafe report directory: ${report_dir:-<empty>}" >&2
+    exit 2
+  fi
+  if [[ -L "$report_dir" ]]; then
+    echo "error: refusing to clear symlink report directory: $report_dir" >&2
+    exit 2
+  fi
+  if [[ -e "$report_dir" && ! -d "$report_dir" ]]; then
+    echo "error: refusing to use non-directory report path: $report_dir" >&2
+    exit 2
+  fi
+  mkdir -p "$report_dir"
+  local find_report_dir="$report_dir"
+  if [[ "$find_report_dir" == -* ]]; then
+    find_report_dir="./$find_report_dir"
+  fi
+  find "$find_report_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+}
+
+prepare_report_dir
 
 ./tetra smoke --target wasm32-wasi --run=false --report "$report_dir/wasi-artifact.json"
 go run ./tools/cmd/validate-wasm-imports --target wasm32-wasi --report "$report_dir/wasi-artifact.json"

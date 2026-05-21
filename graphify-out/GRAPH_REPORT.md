@@ -1,16 +1,16 @@
 # Graph Report - post-v0.4-wasm-ui-gui  (2026-05-21)
 
 ## Corpus Check
-- 620 files · ~1,272,106 words
+- 620 files · ~1,272,155 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 18679 nodes · 73339 edges · 518 communities (441 shown, 77 thin omitted)
+- 18679 nodes · 73339 edges · 520 communities (443 shown, 77 thin omitted)
 - Extraction: 82% EXTRACTED · 18% INFERRED · 0% AMBIGUOUS · INFERRED: 13544 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f80c2aee`
+- Built from commit: `bab05fc6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -319,7 +319,7 @@
 - [[_COMMUNITY_Community 301|Community 301]]
 - [[_COMMUNITY_Community 302|Community 302]]
 - [[_COMMUNITY_Community 303|Community 303]]
-- [[_COMMUNITY_Community 304|Community 304]]
+- [[_COMMUNITY_Community 305|Community 305]]
 - [[_COMMUNITY_Community 306|Community 306]]
 - [[_COMMUNITY_Community 307|Community 307]]
 - [[_COMMUNITY_Community 308|Community 308]]
@@ -478,9 +478,9 @@
 - [[_COMMUNITY_Community 461|Community 461]]
 - [[_COMMUNITY_Community 462|Community 462]]
 - [[_COMMUNITY_Community 463|Community 463]]
+- [[_COMMUNITY_Community 464|Community 464]]
 - [[_COMMUNITY_Community 465|Community 465]]
 - [[_COMMUNITY_Community 466|Community 466]]
-- [[_COMMUNITY_Community 467|Community 467]]
 - [[_COMMUNITY_Community 468|Community 468]]
 - [[_COMMUNITY_Community 469|Community 469]]
 - [[_COMMUNITY_Community 470|Community 470]]
@@ -490,8 +490,8 @@
 - [[_COMMUNITY_Community 474|Community 474]]
 - [[_COMMUNITY_Community 475|Community 475]]
 - [[_COMMUNITY_Community 476|Community 476]]
+- [[_COMMUNITY_Community 477|Community 477]]
 - [[_COMMUNITY_Community 478|Community 478]]
-- [[_COMMUNITY_Community 479|Community 479]]
 - [[_COMMUNITY_Community 480|Community 480]]
 - [[_COMMUNITY_Community 481|Community 481]]
 - [[_COMMUNITY_Community 482|Community 482]]
@@ -507,8 +507,8 @@
 - [[_COMMUNITY_Community 492|Community 492]]
 - [[_COMMUNITY_Community 493|Community 493]]
 - [[_COMMUNITY_Community 494|Community 494]]
-- [[_COMMUNITY_Community 503|Community 503]]
-- [[_COMMUNITY_Community 504|Community 504]]
+- [[_COMMUNITY_Community 495|Community 495]]
+- [[_COMMUNITY_Community 496|Community 496]]
 - [[_COMMUNITY_Community 505|Community 505]]
 - [[_COMMUNITY_Community 506|Community 506]]
 - [[_COMMUNITY_Community 507|Community 507]]
@@ -522,6 +522,8 @@
 - [[_COMMUNITY_Community 515|Community 515]]
 - [[_COMMUNITY_Community 516|Community 516]]
 - [[_COMMUNITY_Community 517|Community 517]]
+- [[_COMMUNITY_Community 518|Community 518]]
+- [[_COMMUNITY_Community 519|Community 519]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `contains()` - 2760 edges
@@ -547,19 +549,19 @@
 - `TestTestAllWASMSchemaChecksUseArtifactSmokeReports()` --calls--> `contains()`  [INFERRED]
   tools/scriptstest/test_all_test.go → compiler/internal/semantics/generics.go
 
-## Communities (518 total, 77 thin omitted)
+## Communities (520 total, 77 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (507): buildAndRun(), buildAndRunFiles(), TestBuildMultiFileAliasCall(), TestBuildFlowElseIfSmoke(), TestBuildLegacyElseIfSmoke(), TestFormatSourceElseIf(), TestBuildForCollectionBoolSliceSmoke(), TestBuildForCollectionSliceSmoke() (+499 more)
+Nodes (503): buildAndRun(), buildAndRunFiles(), TestBuildForCollectionBoolSliceSmoke(), TestBuildForCollectionSliceSmoke(), TestBuildForCollectionStringSmoke(), TestBuildForCollectionU16SliceSmoke(), TestBuildForCollectionU8SliceSmoke(), TestBuildCapturedPtrClosureDirectCallbackArgumentSmoke() (+495 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.02
-Nodes (412): TestELFHasRWDataSegmentAndStringNotInText(), writeFile(), TestCheckCommandJSONDiagnosticsForCrossModuleGenericBorrowReturnCodes(), TestCheckCommandJSONDiagnosticsForGenericBorrowReturnCodes(), TestCheckCommandJSONDiagnosticsForImportedOwnershipBorrowSliceAggregateCallEscapeCodes(), TestCheckCommandJSONDiagnosticsForProtocolImplOwnershipMismatchCodes(), TestCheckCommandJSONDiagnosticsForScopedIslandOptionalRegionEscapeCode(), TestCheckCommandJSONDiagnosticsForSemanticError() (+404 more)
+Cohesion: 0.01
+Nodes (350): TestFunctionTypedCallableTestsAreSplitByDomain(), assertBudgetFailureTail(), assertBudgetFailureTailImms(), findIRFuncByName(), hasInstrKind(), TestBudgetFailureABIReturnAndThrowShapesAreLowered(), TestBudgetRuntimeChecksAreLowered(), TestCapturedFunctionTypedEnumParameterPayloadReturnCannotEscapeIntoGlobalFunctionValue() (+342 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.01
-Nodes (261): TestFunctionTypedCallableTestsAreSplitByDomain(), assertBudgetFailureTail(), assertBudgetFailureTailImms(), findIRFuncByName(), hasInstrKind(), TestBudgetFailureABIReturnAndThrowShapesAreLowered(), TestBudgetRuntimeChecksAreLowered(), TestCapturedFunctionTypedEnumParameterPayloadReturnCannotEscapeIntoGlobalFunctionValue() (+253 more)
+Nodes (413): TestELFHasRWDataSegmentAndStringNotInText(), writeFile(), TestBuildAndRunCommandsAcceptExplicitProjectDirectory(), TestBuildCommandAllTargetsBuildsCapsuleTargets(), TestBuildCommandArtifactsAutoRepairsStaleObject(), TestBuildCommandDiscoversCapsuleT4ProjectEntry(), TestBuildCommandJSONDiagnostics(), TestBuildCommandJSONDiagnosticsForInvalidTarget() (+405 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.07
@@ -570,16 +572,16 @@ Cohesion: 0.07
 Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
 
 ### Community 5 - "Community 5"
+Cohesion: 0.03
+Nodes (264): Check(), CheckWorldOpt(), actorMailboxSendHasSecretPayload(), addFinalizationStates(), addImportedFunctionTypedGlobalAliases(), addPublicImportFunctionAliases(), appendResourceProvenance(), applyInterfaceFunctionReturnMetadata() (+256 more)
+
+### Community 6 - "Community 6"
 Cohesion: 0.02
 Nodes (262): TestOwnershipAllowsBorrowInoutDistinctStructFields(), TestOwnershipAllowsBorrowInoutWithDistinctLocals(), TestOwnershipAllowsBorrowToBorrowForwarding(), TestOwnershipAllowsConsumedStructFieldReassignment(), TestOwnershipAllowsConsumeInoutWithDistinctLocals(), TestOwnershipAllowsCrossModulePartialEnumPayloadConsumeAndSiblingPayloadUse(), TestOwnershipAllowsCrossModulePartialStructFieldConsumeAndRemainingFieldUse(), TestOwnershipAllowsCrossModuleProtocolImplMatchingParameterOwnership() (+254 more)
 
-### Community 7 - "Community 7"
-Cohesion: 0.03
-Nodes (229): TestActorTaskBoundedStressExamples(), BuildFileWithStatsOpt(), buildAndRunFile(), buildAndRunFileWithOptions(), buildOnly(), projectRoot(), requireCheckFileErrorContains(), requireCheckFileOK() (+221 more)
-
 ### Community 8 - "Community 8"
-Cohesion: 0.03
-Nodes (224): Check(), CheckWorldOpt(), actorMailboxSendHasSecretPayload(), addFinalizationStates(), addImportedFunctionTypedGlobalAliases(), addPublicImportFunctionAliases(), applyInterfaceFunctionReturnParamMetadataFromNestedStmt(), bindCatchErrorResourceSummary() (+216 more)
+Cohesion: 0.02
+Nodes (249): TestActorTaskBoundedStressExamples(), BuildFileWithStatsOpt(), buildAndRunFile(), buildAndRunFileWithOptions(), buildOnly(), projectRoot(), requireCheckFileErrorContains(), requireCheckFileOK() (+241 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.03
@@ -622,248 +624,248 @@ Cohesion: 0.03
 Nodes (3): createImports(), instantiateTetra(), runTetra()
 
 ### Community 19 - "Community 19"
-Cohesion: 0.03
-Nodes (171): Examples Index, releaseV10APIDiffFakeRepo(), releaseV10APIDiffToolFakeRepo(), runReleaseV10APIDiff(), TestAPIDiffBaselineWriteIsDeterministicWithoutWallClockTimestamp(), TestAPIDiffReportClassifiesAdditionsAndRemovalsForReview(), TestAPIDiffReportClassifiesSignatureDriftAsChanged(), TestReleaseV10APIDiffRejectsDashPrefixedNonEmptyReportDirBeforeRawFind() (+163 more)
+Cohesion: 0.02
+Nodes (171): TestArgumentLabelsAcceptedByChecker(), TestArgumentLabelsRejectMismatchedOrder(), TestEpic04ExpressionTypingDisplayTextAndBoundary(), TestEpic04ExpressionTypingNegativeDiagnostic(), TestEpic04ExpressionTypingPositiveAndInferenceCrossModule(), TestEpic04LocalInferenceNegativeAndDisplayText(), TestEpic04SemanticCheckerCoreCrossModuleParity(), TestEpic04SemanticCheckerCoreDisplayTextStability() (+163 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.02
-Nodes (188): TestArgumentLabelsAcceptedByChecker(), TestArgumentLabelsRejectMismatchedOrder(), TestEnumMatchDefaultMustBeLastDiagnostic(), TestEnumMatchDuplicateUnguardedPayloadCaseDiagnostic(), TestEnumMatchExhaustiveThreeCasesNoDefaultCheck(), TestEnumMatchGuardedCasesDoNotCountAsExhaustive(), TestEnumMatchMissingCaseStillNeedsReturn(), TestEnumMatchRejectsWrongEnumCaseDiagnostic() (+180 more)
+Cohesion: 0.04
+Nodes (161): shellSingleQuote(), envHasPrefix(), filteredReleaseV030GateEnv(), installReleaseV030CanonicalArtifactGo(), installReleaseV030CIMissingSignoffFailingFinalArtifactHashGo(), installReleaseV030FailingFinalArtifactHashGo(), installReleaseV030FailingSecurityReviewSha256(), installReleaseV030PortablePythonCanonicalizers() (+153 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.02
-Nodes (175): TestBuildAndRunCommandsAcceptExplicitProjectDirectory(), TestBuildCommandAllTargetsBuildsCapsuleTargets(), TestBuildCommandArtifactsAutoRepairsStaleObject(), TestBuildCommandDiscoversCapsuleT4ProjectEntry(), TestBuildCommandJSONDiagnostics(), TestBuildCommandJSONDiagnosticsForInvalidTarget(), TestBuildCommandJSONDiagnosticsForOptionValidation(), TestBuildCommandJSONDiagnosticsForTooManyInputs() (+167 more)
+Cohesion: 0.03
+Nodes (144): Examples Index, releaseV10APIDiffFakeRepo(), releaseV10APIDiffToolFakeRepo(), runReleaseV10APIDiff(), TestAPIDiffBaselineWriteIsDeterministicWithoutWallClockTimestamp(), TestAPIDiffReportClassifiesAdditionsAndRemovalsForReview(), TestAPIDiffReportClassifiesSignatureDriftAsChanged(), TestReleaseV10APIDiffRejectsDashPrefixedNonEmptyReportDirBeforeRawFind() (+136 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.03
-Nodes (155): assertObjectHasSymbols(), TestActorGlueExportsProgramRuntimeSymbols(), TestGeneratedActorGlueIsVerifiedBeforeNativeCodegen(), TestSelfHostRuntimeObjectsExportRequiredSymbols(), BuildStats, checkedBuildWorld, annotateRuntimeObjectSignatures(), blockedWASMIRPolicy() (+147 more)
+Nodes (152): TestGeneratedActorGlueIsVerifiedBeforeNativeCodegen(), TestSelfHostRuntimeObjectsExportRequiredSymbols(), BuildStats, checkedBuildWorld, annotateRuntimeObjectSignatures(), blockedWASMIRPolicy(), buildActorDispatchFunc(), buildActorMainEntryIDFunc() (+144 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.05
-Nodes (146): shellSingleQuote(), envHasPrefix(), filteredReleaseV030GateEnv(), installReleaseV030CanonicalArtifactGo(), installReleaseV030CIMissingSignoffFailingFinalArtifactHashGo(), installReleaseV030FailingFinalArtifactHashGo(), installReleaseV030FailingSecurityReviewSha256(), installReleaseV030PortablePythonCanonicalizers() (+138 more)
+Cohesion: 0.03
+Nodes (149): abiSuiteObjectHasReloc(), abiSuiteObjectHasRelocKind(), abiSuiteObjectHasSymbolSignature(), checkPointerNativeLibcFFIDiagnostics(), checkSourceNativeScalarDiagnostics(), checkStdlibRuntimeBoundaryDiagnostics(), checkTargetRuntimeBoundaryDiagnostics(), checkX32PointerFFIDiagnostics() (+141 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.03
-Nodes (144): TestArrayMVPRejectsAssignmentToArrayLen(), TestArrayMVPRejectsAssignmentToArrayPtr(), TestArrayMVPRejectsAssignmentToNestedArrayLen(), TestArrayMVPRejectsNonPositiveSize(), TestArrayMVPRejectsUnsupportedElementType(), requireCheckErrorContains(), TestOwnershipRejectsBorrowDerivedValueAsInoutArgument(), TestOwnershipRejectsBorrowedFixedArrayInoutAssignment() (+136 more)
+Cohesion: 0.04
+Nodes (144): auditParagraph(), markdownAuditRow(), renderBlockedOwnershipAudit(), stableForbiddenCaseDiagnosticsFixtureEvidence(), TestOwnershipAuditFixtureHelpersLiveInFocusedFile(), TestOwnershipAuditValidatorPackageIsSplitByResponsibility(), TestValidateOwnershipAuditAcceptsBlockedAudit(), TestValidateOwnershipAuditRejectsAchievedStatusWithOpenRows() (+136 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.04
-Nodes (142): markdownAuditRow(), renderBlockedOwnershipAudit(), TestOwnershipAuditFixtureHelpersLiveInFocusedFile(), TestOwnershipAuditValidatorPackageIsSplitByResponsibility(), TestValidateOwnershipAuditAcceptsBlockedAudit(), TestValidateOwnershipAuditRejectsAchievedStatusWithOpenRows(), TestValidateOwnershipAuditRejectsMissingActorAggregateAliasTransferTETRA2101Evidence(), TestValidateOwnershipAuditRejectsMissingActorAggregateTransferAliasRowEvidence() (+134 more)
+Cohesion: 0.03
+Nodes (144): TestArrayMVPRejectsAssignmentToArrayLen(), TestArrayMVPRejectsAssignmentToArrayPtr(), TestArrayMVPRejectsAssignmentToNestedArrayLen(), TestArrayMVPRejectsNonPositiveSize(), TestArrayMVPRejectsUnsupportedElementType(), requireCheckErrorContains(), TestOwnershipRejectsBorrowDerivedValueAsInoutArgument(), TestOwnershipRejectsBorrowedFixedArrayInoutAssignment() (+136 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.05
 Nodes (61): budgetCharge, callableClosureTargetName(), callableTargetFromAssignedExpr(), collectFunctionTypedParamTargets(), enumCaseConstructorInfoForTargets(), enumCasePatternInfoForTargets(), enumPayloadFieldTargetsFromExpr(), enumPayloadTargetInfo() (+53 more)
 
-### Community 27 - "Community 27"
-Cohesion: 0.03
-Nodes (141): assertBudgetFailureTail(), assertBudgetFailureTailImms(), findIRFuncByName(), hasInstrKind(), TestBudgetFailureABIReturnAndThrowShapesAreLowered(), TestBudgetRuntimeChecksAreLowered(), TestCapturedFunctionTypedDirectClosureWholeEnumReassignmentCanSnapshotIntoGlobalFunctionValue(), TestCapturedFunctionTypedDirectClosureWholeNestedStructReassignmentCanSnapshotIntoGlobalFunctionValue() (+133 more)
-
-### Community 38 - "Community 38"
-Cohesion: 0.05
-Nodes (130): resolveFieldChainLower(), assignTargetInfo, appendResourceProvenance(), bindBorrowedPtrAliasFromExpr(), bindFreshResourceTree(), bindPatternBorrowedPtrAliases(), bindPatternOwnershipAliases(), bindPatternRegionLocals() (+122 more)
-
-### Community 39 - "Community 39"
+### Community 37 - "Community 37"
 Cohesion: 0.06
 Nodes (134): TestValidateOwnershipAuditRejectsMissingActorAggregateAliasTransferTETRA2101Evidence(), TestValidateOwnershipAuditRejectsMissingActorAggregateTransferAliasRowEvidence(), TestValidateOwnershipAuditRejectsMissingActorBranchMatchLoopConsumeReuseTETRA2101Evidence(), TestValidateOwnershipAuditRejectsMissingActorConsumeAliasEvidence(), TestValidateOwnershipAuditRejectsMissingActorTaskOptionalPayloadAliasTransferTETRA2101Evidence(), TestValidateOwnershipAuditRejectsMissingActorTaskUseAfterTransferTETRA2101Evidence(), TestValidateOwnershipAuditRejectsMissingAggregateNestedGlobalFieldEscapeEvidence(), TestValidateOwnershipAuditRejectsMissingAliasRowGenericActorResourceAliasEvidence() (+126 more)
 
-### Community 40 - "Community 40"
-Cohesion: 0.04
-Nodes (125): TestActorDeclarationAllowsExtendedScalarStateFieldTypes(), TestActorDeclarationAllowsImmutableStateFields(), TestActorDeclarationAllowsMutableStateField(), TestActorDeclarationMethodRequiresExplicitUsesActors(), TestActorDeclarationMVPCheckAndLower(), TestActorDeclarationRejectsNonConstStateInitializer(), TestActorDeclarationRejectsPtrStateFieldType(), TestActorDeclarationRejectsUnsupportedStateFieldType() (+117 more)
-
-### Community 41 - "Community 41"
+### Community 38 - "Community 38"
 Cohesion: 0.03
 Nodes (130): requireCheckFileErrorContains(), requireCheckFileOK(), TestTaskGroupCancelAllowsTypedErrorResult(), TestTaskSpawnAllowsImmutableGlobalTarget(), TestOwnershipGenericFunctionTypedGlobalPreservesConsumeMarker(), TestOwnershipLoopBreakExitReportsMaybeConsumedWithBreakLabel(), TestOwnershipLoopBreakMakesFollowingBodyStatementsUnreachable(), TestOwnershipLoopContinueExitReportsMaybeConsumedWithContinueLabel() (+122 more)
 
-### Community 42 - "Community 42"
-Cohesion: 0.04
-Nodes (92): checkTargetAliasFuzz(), checkTargetArrayBoundaryFuzz(), checkTargetLayoutFuzz(), checkTargetObjectSignatureFuzz(), compareFuzzAggregateLayout(), expectArrayLayoutError(), fuzzAlignUp(), referenceFuzzStructLayout() (+84 more)
-
-### Community 43 - "Community 43"
-Cohesion: 0.06
-Nodes (116): capsuleSourceModule, appendCapsuleArtifact(), appendCapsuleSourceRoot(), appendCapsuleTarget(), appendGeneratedArtifactsToCapsule(), appendUniqueString(), artifactRepairCommand(), artifactSlug() (+108 more)
-
-### Community 44 - "Community 44"
-Cohesion: 0.08
-Nodes (110): resolveFunctionFieldName(), classifyCallableEscape(), callableEscapeBoundary, CallableEscapeKind, allowCapturedGlobalFunctionSnapshot(), allowFunctionFieldGlobalSnapshot(), applyInterfaceFunctionReturnMetadata(), checkStmts() (+102 more)
-
-### Community 45 - "Community 45"
+### Community 39 - "Community 39"
 Cohesion: 0.06
 Nodes (99): BrokerReport, CaseReport, FrameCounts, ProcessReport, Report, decodeStrict(), TestValidateReportAcceptsExecutableLinuxX64Evidence(), TestValidateReportRejectsMissingFailureCase() (+91 more)
 
-### Community 46 - "Community 46"
+### Community 40 - "Community 40"
+Cohesion: 0.06
+Nodes (109): capsuleArtifact, capsuleSourceModule, appendCapsuleArtifact(), appendCapsuleSourceRoot(), appendCapsuleTarget(), appendGeneratedArtifactsToCapsule(), appendUniqueString(), artifactRepairCommand() (+101 more)
+
+### Community 41 - "Community 41"
 Cohesion: 0.08
 Nodes (103): TestReleaseV011GateValidatesJSONDiagnostics(), testAllFakeRepo(), assertExitCode(), decodeTestAllSummary(), hasTestAllStep(), readReleaseV06GateScript(), readTestAllScript(), runTestAll() (+95 more)
 
-### Community 47 - "Community 47"
+### Community 42 - "Community 42"
+Cohesion: 0.09
+Nodes (107): resolveFunctionFieldName(), classifyCallableEscape(), callableEscapeBoundary, allowCapturedGlobalFunctionSnapshot(), allowFunctionFieldGlobalSnapshot(), checkStmts(), collectionElementType(), collectLocals() (+99 more)
+
+### Community 43 - "Community 43"
+Cohesion: 0.08
+Nodes (107): buildSysVUnixX64(), actorGroupPtrFromR12ToRdi(), actorPtrFromR12ToRdi(), actorPtrInRax(), actorWaitTargetPtrFromEaxToRdi(), clampEdiNonNegativeIntoEcx(), clampEdxNonNegativeIntoR13(), clearCurrentActorWakeAt() (+99 more)
+
+### Community 44 - "Community 44"
 Cohesion: 0.03
 Nodes (107): requireCheckWorldFilesErrorContains(), TestOwnershipAllowsCrossModuleProtocolImplMatchingParameterOwnership(), TestOwnershipBorrowParamCannotMutate(), TestOwnershipConsumeArgumentCannotBeReused(), TestOwnershipConsumedValueCannotBeReassigned(), TestOwnershipInoutRequiresMutableLocal(), TestOwnershipRejectsBorrowEscapeViaAliasReturn(), TestOwnershipRejectsBorrowInoutAlias() (+99 more)
 
+### Community 45 - "Community 45"
+Cohesion: 0.05
+Nodes (92): TestCheckCommandJSONDiagnosticsForCrossModulePartialCopyAfterConsumeCodes(), TestCheckCommandJSONDiagnosticsForCrossModulePartialEnumConstructorAfterConsumeCodes(), TestCheckCommandJSONDiagnosticsForOwnershipOptionalPayloadConsumeCode(), TestCheckCommandJSONDiagnosticsForOwnershipPartialEnumConstructorAfterConsumeCodes(), TestCheckCommandJSONDiagnosticsForOwnershipPartialEnumConsumeCode(), TestCheckCommandJSONDiagnosticsForOwnershipPartialEnumCopyAfterConsumeCode(), TestCheckCommandJSONDiagnosticsForOwnershipPartialStructConsumeCode(), TestCheckCommandJSONDiagnosticsForOwnershipPartialStructCopyAfterConsumeCode() (+84 more)
+
+### Community 46 - "Community 46"
+Cohesion: 0.04
+Nodes (50): branchScopeInfo, returnRegionSummaryForInterfaceExpr(), borrowedEscapeShouldInspect(), appendRegionTree(), bindRegionTreeFromExpr(), checkLocalScope(), checkRegionTreeWithinScope(), checkRegionUsable() (+42 more)
+
+### Community 47 - "Community 47"
+Cohesion: 0.04
+Nodes (85): BuildMacOSX64(), TestArrayMVPWasmBuildSmoke(), assertModules(), TestBuildCacheAddingUnusedExportDoesNotRebuildConsumer(), TestBuildCacheCorruptObjectFallsBackToRebuild(), TestBuildCacheReuse(), TestBuildCacheSliceModuleChangeRebuildsOnlyProducer(), TestBuildCacheStructDependencyChangeRebuildsConsumer() (+77 more)
+
 ### Community 48 - "Community 48"
-Cohesion: 0.09
-Nodes (100): buildSysVUnixX64(), actorGroupPtrFromEaxToRdi(), actorGroupPtrFromR12ToRdi(), actorPtrFromEaxToRdi(), actorPtrFromR12ToRdi(), actorPtrInRax(), actorWaitTargetPtrFromEaxToRdi(), actorWakeAtPtrFromEaxToRdi() (+92 more)
+Cohesion: 0.05
+Nodes (95): buildAndRunWithOptions(), TestGenericFunctionCrossModuleMonomorphizedCall(), TestGenericFunctionMonomorphizedCall(), TestGenericFunctionMonomorphizedNamesAvoidTypeCollisions(), TestGenericFunctionParseCheckAndDocs(), TestGenericFunctionProtocolBoundConformancePasses(), TestGenericFunctionProtocolBoundCrossModuleConformancePasses(), TestGenericFunctionProtocolBoundCrossModuleRejectsMissingImpl() (+87 more)
 
 ### Community 49 - "Community 49"
 Cohesion: 0.02
-Nodes (85): TestBuildCapturedFunctionTypedEnumPayloadReturnSmoke(), TestBuildCapturedFunctionTypedStructFieldReturnSmoke(), TestBuildFunctionTypedCallableMutableReassignmentFromReturnSmoke(), TestBuildFunctionTypedCallableMutableReassignmentFromStructFieldSmoke(), TestBuildFunctionTypedCallableParamSmoke(), TestBuildFunctionTypedCapturedClosureAliasCallbackArgumentSmoke(), TestBuildFunctionTypedCapturedClosureEnumPayloadCallbackSmoke(), TestBuildFunctionTypedCapturedClosureFourSlotCallbackArgumentSmoke() (+77 more)
+Nodes (98): TestBuildCapturedFunctionTypedEnumPayloadReturnSmoke(), TestBuildFunctionTypedCallableMutableReassignmentCallbackSmoke(), TestBuildFunctionTypedCallableMutableReassignmentFromClosureSmoke(), TestBuildFunctionTypedCallableMutableReassignmentFromStructFieldSmoke(), TestBuildFunctionTypedCallableMVPRejectsUnsupportedForms(), TestBuildFunctionTypedCallableParamSmoke(), TestBuildFunctionTypedCapturedClosureAliasCallbackArgumentSmoke(), TestBuildFunctionTypedCapturedClosureCallbackArgumentSmoke() (+90 more)
 
 ### Community 50 - "Community 50"
 Cohesion: 0.02
-Nodes (98): TestBuildFunctionTypedCallableMutableReassignmentCallbackSmoke(), TestBuildFunctionTypedCallableMutableReassignmentDirectCallSmoke(), TestBuildFunctionTypedCallableMutableReassignmentFromClosureSmoke(), TestBuildFunctionTypedCallableMVPRejectsUnsupportedForms(), TestBuildFunctionTypedCapturedClosureCallbackArgumentSmoke(), TestBuildFunctionTypedCapturedClosureEnumPayloadDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureReturnCallbackSmoke(), TestBuildFunctionTypedCapturedClosureReturnDirectCallSmoke() (+90 more)
+Nodes (85): TestBuildCapturedFunctionTypedStructFieldReturnSmoke(), TestBuildFunctionTypedCallableMutableReassignmentDirectCallSmoke(), TestBuildFunctionTypedCallableMutableReassignmentFromReturnSmoke(), TestBuildFunctionTypedCapturedClosureEnumPayloadDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureReturnCallbackSmoke(), TestBuildFunctionTypedCapturedClosureReturnDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureStructFieldCallbackSmoke(), TestBuildFunctionTypedCapturedClosureStructFieldDirectCallSmoke() (+77 more)
 
 ### Community 51 - "Community 51"
-Cohesion: 0.06
-Nodes (97): assertActorAliasTransferDiagnostic(), assertActorTaskOptionalPayloadAliasTransferDiagnostic(), assertBorrowedNestedSliceEnumPayloadDiagnostic(), assertBorrowedNestedSliceStructDiagnostic(), assertBorrowedPtrAggregateGlobalFieldDiagnostic(), assertBorrowedPtrAggregateOptionalGlobalAssignmentDiagnostic(), assertBorrowedPtrAggregateReturnDiagnostic(), assertBorrowedPtrEnumAliasReturnDiagnostic() (+89 more)
+Cohesion: 0.07
+Nodes (90): resolveFieldChainLower(), assignTargetInfo, bindBorrowedPtrAliasFromExpr(), borrowedPtrOwnerFromExpr(), resourcePathForExpr(), ownershipDiagnosticf(), actorTaskWorkerBoundaryEffect(), bareEnumPatternCaseName() (+82 more)
 
 ### Community 52 - "Community 52"
-Cohesion: 0.05
-Nodes (79): BuildMacOSX64(), TestArrayMVPWasmBuildSmoke(), assertModules(), TestBuildCacheAddingUnusedExportDoesNotRebuildConsumer(), TestBuildCacheCorruptObjectFallsBackToRebuild(), TestBuildCacheReuse(), TestBuildCacheSliceModuleChangeRebuildsOnlyProducer(), TestBuildCacheStructDependencyChangeRebuildsConsumer() (+71 more)
+Cohesion: 0.06
+Nodes (92): assertActorAliasTransferDiagnostic(), assertActorTaskOptionalPayloadAliasTransferDiagnostic(), assertBorrowedNestedSliceEnumPayloadDiagnostic(), assertBorrowedNestedSliceStructDiagnostic(), assertBorrowedPtrAggregateGlobalFieldDiagnostic(), assertBorrowedPtrAggregateOptionalGlobalAssignmentDiagnostic(), assertBorrowedPtrAggregateReturnDiagnostic(), assertBorrowedPtrEnumAliasReturnDiagnostic() (+84 more)
 
 ### Community 53 - "Community 53"
 Cohesion: 0.05
-Nodes (41): branchScopeInfo, returnRegionSummaryForInterfaceExpr(), appendRegionTree(), bindRegionTreeFromExpr(), checkLocalScope(), checkRegionTreeWithinScope(), checkRegionUsable(), commonRegionFromTree() (+33 more)
-
-### Community 54 - "Community 54"
-Cohesion: 0.05
 Nodes (91): exprString(), parseExpr(), TestParseActorDeclarationDesugarsMethods(), TestParseActorDeclarationPreservesMethodUsesActors(), TestParseActorDeclarationRejectsUnsupportedMembers(), TestParseActorDeclarationSupportsImmutableStateFields(), TestParseActorDeclarationSupportsMutableStateField(), TestParseActorDeclarationSupportsStateFieldInitializers() (+83 more)
 
-### Community 55 - "Community 55"
+### Community 54 - "Community 54"
 Cohesion: 0.07
 Nodes (84): canRunLinuxX32OnHost(), probeLinuxX32Execution(), artifactCheck, fakeFileInfo, fileInfo, freshnessCheck, gateEvidenceReport, generatedArtifactsReport (+76 more)
 
-### Community 56 - "Community 56"
+### Community 55 - "Community 55"
 Cohesion: 0.07
 Nodes (62): FeatureInfo, FeatureRegistry(), TestFeatureRegistryCLICoreCoversDocumentedPublicCommands(), TestFeatureRegistryCoversReleaseStatusesAndKeyBoundaries(), TestFeatureRegistryReturnsDefensiveCopy(), TestManifestBuiltinsExposeCanonicalSafetyEffectsAndPolicies(), FeatureStatus, TestObjectRoundTrip() (+54 more)
 
+### Community 56 - "Community 56"
+Cohesion: 0.09
+Nodes (71): cloneLocalMap(), collectExprLocals(), inferCatchExprType(), inferMatchExprType(), resolveCallSigForInference(), firstCapture(), validateTypedTaskErrorType(), genericDef (+63 more)
+
 ### Community 57 - "Community 57"
-Cohesion: 0.06
-Nodes (71): BuildOptions, runInterface(), allTargetsOutput(), buildOnlyNativeRunUnsupportedReason(), buildOptions(), canRunBuildOnlyNativeTargetOnHost(), canRunLinuxX86OnHost(), canRunNativeExecutableTargetOnHost() (+63 more)
+Cohesion: 0.14
+Nodes (7): ParseFile(), diagnosticErrorf(), parser, buildFieldAccess(), isFunctionLikeCallee(), ParseFile(), plannedFeatureError()
 
 ### Community 58 - "Community 58"
-Cohesion: 0.08
-Nodes (71): resolveCallSigForInference(), firstCapture(), genericDef, genericProtocolInfo, arrayElemName(), bindGenericType(), checkGenericProtocolBounds(), cloneClosureCaptures() (+63 more)
-
-### Community 59 - "Community 59"
-Cohesion: 0.04
-Nodes (42): itoa(), AwaitExpr, BinaryExpr, BoolLitExpr, CallExpr, CapsuleEntryDecl, CatchExpr, CatchExprCase (+34 more)
-
-### Community 60 - "Community 60"
 Cohesion: 0.05
 Nodes (79): TestActorConsumeRejectsAggregateAliasConsumedTwiceInSingleCall(), TestActorConsumeRejectsAggregateAliasFieldReuse(), TestActorConsumeRejectsAliasConsumedTwiceInSingleCall(), TestActorConsumeRejectsAliasReuse(), TestActorConsumeRejectsEnumPayloadAliasReuse(), TestActorConsumeRejectsGenericStructFieldAliasReuse(), TestActorConsumeRejectsInterproceduralAliasReuse(), TestActorConsumeRejectsInterproceduralOptionalMatchPayloadAliasReuse() (+71 more)
 
+### Community 59 - "Community 59"
+Cohesion: 0.04
+Nodes (41): AssignStmt, itoa(), BreakStmt, CapsuleEntryDecl, CatchExprCase, ContinueStmt, DeferStmt, EnumCaseDecl (+33 more)
+
+### Community 60 - "Community 60"
+Cohesion: 0.05
+Nodes (70): targetReportEntryForTest(), TestDoctorCommandJSON(), TestDoctorCommandProjectJSON(), TestDoctorCommandRejectsUnsupportedFormat(), TestDoctorReportFilesystemProbesFailInIncompleteRepo(), TestTargetMetadataCheck(), stubLookPath(), targetMetaForTest() (+62 more)
+
 ### Community 61 - "Community 61"
-Cohesion: 0.14
-Nodes (6): ParseFile(), diagnosticErrorf(), parser, buildFieldAccess(), ParseFile(), plannedFeatureError()
+Cohesion: 0.1
+Nodes (70): addInterfaceFuncSigTypeRefs(), addInterfaceFuncTypeRefs(), addInterfaceTypeRef(), formatInterfaceExtensionMethodDetail(), GenerateInterfaceFile(), interfaceAggregateMatchReturnExpr(), interfaceAggregateReturnExpr(), interfaceAggregateReturnFromBranches() (+62 more)
 
 ### Community 62 - "Community 62"
 Cohesion: 0.07
 Nodes (64): TestCheckCommandJSONDiagnosticsForCallableMutableCaptureGlobalEscapeCode(), TestCheckCommandJSONDiagnosticsForCallableMutableCaptureHeapEscapeCode(), TestCheckCommandJSONDiagnosticsForCallableResourceCaptureEscapeCode(), TestCheckCommandJSONDiagnosticsForCapturedCallableGlobalStorageCode(), TestCheckCommandJSONDiagnosticsForCapturedClosureExplicitTypeArgsCode(), TestCheckCommandJSONDiagnosticsForCapturingClosureRawPointerEscapeCode(), TestCheckCommandJSONDiagnosticsForFunctionTypedExplicitTypeArgsCode(), TestCheckCommandJSONDiagnosticsForFunctionTypedParameterGlobalStorageCode() (+56 more)
 
 ### Community 63 - "Community 63"
+Cohesion: 0.07
+Nodes (61): BuildOptions, runInterface(), allTargetsOutput(), buildOnlyNativeRunUnsupportedReason(), buildOptions(), canRunBuildOnlyNativeTargetOnHost(), canRunLinuxX86OnHost(), canRunNativeExecutableTargetOnHost() (+53 more)
+
+### Community 64 - "Community 64"
 Cohesion: 0.04
 Nodes (69): requireCheckOK(), requireFileCheckOK(), requireFileSemanticErrorContains(), TestBudgetPrivacyEffectsAndPolicyGroup(), TestCallbackWrapperDeclaredEffectsCannotBypassSemanticClauses(), TestCallbackWrapperRequiresImportedTargetEffects(), TestCallbackWrapperRequiresLocalSymbolBackedTargetEffects(), TestCallbackWrapperRequiresTargetEffects() (+61 more)
 
-### Community 64 - "Community 64"
-Cohesion: 0.1
-Nodes (67): addInterfaceFuncSigTypeRefs(), addInterfaceFuncTypeRefs(), addInterfaceTypeRef(), formatInterfaceExtensionMethodDetail(), GenerateInterfaceFile(), interfaceAggregateMatchReturnExpr(), interfaceAggregateReturnExpr(), interfaceAggregateReturnFromBranches() (+59 more)
-
 ### Community 65 - "Community 65"
 Cohesion: 0.05
-Nodes (69): Agent 12 Stdlib API Docs, API Diff Docs Snapshot (hash 0966...ca390), api diff no-change step, API Docs Snapshot (hash 623d...53917), API Docs Snapshot (hash 09e8...50e66), API Hash sha256:0966... (81 modules, 226 entries), API Hash sha256:09e8... (83 modules, 228 entries), API Hash sha256:623d... (49 modules, 97 entries) (+61 more)
+Nodes (70): Agent 12 Stdlib API Docs, Final Candidate API Diff Docs, Stdlib API Docs, tetra.api.v1alpha1 Schema, API Snapshot sha256:0966eb.. (81 modules, 226 entries), API Snapshot sha256:09e83e.. (83 modules, 228 entries), Tetra Tooling Summary Schema v1alpha1, WaveH API Diff Docs (+62 more)
 
 ### Community 66 - "Community 66"
-Cohesion: 0.06
-Nodes (65): abiSuiteObjectHasReloc(), abiSuiteObjectHasRelocKind(), abiSuiteObjectHasSymbolSignature(), checkPointerNativeLibcFFIDiagnostics(), checkSourceNativeScalarDiagnostics(), checkStdlibRuntimeBoundaryDiagnostics(), checkTargetRuntimeBoundaryDiagnostics(), checkX32PointerFFIDiagnostics() (+57 more)
+Cohesion: 0.07
+Nodes (59): ActorStateField, TestEnsureTypeInfoArrayRejectsUnsupportedSubset(), TestEnsureTypeInfoArraySupportedSubset(), TestEnsureTypeInfoRejectsTargetLayoutOnlyNativeIntegers(), TestClassifyCallableEscapeRejectsMutableCaptureAcrossThreadBoundary(), TestClassifyCallableEscapeRejectsMutableEscapingCapture(), TestClassifyCallableEscapeRejectsResourceCaptureAcrossThreadBoundary(), TestClassifyCallableEscapeUsesFnptrForBoundedLocalSnapshot() (+51 more)
 
 ### Community 67 - "Community 67"
-Cohesion: 0.07
-Nodes (58): ActorStateField, TestEnsureTypeInfoArrayRejectsUnsupportedSubset(), TestEnsureTypeInfoArraySupportedSubset(), TestEnsureTypeInfoRejectsTargetLayoutOnlyNativeIntegers(), TestClassifyCallableEscapeRejectsMutableCaptureAcrossThreadBoundary(), TestClassifyCallableEscapeRejectsMutableEscapingCapture(), TestClassifyCallableEscapeRejectsResourceCaptureAcrossThreadBoundary(), TestClassifyCallableEscapeUsesFnptrForBoundedLocalSnapshot() (+50 more)
+Cohesion: 0.09
+Nodes (7): emitExit(), emitIslandFree(), emitIslandMakeSlice(), emitMmap2Anonymous(), emitWrite(), guardAllocationOffsetRawAccess(), emitter
 
 ### Community 68 - "Community 68"
 Cohesion: 0.1
 Nodes (61): main(), featureManifest, currentExperimentalModulePaths(), currentReleaseTruthDocPaths(), currentSpecMarkdownPaths(), currentStableModulePaths(), defaultMemoryProductionContractDocPaths(), defaultNetworkingRuntimeBoundaryDocPaths() (+53 more)
 
 ### Community 69 - "Community 69"
-Cohesion: 0.08
-Nodes (60): checkEffectsFileProgram(), checkEffectsProgram(), requireCheckOK(), requireFileCheckOK(), requireFileSemanticErrorContains(), TestBudgetPrivacyEffectsAndPolicyGroup(), TestCallbackWrapperDeclaredEffectsCannotBypassSemanticClauses(), TestCallbackWrapperRequiresImportedTargetEffects() (+52 more)
+Cohesion: 0.06
+Nodes (57): assertObjectHasSymbols(), TestActorDeclarationAllowsExtendedScalarStateFieldTypes(), TestActorDeclarationAllowsImmutableStateFields(), TestActorDeclarationAllowsMutableStateField(), TestActorDeclarationMethodRequiresExplicitUsesActors(), TestActorDeclarationMVPCheckAndLower(), TestActorDeclarationRejectsNonConstStateInitializer(), TestActorDeclarationRejectsPtrStateFieldType() (+49 more)
 
 ### Community 70 - "Community 70"
 Cohesion: 0.05
-Nodes (18): AssignStmt, BreakStmt, ContinueStmt, DeferStmt, ExpectStmt, ExprStmt, ForRangeStmt, FreeStmt (+10 more)
+Nodes (19): AwaitExpr, BinaryExpr, BoolLitExpr, CallExpr, CatchExpr, ClosureExpr, EnumCasePatternExpr, FieldAccessExpr (+11 more)
 
 ### Community 71 - "Community 71"
-Cohesion: 0.09
-Nodes (7): atomicFetchCASLoop16(), atomicFetchCASLoop32(), atomicFetchCASLoop8(), emitIslandMakeSlice(), emitMmap2Anonymous(), guardAllocationOffsetRawAccess(), emitter
+Cohesion: 0.08
+Nodes (60): checkEffectsFileProgram(), checkEffectsProgram(), requireCheckOK(), requireFileCheckOK(), requireFileSemanticErrorContains(), TestBudgetPrivacyEffectsAndPolicyGroup(), TestCallbackWrapperDeclaredEffectsCannotBypassSemanticClauses(), TestCallbackWrapperRequiresImportedTargetEffects() (+52 more)
 
 ### Community 72 - "Community 72"
+Cohesion: 0.1
+Nodes (52): runEcoMaterializationValidator(), TestValidateEcoMaterializationAcceptsEmptyTarget(), TestValidateEcoMaterializationAcceptsValidReport(), TestValidateEcoMaterializationRejectsBadLockHash(), TestValidateEcoMaterializationRejectsEmptyPackagePath(), TestValidateEcoMaterializationRejectsEmptyTrustSnapshot(), TestValidateEcoMaterializationRejectsMalformedJSON(), TestValidateEcoMaterializationRejectsMissingRequiredField() (+44 more)
+
+### Community 73 - "Community 73"
 Cohesion: 0.09
 Nodes (49): BuildSigMap(), BuildTypeSigMap(), cacheDir(), cacheKey(), cachePath(), DepSigHashFromDeps(), DepSigHashFromDepsWithInterfaceHashes(), formatFuncSig() (+41 more)
 
-### Community 73 - "Community 73"
-Cohesion: 0.13
-Nodes (20): closureHeaderSegment(), formatFuncSigDecl(), formatTypeRef(), publicPrefix(), sourcePrinter, ActorDecl, CapsuleDecl, EnumDecl (+12 more)
-
 ### Community 74 - "Community 74"
-Cohesion: 0.09
-Nodes (52): irVerifierError(), irVerifierErrorAt(), lowerDiagnostic(), runtimeCallSig, RuntimeCallSignature, stackState, matchesBudgetGuardAt(), matchesBudgetGuardBefore() (+44 more)
+Cohesion: 0.13
+Nodes (19): formatTypeRef(), formatTypeRefPresent(), publicPrefix(), sourcePrinter, ActorDecl, CapsuleDecl, EnumDecl, ExtensionDecl (+11 more)
 
 ### Community 75 - "Community 75"
 Cohesion: 0.09
-Nodes (54): wasmImport, readSLEB32ForTest(), readULEBForTest(), readWASMNameForTest(), stringSetHas(), TestCodegenObjectWebAllowsRepeatedSymAddrSymbolAcrossFunctions(), TestCodegenObjectWebRejectsCallSignatureMismatch(), TestCodegenObjectWebRejectsInvalidCallMetadata() (+46 more)
+Nodes (52): irVerifierError(), irVerifierErrorAt(), lowerDiagnostic(), runtimeCallSig, RuntimeCallSignature, stackState, matchesBudgetGuardAt(), matchesBudgetGuardBefore() (+44 more)
 
 ### Community 76 - "Community 76"
+Cohesion: 0.09
+Nodes (55): wasmImport, TestLinkObjectWASIHeapBaseIsAlignedAfterStaticData(), readSLEB32ForTest(), readULEBForTest(), readWASMNameForTest(), stringSetHas(), TestCodegenObjectWebAllowsRepeatedSymAddrSymbolAcrossFunctions(), TestCodegenObjectWebRejectsCallSignatureMismatch() (+47 more)
+
+### Community 77 - "Community 77"
 Cohesion: 0.14
 Nodes (48): TestLowerCoreAtomicI32BuiltinsToIR(), TestLowerCoreAtomicI64AndWeakCompareExchangeBuiltinsToIR(), TestLowerCoreAtomicSmallAndPointerBuiltinsToIR(), TestLowerCoreAtomicWeakCompareExchangeReportsExplicitDiagnostic(), checkCallableProgram(), countCall(), countCallableClosureCalls(), countCallableKind() (+40 more)
 
-### Community 77 - "Community 77"
+### Community 78 - "Community 78"
 Cohesion: 0.13
 Nodes (53): appendWorkspaceExecutionMember(), buildWorkspaceGraph(), cleanWorkspaceMemberPath(), dedupeWorkspaceIssues(), describeWorkspaceMember(), describeWorkspaceMembers(), encodeWorkspaceJSON(), findWorkspacePath() (+45 more)
 
-### Community 78 - "Community 78"
+### Community 79 - "Community 79"
 Cohesion: 0.12
 Nodes (46): CodegenObjectLinuxX64(), CodegenObjectLinuxX64WithOptions(), applyOperation(), bindingTraces(), bindingValue(), buildReport(), commandByName(), dispatchTranscript() (+38 more)
-
-### Community 79 - "Community 79"
-Cohesion: 0.1
-Nodes (52): readSLEB32ForTest(), readULEBForTest(), readWASMNameForTest(), stringSetHas(), TestCodegenObjectAllowsRepeatedSymAddrSymbolAcrossFunctions(), TestCodegenObjectRejectsCallSignatureMismatch(), TestCodegenObjectRejectsInvalidCallMetadata(), TestCodegenObjectRejectsInvalidFunctionMetadata() (+44 more)
 
 ### Community 80 - "Community 80"
 Cohesion: 0.1
 Nodes (46): validateWorkspaceReportFormat(), decodeStrictJSON(), isASCIIAlpha(), isWorkspaceExecWindowsAbsPath(), main(), TestValidateWorkspaceExecAcceptsBuildPassReport(), TestValidateWorkspaceExecAcceptsTestFailureAndSkipReport(), TestValidateWorkspaceExecRejectsCountMismatch() (+38 more)
 
 ### Community 81 - "Community 81"
+Cohesion: 0.1
+Nodes (46): doctorCheck, doctorReport, decodeStrictJSON(), main(), TestValidateDoctorReportAcceptsExpectedShape(), TestValidateDoctorReportRejectsFailingRequiredCheck(), TestValidateDoctorReportRejectsFailingStatus(), TestValidateDoctorReportRejectsMissingRequiredCheck() (+38 more)
+
+### Community 82 - "Community 82"
 Cohesion: 0.09
 Nodes (51): RunTargetABIChecks(), TestRunTargetABIChecksCoversX86X64AndRejectsWASM(), executableMatrixCase, abiObjectHasSymbol(), abiObjectHasSymbolSignature(), compareAggregateLayout(), containsMovEaxImm32(), elapsedMillis() (+43 more)
 
-### Community 82 - "Community 82"
-Cohesion: 0.13
-Nodes (32): callPatch, atomicCompareExchange16(), atomicCompareExchange32(), atomicCompareExchange8(), atomicExchange16(), atomicExchange32(), atomicExchange8(), atomicFetchAdd16() (+24 more)
-
 ### Community 83 - "Community 83"
+Cohesion: 0.1
+Nodes (51): readSLEB32ForTest(), readULEBForTest(), readWASMNameForTest(), stringSetHas(), TestCodegenObjectAllowsRepeatedSymAddrSymbolAcrossFunctions(), TestCodegenObjectRejectsCallSignatureMismatch(), TestCodegenObjectRejectsInvalidCallMetadata(), TestCodegenObjectRejectsInvalidFunctionMetadata() (+43 more)
+
+### Community 84 - "Community 84"
 Cohesion: 0.11
 Nodes (44): ChecklistItem, hashArtifact, hashManifest, LayerReport, Report, artifactRefExists(), BuildReport(), checklistKey() (+36 more)
 
-### Community 84 - "Community 84"
+### Community 85 - "Community 85"
 Cohesion: 0.15
 Nodes (49): attachEcoPublishTrust(), availableEcoPackageTargets(), buildEcoPublishMetadata(), capsuleIDDirectory(), decodeEcoPublishMetadata(), downloadPackage(), ecoPublishDownloadPath(), ecoPublishHashHex() (+41 more)
 
-### Community 85 - "Community 85"
+### Community 86 - "Community 86"
+Cohesion: 0.12
+Nodes (27): callPatch, atomicCompareExchange16(), atomicCompareExchange32(), atomicCompareExchange8(), atomicExchange16(), atomicExchange32(), atomicExchange8(), atomicFetchAdd16() (+19 more)
+
+### Community 87 - "Community 87"
 Cohesion: 0.07
 Nodes (38): ABIClass, ABIExtension, ABILocation, ABIParam, ABIPlan, ABISignature, Classifier, abiExtensionFor() (+30 more)
 
-### Community 86 - "Community 86"
-Cohesion: 0.12
-Nodes (44): dumpOptions, boolToYesNo(), buildDump(), collectFromFileList(), collectRelPaths(), defaultExcludedDirParts(), defaultExcludePrefixes(), defaultOnlyPrefixes() (+36 more)
-
-### Community 87 - "Community 87"
-Cohesion: 0.1
-Nodes (42): FuzzLexer(), FuzzParser(), capsuleUnpackManifest, ecoPackageMetadata, ecoPackageMetadataFile, appendUnpackSourceRoot(), findCapsuleManifest(), main() (+34 more)
-
 ### Community 88 - "Community 88"
 Cohesion: 0.11
-Nodes (35): Column, Conn, Frame, payloadReader, Result, Row, StartupConfig, AppendBind() (+27 more)
+Nodes (37): Column, Conn, Frame, payloadReader, Result, Row, StartupConfig, AppendBind() (+29 more)
 
 ### Community 89 - "Community 89"
-Cohesion: 0.08
-Nodes (34): LinkWindowsX64(), DataAbs32Reloc, DataDisp32Reloc, FuncAbs32Reloc, IATDisp32Reloc, CollectImports(), FuzzLinkX64ObjectsDoesNotPanic(), LinkX64Objects() (+26 more)
+Cohesion: 0.1
+Nodes (42): FuzzLexer(), FuzzParser(), capsuleUnpackManifest, ecoPackageMetadata, ecoPackageMetadataFile, appendUnpackSourceRoot(), findCapsuleManifest(), main() (+34 more)
 
 ### Community 90 - "Community 90"
 Cohesion: 0.2
@@ -878,256 +880,256 @@ Cohesion: 0.08
 Nodes (47): requireTetraBugInterfaceOnlyBuild(), requireTetraBugLinuxAMD64(), TestTetraBug0001GenericInferenceDirectCallArgument(), TestTetraBug0002ModuleExtensionStaticCall(), TestTetraBug0003FunctionTypedStructFieldEnumPayload(), TestTetraBug0004FormatterPreservesFunctionTypedLocalAnnotation(), TestTetraBug0005ModuleActorEntrypointString(), TestTetraBug0006FormatterPreservesFunctionTypedGlobalAnnotation() (+39 more)
 
 ### Community 93 - "Community 93"
+Cohesion: 0.11
+Nodes (40): hasPrefix(), parseEcoMaterializeArgs(), runEcoMaterialize(), ensureEcoDirectoryNoSymlink(), packageMetadataFingerprint(), packCapsule(), packCapsuleProject(), packFiles() (+32 more)
+
+### Community 94 - "Community 94"
+Cohesion: 0.15
+Nodes (44): isLSPIdentifierChar(), isLSPIdentifierStart(), lspCodeActionDiagnosticsFromCompiler(), lspCodeActions(), lspCodeLineDeclaresLocalName(), lspCodeOnly(), lspCompletionItems(), lspCompletionKind() (+36 more)
+
+### Community 95 - "Community 95"
 Cohesion: 0.16
 Nodes (42): LinuxSysV(), NewEmitFunc(), addEdxImm32Bytes(), assertContainsBytes(), assertNotContainsBytes(), emitOneFunc(), emitOneFuncWithOptions(), emitWithArtifacts() (+34 more)
 
-### Community 94 - "Community 94"
-Cohesion: 0.07
-Nodes (45): BenchmarkEnvironment, benchOptions, EndpointReport, endpointResult, endpointSpec, GitState, latencyStats, averageMS() (+37 more)
-
-### Community 95 - "Community 95"
+### Community 96 - "Community 96"
 Cohesion: 0.1
 Nodes (28): decodeStrictJSON(), errorString(), intPtr(), loadNativeRuntime(), main(), processExitCode(), runCommand(), runRuntimeScenario() (+20 more)
 
-### Community 96 - "Community 96"
+### Community 97 - "Community 97"
+Cohesion: 0.11
+Nodes (42): addVaultRecord(), buildNeedMap(), collectTransitiveNeeds(), runEcoNeedMap(), runEcoTrust(), runEcoTrustSnapshot(), scoreCapsuleTrust(), readVaultIndex() (+34 more)
+
+### Community 98 - "Community 98"
+Cohesion: 0.1
+Nodes (37): apiDocTitle(), apiSurfaceMetadata(), collectDocFiles(), countTetraDoctests(), disambiguatedAPIDocTitles(), GenerateAPIDocs(), GenerateAPIDocsFromSource(), isDocSourceFile() (+29 more)
+
+### Community 99 - "Community 99"
 Cohesion: 0.15
 Nodes (40): runEcoNeedMapValidator(), TestValidateEcoNeedMapAcceptsValidReport(), TestValidateEcoNeedMapRejectsBadLockHash(), TestValidateEcoNeedMapRejectsEdgeToUnknownCapsule(), TestValidateEcoNeedMapRejectsMalformedJSON(), TestValidateEcoNeedMapRejectsMissingRequiredField(), TestValidateEcoNeedMapRejectsTargetSetMismatch(), TestValidateEcoNeedMapRejectsTransitiveMismatch() (+32 more)
 
-### Community 97 - "Community 97"
+### Community 100 - "Community 100"
+Cohesion: 0.13
+Nodes (42): dumpOptions, boolToYesNo(), buildDump(), collectFromFileList(), collectRelPaths(), defaultExcludedDirParts(), defaultExcludePrefixes(), defaultOnlyPrefixes() (+34 more)
+
+### Community 101 - "Community 101"
 Cohesion: 0.12
 Nodes (38): assertOldGateDidNotCreateReportSubdirs(), assertOldGateRejectedBeforeSideEffects(), assertOldGateRejectsNonDirectoryReportPath(), assertOldGateRejectsNonEmptyReportDir(), assertOldGateRejectsNonEmptyReportDirWithArg(), normalizeDashLeadingReportDirForTest(), releaseOldGateMinimalRoot(), runOldReleaseGate() (+30 more)
 
-### Community 98 - "Community 98"
-Cohesion: 0.13
-Nodes (43): isLSPIdentifierChar(), isLSPIdentifierStart(), lspCodeActionDiagnosticsFromCompiler(), lspCodeActions(), lspCodeLineDeclaresLocalName(), lspCodeOnly(), lspCompletionItems(), lspCompletionKind() (+35 more)
+### Community 102 - "Community 102"
+Cohesion: 0.06
+Nodes (46): API Diff Docs Snapshot (hash 0966...ca390), api diff no-change step, API Docs Snapshot (hash 623d...53917), API Docs Snapshot (hash 09e8...50e66), API Hash sha256:0966... (81 modules, 226 entries), API Hash sha256:09e8... (83 modules, 228 entries), API Hash sha256:623d... (49 modules, 97 entries), Release Artifact tetra.release.v0_2_0.test-all-summary.v1 (+38 more)
 
-### Community 99 - "Community 99"
+### Community 103 - "Community 103"
+Cohesion: 0.07
+Nodes (36): alignUp(), LinuxX32Layout(), LinuxX64Layout(), LinuxX86Layout(), TestLinuxX64LayoutKeepsDataPageAligned(), TestWriteELF32LinuxX32HeaderContract(), TestWriteELF32LinuxX32RejectsInvalidImage(), TestWriteELF32LinuxX86HeaderContract() (+28 more)
+
+### Community 104 - "Community 104"
 Cohesion: 0.12
 Nodes (29): compilerNativeShellTrace, compilerUIBundle, desktopRuntime, buildReport(), bundleHasDogfoodSurface(), errorString(), hasOperation(), intPtr() (+21 more)
 
-### Community 100 - "Community 100"
+### Community 105 - "Community 105"
 Cohesion: 0.09
 Nodes (43): extractTetraSnippets(), repoRoot(), TestFlowGrammarSurfaceExampleCoversCanonicalForms(), TestFormatSourceBreakContinue(), TestFormatSourceCallArgumentLabels(), TestFormatSourceClosureLiteralIsIdempotent(), TestFormatSourceCollectionFor(), TestFormatSourceCommentPreservationIsIdempotent() (+35 more)
 
-### Community 101 - "Community 101"
-Cohesion: 0.14
-Nodes (42): artifactIssue, capsuleArtifactBuildOptions, capsuleArtifactPlan, appendGeneratedArtifactsToCapsule(), artifactRepairCommand(), artifactSlug(), buildCapsuleArtifacts(), capsuleArtifactKey() (+34 more)
-
-### Community 102 - "Community 102"
-Cohesion: 0.13
-Nodes (38): fakeColumn, partialWriteRWC, appendDataRow(), appendRowDescription(), authSASLContinuePayload(), authSASLFinalPayload(), authSASLPayload(), backendKeyPayload() (+30 more)
-
-### Community 103 - "Community 103"
+### Community 106 - "Community 106"
 Cohesion: 0.11
 Nodes (42): requireCheckFileErrorContains(), requireCheckFileOK(), TestActorSpawnRejectsMutableGlobalTarget(), TestActorSpawnRejectsThrowingTarget(), TestAsyncParseCheckAndLower(), TestAsyncRejectAwaitOutsideAsync(), TestAsyncRejectBareAsyncCall(), TestAsyncRejectBorrowedEscapeViaAwaitGlobalAssign() (+34 more)
 
-### Community 104 - "Community 104"
+### Community 107 - "Community 107"
 Cohesion: 0.09
 Nodes (43): FormatSource(), extractTetraSnippets(), TestFlowGrammarSurfaceExampleCoversCanonicalForms(), TestFormatSourceBreakContinue(), TestFormatSourceCallArgumentLabels(), TestFormatSourceClosureLiteralIsIdempotent(), TestFormatSourceCollectionFor(), TestFormatSourceCommentPreservationIsIdempotent() (+35 more)
 
-### Community 105 - "Community 105"
-Cohesion: 0.06
-Nodes (44): API Diff No-Change Policy, API Snapshot sha256:0966ebbb..., API Snapshot sha256:09e83e7a..., v0.3.0 Release Gate, tetra.api.v1alpha1 API Documentation, tetra.ui.v1 Shell Preview, Unstable Fuzz Seed Triage, v0.3.0 Release Gate Pass State (+36 more)
-
-### Community 106 - "Community 106"
-Cohesion: 0.13
-Nodes (36): hasPrefix(), defaultCapsulePath(), FuzzParseCapsuleDoesNotPanic(), appendCapsuleArtifact(), appendCapsuleSourceRoot(), appendCapsuleTarget(), capsuleSectionHeader(), cleanCapsuleArtifactPath() (+28 more)
-
-### Community 107 - "Community 107"
+### Community 108 - "Community 108"
 Cohesion: 0.15
 Nodes (39): alignedWASMHeapBase(), CodegenObject(), CodegenObjectWithDataPrefix(), compileFunction(), compileFunctionWithControlFlow(), emitWebNonControlInstr(), escapeJSLiteral(), LinkObject() (+31 more)
 
-### Community 108 - "Community 108"
+### Community 109 - "Community 109"
 Cohesion: 0.11
 Nodes (35): BuiltinManifest, Manifest, manifestAtomicPointerWidthBits(), RuntimeManifest, TargetManifest, atomicBuiltinOpPrefix, atomicBuiltinValueType, BuiltinManifest (+27 more)
 
-### Community 109 - "Community 109"
+### Community 110 - "Community 110"
 Cohesion: 0.15
 Nodes (38): ecoLock, ecoLockArtifact, ecoLockCapsule, ecoSeedItem, cleanArtifactPath(), containsString(), decodeEcoLock(), decodeStrictJSON() (+30 more)
 
-### Community 110 - "Community 110"
+### Community 111 - "Community 111"
 Cohesion: 0.16
 Nodes (38): alignedWASMHeapBase(), CodegenObject(), CodegenObjectWithDataPrefix(), compileFunction(), compileFunctionWithControlFlow(), compileStartFunction(), emitWASINonControlInstr(), LinkObject() (+30 more)
 
 ### Community 112 - "Community 112"
+Cohesion: 0.13
+Nodes (36): fakeColumn, partialWriteRWC, appendDataRow(), authSASLContinuePayload(), authSASLFinalPayload(), authSASLPayload(), backendKeyPayload(), buildSCRAMServerFinalForTest() (+28 more)
+
+### Community 114 - "Community 114"
+Cohesion: 0.06
+Nodes (42): API Snapshot sha256:0966ebbb..., API Snapshot sha256:09e83e7a..., Docs Manifest Freshness Check, Short Fuzz Nightly Mode, v0.3.0 Release Gate, tetra.api.v1alpha1 API Documentation, tetra.ui.v1 Shell Preview, Unstable Seed Tracking Policy (+34 more)
+
+### Community 115 - "Community 115"
 Cohesion: 0.11
 Nodes (33): LowerUI(), TestLowerUIBundle(), TestLowerUIBundleRecognizesCompoundStateDeltaCommands(), TestLowerUIBundleRecognizesStateSubtractCommands(), TestLowerUIBundleRejectsNilCheckedProgram(), TestLowerUIBundleReturnsNilWhenUIDeclsAreMissing(), uiCommandOperations(), uiCompoundStateDeltaOperation() (+25 more)
 
-### Community 113 - "Community 113"
+### Community 116 - "Community 116"
+Cohesion: 0.15
+Nodes (27): isUpdateQuery(), newFakeWorldDB(), parseWorldUpdate(), pgAppendCString(), pgAppendInt16(), pgAppendInt32(), pgBackendKeyPayload(), pgCStringPayload() (+19 more)
+
+### Community 117 - "Community 117"
 Cohesion: 0.14
 Nodes (38): tamperTodexEntry(), testCommand(), TestEcoBetaPublishDownloadAndTetraHubPath(), TestEcoCapsuleFixtureMatrix(), TestEcoDocsDeclareLocalOnlyBetaScope(), TestEcoDogfoodFixtureLocalLifecycle(), TestEcoDownloadRejectsPublishMetadataUnknownFieldsAndKeyMismatches(), TestEcoDownloadRejectsTamperedPublishedPackage() (+30 more)
 
-### Community 114 - "Community 114"
-Cohesion: 0.08
-Nodes (33): alignUp(), LinuxX32Layout(), LinuxX64Layout(), LinuxX86Layout(), TestLinuxX64LayoutKeepsDataPageAligned(), TestWriteELF32LinuxX32HeaderContract(), TestWriteELF32LinuxX32RejectsInvalidImage(), TestWriteELF32LinuxX86HeaderContract() (+25 more)
+### Community 118 - "Community 118"
+Cohesion: 0.09
+Nodes (27): CheckWorld(), CodegenObjectLinuxX64(), CodegenObjectLinuxX86(), CodegenObjectMacOSX64(), CodegenObjectWindowsX64(), LinkLinuxX64(), LinkMacOSX64(), LinkWindowsX64() (+19 more)
 
-### Community 115 - "Community 115"
-Cohesion: 0.14
-Nodes (36): collectTransitiveNeeds(), decodeStrictJSON(), dedupeStrings(), isCapsuleSemver(), main(), nodesByID(), parseSHA256Hash(), sameStringSlice() (+28 more)
+### Community 119 - "Community 119"
+Cohesion: 0.1
+Nodes (35): appendEscapedByte(), AppendMessageObject(), AppendString(), AppendWorldArray(), AppendWorldObject(), assertValidJSONString(), FuzzAppendStringProducesValidJSON(), repairInvalidUTF8Bytewise() (+27 more)
 
-### Community 116 - "Community 116"
+### Community 120 - "Community 120"
+Cohesion: 0.16
+Nodes (36): artifactIssue, capsuleArtifactBuildOptions, capsuleArtifactPlan, appendGeneratedArtifactsToCapsule(), artifactRepairCommand(), artifactSlug(), buildCapsuleArtifacts(), capsuleArtifactKey() (+28 more)
+
+### Community 121 - "Community 121"
 Cohesion: 0.21
 Nodes (36): runLSPStdio(), assertLSPTestError(), assertLSPTestID(), assertLSPTestLocationsContainRange(), assertLSPTestLocationsDoNotContainRange(), assertLSPTestResultArrayLen(), assertLSPTestResultNil(), assertLSPTestResultObject() (+28 more)
 
-### Community 117 - "Community 117"
+### Community 122 - "Community 122"
 Cohesion: 0.17
 Nodes (20): brokerProcess, frameTypeName(), intPtr(), main(), nodeDownSource(), processExitCode(), readBrokerAddr(), readFrame() (+12 more)
 
-### Community 118 - "Community 118"
+### Community 123 - "Community 123"
 Cohesion: 0.09
-Nodes (38): API Diff No-Change Gate, API Diff Regression Event at 13:28:51, API Diff Snapshot (81 modules, 226 entries), Flow Grammar Surface Coverage, Full Mode Test Cycle, Generated API Docs Gate, Quick Mode Test Cycle, Stabilization Mode Test Cycle (+30 more)
+Nodes (37): BenchmarkEnvironment, benchOptions, EndpointReport, endpointResult, endpointSpec, GitState, latencyStats, averageMS() (+29 more)
 
-### Community 119 - "Community 119"
-Cohesion: 0.13
-Nodes (28): createImports(), instantiateTetra(), memoryView(), readUTF8(), runTetra(), createImports(), instantiateTetra(), memoryView() (+20 more)
-
-### Community 120 - "Community 120"
+### Community 124 - "Community 124"
 Cohesion: 0.11
 Nodes (35): TestCurrentReleaseTruthDocPathsCoverCurrentUserAndSpecDocs(), TestExtractTetraDoctestsParsesCommentFence(), TestVerifyDoctestBlocks(), TestVerifyDoctestBlocksRejectsUnterminatedBlock(), TestVerifyEpic14ExampleIndexAcceptsRequiredCoverage(), TestVerifyEpic14ExampleIndexRejectsMissingEntry(), TestVerifyEpic14ExampleIndexRejectsMissingGenericStructEntry(), TestVerifyEpic14ExampleIndexRejectsMissingPrimaryT4ProjectEntry() (+27 more)
 
-### Community 121 - "Community 121"
+### Community 125 - "Community 125"
 Cohesion: 0.11
 Nodes (33): InterfaceFingerprintFromT4I(), ValidateInterfaceAgainstSource(), TestGeneratedInterfaceFunctionTypeRefsCheckAndLowerAcrossModules(), TestGeneratedInterfaceGenericStructTypeArgsCheckAndLowerAcrossModules(), TestGenerateInterfaceFromSourceEmitsProtocolImplDeclarationsBeforeFunctions(), TestGenerateInterfaceFromSourceEmitsTypecheckableExtensionDeclarations(), TestGenerateInterfaceFromSourceFiltersPrivateSurfaceAndHashesPublicAPI(), TestGenerateInterfaceFromSourceKeepsImportsRequiredByFunctionTypeRefs() (+25 more)
 
-### Community 122 - "Community 122"
-Cohesion: 0.09
-Nodes (6): alignUp(), emitCall(), emitExit(), emitFunc(), emitIslandFree(), emitWrite()
-
-### Community 123 - "Community 123"
-Cohesion: 0.11
-Nodes (33): appendEscapedByte(), AppendMessageObject(), AppendString(), AppendWorldArray(), AppendWorldObject(), assertValidJSONString(), FuzzAppendStringProducesValidJSON(), repairInvalidUTF8Bytewise() (+25 more)
-
-### Community 124 - "Community 124"
+### Community 126 - "Community 126"
 Cohesion: 0.18
 Nodes (33): decodeStrictJSON(), defaultReleaseGateSummaryExpectations(), main(), makeReleaseGateSummaryReport(), makeV040PassingReleaseGateSummaryReport(), TestValidateReleaseGateSummaryAcceptsBlockedPreflightReport(), TestValidateReleaseGateSummaryAcceptsPassingV030Report(), TestValidateReleaseGateSummaryAcceptsPassingV040ReportWithCompilerProductionArtifact() (+25 more)
 
-### Community 125 - "Community 125"
-Cohesion: 0.11
-Nodes (26): apiDocTitle(), apiSurfaceMetadata(), collectDocFiles(), countTetraDoctests(), disambiguatedAPIDocTitles(), GenerateAPIDocs(), GenerateAPIDocsFromSource(), isDocSourceFile() (+18 more)
-
-### Community 126 - "Community 126"
-Cohesion: 0.15
-Nodes (32): adjustDiagnosticForRecoveredSyntheticClose(), allCallLabelsEmpty(), blankSourceSpan(), cloneCompoundTarget(), diagnosticFromError(), firstSourceColumn(), includeLeadingAttributeLines(), integerLiteralRangeError() (+24 more)
-
 ### Community 127 - "Community 127"
-Cohesion: 0.15
-Nodes (23): isUpdateQuery(), parseWorldUpdate(), pgAppendCString(), pgAppendInt16(), pgAppendInt32(), pgBackendKeyPayload(), pgCStringPayload(), pgCStringsPayload() (+15 more)
+Cohesion: 0.06
+Nodes (28): TestActorSpawnRejectsMutableGlobalTarget(), TestActorSpawnRejectsThrowingTarget(), TestAsyncRejectAwaitOutsideAsync(), TestAsyncRejectBareAsyncCall(), TestAsyncSmokeExampleBuildAndRun(), TestAsyncTypedErrorBoundaryRejectsAwaitTryForm(), TestTaskJoinTypedErrorRequiresTry(), TestTaskSmokeExampleBuildAndRun() (+20 more)
 
 ### Community 128 - "Community 128"
 Cohesion: 0.1
-Nodes (31): BuildFile(), findELFLoadSegment(), parseELF64ProgramHeaders(), TestELFBuildsHighArityCallSurface(), TestELFDataRelocPointsToDataMarker(), TestELFExecutableModeAndHeaderContract(), TestELFLinkRejectsNonLinuxObjectTarget(), TestELFLinuxLayoutStaysInSyncWithWriter() (+23 more)
+Nodes (37): API Diff No-Change Gate, API Diff Regression Event at 13:28:51, API Diff Snapshot (81 modules, 226 entries), Flow Grammar Surface Coverage, Full Mode Test Cycle, Generated API Docs Gate, Quick Mode Test Cycle, Stabilization Mode Test Cycle (+29 more)
 
 ### Community 129 - "Community 129"
+Cohesion: 0.18
+Nodes (34): capsuleSectionHeader(), appendDependencyToCapsule(), buildProjectDepsReport(), buildProjectInfoReport(), checkProjectLockOnly(), checkProjectSync(), describeProjectDependency(), discoverProjectDepsContext() (+26 more)
+
+### Community 130 - "Community 130"
 Cohesion: 0.1
 Nodes (34): defaultOutputPath(), gitRoot(), intFromInt64(), isUnderDir(), main(), normalizeOutputPath(), printDumpResult(), printUsage() (+26 more)
 
-### Community 130 - "Community 130"
+### Community 131 - "Community 131"
 Cohesion: 0.09
 Nodes (36): tetra.release.v0_3_0.gate-report.v1, tetra.release.v0_3_0.test-all-summary.v1, API Diff No-Change Enforcement, Release Gate v0.3.0, Short Fuzz Nightly Run, Stabilization Test-All Pipeline, Tetra UI v1 Bundle Validation, Unstable Fuzz Seed Promotion Policy (+28 more)
 
-### Community 131 - "Community 131"
-Cohesion: 0.18
-Nodes (33): capsuleSectionHeader(), writeEcoLock(), appendDependencyToCapsule(), buildProjectDepsReport(), buildProjectInfoReport(), checkProjectLockOnly(), checkProjectSync(), describeProjectDependency() (+25 more)
-
 ### Community 132 - "Community 132"
-Cohesion: 0.13
-Nodes (27): formatTestExpr(), NewTestRunnerReport(), sanitizeTestName(), TestTestRunnerReportAggregatesFilesDeterministically(), TestTestRunnerReportCountsPassFailMetadata(), TestTestRunnerSourcesBuildModuleDeclaredCase(), TestTestRunnerSourcesDeclareEffectsForSyntheticFunctions(), TestTestRunnerSourcesIncludeCaseMetadata() (+19 more)
+Cohesion: 0.14
+Nodes (26): createImports(), instantiateTetra(), memoryView(), readUTF8(), runTetra(), createImports(), instantiateTetra(), memoryView() (+18 more)
 
 ### Community 133 - "Community 133"
 Cohesion: 0.16
-Nodes (33): TestAllocBytesRequiresUnsafe(), TestCapabilitiesAllowMmioInUnsafe(), TestCapabilitiesRequireUnsafe(), TestCapabilitiesTypeMismatch(), TestCapMemAllowsLoadStoreInUnsafe(), TestCapMemAllowsLoadStoreU8InUnsafe(), TestCapMemBuiltinsRequireUnsafe(), TestCapMemTypeMismatch() (+25 more)
+Nodes (31): adjustDiagnosticForRecoveredSyntheticClose(), allCallLabelsEmpty(), blankSourceSpan(), cloneCompoundTarget(), diagnosticFromError(), firstSourceColumn(), includeLeadingAttributeLines(), integerLiteralRangeError() (+23 more)
 
 ### Community 134 - "Community 134"
 Cohesion: 0.12
-Nodes (24): importPatch, CodegenObjectMacOSX64(), CodegenObjectMacOSX64WithOptions(), CodegenObjectMacOSX64WithOptionsAndDataPrefix(), MacSysV(), BuildObject(), BuildObjectWithDataPrefix(), TestObjectBuildCollectsRelocsAndSymbols() (+16 more)
+Nodes (27): DataAbs32Reloc, DataDisp32Reloc, FuncAbs32Reloc, IATDisp32Reloc, CollectImports(), FuzzLinkX64ObjectsDoesNotPanic(), LinkX64Objects(), readI32LE() (+19 more)
 
 ### Community 135 - "Community 135"
+Cohesion: 0.13
+Nodes (25): TestRunBenchmarkChecksEndpointsAndWritesReport(), TestRunBenchmarkFailsWhenThresholdIsMissed(), TestRunBenchmarkRecordsLatencyPercentilesAndIntegrityMetadata(), TestValidateReportAllowsFailedEndpointWithZeroRPS(), TestValidateReportRejectsWeakEvidenceMarkers(), TestValidateReportRequiresAllTechEmpowerEndpoints(), validTestReport(), NewServer() (+17 more)
+
+### Community 136 - "Community 136"
+Cohesion: 0.13
+Nodes (27): formatTestExpr(), NewTestRunnerReport(), sanitizeTestName(), TestTestRunnerReportAggregatesFilesDeterministically(), TestTestRunnerReportCountsPassFailMetadata(), TestTestRunnerSourcesBuildModuleDeclaredCase(), TestTestRunnerSourcesDeclareEffectsForSyntheticFunctions(), TestTestRunnerSourcesIncludeCaseMetadata() (+19 more)
+
+### Community 137 - "Community 137"
+Cohesion: 0.16
+Nodes (33): TestAllocBytesRequiresUnsafe(), TestCapabilitiesAllowMmioInUnsafe(), TestCapabilitiesRequireUnsafe(), TestCapabilitiesTypeMismatch(), TestCapMemAllowsLoadStoreInUnsafe(), TestCapMemAllowsLoadStoreU8InUnsafe(), TestCapMemBuiltinsRequireUnsafe(), TestCapMemTypeMismatch() (+25 more)
+
+### Community 138 - "Community 138"
+Cohesion: 0.12
+Nodes (24): importPatch, CodegenObjectMacOSX64(), CodegenObjectMacOSX64WithOptions(), CodegenObjectMacOSX64WithOptionsAndDataPrefix(), MacSysV(), BuildObject(), BuildObjectWithDataPrefix(), TestObjectBuildCollectsRelocsAndSymbols() (+16 more)
+
+### Community 139 - "Community 139"
 Cohesion: 0.18
 Nodes (27): lspID, lspID, lspMessage, correlatedResponseMethod(), editorResponseID(), editorResponseName(), expectedRequestID(), expectedRequestMethod() (+19 more)
 
-### Community 136 - "Community 136"
+### Community 140 - "Community 140"
 Cohesion: 0.09
 Nodes (34): Current Supported Surface Spec, V0 1 1 Release Gate, V0 1 2 Release Gate, V0 1 3 Release Gate, V0 4 0 Release Gate, V1 0 Release Gate, Known Issues, 2026 04 27 Tetra Real Stabilization Agent Backlog (+26 more)
 
-### Community 137 - "Community 137"
+### Community 141 - "Community 141"
 Cohesion: 0.13
 Nodes (34): Final Reports Artifact Alignment Gap, T250 Master Plan Board, Named Security Reviewer Signoff Required Before Tagging, Plan250 Final Change Inventory, Plan250 Final Risk Register, Plan250 Final Summary, Plan250 Final Verification Matrix, Plan250 QA Index (+26 more)
 
-### Community 138 - "Community 138"
-Cohesion: 0.07
-Nodes (34): Release Artifact tetra.release.v0_2_0.test-all-summary.v1, Fail Status, Pass Status, json diagnostic shape check, Test Report 2026-04-27 14:47:59 (v0.1.x quick fail), Test Report 2026-04-27 14:50:11 (v0.1.x quick pass), Test Report 2026-04-29 08:01:57 (v0.2.0 full pass), Test Report 2026-04-29 11:43:27 (v0.2.0 quick pass) (+26 more)
-
-### Community 139 - "Community 139"
+### Community 142 - "Community 142"
 Cohesion: 0.11
 Nodes (33): assertLSPTestError(), assertLSPTestID(), assertLSPTestLocationsContainRange(), assertLSPTestLocationsDoNotContainRange(), assertLSPTestResultArrayLen(), assertLSPTestResultNil(), assertLSPTestResultObject(), loadLSPTranscriptFixture() (+25 more)
 
-### Community 140 - "Community 140"
+### Community 143 - "Community 143"
 Cohesion: 0.13
 Nodes (23): IsSourceFile(), SourceExtensions(), T4Formats(), TestT4FormatRegistryDeclaresOfficialFamily(), All(), IsSourceFile(), ModuleCandidateRelPaths(), ModuleRelPath() (+15 more)
 
-### Community 141 - "Community 141"
+### Community 144 - "Community 144"
+Cohesion: 0.19
+Nodes (28): FuzzParseCapsuleDoesNotPanic(), appendCapsuleArtifact(), appendCapsuleSourceRoot(), appendCapsuleTarget(), capsuleSectionHeader(), cleanCapsuleArtifactPath(), defaultCapsuleArgs(), isCapsuleSemver() (+20 more)
+
+### Community 145 - "Community 145"
 Cohesion: 0.08
 Nodes (31): benchLevel, benchmarkEnvironment, buildEvidence, dbLoadResult, dbRunReport, endpointBenchmarkSpec, gitState, latencyStats (+23 more)
 
-### Community 142 - "Community 142"
+### Community 146 - "Community 146"
 Cohesion: 0.12
 Nodes (25): Diagnostic, DiagnosticError, DiagnosticForError(), hintForDiagnosticMessage(), shiftDiagnosticColumn(), TestNormalizeFlowForMigrationHandlesIfLetAndMatchCases(), TestNormalizeFlowForMigrationRewritesCompatibilitySurface(), TestNormalizeFlowForMigrationSpanCRLFUnicode() (+17 more)
 
-### Community 143 - "Community 143"
-Cohesion: 0.12
-Nodes (23): CheckWorld(), CodegenObjectLinuxX64(), CodegenObjectLinuxX86(), CodegenObjectMacOSX64(), CodegenObjectWindowsX64(), LinkLinuxX64(), LinkMacOSX64(), LoadWorld() (+15 more)
-
-### Community 144 - "Community 144"
+### Community 147 - "Community 147"
 Cohesion: 0.19
 Nodes (28): importEntry, canonicalTarget(), caseName(), importPolicy(), main(), parseImportSection(), parseWASMImports(), readName() (+20 more)
 
-### Community 145 - "Community 145"
+### Community 148 - "Community 148"
+Cohesion: 0.12
+Nodes (29): TestGenericFunctionCrossModuleMonomorphizedCall(), TestGenericFunctionDuplicateRecursiveWorkMonomorphizesOnce(), TestGenericFunctionInfersOptionalParameterElement(), TestGenericFunctionMonomorphizedCall(), TestGenericFunctionMonomorphizedNamesAvoidTypeCollisions(), TestGenericFunctionMultiTypeParametersMonomorphized(), TestGenericFunctionParseCheckAndDocs(), TestGenericFunctionProtocolBoundConformancePasses() (+21 more)
+
+### Community 149 - "Community 149"
+Cohesion: 0.18
+Nodes (27): TestCurrentSupportedSurfaceDocumentIsReleaseAligned(), TestCurrentSupportedSurfaceDocumentIsReleaseAligned(), currentGitHead(), currentReleaseVersion(), releaseV10SecurityReviewPathFakeRepo(), runReleaseV10SecurityReview(), sha256ForTest(), TestReleaseV040SecurityReviewBlocksUntilFullValidationExists() (+19 more)
+
+### Community 150 - "Community 150"
 Cohesion: 0.23
 Nodes (29): TestValidateUIBundleArtifactRejectsMissingRequiredNestedField(), TestValidateUIBundleArtifactRejectsTrailingJSONPayload(), TestValidateUIBundleArtifactRejectsUnsupportedCommandOperation(), TestValidateUIBundleSchemaArtifactAcceptsCheckedInSchema(), TestValidateUIBundleSchemaArtifactRejectsInvalidID(), TestValidateUIBundleSchemaArtifactRejectsTrailingJSONPayload(), TestValidateWebUISmokeReportAcceptsCommandOperations(), TestValidateWebUISmokeReportAcceptsHostBlockedReport() (+21 more)
 
-### Community 146 - "Community 146"
+### Community 151 - "Community 151"
 Cohesion: 0.06
 Nodes (31): requireCheckWorldFilesErrorContains(), TestActorConsumeRejectsCrossModuleEnumPayloadAliasReuse(), TestActorConsumeRejectsCrossModuleGenericStructFieldAliasReuse(), TestActorConsumeRejectsCrossModuleOptionalMatchPayloadAliasReuse(), TestActorConsumeRejectsCrossModuleOptionalPayloadAliasReuse(), TestActorConsumeRejectsCrossModuleStructFieldAliasReuse(), TestActorConsumeRejectsCrossModuleTransitiveInterproceduralAliasReuse(), TestIslandFinalizationRejectsCrossModuleEnumOptionalPayloadAliasDoubleFree() (+23 more)
 
-### Community 147 - "Community 147"
-Cohesion: 0.13
-Nodes (28): TestGenericFunctionCrossModuleMonomorphizedCall(), TestGenericFunctionDuplicateRecursiveWorkMonomorphizesOnce(), TestGenericFunctionInfersOptionalParameterElement(), TestGenericFunctionMonomorphizedCall(), TestGenericFunctionMonomorphizedNamesAvoidTypeCollisions(), TestGenericFunctionMultiTypeParametersMonomorphized(), TestGenericFunctionProtocolBoundConformancePasses(), TestGenericFunctionProtocolBoundCrossModuleConformancePasses() (+20 more)
-
-### Community 148 - "Community 148"
+### Community 152 - "Community 152"
 Cohesion: 0.1
 Nodes (23): Handler, Header, appendHeader(), AppendResponse(), applyHeaderMetadata(), containsControl(), normalizeLimits(), parseHeaderLine() (+15 more)
 
-### Community 149 - "Community 149"
+### Community 153 - "Community 153"
 Cohesion: 0.22
 Nodes (23): assertFrame(), dialTestNode(), readTestFrame(), startTestBroker(), TestBrokerReportsNodeDownForMissingDestination(), TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport(), TestBrokerTreatsClosedDestinationWriteAsDroppedFrame(), TestClosedConnectionErrorsIncludePeerReset() (+15 more)
 
-### Community 150 - "Community 150"
-Cohesion: 0.2
-Nodes (25): buildEcoLock(), buildEcoLockWithArtifactHashes(), copySortedPolicy(), decodeEcoLock(), hydrateLockArtifactHashes(), lockArtifactsFromCapsuleArtifacts(), lockGraphFingerprint(), normalizeLock() (+17 more)
-
-### Community 151 - "Community 151"
-Cohesion: 0.18
-Nodes (25): runAPIDocsValidator(), TestValidateAPIDocsAcceptsGeneratedShape(), TestValidateAPIDocsRejectsAPIMetadataHashMismatch(), TestValidateAPIDocsRejectsBrokenInternalLink(), TestValidateAPIDocsRejectsDuplicateModules(), TestValidateAPIDocsRejectsEmptyDocument(), TestValidateAPIDocsRejectsEntryBeforeSection(), TestValidateAPIDocsRejectsErrorOutput() (+17 more)
-
-### Community 152 - "Community 152"
-Cohesion: 0.21
-Nodes (27): intPtr(), nativeSmokeReportForTest(), smokeReportToolDir(), TestSmokeReportToChecklistUpdatesTargetSection(), TestSmokeReportToChecklistValidateOnly(), TestValidateSmokeReportCountsAcceptsConsistentCounts(), TestValidateSmokeReportCountsAcceptsLegacyReportsWithoutCounts(), TestValidateSmokeReportCountsRejectsExplicitZeroCountsWithCases() (+19 more)
-
-### Community 153 - "Community 153"
+### Community 154 - "Community 154"
 Cohesion: 0.25
 Nodes (27): lspFrame(), numericLookingStringIDRequestResponseTranscript(), postChangeDiagnosticsFrame(), replaceLSPFrameBodies(), runStdioValidator(), stringIDRequestResponseTranscript(), TestParseLSPTranscriptAcceptsNormalContentLength(), TestParseLSPTranscriptRejectsTooLargeContentLength() (+19 more)
 
-### Community 154 - "Community 154"
-Cohesion: 0.09
-Nodes (13): AcceptConfig, Event, Interest, Accept(), Close(), epollEvents(), fcntl(), IsNonblocking() (+5 more)
-
 ### Community 155 - "Community 155"
-Cohesion: 0.15
-Nodes (22): emitX64ReturnSlotPushes(), TestX64ABICallsZeroThroughTenArgs(), TestX64ABIReturnSlotsThreeAndFourRegisterMapping(), TestX64BuildOnlySmokeAcrossNativeTargets(), x64ReturnSlotName(), argCountName(), containsMovEaxImm32(), emitReturnSlotPushes() (+14 more)
+Cohesion: 0.21
+Nodes (27): intPtr(), nativeSmokeReportForTest(), smokeReportToolDir(), TestSmokeReportToChecklistUpdatesTargetSection(), TestSmokeReportToChecklistValidateOnly(), TestValidateSmokeReportCountsAcceptsConsistentCounts(), TestValidateSmokeReportCountsAcceptsLegacyReportsWithoutCounts(), TestValidateSmokeReportCountsRejectsExplicitZeroCountsWithCases() (+19 more)
 
 ### Community 156 - "Community 156"
-Cohesion: 0.11
-Nodes (25): Dial(), DialConnector(), NewDialPool(), DialConfig, TestDialRequiresAddress(), appConfig, configFromEnv(), envOr() (+17 more)
+Cohesion: 0.09
+Nodes (13): AcceptConfig, Event, Interest, Accept(), Close(), epollEvents(), fcntl(), IsNonblocking() (+5 more)
 
 ### Community 157 - "Community 157"
 Cohesion: 0.18
@@ -1138,432 +1140,428 @@ Cohesion: 0.12
 Nodes (28): checkFileProgram(), TestCapsuleAndPropertyAcceptedTogether(), TestCapsuleMetadataPositiveNoRuntimeImpact(), TestCapsuleMetadataSemanticDiagnostics(), requireFileCheckErrorContains(), TestSemanticClauseFunctionTypedGlobalCallbackArgumentDiagnosticUsesArgumentName(), TestSemanticClauseFunctionTypedGlobalDirectCallDiagnosticUsesGlobalName(), TestOwnershipRejectsBorrowedFixedArrayGlobalAssignment() (+20 more)
 
 ### Community 159 - "Community 159"
-Cohesion: 0.19
-Nodes (24): ensureEcoDirectoryNoSymlink(), packageMetadataFingerprint(), packCapsule(), packCapsuleProject(), packFiles(), parseEcoPackArgs(), parseEcoUnpackArgs(), prepareEcoFileInsideRootNoSymlink() (+16 more)
+Cohesion: 0.2
+Nodes (24): buildEcoLock(), buildEcoLockWithArtifactHashes(), copySortedPolicy(), decodeEcoLock(), hydrateLockArtifactHashes(), lockArtifactsFromCapsuleArtifacts(), lockGraphFingerprint(), normalizeLock() (+16 more)
 
 ### Community 160 - "Community 160"
-Cohesion: 0.19
-Nodes (26): addVaultRecord(), readVaultIndex(), runEcoVault(), runEcoVaultAdd(), runEcoVaultList(), runEcoVaultVerify(), sortVaultRecords(), upsertVaultRecord() (+18 more)
+Cohesion: 0.15
+Nodes (21): emitX64ReturnSlotPushes(), TestX64ABICallsZeroThroughTenArgs(), TestX64ABIReturnSlotsThreeAndFourRegisterMapping(), TestX64BuildOnlySmokeAcrossNativeTargets(), x64ReturnSlotName(), argCountName(), containsMovEaxImm32(), emitReturnSlotPushes() (+13 more)
 
 ### Community 161 - "Community 161"
 Cohesion: 0.14
 Nodes (26): TestBuildConstBoolGlobalSmoke(), TestBuildConstGlobalExpressionSmoke(), TestBuildConstGlobalSmoke(), TestBuildGlobalVarConstInitializerSmoke(), TestBuildGlobalVarExpandedScalarInitializerSmoke(), TestBuildGlobalVarPtrZeroInitializerSmoke(), TestBuildGlobalVarStringFieldAccessAfterAssignmentSmoke(), TestBuildGlobalVarStringLiteralInitializerSmoke() (+18 more)
 
 ### Community 162 - "Community 162"
-Cohesion: 0.07
-Nodes (21): TestGenericFunctionCrossModuleMonomorphizedCall(), TestGenericFunctionMonomorphizedNamesAvoidTypeCollisions(), TestGenericFunctionParseCheckAndDocs(), TestGenericFunctionProtocolBoundCrossModuleConformancePasses(), TestGenericFunctionProtocolBoundCrossModuleRejectsMissingImpl(), TestGenericFunctionProtocolBoundRejectsMismatchedImplSignature(), TestGenericFunctionProtocolBoundRejectsMissingImpl(), TestGenericFunctionProtocolBoundRejectsNonProtocolBound() (+13 more)
+Cohesion: 0.21
+Nodes (23): makePublishFixture(), runPublishValidator(), runPublishValidatorWithChannel(), TestValidateEcoPublishAcceptsStableMetadata(), TestValidateEcoPublishAcceptsValidMetadata(), TestValidateEcoPublishRejectsDownloadPathMismatch(), TestValidateEcoPublishRejectsHashMismatch(), TestValidateEcoPublishRejectsTrustSnapshotHashMismatch() (+15 more)
 
 ### Community 163 - "Community 163"
+Cohesion: 0.07
+Nodes (18): TestBuildConstBoolGlobalSmoke(), TestBuildConstGlobalExpressionSmoke(), TestBuildConstGlobalSmoke(), TestBuildGlobalVarConstInitializerSmoke(), TestBuildGlobalVarExpandedScalarInitializerSmoke(), TestBuildGlobalVarPtrZeroInitializerSmoke(), TestBuildGlobalVarStringFieldAccessAfterAssignmentSmoke(), TestBuildGlobalVarStringLiteralInitializerSmoke() (+10 more)
+
+### Community 164 - "Community 164"
 Cohesion: 0.22
 Nodes (25): collectTokens(), collectTokensFrom(), TestLexArchivedFuzzCrashers(), TestLexComments(), TestLexCRLFAndLFPositionTracking(), TestLexErrors(), TestLexFlowTestBlockSpanCRLFTabAndUnicode(), TestLexFlowTestBlockTokenCoverage() (+17 more)
 
-### Community 164 - "Community 164"
-Cohesion: 0.16
-Nodes (17): countingRWC, NewPool(), newTestConn(), TestPoolCloseRejectsFutureCheckoutAndClosesIdle(), TestPoolDropsBadConnectionsAndCreatesReplacement(), TestPoolReusesReleasedConnectionAndCapsOpenConnections(), TestNewTechEmpowerServerAppliesConfigAndRoutes(), TestRegisterTechEmpowerRoutesMountsAllEndpoints() (+9 more)
-
 ### Community 165 - "Community 165"
-Cohesion: 0.14
-Nodes (21): auditParagraph(), markdownAuditRow(), renderBlockedOwnershipAudit(), replaceOwnershipAuditRowEvidence(), stableForbiddenCaseDiagnosticsFixtureEvidence(), auditParagraph(), replaceOwnershipAuditRowEvidence(), stableForbiddenCaseDiagnosticsFixtureEvidence() (+13 more)
+Cohesion: 0.13
+Nodes (23): BuildFile(), findMachOSection(), machoSectionData(), parseMachOInfo(), readMachOName(), TestBuildMachOActors(), TestBuildMachOHeaders(), TestBuildMachOMmio() (+15 more)
 
 ### Community 166 - "Community 166"
-Cohesion: 0.07
-Nodes (19): TestActorSpawnRejectsMutableGlobalTarget(), TestActorSpawnRejectsThrowingTarget(), TestAsyncRejectAwaitOutsideAsync(), TestAsyncRejectBareAsyncCall(), TestAsyncSmokeExampleBuildAndRun(), TestAsyncTypedErrorBoundaryRejectsAwaitTryForm(), TestTaskJoinTypedErrorRequiresTry(), TestTaskSmokeExampleBuildAndRun() (+11 more)
+Cohesion: 0.22
+Nodes (24): cliProjectContext, dependencyArtifactBuildOptions(), dependencyArtifactBuildOptions(), findCapsulePath(), capsuleHasInterfaceArtifacts(), cleanProjectRelPath(), cleanProjectSourceRoots(), cliProjectStartDir() (+16 more)
 
 ### Community 167 - "Community 167"
-Cohesion: 0.18
-Nodes (22): releaseV030FakeRepo(), runReleaseV030Gate(), finalReleaseStateRefreshFollowsSummary(), TestReleaseV030GateHashesEntireReportDirectory(), TestReleaseV030GateRefreshesReleaseStateAfterFinalSummaryWrite(), TestReleaseV030GateRequireCleanRejectsDirtyWorktree(), TestReleaseV030GateValidatesFuzzArtifactsAfterShortFuzz(), TestReleaseV030GateValidatesGateSummaryArtifacts() (+14 more)
-
-### Community 168 - "Community 168"
 Cohesion: 0.17
 Nodes (8): Broker, isClosedConnError(), NewBroker(), readFrame(), Config, nodeConn, Report, runActorNet()
 
-### Community 169 - "Community 169"
-Cohesion: 0.19
-Nodes (17): dialServer(), readUntil(), startBenchmarkServer(), startPlaintextServer(), TestServerHandlesPartialRequestRead(), TestServerJSONEndpointKeepAliveAndPipelining(), TestServerPlaintextKeepAliveAndPipelining(), TestServerRejectsMalformedRequest() (+9 more)
-
-### Community 170 - "Community 170"
+### Community 168 - "Community 168"
 Cohesion: 0.19
 Nodes (22): decodeStrictJSON(), main(), readTargetsReport(), expectedTargetsReportJSON(), TestReadTargetsReportUsesLocalTetraWhenReportOmitted(), TestValidateRunContractAcceptsHostProbedBuildOnly(), TestValidateTargetsReportAcceptsExpectedShape(), TestValidateTargetsReportAcceptsMissingWASIRunner() (+14 more)
 
-### Community 171 - "Community 171"
+### Community 169 - "Community 169"
 Cohesion: 0.19
 Nodes (24): AuditReport, Bounds, CaseReport, ContractReport, EventReport, OperationReport, ProcessReport, Report (+16 more)
 
-### Community 172 - "Community 172"
+### Community 170 - "Community 170"
 Cohesion: 0.1
 Nodes (26): External Security Reviewer Signoff Requirement, Flow Parser Migration Plan, v0.1.3 Release Evidence Snapshot, Tetra v0.1.1 Known Issues, Native Flow Parser Canonical Path, normalizeFlowSyntax Migration Tooling, v0.1.2 Security Review Signoff (post-bump gate), Web UI Smoke DOM Snapshot (post-bump gate) (+18 more)
 
-### Community 173 - "Community 173"
-Cohesion: 0.23
-Nodes (23): cliProjectContext, dependencyArtifactBuildOptions(), dependencyArtifactBuildOptions(), capsuleHasInterfaceArtifacts(), cleanProjectRelPath(), cleanProjectSourceRoots(), cliProjectStartDir(), describeProjectDependencyCycle() (+15 more)
-
-### Community 174 - "Community 174"
+### Community 171 - "Community 171"
 Cohesion: 0.15
 Nodes (23): TestTypedErrorsAllowEnumPayloadError(), TestTypedErrorsAllowMultiSlotErrorPayload(), TestTypedErrorsCatchBindingScopeDiagnostic(), TestTypedErrorsCatchDefaultMustBeLastDiagnostic(), TestTypedErrorsCatchDuplicateUnguardedEnumPayloadCaseDiagnostic(), TestTypedErrorsCatchExpressionEnumPayloadSmoke(), TestTypedErrorsCatchGuardedEnumPayloadCaseIsNotExhaustive(), TestTypedErrorsCatchGuardEnumPayloadSmoke() (+15 more)
 
-### Community 175 - "Community 175"
+### Community 172 - "Community 172"
 Cohesion: 0.15
 Nodes (22): Diagnostic, DiagnosticCodeInfo, defaultString(), DiagnosticCodeRegistry(), DiagnosticFromError(), TestDiagnosticCodeRegistryListsPublicCodes(), TestDiagnosticFromCapsuleParserError(), TestDiagnosticFromCrossModuleSemanticError() (+14 more)
 
-### Community 176 - "Community 176"
-Cohesion: 0.17
-Nodes (19): doctorCheck, doctorReport, decodeStrictJSON(), main(), TestValidateDoctorReportAcceptsExpectedShape(), TestValidateDoctorReportRejectsFailingRequiredCheck(), TestValidateDoctorReportRejectsFailingStatus(), TestValidateDoctorReportRejectsMissingRequiredCheck() (+11 more)
+### Community 173 - "Community 173"
+Cohesion: 0.16
+Nodes (19): auditParagraph(), markdownAuditRow(), renderBlockedOwnershipAudit(), replaceOwnershipAuditRowEvidence(), stableForbiddenCaseDiagnosticsFixtureEvidence(), replaceOwnershipAuditRowEvidence(), TestValidateOwnershipAuditAcceptsRowEvidenceDetails(), ownershipAuditRow (+11 more)
 
-### Community 177 - "Community 177"
-Cohesion: 0.08
-Nodes (15): TestBuildConstBoolGlobalSmoke(), TestBuildConstGlobalExpressionSmoke(), TestBuildConstGlobalSmoke(), TestBuildGlobalVarConstInitializerSmoke(), TestBuildGlobalVarExpandedScalarInitializerSmoke(), TestBuildGlobalVarPtrZeroInitializerSmoke(), TestBuildGlobalVarStringFieldAccessAfterAssignmentSmoke(), TestBuildGlobalVarStringLiteralInitializerSmoke() (+7 more)
-
-### Community 178 - "Community 178"
+### Community 174 - "Community 174"
 Cohesion: 0.26
 Nodes (20): countCallsNamed(), hasCall(), lowerProgramForCatchTest(), programFuncNames(), programHasFunc(), requireIRFunc(), TestLowerCatchHandlerCollectsStagedTypedTaskWrapper(), TestLowerMatchExprCollectsStagedTypedTaskWrapper() (+12 more)
 
-### Community 179 - "Community 179"
+### Community 175 - "Community 175"
+Cohesion: 0.13
+Nodes (14): Connector, countingRWC, Dial(), DialConnector(), NewDialPool(), DialConfig, Pool, NewPool() (+6 more)
+
+### Community 176 - "Community 176"
 Cohesion: 0.16
 Nodes (22): TestBuildFunctionTypedThrowingCallbackParamDirectTrySmoke(), TestBuildFunctionTypedThrowingCapturedClosureCallbackArgumentSmoke(), TestBuildFunctionTypedThrowingCapturedClosureEnumPayloadAliasDirectTrySmoke(), TestBuildFunctionTypedThrowingCapturedClosureEnumPayloadDirectTrySmoke(), TestBuildFunctionTypedThrowingCapturedClosureEnumPayloadReassignmentDirectTrySmoke(), TestBuildFunctionTypedThrowingCapturedClosureLocalDirectTrySmoke(), TestBuildFunctionTypedThrowingCapturedClosureMutableLocalReassignmentDirectTrySmoke(), TestBuildFunctionTypedThrowingCapturedClosureReturnCrossModuleDirectCallbackArgumentSmoke() (+14 more)
 
-### Community 180 - "Community 180"
-Cohesion: 0.22
-Nodes (20): buildBaseline(), buildDiff(), buildReviewSummary(), deterministicTimestampISO(), entryIdentity(), main(), normalizeEntry(), parseAPIDocs() (+12 more)
-
-### Community 181 - "Community 181"
+### Community 177 - "Community 177"
 Cohesion: 0.24
 Nodes (20): exampleIndexEntry, main(), parseExampleIndex(), runValidateExampleIndex(), splitMarkdownTableRow(), TestRunAcceptsDocsFlagWithoutSmokeList(), TestValidateExampleDocsAcceptsT4ProjectEntry(), TestValidateExampleDocsRejectsUnsupportedExtension() (+12 more)
 
-### Community 182 - "Community 182"
+### Community 178 - "Community 178"
+Cohesion: 0.22
+Nodes (20): buildBaseline(), buildDiff(), buildReviewSummary(), deterministicTimestampISO(), entryIdentity(), main(), normalizeEntry(), parseAPIDocs() (+12 more)
+
+### Community 179 - "Community 179"
 Cohesion: 0.32
 Nodes (21): actualForExpected(), artifactCases(), buildOnlyCases(), caseJSON(), intLiteral(), runtimeCases(), runtimeReport(), TestValidateWASISmokeReportAcceptsArtifactPreflightReport() (+13 more)
 
-### Community 183 - "Community 183"
-Cohesion: 0.11
-Nodes (8): emitAllocBytes(), emitIndexStore(), emitIslandNew(), emitMakeSlice(), emitMmapFailureBranch(), emitRawStore(), patchExitBranch(), scaleIndex()
+### Community 180 - "Community 180"
+Cohesion: 0.19
+Nodes (20): actorMethodGroup, TestBuildCompoundAssignmentFieldAndIndexSmoke(), TestBuildCompoundAssignmentSmoke(), actorMethodName(), applyLineComments(), closureHeaderSegment(), collectActorMethodGroups(), collectLineComments() (+12 more)
 
-### Community 184 - "Community 184"
-Cohesion: 0.18
-Nodes (19): actorMethodGroup, TestBuildCompoundAssignmentFieldAndIndexSmoke(), TestBuildCompoundAssignmentSmoke(), actorMethodName(), applyLineComments(), collectActorMethodGroups(), collectLineComments(), commentStart() (+11 more)
-
-### Community 185 - "Community 185"
+### Community 181 - "Community 181"
 Cohesion: 0.26
 Nodes (20): IATReloc, alignUp(), BuildImportSection(), buildRelocSection(), importKey(), normalizeImportKey(), parseImportName(), patchRipDisp32() (+12 more)
 
-### Community 186 - "Community 186"
-Cohesion: 0.27
-Nodes (20): LoadWorldOpt(), cleanModuleRoots(), cleanSourceRoots(), describeModuleSourceRootPaths(), LoadWorld(), LoadWorldOpt(), moduleLoadCandidateRelPaths(), moduleRelPathMatches() (+12 more)
-
-### Community 187 - "Community 187"
+### Community 182 - "Community 182"
 Cohesion: 0.25
 Nodes (21): Object, checkedObjectCountCapacity(), ensureObjectBytesAvailable(), ensureObjectRecordTableAvailable(), maxObjectInt(), minSymbolRecordBytes(), objectRemainingBytes(), readBool() (+13 more)
 
-### Community 188 - "Community 188"
-Cohesion: 0.15
-Nodes (16): buildAndRun(), emitX64ReturnSlotPushes(), TestX64ABICallsZeroThroughTenArgs(), TestX64ABIReturnSlotsThreeAndFourRegisterMapping(), TestX64BuildOnlySmokeAcrossNativeTargets(), TestX64CodegenObjectRelocKindsByPlatformABI(), TestX64CodegenObjectsCarryTargetMetadata(), x64ReturnSlotName() (+8 more)
+### Community 183 - "Community 183"
+Cohesion: 0.27
+Nodes (20): LoadWorldOpt(), cleanModuleRoots(), cleanSourceRoots(), describeModuleSourceRootPaths(), LoadWorld(), LoadWorldOpt(), moduleLoadCandidateRelPaths(), moduleRelPathMatches() (+12 more)
 
-### Community 189 - "Community 189"
+### Community 184 - "Community 184"
+Cohesion: 0.15
+Nodes (20): appConfig, configFromEnv(), envOr(), main(), newRandomWorldIDs(), parseIPv4(), parsePositiveInt(), serve() (+12 more)
+
+### Community 185 - "Community 185"
 Cohesion: 0.21
 Nodes (19): featureEntry, featuresReport, containsForbiddenSafetyClaim(), decodeFeaturesReport(), isValidatorRejectionParagraph(), main(), readSafetyEvidence(), requireDocPhrases() (+11 more)
 
-### Community 190 - "Community 190"
+### Community 186 - "Community 186"
 Cohesion: 0.23
 Nodes (19): artifactState, gitState, gitStatusEntry, buildReleaseState(), currentVersion(), gitStatusEntries(), inspectArtifact(), main() (+11 more)
 
-### Community 191 - "Community 191"
+### Community 187 - "Community 187"
 Cohesion: 0.12
 Nodes (23): Release v0.3.0 Gate API Docs Snapshot, WaveK ImplB API Docs Snapshot, Release v0.3.0 Local Candidate Artifact Hashes, Release v0.3.0 Local Candidate Blocked Gate Summary, Tetra API Surface Snapshot, Docs Manifest Drift, Release Gate Blocked State, Stabilization Pass Status (+15 more)
 
-### Community 192 - "Community 192"
+### Community 188 - "Community 188"
 Cohesion: 0.17
-Nodes (22): emitActorNodeConnect(), emitActorSpawnRemote(), emitActorWireControlFrame(), emitLeaRsiRspDisp(), emitMovMem16RspDispAx(), emitMovMem16RspDispImm16(), emitMovMem32RspDispEax(), emitMovMem32RspDispImm32() (+14 more)
+Nodes (20): TestProtocolConformanceChecksExtensionMethod(), TestProtocolConformanceChecksThrowingExtensionMethod(), TestProtocolConformanceRejectsDuplicateImplClause(), TestProtocolConformanceRejectsDuplicateRequirement(), TestProtocolConformanceRejectsGenericRequirementCountMismatch(), TestProtocolConformanceRejectsInvalidSelfParameterName(), TestProtocolConformanceRejectsMissingRequiredEffect(), TestProtocolConformanceRejectsSelfParameterTypeMismatch() (+12 more)
 
-### Community 193 - "Community 193"
+### Community 189 - "Community 189"
 Cohesion: 0.29
 Nodes (20): assertImportHas(), findSection(), parsePEInfo(), readCString(), readPEImports(), rvaToOffset(), sectionData(), TestBuildWindowsPEActors() (+12 more)
 
-### Community 194 - "Community 194"
+### Community 190 - "Community 190"
 Cohesion: 0.17
 Nodes (20): TestBuildFunctionTypedCapturedClosureEnumPayloadMutableGlobalSnapshotSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentCallbackArgumentSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalReassignmentReturnDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureReturnCallMutableGlobalReassignmentDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureReturnedEnumPayloadMutableGlobalSnapshotSmoke(), TestBuildFunctionTypedCapturedClosureReturnedStructEnumPayloadMutableGlobalSnapshotSmoke(), TestBuildFunctionTypedCapturedClosureReturnEnumPayloadMutableGlobalReassignmentDirectCallSmoke() (+12 more)
 
-### Community 195 - "Community 195"
+### Community 191 - "Community 191"
 Cohesion: 0.17
 Nodes (20): TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitCallbackInout(), TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitEnumPayloadCallbackInout(), TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitEnumPayloadCallbackInoutChain(), TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitInoutAssignment(), TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitOptionalEnumPayloadCallbackInoutChain(), TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitOptionalEnumPayloadCallbackInoutChainNoThrow(), TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitOptionalStructFieldCallbackInout(), TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitStructFieldCallbackInout() (+12 more)
 
-### Community 196 - "Community 196"
+### Community 192 - "Community 192"
 Cohesion: 0.23
 Nodes (13): executableCase, buildReport(), failedCase(), intPtr(), main(), parallelProductionAudit(), processExitCode(), requiredPassingCases() (+5 more)
 
-### Community 197 - "Community 197"
+### Community 193 - "Community 193"
 Cohesion: 0.21
 Nodes (18): decodeStrictNativeUIJSON(), main(), TestValidateNativeUISmokeAcceptsDispatchAndWidgetTrace(), TestValidateNativeUISmokeRejectsMissingActionWidget(), TestValidateNativeUISmokeRejectsMissingDispatchTrace(), validNativeUISmokeReport(), validNativeUISmokeReportFrom(), validateNativeUISmoke() (+10 more)
 
-### Community 198 - "Community 198"
+### Community 194 - "Community 194"
 Cohesion: 0.17
 Nodes (20): TestStabilizationConsentPrivacyDiagnosticsUseSafetyPrivacyCode(), TestStabilizationEffectPolicyDiagnosticsUseSafetyEffectCode(), TestStabilizationEffectsRequireMMIOEffects(), TestStabilizationEnumPayloadsAreAccepted(), TestStabilizationForCollectionRejectsNonCollection(), TestStabilizationJSONDiagnosticSnapshotForSemanticError(), TestStabilizationLogicalOperatorsRequireBool(), TestStabilizationOptionalsRejectIfLetNonOptional() (+12 more)
 
-### Community 199 - "Community 199"
+### Community 196 - "Community 196"
 Cohesion: 0.13
 Nodes (22): Artifact Evidence Policy, Release Artifact Policy, Known Issues Evidence Contract v0.3.0, v0.3.0 Candidate Known Issues, RC Evidence Discipline, v1.0 Release Candidate Process, Tetra v0.1.1 Final Handoff, Tetra v0.2.0 Release Cut Guide (+14 more)
 
-### Community 200 - "Community 200"
+### Community 197 - "Community 197"
 Cohesion: 0.26
 Nodes (19): ecoLockArtifact, ecoLockCapsule, ecoLockDependency, ecoLockEnvelope, cleanArtifactPath(), containsString(), isCapsuleSemver(), lockGraphFingerprint() (+11 more)
 
-### Community 201 - "Community 201"
-Cohesion: 0.32
-Nodes (19): makeUnpackedProject(), makeUnpackedProjectWithFiles(), makeUnpackedProjectWithManifest(), runUnpackValidator(), TestValidateEcoUnpackAcceptsFormatterStyleIndentedManifest(), TestValidateEcoUnpackAcceptsManifestV1SourcesTargetsProjectBundle(), TestValidateEcoUnpackAcceptsProjectBundle(), TestValidateEcoUnpackAcceptsReproducibleMetadataFields() (+11 more)
-
-### Community 202 - "Community 202"
+### Community 198 - "Community 198"
 Cohesion: 0.23
 Nodes (17): Frame, DecodeFrame(), DecodeRemoteHandle(), EncodeFrame(), EncodeRemoteHandle(), isKnownFrameType(), IsRemoteHandle(), TestDecodeRejectsBadHeaderAndInvalidSlotCount() (+9 more)
 
-### Community 203 - "Community 203"
+### Community 199 - "Community 199"
+Cohesion: 0.16
+Nodes (14): TestPublicCheckAPICrossModuleWorldPositive(), TestPublicCheckAPISingleSourceNegativeDiagnostic(), dialTCP4Localhost(), netListenTCP4Localhost(), TestCollectNetRuntimeUsage(), TestNetRuntimeEpollReadinessBuildAndRunLinuxX64(), TestNetRuntimeEpollWaitOneIntoBuildAndRunLinuxX64(), TestNetRuntimeHTTPPipelinedPlaintextJSONBuildAndRunLinuxX64() (+6 more)
+
+### Community 200 - "Community 200"
+Cohesion: 0.16
+Nodes (11): emitIndexLoad(), emitIndexStore(), emitRawLoad(), emitRawMemoryOffsetRead(), emitRawMemoryOffsetWrite(), emitRawMemoryRead(), emitRawMemoryWrite(), emitRawStore() (+3 more)
+
+### Community 201 - "Community 201"
 Cohesion: 0.2
 Nodes (19): checkDiagnosticProgram(), TestDiagnosticCodeRegistryListsPublicCodes(), TestDiagnosticFromCapsuleParserError(), TestDiagnosticFromCrossModuleSemanticError(), TestDiagnosticFromFlowIndentationErrorJSONReady(), TestDiagnosticFromFlowTabIndentationError(), TestDiagnosticFromFlowTestSpanCRLFUnicode(), TestDiagnosticFromInvalidUTF8ParserError() (+11 more)
 
-### Community 204 - "Community 204"
+### Community 202 - "Community 202"
 Cohesion: 0.22
 Nodes (20): assertImportHas(), findSection(), parsePEInfo(), readCString(), readPEImports(), rvaToOffset(), sectionData(), TestBuildWindowsPEActors() (+12 more)
 
-### Community 205 - "Community 205"
+### Community 203 - "Community 203"
 Cohesion: 0.26
 Nodes (19): buildWasmTargets(), runWasmWebMainWithNode(), TestWasmBuildOnlyCallableAliasSmoke(), TestWasmBuildOnlyDirectNamedCallableParamSmoke(), TestWasmBuildOnlyMultiTargetCallableParamSmoke(), TestWasmBuildOnlyMultiTargetStringReturnCallableParamSmoke(), TestWasmBuildOnlyMultiTargetStructReturnCallableParamSmoke(), TestWasmBuildOnlyReturnedCallableValueSmoke() (+11 more)
 
-### Community 206 - "Community 206"
+### Community 204 - "Community 204"
 Cohesion: 0.23
 Nodes (19): Bounds, CaseReport, EventReport, OperationReport, ProcessReport, Report, decodeSchema(), decodeStrict() (+11 more)
 
-### Community 207 - "Community 207"
-Cohesion: 0.19
-Nodes (17): AnalyzeLSPFile(), AnalyzeLSPSource(), TestAnalyzeLSPFileChecksImportedModuleGraph(), TestAnalyzeLSPSourceActorDeclarationDiagnostic(), TestAnalyzeLSPSourceImportedFileDoesNotReportMissingWorkspace(), TestAnalyzeLSPSourcePrivacyConsentDiagnosticCode(), TestAnalyzeLSPSourceRecursiveSecretSignatureDiagnosticCode(), TestAnalyzeLSPSourceSemanticDiagnostics() (+9 more)
+### Community 205 - "Community 205"
+Cohesion: 0.11
+Nodes (21): API Diff No-Change Policy, Release State Audit, WaveB Full Rerun Test Report, WaveB Short Fuzz Nightly Summary, WaveB Release State Audit Output, WaveB Stabilization Test Report, WaveB Gate Test-All Stabilization Report, Unstable Fuzz Seeds Register (+13 more)
 
-### Community 208 - "Community 208"
+### Community 206 - "Community 206"
 Cohesion: 0.26
 Nodes (19): isInternalRuntimeExportedSymbol(), quotedAfter(), targetExportedFFIAggregateParamDiagnostic(), targetExportedFFIAggregateReturnDiagnostic(), targetExportedFFIPointerParamDiagnostic(), targetExportedFFIPointerReturnDiagnostic(), targetExportedFFIRequiresAggregateABI(), targetExportedFFIRequiresPointerBoundaryGate() (+11 more)
 
-### Community 209 - "Community 209"
+### Community 207 - "Community 207"
 Cohesion: 0.2
 Nodes (18): emitActorExitWindowsX64(), emitActorNoArgWrapperWindowsX64(), emitActorOneArgWrapperWindowsX64(), emitActorSendBeginWrapperWindowsX64(), emitActorSendMsgWrapperWindowsX64(), emitActorSendSlotWrapperWindowsX64(), emitActorSendWrapperWindowsX64(), emitActorSpawnWrapperWindowsX64() (+10 more)
 
-### Community 210 - "Community 210"
+### Community 208 - "Community 208"
+Cohesion: 0.12
+Nodes (4): alignUp(), emitCall(), emitFunc(), emitReturn()
+
+### Community 209 - "Community 209"
 Cohesion: 0.14
 Nodes (13): ABIClass, ABIExtension, ABILocation, ABIParam, ABIPlan, ABISignature, Classifier, abiExtensionFor() (+5 more)
 
-### Community 211 - "Community 211"
+### Community 210 - "Community 210"
 Cohesion: 0.31
 Nodes (18): TestObjectRoundTripPreservesV4MetadataSymbolsAndRelocs(), TestReadObjectRejectsInvalidMagicAndBoolEncoding(), TestReadObjectRejectsMalformedSymbolAndRelocNames(), TestReadObjectRejectsMalformedSymbolAndRelocRanges(), TestReadObjectRejectsNonDataRelocationAddends(), TestReadObjectRejectsTruncatedDeclaredSections(), TestWriteObjectRejectsMalformedSymbolAndRelocNames(), TestWriteObjectRejectsMalformedSymbolAndRelocRanges() (+10 more)
 
-### Community 212 - "Community 212"
+### Community 211 - "Community 211"
 Cohesion: 0.28
 Nodes (16): decodeStrictJSON(), knownSeverity(), main(), missingOrUnknown(), risksFieldIsArray(), TestValidateResidualRisksAcceptsOwnedBlockedRisk(), TestValidateResidualRisksRejectsNullRisks(), TestValidateResidualRisksRejectsUnknownFields() (+8 more)
 
-### Community 213 - "Community 213"
+### Community 212 - "Community 212"
 Cohesion: 0.19
 Nodes (18): TestBuildCapturedPtrClosureDirectCallbackArgumentSmoke(), TestBuildCapturedPtrClosureLabeledDirectCallSmoke(), TestBuildCapturedPtrClosureReturnedFunctionValueSmoke(), TestBuildFunctionTypedCapturedClosureCompositeCaptureMatrixCallbackSmoke(), TestBuildFunctionTypedCapturedClosureEnumCaptureMatrixCallbackSmoke(), TestBuildFunctionTypedCapturedClosureLocalDirectCallAllowsArgumentLabelsSmoke(), TestBuildFunctionTypedCapturedClosureLocalDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureOptionalCaptureMatrixCallbackSmoke() (+10 more)
 
-### Community 214 - "Community 214"
+### Community 213 - "Community 213"
 Cohesion: 0.31
 Nodes (18): ClosureCapture, captureMode, cloneBoolMap(), addPatternCaptureBindings(), appendClosureCaptureArgs(), closureCaptureSupportedSubsetText(), closureLiteralDirectCallCaptureText(), collectClosureCaptures() (+10 more)
 
-### Community 215 - "Community 215"
+### Community 214 - "Community 214"
 Cohesion: 0.12
 Nodes (20): GitHub CI Workflow, CLI Contracts Spec, Eco Publishing Model v1, Eco Package Guide, Compiler Features Registry, Plan250 Consolidated Evidence Index, Release Gate Blocked by Web UI Smoke Failure, release_v0_3_0_gate.sh (+12 more)
 
-### Community 216 - "Community 216"
+### Community 215 - "Community 215"
 Cohesion: 0.12
 Nodes (20): API Surface Hash 8c1d187a, API Surface Hash a35d169d, Codex Final Full Test Summary, controller-wave10-full-rerun Test Summary, controller-wave10-quick Test Summary, controller-wave1-full API Docs, controller-wave1-full Test Summary, Current Release Gate Full Test Summary (+12 more)
 
+### Community 216 - "Community 216"
+Cohesion: 0.21
+Nodes (16): AnalyzeLSPFile(), AnalyzeLSPSource(), TestAnalyzeLSPFileChecksImportedModuleGraph(), TestAnalyzeLSPSourceActorDeclarationDiagnostic(), TestAnalyzeLSPSourceImportedFileDoesNotReportMissingWorkspace(), TestAnalyzeLSPSourcePrivacyConsentDiagnosticCode(), TestAnalyzeLSPSourceRecursiveSecretSignatureDiagnosticCode(), TestAnalyzeLSPSourceSemanticDiagnostics() (+8 more)
+
 ### Community 217 - "Community 217"
-Cohesion: 0.12
-Nodes (19): absPath(), buildRelease(), defaultEmbeddedPostgresCacheDir(), endpointBenchmarkSpecs(), freeTCPPort(), main(), postgresDSN(), prepareWorkDir() (+11 more)
-
-### Community 218 - "Community 218"
-Cohesion: 0.34
-Nodes (17): writeFileAPIDocsWithTitle(), writeInterfaceHashOnlySurface(), writeInterfaceStruct(), canonicalLSPTypeName(), collectLSPHovers(), collectLSPSymbols(), formatLSPFuncDetail(), formatLSPFuncSigDecl() (+9 more)
-
-### Community 219 - "Community 219"
 Cohesion: 0.27
 Nodes (15): hashedArtifact, hashManifest, buildHashManifest(), decodeStrictJSON(), detectJSONSchema(), hashFile(), listArtifactPaths(), main() (+7 more)
 
-### Community 220 - "Community 220"
+### Community 218 - "Community 218"
 Cohesion: 0.2
 Nodes (18): buildWasmTargets(), runWasmWebMainWithNode(), TestWasmBuildOnlyCallableAliasSmoke(), TestWasmBuildOnlyDirectNamedCallableParamSmoke(), TestWasmBuildOnlyMultiTargetCallableParamSmoke(), TestWasmBuildOnlyMultiTargetStringReturnCallableParamSmoke(), TestWasmBuildOnlyMultiTargetStructReturnCallableParamSmoke(), TestWasmBuildOnlyReturnedCallableValueSmoke() (+10 more)
 
-### Community 221 - "Community 221"
+### Community 219 - "Community 219"
 Cohesion: 0.25
 Nodes (15): bodyPrefix(), hasSymbol(), symbolBody(), TestActorNetPumpIsExportedButOnlyLinuxHasRuntimePump(), TestBuiltinRuntimeExportsActorStateSymbols(), TestLinuxDistributedRuntimeUsesWideStackSubFor128ByteFrames(), TestLinuxRuntimeExportsDistributedActorSymbols(), TestLinuxRuntimeExportsFilesystemSymbol() (+7 more)
 
-### Community 222 - "Community 222"
+### Community 220 - "Community 220"
+Cohesion: 0.15
+Nodes (6): emitAllocBytes(), emitIslandNew(), emitMakeSlice(), emitMmapFailureBranch(), emitMMIOWriteI32(), patchExitBranch()
+
+### Community 221 - "Community 221"
 Cohesion: 0.18
 Nodes (15): classifyOwnershipAuditResult(), isOwnershipAuditSeparatorRow(), main(), normalizeOwnershipAuditStatus(), ownershipAuditSection(), parseOwnershipAuditRows(), parseOwnershipAuditStatus(), splitOwnershipAuditTableRow() (+7 more)
 
-### Community 223 - "Community 223"
+### Community 222 - "Community 222"
 Cohesion: 0.28
 Nodes (15): actorTransportMessage, actorTransportReport, actorTransportTraceEvent, actorTransportMessageSHA256(), decodeStrictActorTransportJSON(), main(), parseActorTransportSHA256(), TestValidateActorTransportAcceptsValidReport() (+7 more)
 
-### Community 224 - "Community 224"
+### Community 223 - "Community 223"
 Cohesion: 0.27
 Nodes (17): fuzzJSONArtifacts, fuzzStep, fuzzSummary, fuzzSummaryJSON, fuzzSummaryJSONStep, expectedFuzzCommand(), main(), metadataValue() (+9 more)
 
-### Community 225 - "Community 225"
-Cohesion: 0.23
-Nodes (15): newRegionState(), TestCheckNoConsumedDescendantsCanonicalizesAliasPaths(), TestCheckNotConsumedCanonicalizesAliasPaths(), TestCheckNotConsumedCanonicalizesAliasPathsWhenConsumedBeforeAlias(), TestCheckNotConsumedNestedAliasCanonicalizesPath(), TestClearConsumedTreeClearsAliasEquivalentPaths(), TestClearConsumedTreeClearsAliasForConsumedBasePath(), TestMergeFlowWithLabelsIntersectsOwnershipAliases() (+7 more)
+### Community 224 - "Community 224"
+Cohesion: 0.15
+Nodes (15): buildObjectsForEntry(), TestLinkCrossModuleCall(), TestLinkCrossModuleCallSevenPlusArgs(), TestLinkUnresolvedSymbol(), assertResourceAliasFinalizationDiagnostic(), assertTaskGroupAliasCloseDiagnostic(), assertTaskHandleAliasJoinDiagnostic(), TestSafetyDiagnosticCodesForEnumConstructorReturnResourceAliases() (+7 more)
 
-### Community 226 - "Community 226"
+### Community 225 - "Community 225"
 Cohesion: 0.31
 Nodes (16): runEcoLockValidator(), TestValidateEcoLockAcceptsArtifacts(), TestValidateEcoLockAcceptsCapsulePolicy(), TestValidateEcoLockAcceptsDependencyGraph(), TestValidateEcoLockRejectsDependencyPermissionEscalation(), TestValidateEcoLockRejectsDuplicateCapsuleID(), TestValidateEcoLockRejectsDuplicateDependency(), TestValidateEcoLockRejectsDuplicateTarget() (+8 more)
 
-### Community 227 - "Community 227"
+### Community 226 - "Community 226"
 Cohesion: 0.39
 Nodes (16): makeSummaryReport(), runSummaryValidator(), TestValidateTestAllSummaryAcceptsPassingReport(), TestValidateTestAllSummaryAcceptsStabilizationReport(), TestValidateTestAllSummaryRejectsCountMismatch(), TestValidateTestAllSummaryRejectsDuplicateStepNameAndLog(), TestValidateTestAllSummaryRejectsFullPassMissingSafetyOwnershipSteps(), TestValidateTestAllSummaryRejectsInvalidTimestampOrder() (+8 more)
 
-### Community 228 - "Community 228"
+### Community 227 - "Community 227"
 Cohesion: 0.21
 Nodes (16): TestBuildFullCallableCallbackAliasTwelveCaptureSmoke(), TestBuildFullCallableCallbackArgumentNineCaptureSmoke(), TestBuildFullCallableCrossModuleReturnedNineCaptureMatrixSmoke(), TestBuildFullCallableEnumPayloadNineCaptureSmoke(), TestBuildFullCallableEnumPayloadReassignNineCaptureSmoke(), TestBuildFullCallableEscapedGlobalNineCaptureSmoke(), TestBuildFullCallableEscapedNineCaptureReturnSmoke(), TestBuildFullCallableGlobalAliasTwelveCaptureSmoke() (+8 more)
 
-### Community 229 - "Community 229"
+### Community 228 - "Community 228"
 Cohesion: 0.25
 Nodes (14): decodeStrictJSON(), main(), TestValidateProjectDepsReportAcceptsCheckFailReport(), TestValidateProjectDepsReportAcceptsCheckPassReport(), TestValidateProjectDepsReportAcceptsListReport(), TestValidateProjectDepsReportRejectsBadDependencyFields(), TestValidateProjectDepsReportRejectsFailWithoutIssue(), TestValidateProjectDepsReportRejectsInvalidTopLevelStatus() (+6 more)
 
-### Community 230 - "Community 230"
+### Community 229 - "Community 229"
 Cohesion: 0.25
 Nodes (14): featureEntry, featuresReport, decodeFeaturesReport(), main(), readReadinessEvidence(), TestValidateToolingStdlibReadinessAcceptsProductionEvidence(), TestValidateToolingStdlibReadinessRejectsPlaceholderStdlibClaims(), TestValidateToolingStdlibReadinessRejectsTextualLSPMVPClaims() (+6 more)
+
+### Community 230 - "Community 230"
+Cohesion: 0.31
+Nodes (14): decodeStrictJSON(), main(), TestValidateReadinessBlockersAcceptsBlockedV040Artifact(), TestValidateReadinessBlockersRejectsEmptyBlockers(), TestValidateReadinessBlockersRejectsUnknownFields(), TestValidateReadinessBlockersRejectsUnsafeSourceLog(), TestValidateReadinessBlockersRejectsWrongVersion(), writeReadinessBlockers() (+6 more)
 
 ### Community 231 - "Community 231"
 Cohesion: 0.25
 Nodes (14): formatEntry, formatsReport, decodeStrictJSON(), main(), sameStringSequence(), TestValidateFormatsReportAcceptsExpectedShape(), TestValidateFormatsReportRejectsDuplicateKeys(), TestValidateFormatsReportRejectsExtensionAndFileNameTogether() (+6 more)
 
 ### Community 232 - "Community 232"
-Cohesion: 0.31
-Nodes (14): decodeStrictJSON(), main(), TestValidateReadinessBlockersAcceptsBlockedV040Artifact(), TestValidateReadinessBlockersRejectsEmptyBlockers(), TestValidateReadinessBlockersRejectsUnknownFields(), TestValidateReadinessBlockersRejectsUnsafeSourceLog(), TestValidateReadinessBlockersRejectsWrongVersion(), writeReadinessBlockers() (+6 more)
-
-### Community 233 - "Community 233"
 Cohesion: 0.21
 Nodes (16): TestNestedOptionalLiteralPayloadsCheckAndLower(), TestNestedOptionalReturnPayloadCheckAndLower(), TestNestedOptionalSmallIntLiteralPayloadsRejectOutOfRange(), TestOptionalAllowsMultiSlotPayload(), TestOptionalIfLetLowers(), TestOptionalIfLetNonePatternCheckAndLower(), TestOptionalIfLetPatternRejectsNonOptionalValue(), TestOptionalIfLetSomePatternCheckAndLower() (+8 more)
+
+### Community 233 - "Community 233"
+Cohesion: 0.22
+Nodes (14): collectImportAliases(), TestCheckWorldRejectsDuplicateInterfaceFunctionParams(), TestResolutionDiagnosticForInvalidAliasCallShape(), TestResolutionDisplayTextForEnumCaseUsesLocalTypeName(), TestResolutionImportAliasConflictWithTopLevelDeclaration(), TestResolutionImportAliasRequiredBoundary(), TestResolutionImportPathRequiredBoundary(), TestResolutionModuleImportAliasResolvesCallAndType() (+6 more)
 
 ### Community 234 - "Community 234"
 Cohesion: 0.18
 Nodes (15): errForPlan250RuntimeDiagnostic, firstPlan250InstrKind(), hasPlan250BudgetGuardBefore(), matchesPlan250BudgetGuardAt(), requireCheckFileErrorContainsAll(), TestPlan250RuntimeDiagnosticsPreserveExitAndPanicBoundaries(), TestPlan250RuntimeRejectsReservedExportOutsideRuntimeModule(), TestPlan250SafetyBorrowEscapeAcrossBranchMerge() (+7 more)
 
 ### Community 235 - "Community 235"
+Cohesion: 0.13
+Nodes (17): absPath(), buildRelease(), defaultEmbeddedPostgresCacheDir(), endpointBenchmarkSpecs(), freeTCPPort(), main(), postgresDSN(), prepareWorkDir() (+9 more)
+
+### Community 236 - "Community 236"
+Cohesion: 0.21
+Nodes (13): TestValidateReportAcceptsExecutableLinuxX64NativeRuntimeEvidence(), TestValidateReportRejectsMissingStateTransition(), TestValidateReportRejectsNativeShellSidecarOnlyEvidence(), stringSliceContains(), TestCIWorkflowArtifactNamesAreReleaseAware(), TestCIWorkflowHasLeastPrivilegeConcurrencyAndTimeouts(), TestCIWorkflowIncludesCanonicalV030ReleaseGateJob(), TestCIWorkflowIncludesMinimalActionAndShellLinting() (+5 more)
+
+### Community 237 - "Community 237"
 Cohesion: 0.22
 Nodes (15): TestDeferAllowsSiblingCaptureAfterDescendantConsume(), TestDeferBodyConsumeDoesNotPoisonPreCleanupReturn(), TestDeferRejectsBreakToOuterLoopInsideCleanup(), TestDeferRejectsLaterActorTransferOfCapturedIsland(), TestDeferRejectsLaterConsumeOfCapturedDescendant(), TestDeferRejectsLaterConsumeOfCapturedValue(), TestDeferRejectsReturnInsideCleanup(), TestDeferRejectsThrowInsideCleanup() (+7 more)
 
-### Community 236 - "Community 236"
-Cohesion: 0.23
-Nodes (13): dialTCP4Localhost(), netListenTCP4Localhost(), TestCollectNetRuntimeUsage(), TestNetRuntimeEpollReadinessBuildAndRunLinuxX64(), TestNetRuntimeEpollWaitOneIntoBuildAndRunLinuxX64(), TestNetRuntimeHTTPPipelinedPlaintextJSONBuildAndRunLinuxX64(), TestNetRuntimeHTTPPlaintextServerBuildAndRunLinuxX64(), TestNetRuntimeRejectsUnsupportedNativeTargets() (+5 more)
-
-### Community 237 - "Community 237"
+### Community 238 - "Community 238"
 Cohesion: 0.2
 Nodes (12): hmacSHA256(), newSCRAMSHA256Client(), newSCRAMSHA256ClientWithRandomNonce(), parseSCRAMAttributes(), pbkdf2HMACSHA256(), scramEscapeName(), scramSHA256ProofAndServerSignature(), scramSHA256ServerSignature() (+4 more)
 
-### Community 238 - "Community 238"
+### Community 239 - "Community 239"
 Cohesion: 0.29
 Nodes (15): findMachOSection(), machoSectionData(), parseMachOInfo(), readMachOName(), TestBuildMachOActors(), TestBuildMachOHeaders(), TestBuildMachOMmio(), TestMachOBuildsHighArityCallSurface() (+7 more)
 
-### Community 239 - "Community 239"
+### Community 240 - "Community 240"
 Cohesion: 0.26
 Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
 
-### Community 240 - "Community 240"
+### Community 241 - "Community 241"
 Cohesion: 0.19
 Nodes (17): Agent 12 API Docs, Agent 12 Full API Docs, Agent 12 Full Test Summary, agent-12 full rerun tetra docs, agent-4 full API docs, agent-4 full tetra docs, agent-8 full API docs, agent-8 full tetra docs (+9 more)
 
-### Community 241 - "Community 241"
-Cohesion: 0.33
-Nodes (14): runManifestValidator(), TestValidateFeaturesAcceptsMachineReadableCurrentFutureClaims(), TestValidateFeaturesRejectsFutureStatusPromotionWithoutRegistryUpdate(), TestValidateManifestAcceptsGeneratedShape(), TestValidateManifestRejectsDuplicateBuiltin(), TestValidateManifestRejectsInvalidUnsafePolicy(), TestValidateManifestRejectsMissingRuntimeSymbols(), TestValidateManifestRejectsMissingTimeRuntimeSymbols() (+6 more)
-
 ### Community 242 - "Community 242"
 Cohesion: 0.33
-Nodes (14): TestValidateFeaturesReportAcceptsExpectedShape(), TestValidateFeaturesReportAcceptsRegistryWithoutExperimentalStatus(), TestValidateFeaturesReportRejectsCurrentFeatureWithoutSince(), TestValidateFeaturesReportRejectsDuplicateIDs(), TestValidateFeaturesReportRejectsInvalidSchema(), TestValidateFeaturesReportRejectsInvalidStatus(), TestValidateFeaturesReportRejectsMissingDocFile(), TestValidateFeaturesReportRejectsMissingRequiredStatusCategory() (+6 more)
+Nodes (14): runManifestValidator(), TestValidateFeaturesAcceptsMachineReadableCurrentFutureClaims(), TestValidateFeaturesRejectsFutureStatusPromotionWithoutRegistryUpdate(), TestValidateManifestAcceptsGeneratedShape(), TestValidateManifestRejectsDuplicateBuiltin(), TestValidateManifestRejectsInvalidUnsafePolicy(), TestValidateManifestRejectsMissingRuntimeSymbols(), TestValidateManifestRejectsMissingTimeRuntimeSymbols() (+6 more)
 
 ### Community 243 - "Community 243"
 Cohesion: 0.42
 Nodes (14): makeVaultStore(), onlyRecordHex(), runVaultValidator(), TestValidateEcoVaultAcceptsValidStore(), TestValidateEcoVaultAllowsSameObjectForDifferentKinds(), TestValidateEcoVaultRejectsDuplicateRecordIdentity(), TestValidateEcoVaultRejectsHashMismatch(), TestValidateEcoVaultRejectsInvalidHash() (+6 more)
 
 ### Community 244 - "Community 244"
+Cohesion: 0.33
+Nodes (14): TestValidateFeaturesReportAcceptsExpectedShape(), TestValidateFeaturesReportAcceptsRegistryWithoutExperimentalStatus(), TestValidateFeaturesReportRejectsCurrentFeatureWithoutSince(), TestValidateFeaturesReportRejectsDuplicateIDs(), TestValidateFeaturesReportRejectsInvalidSchema(), TestValidateFeaturesReportRejectsInvalidStatus(), TestValidateFeaturesReportRejectsMissingDocFile(), TestValidateFeaturesReportRejectsMissingRequiredStatusCategory() (+6 more)
+
+### Community 245 - "Community 245"
 Cohesion: 0.24
 Nodes (4): Config, connState, Server, isWouldBlock()
 
-### Community 245 - "Community 245"
+### Community 246 - "Community 246"
+Cohesion: 0.22
+Nodes (14): CodegenObjectLinuxX32(), CodegenObjectLinuxX32WithOptions(), CodegenObjectLinuxX32WithOptionsAndDataPrefix(), linuxX32CodegenOptions(), addEdxImm32Bytes(), assertContainsBytes(), assertNotContainsBytes(), containsMovEaxImm32() (+6 more)
+
+### Community 247 - "Community 247"
 Cohesion: 0.33
 Nodes (14): hashedT4I(), TestModuleLoadWorldDiagnosticForDuplicateImportPath(), TestModuleLoadWorldDiagnosticForImportCycle(), TestModuleLoadWorldDiagnosticForModuleDeclarationMismatch(), TestModuleLoadWorldFallsBackToT4InterfaceForDependencyImport(), TestModuleLoadWorldPrefersT4OverLegacyTetraImport(), TestModuleLoadWorldRejectsDuplicateModuleAcrossSourceRoots(), TestModuleLoadWorldRejectsTamperedT4InterfaceHash() (+6 more)
 
-### Community 246 - "Community 246"
+### Community 248 - "Community 248"
 Cohesion: 0.36
 Nodes (12): main(), TestValidateMemoryProductionReportAcceptsValidReport(), TestValidateMemoryProductionReportRejectsInvalidReport(), TestValidateMemoryProductionReportRejectsMissingCallableMutableCaptureHeapEscapeCase(), TestValidateMemoryProductionReportRejectsMissingCapMemUnsafeBoundaryCase(), TestValidateMemoryProductionReportRejectsMissingFunctionTypedSliceAggregateBorrowEscapeCoverageCase(), TestValidateMemoryProductionReportRejectsMissingHeapClosureHandleCoverageCase(), TestValidateMemoryProductionReportRejectsMissingRealMemoryExamplesAudit() (+4 more)
 
-### Community 247 - "Community 247"
-Cohesion: 0.23
-Nodes (14): lspCodeActionDiagnostic, lspCodeActionParams, lspDefinitionParams, lspDidChangeParams, lspDidCloseParams, lspDidOpenParams, lspHoverParams, lspOpenDocument (+6 more)
-
-### Community 248 - "Community 248"
+### Community 249 - "Community 249"
 Cohesion: 0.28
 Nodes (12): decodeStrictJSON(), main(), TestValidateProjectInfoReportAcceptsFoundProject(), TestValidateProjectInfoReportAcceptsNotFoundProject(), TestValidateProjectInfoReportRejectsMissingFoundProjectFields(), TestValidateProjectInfoReportRejectsNegativeArtifactCount(), TestValidateProjectInfoReportRejectsNotFoundWithProjectFields(), TestValidateProjectInfoReportRejectsUnknownFields() (+4 more)
 
-### Community 249 - "Community 249"
+### Community 250 - "Community 250"
+Cohesion: 0.34
+Nodes (12): diagnostic, main(), parseDiagnostic(), TestValidateDiagnosticAcceptsStableShape(), TestValidateDiagnosticRejectsInvalidSeverity(), TestValidateDiagnosticRejectsMissingRequiredFields(), TestValidateDiagnosticRejectsMissingRequiredPosition(), TestValidateDiagnosticRejectsPartialPositionWithoutFile() (+4 more)
+
+### Community 251 - "Community 251"
+Cohesion: 0.23
+Nodes (14): lspCodeActionDiagnostic, lspCodeActionParams, lspDefinitionParams, lspDidChangeParams, lspDidCloseParams, lspDidOpenParams, lspHoverParams, lspOpenDocument (+6 more)
+
+### Community 252 - "Community 252"
 Cohesion: 0.19
 Nodes (15): BenchmarkEnvironment, EndpointReport, GitState, Options, Report, decodeStrict(), hasSkipDBLimitation(), isSkipDBReport() (+7 more)
 
-### Community 250 - "Community 250"
+### Community 253 - "Community 253"
 Cohesion: 0.38
 Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
 
-### Community 251 - "Community 251"
+### Community 254 - "Community 254"
 Cohesion: 0.38
 Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
 
-### Community 252 - "Community 252"
+### Community 255 - "Community 255"
 Cohesion: 0.17
 Nodes (16): Post-Commits Release Gate API Diff Docs, Post-Commits Release Gate Test-All Summary, v0.1.3 Post-Bump Full-2 Summary (Pass), v0.1.3 Post-Bump Full Summary (Fail), v0.1.3 Known Issues (Pass Gate), v0.1.3 Release State (Pass), Security Review Signoff Document (v0.1.2), v0.1.3 Post-Bump Release Gate-2 Summary (Pass) (+8 more)
 
-### Community 253 - "Community 253"
+### Community 256 - "Community 256"
 Cohesion: 0.35
 Nodes (13): TestValidateReportAcceptsLinuxX64DesktopUIProductionEvidence(), TestValidateReportRejectsMissingCompilerBundleRuntimeLoad(), TestValidateReportRejectsMissingCompletionAudit(), TestValidateReportRejectsMissingInputFocusChangeEvidence(), TestValidateReportRejectsMissingNativeRuntimeAudit(), TestValidateReportRejectsMissingNativeRuntimeIntegration(), TestValidateReportRejectsMissingNativeRuntimeProcess(), TestValidateReportRejectsMissingNativeRuntimeSidecarConsistency() (+5 more)
 
-### Community 254 - "Community 254"
-Cohesion: 0.45
-Nodes (13): runEcoMaterializationValidator(), TestValidateEcoMaterializationAcceptsEmptyTarget(), TestValidateEcoMaterializationAcceptsValidReport(), TestValidateEcoMaterializationRejectsBadLockHash(), TestValidateEcoMaterializationRejectsEmptyPackagePath(), TestValidateEcoMaterializationRejectsEmptyTrustSnapshot(), TestValidateEcoMaterializationRejectsMalformedJSON(), TestValidateEcoMaterializationRejectsMissingRequiredField() (+5 more)
+### Community 257 - "Community 257"
+Cohesion: 0.36
+Nodes (13): runValidator(), TestValidateTestReportAcceptsValidReport(), TestValidateTestReportRejectsCountMismatch(), TestValidateTestReportRejectsDuplicateIndexInFile(), TestValidateTestReportRejectsDuplicateResultNameInFile(), TestValidateTestReportRejectsFailedResultWithoutFailureDetail(), TestValidateTestReportRejectsMissingSyntheticFunction(), TestValidateTestReportRejectsNegativeDurations() (+5 more)
 
-### Community 255 - "Community 255"
+### Community 258 - "Community 258"
 Cohesion: 0.33
 Nodes (13): nativeSmokeListForTest(), TestValidateSmokeListAcceptsDocumentedExampleExclusion(), TestValidateSmokeListAcceptsExpectedShape(), TestValidateSmokeListAcceptsWASMBuildOnlyProfile(), TestValidateSmokeListRejectsDebugOnlyWithoutFlag(), TestValidateSmokeListRejectsDuplicateSourcePath(), TestValidateSmokeListRejectsInvalidExitCode(), TestValidateSmokeListRejectsMissingCoreStdlibCase() (+5 more)
 
-### Community 256 - "Community 256"
+### Community 259 - "Community 259"
 Cohesion: 0.26
 Nodes (9): findIRFuncByName(), hasIRCallName(), TestLowerActorStateExtendedScalarsUseRuntimeLoadStore(), TestLowerActorStateUsesRuntimeLoadStore(), TestLowerDistributedActorRuntimeBuiltins(), TestCheckActorStateBuildsSlotMapping(), TestCheckActorStateRejectsPtrType(), TestCheckActorStateRejectsUnsupportedType() (+1 more)
 
-### Community 257 - "Community 257"
-Cohesion: 0.14
-Nodes (11): TestBuildIslandMakeBoolSliceSmoke(), TestBuildMakeBoolSliceSmoke(), TestSliceBoolSemanticsAcceptance(), TestSliceBoolWasmBuildOnlyIslandMakeBoolSmoke(), TestSliceBoolWasmBuildOnlyMakeBoolSmoke(), TestSliceWasmBuildOnlyIslandMakeU8I32Smoke(), TestBuildIslandMakeU16SliceSmoke(), TestBuildMakeU16SliceSmoke() (+3 more)
+### Community 260 - "Community 260"
+Cohesion: 0.3
+Nodes (15): actorGroupPtrFromEaxToRdi(), actorPtrFromEaxToRdi(), actorWakeAtPtrFromEaxToRdi(), emitAdvanceClockToNextSleepingWake(), emitBlockedDeadlineWakeCheck(), emitEntry(), emitTaskSpawnGroupI32(), emitTaskSpawnI32() (+7 more)
 
-### Community 258 - "Community 258"
-Cohesion: 0.24
-Nodes (13): CodegenObjectLinuxX32(), CodegenObjectLinuxX32WithOptions(), CodegenObjectLinuxX32WithOptionsAndDataPrefix(), linuxX32CodegenOptions(), addEdxImm32Bytes(), assertContainsBytes(), assertNotContainsBytes(), containsMovEaxImm32() (+5 more)
-
-### Community 259 - "Community 259"
+### Community 261 - "Community 261"
 Cohesion: 0.29
 Nodes (13): buildAndRun(), runBinary(), TestBuildIslandMakeBoolSliceSmoke(), TestBuildMakeBoolSliceSmoke(), TestSliceBoolSemanticsAcceptance(), TestSliceBoolSemanticsRejectWrongElementType(), TestSliceBoolWasmBuildOnlyIslandMakeBoolSmoke(), TestSliceBoolWasmBuildOnlyMakeBoolSmoke() (+5 more)
 
-### Community 260 - "Community 260"
+### Community 262 - "Community 262"
 Cohesion: 0.25
 Nodes (13): TestBuildFunctionTypedCapturedClosureImportedReturnedEnumPayloadMutableGlobalSnapshotSmoke(), TestBuildFunctionTypedCapturedClosureImportedReturnedStructEnumPayloadMutableGlobalSnapshotSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnDirectCallbackArgumentSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnEnumPayloadDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnMutableLocalReassignmentSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalCrossModuleReturnStructFieldDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalEnumPayloadInitializerDirectCallSmoke(), TestBuildFunctionTypedCapturedClosureMutableGlobalEnumPayloadReassignmentDirectCallSmoke() (+5 more)
-
-### Community 261 - "Community 261"
-Cohesion: 0.31
-Nodes (13): capsuleIDDirectory(), containsString(), isSupportedPublishChannel(), main(), parseSHA256Hash(), publishSchemaForChannel(), validatePublishedPackage(), validateRelativeMetadataPath() (+5 more)
-
-### Community 262 - "Community 262"
-Cohesion: 0.37
-Nodes (13): completionAuditOptions, completionAuditRow, classifyCompletionAuditResult(), completionAuditSection(), hasCompletionAuditSection(), isCompletionAuditSeparatorRow(), main(), normalizeCompletionAuditStatus() (+5 more)
 
 ### Community 263 - "Community 263"
 Cohesion: 0.3
 Nodes (11): main(), metricsHash(), mustReportJSON(), TestValidatePerformanceReportAcceptsEvidence(), TestValidatePerformanceReportRejectsMissingMetrics(), TestValidatePerformanceReportRejectsSummaryHashMismatch(), TestValidatePerformanceReportRejectsUnsortedMetrics(), validatePerformanceReport() (+3 more)
 
 ### Community 264 - "Community 264"
-Cohesion: 0.3
-Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
+Cohesion: 0.37
+Nodes (13): completionAuditOptions, completionAuditRow, classifyCompletionAuditResult(), completionAuditSection(), hasCompletionAuditSection(), isCompletionAuditSeparatorRow(), main(), normalizeCompletionAuditStatus() (+5 more)
 
 ### Community 265 - "Community 265"
-Cohesion: 0.3
-Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
+Cohesion: 0.31
+Nodes (13): capsuleIDDirectory(), containsString(), isSupportedPublishChannel(), main(), parseSHA256Hash(), publishSchemaForChannel(), validatePublishedPackage(), validateRelativeMetadataPath() (+5 more)
 
 ### Community 266 - "Community 266"
 Cohesion: 0.3
@@ -1578,160 +1576,160 @@ Cohesion: 0.3
 Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
 
 ### Community 269 - "Community 269"
+Cohesion: 0.3
+Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
+
+### Community 270 - "Community 270"
+Cohesion: 0.3
+Nodes (14): accessibilityValue(), addLine(), applyAccessibilityMetadata(), applyStyleMetadata(), applyTetraCommand(), bindingValue(), initialState(), mountTetraUI() (+6 more)
+
+### Community 271 - "Community 271"
 Cohesion: 0.29
 Nodes (13): requireCheckWorldFilesErrorContains(), requireCheckWorldFilesOK(), TestActorAndTaskTransfersCannotBeReusedAfterConsume(), TestActorSpawnOwnershipMatrix(), TestReleaseTraceabilityCrossModuleCallableMutableTargetBoundary(), TestReleaseTraceabilityCrossModuleImmutableCallableGlobalMutableTargetBoundary(), TestReleaseTraceabilityCrossModuleReturnedAggregateCallableMutableTargetBoundary(), TestReleaseTraceabilityLifetimeAndRaceSafetyNegativeActorTaskOwnership() (+5 more)
 
-### Community 270 - "Community 270"
+### Community 272 - "Community 272"
 Cohesion: 0.34
 Nodes (10): effectDiagnosticf(), effectContext, canonicalizeEffectName(), effectSet(), expandEffectGroup(), newEffectContext(), normalizeEffectDecl(), normalizeEffects() (+2 more)
 
-### Community 271 - "Community 271"
+### Community 273 - "Community 273"
 Cohesion: 0.13
 Nodes (14): requireCheckWorldFilesOK(), TestActorAndTaskTransfersCannotBeReusedAfterConsume(), TestActorSpawnOwnershipMatrix(), TestReleaseTraceabilityCrossModuleCallableMutableTargetBoundary(), TestReleaseTraceabilityCrossModuleImmutableCallableGlobalMutableTargetBoundary(), TestReleaseTraceabilityCrossModuleReturnedAggregateCallableMutableTargetBoundary(), TestReleaseTraceabilityLifetimeAndRaceSafetyNegativeActorTaskOwnership(), TestTaskConsumeRejectsCrossModuleOptionalMatchPayloadAliasReuse() (+6 more)
 
-### Community 272 - "Community 272"
+### Community 274 - "Community 274"
 Cohesion: 0.16
 Nodes (14): averageMS(), clockTicksPerSecond(), countTCPConnections(), countTCPConnectionsIn(), detectResource(), latencySummary(), maxMS(), oneDBRequest() (+6 more)
 
-### Community 273 - "Community 273"
+### Community 275 - "Community 275"
 Cohesion: 0.38
-Nodes (12): runLSPValidator(), TestValidateLSPSmokeAcceptsValidAnalysis(), TestValidateLSPSmokeRejectsDuplicateHover(), TestValidateLSPSmokeRejectsDuplicateSymbol(), TestValidateLSPSmokeRejectsHoverWithoutContents(), TestValidateLSPSmokeRejectsHoverWithoutSymbol(), TestValidateLSPSmokeRejectsInvalidDiagnosticSeverity(), TestValidateLSPSmokeRejectsNonTetraURI() (+4 more)
+Nodes (12): runAPIDocsValidator(), TestValidateAPIDocsAcceptsGeneratedShape(), TestValidateAPIDocsRejectsAPIMetadataHashMismatch(), TestValidateAPIDocsRejectsBrokenInternalLink(), TestValidateAPIDocsRejectsDuplicateModules(), TestValidateAPIDocsRejectsEmptyDocument(), TestValidateAPIDocsRejectsEntryBeforeSection(), TestValidateAPIDocsRejectsErrorOutput() (+4 more)
 
-### Community 274 - "Community 274"
+### Community 276 - "Community 276"
 Cohesion: 0.14
 Nodes (12): TestDeferRejectsBreakToOuterLoopInsideCleanup(), TestDeferRejectsLaterActorTransferOfCapturedIsland(), TestDeferRejectsLaterConsumeOfCapturedValue(), TestDeferRejectsReturnInsideCleanup(), TestDeferRejectsThrowInsideCleanup(), TestDeferRunsBeforeScopedIslandAutoFree(), TestDeferRunsBeforeThrowReturn(), TestDeferRunsLIFOAndPreservesReturnValue() (+4 more)
 
-### Community 275 - "Community 275"
+### Community 277 - "Community 277"
 Cohesion: 0.36
 Nodes (12): NormalizeFlowForMigration(), bridgeFlowSyntax(), canonicalizeFlowSyntax(), flowBlockKind(), flowIndent(), flowRewriteBlockHeader(), flowRewriteLine(), isCaseBlockKind() (+4 more)
 
-### Community 276 - "Community 276"
+### Community 278 - "Community 278"
 Cohesion: 0.43
 Nodes (12): DataReloc, alignUp(), patchRipDisp32From64(), validDisp32PatchOffset(), WriteMachO64MacOSX64(), writeMachOName(), writeMachOU32(), writeMachOU64() (+4 more)
 
-### Community 277 - "Community 277"
+### Community 279 - "Community 279"
 Cohesion: 0.32
 Nodes (12): containsMovEaxImm32(), findELFLoadSegment(), parseELF64ProgramHeaders(), TestELF32LinuxX32ExecutableBuildHeaderContract(), TestELF32LinuxX86ExecutableBuildHeaderContract(), TestELFBuildsHighArityCallSurface(), TestELFDataRelocPointsToDataMarker(), TestELFExecutableModeAndHeaderContract() (+4 more)
 
-### Community 278 - "Community 278"
-Cohesion: 0.33
-Nodes (12): checkboxUpdate, applyToChecklist(), extractSection(), main(), parseSmokeReport(), sectionHeadingForTarget(), setCheckboxState(), setHeaderField() (+4 more)
-
-### Community 279 - "Community 279"
-Cohesion: 0.33
-Nodes (12): AuditReport, CaseReport, ContractReport, ProcessReport, Report, decodeStrict(), rejectPaperEvidence(), validateAudit() (+4 more)
-
 ### Community 280 - "Community 280"
 Cohesion: 0.33
-Nodes (12): AuditReport, CaseReport, ContractReport, ProcessReport, Report, decodeStrict(), rejectPaperEvidence(), validateAudit() (+4 more)
+Nodes (12): checkboxUpdate, applyToChecklist(), extractSection(), main(), parseSmokeReport(), sectionHeadingForTarget(), setCheckboxState(), setHeaderField() (+4 more)
 
 ### Community 281 - "Community 281"
 Cohesion: 0.33
 Nodes (12): AuditReport, CaseReport, ContractReport, ProcessReport, Report, decodeStrict(), rejectPaperEvidence(), validateAudit() (+4 more)
 
 ### Community 282 - "Community 282"
-Cohesion: 0.26
-Nodes (12): TestPlan250CanonicalTypeDisplayPolicyCoversDiagnosticsAndDocs(), TestPlan250CapsuleMetadataHasNoRuntimeCoupling(), TestPlan250CrossModuleGenericMonomorphizationAndInferenceDiagnostic(), TestPlan250EnumPayloadOptionalTypedErrorAndExtensionBoundaries(), TestPlan250EnumUnguardedMatchAndCatchExhaustiveness(), TestPlan250ExtensionResolutionOrderStableAcrossImports(), TestPlan250FunctionTypeLocalBindingAndCallbackBoundaries(), TestPlan250GenericSpecializationNamesDeterministic() (+4 more)
+Cohesion: 0.33
+Nodes (12): AuditReport, CaseReport, ContractReport, ProcessReport, Report, decodeStrict(), rejectPaperEvidence(), validateAudit() (+4 more)
 
 ### Community 283 - "Community 283"
+Cohesion: 0.33
+Nodes (12): AuditReport, CaseReport, ContractReport, ProcessReport, Report, decodeStrict(), rejectPaperEvidence(), validateAudit() (+4 more)
+
+### Community 284 - "Community 284"
 Cohesion: 0.26
 Nodes (12): TestEpic04ExpressionTypingDisplayTextAndBoundary(), TestEpic04ExpressionTypingNegativeDiagnostic(), TestEpic04ExpressionTypingPositiveAndInferenceCrossModule(), TestEpic04LocalInferenceNegativeAndDisplayText(), TestEpic04SemanticCheckerCoreBoundaryNilProgram(), TestEpic04SemanticCheckerCoreCrossModuleParity(), TestEpic04SemanticCheckerCoreDisplayTextStability(), TestEpic04SemanticCheckerCoreNegativePositionedDiagnostic() (+4 more)
 
-### Community 284 - "Community 284"
+### Community 285 - "Community 285"
+Cohesion: 0.26
+Nodes (12): TestPlan250CanonicalTypeDisplayPolicyCoversDiagnosticsAndDocs(), TestPlan250CapsuleMetadataHasNoRuntimeCoupling(), TestPlan250CrossModuleGenericMonomorphizationAndInferenceDiagnostic(), TestPlan250EnumPayloadOptionalTypedErrorAndExtensionBoundaries(), TestPlan250EnumUnguardedMatchAndCatchExhaustiveness(), TestPlan250ExtensionResolutionOrderStableAcrossImports(), TestPlan250FunctionTypeLocalBindingAndCallbackBoundaries(), TestPlan250GenericSpecializationNamesDeterministic() (+4 more)
+
+### Community 286 - "Community 286"
 Cohesion: 0.14
 Nodes (14): Actors Linux Smoke Checklist (Deprecated), Tetra v0.4.0 Project Profile, v0.5.0 Integrated Alpha Release Notes, v0.6.0 Usable Alpha Release Notes, v0.6 Stabilization Focus, Roadmap v0.12 to v0.13, Roadmap v0.13 to v0.14, Roadmap v0.14 to v0.15 (+6 more)
 
-### Community 285 - "Community 285"
+### Community 287 - "Community 287"
 Cohesion: 0.21
 Nodes (14): Plan250 Evidence-Driven Execution Model, v1.0 Release Gate Enforcement, Full Test-All Verification Gate, Generated Test-All Full Summary (v0.1.x), v1.0 Performance Threshold Policy, 2026-04-27 Agent Execution Dashboard, 2026-05-05 Full Project Refactor Plan, 2026-04-27 Real Stabilization Agent Backlog (+6 more)
 
-### Community 286 - "Community 286"
+### Community 288 - "Community 288"
 Cohesion: 0.18
 Nodes (14): Tetra CLI Cheatsheet, Tetra Flow v1 Grammar (Canonical), Fuzz, Property, And Stress Suite, Getting Started With Tetra, Islands Memory Model, Tetra Language Tour, Ownership And Effects Guide, Ownership Markers v1 (+6 more)
 
-### Community 287 - "Community 287"
+### Community 289 - "Community 289"
 Cohesion: 0.21
 Nodes (14): Frontend Focused Test Target, v0.3.0 Release Gate Blockers, Report Directory Freshness Guard, WaveA Impl1 Evidence, WaveA Impl2 Evidence, WaveA Impl3 Backend Summary, WaveA Impl3 CLI Tools Summary, WaveA Impl3 QA Security Summary (+6 more)
 
-### Community 288 - "Community 288"
-Cohesion: 0.33
-Nodes (11): buildNeedMap(), collectTransitiveNeeds(), runEcoNeedMap(), runEcoTrust(), runEcoTrustSnapshot(), scoreCapsuleTrust(), ecoNeedMap, ecoNeedMapEdge (+3 more)
-
-### Community 289 - "Community 289"
-Cohesion: 0.15
-Nodes (11): orderedMarkers(), parseEndpointNames(), parseLevels(), parsePositiveIntList(), rewritePGHBAForSCRAM(), startSCRAMPostgres(), TestOrderedMarkers(), TestParseEndpointNamesAndWorkerLevels() (+3 more)
-
 ### Community 290 - "Community 290"
+Cohesion: 0.16
+Nodes (14): CounterView Binding and Accessibility Contract, mountTetraUI Web Mount Entry, runTetra Runtime Entry, Tetra Docs Snapshot (83 modules, 228 entries), Tetra API Docs Snapshot (83 modules, 228 entries), Test Report 2026-04-29 12:41:02Z, Web UI Smoke DOM Artifact (run 124102), API Diff Docs Snapshot (81 modules, 226 entries) (+6 more)
+
+### Community 291 - "Community 291"
+Cohesion: 0.15
+Nodes (11): parseEndpointNames(), parseLevels(), parsePositiveIntList(), rewritePGHBAForSCRAM(), semanticFailed(), startSCRAMPostgres(), TestParseEndpointNamesAndWorkerLevels(), TestParseLevels() (+3 more)
+
+### Community 292 - "Community 292"
 Cohesion: 0.51
 Nodes (11): makeFuzzReport(), runFuzzValidator(), TestValidateFuzzSummaryAcceptsShortReport(), TestValidateFuzzSummaryRejectsFailingStep(), TestValidateFuzzSummaryRejectsMalformedMetadata(), TestValidateFuzzSummaryRejectsMalformedSummaryJSON(), TestValidateFuzzSummaryRejectsMalformedUnstableSeedLog(), TestValidateFuzzSummaryRejectsMissingRequiredLog() (+3 more)
 
-### Community 291 - "Community 291"
-Cohesion: 0.51
-Nodes (11): makePublishFixture(), runPublishValidator(), runPublishValidatorWithChannel(), TestValidateEcoPublishAcceptsStableMetadata(), TestValidateEcoPublishAcceptsValidMetadata(), TestValidateEcoPublishRejectsDownloadPathMismatch(), TestValidateEcoPublishRejectsHashMismatch(), TestValidateEcoPublishRejectsTrustSnapshotHashMismatch() (+3 more)
-
-### Community 292 - "Community 292"
+### Community 293 - "Community 293"
 Cohesion: 0.28
 Nodes (11): containsMovEaxImm32(), emitObjectHasSymbol(), TestEmitLibraryAllowsNoMainAndWritesTOBJ(), TestEmitLibraryBuildOnlyAcrossNativeTargets(), TestEmitLibraryLinuxX32BuildsI64AndWeakAtomicObject(), TestEmitLibraryLinuxX32WritesRealX32TOBJ(), TestEmitLibraryLinuxX86StillRejectsMissingObjectBackend(), TestEmitLibraryLinuxX86WritesRealI386TOBJ() (+3 more)
 
-### Community 293 - "Community 293"
+### Community 294 - "Community 294"
 Cohesion: 0.19
 Nodes (6): CodegenOptions, AlignStackSize(), TestABIAlignStackSize(), TestObjectPatchRel32ForwardAndBackward(), TestObjectPatchRel32RejectsInvalidPatchOffsets(), TestObjectPatchRel32RejectsOutOfRangeTargets()
 
-### Community 294 - "Community 294"
+### Community 295 - "Community 295"
 Cohesion: 0.32
 Nodes (11): buildOnly(), TestArrayMVPBuildSmoke(), TestArrayMVPBuildSupportsOptionalFixedArrayGlobal(), TestArrayMVPBuildSupportsZeroedFixedArrayFieldGlobal(), TestArrayMVPCheckAcceptsIndexAndForOnFixedArray(), TestArrayMVPRejectsAssignmentToArrayLen(), TestArrayMVPRejectsAssignmentToArrayPtr(), TestArrayMVPRejectsAssignmentToNestedArrayLen() (+3 more)
 
-### Community 295 - "Community 295"
+### Community 296 - "Community 296"
+Cohesion: 0.24
+Nodes (8): buildActorTaskStressFile(), TestActorTaskBoundedStressExamples(), BenchmarkBenchmarkExamplesBuild(), BenchmarkBenchmarkExamplesRun(), TestBenchmarkExamplesCompileAndRun(), RepoPath(), RepoRoot(), RunBinary()
+
+### Community 297 - "Community 297"
 Cohesion: 0.28
 Nodes (11): TestBuildFunctionTypedMutableLocalReassignmentFromMultiTargetReturnSmoke(), TestBuildFunctionTypedParameterAliasCallbackArgumentSmoke(), TestBuildFunctionTypedParameterAliasDirectCallSmoke(), TestBuildFunctionTypedReturnDirectCallbackArgumentSmoke(), TestBuildFunctionTypedReturnDirectNamedSymbolSmoke(), TestBuildFunctionTypedReturnMultiTargetCallbackSmoke(), TestBuildFunctionTypedReturnMultiTargetDirectCallSmoke(), TestBuildFunctionTypedReturnMultiTargetLocalAliasSmoke() (+3 more)
 
-### Community 296 - "Community 296"
+### Community 298 - "Community 298"
 Cohesion: 0.4
 Nodes (11): capsuleIDDirectory(), decodeStrictJSON(), isHTTPStoreURL(), isSupportedMirrorChannel(), main(), parseSHA256Hash(), validateEcoMirror(), validateMirrorRelativePath() (+3 more)
 
-### Community 297 - "Community 297"
-Cohesion: 0.18
-Nodes (13): CounterView Binding and Accessibility Contract, mountTetraUI Web Mount Entry, runTetra Runtime Entry, Tetra Docs Snapshot (83 modules, 228 entries), Tetra API Docs Snapshot (83 modules, 228 entries), Test Report 2026-04-29 12:41:02Z, Web UI Smoke DOM Artifact (run 124102), API Diff Docs Snapshot (81 modules, 226 entries) (+5 more)
-
-### Community 298 - "Community 298"
+### Community 299 - "Community 299"
 Cohesion: 0.33
 Nodes (10): readRepoFileForEpic06(), TestEpic06CapabilityAndIslandExamplesUseAuditedEffects(), TestEpic06DocsAndReleaseGateAlignWithUsesCapabilityUnsafeOwnershipIslandCoverage(), TestEpic06EffectsCapabilitiesUnsafeOwnershipIslandPrivacyBudgetMatrix(), TestEpic06OwnershipAliasRejectionMatrix(), TestEpic06OwnershipFunctionTypeCallbackSignatures(), TestEpic06OwnershipTransferForActorsAndTasks(), TestEpic06RejectsCapMemOutsideUnsafeBlock() (+2 more)
 
-### Community 299 - "Community 299"
+### Community 300 - "Community 300"
 Cohesion: 0.3
 Nodes (10): TestAsyncRejectBorrowedEscapeViaCrossModuleAwaitReturn(), TestAsyncRejectBorrowedEscapeViaCrossModuleRelayAwaitOptionalReturn(), TestAsyncRejectBorrowedEscapeViaCrossModuleRelayAwaitReturn(), TestAsyncRejectBorrowedEscapeViaCrossModuleRelayMatchOptionalReturn(), TestAsyncRejectBorrowedEscapeViaCrossModuleRelayTryAwaitGlobalAssign(), TestAsyncRejectBorrowedEscapeViaCrossModuleRelayTryAwaitMatchOptionalGlobalAssign(), TestAsyncRejectBorrowedEscapeViaCrossModuleRelayTryAwaitOptionalGlobalAssign(), TestAsyncRejectBorrowedEscapeViaCrossModuleRelayTryAwaitReturn() (+2 more)
 
-### Community 300 - "Community 300"
+### Community 301 - "Community 301"
 Cohesion: 0.44
 Nodes (10): decodeStrictJSON(), main(), unmarshalArray(), validateFileReport(), validateTestReport(), validateTestReportCounts(), validateTestResult(), testFileReport (+2 more)
 
-### Community 301 - "Community 301"
+### Community 302 - "Community 302"
 Cohesion: 0.2
 Nodes (12): Hello T4 README, Capability Unsafe Boundary Recipe, Standard Library Guide, Stable Module Choices, Current Status, v0.3.0 Current Public Profile, Troubleshooting, Failure Diagnostic Playbook (+4 more)
 
-### Community 302 - "Community 302"
-Cohesion: 0.23
-Nodes (12): WaveD API Snapshot sha256:09e83e7a..., WaveD Full API Docs, WaveD Full Tetra Docs, WaveD Full Tooling Summary, WaveD v0.3 Gate Recovery, WaveD Reviewer v0.3 Gate Summary, WaveD Reviewer v0.3 Gate Release State, WaveD Stabilization API Docs (+4 more)
-
 ### Community 303 - "Community 303"
-Cohesion: 0.25
-Nodes (6): TestPublicCheckAPICrossModuleWorldPositive(), TestPublicCheckAPISingleSourceNegativeDiagnostic(), sha256File(), TestBuildCacheHitNoLowering(), TestBuildDeterministicAcrossJobs(), TestConcurrentBuildsSameCache()
-
-### Community 304 - "Community 304"
 Cohesion: 0.36
 Nodes (10): assertStackArg(), mustClassifier(), mustTarget(), sameStrings(), TestI386SysVClassifierRejectsNonX86Targets(), TestI386SysVClassifierScalarReturns(), TestI386SysVClassifierStructReturnUsesHiddenSRet(), TestI386SysVClassifierUsesStackArguments() (+2 more)
 
-### Community 306 - "Community 306"
+### Community 305 - "Community 305"
 Cohesion: 0.33
 Nodes (9): TestImportedReturnedEnumPayloadDirectClosureMetadata(), TestImportedReturnedStructEnumPayloadDirectClosureMetadata(), TestInterfaceReturnedEnumPayloadInlineClosureMetadata(), TestInterfaceReturnedEnumPayloadInlineThrowingClosureMetadata(), TestInterfaceReturnedStructEnumPayloadInlineClosureMetadata(), TestInterfaceReturnedStructEnumPayloadInlineThrowingClosureMetadata(), TestInterfaceReturnedStructFieldInlineThrowingClosureMetadata(), TestReturnedStructEnumPayloadFieldCallSiteCaptureMetadata() (+1 more)
 
-### Community 307 - "Community 307"
+### Community 306 - "Community 306"
 Cohesion: 0.42
 Nodes (7): main(), TestValidateParallelProductionReportAcceptsValidReport(), TestValidateParallelProductionReportRejectsInvalidReport(), TestValidateParallelProductionReportRejectsMissingParallelEdgeCases(), TestValidateParallelProductionReportRejectsMissingSafeUnsafeForbiddenBoundaryCoverageCase(), validParallelProductionReport(), validateParallelProductionReport()
 
-### Community 308 - "Community 308"
+### Community 307 - "Community 307"
 Cohesion: 0.45
 Nodes (9): main(), parseSHA256Hash(), strictUnmarshalJSON(), unmarshalRecords(), validateEcoVault(), validateVaultRecord(), validVaultKind(), vaultIndex (+1 more)
+
+### Community 308 - "Community 308"
+Cohesion: 0.44
+Nodes (9): decodeStrictJSON(), expectedTestAllSummaryArtifact(), main(), validateLogOrdinal(), validateRequiredPassingSteps(), validateStep(), validateTestAllSummary(), testAllStep (+1 more)
 
 ### Community 309 - "Community 309"
 Cohesion: 0.42
@@ -1750,12 +1748,12 @@ Cohesion: 0.27
 Nodes (11): v0.2.0 Candidate Release Gate Summary (Blocked), v0.2.0 Candidate Known Issues (175907), v0.2.0 Candidate Release State (175907), Security Review Signoff in 175907 Artifacts, v0.2.0 Candidate Test-All Summary (175907), v0.2.0 Candidate Tetra Docs (175907), v0.2.0 Candidate Web UI Smoke DOM (175907), v0.2.0 Candidate API Docs (Rerun) (+3 more)
 
 ### Community 313 - "Community 313"
-Cohesion: 0.36
-Nodes (6): readLSPMessage(), TestReadLSPMessageReadsNormalContentLength(), TestReadLSPMessageRejectsTooLargeContentLength(), writeLSPMessage(), writeLSPNotification(), writeLSPResponse()
+Cohesion: 0.29
+Nodes (10): decodeWorldResponse(), get(), getWorldArray(), orderedMarkers(), runSemanticProbe(), TestOrderedMarkers(), validateFortunesHTTP(), validateWorld() (+2 more)
 
 ### Community 314 - "Community 314"
-Cohesion: 0.62
-Nodes (8): runEcoMirrorValidator(), TestValidateEcoMirrorAcceptsHTTPSourceStore(), TestValidateEcoMirrorAcceptsValidReport(), TestValidateEcoMirrorRejectsBadHash(), TestValidateEcoMirrorRejectsOneSidedTrustHash(), TestValidateEcoMirrorRejectsPathMismatch(), TestValidateEcoMirrorRejectsUnknownField(), validMirrorReport()
+Cohesion: 0.36
+Nodes (6): readLSPMessage(), TestReadLSPMessageReadsNormalContentLength(), TestReadLSPMessageRejectsTooLargeContentLength(), writeLSPMessage(), writeLSPNotification(), writeLSPResponse()
 
 ### Community 315 - "Community 315"
 Cohesion: 0.49
@@ -1766,40 +1764,44 @@ Cohesion: 0.38
 Nodes (6): generateSmokeSource(), main(), TestGenerateSmokeSourceCoversSupportedFamilies(), TestGenerateSmokeSourceMalformedTestDeclDiagnostic(), TestGenerateSmokeSourceParsesWithCompilerFrontend(), TestGenerateSmokeSourceSpanCRLFTabAndUnicode()
 
 ### Community 317 - "Community 317"
+Cohesion: 0.42
+Nodes (8): buildAndRun(), emitX64ReturnSlotPushes(), TestX64ABICallsZeroThroughTenArgs(), TestX64ABIReturnSlotsThreeAndFourRegisterMapping(), TestX64BuildOnlySmokeAcrossNativeTargets(), TestX64CodegenObjectRelocKindsByPlatformABI(), TestX64CodegenObjectsCarryTargetMetadata(), x64ReturnSlotName()
+
+### Community 318 - "Community 318"
 Cohesion: 0.36
 Nodes (8): TestBuildFunctionTypedImportedParameterReturnMutableLocalReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedImportedParameterReturnNestedStructFieldReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedImportedParameterReturnStructFieldReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedImportedParameterReturnStructValuedFieldReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedImportedParameterReturnWholeNestedStructReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedImportedParameterReturnWholeStructReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedParameterReturnMutableLocalReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedParameterReturnStructFieldReassignmentCapturedPtrClosureSmoke()
 
-### Community 318 - "Community 318"
+### Community 319 - "Community 319"
 Cohesion: 0.42
 Nodes (6): main(), mustJSON(), TestValidateCompilerProductionReportAcceptsValidReport(), TestValidateCompilerProductionReportRejectsInvalidReport(), validCompilerReport(), validateCompilerProductionReport()
 
-### Community 319 - "Community 319"
-Cohesion: 0.49
-Nodes (8): flowIssue, firstCodeColumn(), isTetraSourceFile(), main(), stripInlineStructLiterals(), stripStringsAndLineComment(), validateFile(), validatePaths()
-
 ### Community 320 - "Community 320"
-Cohesion: 0.47
-Nodes (8): discoverExamples(), isSmokeSourceFile(), main(), requiredCasesForReport(), validateSmokeListWithExamplesRoot(), smokeExcludedExample, smokeListCase, smokeListReport
-
-### Community 321 - "Community 321"
-Cohesion: 0.49
-Nodes (8): apiMetadata, decodeStrictJSON(), hashAPISurface(), main(), markdownAnchor(), parseAPIMetadata(), validateAPIDocs(), validateInternalLinks()
-
-### Community 322 - "Community 322"
 Cohesion: 0.49
 Nodes (8): decodeStrictJSON(), main(), parseSHA256Hash(), supportedTargets(), validateEcoMaterialization(), validateMaterializationPath(), validateMaterializationTarget(), materializationReport
 
-### Community 323 - "Community 323"
+### Community 321 - "Community 321"
 Cohesion: 0.44
 Nodes (8): lspDiagnostic, lspHover, lspSmokeEnvelope, lspSymbol, main(), strictDecodeJSON(), unmarshalArray(), validateLSPSmoke()
 
+### Community 322 - "Community 322"
+Cohesion: 0.49
+Nodes (8): apiMetadata, decodeStrictJSON(), hashAPISurface(), main(), markdownAnchor(), parseAPIMetadata(), validateAPIDocs(), validateInternalLinks()
+
+### Community 323 - "Community 323"
+Cohesion: 0.49
+Nodes (8): flowIssue, firstCodeColumn(), isTetraSourceFile(), main(), stripInlineStructLiterals(), stripStringsAndLineComment(), validateFile(), validatePaths()
+
 ### Community 324 - "Community 324"
-Cohesion: 0.24
-Nodes (9): readRepoFileForEpic06(), TestEpic06CapabilityAndIslandExamplesUseAuditedEffects(), TestEpic06DocsAndReleaseGateAlignWithUsesCapabilityUnsafeOwnershipIslandCoverage(), TestEpic06EffectsCapabilitiesUnsafeOwnershipIslandPrivacyBudgetMatrix(), TestEpic06OwnershipAliasRejectionMatrix(), TestEpic06OwnershipFunctionTypeCallbackSignatures(), TestEpic06OwnershipTransferForActorsAndTasks(), TestEpic06ResourceLifetimeLoopBreakExitIgnoresUnreachableReopen() (+1 more)
+Cohesion: 0.47
+Nodes (8): discoverExamples(), isSmokeSourceFile(), main(), requiredCasesForReport(), validateSmokeListWithExamplesRoot(), smokeExcludedExample, smokeListCase, smokeListReport
 
 ### Community 325 - "Community 325"
 Cohesion: 0.2
 Nodes (10): Plan250 Backend/CLI/QA/Release Evidence, Plan250 Docs Evidence, Plan250 Frontend/Semantics Evidence, Plan250 Epic 04/05 Evidence, Plan250 Controller Log, Plan250 Frontend Summary, Plan250 Epic 05 Runtime Summary, Plan250 Epic 04 Safety Summary (+2 more)
+
+### Community 326 - "Community 326"
+Cohesion: 0.42
+Nodes (7): finalReleaseStateRefreshFollowsSummary(), TestReleaseV030GateHashesEntireReportDirectory(), TestReleaseV030GateRefreshesReleaseStateAfterFinalSummaryWrite(), TestReleaseV030GateRequireCleanRejectsDirtyWorktree(), TestReleaseV030GateValidatesFuzzArtifactsAfterShortFuzz(), TestReleaseV030GateValidatesGateSummaryArtifacts(), TestReleaseV030GateWritesBlockedReleaseStateBeforeCIMissingSignoffExit()
 
 ### Community 327 - "Community 327"
 Cohesion: 0.28
@@ -1814,148 +1816,148 @@ Cohesion: 0.56
 Nodes (7): assertExactConsentGuard(), assertNoPrivacySideEffects(), containsConstI32(), countKindPattern(), findLoweredFuncByName(), TestLowerConsentTokenUsesOpaqueRuntimeSentinel(), TestLowerPrivacySealUnsealI32DeterministicShapeAndNoSideEffects()
 
 ### Community 330 - "Community 330"
+Cohesion: 0.36
+Nodes (5): fakeFortuneDB, fakeFortuneRow, newFakeFortuneDB(), startFortunesBenchmarkServer(), TestServerFortunesEndpointFetchesSortsAndEscapesHTML()
+
+### Community 331 - "Community 331"
 Cohesion: 0.53
 Nodes (7): checkIfLetPatternError(), checkIfLetPatternSource(), TestIfLetEnumPayloadPatternBindsPayloads(), TestIfLetNonePatternAcceptsOptionalValue(), TestIfLetOptionalPatternRejectsLiteralPattern(), TestIfLetPatternRejectsNonOptionalAndNonEnumValue(), TestIfLetSomePatternBindsOptionalPayload()
 
-### Community 331 - "Community 331"
+### Community 332 - "Community 332"
+Cohesion: 0.33
+Nodes (8): findELFLoadSegment(), parseELF64ProgramHeaders(), TestELFBuildsHighArityCallSurface(), TestELFDataRelocPointsToDataMarker(), TestELFExecutableModeAndHeaderContract(), TestELFLinkRejectsNonLinuxObjectTarget(), TestELFLinuxLayoutStaysInSyncWithWriter(), elfProgramHeader
+
+### Community 333 - "Community 333"
 Cohesion: 0.56
 Nodes (7): buildAndRun(), buildAndRunFiles(), buildOnly(), buildOnlyFiles(), runBinary(), verifyELF(), writeTestFiles()
 
-### Community 332 - "Community 332"
+### Community 334 - "Community 334"
 Cohesion: 0.39
 Nodes (7): TestBuildFunctionTypedCallableParamCrossModuleSmoke(), TestBuildFunctionTypedCallableParamMultiTargetCrossModuleSmoke(), TestBuildFunctionTypedEnumPayloadCrossModuleCallbackSmoke(), TestBuildFunctionTypedImportedParameterReturnCapturedPtrClosureDirectCallbackArgumentSmoke(), TestBuildFunctionTypedImportedReturnIgnoresCapturedCallbackArgumentSmoke(), TestBuildFunctionTypedReturnDirectCallbackArgumentCrossModuleSmoke(), TestBuildFunctionTypedStructFieldCrossModuleCallbackSmoke()
 
-### Community 333 - "Community 333"
+### Community 335 - "Community 335"
 Cohesion: 0.39
 Nodes (7): TestBuildFunctionTypedCallableParamDirectNamedSymbolCrossModuleSmoke(), TestBuildFunctionTypedEnumPayloadFromMultiTargetCrossModuleReturnSmoke(), TestBuildFunctionTypedParameterReturnedEnumPayloadCrossModuleSmoke(), TestBuildFunctionTypedReturnDirectNamedSymbolCrossModuleSmoke(), TestBuildFunctionTypedReturnMultiTargetCrossModuleCallbackSmoke(), TestBuildFunctionTypedStructFieldFromCapturedCrossModuleReturnSmoke(), TestBuildFunctionTypedStructFieldFromMultiTargetCrossModuleReturnSmoke()
 
-### Community 334 - "Community 334"
+### Community 336 - "Community 336"
 Cohesion: 0.39
 Nodes (7): TestBuildFunctionTypedCallableParamDirectNamedSymbolSmoke(), TestBuildFunctionTypedCallableParamMultiTargetSmoke(), TestBuildFunctionTypedCallableParamMultiTargetStringReturnSmoke(), TestBuildFunctionTypedCallableParamMultiTargetStructReturnSmoke(), TestBuildFunctionTypedCallbackCallAllowsArgumentLabelsSmoke(), TestBuildFunctionTypedGlobalCallAllowsArgumentLabelsSmoke(), TestBuildFunctionTypedStructFieldCallAllowsArgumentLabelsSmoke()
 
-### Community 335 - "Community 335"
+### Community 337 - "Community 337"
 Cohesion: 0.39
 Nodes (7): TestBuildFunctionTypedEnumParameterPayloadReturnCapturedClosureCallbackArgumentSmoke(), TestBuildFunctionTypedEnumParameterPayloadReturnCapturedClosureDirectCallSmoke(), TestBuildFunctionTypedEnumParameterWholeReturnCapturedClosureDirectCallSmoke(), TestBuildFunctionTypedNestedStructParameterFieldReturnCapturedClosureDirectCallSmoke(), TestBuildFunctionTypedStructParameterFieldReturnCapturedClosureCallbackArgumentSmoke(), TestBuildFunctionTypedStructParameterFieldReturnCapturedClosureDirectCallSmoke(), TestBuildFunctionTypedStructParameterWholeReturnCapturedClosureDirectCallSmoke()
 
-### Community 336 - "Community 336"
+### Community 338 - "Community 338"
 Cohesion: 0.39
 Nodes (5): main(), TestValidateNativeUIRuntimeReportAcceptsExecutableEvidence(), TestValidateNativeUIRuntimeReportRejectsSidecarOnlyEvidence(), validNativeUIRuntimeReportJSON(), validateNativeUIRuntimeReport()
 
-### Community 337 - "Community 337"
+### Community 339 - "Community 339"
 Cohesion: 0.42
 Nodes (5): main(), TestValidateUIProductionRuntimeReportAcceptsValidReport(), TestValidateUIProductionRuntimeReportRejectsInvalidReport(), validUIProductionRuntimeReport(), validateUIProductionRuntimeReport()
 
-### Community 338 - "Community 338"
+### Community 340 - "Community 340"
 Cohesion: 0.47
 Nodes (7): endpointName(), mustReportJSON(), reportFixture(), TestValidateReportAcceptsFullSixEndpointReport(), TestValidateReportRejectsWeakEvidenceAndBadCounters(), TestValidateReportRequiresExplicitSkipDBAllowance(), TestValidateReportRequiresLatencyPercentilesAndIntegrityMetadata()
 
-### Community 339 - "Community 339"
+### Community 341 - "Community 341"
 Cohesion: 0.39
 Nodes (7): TestFlowLetIsImmutable(), TestLocalTypeInference(), TestV1APIDocsUseCanonicalBuiltinTypeNames(), TestV1CanonicalTypeNamesAndStructuralSlots(), TestV1InferenceRequiresAnnotationForNoneAndUsesExpectedOptionals(), TestV1OpaqueHandleTypesAreNotInterchangeable(), TestV1StructConstructorsRejectInvalidFields()
 
-### Community 340 - "Community 340"
+### Community 342 - "Community 342"
 Cohesion: 0.25
 Nodes (9): v0.1.2 Security Review Signoff, Codex Current Web Smoke DOM Snapshot, Codex Web Smoke Next DOM Snapshot, Dogfood WASI README, Dogfood Web UI README, v0.2.0 Security Review Signoff, WASM And UI Guide, WASM/UI Release Evidence Rules (+1 more)
 
-### Community 341 - "Community 341"
+### Community 343 - "Community 343"
 Cohesion: 0.28
 Nodes (9): agent-12 full rerun summary, agent-15 full summary, agent-4 full summary, agent-8 full summary, bootstrap step failure event, codex analysis full summary, codex analysis quick summary, full mode test report (23 steps) (+1 more)
 
-### Community 342 - "Community 342"
-Cohesion: 0.22
-Nodes (9): Docs Manifest Freshness Check, Short Fuzz Nightly Mode, Unstable Seed Tracking Policy, Fuzz Short Summary (v0.3-stabilization), Wave2 ImplD Fuzz Short Summary, Wave2 ImplD Gate Summary, Wave2 ImplD Release State, Wave2 ImplD Unstable Seeds (+1 more)
-
-### Community 343 - "Community 343"
-Cohesion: 0.22
-Nodes (9): WaveD Fuzz Seed Triage Policy, Wave H Reviewer Short Fuzz Summary, Wave H Reviewer Unstable Seed Promotion Policy, Wave H Reviewer Unstable Seeds Log, WaveJ Reviewer Fuzz Nightly Short Summary, WaveJ Reviewer v0.3.0 Release Gate Report, WaveJ Reviewer Release State, WaveJ Reviewer Test-All Stabilization Summary (+1 more)
-
 ### Community 344 - "Community 344"
-Cohesion: 0.39
-Nodes (8): decodeWorldResponse(), get(), getWorldArray(), runSemanticProbe(), validateFortunesHTTP(), validateWorld(), validateWorldArrayHTTP(), validateWorldHTTP()
-
-### Community 345 - "Community 345"
 Cohesion: 0.61
 Nodes (6): TestValidateCompletionAuditAcceptsCurrentBlockedAudit(), TestValidateCompletionAuditRejectsAchievedStatusWithFailingRows(), TestValidateCompletionAuditRejectsBlockedAuditWithoutMissingWorkSummary(), TestValidateCompletionAuditRejectsMissingRequiredRequirement(), TestValidateCompletionAuditRequiresMemoryParallelCompilerProductionRows(), validBlockedCompletionAudit()
 
-### Community 346 - "Community 346"
+### Community 345 - "Community 345"
 Cohesion: 0.61
 Nodes (6): TestModuleBoundaryAllowsPublicImportedFunction(), TestModuleBoundaryRejectsPrivateImportedFunction(), TestPublicReExportSupportsSelectiveImport(), TestSelectiveImportRejectsDuplicateImportedSymbol(), TestSelectiveImportResolvesPublicFunctionAndType(), writeCompilerModuleFiles()
 
-### Community 347 - "Community 347"
+### Community 346 - "Community 346"
 Cohesion: 0.32
 Nodes (6): atomicIRTargetInfo(), TestAtomicIRTargetInfoUsesX32PointerWidth(), TestX86RejectsI64AtomicWithTargetDiagnostic(), targetAtomicDiagnostic(), validateTargetAtomicIR(), atomicIRInfo
 
-### Community 348 - "Community 348"
+### Community 347 - "Community 347"
 Cohesion: 0.46
 Nodes (6): buildWASMUIFixture(), TestNativeShellUIExampleWritesMetadataPreviewSidecar(), TestWASIDogfoodTargetBuildOnlyAndNoUIRuntimeArtifacts(), TestWASMUIExamplesBuildWithDeterministicMetadataSidecars(), TestWASMUISidecarsAreDeterministicAcrossBuilds(), TestWebUIDogfoodBuildWritesSchemaCheckedArtifacts()
 
-### Community 349 - "Community 349"
+### Community 348 - "Community 348"
 Cohesion: 0.36
 Nodes (4): TestEmitTaskJoinTypedSlotBounds(), TestEmitTaskJoinTypedWrapperWindowsX64SlotBounds(), TestLowerTypedTaskWrapperSlotBounds(), TestLowerTypedTaskWrapperStagedThrowingTargetPassThroughStatus()
 
-### Community 350 - "Community 350"
+### Community 349 - "Community 349"
 Cohesion: 0.5
 Nodes (6): isDigit(), isIdentPart(), isIdentStart(), newLexer(), token, TokenType
 
-### Community 351 - "Community 351"
+### Community 350 - "Community 350"
 Cohesion: 0.36
 Nodes (6): Fortune, AppendEscaped(), RenderFortunes(), FuzzAppendEscapedRemovesRawHTMLSpecials(), TestAppendEscapedEscapesHTMLSpecialsAndPreservesUTF8(), TestRenderFortunesSortsByMessageAndEscapesMessages()
 
-### Community 352 - "Community 352"
-Cohesion: 0.36
-Nodes (3): Connector, Pool, PooledConn
-
-### Community 353 - "Community 353"
+### Community 351 - "Community 351"
 Cohesion: 0.43
 Nodes (6): TestBuildFunctionTypedImportedParameterReturnEnumPayloadCapturedPtrClosureSmoke(), TestBuildFunctionTypedImportedParameterReturnStructFieldCapturedPtrClosureSmoke(), TestBuildFunctionTypedParameterReturnCapturedPtrClosureCrossModuleSmoke(), TestBuildFunctionTypedParameterReturnCapturedPtrClosureSmoke(), TestBuildFunctionTypedReturnCallEnumPayloadCapturedPtrClosureSmoke(), TestBuildFunctionTypedReturnCallStructFieldCapturedPtrClosureSmoke()
 
-### Community 354 - "Community 354"
+### Community 352 - "Community 352"
 Cohesion: 0.43
 Nodes (6): TestBuildOptionalMatchNoneSmoke(), TestBuildOptionalMatchSomeSmoke(), TestEnumExhaustiveMatchNoDefaultCheckAndLower(), TestOptionalMatchNoneCheckAndLower(), TestOptionalMatchRejectsNonNonePattern(), TestOptionalMatchSomeBindingCheckAndLower()
 
-### Community 355 - "Community 355"
+### Community 353 - "Community 353"
 Cohesion: 0.43
 Nodes (6): TestUICheckEventRequiresExistingCommand(), TestUICheckRejectsImmutableStateWrites(), TestUICheckRejectsReturnInsideViewCommand(), TestUICheckRequiresAtLeastOneCommandPerView(), TestUICheckStateViewBindingsEventsCommandsOK(), TestUICheckStyleTypeMismatch()
 
-### Community 356 - "Community 356"
+### Community 354 - "Community 354"
 Cohesion: 0.61
 Nodes (6): hasCase(), mustJSON(), process(), requiredPassingCases(), TestBuildReportProducesValidCompilerProductionEvidence(), TestRequiredPassingCasesIncludeCompilerProductionEdgeCases()
 
-### Community 357 - "Community 357"
+### Community 355 - "Community 355"
 Cohesion: 0.5
 Nodes (6): main(), validateWASISmokeCase(), validateWASISmokeReportContract(), validationMode, wasiSmokeReport, wasiSmokeReportCase
 
-### Community 358 - "Community 358"
+### Community 356 - "Community 356"
 Cohesion: 0.43
 Nodes (6): TestBuildFunctionTypedImportedReturnedStructEnumPayloadCapturedPtrClosureSmoke(), TestBuildFunctionTypedNestedReturnedStructEnumPayloadCapturedPtrClosureSmoke(), TestBuildFunctionTypedReturnedStructEnumPayloadCapturedPtrClosureSmoke(), TestBuildFunctionTypedReturnedStructEnumPayloadDirectFieldMatchCapturedPtrClosureSmoke(), TestBuildFunctionTypedReturnedStructEnumPayloadMultiTargetDirectCallSmoke(), TestBuildFunctionTypedReturnedStructEnumPayloadWholeStructReassignmentCapturedPtrClosureSmoke()
 
-### Community 359 - "Community 359"
+### Community 357 - "Community 357"
 Cohesion: 0.43
 Nodes (6): TestBuildCollectionForBreakContinueSmoke(), TestBuildLogicalShortCircuitSmoke(), TestBuildNestedControlFlowSmoke(), TestBuildRangeForBreakContinueSmoke(), TestBuildUnaryBangSmoke(), TestBuildWhileBreakContinueSmoke()
 
-### Community 360 - "Community 360"
+### Community 358 - "Community 358"
 Cohesion: 0.5
 Nodes (6): CheckFileProgram(), CheckFileSemanticProgram(), RequireCheckErrorContains(), RequireCheckOK(), RequireFileCheckErrorContains(), RequireFileCheckOK()
 
-### Community 361 - "Community 361"
+### Community 359 - "Community 359"
 Cohesion: 0.25
 Nodes (5): TestArrayMVPBuildSmoke(), TestArrayMVPBuildSupportsOptionalFixedArrayGlobal(), TestArrayMVPBuildSupportsZeroedFixedArrayFieldGlobal(), TestArrayMVPCheckAcceptsIndexAndForOnFixedArray(), TestParseArrayTypeRefInParamAndLocal()
 
-### Community 362 - "Community 362"
+### Community 360 - "Community 360"
 Cohesion: 0.54
 Nodes (6): fileSurfaceSignature(), formatPropertyRepoRoot(), TestFormatSourceIdempotencePropertySuite(), TestFormatSourcePropertySuiteCoversCommentRejectionAndMalformedInput(), TestFormatSourceRepositoryParseFormatParseProperty(), tetraCorpusFiles()
 
-### Community 363 - "Community 363"
+### Community 361 - "Community 361"
 Cohesion: 0.29
 Nodes (8): UI Shell Counter View Example, tetra.ui.v1 Metadata Surface, Wave 9 UI v1 Syntax, Unified x64 Backend Architecture, Hourglass Split for x64 Backend, WASM Object and Runtime Architecture, WOBJ Deterministic WASM Object Model, WASM Backend Plan
 
-### Community 364 - "Community 364"
+### Community 362 - "Community 362"
 Cohesion: 0.36
 Nodes (8): Codex Current Full API Docs, Codex Current Full Tetra Docs, Release Gate Tetra Docs (Blocked Run), Release Gate API Diff API Docs, Release Gate Test-All API Docs, Release Gate Test-All Tetra Docs, Release Gate Tetra Docs (Pass Run), Tetra API Schema v1alpha1 Snapshot
 
-### Community 365 - "Community 365"
+### Community 363 - "Community 363"
 Cohesion: 0.25
 Nodes (8): Codex Final API Diff Docs, Codex Final Test-All API Docs, Codex Final Test-All Tetra Docs, Codex Final Tetra Docs, Current Release Gate API Diff Docs, Current Release Gate Test-All API Docs, Post-Commits Tetra Docs, Tetra API Hash sha256:40f6fcd0...
+
+### Community 364 - "Community 364"
+Cohesion: 0.48
+Nodes (5): TestObjectReadRejectsInvalidMagicAndVersion(), TestObjectRoundTrip(), TestObjectWriteRejectsMalformedSymbolAndRelocNames(), TestObjectWriteRejectsMalformedSymbolAndRelocRanges(), TestObjectWriteRejectsTooLongHeaderString()
+
+### Community 365 - "Community 365"
+Cohesion: 0.48
+Nodes (5): TestOwnershipAuditDocumentSourceAvoidsGiantRows(), TestOwnershipAuditFixtureHelpersLiveInFocusedFile(), TestOwnershipAuditFixtureSourceAvoidsGiantRows(), TestOwnershipAuditTestsAreSplitByResponsibility(), TestOwnershipAuditValidatorPackageIsSplitByResponsibility()
 
 ### Community 366 - "Community 366"
 Cohesion: 0.52
@@ -2046,48 +2048,48 @@ Cohesion: 0.33
 Nodes (7): Codex Current Release Gate Summary (Pass), Release Gate State (Blocked Run Artifacts), Release Gate State (Pass Run Artifacts), Release Gate Security Review Signoff, Release Gate Suite (33 steps), Release State Manifest, Security Review Signoff Check
 
 ### Community 388 - "Community 388"
-Cohesion: 0.73
-Nodes (4): hasRelocKind(), hasSymbol(), TestCodegenObjectLinuxX64SetsTargetAndUsesSysVRelocs(), writeHelloMainFunc()
+Cohesion: 0.67
+Nodes (4): sha256File(), TestBuildCacheHitNoLowering(), TestBuildDeterministicAcrossJobs(), TestConcurrentBuildsSameCache()
 
 ### Community 389 - "Community 389"
 Cohesion: 0.73
-Nodes (4): hasRelocKind(), hasSymbol(), TestCodegenObjectMacOSX64SetsTargetAndUsesSysVRelocs(), writeHelloMainFunc()
+Nodes (4): hasRelocKind(), hasSymbol(), TestCodegenObjectLinuxX64SetsTargetAndUsesSysVRelocs(), writeHelloMainFunc()
 
 ### Community 390 - "Community 390"
 Cohesion: 0.73
-Nodes (4): hasIATReloc(), hasSymbol(), TestCodegenObjectWindowsX64SetsTargetAndCollectsIATRelocs(), writeHelloMainFunc()
+Nodes (4): hasRelocKind(), hasSymbol(), TestCodegenObjectMacOSX64SetsTargetAndUsesSysVRelocs(), writeHelloMainFunc()
 
 ### Community 391 - "Community 391"
 Cohesion: 0.73
-Nodes (4): hasConstStore(), lowerGlobalAssignmentProgram(), TestLowerGlobalStructFieldAssignmentStoresGlobalSlot(), TestLowerGlobalStructFieldAssignmentWithoutLocalsVerifies()
+Nodes (4): hasIATReloc(), hasSymbol(), TestCodegenObjectWindowsX64SetsTargetAndCollectsIATRelocs(), writeHelloMainFunc()
 
 ### Community 392 - "Community 392"
-Cohesion: 0.53
-Nodes (4): BenchmarkBinarySizeBaselines(), BenchmarkCompileRepresentativeExamples(), BenchmarkFormatRepresentativeSources(), BenchmarkGenerateAPIDocsDogfoodProjects()
+Cohesion: 0.73
+Nodes (4): hasConstStore(), lowerGlobalAssignmentProgram(), TestLowerGlobalStructFieldAssignmentStoresGlobalSlot(), TestLowerGlobalStructFieldAssignmentWithoutLocalsVerifies()
 
 ### Community 393 - "Community 393"
 Cohesion: 0.53
-Nodes (4): TestBuildFunctionTypedMutableEnumPayloadReassignmentFromMultiTargetCrossModuleReturnSmoke(), TestBuildFunctionTypedMutableLocalReassignmentFromMultiTargetCrossModuleReturnSmoke(), TestBuildFunctionTypedReturnMultiTargetCrossModuleDirectCallSmoke(), TestBuildFunctionTypedStructFieldReassignmentFromMultiTargetCrossModuleReturnSmoke()
+Nodes (4): BenchmarkBinarySizeBaselines(), BenchmarkCompileRepresentativeExamples(), BenchmarkFormatRepresentativeSources(), BenchmarkGenerateAPIDocsDogfoodProjects()
 
 ### Community 394 - "Community 394"
 Cohesion: 0.53
-Nodes (4): TestExportAddsAliasSymbol(), TestExportAllowsReservedPrefixInInternalModule(), TestExportRejectsDuplicateNames(), TestExportRejectsReservedPrefixOutsideInternalModule()
+Nodes (4): TestBuildFunctionTypedMutableEnumPayloadReassignmentFromMultiTargetCrossModuleReturnSmoke(), TestBuildFunctionTypedMutableLocalReassignmentFromMultiTargetCrossModuleReturnSmoke(), TestBuildFunctionTypedReturnMultiTargetCrossModuleDirectCallSmoke(), TestBuildFunctionTypedStructFieldReassignmentFromMultiTargetCrossModuleReturnSmoke()
 
 ### Community 395 - "Community 395"
+Cohesion: 0.53
+Nodes (4): TestExportAddsAliasSymbol(), TestExportAllowsReservedPrefixInInternalModule(), TestExportRejectsDuplicateNames(), TestExportRejectsReservedPrefixOutsideInternalModule()
+
+### Community 396 - "Community 396"
 Cohesion: 0.73
 Nodes (4): checkCapsuleFileProgram(), TestCapsuleAndPropertyAcceptedTogether(), TestCapsuleMetadataPositiveNoRuntimeImpact(), TestCapsuleMetadataSemanticDiagnostics()
 
-### Community 396 - "Community 396"
+### Community 397 - "Community 397"
 Cohesion: 0.53
 Nodes (4): TestBuildCompoundAssignmentFieldAndIndexSmoke(), TestBuildCompoundAssignmentSmoke(), TestCompoundIndexAssignmentAllowsStableTarget(), TestCompoundIndexAssignmentRejectsSideEffectingTarget()
 
-### Community 397 - "Community 397"
-Cohesion: 0.53
-Nodes (4): TestBuildIslandMakeU16SliceSmoke(), TestBuildMakeU16SliceSmoke(), TestSliceU16SemanticsAcceptance(), TestSliceU16WasmBuildOnlyIslandMakeU16Smoke()
-
 ### Community 398 - "Community 398"
 Cohesion: 0.53
-Nodes (5): createImports(), instantiateTetra(), memoryView(), readUTF8(), runTetra()
+Nodes (4): TestBuildIslandMakeU16SliceSmoke(), TestBuildMakeU16SliceSmoke(), TestSliceU16SemanticsAcceptance(), TestSliceU16WasmBuildOnlyIslandMakeU16Smoke()
 
 ### Community 399 - "Community 399"
 Cohesion: 0.53
@@ -2166,106 +2168,114 @@ Cohesion: 0.53
 Nodes (5): createImports(), instantiateTetra(), memoryView(), readUTF8(), runTetra()
 
 ### Community 418 - "Community 418"
-Cohesion: 0.67
-Nodes (4): buildObjectsForEntry(), TestLinkCrossModuleCall(), TestLinkCrossModuleCallSevenPlusArgs(), TestLinkUnresolvedSymbol()
+Cohesion: 0.53
+Nodes (5): createImports(), instantiateTetra(), memoryView(), readUTF8(), runTetra()
 
 ### Community 419 - "Community 419"
 Cohesion: 0.47
 Nodes (5): fileSurfaceSignature(), TestFormatSourceIdempotencePropertySuite(), TestFormatSourcePropertySuiteCoversCommentRejectionAndMalformedInput(), TestFormatSourceRepositoryParseFormatParseProperty(), tetraCorpusFiles()
 
 ### Community 420 - "Community 420"
+Cohesion: 0.7
+Nodes (3): documentedCLICommands(), TestCLIContractDocumentedCommandsHaveHelpAndInvalidArgBehavior(), TestVersionCommand()
+
+### Community 421 - "Community 421"
 Cohesion: 0.6
-Nodes (3): capsuleArtifact, capsuleDependency, capsuleManifest
+Nodes (3): TestNormalizeFlowForMigrationAPI(), TestNormalizeFlowForMigrationAPICoversFlowTestAndMatchSurface(), TestNormalizeFlowForMigrationAPITabDiagnostic()
 
 ### Community 422 - "Community 422"
 Cohesion: 0.6
-Nodes (3): TestBuildFunctionTypedImportedParameterReturnEnumPayloadReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedImportedParameterReturnStructFieldEnumPayloadReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedParameterReturnEnumPayloadReassignmentCapturedPtrClosureSmoke()
-
-### Community 423 - "Community 423"
-Cohesion: 0.6
-Nodes (3): TestStringMetadataAssignmentRejectsLen(), TestStringMetadataAssignmentRejectsNestedLen(), TestStringMetadataAssignmentRejectsPtr()
+Nodes (3): TestCheckDistributedActorRuntimeBuiltins(), TestCheckDistributedActorRuntimeBuiltinsRequireRuntimeEffect(), TestCheckSpawnRemoteRejectsNonLiteralTarget()
 
 ### Community 424 - "Community 424"
-Cohesion: 0.7
-Nodes (3): hasCase(), TestBuildReportProducesValidParallelProductionEvidence(), TestRequiredPassingCasesIncludeParallelEdgeCases()
+Cohesion: 0.6
+Nodes (3): TestBuildFunctionTypedImportedParameterReturnEnumPayloadReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedImportedParameterReturnStructFieldEnumPayloadReassignmentCapturedPtrClosureSmoke(), TestBuildFunctionTypedParameterReturnEnumPayloadReassignmentCapturedPtrClosureSmoke()
 
 ### Community 425 - "Community 425"
 Cohesion: 0.6
-Nodes (5): assertPtrEnumPayloadCallDiagnostic(), ptrEnumPayloadCallBody(), ptrEnumPayloadCallEscapeSource(), ptrEnumPayloadSinkSource(), TestSafetyDiagnosticCodesForPtrEnumPayloadCallRejections()
+Nodes (3): TestStringMetadataAssignmentRejectsLen(), TestStringMetadataAssignmentRejectsNestedLen(), TestStringMetadataAssignmentRejectsPtr()
 
 ### Community 426 - "Community 426"
+Cohesion: 0.7
+Nodes (3): hasCase(), TestBuildReportProducesValidParallelProductionEvidence(), TestRequiredPassingCasesIncludeParallelEdgeCases()
+
+### Community 427 - "Community 427"
 Cohesion: 0.6
 Nodes (3): TestBuildFlowElseIfSmoke(), TestBuildLegacyElseIfSmoke(), TestFormatSourceElseIf()
 
-### Community 427 - "Community 427"
+### Community 428 - "Community 428"
 Cohesion: 0.4
 Nodes (5): Capsule v1 Delivery Track, 2026-04-28 Capsule Artifact Build v1 Plan, 2026-04-28 Capsule Lock Resolution v1 Design, 2026-04-28 Capsule Project System v1 Design, 2026-04-28 Capsule Project System v1 Implementation Plan
 
-### Community 454 - "Community 454"
+### Community 435 - "Community 435"
+Cohesion: 0.5
+Nodes (3): TestBuildFlowElseIfSmoke(), TestBuildLegacyElseIfSmoke(), TestFormatSourceElseIf()
+
+### Community 458 - "Community 458"
 Cohesion: 0.67
 Nodes (4): API Surface Growth 64->72 Modules, Generated v1.0 API Diff Docs Snapshot (72 modules), Generated Test-All API Docs Snapshot, Generated v1.0 Tetra API Docs Snapshot (64 modules)
 
-### Community 455 - "Community 455"
+### Community 459 - "Community 459"
 Cohesion: 0.5
 Nodes (4): WASM/Web UI Smoke Validation Flow, WASM32 Web Dogfood UI Preview Artifact, WASM32 Web UI Smoke Preview Artifact, Generated Web UI Smoke DOM Report
 
-### Community 456 - "Community 456"
+### Community 460 - "Community 460"
 Cohesion: 0.5
 Nodes (4): Post-v1 Feature Promotion Checklist, Post-v1 Promotion Gate, v1 Scope Freeze Contract, v1 Scope Freeze Frontend Runtime Plan
 
-### Community 457 - "Community 457"
+### Community 461 - "Community 461"
 Cohesion: 0.5
 Nodes (4): Actors Runtime v1, Capabilities (MVP), Effects Capabilities Privacy V1, Runtime Abi
 
-### Community 458 - "Community 458"
+### Community 462 - "Community 462"
 Cohesion: 0.5
 Nodes (4): v0.1.3 Gate-2 API Diff Docs, v0.1.3 Gate-2 Test-All API Docs, v0.1.3 Gate-2 Test-All Tetra Docs, v0.1.3 Gate-2 Tetra Docs
 
-### Community 459 - "Community 459"
+### Community 463 - "Community 463"
 Cohesion: 0.5
 Nodes (4): API Diff Docs (post-bump gate), Test-all API Docs (post-bump gate), Test-all Tetra Docs (post-bump gate), Tetra API Docs (post-bump gate)
 
-### Community 460 - "Community 460"
+### Community 464 - "Community 464"
 Cohesion: 0.5
 Nodes (4): Release Step: Go Test Packages, Release Step: Release State Audit, Release Step: Stabilization Wrapper, WaveK ImplB v0.3.0 Release Gate Report
 
-### Community 467 - "Community 467"
+### Community 469 - "Community 469"
 Cohesion: 0.67
 Nodes (3): Codex Batch Next Quick Summary, Codex Current Quick Summary, Quick Validation Suite (13 steps)
 
-### Community 468 - "Community 468"
+### Community 470 - "Community 470"
 Cohesion: 0.67
 Nodes (3): Codex Current Full Summary, Full Validation Suite (23 steps), Release Gate Test-All Summary
 
-### Community 469 - "Community 469"
+### Community 471 - "Community 471"
 Cohesion: 0.67
 Nodes (3): Known Issues Register, Release Gate Known Issues (Blocked Run), Release Gate Known Issues (Pass Run)
 
-### Community 470 - "Community 470"
+### Community 472 - "Community 472"
 Cohesion: 0.67
 Nodes (3): Codex Final Web UI Smoke DOM, Current Release Gate Web UI Smoke DOM, runTetra Web Smoke Harness
 
-### Community 471 - "Community 471"
+### Community 473 - "Community 473"
 Cohesion: 1.0
 Nodes (3): Codex Final2 Quick Test Summary, Codex Final Quick Test Summary, Tetra v0.1.x Quick Test Report
 
-### Community 472 - "Community 472"
+### Community 474 - "Community 474"
 Cohesion: 0.67
 Nodes (3): Post-Commits Release Gate Web UI Smoke DOM, v0.1.3 Gate-2 Web UI Smoke DOM, runTetra Web Smoke Module
 
-### Community 473 - "Community 473"
+### Community 475 - "Community 475"
 Cohesion: 1.0
 Nodes (3): Plan250 API Snapshot sha256:09e83e7a..., Wave1 ImplC API Docs, Wave2 ImplD API Docs
 
-### Community 474 - "Community 474"
+### Community 476 - "Community 476"
 Cohesion: 0.67
 Nodes (3): WaveD Zero Exit Codes, WaveD Full Exit Code, WaveD Go Test Exit Code
 
-### Community 475 - "Community 475"
+### Community 477 - "Community 477"
 Cohesion: 0.67
 Nodes (3): Backend Web UI Smoke DOM Snapshot, Stabilization Web UI Smoke DOM Placeholder, Final Candidate Test-All Stabilization Summary
 
-### Community 476 - "Community 476"
+### Community 478 - "Community 478"
 Cohesion: 1.0
 Nodes (3): v0.2.0 RC Test-All API Docs, v0.2.0 RC Test-All Summary Report (Fail), v0.2.0 RC Test-All Tetra Docs
 

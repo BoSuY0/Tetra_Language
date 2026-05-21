@@ -17,6 +17,8 @@ func TestReleasePostV04WASMUIGUIGateRunsProductionEvidence(t *testing.T) {
 	text := string(raw)
 	for _, want := range []string{
 		"Usage: bash scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh [--report-dir DIR]",
+		`prepare_report_dir`,
+		`find "$find_report_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +`,
 		`./tetra smoke --target wasm32-wasi --run=false --report "$report_dir/wasi-artifact.json"`,
 		`go run ./tools/cmd/validate-wasm-imports --target wasm32-wasi --report "$report_dir/wasi-artifact.json"`,
 		`./tetra smoke --target wasm32-wasi --run=true --report "$report_dir/wasi-runtime.json"`,
