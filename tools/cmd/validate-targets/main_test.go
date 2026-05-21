@@ -1,12 +1,21 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestValidateTargetsReportAcceptsExpectedShape(t *testing.T) {
-	raw := []byte(`{
+	raw := []byte(expectedTargetsReportJSON())
+	if err := validateTargetsReport(raw); err != nil {
+		t.Fatalf("validate targets: %v", err)
+	}
+}
+
+func expectedTargetsReportJSON() string {
+	return `{
   "supported":["linux-x64","windows-x64","macos-x64","wasm32-wasi","wasm32-web"],
   "build_only":["linux-x86","linux-x32"],
   "planned":[],
@@ -19,9 +28,34 @@ func TestValidateTargetsReportAcceptsExpectedShape(t *testing.T) {
     {"triple":"linux-x86","status":"build_only","os":"linux","arch":"x86","abi":"i386-sysv","format":"elf","exe_ext":"","build_only":true,"run_mode":"host_probed","run_supported":false,"run_unsupported_reason":"host does not support Linux i386 execution; no host fallback is allowed","supports_debug_info":false,"supports_release_optimize":false},
     {"triple":"linux-x32","status":"build_only","os":"linux","arch":"x64","abi":"x32-sysv","format":"elf","exe_ext":"","build_only":true,"run_mode":"host_probed","run_supported":false,"run_unsupported_reason":"host does not support Linux x32 ABI execution; no host fallback is allowed","supports_debug_info":false,"supports_release_optimize":false}
   ]
-}`)
+}`
+}
+
+func TestReadTargetsReportUsesLocalTetraWhenReportOmitted(t *testing.T) {
+	tmp := t.TempDir()
+	tetraPath := filepath.Join(tmp, "tetra")
+	if err := os.WriteFile(tetraPath, []byte("#!/usr/bin/env sh\nprintf '%s\\n' '"+expectedTargetsReportJSON()+"'\n"), 0o755); err != nil {
+		t.Fatalf("write fake tetra: %v", err)
+	}
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldWD); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+
+	raw, err := readTargetsReport("")
+	if err != nil {
+		t.Fatalf("read targets report from local tetra: %v", err)
+	}
 	if err := validateTargetsReport(raw); err != nil {
-		t.Fatalf("validate targets: %v", err)
+		t.Fatalf("validate generated targets report: %v", err)
 	}
 }
 

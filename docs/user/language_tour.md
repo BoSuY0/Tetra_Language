@@ -1,6 +1,6 @@
 # Tetra Language Tour
 
-Status: user-facing tour for the current `v0.3.0` profile with future v1.0
+Status: user-facing tour for the current `v0.4.0` profile with future v1.0
 notes. This guide calls out planned or blocked areas instead of implying they
 are complete.
 
@@ -53,8 +53,8 @@ remains experimental unless `docs/spec/current_supported_surface.md`,
 `docs/generated/manifest.json`, and `compiler/features.go` all mark a narrower
 slice as current.
 
-For a compact map of promoted and deferred `v0.3.0` behavior, see
-`docs/user/v0_3_preview.md`.
+For a compact map of promoted and deferred behavior, see
+`docs/spec/current_supported_surface.md`.
 
 ## Diagnostics
 

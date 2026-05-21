@@ -1,13 +1,16 @@
 # WASM Backend Plan
 
-Status: current for v0.4.0 runner-backed WASM execution; broader runtime parity
-work remains tracked by the release gate.
+Status: current for v0.4.0 runner-backed WASM execution plus the separately
+gated post-v0.4 WASM/UI/GUI production promotion path; broader runtime parity
+work remains tracked by the v1 release gate.
 
 This document records the WASM implementation contract. The current compiler
 supports `wasm32-wasi` through `wasmtime` or the Node WASI fallback and supports
-`wasm32-web` through a discovered Chromium-compatible web runner. Both
-targets still keep explicit missing-runner diagnostics, and UI event dispatch
-remains outside this WASM runtime claim.
+`wasm32-web` through a discovered Chromium-compatible browser runner. Both
+targets still keep explicit missing-runner diagnostics. Browser UI event
+dispatch is production evidence only when the dedicated Web UI smoke report
+loads real WASM, mounts DOM from `tetra.ui.v1`, dispatches events, and passes
+`go run ./tools/cmd/validate-web-ui-smoke`.
 
 v0.4.0 checkpoint (current behavior in this repository):
 
@@ -23,10 +26,10 @@ v0.4.0 checkpoint (current behavior in this repository):
 - Unsupported IR remains explicit and fails with stable backend diagnostics
   instead of silent behavior changes.
 - UI output is metadata-first (`tetra.ui.v1`) with preview artifacts.
-- Web preview validates metadata, mounts DOM, and dispatches lowered scalar
-  state command operations for supported events. Passing web UI smoke
-  reports must include `ui-event-dispatch:web-command-dispatch` in
-  `runtime_trace`.
+- Web UI production smoke validates metadata, instantiates real WASM in a
+  Chromium-compatible browser runner, mounts DOM, dispatches lowered scalar
+  state command operations for supported events, verifies state/render changes,
+  and records the validator-required production runtime trace markers.
 - WASI dogfood remains non-UI for this wave and must not emit web/native UI sidecars.
 
 Exact object/runtime/package/host-binding decisions are fixed in [WASM Object and Runtime Architecture](wasm_architecture.md) and should be treated as the prerequisite contract for target metadata and backend implementation changes.
@@ -153,7 +156,16 @@ go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 bash scripts/release/v1_0/gate.sh
 ```
 
-The v1.0 release gate must not be changed to skip WASM. Until all commands above are real and green, the correct state is a failing `scripts/release/v1_0/gate.sh`.
+For the bounded post-v0.4 promotion wave, run the dedicated gate without
+rewriting v0.4.0 release truth:
+
+```sh
+bash scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh --report-dir reports/wasm-ui-gui
+```
+
+The v1.0 release gate must not be changed to skip WASM. It remains the full
+future `v1.0.0` release gate and may still fail on version/scope preflights
+while separately gated post-v0.4 evidence is being collected.
 
 ## Remaining Limits For Full Runtime Parity
 

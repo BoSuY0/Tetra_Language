@@ -709,11 +709,11 @@ func execWASMProgramWithRunner(path string, runner wasiRunner, stdout io.Writer,
 }
 
 func execWebProgram(path string, stdout io.Writer, stderr io.Writer) (int, error) {
-	runner, err := discoverWebRuntimeRunner("")
+	runner, err := discoverWebRunner()
 	if err != nil {
 		return 0, err
 	}
-	return execWebProgramWithRunner(path, runner, stdout, stderr)
+	return execWebProgramWithBrowserRunner(path, runner, stdout, stderr)
 }
 
 func execWebProgramWithRunner(path string, runner webRuntimeRunner, stdout io.Writer, stderr io.Writer) (int, error) {

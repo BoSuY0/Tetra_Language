@@ -143,7 +143,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 	runWASI := false
 	var wasiRunner wasiRunner
 	runWeb := false
-	var webRunner webRuntimeRunner
+	var webRunner string
 	if *runBuilt && tgt.Triple == "wasm32-wasi" {
 		runner, err := discoverWASIRunner(repoRoot)
 		if err != nil {
@@ -155,7 +155,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 		shouldRun = true
 	}
 	if *runBuilt && tgt.Triple == "wasm32-web" {
-		runner, err := discoverWebRuntimeRunner(repoRoot)
+		runner, err := discoverWebRunner()
 		if err != nil {
 			fmt.Fprintln(stderr, err)
 			return 2
@@ -173,7 +173,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
 		Target:       tgt.Triple,
 		BuildOnly:    ctarget.IsBuildOnlyTarget(tgt.Triple),
-		Runner:       runnerName(wasiRunner.Name, webRunner.Name),
+		Runner:       runnerName(wasiRunner.Name, webRunner),
 		Host:         host,
 		Version:      compiler.Version(),
 		GitHead:      gitHead(repoRoot),
@@ -223,7 +223,7 @@ func runSmoke(args []string, stdout io.Writer, stderr io.Writer) int {
 					continue
 				}
 			} else if runWeb {
-				actual, err = execWebProgramWithRunner(outPath, webRunner, io.Discard, io.Discard)
+				actual, err = execWebProgramWithBrowserRunner(outPath, webRunner, io.Discard, io.Discard)
 				if err != nil {
 					caseReport.Error = "run: " + err.Error()
 					caseReport.Pass = false

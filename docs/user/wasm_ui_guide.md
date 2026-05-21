@@ -21,12 +21,15 @@ Required release checks:
 
 ```sh
 ./tetra smoke --target wasm32-wasi --run=false --report /tmp/tetra-wasi-artifact.json
+go run ./tools/cmd/validate-wasm-imports --target wasm32-wasi --report /tmp/tetra-wasi-artifact.json
+./tetra smoke --target wasm32-wasi --run=true --report /tmp/tetra-wasi-runtime.json
 ./tetra smoke --target wasm32-web --run=false --report /tmp/tetra-web-artifact.json
+go run ./tools/cmd/validate-wasm-imports --target wasm32-web --report /tmp/tetra-web-artifact.json
+./tetra smoke --target wasm32-web --run=true --report /tmp/tetra-web-runtime.json
 bash scripts/release/v1_0/wasi-smoke.sh --report /tmp/tetra-wasi-smoke.json
 bash scripts/release/v1_0/web-smoke.sh --report /tmp/tetra-web-smoke.json
 go run ./tools/cmd/validate-web-ui-smoke --report /tmp/tetra-web-smoke.json
-bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh --report-dir reports/v0.4.0
-go run ./tools/cmd/validate-native-ui-runtime --report reports/v0.4.0/native-ui-linux-x64.json
+bash scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh --report-dir reports/wasm-ui-gui
 ```
 
 ## UI
@@ -43,11 +46,13 @@ For a `pass` web UI smoke report, validator-enforced evidence now includes:
 - `ui_bundle_path` ending in `.ui.json`
 - `ui_module_path` ending in `.ui.web.mjs`
 - `dom_snapshot` ending in `.html`
-- `runtime_trace` containing `ui-event-dispatch:web-command-dispatch`
+- `runtime_trace` containing DOM mount/layout/widget/event markers plus
+  `ui-event-dispatch:web-command-dispatch`
 
-Support boundary for v0.3.0:
+Support boundary for the bounded post-v0.4 promotion:
 
-- Web UI validates metadata, mounts a DOM preview shell, and dispatches
+- Web UI validates metadata, instantiates real WASM through a
+  Chromium-compatible browser runner, mounts a DOM runtime shell, and dispatches
   supported events to lowered scalar state command operations.
 - `event click -> increment`/`decrement` style handlers are validated,
   rendered, and dispatched when the generated command operations describe
@@ -63,13 +68,13 @@ Support boundary for v0.3.0:
   and should not emit UI runtime sidecars.
 
 Linux-x64 native UI runtime support is separate from both web UI and native
-shell metadata. The v0.4.0 native runtime smoke builds the current CLI, builds
+shell metadata. The native runtime smoke builds the current CLI, builds
 `examples/ui_native_shell_smoke.tetra` for `linux-x64`, runs the native
 executable, loads the generated native shell sidecar into the runtime smoke,
 dispatches click events through lowered command operations, records before/after
 state and widget updates, covers invalid widget/malformed metadata/unsupported
 event/command failure negatives, closes the runtime, and writes
-`reports/v0.4.0/native-ui-linux-x64.json`.
+`native-ui-linux-x64.json` under the selected report directory.
 
 Do not use `tetra.ui.v1` metadata, wasm/web UI reports, or
 `tetra.ui.native-shell.v1` sidecars alone as native runtime proof. macOS and

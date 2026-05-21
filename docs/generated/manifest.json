@@ -4995,8 +4995,8 @@
       "name": "UI metadata v1 surface",
       "status": "current",
       "since": "v0.4.0",
-      "scope": "production UI metadata contract for checked view/state declarations, deterministic tetra.ui.v1 JSON, web command-dispatch preview artifacts, style metadata preview attributes, accessibility metadata preview attributes, and native shell command-dispatch text plus JSON trace sidecars with deterministic widget-tree artifacts",
-      "stability": "current metadata plus wasm32-web command dispatch and native shell command dispatch/widget-tree traces for lowered scalar state operations; style and accessibility metadata are preview attributes only, while executable Linux-x64 native runtime evidence is tracked by ui.native-runtime",
+      "scope": "production UI metadata contract for checked view/state declarations, deterministic tetra.ui.v1 JSON, browser-backed web command-dispatch runtime artifacts, style metadata preview attributes, accessibility metadata preview attributes, and native shell command-dispatch text plus JSON trace sidecars with deterministic widget-tree artifacts",
+      "stability": "current metadata plus wasm32-web command dispatch covered by post-v0.4 Web UI runtime smoke and native shell command dispatch/widget-tree traces for lowered scalar state operations; style and accessibility metadata are preview attributes only, while executable Linux-x64 native runtime evidence is tracked by ui.native-runtime",
       "docs": [
         "docs/spec/current_supported_surface.md",
         "docs/spec/ui_v1.md",

@@ -203,7 +203,7 @@ Use these notes to separate unsupported profile boundaries from real regressions
 
 - `generic`, `protocol`, and `extension` MVP examples are required in native smoke and should fail loudly on semantic regressions.
 - `generic_struct` coverage is experimental evidence only unless the feature registry promotes generic structs to `current`.
-- Enum payload constructor/match examples are current only for the narrow `v0.3.0` positional match/catch/if-let slice.
+- Enum payload constructor/match examples are current only for the narrow current positional match/catch/if-let slice.
 
 ### Safety/runtime examples (`V020-0731..0735`)
 

@@ -265,11 +265,11 @@ func targetRunSupport(tgt ctarget.Target, host string, hostOK bool) (bool, strin
 		}
 		return true, runner.Name, ""
 	case ctarget.RunModeWebRunner:
-		runner, err := discoverWebRuntimeRunner("")
+		runner, err := discoverWebRunner()
 		if err != nil {
 			return false, "", err.Error()
 		}
-		return true, runner.Name, ""
+		return true, runner, ""
 	case ctarget.RunModeUnsupported:
 		if tgt.UnsupportedReason != "" {
 			return false, "", tgt.UnsupportedReason

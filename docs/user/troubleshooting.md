@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Status: user guide for common command failures in the current `v0.3.0` profile
+Status: user guide for common command failures in the current `v0.4.0` profile
 and future v1.0 preparation.
 
 Use the exact command that matches the failing workflow, then apply the fix
@@ -93,8 +93,9 @@ browser automation unavailable
 
 Fix: keep the generated blocked report as evidence, install the documented
 browser automation dependency for the release environment, then rerun the same
-command. These `release_v1_0_*` helpers are future-release maintainer tooling;
-they are not current `v0.3.0` runtime support by themselves.
+command. These `release_v1_0_*` helpers are shared maintainer tooling; a report
+counts for current support only when it is generated fresh in the selected
+release or post-v0.4 report directory and passes its validator.
 
 ## WASI Runner Missing
 
@@ -113,7 +114,7 @@ wasmtime
 Fix: install `wasmtime` or keep the artifact/import preflight report when
 runner evidence is not available on the current host. Do not treat
 artifact/import output as runtime isolation evidence, and do not treat the
-`release_v1_0_*` helper name as a `v0.3.0` runtime support claim.
+`release_v1_0_*` helper name alone as a runtime support claim.
 
 ## Eco Lock Mismatch
 

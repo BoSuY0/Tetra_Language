@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 )
@@ -48,11 +49,7 @@ func main() {
 	var path string
 	flag.StringVar(&path, "report", "", "path to tetra targets --format=json output")
 	flag.Parse()
-	if path == "" {
-		fmt.Fprintln(os.Stderr, "error: --report is required")
-		os.Exit(2)
-	}
-	raw, err := os.ReadFile(path)
+	raw, err := readTargetsReport(path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -61,6 +58,22 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func readTargetsReport(path string) ([]byte, error) {
+	if path != "" {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		return raw, nil
+	}
+	cmd := exec.Command("./tetra", "targets", "--format=json")
+	raw, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("run ./tetra targets --format=json: %w: %s", err, strings.TrimSpace(string(raw)))
+	}
+	return raw, nil
 }
 
 func validateTargetsReport(raw []byte) error {

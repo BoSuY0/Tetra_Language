@@ -109,8 +109,9 @@ canonical for the contract revision being validated.
   `run_mode: "wasi_runner"` and is runnable when the CLI can discover
   `wasmtime` or the Node WASI fallback. `wasm32-web` uses
   `run_mode: "web_runner"` and is runnable when the CLI can discover a
-  Node web runtime runner. Browser automation remains UI-smoke evidence, not
-  the production `wasm32-web` runtime runner. Missing runners set
+  Chromium-compatible browser runner. Browser automation is also the
+  production Web UI smoke evidence when the UI validator accepts the report.
+  Missing runners set
   `run_supported: false` with a `run_unsupported_reason`. `run_runner` records
   the selected runner only when `run_supported` is true.
 - `features --format=json` emits `schema`, `version`, and `features` entries

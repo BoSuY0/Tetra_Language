@@ -11,6 +11,13 @@ This directory owns the ordered production gates:
 - `memory-parallel-compiler-production-linux-x64-gate.sh`
 - `ui-production-runtime-linux-x64-smoke.sh`
 - `memory-parallel-ui-production-linux-x64-gate.sh`
+- `wasm-ui-gui-production-gate.sh`
+
+`wasm-ui-gui-production-gate.sh` is the bounded post-v0.4 promotion gate for
+WASI/Web runtime execution, browser-backed Web UI runtime evidence, and
+Linux-x64 native UI/GUI runtime evidence. It emits
+`tetra.release.post_v0_4.wasm_ui_gui.production-gate.v1` plus artifact hashes
+under the selected report directory.
 
 Keep post-v0.4 production evidence behavior here. Do not add root-level
 compatibility wrappers under `scripts/`.

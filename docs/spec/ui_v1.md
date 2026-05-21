@@ -1,9 +1,9 @@
 # UI v1 Surface
 
-Status: current `v0.4.0` metadata UI surface with web and native shell scalar
-command-dispatch previews plus a Linux-x64 native runtime smoke path. This does
-not claim GTK/Qt/OS widget backends, macOS/Windows native UI runtimes, or
-platform accessibility integration.
+Status: current `v0.4.0` metadata UI surface with separately gated post-v0.4
+browser-backed Web UI and Linux-x64 native runtime smoke paths. This does not
+claim GTK/Qt/OS widget backends, macOS/Windows native UI runtimes, or platform
+accessibility integration.
 
 This document defines the UI syntax and backend artifact contract that is in
 scope for the `v0.4.0` metadata contract. It intentionally describes a
@@ -71,10 +71,10 @@ When a build contains a view:
 
 ## Backend Status
 
-`wasm32-web` is the browser command-dispatch preview backend. The generated web
-module reads the UI JSON bundle, mounts a simple DOM representation before
-running `tetra_main`, dispatches supported DOM events to lowered command
-operations, and refreshes scalar state bindings. The current lowered scalar
+`wasm32-web` is the bounded browser command-dispatch runtime backend. The
+generated web module reads the UI JSON bundle, mounts a deterministic DOM
+representation before running `tetra_main`, dispatches supported DOM events to
+lowered command operations, and refreshes scalar state bindings. The current lowered scalar
 operation set includes direct state assignment plus integer increment and
 decrement patterns of the form `state.field = state.field +/- <integer>`.
 The same integer delta operations are emitted for supported `+=` and `-=`
@@ -82,11 +82,13 @@ compound assignments.
 String, boolean, and integer-like assignments are hydrated as scalar runtime
 values rather than raw source literals, and same-state field assignments copy
 the current source field value in command order.
-The web preview also mirrors supported style and accessibility metadata into
+The web runtime also mirrors supported style and accessibility metadata into
 DOM preview attributes such as `data-tetra-style-*`,
 `data-tetra-accessibility-*`, `role`, and `aria-label`; full styling/layout
 engines and platform accessibility API integration remain outside this surface.
-Passing web UI smoke evidence must carry the runtime trace marker
+Passing web UI smoke evidence must carry the production runtime trace markers
+for window/root/layout/text/button/input/list/panel/focus/input/change/select/
+click/timer/async/redraw/error recovery plus
 `ui-event-dispatch:web-command-dispatch`.
 
 Native shell UI is a deterministic text-mode command-dispatch preview backend.
@@ -171,6 +173,20 @@ commands that must back the promotion.
 | WASI runner report | `reports/plan250/backend/wasi-smoke.json` |
 | WASI runner status | target `wasm32-wasi`, runner `node-wasi`, total `5`, passed `5`, failed `0` |
 | WASM artifact/import reports | `reports/plan250/backend/wasm32-wasi-artifact-smoke.json`; `reports/plan250/backend/wasm32-web-artifact-smoke.json` |
+
+## Post-v0.4 Production Gate
+
+The bounded WASM/UI/GUI promotion gate is:
+
+```sh
+bash scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh --report-dir reports/wasm-ui-gui
+```
+
+It collects fresh WASI/Web artifact and runtime smoke, validates WASM imports,
+runs browser-backed Web UI smoke, validates `tetra.ui.v1` runtime evidence,
+runs Linux-x64 native UI runtime smoke, validates `tetra.ui.native-runtime.v1`,
+and writes artifact hashes. This does not promote macOS/Windows GUI or full
+toolkit/runtime guarantees.
 
 ## Post-v1
 

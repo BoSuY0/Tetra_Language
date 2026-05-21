@@ -237,6 +237,24 @@ func validateRuntimeTrace(trace string) error {
 		"failure-propagation:ok",
 		"repeated-instantiation:ok",
 		uiEventDispatchBoundaryTrace,
+		"window-mount:ok",
+		"root-mount:ok",
+		"layout:ok",
+		"text:ok",
+		"button:ok",
+		"input:ok",
+		"list:ok",
+		"panel:ok",
+		"focus:ok",
+		"input-event:ok",
+		"change:ok",
+		"select:ok",
+		"click:ok",
+		"timer:ok",
+		"async-command:ok",
+		"redraw-update:ok",
+		"error-recovery:ok",
+		"main-instantiation:ok",
 	} {
 		if !strings.Contains(trace, marker) {
 			return fmt.Errorf("web UI smoke runtime_trace missing %q", marker)
@@ -489,6 +507,14 @@ func validateDOMSnapshotArtifact(path string, bundle uiBundleArtifact) error {
 	text := html.UnescapeString(dom)
 	if !hasDOMAttribute(dom, "data-tetra-ui", "v1") {
 		return fmt.Errorf(`web UI smoke dom_snapshot missing mounted UI marker data-tetra-ui="v1"`)
+	}
+	if !hasDOMAttribute(dom, "data-tetra-runtime", "web-production") {
+		return fmt.Errorf(`web UI smoke dom_snapshot missing runtime marker data-tetra-runtime="web-production"`)
+	}
+	for _, widget := range []string{"window", "root", "layout", "panel", "text", "input", "list", "button"} {
+		if !hasDOMAttribute(dom, "data-tetra-widget", widget) {
+			return fmt.Errorf(`web UI smoke dom_snapshot missing widget marker data-tetra-widget=%q`, widget)
+		}
 	}
 	for _, marker := range []string{
 		"Tetra UI Shell",

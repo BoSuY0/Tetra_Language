@@ -1,6 +1,6 @@
 # Tutorial Path
 
-Status: recommended reading order for new users of the current `v0.3.0` profile.
+Status: recommended reading order for new users of the current `v0.4.0` profile.
 
 This path uses existing release-covered examples and avoids claiming future
 `v1.0.0` features as current support. The current support boundary is

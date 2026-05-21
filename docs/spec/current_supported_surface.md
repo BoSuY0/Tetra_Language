@@ -44,6 +44,10 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `v0.1.3` tag.
 - Historical gate: `scripts/release/v0_1_1/gate.sh` remains for the immutable
   `v0.1.1` tag.
+- Separately gated post-v0.4 promotion evidence for WASM/Web UI/Linux-x64 GUI
+  lives under `scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh` and
+  writes fresh reports under `reports/wasm-ui-gui` when requested. This does
+  not rewrite the `v0.4.0` release gate or claim full `v1.0.0` readiness.
 
 ## Supported Now
 
@@ -74,7 +78,7 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `macos-x64` and `windows-x64`.
 - WASM artifact/import preflight for `wasm32-wasi` and `wasm32-web` through
   `smoke --run=false`, with runtime proof coming from the dedicated WASI and
-  web runner smoke reports validated by the gate.
+  browser-backed web runner smoke reports validated by the gate.
 - Local Eco package lifecycle validation for verify, lock generation/validation
   through `--lock` workflows, pack/unpack, vault, stable local publish
   metadata, beta publish metadata, target-aware downloads, and stable/beta
@@ -848,9 +852,10 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
 - WASM runtime execution is supported when the required host runner is
   discoverable. `wasm32-wasi` uses `run_mode: "wasi_runner"` and runs through
   `wasmtime` or the Node WASI fallback. `wasm32-web` uses
-  `run_mode: "web_runner"` and runs through the Node web runtime runner.
-  Browser automation remains UI-smoke evidence, not the production
-  `wasm32-web` runtime runner. Missing runners are explicit environment blockers in
+  `run_mode: "web_runner"` and runs through a discovered Chromium-compatible
+  browser runner. Browser automation is also the required Web UI runtime smoke
+  evidence when it instantiates real WASM, mounts DOM from `tetra.ui.v1`, and
+  passes `go run ./tools/cmd/validate-web-ui-smoke`. Missing runners are explicit environment blockers in
   `targets --format=json`; Linux-x64 native UI runtime evidence remains a
   separate `ui.native-runtime` release artifact and does not promote
   macOS/Windows native UI claims.

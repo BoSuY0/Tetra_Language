@@ -1,6 +1,8 @@
 # WASM Object and Runtime Architecture
 
-Status: accepted for TODO 660 (2026-04-26)
+Status: accepted for TODO 660 (2026-04-26), with bounded post-v0.4
+WASI/Web runtime and Web UI production promotion evidence tracked by
+`scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh`.
 
 Related v1 scope-freeze decisions for unresolved backend/UI rollout items:
 `../plans/v1_scope_freeze_backend_stdlib_ui.md`.
@@ -15,10 +17,12 @@ This document defines the concrete WASM backend architecture that must be used b
 - Packaging: `wasm32-wasi` emits one `.wasm`; `wasm32-web` emits `.wasm` plus a deterministic JS loader module.
 - Host bindings: WASI imports only from `wasi_snapshot_preview1`; web imports only from `tetra_web_v1`.
 - Release gates: WASM support is blocked until the gate commands in this document are real and green.
-- UI boundary in this architecture wave: metadata plus supported web command
-  dispatch preview. `wasm32-web` may mount `tetra.ui.v1` metadata in a preview
-  shell and dispatch lowered scalar state command operations; full layout
-  engines, native widgets, and platform accessibility APIs remain post-v1.
+- UI boundary in this architecture wave: `tetra.ui.v1` metadata plus the
+  bounded browser-backed Web UI runtime smoke. `wasm32-web` may mount
+  `tetra.ui.v1` metadata, dispatch lowered scalar state command operations,
+  and validate the required DOM/state/runtime trace evidence. Full layout
+  engines, native widgets, and platform accessibility APIs remain out of
+  this WASM production claim.
 
 ## Concrete Object Model
 
@@ -128,16 +132,19 @@ Allowed imports (v1), module `tetra_web_v1`:
 
 Policy:
 
-- Browser APIs are accessed only through these imports in v1.
-- DOM/event-loop expansion is deferred until UI MVP runtime slices are approved.
-- UI sidecar behavior for v0.2.0: `.ui.web.mjs` and `.ui.html` are metadata preview artifacts and must validate `tetra.ui.v1` schema before rendering.
+- Browser APIs are accessed only through these imports in the `.wasm` module.
+- DOM/event-loop behavior lives in deterministic sidecar/runtime glue and must
+  not expand the `.wasm` import surface without updating this contract and
+  validator.
+- UI sidecar behavior: `.ui.web.mjs` and `.ui.html` are deterministic Web UI
+  runtime artifacts and must validate `tetra.ui.v1` schema before rendering.
 
 ### UI Sidecar Boundary
 
 - `wasm32-wasi` must not emit web/native UI runtime sidecars (`.ui.web.mjs`, `.ui.html`, `.ui.shell.txt`).
-- `wasm32-web` mounts metadata, reports preview output, and may execute the
-  supported lowered scalar command-dispatch preview covered by web runtime
-  smoke. Broader UI runtime semantics remain outside this architecture wave.
+- `wasm32-web` mounts metadata, reports DOM/runtime output, and executes the
+  supported lowered scalar command-dispatch path covered by browser-backed Web
+  UI smoke. Broader UI runtime semantics remain outside this architecture wave.
 - Native targets may emit `.ui.shell.txt` as deterministic metadata text only.
 
 ## Gate Commands (Must Stay Mandatory)
@@ -153,6 +160,7 @@ go run ./tools/cmd/validate-wasm-imports --target wasm32-wasi --report /tmp/tetr
 go run ./tools/cmd/validate-wasm-imports --target wasm32-web --report /tmp/tetra-web-artifact.json
 bash scripts/release/v1_0/wasi-smoke.sh --report /tmp/tetra-wasi-smoke.json
 bash scripts/release/v1_0/web-smoke.sh --report /tmp/tetra-web-smoke.json
+bash scripts/release/post_v0_4/wasm-ui-gui-production-gate.sh --report-dir /tmp/tetra-wasm-ui-gui
 bash scripts/release/v1_0/gate.sh
 ```
 

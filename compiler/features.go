@@ -275,8 +275,8 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "UI metadata v1 surface",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.4.0",
-			Scope:     "production UI metadata contract for checked view/state declarations, deterministic tetra.ui.v1 JSON, web command-dispatch preview artifacts, style metadata preview attributes, accessibility metadata preview attributes, and native shell command-dispatch text plus JSON trace sidecars with deterministic widget-tree artifacts",
-			Stability: "current metadata plus wasm32-web command dispatch and native shell command dispatch/widget-tree traces for lowered scalar state operations; style and accessibility metadata are preview attributes only, while executable Linux-x64 native runtime evidence is tracked by ui.native-runtime",
+			Scope:     "production UI metadata contract for checked view/state declarations, deterministic tetra.ui.v1 JSON, browser-backed web command-dispatch runtime artifacts, style metadata preview attributes, accessibility metadata preview attributes, and native shell command-dispatch text plus JSON trace sidecars with deterministic widget-tree artifacts",
+			Stability: "current metadata plus wasm32-web command dispatch covered by post-v0.4 Web UI runtime smoke and native shell command dispatch/widget-tree traces for lowered scalar state operations; style and accessibility metadata are preview attributes only, while executable Linux-x64 native runtime evidence is tracked by ui.native-runtime",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/spec/v1_feature_status.md", "docs/user/wasm_ui_guide.md"},
 		},
 		{

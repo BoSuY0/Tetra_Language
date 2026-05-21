@@ -10,7 +10,7 @@ Module naming and versioning rules are documented in
 ## Finding Stable Modules
 
 Stable modules live under `lib/core`. Experimental or lower-level modules must
-not be described as stable release APIs unless the current `v0.3.0` checklist
+not be described as stable release APIs unless the current `v0.4.0` checklist
 includes fresh evidence for them.
 
 Stability labels used below:

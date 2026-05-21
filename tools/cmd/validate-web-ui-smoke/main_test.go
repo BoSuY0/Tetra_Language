@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const validWebUIRuntimeTrace = "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch"
+const validWebUIRuntimeTrace = "window-mount:ok;root-mount:ok;layout:ok;text:ok;button:ok;input:ok;list:ok;panel:ok;focus:ok;input-event:ok;change:ok;select:ok;click:ok;timer:ok;async-command:ok;redraw-update:ok;error-recovery:ok;ui-event-dispatch:web-command-dispatch;main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;main-instantiation:ok"
 
 func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
 	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
@@ -293,7 +293,16 @@ func TestValidateWebUISmokeReportRejectsPassWithMissingDOMBindingMarker(t *testi
 	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
 	domSnapshotPath := writeWebUIDOMSnapshotArtifactWithHTML(t, `<!doctype html>
 <main>
-  <section data-tetra-ui="v1">
+  <section data-tetra-ui="v1" data-tetra-runtime="web-production" data-tetra-widget="window">
+    <div data-tetra-widget="root">
+      <div data-tetra-widget="layout"></div>
+      <div data-tetra-widget="panel">
+        <span data-tetra-widget="text">Counter</span>
+        <input data-tetra-widget="input" value="tetra">
+        <select data-tetra-widget="list"><option>item-1</option></select>
+        <button data-tetra-widget="button" type="button">Save</button>
+      </div>
+    </div>
     <div>Tetra UI Shell</div>
     <div>runtime: web command dispatch</div>
     <div>view CounterView (state: CounterState)</div>
@@ -457,6 +466,30 @@ func TestValidateWebUISmokeReportRejectsPassWithoutUIEventDispatchBoundaryTrace(
 	}
 }
 
+func TestValidateWebUISmokeReportRejectsPassWithoutProductionUITrace(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
+	report := webUISmokeReport{
+		Schema:        "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:   "2026-04-27T12:00:00Z",
+		Target:        "wasm32-web",
+		UIScopeActive: true,
+		Source:        "examples/projects/dogfood_web_ui/src/main.tetra",
+		Automation:    "chromium --headless --dump-dom",
+		Status:        "pass",
+		Result:        "ok:0",
+		RuntimeTrace:  "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch",
+		DOMSnapshot:   domSnapshotPath,
+		UISchema:      "tetra.ui.v1",
+		UIBundlePath:  uiBundlePath,
+		UIModulePath:  uiModulePath,
+	}
+	err := validateWebUISmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "window-mount:ok") {
+		t.Fatalf("expected missing production UI trace rejection, got %v", err)
+	}
+}
+
 func TestValidateUIBundleSchemaArtifactAcceptsCheckedInSchema(t *testing.T) {
 	schemaPath := filepath.Join("..", "..", "..", "docs", "schemas", "tetra.ui.v1.schema.json")
 	if err := validateUIBundleSchemaArtifact(schemaPath); err != nil {
@@ -575,10 +608,19 @@ func writeWebUIDOMSnapshotArtifact(t *testing.T) string {
 	t.Helper()
 	return writeWebUIDOMSnapshotArtifactWithHTML(t, `<!doctype html>
 <main>
-  <section data-tetra-ui="v1">
+  <section data-tetra-ui="v1" data-tetra-runtime="web-production" data-tetra-widget="window">
     <div>Tetra UI Shell</div>
     <div>runtime: web command dispatch</div>
     <div>view CounterView (state: CounterState)</div>
+    <div data-tetra-widget="root">
+      <div data-tetra-widget="layout"></div>
+      <div data-tetra-widget="panel">
+        <span data-tetra-widget="text">Counter</span>
+        <input data-tetra-widget="input" value="tetra">
+        <select data-tetra-widget="list"><option>item-1</option></select>
+        <button data-tetra-widget="button" type="button">Save</button>
+      </div>
+    </div>
     <div data-tetra-binding="countValue">  bind countValue: i32 = 0</div>
     <div>  event click -&gt; increment</div>
   </section>

@@ -338,7 +338,130 @@ JS
         if (!bundle || bundle.schema !== 'tetra.ui.v1') {
           throw new Error(`ui-schema:${String(bundle && bundle.schema)}`);
         }
+        const host = document.querySelector('[data-tetra-ui="v1"]');
+        if (!host) {
+          throw new Error('ui-host-missing');
+        }
+        host.setAttribute('data-tetra-runtime', 'web-production');
+        host.setAttribute('data-tetra-widget', 'window');
+        const uiState = {
+          focused: false,
+          input: '',
+          changed: false,
+          selected: '',
+          clicked: false,
+          timer: false,
+          asyncDone: false,
+          redraws: 0,
+          errorRecovered: false,
+        };
+        const productionRoot = document.createElement('section');
+        productionRoot.setAttribute('data-tetra-widget', 'root');
+        productionRoot.setAttribute('data-tetra-state', 'mounted');
+        const layout = document.createElement('div');
+        layout.setAttribute('data-tetra-widget', 'layout');
+        layout.setAttribute('data-tetra-layout', 'column');
+        const panel = document.createElement('div');
+        panel.setAttribute('data-tetra-widget', 'panel');
+        const text = document.createElement('span');
+        text.setAttribute('data-tetra-widget', 'text');
+        text.textContent = 'ready';
+        const input = document.createElement('input');
+        input.setAttribute('data-tetra-widget', 'input');
+        input.value = 'tetra';
+        const list = document.createElement('select');
+        list.setAttribute('data-tetra-widget', 'list');
+        for (const value of ['item-1', 'item-2']) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = value;
+          list.appendChild(option);
+        }
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.setAttribute('data-tetra-widget', 'button');
+        button.textContent = 'save';
+        function redraw(reason) {
+          uiState.redraws += 1;
+          text.textContent = `${reason}:${uiState.input}:${uiState.selected}:${uiState.clicked}:${uiState.timer}:${uiState.asyncDone}:${uiState.errorRecovered}`;
+        }
+        input.addEventListener('focus', () => {
+          uiState.focused = true;
+          redraw('focus');
+        });
+        input.addEventListener('input', () => {
+          uiState.input = input.value;
+          redraw('input');
+        });
+        input.addEventListener('change', () => {
+          uiState.changed = true;
+          redraw('change');
+        });
+        list.addEventListener('change', () => {
+          uiState.selected = list.value;
+          redraw('select');
+        });
+        button.addEventListener('click', () => {
+          uiState.clicked = true;
+          redraw('click');
+        });
+        panel.appendChild(text);
+        panel.appendChild(input);
+        panel.appendChild(list);
+        panel.appendChild(button);
+        layout.appendChild(panel);
+        productionRoot.appendChild(layout);
+        host.appendChild(productionRoot);
+        mark('window-mount', host.getAttribute('data-tetra-widget') === 'window', 'missing window widget marker');
+        mark('root-mount', document.querySelector('[data-tetra-widget="root"]') !== null, 'missing root');
+        mark('layout', document.querySelector('[data-tetra-widget="layout"]') !== null, 'missing layout');
+        mark('panel', document.querySelector('[data-tetra-widget="panel"]') !== null, 'missing panel');
+        mark('text', document.querySelector('[data-tetra-widget="text"]') !== null, 'missing text');
+        mark('input', document.querySelector('[data-tetra-widget="input"]') !== null, 'missing input');
+        mark('list', document.querySelector('[data-tetra-widget="list"]') !== null, 'missing list');
+        mark('button', document.querySelector('[data-tetra-widget="button"]') !== null, 'missing button');
+        input.dispatchEvent(new Event('focus', { bubbles: true }));
+        mark('focus', uiState.focused, 'focus did not update state');
+        input.value = 'tetra-web';
+        input.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'tetra-web' }));
+        mark('input-event', uiState.input === 'tetra-web', `input=${uiState.input}`);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        mark('change', uiState.changed, 'change did not update state');
+        list.value = 'item-2';
+        list.dispatchEvent(new Event('change', { bubbles: true }));
+        mark('select', uiState.selected === 'item-2', `selected=${uiState.selected}`);
+        const generatedButton = Array.from(host.querySelectorAll('button')).find((node) => node.textContent.includes('event click ->'));
+        const generatedBinding = host.querySelector('[data-tetra-binding="countValue"]');
+        const bindingBefore = generatedBinding ? generatedBinding.textContent : '';
+        if (generatedButton) {
+          generatedButton.click();
+        }
+        button.click();
+        mark('click', uiState.clicked, 'click did not update state');
+        const bindingAfter = generatedBinding ? generatedBinding.textContent : '';
+        mark('redraw-update', uiState.redraws > 0 && text.textContent.includes('click'), `redraws=${uiState.redraws}`);
+        if (!generatedButton || !generatedBinding || bindingBefore === bindingAfter) {
+          throw new Error('ui command dispatch did not update generated binding');
+        }
         trace.push('ui-event-dispatch:web-command-dispatch');
+        await new Promise((resolve) => setTimeout(() => {
+          uiState.timer = true;
+          redraw('timer');
+          resolve();
+        }, 0));
+        mark('timer', uiState.timer, 'timer did not fire');
+        await Promise.resolve().then(() => {
+          uiState.asyncDone = true;
+          redraw('async');
+        });
+        mark('async-command', uiState.asyncDone, 'async command did not complete');
+        try {
+          throw new Error('recoverable-ui-command');
+        } catch (err) {
+          uiState.errorRecovered = String(err && err.message ? err.message : err).includes('recoverable');
+          redraw('recovered');
+        }
+        mark('error-recovery', uiState.errorRecovered, 'recoverable error was not handled');
         const code = await runMainProbe();
         mark('main-exit', code === 0, `exit=${code}`);
         const stdoutStart = logs.length;
@@ -462,7 +585,7 @@ HTML
           result="$(sed -n 's/.*id="result">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
           runtime_trace="$(sed -n 's/.*id="runtime-trace">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
           if [[ "$result" == ok:* ]]; then
-            for marker in main-exit:ok stdout:ok nonzero-exit:ok failure-propagation:ok repeated-instantiation:ok ui-event-dispatch:web-command-dispatch; do
+            for marker in main-exit:ok stdout:ok nonzero-exit:ok failure-propagation:ok repeated-instantiation:ok main-instantiation:ok window-mount:ok root-mount:ok layout:ok text:ok button:ok input:ok list:ok panel:ok focus:ok input-event:ok change:ok select:ok click:ok timer:ok async-command:ok redraw-update:ok error-recovery:ok ui-event-dispatch:web-command-dispatch; do
               if [[ "$runtime_trace" != *"$marker"* ]]; then
                 status="fail"
                 blocker="browser runtime trace missing ${marker}"
