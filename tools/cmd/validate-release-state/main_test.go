@@ -1042,6 +1042,46 @@ func TestReleaseStateV1ReportDirAuditsFreshArchiveInsteadOfDocsGenerated(t *test
 	}
 }
 
+func TestReleaseStateRejectsMissingV1BackendSummary(t *testing.T) {
+	reportDir := "/tmp/tetra-v1_0-gate"
+	version := "v1.0.0"
+	gitHead := "abcdef0"
+	files := releaseStateV1FreshFiles(reportDir, version, gitHead)
+	delete(files, reportDir+"/artifacts/backend-summary.md")
+	readFile := func(path string) ([]byte, error) {
+		raw, ok := files[path]
+		if !ok {
+			return nil, errNotExist(path)
+		}
+		return raw, nil
+	}
+	statFile := func(path string) (fileInfo, error) {
+		raw, ok := files[path]
+		if !ok {
+			return nil, errNotExist(path)
+		}
+		return fakeFileInfo{size: int64(len(raw))}, nil
+	}
+	report := buildReleaseStateReport(releaseStateInputs{
+		Branch:          "main",
+		Version:         version,
+		ExpectedVersion: version,
+		ReportDir:       reportDir,
+		GitHead:         gitHead,
+		GitStatus:       nil,
+		ReadFile:        readFile,
+		StatFile:        statFile,
+		Freshness:       []freshnessCheck{{Name: "docs/generated/manifest.json", Status: "pass"}},
+	})
+	if report.Status != "fail" {
+		t.Fatalf("status = %q, want fail", report.Status)
+	}
+	got := strings.Join(report.Issues, "\n")
+	if !strings.Contains(got, "missing required release artifact: "+reportDir+"/artifacts/backend-summary.md") {
+		t.Fatalf("issues did not require backend summary artifact: %v", report.Issues)
+	}
+}
+
 func TestReleaseStateRejectsNonCanonicalV1GateCommand(t *testing.T) {
 	reportDir := "/tmp/tetra-v1_0-gate"
 	gitHead := "abcdef0"

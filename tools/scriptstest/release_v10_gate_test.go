@@ -36,6 +36,7 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 		`run_step "build-only smoke linux-x64"`,
 		`run_step "build-only smoke macos-x64"`,
 		`run_step "build-only smoke windows-x64"`,
+		`run_step "backend summary artifact" check_backend_summary`,
 		`run_step "API diff gate" check_api_diff`,
 		`run_step "reproducible build proof" check_repro_build`,
 		`run_step "release state audit" check_release_state`,
@@ -139,6 +140,7 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 		"build-only smoke linux-x64",
 		"build-only smoke macos-x64",
 		"build-only smoke windows-x64",
+		"backend summary artifact",
 		"API diff gate",
 		"reproducible build proof",
 		"release state audit",
@@ -150,6 +152,7 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 	for _, artifact := range []string{
 		"artifacts/wasi-smoke.json",
 		"artifacts/web-ui-smoke.json",
+		"artifacts/backend-summary.md",
 		"artifacts/api-diff/api-diff.json",
 		"artifacts/reproducible-build.json",
 	} {

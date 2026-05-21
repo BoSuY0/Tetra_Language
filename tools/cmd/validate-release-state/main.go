@@ -449,6 +449,7 @@ func v1ReportDirRequiredArtifacts(reportDir string) []string {
 		join("artifacts", "wasi-smoke.artifact.json"),
 		join("artifacts", "wasi-smoke.json"),
 		join("artifacts", "web-ui-smoke.json"),
+		join("artifacts", "backend-summary.md"),
 		join("artifacts", "api-diff", "api-docs.md"),
 		join("artifacts", "api-diff", "api-diff.json"),
 		join("artifacts", "tetra-docs.md"),

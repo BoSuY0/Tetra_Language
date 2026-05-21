@@ -313,6 +313,28 @@ check_web_runtime_smoke() {
   go run ./tools/cmd/validate-web-ui-smoke --report "$artifacts_dir/web-ui-smoke.json"
 }
 
+check_backend_summary() {
+  local summary="$artifacts_dir/backend-summary.md"
+  local commit
+  local version
+  commit="$(git rev-parse HEAD)"
+  version="$(./tetra version)"
+  cat >"$summary" <<SUMMARY
+# Tetra $release_version Backend Summary
+
+- commit: \`$commit\`
+- version: \`$version\`
+- report_dir: \`$report_dir\`
+- native target reports: \`artifacts/host-smoke.json\`, \`artifacts/linux-smoke.json\`, \`artifacts/macos-smoke.json\`, \`artifacts/windows-smoke.json\`
+- WASM artifact/import reports: \`artifacts/wasm32-wasi-artifact-smoke.json\`, \`artifacts/wasm32-web-artifact-smoke.json\`
+- WASI runtime report: \`artifacts/wasi-smoke.json\`
+- Web UI runtime report: \`artifacts/web-ui-smoke.json\`
+- UI/native boundary: Linux-x64 desktop GUI production evidence is covered by the post-v0.4 WASM/UI/GUI gate; v1 target-matrix evidence does not claim cross-platform native widget runtime.
+- residual backend risks: None recorded by the gate; update \`artifacts/known_issues.md\` before release if review finds an accepted backend risk.
+SUMMARY
+  test -s "$summary"
+}
+
 check_api_diff() {
   bash scripts/release/v1_0/api-diff.sh --report-dir "$artifacts_dir/api-diff" --baseline docs/baselines/api-diff-baseline.v1alpha1.json --enforce no-change
 }
@@ -470,6 +492,7 @@ run_step "Web artifact/import smoke" sh -c './tetra smoke --target wasm32-web --
 
 run_step "WASI runner smoke" check_wasi_runner_smoke
 run_step "Web runtime browser smoke" check_web_runtime_smoke
+run_step "backend summary artifact" check_backend_summary
 run_step "security review signoff" check_security_review_signoff
 run_step "security review detached hash" write_security_review_detached_hash
 run_step "API diff gate" check_api_diff

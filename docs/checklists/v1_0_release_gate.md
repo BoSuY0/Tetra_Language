@@ -115,6 +115,7 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 - [ ] `<report-dir>/artifacts/wasi-smoke.artifact.json`
 - [ ] `<report-dir>/artifacts/wasi-smoke.json`
 - [ ] `<report-dir>/artifacts/web-ui-smoke.json`
+- [ ] `<report-dir>/artifacts/backend-summary.md`
 - [ ] `<report-dir>/artifacts/api-diff/api-docs.md`
 - [ ] `<report-dir>/artifacts/api-diff/api-diff.json`
 - [ ] `<report-dir>/artifacts/tetra-docs.md`
