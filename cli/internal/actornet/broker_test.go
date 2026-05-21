@@ -60,6 +60,9 @@ func TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport(t *testing.T) {
 
 	got := readTestFrame(t, node2)
 	assertFrame(t, got, want)
+	waitForBrokerReport(t, broker, func(report Report) bool {
+		return report.RoutedFrames == 1
+	})
 
 	stop()
 
@@ -77,6 +80,18 @@ func TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport(t *testing.T) {
 	if report.RoutedFrames != 1 || report.AcceptedConnections != 2 {
 		t.Fatalf("report counts = routed %d accepted %d, want 1/2", report.RoutedFrames, report.AcceptedConnections)
 	}
+}
+
+func waitForBrokerReport(t *testing.T, broker *Broker, done func(Report) bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if report := broker.Report(); done(report) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("broker report condition was not met before timeout: %+v", broker.Report())
 }
 
 func TestBrokerReportsNodeDownForMissingDestination(t *testing.T) {

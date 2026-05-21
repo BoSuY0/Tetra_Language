@@ -21,6 +21,11 @@ CI fan-in:
 
 Manual target-host evidence:
 
+- To prepare a request bundle with the exact commit, version, and target-host
+  commands, run `bash scripts/release/full_platform/target-host-evidence-request.sh
+  --out-dir reports/full-platform-ui-runtime/target-host-request`. The bundle is
+  not runtime evidence; it is only a handoff for collecting real Windows/macOS
+  reports from the same Git commit.
 - Check out the same Git commit on a real Windows amd64 host and run
   `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
   --target windows-x64 --report windows-ui-runtime.json`.

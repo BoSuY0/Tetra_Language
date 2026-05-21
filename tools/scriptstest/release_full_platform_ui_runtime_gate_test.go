@@ -1,7 +1,9 @@
 package scriptstest
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -54,6 +56,7 @@ func TestReleaseFullPlatformSmokeScriptsExist(t *testing.T) {
 		"scripts/release/full_platform/README.md",
 		"scripts/release/full_platform/actions-availability-preflight.sh",
 		"scripts/release/full_platform/github-actions-startup-diagnostic.sh",
+		"scripts/release/full_platform/target-host-evidence-request.sh",
 		"scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
 		"scripts/release/full_platform/windows-ui-runtime-smoke.ps1",
 		"scripts/release/full_platform/windows-ui-runtime-smoke.sh",
@@ -184,6 +187,7 @@ func TestReleaseFullPlatformTargetHostHelperDocumentsManualEvidence(t *testing.T
 	readme := string(readmeRaw)
 	for _, want := range []string{
 		"Manual target-host evidence",
+		"target-host-evidence-request.sh",
 		"bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh",
 		"pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1",
 		"TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json",
@@ -194,6 +198,82 @@ func TestReleaseFullPlatformTargetHostHelperDocumentsManualEvidence(t *testing.T
 	} {
 		if !strings.Contains(readme, want) {
 			t.Fatalf("full-platform README missing manual evidence detail %q", want)
+		}
+	}
+}
+
+func TestReleaseFullPlatformTargetHostEvidenceRequestBundle(t *testing.T) {
+	scriptPath := filepath.Join(repoRoot(t), "scripts", "release", "full_platform", "target-host-evidence-request.sh")
+	raw, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read target-host evidence request helper: %v", err)
+	}
+	script := string(raw)
+	for _, want := range []string{
+		"Usage: bash scripts/release/full_platform/target-host-evidence-request.sh [--out-dir DIR] [--repo OWNER/REPO] [--branch BRANCH]",
+		"tetra.ui.target-host-evidence-request.v1",
+		"production_evidence: false",
+		"windows-ui-runtime-smoke.ps1",
+		"target-host-ui-runtime-smoke.sh --target macos-x64",
+		"TETRA_WINDOWS_UI_RUNTIME_REPORT",
+		"TETRA_MACOS_UI_RUNTIME_REPORT",
+		"not runtime evidence",
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("target-host evidence request helper missing %q", want)
+		}
+	}
+
+	outDir := t.TempDir()
+	cmd := exec.Command("bash", scriptPath, "--out-dir", outDir, "--repo", "BoSuY0/Tetra_Language", "--branch", "codex/full-platform-ui-runtime")
+	cmd.Dir = repoRoot(t)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("target-host evidence request helper failed: %v\n%s", err, output)
+	}
+	reportPath := filepath.Join(outDir, "target-host-evidence-request.json")
+	reportRaw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read target-host evidence request json: %v", err)
+	}
+	var report struct {
+		Schema             string `json:"schema"`
+		ProductionEvidence bool   `json:"production_evidence"`
+		ExpectedVersion    string `json:"expected_version"`
+		ExpectedGitHead    string `json:"expected_git_head"`
+		Targets            []struct {
+			Target  string `json:"target"`
+			Command string `json:"command"`
+		} `json:"targets"`
+		Aggregation struct {
+			Command string `json:"command"`
+		} `json:"aggregation"`
+	}
+	if err := json.Unmarshal(reportRaw, &report); err != nil {
+		t.Fatalf("decode target-host evidence request json: %v", err)
+	}
+	if report.Schema != "tetra.ui.target-host-evidence-request.v1" {
+		t.Fatalf("schema = %q", report.Schema)
+	}
+	if report.ProductionEvidence {
+		t.Fatalf("target-host evidence request must not be production evidence")
+	}
+	if report.ExpectedVersion != "v0.4.0" || strings.TrimSpace(report.ExpectedGitHead) == "" {
+		t.Fatalf("request missing expected version/head: %#v", report)
+	}
+	if len(report.Targets) != 2 {
+		t.Fatalf("target count = %d, want 2", len(report.Targets))
+	}
+	if !strings.Contains(report.Aggregation.Command, "ui-runtime-gate.sh") {
+		t.Fatalf("aggregation command missing gate: %q", report.Aggregation.Command)
+	}
+	readmeRaw, err := os.ReadFile(filepath.Join(outDir, "README.md"))
+	if err != nil {
+		t.Fatalf("read generated README: %v", err)
+	}
+	for _, want := range []string{"not runtime evidence", "same Git commit", "windows-ui-runtime-smoke.ps1", "macos-ui-runtime.json"} {
+		if !strings.Contains(string(readmeRaw), want) {
+			t.Fatalf("generated README missing %q", want)
 		}
 	}
 }
