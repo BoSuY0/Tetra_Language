@@ -3,7 +3,10 @@ set -euo pipefail
 
 report_path=""
 
-: "${GOCACHE:=/tmp/tetra-go-cache}"
+if [[ -z "${GOCACHE:-}" ]]; then
+  cache_home="${XDG_CACHE_HOME:-${HOME:?HOME must be set}/.cache}"
+  GOCACHE="$cache_home/tetra-language/go-build"
+fi
 mkdir -p "$GOCACHE"
 export GOCACHE
 

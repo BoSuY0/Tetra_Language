@@ -40,6 +40,10 @@ func run(args []string) error {
 		return err
 	}
 
+	if _, err := removePreviousDumpFiles(dumpDir); err != nil {
+		return err
+	}
+
 	cmdArgs := append([]string{"run", "./tools/cmd/dump-project"}, forwardArgs...)
 	cmd := exec.Command("go", cmdArgs...)
 	cmd.Dir = root
@@ -77,6 +81,7 @@ func printUsage() {
 
 Creates project dump artifacts under ./dumps/ while preserving gitignore filtering.
 Each dump artifact is Markdown and is capped at 10 MiB per .md file.
+Before creating a new dump, existing top-level files under ./dumps/ are removed.
 
 Common examples:
   go run ./create_dumps.go
@@ -87,6 +92,7 @@ Output rules:
   --out may be a file name or a path inside dumps/.
   Plain file names are written as dumps/<name>.md.
   Larger dumps are split as dumps/<name>_part_001.md, dumps/<name>_part_002.md, ...
+  .gitignore is always applied, including tracked files that match ignore rules.
 
 Disabled here:
   --root, --no-git, --include-ignored, --include-dumps, --include-dotenv, --file-list
@@ -297,6 +303,32 @@ func removeExistingChunks(path string) error {
 		}
 	}
 	return nil
+}
+
+func removePreviousDumpFiles(dumpDir string) (int, error) {
+	entries, err := os.ReadDir(dumpDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("read dumps directory: %w", err)
+	}
+
+	removed := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(dumpDir, entry.Name())
+		if err := os.Remove(path); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return removed, fmt.Errorf("remove previous dump file %s: %w", path, err)
+		}
+		removed++
+	}
+	return removed, nil
 }
 
 func intFromInt64(value int64) (int, error) {

@@ -65,7 +65,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$report_dir" ]]; then
-  report_dir="/tmp/release-${release_slug}-gate-$(date -u +%Y%m%d-%H%M%S)"
+  state_home="${XDG_STATE_HOME:-${HOME:?HOME must be set}/.local/state}"
+  report_dir="$state_home/tetra-language/release-${release_slug}-gate-$(date -u +%Y%m%d-%H%M%S)"
 fi
 if [[ "$report_dir" == -* ]]; then
   report_dir="./$report_dir"

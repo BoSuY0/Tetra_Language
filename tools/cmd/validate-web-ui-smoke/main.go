@@ -18,6 +18,7 @@ const uiBundleSchema = "tetra.ui.v1"
 const uiEventDispatchBoundaryTrace = "ui-event-dispatch:web-command-dispatch"
 const uiBundleSchemaArtifactID = "tetra.ui.v1.schema.json"
 const defaultUIBundleSchemaArtifactPath = "docs/schemas/tetra.ui.v1.schema.json"
+const defaultMaxWebUISmokeAge = 7 * 24 * time.Hour
 
 type webUISmokeReport struct {
 	Schema             string `json:"schema"`
@@ -139,21 +140,38 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := validateWebUISmokeReport(report); err != nil {
+	if err := validateWebUISmokeReportAt(report, time.Now().UTC(), defaultMaxWebUISmokeAge); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateWebUISmokeReport(report webUISmokeReport) error {
+	return validateWebUISmokeReportAt(report, time.Time{}, 0)
+}
+
+func validateWebUISmokeReportAt(report webUISmokeReport, now time.Time, maxAge time.Duration) error {
 	if report.Schema != webUISmokeSchema {
 		return fmt.Errorf("web UI smoke schema = %q, want %q", report.Schema, webUISmokeSchema)
 	}
 	if report.GeneratedAt == "" {
 		return fmt.Errorf("web UI smoke missing generated_at")
 	}
-	if _, err := time.Parse(time.RFC3339, report.GeneratedAt); err != nil {
+	generatedAt, err := time.Parse(time.RFC3339, report.GeneratedAt)
+	if err != nil {
 		return fmt.Errorf("web UI smoke generated_at is not RFC3339: %w", err)
+	}
+	if !now.IsZero() {
+		if maxAge == 0 {
+			maxAge = defaultMaxWebUISmokeAge
+		}
+		now = now.UTC()
+		if generatedAt.After(now.Add(5 * time.Minute)) {
+			return fmt.Errorf("web UI smoke generated_at %s is in the future relative to %s", generatedAt.Format(time.RFC3339), now.Format(time.RFC3339))
+		}
+		if now.Sub(generatedAt) > maxAge {
+			return fmt.Errorf("web UI smoke generated_at %s is stale; max age is %s", generatedAt.Format(time.RFC3339), maxAge)
+		}
 	}
 	if report.Target != "wasm32-web" {
 		return fmt.Errorf("web UI smoke target = %q, want wasm32-web", report.Target)
@@ -231,6 +249,21 @@ func validateRuntimeTrace(trace string) error {
 		return fmt.Errorf("web UI smoke pass missing runtime_trace")
 	}
 	for _, marker := range []string{
+		"window/root mount:ok",
+		"layout:ok",
+		"text:ok",
+		"button:ok",
+		"input:ok",
+		"list:ok",
+		"panel:ok",
+		"focus:ok",
+		"change:ok",
+		"select:ok",
+		"click:ok",
+		"timer:ok",
+		"async command:ok",
+		"redraw/update:ok",
+		"error recovery:ok",
 		"main-exit:ok",
 		"stdout:ok",
 		"nonzero-exit:ok",

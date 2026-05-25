@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
-const validWebUIRuntimeTrace = "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch"
+const validWebUIRuntimeTrace = "window/root mount:ok;layout:ok;text:ok;button:ok;input:ok;list:ok;panel:ok;focus:ok;change:ok;select:ok;click:ok;timer:ok;async command:ok;redraw/update:ok;error recovery:ok;main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch"
 
 func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
 	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
@@ -113,6 +114,32 @@ func TestValidateWebUISmokeReportAcceptsHostBlockedReport(t *testing.T) {
 	}
 }
 
+func TestValidateWebUISmokeReportRejectsStaleGeneratedAt(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
+	report := webUISmokeReport{
+		Schema:             "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:        "2026-04-20T12:00:00Z",
+		Target:             "wasm32-web",
+		UIScopeActive:      true,
+		Source:             "examples/projects/dogfood_web_ui/src/main.tetra",
+		UsedFallbackSource: false,
+		Automation:         "chromium --headless --dump-dom",
+		Status:             "pass",
+		Result:             "ok:0",
+		RuntimeTrace:       validWebUIRuntimeTrace,
+		DOMSnapshot:        domSnapshotPath,
+		UISchema:           "tetra.ui.v1",
+		UIBundlePath:       uiBundlePath,
+		UIModulePath:       uiModulePath,
+	}
+	now := time.Date(2026, 4, 27, 12, 0, 0, 0, time.UTC)
+	err := validateWebUISmokeReportAt(report, now, 24*time.Hour)
+	if err == nil || !strings.Contains(err.Error(), "stale") {
+		t.Fatalf("expected stale generated_at rejection, got %v", err)
+	}
+}
+
 func TestValidateWebUISmokeReportRejectsFallbackPass(t *testing.T) {
 	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
 	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
@@ -197,6 +224,31 @@ func TestValidateWebUISmokeReportRejectsPassWithoutOKResult(t *testing.T) {
 	err := validateWebUISmokeReport(report)
 	if err == nil || !strings.Contains(err.Error(), "ok:") {
 		t.Fatalf("expected missing ok result rejection, got %v", err)
+	}
+}
+
+func TestValidateWebUISmokeReportRejectsPassWithoutFullPlatformRuntimeMarkers(t *testing.T) {
+	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
+	domSnapshotPath := writeWebUIDOMSnapshotArtifact(t)
+	report := webUISmokeReport{
+		Schema:             "tetra.web-ui-smoke.v1alpha1",
+		GeneratedAt:        "2026-04-27T12:00:00Z",
+		Target:             "wasm32-web",
+		UIScopeActive:      true,
+		Source:             "examples/projects/dogfood_web_ui/src/main.tetra",
+		UsedFallbackSource: false,
+		Automation:         "chromium --headless --dump-dom",
+		Status:             "pass",
+		Result:             "ok:0:ui=1",
+		RuntimeTrace:       "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch",
+		DOMSnapshot:        domSnapshotPath,
+		UISchema:           "tetra.ui.v1",
+		UIBundlePath:       uiBundlePath,
+		UIModulePath:       uiModulePath,
+	}
+	err := validateWebUISmokeReport(report)
+	if err == nil || !strings.Contains(err.Error(), "window/root mount") {
+		t.Fatalf("expected full-platform runtime marker rejection, got %v", err)
 	}
 }
 
@@ -421,7 +473,7 @@ func TestValidateWebUISmokeReportRejectsPassWithIncompleteRuntimeTrace(t *testin
 		Automation:    "chromium --headless --dump-dom",
 		Status:        "pass",
 		Result:        "ok:0",
-		RuntimeTrace:  "main-exit:ok;stdout:ok;nonzero-exit:ok;repeated-instantiation:ok",
+		RuntimeTrace:  strings.Replace(validWebUIRuntimeTrace, "failure-propagation:ok;", "", 1),
 		DOMSnapshot:   domSnapshotPath,
 		UISchema:      "tetra.ui.v1",
 		UIBundlePath:  uiBundlePath,
@@ -445,7 +497,7 @@ func TestValidateWebUISmokeReportRejectsPassWithoutUIEventDispatchBoundaryTrace(
 		Automation:    "chromium --headless --dump-dom",
 		Status:        "pass",
 		Result:        "ok:0",
-		RuntimeTrace:  "main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok",
+		RuntimeTrace:  strings.Replace(validWebUIRuntimeTrace, ";ui-event-dispatch:web-command-dispatch", "", 1),
 		DOMSnapshot:   domSnapshotPath,
 		UISchema:      "tetra.ui.v1",
 		UIBundlePath:  uiBundlePath,

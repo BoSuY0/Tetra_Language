@@ -529,11 +529,11 @@ check_cross_target_smoke() {
 
 check_wasm_smoke_schema() {
   local target="$1"
-  local report="$report_dir/$target-smoke.json"
-  test -s "$report"
-  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report"
+  local report="$report_dir/$target-artifact-smoke.json"
+  test -s "$report" || return 1
+  go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report" || return 1
   if [[ "$target" == "wasm32-wasi" ]]; then
-    go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$report"
+    go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$report" || return 1
   fi
 }
 

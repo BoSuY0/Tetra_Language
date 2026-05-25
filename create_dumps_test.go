@@ -56,3 +56,41 @@ func TestSplitDumpFileKeepsChunksUnderLimitAndMarkdown(t *testing.T) {
 		t.Fatalf("source dump should be replaced by chunks, stat error = %v", err)
 	}
 }
+
+func TestRemovePreviousDumpFilesDeletesTopLevelFilesOnly(t *testing.T) {
+	root := t.TempDir()
+	dumpDir := filepath.Join(root, "dumps")
+	if err := os.MkdirAll(filepath.Join(dumpDir, "kept"), 0o755); err != nil {
+		t.Fatalf("mkdir dumps: %v", err)
+	}
+	oldFiles := []string{
+		filepath.Join(dumpDir, "project_dump_20260520_225713Z_part_001.md"),
+		filepath.Join(dumpDir, "project_dump_20260520_225713Z_part_002.md"),
+		filepath.Join(dumpDir, "project_dump_20260520_225713Z.txt"),
+	}
+	for _, path := range oldFiles {
+		if err := os.WriteFile(path, []byte("old dump"), 0o644); err != nil {
+			t.Fatalf("write old dump %q: %v", path, err)
+		}
+	}
+	nested := filepath.Join(dumpDir, "kept", "note.md")
+	if err := os.WriteFile(nested, []byte("not a top-level dump"), 0o644); err != nil {
+		t.Fatalf("write nested file: %v", err)
+	}
+
+	removed, err := removePreviousDumpFiles(dumpDir)
+	if err != nil {
+		t.Fatalf("remove previous dump files: %v", err)
+	}
+	if removed != len(oldFiles) {
+		t.Fatalf("removed = %d, want %d", removed, len(oldFiles))
+	}
+	for _, path := range oldFiles {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("old dump %q should be removed, stat error = %v", path, err)
+		}
+	}
+	if _, err := os.Stat(nested); err != nil {
+		t.Fatalf("nested file should be preserved: %v", err)
+	}
+}

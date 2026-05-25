@@ -66,7 +66,7 @@ func TestCIWorkflowHasLeastPrivilegeConcurrencyAndTimeouts(t *testing.T) {
 		"supply-chain-vulnerability-scan-linux:",
 		"fuzz-short-linux:",
 		"fuzz-nightly-linux:",
-		"release-v0-3-0-gate-linux:",
+		"release-v0-4-0-readiness-linux:",
 		"lint-workflows-and-shell-linux:",
 	} {
 		if !workflowJobHasField(text, job, "timeout-minutes:") {
@@ -101,28 +101,36 @@ func TestCIWorkflowIncludesSupplyChainVulnerabilityScan(t *testing.T) {
 	}
 }
 
-func TestCIWorkflowIncludesCanonicalV030ReleaseGateJob(t *testing.T) {
+func TestCIWorkflowIncludesCurrentV040ReleaseReadinessJob(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatalf("read ci workflow: %v", err)
 	}
 	text := string(raw)
 	for _, want := range []string{
-		"release-v0-3-0-gate-linux:",
+		"release-v0-4-0-readiness-linux:",
 		"github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
 		"needs: test",
-		"TETRA_RELEASE_GATE_CI_ALLOW_MISSING_SECURITY_SIGNOFF: \"1\"",
-		"TETRA_MACOS_RUNTIME_SMOKE_REPORT: reports/ci-smoke-runtime/tetra-v0.3.0-${{ github.sha }}-smoke-macOS/smoke_macos-x64.json",
-		"TETRA_WINDOWS_RUNTIME_SMOKE_REPORT: reports/ci-smoke-runtime/tetra-v0.3.0-${{ github.sha }}-smoke-Windows/smoke_windows-x64.json",
-		"uses: actions/download-artifact@v4",
-		"pattern: tetra-v0.3.0-${{ github.sha }}-smoke-*",
-		"bash scripts/release/v0_3_0/gate.sh --report-dir reports/ci-release-v0.3.0-gate",
-		"name: tetra-v0.3.0-${{ github.sha }}-release-gate-linux",
-		"path: reports/ci-release-v0.3.0-gate",
+		"mkdir -p reports/ci-release-v0.4.0-readiness",
+		"./tetra features --format=json > reports/ci-release-v0.4.0-readiness/features.json",
+		"./tetra targets --format=json > reports/ci-release-v0.4.0-readiness/targets.json",
+		"go run ./tools/cmd/validate-v0-4-readiness \\",
+		"--expected-version v0.4.0 \\",
+		"--features reports/ci-release-v0.4.0-readiness/features.json \\",
+		"--targets reports/ci-release-v0.4.0-readiness/targets.json \\",
+		"--manifest docs/generated/manifest.json \\",
+		"--scope-decisions docs/release/v0_4_0_scope_decisions.json",
+		"go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+		"go run ./tools/cmd/validate-v0-4-completion-audit --audit docs/release/v0_4_0_completion_audit.md --expected-status achieved",
+		"name: tetra-v0.4.0-${{ github.sha }}-release-readiness-linux",
+		"path: reports/ci-release-v0.4.0-readiness",
 	} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("ci workflow missing canonical v0.3.0 release gate detail %q", want)
+			t.Fatalf("ci workflow missing current v0.4.0 release readiness detail %q", want)
 		}
+	}
+	if strings.Contains(text, "v0.3.0") || strings.Contains(text, "v0_3_0") {
+		t.Fatalf("ci workflow contains stale v0.3 release assumptions")
 	}
 }
 
@@ -133,13 +141,13 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 	}
 	names := workflowUploadArtifactNames(string(raw))
 	want := []string{
-		"tetra-v0.3.0-${{ github.sha }}-smoke-${{ runner.os }}",
-		"tetra-v0.3.0-${{ github.sha }}-test-all-quick-linux",
-		"tetra-v0.3.0-${{ github.sha }}-test-all-stabilization-linux",
-		"tetra-v0.3.0-${{ github.sha }}-release-gate-linux",
-		"tetra-v0.3.0-${{ github.sha }}-coverage-linux",
-		"tetra-v0.3.0-${{ github.sha }}-fuzz-short-linux",
-		"tetra-v0.3.0-${{ github.sha }}-fuzz-nightly-linux",
+		"tetra-v0.4.0-${{ github.sha }}-smoke-${{ runner.os }}",
+		"tetra-v0.4.0-${{ github.sha }}-test-all-quick-linux",
+		"tetra-v0.4.0-${{ github.sha }}-test-all-stabilization-linux",
+		"tetra-v0.4.0-${{ github.sha }}-release-readiness-linux",
+		"tetra-v0.4.0-${{ github.sha }}-coverage-linux",
+		"tetra-v0.4.0-${{ github.sha }}-fuzz-short-linux",
+		"tetra-v0.4.0-${{ github.sha }}-fuzz-nightly-linux",
 	}
 	if len(names) != len(want) {
 		t.Fatalf("ci workflow upload-artifact names = %v, want %v", names, want)
@@ -150,7 +158,7 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		}
 	}
 	for _, name := range names {
-		for _, wantPart := range []string{"v0.3.0", "${{ github.sha }}"} {
+		for _, wantPart := range []string{"v0.4.0", "${{ github.sha }}"} {
 			if !strings.Contains(name, wantPart) {
 				t.Fatalf("ci workflow artifact name %q missing release-aware metadata %q", name, wantPart)
 			}

@@ -48,12 +48,14 @@ func TestValidateReportRequiresLatencyPercentilesAndIntegrityMetadata(t *testing
 	report.Git.WorktreeStatus = ""
 	report.Endpoints[0].P99LatencyMS = -1
 	report.Endpoints[1].P999LatencyMS = -1
+	report.Endpoints[2].ObservedContentType = ""
+	report.Endpoints[3].SemanticChecks = nil
 	raw := mustReportJSON(t, report)
 	err := ValidateReport(raw, Options{})
 	if err == nil {
 		t.Fatalf("ValidateReport accepted missing integrity metadata")
 	}
-	for _, want := range []string{"generated_local_at", "environment", "git", "invalid timing metrics"} {
+	for _, want := range []string{"generated_local_at", "environment", "git", "invalid timing metrics", "observed content type", "semantic checks"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("ValidateReport error missing %q: %v", want, err)
 		}
@@ -70,6 +72,16 @@ func TestValidateCheckedInSmokeReport(t *testing.T) {
 	}
 }
 
+func TestValidateCheckedInSCRAMReport(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM report: %v", err)
+	}
+	if err := ValidateReport(raw, Options{}); err != nil {
+		t.Fatalf("ValidateReport checked-in SCRAM report: %v", err)
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {
@@ -78,27 +90,29 @@ func reportFixture(skipDB bool) Report {
 	endpoints := make([]EndpointReport, 0, len(paths))
 	for _, path := range paths {
 		endpoints = append(endpoints, EndpointReport{
-			Name:          endpointName(path),
-			Path:          path,
-			Kind:          "contract",
-			Status:        "pass",
-			HTTPStatus:    200,
-			Requests:      4,
-			Successes:     4,
-			Failures:      0,
-			Bytes:         52,
-			RPS:           100,
-			AvgLatencyMS:  1,
-			P50LatencyMS:  1,
-			P90LatencyMS:  2,
-			P95LatencyMS:  2,
-			P99LatencyMS:  2,
-			P999LatencyMS: 2,
-			MaxLatencyMS:  2,
-			Threshold:     "min_rps >= 1",
-			ThresholdPass: true,
-			Validation:    "HTTP status, content type, and endpoint body contract checked",
-			Evidence:      "real HTTP request/response validation and concurrent load completed",
+			Name:                endpointName(path),
+			Path:                path,
+			Kind:                "contract",
+			Status:              "pass",
+			HTTPStatus:          200,
+			Requests:            4,
+			Successes:           4,
+			Failures:            0,
+			Bytes:               52,
+			RPS:                 100,
+			AvgLatencyMS:        1,
+			P50LatencyMS:        1,
+			P90LatencyMS:        2,
+			P95LatencyMS:        2,
+			P99LatencyMS:        2,
+			P999LatencyMS:       2,
+			MaxLatencyMS:        2,
+			ObservedContentType: expectedContentType(path),
+			SemanticChecks:      semanticChecksForPath(path),
+			Threshold:           "min_rps >= 1",
+			ThresholdPass:       true,
+			Validation:          "HTTP status, content type, and endpoint body contract checked",
+			Evidence:            "real HTTP request/response validation and concurrent load completed",
 		})
 	}
 	limitations := []string{"local harness evidence; official TechEmpower publication is not implied"}
@@ -132,6 +146,36 @@ func reportFixture(skipDB bool) Report {
 			Decision:       "pass",
 		},
 		Limitations: limitations,
+	}
+}
+
+func expectedContentType(path string) string {
+	switch path {
+	case "/plaintext":
+		return "text/plain"
+	case "/fortunes":
+		return "text/html; charset=utf-8"
+	default:
+		return "application/json"
+	}
+}
+
+func semanticChecksForPath(path string) []string {
+	switch path {
+	case "/plaintext":
+		return []string{"status 200", "content-type text/plain", "body equals Hello, World!"}
+	case "/json":
+		return []string{"status 200", "content-type application/json", "JSON message equals Hello, World!"}
+	case "/db":
+		return []string{"status 200", "content-type application/json", "World object id/randomNumber range"}
+	case "/queries?queries=2":
+		return []string{"status 200", "content-type application/json", "World array shape"}
+	case "/updates?queries=2":
+		return []string{"status 200", "content-type application/json", "World update array shape"}
+	case "/fortunes":
+		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel"}
+	default:
+		return []string{"status 200"}
 	}
 }
 

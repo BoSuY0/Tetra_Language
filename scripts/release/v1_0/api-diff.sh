@@ -96,7 +96,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$report_dir" ]]; then
-  report_dir="/tmp/tetra-v1-api-diff-$(date -u +%Y%m%d-%H%M%S)"
+  state_home="${XDG_STATE_HOME:-${HOME:?HOME must be set}/.local/state}"
+  report_dir="$state_home/tetra-language/v1-api-diff-$(date -u +%Y%m%d-%H%M%S)"
 fi
 report_dir="$(normalize_relative_dash_path "$report_dir")"
 

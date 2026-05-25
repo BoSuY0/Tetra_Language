@@ -86,6 +86,20 @@ func TestReleaseV10WebSmokeScriptCapturesRuntimeSignals(t *testing.T) {
 	}
 }
 
+func TestReleaseV10WebSmokeScriptWritesUTCGeneratedAt(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release", "v1_0", "web-smoke.sh"))
+	if err != nil {
+		t.Fatalf("read web smoke script: %v", err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, `date -u +%Y-%m-%dT%H:%M:%SZ`) {
+		t.Fatalf("web smoke script must write UTC generated_at timestamps")
+	}
+	if strings.Contains(text, `%(%Y-%m-%dT%H:%M:%SZ)T`) {
+		t.Fatalf("web smoke script must not format local time with a Z suffix")
+	}
+}
+
 func TestReleaseV10WebSmokeScript_bindHTTPServerToLoopback(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release", "v1_0", "web-smoke.sh"))
 	if err != nil {

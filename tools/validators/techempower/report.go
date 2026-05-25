@@ -44,28 +44,30 @@ type GitState struct {
 }
 
 type EndpointReport struct {
-	Name          string  `json:"name"`
-	Path          string  `json:"path"`
-	Kind          string  `json:"kind"`
-	Status        string  `json:"status"`
-	HTTPStatus    int     `json:"http_status"`
-	Requests      int     `json:"requests"`
-	Successes     int     `json:"successes"`
-	Failures      int     `json:"failures"`
-	Bytes         int64   `json:"bytes"`
-	RPS           float64 `json:"rps"`
-	AvgLatencyMS  float64 `json:"avg_latency_ms"`
-	P50LatencyMS  float64 `json:"p50_latency_ms"`
-	P90LatencyMS  float64 `json:"p90_latency_ms"`
-	P95LatencyMS  float64 `json:"p95_latency_ms"`
-	P99LatencyMS  float64 `json:"p99_latency_ms"`
-	P999LatencyMS float64 `json:"p999_latency_ms"`
-	MaxLatencyMS  float64 `json:"max_latency_ms"`
-	Threshold     string  `json:"threshold"`
-	ThresholdPass bool    `json:"threshold_pass"`
-	Validation    string  `json:"validation"`
-	Evidence      string  `json:"evidence"`
-	Error         string  `json:"error,omitempty"`
+	Name                string   `json:"name"`
+	Path                string   `json:"path"`
+	Kind                string   `json:"kind"`
+	Status              string   `json:"status"`
+	HTTPStatus          int      `json:"http_status"`
+	Requests            int      `json:"requests"`
+	Successes           int      `json:"successes"`
+	Failures            int      `json:"failures"`
+	Bytes               int64    `json:"bytes"`
+	RPS                 float64  `json:"rps"`
+	AvgLatencyMS        float64  `json:"avg_latency_ms"`
+	P50LatencyMS        float64  `json:"p50_latency_ms"`
+	P90LatencyMS        float64  `json:"p90_latency_ms"`
+	P95LatencyMS        float64  `json:"p95_latency_ms"`
+	P99LatencyMS        float64  `json:"p99_latency_ms"`
+	P999LatencyMS       float64  `json:"p999_latency_ms"`
+	MaxLatencyMS        float64  `json:"max_latency_ms"`
+	ObservedContentType string   `json:"observed_content_type"`
+	SemanticChecks      []string `json:"semantic_checks"`
+	Threshold           string   `json:"threshold"`
+	ThresholdPass       bool     `json:"threshold_pass"`
+	Validation          string   `json:"validation"`
+	Evidence            string   `json:"evidence"`
+	Error               string   `json:"error,omitempty"`
 }
 
 type Summary struct {
@@ -204,6 +206,16 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 	if endpoint.MaxLatencyMS > 0 && endpoint.P999LatencyMS > endpoint.MaxLatencyMS {
 		issues = append(issues, fmt.Sprintf("endpoint %s p999 latency exceeds max latency", endpoint.Path))
 	}
+	if strings.TrimSpace(endpoint.ObservedContentType) == "" {
+		issues = append(issues, fmt.Sprintf("endpoint %s missing observed content type", endpoint.Path))
+	} else if expected := expectedContentTypePrefix(endpoint.Path); expected != "" && !strings.HasPrefix(endpoint.ObservedContentType, expected) {
+		issues = append(issues, fmt.Sprintf("endpoint %s observed content type = %q, want prefix %q", endpoint.Path, endpoint.ObservedContentType, expected))
+	}
+	if len(endpoint.SemanticChecks) == 0 {
+		issues = append(issues, fmt.Sprintf("endpoint %s missing semantic checks", endpoint.Path))
+	} else {
+		issues = append(issues, validateSemanticChecks(endpoint.Path, endpoint.SemanticChecks)...)
+	}
 	if strings.TrimSpace(endpoint.Threshold) == "" || strings.TrimSpace(endpoint.Validation) == "" || strings.TrimSpace(endpoint.Evidence) == "" {
 		issues = append(issues, fmt.Sprintf("endpoint %s missing threshold/validation/evidence", endpoint.Path))
 	}
@@ -214,6 +226,49 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 		issues = append(issues, fmt.Sprintf("endpoint %s has error: %s", endpoint.Path, endpoint.Error))
 	}
 	return issues
+}
+
+func expectedContentTypePrefix(path string) string {
+	switch path {
+	case "/plaintext":
+		return "text/plain"
+	case "/json", "/db", "/queries?queries=2", "/updates?queries=2":
+		return "application/json"
+	case "/fortunes":
+		return "text/html"
+	default:
+		return ""
+	}
+}
+
+func validateSemanticChecks(path string, checks []string) []string {
+	var issues []string
+	joined := strings.ToLower(strings.Join(checks, "\n"))
+	for _, want := range requiredSemanticCheckMarkers(path) {
+		if !strings.Contains(joined, strings.ToLower(want)) {
+			issues = append(issues, fmt.Sprintf("endpoint %s semantic checks missing %q", path, want))
+		}
+	}
+	return issues
+}
+
+func requiredSemanticCheckMarkers(path string) []string {
+	switch path {
+	case "/plaintext":
+		return []string{"status 200", "content-type text/plain", "body equals Hello, World!"}
+	case "/json":
+		return []string{"status 200", "content-type application/json", "JSON message equals Hello, World!"}
+	case "/db":
+		return []string{"status 200", "content-type application/json", "World object id/randomNumber range"}
+	case "/queries?queries=2":
+		return []string{"status 200", "content-type application/json", "World array shape"}
+	case "/updates?queries=2":
+		return []string{"status 200", "content-type application/json", "World update array shape"}
+	case "/fortunes":
+		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel"}
+	default:
+		return nil
+	}
 }
 
 func validateSummary(summary Summary, endpointCount int, totalRequests int, totalSuccesses int, totalFailures int) []string {

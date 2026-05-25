@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -24,9 +23,7 @@ type dumpOptions struct {
 	outputPath      string
 	maxFileBytes    int64
 	fileListPath    string
-	useGit          bool
 	includeDumps    bool
-	includeIgnored  bool
 	includeDotenv   bool
 	onlyRelPrefixes []string
 	excludePrefixes []string
@@ -124,16 +121,18 @@ var binaryExtensions = map[string]struct{}{
 
 func main() {
 	rootDefault := defaultProjectRoot()
+	if err := rejectDisabledDumpFlags(os.Args[1:]); err != nil {
+		fmt.Fprintf(os.Stderr, "dump failed: %v\n", err)
+		os.Exit(1)
+	}
 
 	var (
 		rootFlag         = flag.String("root", "", "Root directory to dump (default: project root)")
 		outFlag          = flag.String("out", "", "Output file path (default: dumps/<name>_dump_<timestamp>.txt)")
 		fileListFlag     = flag.String("file-list", "", "Text file with rel paths to include (one per line)")
 		maxFileBytesFlag = flag.Int64("max-file-bytes", 1_000_000, "Max file size to include")
-		noGitFlag        = flag.Bool("no-git", false, "Do not use git ls-files; scan filesystem instead")
 		allFlag          = flag.Bool("all", false, "Include all files (disables default --only prefixes)")
 		includeDumpsFlag = flag.Bool("include-dumps", false, "Include dumps/ directory contents")
-		includeIgnored   = flag.Bool("include-ignored", false, "Include git-ignored files")
 		includeDotenv    = flag.Bool("include-dotenv", false, "Include .env and .env.* files")
 		noSummary        = flag.Bool("no-summary", false, "Do not write _summary.txt")
 	)
@@ -173,9 +172,7 @@ func main() {
 		outputPath:      outputPath,
 		maxFileBytes:    *maxFileBytesFlag,
 		fileListPath:    fileListPath,
-		useGit:          !*noGitFlag,
 		includeDumps:    *includeDumpsFlag,
-		includeIgnored:  *includeIgnored,
 		includeDotenv:   *includeDotenv,
 		onlyRelPrefixes: onlyPrefixes,
 		excludePrefixes: excludePrefixes,
@@ -190,6 +187,27 @@ func main() {
 
 	fmt.Printf("Dump created: %s\n", opts.outputPath)
 	fmt.Printf("Included: %d; skipped (binary): %d; skipped (too large): %d\n", included, skippedBinary, skippedLarge)
+}
+
+func rejectDisabledDumpFlags(args []string) error {
+	for _, arg := range args {
+		name := dumpFlagName(arg)
+		switch name {
+		case "--include-ignored", "-include-ignored", "--no-git", "-no-git":
+			return fmt.Errorf("%s is disabled because .gitignore filtering is mandatory", name)
+		}
+	}
+	return nil
+}
+
+func dumpFlagName(arg string) string {
+	if !strings.HasPrefix(arg, "-") {
+		return arg
+	}
+	if idx := strings.IndexByte(arg, '='); idx >= 0 {
+		return arg[:idx]
+	}
+	return arg
 }
 
 func defaultProjectRoot() string {
@@ -367,7 +385,10 @@ func buildDump(opts dumpOptions) (int, int, int, error) {
 	}
 
 	excludeRel := determineExcludes(opts.root, opts.outputPath)
-	relPaths := collectRelPaths(opts, excludeRel)
+	relPaths, err := collectRelPaths(opts, excludeRel)
+	if err != nil {
+		return 0, 0, 0, err
+	}
 	gitHead := gitHead(opts.root)
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -417,31 +438,28 @@ func determineExcludes(root, outputPath string) map[string]struct{} {
 	return exclude
 }
 
-func collectRelPaths(opts dumpOptions, excludeRel map[string]struct{}) []string {
+func collectRelPaths(opts dumpOptions, excludeRel map[string]struct{}) ([]string, error) {
 	if opts.fileListPath != "" {
 		relPaths := collectFromFileList(opts, excludeRel)
-		return filterRelPaths(opts, relPaths)
+		relPaths = filterRelPaths(opts, relPaths)
+		return filterGitignoredRelPaths(opts, relPaths)
 	}
 
 	paths := make(map[string]struct{})
-	if opts.useGit {
-		for _, rel := range gitLsFiles(opts.root, []string{}) {
-			paths[rel] = struct{}{}
-		}
-		for _, rel := range gitLsFiles(opts.root, []string{"--others", "--exclude-standard"}) {
-			paths[rel] = struct{}{}
-		}
-		if opts.includeIgnored {
-			for _, rel := range gitLsFiles(opts.root, []string{"--others", "-i", "--exclude-standard"}) {
-				paths[rel] = struct{}{}
-			}
-		}
+	tracked, err := gitLsFiles(opts.root, []string{})
+	if err != nil {
+		return nil, fmt.Errorf("collect git tracked files: %w", err)
+	}
+	for _, rel := range tracked {
+		paths[rel] = struct{}{}
 	}
 
-	if len(paths) == 0 {
-		for _, rel := range rglobFiles(opts.root, opts.includeDumps, excludeRel) {
-			paths[rel] = struct{}{}
-		}
+	untracked, err := gitLsFiles(opts.root, []string{"--others", "--exclude-standard"})
+	if err != nil {
+		return nil, fmt.Errorf("collect git untracked files: %w", err)
+	}
+	for _, rel := range untracked {
+		paths[rel] = struct{}{}
 	}
 
 	if opts.includeDotenv {
@@ -456,7 +474,68 @@ func collectRelPaths(opts dumpOptions, excludeRel map[string]struct{}) []string 
 	}
 
 	relPaths := setToSortedSlice(paths, excludeRel)
-	return filterRelPaths(opts, relPaths)
+	relPaths = filterRelPaths(opts, relPaths)
+	return filterGitignoredRelPaths(opts, relPaths)
+}
+
+func filterGitignoredRelPaths(opts dumpOptions, relPaths []string) ([]string, error) {
+	if len(relPaths) == 0 {
+		return relPaths, nil
+	}
+
+	ignored, err := gitCheckIgnored(opts.root, relPaths)
+	if err != nil {
+		return nil, err
+	}
+	if len(ignored) == 0 {
+		return relPaths, nil
+	}
+
+	out := make([]string, 0, len(relPaths)-len(ignored))
+	for _, rel := range relPaths {
+		if _, skip := ignored[rel]; skip {
+			continue
+		}
+		out = append(out, rel)
+	}
+	return out, nil
+}
+
+func gitCheckIgnored(root string, relPaths []string) (map[string]struct{}, error) {
+	var stdin bytes.Buffer
+	for _, rel := range relPaths {
+		if rel == "" {
+			continue
+		}
+		stdin.WriteString(rel)
+		stdin.WriteByte(0)
+	}
+	if stdin.Len() == 0 {
+		return nil, nil
+	}
+
+	cmd := exec.Command("git", "-C", root, "check-ignore", "--no-index", "-z", "--stdin")
+	cmd.Stdin = &stdin
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("apply .gitignore filter: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	ignored := make(map[string]struct{})
+	for _, part := range bytes.Split(out, []byte{0}) {
+		if len(part) == 0 || !utf8.Valid(part) {
+			continue
+		}
+		rel := normalizeRel(filepath.ToSlash(string(part)))
+		if rel == "" {
+			continue
+		}
+		ignored[rel] = struct{}{}
+	}
+	return ignored, nil
 }
 
 func collectFromFileList(opts dumpOptions, excludeRel map[string]struct{}) []string {
@@ -502,15 +581,15 @@ func collectFromFileList(opts dumpOptions, excludeRel map[string]struct{}) []str
 	return relPaths
 }
 
-func gitLsFiles(root string, extra []string) []string {
+func gitLsFiles(root string, extra []string) ([]string, error) {
 	args := []string{"-C", root, "ls-files"}
 	args = append(args, extra...)
 	args = append(args, "-z")
 
 	cmd := exec.Command("git", args...)
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("git ls-files %v failed: %w: %s", extra, err, strings.TrimSpace(string(out)))
 	}
 
 	parts := bytes.Split(out, []byte{0})
@@ -528,65 +607,7 @@ func gitLsFiles(root string, extra []string) []string {
 		}
 		paths = append(paths, rel)
 	}
-	return paths
-}
-
-func rglobFiles(root string, includeDumps bool, excludeRel map[string]struct{}) []string {
-	skipDirs := map[string]struct{}{
-		".git":          {},
-		".cache":        {},
-		".gocache":      {},
-		".tetra_cache":  {},
-		".venv":         {},
-		"_legacy":       {},
-		"__pycache__":   {},
-		"bin":           {},
-		"dist":          {},
-		"node_modules":  {},
-		"out":           {},
-		"tetra_cache":   {},
-		".pytest_cache": {},
-		".mypy_cache":   {},
-		".hypothesis":   {},
-		".ruff_cache":   {},
-		".tmp":          {},
-	}
-	if !includeDumps {
-		skipDirs["dumps"] = struct{}{}
-	}
-
-	var relPaths []string
-	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		rel, ok := relToSlash(root, path)
-		if !ok {
-			return nil
-		}
-		if rel == "" {
-			return nil
-		}
-		parts := strings.Split(rel, "/")
-		for _, part := range parts {
-			if _, skip := skipDirs[part]; skip {
-				if d.IsDir() {
-					return fs.SkipDir
-				}
-				return nil
-			}
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if _, skip := excludeRel[rel]; skip {
-			return nil
-		}
-		relPaths = append(relPaths, rel)
-		return nil
-	})
-
-	return relPaths
+	return paths, nil
 }
 
 func setToSortedSlice(paths map[string]struct{}, excludeRel map[string]struct{}) []string {
@@ -725,7 +746,7 @@ func writeDumpHeader(w *bufio.Writer, opts dumpOptions, now, gitHead string, rel
 	w.WriteString(fmt.Sprintf("Max file bytes: %d\n", opts.maxFileBytes))
 	w.WriteString(fmt.Sprintf("Files listed: %d\n", len(relPaths)))
 	w.WriteString(fmt.Sprintf("Include dumps/: %v\n", boolToYesNo(opts.includeDumps)))
-	w.WriteString(fmt.Sprintf("Include ignored: %v\n", boolToYesNo(opts.includeIgnored)))
+	w.WriteString("Include ignored: no (mandatory .gitignore filtering)\n")
 	w.WriteString(fmt.Sprintf("Include .env*: %v\n", boolToYesNo(opts.includeDotenv)))
 	if len(opts.onlyRelPrefixes) > 0 {
 		w.WriteString(fmt.Sprintf("Only prefixes: %s\n", strings.Join(opts.onlyRelPrefixes, ", ")))

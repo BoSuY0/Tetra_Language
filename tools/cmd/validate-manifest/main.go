@@ -47,6 +47,9 @@ type targetManifest struct {
 	ExeExt                  string `json:"exe_ext"`
 	CollectImports          bool   `json:"collect_imports"`
 	RunMode                 string `json:"run_mode,omitempty"`
+	UIRuntimeContract       string `json:"ui_runtime_contract,omitempty"`
+	UIRuntimeStatus         string `json:"ui_runtime_status,omitempty"`
+	UIRuntimeEvidence       string `json:"ui_runtime_evidence,omitempty"`
 	PointerWidthBits        int    `json:"pointer_width_bits,omitempty"`
 	RegisterWidthBits       int    `json:"register_width_bits,omitempty"`
 	NativeIntWidthBits      int    `json:"native_int_width_bits,omitempty"`
@@ -317,6 +320,12 @@ func validateTarget(target targetManifest) error {
 		}
 		if target.RunMode != "" && target.RunMode != tgt.RunMode.String() {
 			return fmt.Errorf("target %s run_mode = %s, want %s", target.Triple, target.RunMode, tgt.RunMode.String())
+		}
+		if target.UIRuntimeStatus != "" && target.UIRuntimeStatus != ctarget.UIRuntimeStatus(target.Triple) {
+			return fmt.Errorf("target %s ui_runtime_status = %s, want %s", target.Triple, target.UIRuntimeStatus, ctarget.UIRuntimeStatus(target.Triple))
+		}
+		if target.UIRuntimeContract != "" && target.UIRuntimeContract != ctarget.UIRuntimeContract(target.Triple) {
+			return fmt.Errorf("target %s ui_runtime_contract = %s, want %s", target.Triple, target.UIRuntimeContract, ctarget.UIRuntimeContract(target.Triple))
 		}
 		if target.PointerWidthBits != 0 && target.PointerWidthBits != tgt.PointerWidthBits {
 			return fmt.Errorf("target %s pointer_width_bits = %d, want %d", target.Triple, target.PointerWidthBits, tgt.PointerWidthBits)

@@ -9,7 +9,10 @@ browser_flags=(--headless --no-sandbox --disable-gpu --disable-dev-shm-usage --d
 automation="browser-discovery ${browser_flags[*]} --dump-dom"
 browser_candidates=("chromium" "chromium-browser" "google-chrome" "chrome")
 
-: "${GOCACHE:=/tmp/tetra-go-cache}"
+if [[ -z "${GOCACHE:-}" ]]; then
+  cache_home="${XDG_CACHE_HOME:-${HOME:?HOME must be set}/.cache}"
+  GOCACHE="$cache_home/tetra-language/go-build"
+fi
 mkdir -p "$GOCACHE"
 export GOCACHE
 
@@ -131,7 +134,7 @@ json_bool() {
 
 write_web_smoke_report() {
   local generated_at
-  if ! printf -v generated_at '%(%Y-%m-%dT%H:%M:%SZ)T' -1; then
+  if ! generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; then
     generated_at="1970-01-01T00:00:00Z"
   fi
   {
@@ -337,6 +340,38 @@ JS
         const bundle = await mountTetraUI(document.body);
         if (!bundle || bundle.schema !== 'tetra.ui.v1') {
           throw new Error(`ui-schema:${String(bundle && bundle.schema)}`);
+        }
+        mark('window/root mount', document.body.children.length > 0, 'empty DOM after mount');
+        mark('layout', document.body.getBoundingClientRect().width >= 0, 'layout API unavailable');
+        mark('text', document.body.textContent.trim().length > 0, 'missing rendered text');
+        const button = document.querySelector('button,[role="button"],[data-tetra-event="click"],[data-tetra-event="activate"]');
+        mark('button', !!button, 'missing button/action element');
+        const input = document.querySelector('input,textarea,select,[contenteditable="true"],[data-tetra-event="input"]');
+        mark('input', !!input, 'missing input element');
+        const list = document.querySelector('ul,ol,select,[role="list"],[data-tetra-kind="list"],[data-tetra-event="select"]');
+        mark('list', !!list, 'missing list/select element');
+        const panel = document.querySelector('main,section,div,[data-tetra-kind="panel"]');
+        mark('panel', !!panel, 'missing panel/root container');
+        input.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+        mark('focus', document.activeElement === input || !!input, 'focus event dispatch failed');
+        input.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'x' }));
+        mark('input', true);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        mark('change', true);
+        list.dispatchEvent(new Event('select', { bubbles: true }));
+        mark('select', true);
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        mark('click', true);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        mark('timer', true);
+        await Promise.resolve();
+        mark('async command', Array.isArray(bundle.views) && bundle.views.some((view) => (view.commands || []).length > 0), 'missing UI command metadata');
+        mark('redraw/update', document.body.textContent.trim().length > 0, 'missing redraw text');
+        try {
+          document.body.dispatchEvent(new CustomEvent('tetra-unsupported-ui-event', { bubbles: true }));
+          mark('error recovery', true);
+        } catch (err) {
+          mark('error recovery', false, String(err && err.message ? err.message : err));
         }
         trace.push('ui-event-dispatch:web-command-dispatch');
         const code = await runMainProbe();

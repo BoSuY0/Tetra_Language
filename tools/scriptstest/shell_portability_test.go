@@ -57,6 +57,44 @@ func TestShellScriptsUsePortableBashSafetyHeader(t *testing.T) {
 	}
 }
 
+func TestShellScriptsDoNotDefaultTetraArtifactsToTmpfs(t *testing.T) {
+	root := repoRoot(t)
+	bannedPrefixes := []string{
+		"/tmp/" + "tetra",
+		"/tmp/" + "release-",
+	}
+	var entries []string
+	err := filepath.WalkDir(filepath.Join(root, "scripts"), func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".sh") {
+			entries = append(entries, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk scripts: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("no shell scripts found")
+	}
+	for _, path := range entries {
+		t.Run(filepath.ToSlash(strings.TrimPrefix(path, root+string(os.PathSeparator))), func(t *testing.T) {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read script: %v", err)
+			}
+			text := string(raw)
+			for _, bannedPrefix := range bannedPrefixes {
+				if strings.Contains(text, bannedPrefix) {
+					t.Fatalf("%s must not default Tetra cache/report artifacts under tmpfs prefix %q", path, bannedPrefix)
+				}
+			}
+		})
+	}
+}
+
 func TestDevScriptsHaveNoLegacyRootEntrypoints(t *testing.T) {
 	for rel, canonical := range map[string]string{
 		"scripts/format.sh": "scripts/dev/format.sh",

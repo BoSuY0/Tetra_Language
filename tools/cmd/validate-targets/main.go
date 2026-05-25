@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 )
@@ -31,6 +32,9 @@ type targetReportEntry struct {
 	RunRunner               string `json:"run_runner,omitempty"`
 	RunSupported            bool   `json:"run_supported"`
 	RunUnsupportedReason    string `json:"run_unsupported_reason,omitempty"`
+	UIRuntimeContract       string `json:"ui_runtime_contract,omitempty"`
+	UIRuntimeStatus         string `json:"ui_runtime_status,omitempty"`
+	UIRuntimeEvidence       string `json:"ui_runtime_evidence,omitempty"`
 	PointerWidthBits        int    `json:"pointer_width_bits"`
 	RegisterWidthBits       int    `json:"register_width_bits"`
 	NativeIntWidthBits      int    `json:"native_int_width_bits"`
@@ -48,14 +52,20 @@ func main() {
 	var path string
 	flag.StringVar(&path, "report", "", "path to tetra targets --format=json output")
 	flag.Parse()
+	var raw []byte
+	var err error
 	if path == "" {
-		fmt.Fprintln(os.Stderr, "error: --report is required")
-		os.Exit(2)
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		raw, err = exec.Command("./tetra", "targets", "--format=json").Output()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to run ./tetra targets --format=json: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		raw, err = os.ReadFile(path)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	}
 	if err := validateTargetsReport(raw); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -156,6 +166,39 @@ func validateTargetMetadata(got []targetReportEntry) error {
 		if got[i].SupportsReleaseOptimize != want[i].SupportsReleaseOptimize {
 			return fmt.Errorf("target metadata[%s].supports_release_optimize = %v, want %v", got[i].Triple, got[i].SupportsReleaseOptimize, want[i].SupportsReleaseOptimize)
 		}
+		if err := validateUIRuntimeMetadata(got[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateUIRuntimeMetadata(entry targetReportEntry) error {
+	if entry.UIRuntimeStatus == "" {
+		return nil
+	}
+	wantStatus := map[string]string{
+		"linux-x64":   "production",
+		"windows-x64": "requires_target_host_evidence",
+		"macos-x64":   "requires_target_host_evidence",
+		"wasm32-web":  "production",
+		"wasm32-wasi": "unsupported",
+		"linux-x86":   "unsupported",
+		"linux-x32":   "unsupported",
+	}[entry.Triple]
+	if entry.UIRuntimeStatus != wantStatus {
+		return fmt.Errorf("target metadata[%s].ui_runtime_status = %q, want %q", entry.Triple, entry.UIRuntimeStatus, wantStatus)
+	}
+	if entry.UIRuntimeStatus == "production" || entry.UIRuntimeStatus == "requires_target_host_evidence" {
+		if entry.UIRuntimeContract != "tetra.ui.platform.v1" {
+			return fmt.Errorf("target metadata[%s].ui_runtime_contract = %q, want tetra.ui.platform.v1", entry.Triple, entry.UIRuntimeContract)
+		}
+		if strings.TrimSpace(entry.UIRuntimeEvidence) == "" {
+			return fmt.Errorf("target metadata[%s].ui_runtime_evidence is required", entry.Triple)
+		}
+	}
+	if (entry.Triple == "windows-x64" || entry.Triple == "macos-x64") && strings.Contains(entry.UIRuntimeStatus, "production") {
+		return fmt.Errorf("target metadata[%s] must not mark UI runtime production without target-host evidence", entry.Triple)
 	}
 	return nil
 }

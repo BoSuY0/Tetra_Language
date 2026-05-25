@@ -1219,6 +1219,24 @@ func TestTestAllFullValidatesCrossTargetSmokeReports(t *testing.T) {
 	}
 }
 
+func TestTestAllWasmSchemaValidationUsesPersistedArtifactReports(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test_all: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`local report="$report_dir/$target-artifact-smoke.json"`,
+		`test -s "$report" || return 1`,
+		`go run ./tools/cmd/smoke-report-to-checklist --validate-only --report "$report" || return 1`,
+		`go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$report" || return 1`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("test_all wasm schema validation missing %q", want)
+		}
+	}
+}
+
 func TestTestAllFullAggregatesToolingSummary(t *testing.T) {
 	root := testAllFakeRepo(t, false)
 	reportDir := filepath.Join(root, "report")
