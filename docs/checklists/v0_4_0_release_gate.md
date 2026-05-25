@@ -134,6 +134,8 @@ go run ./tools/cmd/validate-release-gate-summary \
   --expected-command 'bash scripts/release/v0_4_0/gate.sh'
 ```
 
+For a passing `v0.4.0` summary, `summary.report_dir` must match the report
+directory being validated.
 For a passing `v0.4.0` summary, `summary.steps` must follow the canonical
 `scripts/release/v0_4_0/gate.sh` step order.
 Required `summary.steps[].log` values must use the canonical

@@ -225,6 +225,9 @@ func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, ex
 		return fmt.Errorf("pass summary contains failing steps")
 	}
 	if summary.Status == "pass" && summary.ReleaseVersion == "v0.4.0" {
+		if err := validateV040ReportDir(summary, reportDir); err != nil {
+			return err
+		}
 		if err := validateV040RequiredPassingSteps(summary); err != nil {
 			return err
 		}
@@ -233,6 +236,17 @@ func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, ex
 		}
 	}
 	return nil
+}
+
+func validateV040ReportDir(summary releaseGateSummary, reportDir string) error {
+	if normalizeReleaseGateReportDir(summary.ReportDir) != normalizeReleaseGateReportDir(reportDir) {
+		return fmt.Errorf("passing v0.4.0 summary report_dir = %q, want %q", summary.ReportDir, filepath.ToSlash(reportDir))
+	}
+	return nil
+}
+
+func normalizeReleaseGateReportDir(path string) string {
+	return strings.TrimRight(filepath.ToSlash(filepath.Clean(path)), "/")
 }
 
 func validateV040RequiredPassingSteps(summary releaseGateSummary) error {

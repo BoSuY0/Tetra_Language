@@ -162,6 +162,27 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStep
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithMismatchedReportDir(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	spoofedReportDir := "reports/spoofed-v0.4.0-gate"
+	mutateV040ReleaseGateSummary(t, dir, func(summary *releaseGateSummary) {
+		summary.ReportDir = spoofedReportDir
+		for i := range summary.Steps {
+			if command, ok := expectedV040RequiredStepCommand(summary.Steps[i].Name, spoofedReportDir); ok {
+				summary.Steps[i].Command = command
+			}
+		}
+	})
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `report_dir = "reports/spoofed-v0.4.0-gate"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
@@ -430,7 +451,8 @@ func makeV040PassingReleaseGateSummaryReportExcept(t *testing.T, omittedSteps ..
 
 func makeV040PassingReleaseGateSummaryReportInOrder(t *testing.T, order []string) string {
 	t.Helper()
-	reportDir := "reports/release-v0.4.0-gate"
+	dir := t.TempDir()
+	reportDir := filepath.ToSlash(dir)
 	steps, logs := v040GateStepsForOrder(t, order, reportDir)
 	summary := releaseGateSummary{
 		Status:             "pass",
@@ -444,14 +466,33 @@ func makeV040PassingReleaseGateSummaryReportInOrder(t *testing.T, order []string
 		ReportDir:          reportDir,
 		Steps:              steps,
 	}
+	for _, log := range logs {
+		writeReleaseGateLog(t, dir, log)
+	}
 	raw, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return makeReleaseGateSummaryReport(t, string(raw), logs...)
+	if err := os.WriteFile(filepath.Join(dir, "summary.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }
 
 func mutateV040ReleaseGateSummaryStep(t *testing.T, dir string, name string, mutate func(*releaseGateStep)) {
+	t.Helper()
+	mutateV040ReleaseGateSummary(t, dir, func(summary *releaseGateSummary) {
+		for i := range summary.Steps {
+			if summary.Steps[i].Name == name {
+				mutate(&summary.Steps[i])
+				return
+			}
+		}
+		t.Fatalf("summary missing step %q", name)
+	})
+}
+
+func mutateV040ReleaseGateSummary(t *testing.T, dir string, mutate func(*releaseGateSummary)) {
 	t.Helper()
 	path := filepath.Join(dir, "summary.json")
 	raw, err := os.ReadFile(path)
@@ -462,20 +503,14 @@ func mutateV040ReleaseGateSummaryStep(t *testing.T, dir string, name string, mut
 	if err := json.Unmarshal(raw, &summary); err != nil {
 		t.Fatal(err)
 	}
-	for i := range summary.Steps {
-		if summary.Steps[i].Name == name {
-			mutate(&summary.Steps[i])
-			raw, err := json.MarshalIndent(summary, "", "  ")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(path, raw, 0o644); err != nil {
-				t.Fatal(err)
-			}
-			return
-		}
+	mutate(&summary)
+	raw, err = json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		t.Fatal(err)
 	}
-	t.Fatalf("summary missing step %q", name)
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func v040GateStepsForOrder(t *testing.T, order []string, reportDir string) ([]releaseGateStep, []string) {
