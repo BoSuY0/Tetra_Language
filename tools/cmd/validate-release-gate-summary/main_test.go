@@ -260,6 +260,19 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNegativeArtifactH
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithMismatchedSecurityReviewDetachedHash(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	writeV040SecurityReviewDetachedHash(t, dir, "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  artifacts/security-review.md")
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), "security-review.md.sha256") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
@@ -504,6 +517,17 @@ func writeReleaseGateLog(t *testing.T, dir, log string) {
 	}
 }
 
+func writeV040SecurityReviewDetachedHash(t *testing.T, dir, line string) {
+	t.Helper()
+	path := filepath.Join(dir, "artifacts", "security-review.md.sha256")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func makeV040PassingReleaseGateSummaryReport(t *testing.T) string {
 	t.Helper()
 	return makeV040PassingReleaseGateSummaryReportExcept(t)
@@ -553,6 +577,7 @@ func makeV040PassingReleaseGateSummaryReportInOrder(t *testing.T, order []string
 	if err := os.WriteFile(filepath.Join(dir, "summary.json"), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	writeV040SecurityReviewDetachedHash(t, dir, v040FixtureSHA(v040SecurityReviewArtifactPath)+"  "+v040SecurityReviewArtifactPath)
 	return dir
 }
 
@@ -850,8 +875,17 @@ var v040ArtifactHashFixtures = []releaseHashArtifact{
 	{Path: "artifacts/native-ui-linux-x64.json", Schema: "tetra.ui.native-runtime.v1"},
 	{Path: "artifacts/release-state.json", Schema: "tetra.release.v0_4_0.release-state.v1"},
 	{Path: "artifacts/release-state.txt"},
-	{Path: "artifacts/security-review.md"},
-	{Path: "artifacts/security-review.md.sha256"},
+	{Path: v040SecurityReviewArtifactPath},
+	{Path: v040SecurityReviewDetachedHashPath},
+}
+
+func v040FixtureSHA(path string) string {
+	for i, fixture := range v040ArtifactHashFixtures {
+		if fixture.Path == path {
+			return fmt.Sprintf("sha256:%064x", i+1)
+		}
+	}
+	panic(fmt.Sprintf("missing v0.4 artifact fixture %q", path))
 }
 
 func writeReleaseGateArtifactHashes(t *testing.T, dir string, manifest string) {

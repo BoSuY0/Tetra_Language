@@ -179,6 +179,9 @@ It must also list every step log referenced by `summary.json` under `logs/`.
 Every listed artifact must carry a canonical `sha256:<64 lowercase hex>` digest
 and a non-negative byte size; `validate-artifact-hashes` remains authoritative
 for matching those metadata fields to files on disk.
+`artifacts/security-review.md.sha256` must contain exactly the same digest
+listed for `artifacts/security-review.md`, followed by two spaces and the path
+`artifacts/security-review.md`.
 
 ## Security Review
 

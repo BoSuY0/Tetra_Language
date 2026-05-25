@@ -17,6 +17,8 @@ const expectedReleaseVersion = "v0.3.0"
 const expectedReleaseArtifact = "tetra.release.v0_3_0.gate-report.v1"
 const expectedReleaseGateCommand = "bash scripts/release/v0_3_0/gate.sh"
 const releaseArtifactHashesSchema = "tetra.release-artifact-hashes.v1alpha1"
+const v040SecurityReviewArtifactPath = "artifacts/security-review.md"
+const v040SecurityReviewDetachedHashPath = "artifacts/security-review.md.sha256"
 
 var v040RequiredArtifacts = []struct {
 	Path   string
@@ -34,8 +36,8 @@ var v040RequiredArtifacts = []struct {
 	{Path: "artifacts/native-ui-linux-x64.json", Schema: "tetra.ui.native-runtime.v1"},
 	{Path: "artifacts/release-state.json", Schema: "tetra.release.v0_4_0.release-state.v1"},
 	{Path: "artifacts/release-state.txt"},
-	{Path: "artifacts/security-review.md"},
-	{Path: "artifacts/security-review.md.sha256"},
+	{Path: v040SecurityReviewArtifactPath},
+	{Path: v040SecurityReviewDetachedHashPath},
 }
 
 var v040RequiredPassingSteps = []string{
@@ -411,6 +413,36 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 		if _, ok := artifacts[log]; !ok {
 			return fmt.Errorf("passing v0.4.0 summary missing step log %s in artifact-hashes.json", log)
 		}
+	}
+	if err := validateV040SecurityReviewDetachedHash(reportDir, artifacts); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateV040SecurityReviewDetachedHash(reportDir string, artifacts map[string]releaseHashArtifact) error {
+	review, ok := artifacts[v040SecurityReviewArtifactPath]
+	if !ok {
+		return fmt.Errorf("passing v0.4.0 summary missing required artifact %s in artifact-hashes.json", v040SecurityReviewArtifactPath)
+	}
+	if _, ok := artifacts[v040SecurityReviewDetachedHashPath]; !ok {
+		return fmt.Errorf("passing v0.4.0 summary missing required artifact %s in artifact-hashes.json", v040SecurityReviewDetachedHashPath)
+	}
+	path := filepath.Join(reportDir, filepath.FromSlash(v040SecurityReviewDetachedHashPath))
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("passing v0.4.0 summary missing %s file", v040SecurityReviewDetachedHashPath)
+		}
+		return err
+	}
+	line := strings.TrimSuffix(string(raw), "\n")
+	if strings.ContainsAny(line, "\r\n") {
+		return fmt.Errorf("%s must contain exactly one detached hash line", v040SecurityReviewDetachedHashPath)
+	}
+	expected := review.SHA256 + "  " + v040SecurityReviewArtifactPath
+	if line != expected {
+		return fmt.Errorf("%s = %q, want %q", v040SecurityReviewDetachedHashPath, line, expected)
 	}
 	return nil
 }
