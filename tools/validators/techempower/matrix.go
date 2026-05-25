@@ -3,6 +3,7 @@ package techempower
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -222,6 +223,7 @@ func ValidateMatrixReport(raw []byte) error {
 	}
 	issues = append(issues, validateMatrixSummary(report.Summary, len(report.Runs), totalRequests, totalFailures, bestRPS, worstP99, worstP999)...)
 	issues = append(issues, validateMatrixArtifacts(report.Artifacts)...)
+	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -241,6 +243,167 @@ func validateMatrixArtifacts(artifacts map[string]string) []string {
 		}
 	}
 	return issues
+}
+
+func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, runs []MatrixRun) []string {
+	if strings.TrimSpace(artifacts["endpoints"]) == "" || strings.TrimSpace(artifacts["levels"]) == "" || strings.TrimSpace(artifacts["worker_levels"]) == "" {
+		return nil
+	}
+
+	var issues []string
+	endpoints, endpointIssues := parseMatrixArtifactEndpoints(artifacts["endpoints"])
+	levels, levelIssues := parseMatrixArtifactLevels(artifacts["levels"])
+	workers, workerIssues := parseMatrixArtifactWorkers(artifacts["worker_levels"])
+	issues = append(issues, endpointIssues...)
+	issues = append(issues, levelIssues...)
+	issues = append(issues, workerIssues...)
+	if len(issues) > 0 {
+		return issues
+	}
+
+	if !sameIntSet(server.WorkerLevels, workers) {
+		issues = append(issues, "matrix coverage worker_levels artifact does not match server.worker_levels")
+	}
+
+	declaredEndpoints := make(map[string]bool, len(endpoints))
+	declaredWorkers := make(map[int]bool, len(workers))
+	declaredLevels := make(map[string]bool, len(levels))
+	for _, endpoint := range endpoints {
+		declaredEndpoints[endpoint] = true
+		for _, workerCount := range workers {
+			declaredWorkers[workerCount] = true
+			for _, level := range levels {
+				declaredLevels[matrixLevelKey(level)] = true
+			}
+		}
+	}
+
+	seen := make(map[string]bool, len(runs))
+	for _, run := range runs {
+		if !declaredEndpoints[run.Endpoint] || !declaredWorkers[run.Workers] || !declaredLevels[matrixLevelKey(run.Level)] {
+			issues = append(issues, fmt.Sprintf("matrix coverage includes undeclared endpoint %s workers=%d c%d/k%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections))
+			continue
+		}
+		seen[matrixCoverageKey(run.Endpoint, run.Workers, run.Level)] = true
+	}
+
+	for _, endpoint := range endpoints {
+		for _, workerCount := range workers {
+			for _, level := range levels {
+				key := matrixCoverageKey(endpoint, workerCount, level)
+				if !seen[key] {
+					issues = append(issues, fmt.Sprintf("matrix coverage missing endpoint %s workers=%d c%d/k%d", endpoint, workerCount, level.Concurrency, level.Connections))
+				}
+			}
+		}
+	}
+	return issues
+}
+
+func parseMatrixArtifactEndpoints(raw string) ([]string, []string) {
+	var endpoints []string
+	var issues []string
+	seen := map[string]bool{}
+	for _, part := range strings.Split(raw, ",") {
+		endpoint := strings.TrimSpace(part)
+		if endpoint == "" {
+			issues = append(issues, "matrix coverage endpoints contain an empty entry")
+			continue
+		}
+		if _, ok := matrixEndpointSpecs()[endpoint]; !ok {
+			issues = append(issues, "matrix coverage endpoint "+endpoint+" is unsupported")
+			continue
+		}
+		if seen[endpoint] {
+			issues = append(issues, "matrix coverage endpoint "+endpoint+" is duplicated")
+			continue
+		}
+		seen[endpoint] = true
+		endpoints = append(endpoints, endpoint)
+	}
+	return endpoints, issues
+}
+
+func parseMatrixArtifactLevels(raw string) ([]MatrixLevel, []string) {
+	var levels []MatrixLevel
+	var issues []string
+	seen := map[string]bool{}
+	for _, part := range strings.Split(raw, ",") {
+		entry := strings.TrimSpace(part)
+		if entry == "" {
+			issues = append(issues, "matrix coverage levels contain an empty entry")
+			continue
+		}
+		concurrencyRaw, connectionsRaw, ok := strings.Cut(entry, ":")
+		if !ok {
+			issues = append(issues, "matrix coverage level "+entry+" must be concurrency:connections")
+			continue
+		}
+		concurrency, err1 := strconv.Atoi(strings.TrimSpace(concurrencyRaw))
+		connections, err2 := strconv.Atoi(strings.TrimSpace(connectionsRaw))
+		if err1 != nil || err2 != nil || concurrency <= 0 || connections <= 0 {
+			issues = append(issues, "matrix coverage level "+entry+" must use positive integers")
+			continue
+		}
+		level := MatrixLevel{Concurrency: concurrency, Connections: connections}
+		key := matrixLevelKey(level)
+		if seen[key] {
+			issues = append(issues, "matrix coverage level "+entry+" is duplicated")
+			continue
+		}
+		seen[key] = true
+		levels = append(levels, level)
+	}
+	return levels, issues
+}
+
+func parseMatrixArtifactWorkers(raw string) ([]int, []string) {
+	var workers []int
+	var issues []string
+	seen := map[int]bool{}
+	for _, part := range strings.Split(raw, ",") {
+		entry := strings.TrimSpace(part)
+		if entry == "" {
+			issues = append(issues, "matrix coverage worker_levels contain an empty entry")
+			continue
+		}
+		value, err := strconv.Atoi(entry)
+		if err != nil || value <= 0 {
+			issues = append(issues, "matrix coverage worker level "+entry+" must be a positive integer")
+			continue
+		}
+		if seen[value] {
+			issues = append(issues, fmt.Sprintf("matrix coverage worker level %d is duplicated", value))
+			continue
+		}
+		seen[value] = true
+		workers = append(workers, value)
+	}
+	return workers, issues
+}
+
+func sameIntSet(left []int, right []int) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[int]bool, len(left))
+	for _, value := range left {
+		seen[value] = true
+	}
+	for _, value := range right {
+		if !seen[value] {
+			return false
+		}
+	}
+	return true
+}
+
+func matrixCoverageKey(endpoint string, workers int, level MatrixLevel) string {
+	return fmt.Sprintf("%s|%d|%d|%d", endpoint, workers, level.Concurrency, level.Connections)
+}
+
+func matrixLevelKey(level MatrixLevel) string {
+	return fmt.Sprintf("%d:%d", level.Concurrency, level.Connections)
 }
 
 func validateMatrixBuild(build MatrixBuild) []string {

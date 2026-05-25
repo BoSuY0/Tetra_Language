@@ -327,6 +327,30 @@ func TestValidateSCRAMMatrixRejectsMissingArtifacts(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsMissingDeclaredGridCoverage(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if len(report.Runs) < 2 {
+		t.Fatalf("checked-in SCRAM matrix report has too few runs")
+	}
+
+	report.Runs = append([]MatrixRun(nil), report.Runs[:len(report.Runs)-1]...)
+	report.Summary = summarizeMatrixRunsForTest(report.Runs)
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report with missing declared grid coverage")
+	}
+	if !strings.Contains(err.Error(), "matrix coverage") {
+		t.Fatalf("ValidateReport coverage error = %v, want matrix coverage rejection", err)
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {
@@ -451,4 +475,31 @@ func mustMatrixReportJSON(t *testing.T, report MatrixReport) []byte {
 		t.Fatalf("json.Marshal: %v", err)
 	}
 	return raw
+}
+
+func summarizeMatrixRunsForTest(runs []MatrixRun) MatrixSummary {
+	summary := MatrixSummary{
+		RunCount: len(runs),
+		Decision: "pass",
+	}
+	for _, run := range runs {
+		summary.TotalRequests += run.Requests
+		summary.TotalFailures += run.Failures
+		if run.RPS > summary.BestRPS {
+			summary.BestRPS = run.RPS
+		}
+		if run.P99LatencyMS > summary.WorstP99MS {
+			summary.WorstP99MS = run.P99LatencyMS
+		}
+		if run.P999LatencyMS > summary.WorstP999MS {
+			summary.WorstP999MS = run.P999LatencyMS
+		}
+		if run.Failures != 0 || run.Successes == 0 || strings.TrimSpace(run.Error) != "" {
+			summary.Decision = "fail"
+		}
+	}
+	if len(runs) == 0 {
+		summary.Decision = "fail"
+	}
+	return summary
 }
