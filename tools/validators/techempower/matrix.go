@@ -230,6 +230,7 @@ func ValidateMatrixReport(raw []byte) error {
 	issues = append(issues, validateMatrixCommandArtifacts(report.Command, report.Artifacts)...)
 	issues = append(issues, validateMatrixCommandDuration(report.Command, report.Runs)...)
 	issues = append(issues, validateMatrixCommandRepeats(report.Command, report.Runs)...)
+	issues = append(issues, validateMatrixCommandWarmup(report.Command, report.Warmup)...)
 	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
 	issues = append(issues, validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
 
@@ -354,6 +355,35 @@ func validateMatrixCommandRepeats(command string, runs []MatrixRun) []string {
 	}
 	if actual != expected {
 		return []string{fmt.Sprintf("matrix command repeats = %d, want %d from run repeat evidence", expected, actual)}
+	}
+	return nil
+}
+
+func validateMatrixCommandWarmup(command string, warmup *MatrixRun) []string {
+	if strings.TrimSpace(command) == "" {
+		return nil
+	}
+	flags := parseMatrixCommandFlags(command)
+	rawWarmup := strings.TrimSpace(flags["warmup"])
+	if rawWarmup == "" {
+		if warmup == nil {
+			return nil
+		}
+		return []string{"matrix command warmup flag --warmup is required"}
+	}
+	duration, err := time.ParseDuration(rawWarmup)
+	if err != nil || duration < 0 {
+		return []string{fmt.Sprintf("matrix command warmup %q is invalid", rawWarmup)}
+	}
+	expected := duration.Seconds()
+	if warmup == nil {
+		if expected > 0.001 {
+			return []string{fmt.Sprintf("matrix command warmup = %g, want 0 because warmup evidence is absent", expected)}
+		}
+		return nil
+	}
+	if math.Abs(warmup.DurationSeconds-expected) > 0.001 {
+		return []string{fmt.Sprintf("matrix command warmup = %g, want %g from warmup duration_seconds", expected, warmup.DurationSeconds)}
 	}
 	return nil
 }

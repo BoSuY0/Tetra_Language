@@ -219,6 +219,33 @@ func TestValidateSCRAMMatrixRejectsCommandRepeatsMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsCommandWarmupMismatch(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if report.Warmup == nil {
+		t.Fatalf("checked-in SCRAM matrix report has no warmup")
+	}
+
+	original := report.Command
+	report.Command = strings.Replace(report.Command, "--warmup 10s", "--warmup 1s", 1)
+	if report.Command == original {
+		t.Fatalf("test did not mutate matrix command warmup")
+	}
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report with command/warmup duration mismatch")
+	}
+	if !strings.Contains(err.Error(), "command warmup") {
+		t.Fatalf("ValidateReport matrix warmup error = %v, want command warmup rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {
