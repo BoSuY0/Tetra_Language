@@ -171,6 +171,33 @@ func TestValidateSCRAMMatrixRejectsNonMonotonicSoakTailLatency(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsInvalidSoakMetrics(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if report.Soak == nil {
+		t.Fatalf("checked-in SCRAM matrix report has no soak evidence")
+	}
+
+	report.Soak.DurationSeconds = 0
+	report.Soak.Level.Concurrency = 0
+	report.Soak.AvgLatencyMS = -1
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted invalid soak metrics")
+	}
+	for _, want := range []string{"soak duration", "soak level", "invalid timing metrics"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateReport soak error missing %q: %v", want, err)
+		}
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {

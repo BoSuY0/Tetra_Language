@@ -334,8 +334,17 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	if strings.TrimSpace(soak.Endpoint) == "" || strings.TrimSpace(soak.Path) == "" || soak.Workers <= 0 {
 		issues = append(issues, "soak endpoint/path/workers are required")
 	}
+	if soak.Level.Concurrency <= 0 || soak.Level.Connections <= 0 {
+		issues = append(issues, "soak level concurrency/connections must be positive")
+	}
+	if soak.DurationSeconds <= 0 {
+		issues = append(issues, "soak duration evidence is required")
+	}
 	if soak.Requests <= 0 || soak.Successes <= 0 || soak.Failures != 0 || soak.RPS <= 0 {
 		issues = append(issues, "soak evidence did not pass")
+	}
+	if soak.AvgLatencyMS < 0 || soak.P99LatencyMS < 0 || soak.P999LatencyMS < 0 || soak.MaxLatencyMS < 0 || soak.FirstHalfAvgMS < 0 || soak.SecondHalfAvgMS < 0 {
+		issues = append(issues, "soak has invalid timing metrics")
 	}
 	issues = append(issues, validateTailLatencyPercentiles("soak "+soak.Path, soak.P99LatencyMS, soak.P999LatencyMS, soak.MaxLatencyMS)...)
 	if !soak.ShutdownClean {
