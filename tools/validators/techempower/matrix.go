@@ -3,6 +3,7 @@ package techempower
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -280,6 +281,7 @@ func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, ru
 
 	seen := make(map[string]bool, len(runs))
 	seenRuns := make(map[string]bool, len(runs))
+	repeatsByCell := make(map[string]map[int]bool, len(runs))
 	for _, run := range runs {
 		if !declaredEndpoints[run.Endpoint] || !declaredWorkers[run.Workers] || !declaredLevels[matrixLevelKey(run.Level)] {
 			issues = append(issues, fmt.Sprintf("matrix coverage includes undeclared endpoint %s workers=%d c%d/k%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections))
@@ -291,15 +293,38 @@ func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, ru
 			continue
 		}
 		seenRuns[runKey] = true
-		seen[matrixCoverageKey(run.Endpoint, run.Workers, run.Level)] = true
+		coverageKey := matrixCoverageKey(run.Endpoint, run.Workers, run.Level)
+		seen[coverageKey] = true
+		if run.Repeat > 0 {
+			if repeatsByCell[coverageKey] == nil {
+				repeatsByCell[coverageKey] = make(map[int]bool)
+			}
+			repeatsByCell[coverageKey][run.Repeat] = true
+		}
 	}
 
+	var expectedRepeats []int
 	for _, endpoint := range endpoints {
 		for _, workerCount := range workers {
 			for _, level := range levels {
 				key := matrixCoverageKey(endpoint, workerCount, level)
 				if !seen[key] {
 					issues = append(issues, fmt.Sprintf("matrix coverage missing endpoint %s workers=%d c%d/k%d", endpoint, workerCount, level.Concurrency, level.Connections))
+					continue
+				}
+				label := matrixCoverageLabel(endpoint, workerCount, level)
+				repeats := sortedRepeatSet(repeatsByCell[key])
+				if len(repeats) == 0 {
+					issues = append(issues, "matrix repeat coverage "+label+" is missing positive repeat evidence")
+					continue
+				}
+				issues = append(issues, validateMatrixRepeatSequence(label, repeats)...)
+				if expectedRepeats == nil {
+					expectedRepeats = repeats
+					continue
+				}
+				if !sameIntSequence(repeats, expectedRepeats) {
+					issues = append(issues, fmt.Sprintf("matrix repeat coverage %s repeats %s, want %s", label, formatIntSequence(repeats), formatIntSequence(expectedRepeats)))
 				}
 			}
 		}
@@ -409,12 +434,57 @@ func matrixCoverageKey(endpoint string, workers int, level MatrixLevel) string {
 	return fmt.Sprintf("%s|%d|%d|%d", endpoint, workers, level.Concurrency, level.Connections)
 }
 
+func matrixCoverageLabel(endpoint string, workers int, level MatrixLevel) string {
+	return fmt.Sprintf("endpoint %s workers=%d c%d/k%d", endpoint, workers, level.Concurrency, level.Connections)
+}
+
 func matrixRunIdentityKey(run MatrixRun) string {
 	return fmt.Sprintf("%s|%d|%d|%d|%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat)
 }
 
 func matrixLevelKey(level MatrixLevel) string {
 	return fmt.Sprintf("%d:%d", level.Concurrency, level.Connections)
+}
+
+func sortedRepeatSet(repeats map[int]bool) []int {
+	values := make([]int, 0, len(repeats))
+	for repeat := range repeats {
+		values = append(values, repeat)
+	}
+	sort.Ints(values)
+	return values
+}
+
+func validateMatrixRepeatSequence(label string, repeats []int) []string {
+	var issues []string
+	for index, repeat := range repeats {
+		want := index + 1
+		if repeat != want {
+			issues = append(issues, fmt.Sprintf("matrix repeat coverage %s missing repeat %d before repeat %d", label, want, repeat))
+			return issues
+		}
+	}
+	return issues
+}
+
+func sameIntSequence(left []int, right []int) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func formatIntSequence(values []int) string {
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		parts = append(parts, strconv.Itoa(value))
+	}
+	return "[" + strings.Join(parts, ",") + "]"
 }
 
 func validateMatrixBuild(build MatrixBuild) []string {
