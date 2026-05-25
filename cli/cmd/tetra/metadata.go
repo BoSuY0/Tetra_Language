@@ -33,6 +33,9 @@ type targetReportEntry struct {
 	RunRunner               string `json:"run_runner,omitempty"`
 	RunSupported            bool   `json:"run_supported"`
 	RunUnsupportedReason    string `json:"run_unsupported_reason,omitempty"`
+	UIRuntimeContract       string `json:"ui_runtime_contract,omitempty"`
+	UIRuntimeStatus         string `json:"ui_runtime_status"`
+	UIRuntimeEvidence       string `json:"ui_runtime_evidence,omitempty"`
 	PointerWidthBits        int    `json:"pointer_width_bits"`
 	RegisterWidthBits       int    `json:"register_width_bits"`
 	NativeIntWidthBits      int    `json:"native_int_width_bits"`
@@ -219,6 +222,9 @@ func buildTargetReportEntries() []targetReportEntry {
 			RunRunner:               runRunner,
 			RunSupported:            runSupported,
 			RunUnsupportedReason:    runUnsupportedReason,
+			UIRuntimeContract:       ctarget.UIRuntimeContract(tgt.Triple),
+			UIRuntimeStatus:         ctarget.UIRuntimeStatus(tgt.Triple),
+			UIRuntimeEvidence:       ctarget.UIRuntimeEvidence(tgt.Triple),
 			PointerWidthBits:        tgt.PointerWidthBits,
 			RegisterWidthBits:       tgt.RegisterWidthBits,
 			NativeIntWidthBits:      tgt.NativeIntWidthBits,

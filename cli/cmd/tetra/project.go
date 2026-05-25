@@ -40,17 +40,16 @@ func resolveCLIInput(input string) (string, compiler.WorldOptions, *cliProjectCo
 		return input, compiler.WorldOptions{}, nil, nil
 	}
 
-	entry := input
-	if entry == "" {
-		entry = ctx.EntryPath
-	} else if isProjectReference(input, ctx) {
-		entry = ctx.EntryPath
-	} else {
-		entry, err = filepath.Abs(entry)
+	projectReference := isProjectReference(input, ctx)
+	if input != "" && !projectReference {
+		entry, err := filepath.Abs(input)
 		if err != nil {
 			return "", compiler.WorldOptions{}, nil, fmt.Errorf("resolve input path: %w", err)
 		}
+		return entry, compiler.WorldOptions{}, nil, nil
 	}
+
+	entry := ctx.EntryPath
 	opt := compiler.WorldOptions{
 		Root:            ctx.Root,
 		SourceRoots:     append([]string(nil), ctx.SourceRoots...),

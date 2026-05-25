@@ -44,6 +44,33 @@ func TestTargetListsAreStable(t *testing.T) {
 	}
 }
 
+func TestUIRuntimeMetadataIsTruthfulPerTarget(t *testing.T) {
+	cases := []struct {
+		triple   string
+		status   string
+		contract string
+	}{
+		{"linux-x64", "production", "tetra.ui.platform.v1"},
+		{"windows-x64", "requires_target_host_evidence", "tetra.ui.platform.v1"},
+		{"macos-x64", "requires_target_host_evidence", "tetra.ui.platform.v1"},
+		{"wasm32-web", "production", "tetra.ui.platform.v1"},
+		{"wasm32-wasi", "unsupported", ""},
+		{"linux-x86", "unsupported", ""},
+		{"linux-x32", "unsupported", ""},
+	}
+	for _, tc := range cases {
+		if got := UIRuntimeStatus(tc.triple); got != tc.status {
+			t.Fatalf("UIRuntimeStatus(%q) = %q, want %q", tc.triple, got, tc.status)
+		}
+		if got := UIRuntimeContract(tc.triple); got != tc.contract {
+			t.Fatalf("UIRuntimeContract(%q) = %q, want %q", tc.triple, got, tc.contract)
+		}
+		if got := UIRuntimeEvidence(tc.triple); strings.TrimSpace(got) == "" {
+			t.Fatalf("UIRuntimeEvidence(%q) is empty", tc.triple)
+		}
+	}
+}
+
 func TestTargetStatusValues(t *testing.T) {
 	cases := []struct {
 		triple string

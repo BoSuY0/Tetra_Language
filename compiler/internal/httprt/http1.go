@@ -8,17 +8,20 @@ import (
 )
 
 var (
-	ErrIncomplete         = errors.New("incomplete HTTP request")
-	ErrHeaderTooLarge     = errors.New("HTTP header section exceeds limit")
-	ErrTooManyHeaders     = errors.New("HTTP request has too many headers")
-	ErrMalformedRequest   = errors.New("malformed HTTP request")
-	ErrMalformedHeader    = errors.New("malformed HTTP header")
-	ErrUnsupportedVersion = errors.New("unsupported HTTP version")
+	ErrIncomplete                  = errors.New("incomplete HTTP request")
+	ErrHeaderTooLarge              = errors.New("HTTP header section exceeds limit")
+	ErrTooManyHeaders              = errors.New("HTTP request has too many headers")
+	ErrBodyTooLarge                = errors.New("HTTP request body exceeds limit")
+	ErrMalformedRequest            = errors.New("malformed HTTP request")
+	ErrMalformedHeader             = errors.New("malformed HTTP header")
+	ErrUnsupportedVersion          = errors.New("unsupported HTTP version")
+	ErrUnsupportedTransferEncoding = errors.New("unsupported HTTP transfer encoding")
 )
 
 type Limits struct {
 	MaxHeaderBytes int
 	MaxHeaders     int
+	MaxBodyBytes   int
 }
 
 type Header struct {
@@ -33,9 +36,15 @@ type Request struct {
 	Query         string
 	Version       string
 	Headers       []Header
+	PathParams    []PathParam
 	ContentLength int
 	Body          []byte
 	KeepAlive     bool
+}
+
+type PathParam struct {
+	Name  string
+	Value string
 }
 
 func (r Request) Header(name string) string {
@@ -64,6 +73,15 @@ func (r Request) QueryValue(name string) string {
 		}
 		if key == name {
 			return value
+		}
+	}
+	return ""
+}
+
+func (r Request) PathValue(name string) string {
+	for _, param := range r.PathParams {
+		if param.Name == name {
+			return param.Value
 		}
 	}
 	return ""
@@ -101,7 +119,7 @@ func ParseRequest(input []byte, limits Limits) (Request, int, error) {
 		}
 		req.Headers = append(req.Headers, header)
 	}
-	if err := applyHeaderMetadata(&req); err != nil {
+	if err := applyHeaderMetadata(&req, limits); err != nil {
 		return Request{}, 0, err
 	}
 	consumed := headerBytes + req.ContentLength
@@ -120,6 +138,9 @@ func normalizeLimits(limits Limits) Limits {
 	}
 	if limits.MaxHeaders <= 0 {
 		limits.MaxHeaders = 64
+	}
+	if limits.MaxBodyBytes <= 0 {
+		limits.MaxBodyBytes = 1 << 20
 	}
 	return limits
 }
@@ -162,12 +183,18 @@ func parseHeaderLine(line string) (Header, error) {
 	return Header{Name: name, Value: value}, nil
 }
 
-func applyHeaderMetadata(req *Request) error {
+func applyHeaderMetadata(req *Request, limits Limits) error {
+	if value := req.Header("Transfer-Encoding"); value != "" && !strings.EqualFold(value, "identity") {
+		return ErrUnsupportedTransferEncoding
+	}
 	req.ContentLength = 0
 	if value := req.Header("Content-Length"); value != "" {
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
 			return ErrMalformedHeader
+		}
+		if n > limits.MaxBodyBytes {
+			return ErrBodyTooLarge
 		}
 		req.ContentLength = n
 	}
@@ -268,6 +295,8 @@ func statusText(code int) string {
 		return "Bad Request"
 	case 404:
 		return "Not Found"
+	case 413:
+		return "Payload Too Large"
 	case 500:
 		return "Internal Server Error"
 	default:
@@ -277,25 +306,94 @@ func statusText(code int) string {
 
 type Handler func(Request) Response
 
+type Middleware func(Handler) Handler
+
 type route struct {
 	method  string
 	path    string
 	handler Handler
+	params  []string
 }
 
 type Router struct {
-	routes []route
+	routes      []route
+	middlewares []Middleware
+}
+
+func (r *Router) Use(middleware Middleware) {
+	if middleware != nil {
+		r.middlewares = append(r.middlewares, middleware)
+	}
 }
 
 func (r *Router) Handle(method string, path string, handler Handler) {
-	r.routes = append(r.routes, route{method: method, path: path, handler: handler})
+	r.routes = append(r.routes, route{method: method, path: path, handler: r.wrap(handler), params: routeParams(path)})
 }
 
 func (r *Router) Route(req Request) (Response, bool) {
 	for _, route := range r.routes {
-		if route.method == req.Method && route.path == req.Path {
+		if route.method == req.Method && len(route.params) == 0 && route.path == req.Path {
 			return route.handler(req), true
 		}
 	}
+	for _, route := range r.routes {
+		if route.method != req.Method || len(route.params) == 0 {
+			continue
+		}
+		params, ok := matchParameterizedPath(route.path, route.params, req.Path)
+		if !ok {
+			continue
+		}
+		req.PathParams = params
+		return route.handler(req), true
+	}
 	return Response{}, false
+}
+
+func (r *Router) wrap(handler Handler) Handler {
+	for i := len(r.middlewares) - 1; i >= 0; i-- {
+		handler = r.middlewares[i](handler)
+	}
+	return handler
+}
+
+func routeParams(path string) []string {
+	segments := splitPath(path)
+	params := make([]string, 0)
+	for _, segment := range segments {
+		if strings.HasPrefix(segment, ":") && len(segment) > 1 {
+			params = append(params, segment[1:])
+		}
+	}
+	return params
+}
+
+func matchParameterizedPath(pattern string, names []string, path string) ([]PathParam, bool) {
+	patternSegments := splitPath(pattern)
+	pathSegments := splitPath(path)
+	if len(patternSegments) != len(pathSegments) {
+		return nil, false
+	}
+	params := make([]PathParam, 0, len(names))
+	for i, segment := range patternSegments {
+		if strings.HasPrefix(segment, ":") && len(segment) > 1 {
+			if pathSegments[i] == "" {
+				return nil, false
+			}
+			params = append(params, PathParam{Name: segment[1:], Value: pathSegments[i]})
+			continue
+		}
+		if segment != pathSegments[i] {
+			return nil, false
+		}
+	}
+	return params, true
+}
+
+func splitPath(path string) []string {
+	trimmed := strings.Trim(path, "/")
+	if trimmed == "" {
+		return nil
+	}
+	return strings.Split(trimmed, "/")
 }

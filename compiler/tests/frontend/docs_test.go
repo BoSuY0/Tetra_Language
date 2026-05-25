@@ -119,6 +119,43 @@ func unstable_add(a: Int, b: Int) -> Int:
 	}
 }
 
+func TestGenerateAPIDocsDisambiguatesDuplicateModuleHeadings(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "services", "alpha", "app", "main.t4")
+	second := filepath.Join(dir, "services", "beta", "app", "main.t4")
+	if err := os.MkdirAll(filepath.Dir(first), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(second), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(first, []byte("module app.main\nfunc alpha() -> Int:\n    return 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte("module app.main\nfunc beta() -> Int:\n    return 2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	docs, err := compiler.GenerateAPIDocs([]string{dir})
+	if err != nil {
+		t.Fatalf("GenerateAPIDocs: %v", err)
+	}
+	out := string(docs)
+	if strings.Contains(out, "## app.main\n") {
+		t.Fatalf("duplicate module heading was not disambiguated:\n%s", out)
+	}
+	for _, want := range []string{
+		"## app.main (" + filepath.ToSlash(first) + ")",
+		"## app.main (" + filepath.ToSlash(second) + ")",
+		"- `func alpha() -> i32`",
+		"- `func beta() -> i32`",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("docs missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestGenerateAPIDocsStablePublicSurfaceSnapshot(t *testing.T) {
 	src := []byte(`struct Vec2:
     x: Int

@@ -30,6 +30,9 @@ type TargetManifest struct {
 	ExeExt                  string `json:"exe_ext"`
 	CollectImports          bool   `json:"collect_imports"`
 	RunMode                 string `json:"run_mode"`
+	UIRuntimeContract       string `json:"ui_runtime_contract,omitempty"`
+	UIRuntimeStatus         string `json:"ui_runtime_status"`
+	UIRuntimeEvidence       string `json:"ui_runtime_evidence,omitempty"`
 	PointerWidthBits        int    `json:"pointer_width_bits"`
 	RegisterWidthBits       int    `json:"register_width_bits"`
 	NativeIntWidthBits      int    `json:"native_int_width_bits"`
@@ -99,6 +102,9 @@ func GetManifest() (Manifest, error) {
 			ExeExt:                  t.ExeExt,
 			CollectImports:          t.CollectImports,
 			RunMode:                 fmt.Sprint(t.RunMode),
+			UIRuntimeContract:       ctarget.UIRuntimeContract(t.Triple),
+			UIRuntimeStatus:         ctarget.UIRuntimeStatus(t.Triple),
+			UIRuntimeEvidence:       ctarget.UIRuntimeEvidence(t.Triple),
 			PointerWidthBits:        t.PointerWidthBits,
 			RegisterWidthBits:       t.RegisterWidthBits,
 			NativeIntWidthBits:      t.NativeIntWidthBits,

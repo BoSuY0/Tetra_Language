@@ -115,6 +115,48 @@ func TestPoolCloseRejectsFutureCheckoutAndClosesIdle(t *testing.T) {
 	}
 }
 
+func TestPoolStatsTrackOpenIdleInUseAndClosedState(t *testing.T) {
+	pool, err := NewPool(2, func(ctx context.Context) (*Conn, error) {
+		return newTestConn(), nil
+	})
+	if err != nil {
+		t.Fatalf("NewPool: %v", err)
+	}
+	first, err := pool.Checkout(context.Background())
+	if err != nil {
+		t.Fatalf("Checkout first: %v", err)
+	}
+	second, err := pool.Checkout(context.Background())
+	if err != nil {
+		t.Fatalf("Checkout second: %v", err)
+	}
+	stats := pool.Stats()
+	if stats.MaxOpen != 2 || stats.Open != 2 || stats.InUse != 2 || stats.Idle != 0 || stats.Closed {
+		t.Fatalf("checked-out stats = %#v", stats)
+	}
+	if err := first.Release(nil); err != nil {
+		t.Fatalf("Release first: %v", err)
+	}
+	stats = pool.Stats()
+	if stats.Open != 2 || stats.InUse != 1 || stats.Idle != 1 {
+		t.Fatalf("partially released stats = %#v", stats)
+	}
+	if err := second.Release(ErrBadConn); err != nil {
+		t.Fatalf("Release bad second: %v", err)
+	}
+	stats = pool.Stats()
+	if stats.Open != 1 || stats.InUse != 0 || stats.Idle != 1 {
+		t.Fatalf("bad-release stats = %#v", stats)
+	}
+	if err := pool.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	stats = pool.Stats()
+	if stats.Open != 0 || stats.InUse != 0 || stats.Idle != 0 || !stats.Closed {
+		t.Fatalf("closed stats = %#v", stats)
+	}
+}
+
 func newTestConn() *Conn {
 	return &Conn{rwc: &countingRWC{}, maxPayload: 1 << 20}
 }

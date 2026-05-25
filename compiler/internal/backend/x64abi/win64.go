@@ -240,6 +240,8 @@ func (a *Win64) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *i
 	}
 	*stackDepth--
 	e.PopRax()
+	e.TestRaxRax()
+	emptyAt := e.JzRel32()
 	e.PushRax()
 	*stackDepth++
 	if kind == ir.IRMakeSliceI32 {
@@ -266,6 +268,17 @@ func (a *Win64) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *i
 	*stackDepth++
 	e.PushRcx()
 	*stackDepth++
+	doneAt := e.JmpRel32()
+	emptyOff := len(e.Buf)
+	e.PushRax()
+	e.PushRax()
+	doneOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, emptyAt, emptyOff); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
+		return err
+	}
 	return nil
 }
 

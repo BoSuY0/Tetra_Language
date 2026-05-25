@@ -812,6 +812,25 @@ func lowerTypedTaskWrapper(wrapper typedTaskWrapper) (ir.IRFunc, error) {
 	}, nil
 }
 
+func lowerCallExprWithName(call *frontend.CallExpr, name string) *frontend.CallExpr {
+	if call == nil || call.Name == name {
+		return call
+	}
+	clone := *call
+	clone.Name = name
+	return &clone
+}
+
+func lowerCallExprWithBuiltinAlias(call *frontend.CallExpr) *frontend.CallExpr {
+	if call == nil {
+		return nil
+	}
+	if builtin, ok := semantics.ResolveBuiltinAlias(call.Name); ok {
+		return lowerCallExprWithName(call, builtin)
+	}
+	return call
+}
+
 // throwingLayout computes the slot layout for typed-error returns. The compact
 // path is only valid when both success and error payloads fit in one slot.
 func throwingLayout(returnType, throwsType string, types map[string]*semantics.TypeInfo) (int, int, bool, error) {
@@ -2447,9 +2466,7 @@ func (l *lowerer) lowerCatchExpr(e *frontend.CatchExpr) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("%s: unknown catch result local", frontend.FormatPos(e.At))
 	}
-	if builtin, ok := semantics.ResolveBuiltinAlias(call.Name); ok {
-		call.Name = builtin
-	}
+	call = lowerCallExprWithBuiltinAlias(call)
 	var callSuccessSlots int
 	var callErrorSlots int
 	var callCompact bool
@@ -3119,9 +3136,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		if !ok {
 			return 0, fmt.Errorf("%s: try expects a throwing function call", frontend.FormatPos(e.At))
 		}
-		if builtin, ok := semantics.ResolveBuiltinAlias(call.Name); ok {
-			call.Name = builtin
-		}
+		call = lowerCallExprWithBuiltinAlias(call)
 		var dynamicFunctionValueSig *semantics.FuncSig
 		if local, ok := l.locals[call.Name]; ok && local.FunctionTypeValue && local.FunctionThrowsType != "" {
 			dynamicFunctionValueSig = &semantics.FuncSig{
@@ -3129,7 +3144,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				ThrowsType: local.FunctionThrowsType,
 			}
 		} else if local, ok := l.locals[call.Name]; ok && local.FunctionTypeValue && local.FunctionValue != "" {
-			call.Name = local.FunctionValue
+			call = lowerCallExprWithName(call, local.FunctionValue)
 		} else if fieldInfo, _, ok, err := l.functionFieldCallSource(call.Name, call.At); err != nil {
 			return 0, err
 		} else if ok && fieldInfo.FunctionThrowsType != "" {
@@ -3271,9 +3286,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			l.emitGlobalFunctionValueInitIfNeeded(global, e.At)
 			return l.lowerGlobalStoredFunctionCall(e, global)
 		}
-		if builtin, ok := semantics.ResolveBuiltinAlias(e.Name); ok {
-			e.Name = builtin
-		}
+		e = lowerCallExprWithBuiltinAlias(e)
 		if slots, ok, err := l.lowerRawOffsetCall(e); ok {
 			return slots, err
 		}
@@ -4729,9 +4742,7 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 		if global, ok := l.globals[e.Name]; ok && global.FunctionTypeValue {
 			return global.FunctionReturnType, nil
 		}
-		if builtin, ok := semantics.ResolveBuiltinAlias(e.Name); ok {
-			e.Name = builtin
-		}
+		e = lowerCallExprWithBuiltinAlias(e)
 		if e.Name == "core.recv_typed" {
 			if len(e.TypeArgs) != 1 {
 				return "", fmt.Errorf("%s: recv_typed expects one explicit type argument", frontend.FormatPos(e.At))
@@ -4767,9 +4778,7 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 		if !ok {
 			return "", fmt.Errorf("%s: try expects a throwing function call", frontend.FormatPos(e.At))
 		}
-		if builtin, ok := semantics.ResolveBuiltinAlias(call.Name); ok {
-			call.Name = builtin
-		}
+		call = lowerCallExprWithBuiltinAlias(call)
 		sig, ok := l.funcs[call.Name]
 		if !ok {
 			return "", fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(call.At), call.Name)
@@ -4782,9 +4791,7 @@ func (l *lowerer) inferExprType(expr frontend.Expr) (string, error) {
 		if !ok {
 			return "", fmt.Errorf("%s: await expects an async function call", frontend.FormatPos(e.At))
 		}
-		if builtin, ok := semantics.ResolveBuiltinAlias(call.Name); ok {
-			call.Name = builtin
-		}
+		call = lowerCallExprWithBuiltinAlias(call)
 		sig, ok := l.funcs[call.Name]
 		if !ok {
 			return "", fmt.Errorf("%s: unknown function '%s'", frontend.FormatPos(call.At), call.Name)

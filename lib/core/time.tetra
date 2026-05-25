@@ -12,6 +12,8 @@ module lib.core.time
 func millis_from_seconds(seconds: Int) -> Int:
     if seconds < 0:
         return 0
+    if seconds > 2147483:
+        return 2147483647
     return seconds * 1000
 
 func seconds_from_millis(milliseconds: Int) -> Int:
@@ -27,7 +29,18 @@ func clamp_timeout_ms(value: Int, lo: Int, hi: Int) -> Int:
     return value
 
 func add_duration_ms(base: Int, delta: Int) -> Int:
-    let next: Int = base + delta
-    if next < 0:
+    if delta > 0:
+        if base > 2147483647 - delta:
+            return 2147483647
+        let next: Int = base + delta
+        if next < 0:
+            return 0
+        return next
+    if base < 0:
         return 0
-    return next
+    let reduced: Int = base + delta
+    if reduced < 0:
+        return 0
+    if reduced > base:
+        return 0
+    return reduced

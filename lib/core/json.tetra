@@ -28,6 +28,8 @@ func message_object_len(message: String) -> Int:
 func digits_i32(value: Int) -> Int:
     if value == 0:
         return 1
+    if value == -2147483648:
+        return 11
     var n: Int = value
     var digits: Int = 0
     if n < 0:
@@ -47,6 +49,10 @@ uses mem:
 
 func write_message_object_at(dst: inout []u8, start: Int, message: String) -> Int
 uses mem:
+    if start < 0:
+        return -1
+    if !has_u8_window(dst, start, message_object_len(message)):
+        return -1
     var i: Int = start
     dst[i] = 123
     i = i + 1
@@ -71,6 +77,8 @@ uses mem:
     dst[i] = 58
     i = i + 1
     i = write_json_string_at(dst, i, message)
+    if i < 0:
+        return -1
     dst[i] = 125
     return i + 1
 
@@ -80,6 +88,10 @@ uses mem:
 
 func write_json_string_at(dst: inout []u8, start: Int, text: String) -> Int
 uses mem:
+    if start < 0:
+        return -1
+    if !has_u8_window(dst, start, encoded_string_len(text)):
+        return -1
     var i: Int = start
     dst[i] = 34
     i = i + 1
@@ -126,7 +138,30 @@ uses mem:
     dst[i] = 34
     return i + 1
 
+func has_u8_window(src: []u8, start: Int, count: Int) -> Bool
+uses mem:
+    if start < 0:
+        return false
+    if count < 0:
+        return false
+    if count == 0:
+        return true
+    let end: Int = start + count
+    if end < start:
+        return false
+    var seen: Int = 0
+    var index: Int = 0
+    for ch in src:
+        if index >= start && index < end:
+            seen = seen + 1
+        index = index + 1
+    return seen == count
+
 func hex_digit_lower(value: Int) -> Int:
+    if value < 0:
+        return 48
+    if value > 15:
+        return 102
     if value < 10:
         return 48 + value
     return 87 + value

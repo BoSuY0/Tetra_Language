@@ -670,6 +670,108 @@ func TestTestCommandExplicitProjectDirectoryUsesSourceRootsAndImports(t *testing
 	}
 }
 
+func TestTestCommandDirectoryScanUsesNestedCapsuleSourceRoots(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	project := filepath.Join(dir, "examples", "service")
+	writeCLIProjectFile(t, project, "Capsule.t4", `capsule Service:
+    id "tetra://service"
+    version "0.1.0"
+    entry "src/app/main.t4"
+    sources:
+        src
+        tests
+`)
+	writeCLIProjectFile(t, project, "src/app/main.t4", "module app.main\nfunc main() -> Int:\n    return 0\n")
+	writeCLIProjectFile(t, project, "src/services/gateway.t4", "module services.gateway\nfunc status() -> Int:\n    return 42\n")
+	writeCLIProjectFile(t, project, "tests/gateway_routes.t4", "module gateway_routes\nimport services.gateway as gateway\ntest \"nested capsule import\":\n    expect gateway.status() == 42\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"test", "--target", mustHostTarget(t), filepath.Join(dir, "examples")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "1/1 passed") {
+		t.Fatalf("test stdout = %q", stdout.String())
+	}
+}
+
+func TestTestCommandDirectoryScanFallsBackForNestedLegacyModulePath(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	dir := t.TempDir()
+	project := filepath.Join(dir, "examples", "projects", "dogfood_cli")
+	writeCLIProjectFile(t, project, "Capsule.t4", `capsule DogfoodCLI:
+    id "tetra://examples/dogfood-cli"
+    version "0.1.0"
+    target "linux-x64"
+`)
+	writeCLIProjectFile(t, project, "src/main.t4", "module examples.projects.dogfood_cli.src.main\n\ntest \"legacy module path\":\n    expect 40 + 2 == 42\n")
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"test", "--target", mustHostTarget(t), filepath.Join(dir, "examples")}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "1/1 passed") {
+		t.Fatalf("test stdout = %q", stdout.String())
+	}
+}
+
+func TestTestCommandRunsMicroserviceCapsuleSourceRootExample(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	project := filepath.Join("..", "..", "..", "examples", "microservices", "backend_capsule_source_root_service")
+	if _, err := os.Stat(project); err != nil {
+		t.Fatalf("missing microservice capsule project %s: %v", project, err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(filepath.Join(project, ".tetra_cache"))
+		_ = os.RemoveAll(filepath.Join(project, "tetra_cache"))
+	})
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"check", project}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(filepath.ToSlash(stdout.String()), "src/app/main.tetra") {
+		t.Fatalf("check stdout = %q", stdout.String())
+	}
+
+	out := filepath.Join(t.TempDir(), "capsule-service")
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"build", "--target", mustHostTarget(t), "-o", out, project}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("expected build output %s: %v", out, err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"run", "--target", mustHostTarget(t), project}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"test", "--target", mustHostTarget(t), project}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("test exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "2/2 passed") {
+		t.Fatalf("test stdout = %q", stdout.String())
+	}
+}
+
 func TestTestCommandRunsModuleFileWithImportsAndMain(t *testing.T) {
 	if _, ok := hostTarget(); !ok {
 		t.Skip("host target unsupported")

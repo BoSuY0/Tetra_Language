@@ -60,6 +60,19 @@ func TestParseRequestHandlesBodyMetadataAndBoundaries(t *testing.T) {
 	}
 }
 
+func TestParseRequestRejectsOversizedBodyAndUnsupportedTransferEncoding(t *testing.T) {
+	limits := Limits{MaxHeaderBytes: 4096, MaxHeaders: 32, MaxBodyBytes: 4}
+	raw := []byte("POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\n\r\nhello")
+	if _, _, err := ParseRequest(raw, limits); !errors.Is(err, ErrBodyTooLarge) {
+		t.Fatalf("oversized body error = %v, want ErrBodyTooLarge", err)
+	}
+
+	chunked := []byte("POST /echo HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n")
+	if _, _, err := ParseRequest(chunked, limits); !errors.Is(err, ErrUnsupportedTransferEncoding) {
+		t.Fatalf("chunked body error = %v, want ErrUnsupportedTransferEncoding", err)
+	}
+}
+
 func TestParseRequestSeparatesPathAndQuery(t *testing.T) {
 	req, _, err := ParseRequest([]byte("GET /queries?queries=20&unused=yes HTTP/1.1\r\nHost: localhost\r\n\r\n"), Limits{})
 	if err != nil {
@@ -151,6 +164,45 @@ func TestRouterMatchesMethodAndPath(t *testing.T) {
 	}
 	if _, ok := router.Route(Request{Method: "GET", Path: "/missing"}); ok {
 		t.Fatalf("Route matched wrong path")
+	}
+}
+
+func TestRouterMatchesPathParamsAndMiddleware(t *testing.T) {
+	var router Router
+	router.Use(func(next Handler) Handler {
+		return func(req Request) Response {
+			resp := next(req)
+			resp.Headers = append(resp.Headers, Header{Name: "X-Route-ID", Value: req.PathValue("id")})
+			return resp
+		}
+	})
+	router.Handle("GET", "/users/:id/books/:book", func(req Request) Response {
+		return Response{StatusCode: 200, Body: []byte(req.PathValue("id") + "/" + req.PathValue("book"))}
+	})
+	router.Handle("GET", "/users/me/books/current", func(req Request) Response {
+		return Response{StatusCode: 200, Body: []byte("static")}
+	})
+
+	resp, ok := router.Route(Request{Method: "GET", Path: "/users/42/books/tetra"})
+	if !ok {
+		t.Fatalf("Route did not match parameterized path")
+	}
+	if string(resp.Body) != "42/tetra" {
+		t.Fatalf("parameterized response body = %q", resp.Body)
+	}
+	if len(resp.Headers) != 1 || resp.Headers[0].Value != "42" {
+		t.Fatalf("middleware header = %#v, want X-Route-ID 42", resp.Headers)
+	}
+
+	static, ok := router.Route(Request{Method: "GET", Path: "/users/me/books/current"})
+	if !ok {
+		t.Fatalf("Route did not match static path")
+	}
+	if string(static.Body) != "static" {
+		t.Fatalf("static route body = %q, want static", static.Body)
+	}
+	if _, ok := router.Route(Request{Method: "GET", Path: "/users/42"}); ok {
+		t.Fatalf("Route matched incomplete parameterized path")
 	}
 }
 

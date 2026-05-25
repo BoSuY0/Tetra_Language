@@ -22,10 +22,11 @@ import (
 const reportSchema = "tetra.techempower.benchmark.v1"
 
 type endpointSpec struct {
-	Name     string
-	Path     string
-	Kind     string
-	Validate func(int, http.Header, []byte) error
+	Name           string
+	Path           string
+	Kind           string
+	SemanticChecks []string
+	Validate       func(int, http.Header, []byte) error
 }
 
 type benchOptions struct {
@@ -67,28 +68,30 @@ type GitState struct {
 }
 
 type EndpointReport struct {
-	Name          string  `json:"name"`
-	Path          string  `json:"path"`
-	Kind          string  `json:"kind"`
-	Status        string  `json:"status"`
-	HTTPStatus    int     `json:"http_status"`
-	Requests      int     `json:"requests"`
-	Successes     int     `json:"successes"`
-	Failures      int     `json:"failures"`
-	Bytes         int64   `json:"bytes"`
-	RPS           float64 `json:"rps"`
-	AvgLatencyMS  float64 `json:"avg_latency_ms"`
-	P50LatencyMS  float64 `json:"p50_latency_ms"`
-	P90LatencyMS  float64 `json:"p90_latency_ms"`
-	P95LatencyMS  float64 `json:"p95_latency_ms"`
-	P99LatencyMS  float64 `json:"p99_latency_ms"`
-	P999LatencyMS float64 `json:"p999_latency_ms"`
-	MaxLatencyMS  float64 `json:"max_latency_ms"`
-	Threshold     string  `json:"threshold"`
-	ThresholdPass bool    `json:"threshold_pass"`
-	Validation    string  `json:"validation"`
-	Evidence      string  `json:"evidence"`
-	Error         string  `json:"error,omitempty"`
+	Name                string   `json:"name"`
+	Path                string   `json:"path"`
+	Kind                string   `json:"kind"`
+	Status              string   `json:"status"`
+	HTTPStatus          int      `json:"http_status"`
+	Requests            int      `json:"requests"`
+	Successes           int      `json:"successes"`
+	Failures            int      `json:"failures"`
+	Bytes               int64    `json:"bytes"`
+	RPS                 float64  `json:"rps"`
+	AvgLatencyMS        float64  `json:"avg_latency_ms"`
+	P50LatencyMS        float64  `json:"p50_latency_ms"`
+	P90LatencyMS        float64  `json:"p90_latency_ms"`
+	P95LatencyMS        float64  `json:"p95_latency_ms"`
+	P99LatencyMS        float64  `json:"p99_latency_ms"`
+	P999LatencyMS       float64  `json:"p999_latency_ms"`
+	MaxLatencyMS        float64  `json:"max_latency_ms"`
+	ObservedContentType string   `json:"observed_content_type"`
+	SemanticChecks      []string `json:"semantic_checks"`
+	Threshold           string   `json:"threshold"`
+	ThresholdPass       bool     `json:"threshold_pass"`
+	Validation          string   `json:"validation"`
+	Evidence            string   `json:"evidence"`
+	Error               string   `json:"error,omitempty"`
 }
 
 type Summary struct {
@@ -101,13 +104,14 @@ type Summary struct {
 }
 
 type endpointResult struct {
-	httpStatus int
-	bytes      int64
-	latencies  []time.Duration
-	successes  int
-	failures   int
-	err        error
-	elapsed    time.Duration
+	httpStatus  int
+	bytes       int64
+	contentType string
+	latencies   []time.Duration
+	successes   int
+	failures    int
+	err         error
+	elapsed     time.Duration
 }
 
 func main() {
@@ -202,27 +206,29 @@ func runEndpoint(ctx context.Context, opt benchOptions, base string, endpoint en
 	}
 	latency := latencySummary(result.latencies)
 	report := EndpointReport{
-		Name:          endpoint.Name,
-		Path:          endpoint.Path,
-		Kind:          endpoint.Kind,
-		Status:        "pass",
-		HTTPStatus:    result.httpStatus,
-		Requests:      requests,
-		Successes:     result.successes,
-		Failures:      result.failures,
-		Bytes:         result.bytes,
-		RPS:           float64(result.successes) / elapsed,
-		AvgLatencyMS:  averageMS(result.latencies),
-		P50LatencyMS:  latency.P50MS,
-		P90LatencyMS:  latency.P90MS,
-		P95LatencyMS:  latency.P95MS,
-		P99LatencyMS:  latency.P99MS,
-		P999LatencyMS: latency.P999MS,
-		MaxLatencyMS:  latency.MaxMS,
-		Threshold:     fmt.Sprintf("min_rps >= %.2f", opt.MinRPS),
-		ThresholdPass: float64(result.successes)/elapsed >= opt.MinRPS,
-		Validation:    "HTTP status, content type, and endpoint body contract checked",
-		Evidence:      "real HTTP request/response validation and concurrent load completed",
+		Name:                endpoint.Name,
+		Path:                endpoint.Path,
+		Kind:                endpoint.Kind,
+		Status:              "pass",
+		HTTPStatus:          result.httpStatus,
+		Requests:            requests,
+		Successes:           result.successes,
+		Failures:            result.failures,
+		Bytes:               result.bytes,
+		RPS:                 float64(result.successes) / elapsed,
+		AvgLatencyMS:        averageMS(result.latencies),
+		P50LatencyMS:        latency.P50MS,
+		P90LatencyMS:        latency.P90MS,
+		P95LatencyMS:        latency.P95MS,
+		P99LatencyMS:        latency.P99MS,
+		P999LatencyMS:       latency.P999MS,
+		MaxLatencyMS:        latency.MaxMS,
+		ObservedContentType: result.contentType,
+		SemanticChecks:      append([]string(nil), endpoint.SemanticChecks...),
+		Threshold:           fmt.Sprintf("min_rps >= %.2f", opt.MinRPS),
+		ThresholdPass:       float64(result.successes)/elapsed >= opt.MinRPS,
+		Validation:          "HTTP status, content type, and endpoint body contract checked",
+		Evidence:            "real HTTP request/response validation and concurrent load completed",
 	}
 	if result.err != nil {
 		report.Error = result.err.Error()
@@ -287,6 +293,9 @@ func exerciseEndpoint(ctx context.Context, client *http.Client, target string, e
 	for result := range results {
 		out.httpStatus = result.httpStatus
 		out.bytes += int64(result.bytes)
+		if out.contentType == "" && result.contentType != "" {
+			out.contentType = result.contentType
+		}
 		out.latencies = append(out.latencies, result.latency)
 		if result.err != nil {
 			out.failures++
@@ -302,10 +311,11 @@ func exerciseEndpoint(ctx context.Context, client *http.Client, target string, e
 }
 
 type singleResult struct {
-	httpStatus int
-	bytes      int
-	latency    time.Duration
-	err        error
+	httpStatus  int
+	bytes       int
+	contentType string
+	latency     time.Duration
+	err         error
 }
 
 func oneRequest(ctx context.Context, client *http.Client, target string, endpoint endpointSpec) singleResult {
@@ -324,25 +334,44 @@ func oneRequest(ctx context.Context, client *http.Client, target string, endpoin
 		return singleResult{httpStatus: resp.StatusCode, latency: time.Since(start), err: err}
 	}
 	if err := endpoint.Validate(resp.StatusCode, resp.Header, body); err != nil {
-		return singleResult{httpStatus: resp.StatusCode, bytes: len(body), latency: time.Since(start), err: err}
+		return singleResult{httpStatus: resp.StatusCode, bytes: len(body), contentType: resp.Header.Get("Content-Type"), latency: time.Since(start), err: err}
 	}
-	return singleResult{httpStatus: resp.StatusCode, bytes: len(body), latency: time.Since(start)}
+	return singleResult{httpStatus: resp.StatusCode, bytes: len(body), contentType: resp.Header.Get("Content-Type"), latency: time.Since(start)}
 }
 
 func defaultEndpoints(skipDB bool) []endpointSpec {
 	endpoints := []endpointSpec{
-		{Name: "plaintext", Path: "/plaintext", Kind: "plaintext", Validate: validatePlaintext},
-		{Name: "json", Path: "/json", Kind: "json", Validate: validateJSON},
+		{Name: "plaintext", Path: "/plaintext", Kind: "plaintext", SemanticChecks: semanticChecksForPath("/plaintext"), Validate: validatePlaintext},
+		{Name: "json", Path: "/json", Kind: "json", SemanticChecks: semanticChecksForPath("/json"), Validate: validateJSON},
 	}
 	if skipDB {
 		return endpoints
 	}
 	return append(endpoints,
-		endpointSpec{Name: "db", Path: "/db", Kind: "single-query", Validate: validateWorldObject},
-		endpointSpec{Name: "queries", Path: "/queries?queries=2", Kind: "multiple-queries", Validate: validateWorldArray},
-		endpointSpec{Name: "updates", Path: "/updates?queries=2", Kind: "updates", Validate: validateWorldArray},
-		endpointSpec{Name: "fortunes", Path: "/fortunes", Kind: "fortunes", Validate: validateFortunes},
+		endpointSpec{Name: "db", Path: "/db", Kind: "single-query", SemanticChecks: semanticChecksForPath("/db"), Validate: validateWorldObject},
+		endpointSpec{Name: "queries", Path: "/queries?queries=2", Kind: "multiple-queries", SemanticChecks: semanticChecksForPath("/queries?queries=2"), Validate: validateWorldArray},
+		endpointSpec{Name: "updates", Path: "/updates?queries=2", Kind: "updates", SemanticChecks: semanticChecksForPath("/updates?queries=2"), Validate: validateWorldArray},
+		endpointSpec{Name: "fortunes", Path: "/fortunes", Kind: "fortunes", SemanticChecks: semanticChecksForPath("/fortunes"), Validate: validateFortunes},
 	)
+}
+
+func semanticChecksForPath(path string) []string {
+	switch path {
+	case "/plaintext":
+		return []string{"status 200", "content-type text/plain", "body equals Hello, World!"}
+	case "/json":
+		return []string{"status 200", "content-type application/json", "JSON message equals Hello, World!"}
+	case "/db":
+		return []string{"status 200", "content-type application/json", "World object id/randomNumber range"}
+	case "/queries?queries=2":
+		return []string{"status 200", "content-type application/json", "World array shape"}
+	case "/updates?queries=2":
+		return []string{"status 200", "content-type application/json", "World update array shape"}
+	case "/fortunes":
+		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel"}
+	default:
+		return []string{"status 200"}
+	}
 }
 
 func validatePlaintext(status int, header http.Header, body []byte) error {
@@ -542,6 +571,12 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 	}
 	if endpoint.RPS < 0 || endpoint.AvgLatencyMS < 0 || endpoint.P50LatencyMS < 0 || endpoint.P90LatencyMS < 0 || endpoint.P95LatencyMS < 0 || endpoint.P99LatencyMS < 0 || endpoint.P999LatencyMS < 0 || endpoint.MaxLatencyMS < 0 {
 		issues = append(issues, fmt.Sprintf("endpoint %s has invalid timing metrics", endpoint.Path))
+	}
+	if endpoint.Status == "pass" && strings.TrimSpace(endpoint.ObservedContentType) == "" {
+		issues = append(issues, fmt.Sprintf("endpoint %s missing observed content type", endpoint.Path))
+	}
+	if endpoint.Status == "pass" && len(endpoint.SemanticChecks) == 0 {
+		issues = append(issues, fmt.Sprintf("endpoint %s missing semantic checks", endpoint.Path))
 	}
 	if strings.TrimSpace(endpoint.Threshold) == "" || strings.TrimSpace(endpoint.Validation) == "" || strings.TrimSpace(endpoint.Evidence) == "" {
 		issues = append(issues, fmt.Sprintf("endpoint %s missing threshold/validation/evidence", endpoint.Path))

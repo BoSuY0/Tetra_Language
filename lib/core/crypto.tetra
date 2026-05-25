@@ -17,6 +17,8 @@ func interface_strength() -> Int:
 
 func mix_seed(seed: Int, value: Int) -> Int:
     let mixed: Int = seed * 33 + value
+    if mixed == -2147483648:
+        return 2147483647
     if mixed < 0:
         return 0 - mixed
     return mixed % 2147483647

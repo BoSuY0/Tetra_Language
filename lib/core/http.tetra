@@ -70,9 +70,13 @@ func route_tech_empower(request: String) -> Int:
                 return route_bad_request()
         else:
             if ch == 32 || ch == 63:
+                if path_pos == 0:
+                    return route_bad_request()
                 saw_target_end = true
                 break
             if path_pos == 0 && ch != 47:
+                return route_bad_request()
+            if !http_request_target_char(ch):
                 return route_bad_request()
             if route_path_char(route_plaintext(), path_pos) != ch:
                 match_plaintext = false
@@ -110,6 +114,8 @@ uses mem:
 
 func route_tech_empower_bytes_at(request: []u8, start: Int, request_len: Int) -> Int
 uses mem:
+    if !has_u8_window(request, start, request_len):
+        return route_bad_request()
     if !contains_http11_marker_bytes_at(request, start, request_len):
         return route_bad_request()
     var pos: Int = 0
@@ -140,9 +146,13 @@ uses mem:
                 return route_bad_request()
         else:
             if ch == 32 || ch == 63:
+                if path_pos == 0:
+                    return route_bad_request()
                 saw_target_end = true
                 break
             if path_pos == 0 && ch != 47:
+                return route_bad_request()
+            if !http_request_target_char(ch):
                 return route_bad_request()
             if route_path_char(route_plaintext(), path_pos) != ch:
                 match_plaintext = false
@@ -183,6 +193,8 @@ uses mem:
 
 func request_keep_alive_bytes_at(request: []u8, start: Int, request_len: Int) -> Bool
 uses mem:
+    if !has_u8_window(request, start, request_len):
+        return false
     return contains_http11_marker_bytes_at(request, start, request_len) && !contains_connection_close_bytes_at(request, start, request_len)
 
 func request_head_len_bytes(request: []u8, request_len: Int) -> Int
@@ -191,6 +203,8 @@ uses mem:
 
 func request_head_len_bytes_at(request: []u8, start: Int, request_len: Int) -> Int
 uses mem:
+    if !has_u8_window(request, start, request_len):
+        return 0
     var pos: Int = 0
     var state: Int = 0
     while pos < request_len:
@@ -225,6 +239,18 @@ func plaintext_body_len() -> Int:
     return 13
 
 func response_head_len(status: Int, reason: String, server: String, date: String, content_type: String, content_len: Int, keep_alive: Bool) -> Int:
+    if status < 100 || status > 999:
+        return -1
+    if content_len < 0:
+        return -1
+    if !http_header_value_valid(reason):
+        return -1
+    if !http_header_value_valid(server):
+        return -1
+    if !http_header_value_valid(date):
+        return -1
+    if !http_header_value_valid(content_type):
+        return -1
     var total: Int = 9 + digits_i32(status) + 1 + strings.ascii_len(reason) + 2
     total = total + header_line_len("Server", server)
     total = total + header_line_len("Date", date)
@@ -237,14 +263,22 @@ func response_head_len(status: Int, reason: String, server: String, date: String
     return total + 2
 
 func plaintext_response_len(server: String, date: String, keep_alive: Bool) -> Int:
-    return response_head_len(200, "OK", server, date, "text/plain", plaintext_body_len(), keep_alive) + plaintext_body_len()
+    let head_len: Int = response_head_len(200, "OK", server, date, "text/plain", plaintext_body_len(), keep_alive)
+    if head_len < 0:
+        return -1
+    return head_len + plaintext_body_len()
 
 func json_message_response_len(server: String, date: String, message: String, keep_alive: Bool) -> Int:
     let body_len: Int = json.message_object_len(message)
-    return response_head_len(200, "OK", server, date, "application/json", body_len, keep_alive) + body_len
+    let head_len: Int = response_head_len(200, "OK", server, date, "application/json", body_len, keep_alive)
+    if head_len < 0:
+        return -1
+    return head_len + body_len
 
 func write_plaintext_response(dst: inout []u8, server: String, date: String, keep_alive: Bool) -> Int
 uses mem:
+    if !has_u8_window(dst, 0, plaintext_response_len(server, date, keep_alive)):
+        return -1
     var i: Int = write_response_head(dst, 200, "OK", server, date, "text/plain", plaintext_body_len(), keep_alive)
     i = write_ascii_at(dst, i, "Hello, World!")
     return i
@@ -252,11 +286,16 @@ uses mem:
 func write_json_message_response(dst: inout []u8, server: String, date: String, message: String, keep_alive: Bool) -> Int
 uses mem:
     let body_len: Int = json.message_object_len(message)
+    if !has_u8_window(dst, 0, json_message_response_len(server, date, message, keep_alive)):
+        return -1
     var i: Int = write_response_head(dst, 200, "OK", server, date, "application/json", body_len, keep_alive)
     return json.write_message_object_at(dst, i, message)
 
 func write_response_head(dst: inout []u8, status: Int, reason: String, server: String, date: String, content_type: String, content_len: Int, keep_alive: Bool) -> Int
 uses mem:
+    let total: Int = response_head_len(status, reason, server, date, content_type, content_len, keep_alive)
+    if !has_u8_window(dst, 0, total):
+        return -1
     var i: Int = write_ascii_at(dst, 0, "HTTP/1.1 ")
     i = write_decimal_i32_at(dst, i, status)
     dst[i] = 32
@@ -276,33 +315,79 @@ uses mem:
     return write_crlf_at(dst, i)
 
 func header_line_len(name: String, value: String) -> Int:
+    if !http_header_name_valid(name):
+        return -1
+    if !http_header_value_valid(value):
+        return -1
     return strings.ascii_len(name) + 2 + strings.ascii_len(value) + 2
 
 func write_header_at(dst: inout []u8, start: Int, name: String, value: String) -> Int
 uses mem:
+    if start < 0:
+        return -1
+    let total: Int = header_line_len(name, value)
+    if !has_u8_window(dst, start, total):
+        return -1
     var i: Int = write_ascii_at(dst, start, name)
+    if i < 0:
+        return -1
     dst[i] = 58
     dst[i + 1] = 32
     i = i + 2
     i = write_ascii_at(dst, i, value)
+    if i < 0:
+        return -1
     return write_crlf_at(dst, i)
 
 func write_crlf_at(dst: inout []u8, start: Int) -> Int
 uses mem:
+    if start < 0:
+        return -1
+    if !has_u8_window(dst, start, 2):
+        return -1
     dst[start] = 13
     dst[start + 1] = 10
     return start + 2
 
 func write_ascii_at(dst: inout []u8, start: Int, text: String) -> Int
 uses mem:
+    if start < 0:
+        return -1
+    if !has_u8_window(dst, start, strings.ascii_len(text)):
+        return -1
     var i: Int = start
     for ch in text:
         dst[i] = ch
         i = i + 1
     return i
 
+func has_u8_window(src: []u8, start: Int, count: Int) -> Bool
+uses mem:
+    if start < 0:
+        return false
+    if count < 0:
+        return false
+    if count == 0:
+        return true
+    let end: Int = start + count
+    if end < start:
+        return false
+    var seen: Int = 0
+    var index: Int = 0
+    for ch in src:
+        if index >= start && index < end:
+            seen = seen + 1
+        index = index + 1
+    return seen == count
+
 func write_decimal_i32_at(dst: inout []u8, start: Int, value: Int) -> Int
 uses mem:
+    if start < 0:
+        return -1
+    if !has_u8_window(dst, start, digits_i32(value)):
+        return -1
+    if value == -2147483648:
+        return write_ascii_at(dst, start, "-2147483648")
     var i: Int = start
     var n: Int = value
     if n == 0:
@@ -328,6 +413,8 @@ uses mem:
 func digits_i32(value: Int) -> Int:
     if value == 0:
         return 1
+    if value == -2147483648:
+        return 11
     var n: Int = value
     var digits: Int = 0
     if n < 0:
@@ -474,51 +561,82 @@ func fortunes_path_char(pos: Int) -> Int:
 
 func contains_http11_marker(request: String) -> Bool:
     var state: Int = 0
+    var method_len: Int = 0
+    var target_len: Int = 0
     for ch in request:
         if state == 0:
+            if ch == 13 || ch == 10:
+                return false
             if ch == 32:
-                state = 1
-        else if state == 1:
-            if ch == 72:
-                state = 2
-            else if ch == 32:
+                if method_len == 0:
+                    return false
                 state = 1
             else:
-                state = 0
+                if !http_token_char(ch):
+                    return false
+                method_len = method_len + 1
+        else if state == 1:
+            if ch == 13 || ch == 10:
+                return false
+            if ch == 32:
+                if target_len == 0:
+                    return false
+                state = 2
+            else:
+                if target_len == 0 && ch != 47:
+                    return false
+                if !http_request_target_char(ch):
+                    return false
+                target_len = target_len + 1
         else if state == 2:
-            if ch == 84:
+            if ch == 72:
                 state = 3
             else:
-                state = 0
+                return false
         else if state == 3:
             if ch == 84:
                 state = 4
             else:
-                state = 0
+                return false
         else if state == 4:
-            if ch == 80:
+            if ch == 84:
                 state = 5
             else:
-                state = 0
+                return false
         else if state == 5:
-            if ch == 47:
+            if ch == 80:
                 state = 6
             else:
-                state = 0
+                return false
         else if state == 6:
-            if ch == 49:
+            if ch == 47:
                 state = 7
             else:
-                state = 0
+                return false
         else if state == 7:
-            if ch == 46:
+            if ch == 49:
                 state = 8
             else:
-                state = 0
+                return false
         else if state == 8:
+            if ch == 46:
+                state = 9
+            else:
+                return false
+        else if state == 9:
             if ch == 49:
+                state = 10
+            else:
+                return false
+        else if state == 10:
+            if ch == 13:
+                state = 11
+            else:
+                return false
+        else if state == 11:
+            if ch == 10:
                 return true
-            state = 0
+            return false
     return false
 
 func contains_http11_marker_bytes(request: []u8, request_len: Int) -> Bool
@@ -527,64 +645,101 @@ uses mem:
 
 func contains_http11_marker_bytes_at(request: []u8, start: Int, request_len: Int) -> Bool
 uses mem:
+    if !has_u8_window(request, start, request_len):
+        return false
     var state: Int = 0
+    var method_len: Int = 0
+    var target_len: Int = 0
     var pos: Int = 0
     while pos < request_len:
         let absolute: Int = start + pos
         let ch: Int = request[absolute]
         if state == 0:
+            if ch == 13 || ch == 10:
+                return false
             if ch == 32:
-                state = 1
-        else if state == 1:
-            if ch == 72:
-                state = 2
-            else if ch == 32:
+                if method_len == 0:
+                    return false
                 state = 1
             else:
-                state = 0
+                if !http_token_char(ch):
+                    return false
+                method_len = method_len + 1
+        else if state == 1:
+            if ch == 13 || ch == 10:
+                return false
+            if ch == 32:
+                if target_len == 0:
+                    return false
+                state = 2
+            else:
+                if target_len == 0 && ch != 47:
+                    return false
+                if !http_request_target_char(ch):
+                    return false
+                target_len = target_len + 1
         else if state == 2:
-            if ch == 84:
+            if ch == 72:
                 state = 3
             else:
-                state = 0
+                return false
         else if state == 3:
             if ch == 84:
                 state = 4
             else:
-                state = 0
+                return false
         else if state == 4:
-            if ch == 80:
+            if ch == 84:
                 state = 5
             else:
-                state = 0
+                return false
         else if state == 5:
-            if ch == 47:
+            if ch == 80:
                 state = 6
             else:
-                state = 0
+                return false
         else if state == 6:
-            if ch == 49:
+            if ch == 47:
                 state = 7
             else:
-                state = 0
+                return false
         else if state == 7:
-            if ch == 46:
+            if ch == 49:
                 state = 8
             else:
-                state = 0
+                return false
         else if state == 8:
+            if ch == 46:
+                state = 9
+            else:
+                return false
+        else if state == 9:
             if ch == 49:
+                state = 10
+            else:
+                return false
+        else if state == 10:
+            if ch == 13:
+                state = 11
+            else:
+                return false
+        else if state == 11:
+            if ch == 10:
                 return true
-            state = 0
+            return false
         pos = pos + 1
     return false
 
 func contains_connection_close(request: String) -> Bool:
     var state: Int = 0
+    var head_state: Int = 0
     for ch in request:
         state = connection_close_next_state(state, ch)
         if state == 17:
             return true
+        head_state = header_end_next_state(head_state, ch)
+        if head_state == 4:
+            return false
     return false
 
 func contains_connection_close_bytes(request: []u8, request_len: Int) -> Bool
@@ -593,7 +748,10 @@ uses mem:
 
 func contains_connection_close_bytes_at(request: []u8, start: Int, request_len: Int) -> Bool
 uses mem:
+    if !has_u8_window(request, start, request_len):
+        return false
     var state: Int = 0
+    var head_state: Int = 0
     var pos: Int = 0
     while pos < request_len:
         let absolute: Int = start + pos
@@ -601,76 +759,206 @@ uses mem:
         state = connection_close_next_state(state, ch)
         if state == 17:
             return true
+        head_state = header_end_next_state(head_state, ch)
+        if head_state == 4:
+            return false
         pos = pos + 1
     return false
 
-func connection_close_next_state(state: Int, ch: Int) -> Int:
+func header_end_next_state(state: Int, ch: Int) -> Int:
     if state == 0:
-        if ch == 67:
+        if ch == 13:
             return 1
-        return 0
-    if state == 1:
-        if ch == 111:
+        if ch == 10:
             return 2
         return 0
-    if state == 2:
-        if ch == 110:
-            return 3
+    if state == 1:
+        if ch == 10:
+            return 2
+        if ch == 13:
+            return 1
         return 0
-    if state == 3:
-        if ch == 110:
+    if state == 2:
+        if ch == 13:
+            return 3
+        if ch == 10:
             return 4
         return 0
+    if state == 3:
+        if ch == 10:
+            return 4
+        if ch == 13:
+            return 1
+        return 0
+    return state
+
+func http_token_char(ch: Int) -> Bool:
+    if ch >= 48 && ch <= 57:
+        return true
+    if ch >= 65 && ch <= 90:
+        return true
+    if ch >= 97 && ch <= 122:
+        return true
+    if ch == 33 || ch == 35 || ch == 36 || ch == 37 || ch == 38:
+        return true
+    if ch == 39 || ch == 42 || ch == 43 || ch == 45 || ch == 46:
+        return true
+    if ch == 94 || ch == 95 || ch == 96 || ch == 124 || ch == 126:
+        return true
+    return false
+
+func http_request_target_char(ch: Int) -> Bool:
+    return ch >= 33 && ch <= 126
+
+func http_header_name_valid(name: String) -> Bool:
+    var count: Int = 0
+    for ch in name:
+        if !http_token_char(ch):
+            return false
+        count = count + 1
+    return count > 0
+
+func http_header_value_valid(value: String) -> Bool:
+    for ch in value:
+        if ch < 32 && ch != 9:
+            return false
+        if ch == 127:
+            return false
+    return true
+
+func ascii_lower(ch: Int) -> Int:
+    if ch >= 65 && ch <= 90:
+        return ch + 32
+    return ch
+
+func connection_close_next_state(state: Int, ch: Int) -> Int:
+    let lower: Int = ascii_lower(ch)
+    if state == 19:
+        if lower == 10:
+            return 0
+        return 19
+    if state == 0:
+        if lower == 99:
+            return 1
+        if lower == 13 || lower == 10:
+            return 0
+        return 19
+    if state == 1:
+        if lower == 111:
+            return 2
+        if lower == 10:
+            return 0
+        return 19
+    if state == 2:
+        if lower == 110:
+            return 3
+        if lower == 10:
+            return 0
+        return 19
+    if state == 3:
+        if lower == 110:
+            return 4
+        if lower == 10:
+            return 0
+        return 19
     if state == 4:
-        if ch == 101:
+        if lower == 101:
             return 5
-        return 0
+        if lower == 10:
+            return 0
+        return 19
     if state == 5:
-        if ch == 99:
+        if lower == 99:
             return 6
-        return 0
+        if lower == 10:
+            return 0
+        return 19
     if state == 6:
-        if ch == 116:
+        if lower == 116:
             return 7
-        return 0
+        if lower == 10:
+            return 0
+        return 19
     if state == 7:
-        if ch == 105:
+        if lower == 105:
             return 8
-        return 0
+        if lower == 10:
+            return 0
+        return 19
     if state == 8:
-        if ch == 111:
+        if lower == 111:
             return 9
-        return 0
+        if lower == 10:
+            return 0
+        return 19
     if state == 9:
-        if ch == 110:
+        if lower == 110:
             return 10
-        return 0
+        if lower == 10:
+            return 0
+        return 19
     if state == 10:
-        if ch == 58:
+        if lower == 58:
             return 11
-        return 0
+        if lower == 10:
+            return 0
+        return 19
     if state == 11:
-        if ch == 32:
+        if lower == 32 || lower == 9:
             return 12
-        return 0
-    if state == 12:
-        if ch == 99:
+        if lower == 99:
             return 13
-        return 0
+        if lower == 13 || lower == 10:
+            return 0
+        return 18
+    if state == 18:
+        if lower == 44:
+            return 12
+        if lower == 13 || lower == 10:
+            return 0
+        return 18
+    if state == 12:
+        if lower == 32 || lower == 9 || lower == 44:
+            return 12
+        if lower == 99:
+            return 13
+        if lower == 13 || lower == 10:
+            return 0
+        return 18
     if state == 13:
-        if ch == 108:
+        if lower == 108:
             return 14
-        return 0
+        if lower == 44:
+            return 12
+        if lower == 13 || lower == 10:
+            return 0
+        return 18
     if state == 14:
-        if ch == 111:
+        if lower == 111:
             return 15
-        return 0
+        if lower == 44:
+            return 12
+        if lower == 13 || lower == 10:
+            return 0
+        return 18
     if state == 15:
-        if ch == 115:
+        if lower == 115:
             return 16
-        return 0
+        if lower == 44:
+            return 12
+        if lower == 13 || lower == 10:
+            return 0
+        return 18
     if state == 16:
-        if ch == 101:
+        if lower == 101:
+            return 20
+        if lower == 44:
+            return 12
+        if lower == 13 || lower == 10:
+            return 0
+        return 18
+    if state == 20:
+        if lower == 32 || lower == 9 || lower == 44 || lower == 13 || lower == 10:
             return 17
-        return 0
+        return 18
     return state

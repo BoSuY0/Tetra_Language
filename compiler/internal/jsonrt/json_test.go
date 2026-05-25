@@ -72,6 +72,36 @@ func TestAppendWorldObjectAndArray(t *testing.T) {
 	}
 }
 
+func TestParseAndAppendGenericJSONValueDeterministically(t *testing.T) {
+	value, err := ParseValue([]byte(`{"b":2,"a":[true,null,"x\n"],"nested":{"z":false}}`))
+	if err != nil {
+		t.Fatalf("ParseValue: %v", err)
+	}
+	got, err := AppendValue(nil, value)
+	if err != nil {
+		t.Fatalf("AppendValue: %v", err)
+	}
+	want := `{"a":[true,null,"x\n"],"b":2,"nested":{"z":false}}`
+	if string(got) != want {
+		t.Fatalf("AppendValue deterministic output:\ngot  %s\nwant %s", got, want)
+	}
+	if !json.Valid(got) {
+		t.Fatalf("AppendValue produced invalid JSON: %s", got)
+	}
+}
+
+func TestGenericJSONValueRejectsMalformedAndUnsupportedValues(t *testing.T) {
+	if _, err := ParseValue([]byte(`{"a":`)); err == nil {
+		t.Fatalf("ParseValue accepted malformed JSON")
+	}
+	if _, err := AppendValue(nil, Value{Kind: NumberKind, Number: "01"}); err == nil {
+		t.Fatalf("AppendValue accepted invalid JSON number")
+	}
+	if _, err := AppendValue(nil, Value{Kind: Kind(99)}); err == nil {
+		t.Fatalf("AppendValue accepted unsupported kind")
+	}
+}
+
 func FuzzAppendStringProducesValidJSON(f *testing.F) {
 	for _, seed := range []string{
 		"Hello, World!",

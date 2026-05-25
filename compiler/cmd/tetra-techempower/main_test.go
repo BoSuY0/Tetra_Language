@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -27,6 +29,9 @@ func TestConfigFromEnvDefaults(t *testing.T) {
 	if cfg.PostgresPoolSize != 256 || cfg.PostgresDialTimeout != 2*time.Second {
 		t.Fatalf("pool/timeout defaults = %#v", cfg)
 	}
+	if cfg.PprofAddr != "" {
+		t.Fatalf("pprof default = %q, want disabled", cfg.PprofAddr)
+	}
 }
 
 func TestConfigFromEnvOverrides(t *testing.T) {
@@ -43,6 +48,7 @@ func TestConfigFromEnvOverrides(t *testing.T) {
 		"TETRA_TE_PG_PASSWORD":     "secret",
 		"TETRA_TE_PG_POOL":         "4",
 		"TETRA_TE_PG_DIAL_TIMEOUT": "1500ms",
+		"TETRA_TE_PPROF_ADDR":      "127.0.0.1:6060",
 	}
 	cfg, err := configFromEnv(func(key string) string { return env[key] })
 	if err != nil {
@@ -57,6 +63,9 @@ func TestConfigFromEnvOverrides(t *testing.T) {
 	if cfg.PostgresPoolSize != 4 || cfg.PostgresDialTimeout != 1500*time.Millisecond {
 		t.Fatalf("pool/timeout overrides = %#v", cfg)
 	}
+	if cfg.PprofAddr != "127.0.0.1:6060" {
+		t.Fatalf("pprof override = %q, want loopback addr", cfg.PprofAddr)
+	}
 }
 
 func TestConfigFromEnvRejectsInvalidValues(t *testing.T) {
@@ -70,6 +79,8 @@ func TestConfigFromEnvRejectsInvalidValues(t *testing.T) {
 		{name: "pg port", env: map[string]string{"TETRA_TE_PG_PORT": "abc"}},
 		{name: "pool", env: map[string]string{"TETRA_TE_PG_POOL": "-1"}},
 		{name: "timeout", env: map[string]string{"TETRA_TE_PG_DIAL_TIMEOUT": "soon"}},
+		{name: "pprof public bind", env: map[string]string{"TETRA_TE_PPROF_ADDR": "0.0.0.0:6060"}},
+		{name: "pprof bad addr", env: map[string]string{"TETRA_TE_PPROF_ADDR": "127.0.0.1"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -78,6 +89,20 @@ func TestConfigFromEnvRejectsInvalidValues(t *testing.T) {
 				t.Fatalf("configFromEnv(%s) succeeded, want error", tc.name)
 			}
 		})
+	}
+}
+
+func TestPprofHandlerExposesIndex(t *testing.T) {
+	server := httptest.NewServer(newPprofHandler())
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/debug/pprof/")
+	if err != nil {
+		t.Fatalf("GET pprof index: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("pprof index status = %d, want 200", resp.StatusCode)
 	}
 }
 

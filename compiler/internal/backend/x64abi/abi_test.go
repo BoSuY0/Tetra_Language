@@ -467,6 +467,39 @@ func TestABIDiagnosticMethodsRejectMissingPointers(t *testing.T) {
 	})
 }
 
+func TestEmitMakeSliceZeroLengthBypassesAllocator(t *testing.T) {
+	cases := []struct {
+		name          string
+		abi           ABI
+		importPatches *[]x64obj.ImportPatch
+	}{
+		{name: "linux", abi: LinuxSysV()},
+		{name: "linux-x32", abi: LinuxX32SysV()},
+		{name: "macos", abi: MacSysV()},
+		{name: "win64", abi: NewWin64(), importPatches: &[]x64obj.ImportPatch{}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &x64.Emitter{}
+			stackDepth := 1
+			e.PushRax()
+			if err := tc.abi.EmitMakeSlice(e, ir.IRMakeSliceI32, &stackDepth, x64.CodegenOptions{}, tc.importPatches); err != nil {
+				t.Fatalf("EmitMakeSlice: %v", err)
+			}
+			if stackDepth != 2 {
+				t.Fatalf("stackDepth = %d, want 2", stackDepth)
+			}
+			if !bytes.Contains(e.Buf, []byte{0x48, 0x85, 0xC0, 0x0F, 0x84}) {
+				t.Fatalf("make_slice missing zero-length test/jz bypass:\n% x", e.Buf)
+			}
+			if !bytes.Contains(e.Buf, []byte{0x50, 0x50}) {
+				t.Fatalf("make_slice empty branch does not push ptr/len zeros:\n% x", e.Buf)
+			}
+		})
+	}
+}
+
 func argCountName(n int) string {
 	return fmt.Sprintf("args_%02d", n)
 }

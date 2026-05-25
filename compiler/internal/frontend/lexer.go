@@ -380,6 +380,13 @@ func (l *lexer) readString() (token, error) {
 				out = append(out, '\\')
 			case '"':
 				out = append(out, '"')
+			case 'x':
+				if l.idx+1 >= len(l.src) || !isHexDigit(l.src[l.idx]) || !isHexDigit(l.src[l.idx+1]) {
+					return token{}, l.errorf(pos, "unsupported escape: \\%c", esc)
+				}
+				hi := l.advance()
+				lo := l.advance()
+				out = append(out, hexValue(hi)<<4|hexValue(lo))
 			default:
 				return token{}, l.errorf(pos, "unsupported escape: \\%c", esc)
 			}
@@ -476,4 +483,21 @@ func isIdentPart(ch byte) bool {
 
 func isDigit(ch byte) bool {
 	return ch >= '0' && ch <= '9'
+}
+
+func isHexDigit(ch byte) bool {
+	return isDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
+}
+
+func hexValue(ch byte) byte {
+	switch {
+	case ch >= '0' && ch <= '9':
+		return ch - '0'
+	case ch >= 'a' && ch <= 'f':
+		return ch - 'a' + 10
+	case ch >= 'A' && ch <= 'F':
+		return ch - 'A' + 10
+	default:
+		return 0
+	}
 }

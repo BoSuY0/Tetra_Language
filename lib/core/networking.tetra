@@ -43,12 +43,15 @@ func retry_backoff_ms(attempt: Int, base_ms: Int, max_ms: Int) -> Int:
     var value: Int = base_ms
     if value < 0:
         value = 0
+    var cap_ms: Int = max_ms
+    if cap_ms < 0:
+        cap_ms = 2147483647
     var step: Int = 0
     while step < attempt:
+        if value > cap_ms / 2:
+            return cap_ms
         value = value * 2
         step = step + 1
-    if max_ms < 0:
-        return value
-    if value > max_ms:
-        return max_ms
+    if value > cap_ms:
+        return cap_ms
     return value

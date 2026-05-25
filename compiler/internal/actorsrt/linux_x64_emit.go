@@ -1100,6 +1100,8 @@ func emitFilesystemExists(e *x64.Emitter) error {
 	e.Emit(0x48, 0x39, 0xc8) // cmp rax, rcx
 	copiedAt := e.JaeRel32()
 	e.Emit(0x41, 0x8a, 0x14, 0x00) // mov dl, byte ptr [r8+rax]
+	e.Emit(0x84, 0xd2)             // test dl, dl
+	failJumps = append(failJumps, e.JzRel32())
 	e.Emit(0x41, 0x88, 0x14, 0x01) // mov byte ptr [r9+rax], dl
 	e.Emit(0x48, 0xff, 0xc0)       // inc rax
 	backAt := e.JmpRel32()
@@ -1150,6 +1152,10 @@ func emitNetSocketTCP4(e *x64.Emitter) error {
 
 func emitNetBindTCP4Loopback(e *x64.Emitter) error {
 	// Arguments: rdi=fd, rsi=port, rdx=cap.io token (ignored).
+	failJumps, err := emitNetRejectInvalidTCPPort(e)
+	if err != nil {
+		return err
+	}
 	e.PushRbp()
 	e.MovRbpRsp()
 	e.SubRspImm32(32)
@@ -1169,11 +1175,24 @@ func emitNetBindTCP4Loopback(e *x64.Emitter) error {
 	e.Syscall()
 	e.Leave()
 	e.Ret()
+
+	failTo := len(e.Buf)
+	for _, at := range failJumps {
+		if err := x64.PatchRel32(e.Buf, at, failTo); err != nil {
+			return err
+		}
+	}
+	e.MovEaxImm32(0xFFFFFFFF)
+	e.Ret()
 	return nil
 }
 
 func emitNetConnectTCP4Loopback(e *x64.Emitter) error {
 	// Arguments: rdi=fd, rsi=port, rdx=cap.io token (ignored).
+	failJumps, err := emitNetRejectInvalidTCPPort(e)
+	if err != nil {
+		return err
+	}
 	e.PushRbp()
 	e.MovRbpRsp()
 	e.SubRspImm32(32)
@@ -1193,7 +1212,30 @@ func emitNetConnectTCP4Loopback(e *x64.Emitter) error {
 	e.Syscall()
 	e.Leave()
 	e.Ret()
+
+	failTo := len(e.Buf)
+	for _, at := range failJumps {
+		if err := x64.PatchRel32(e.Buf, at, failTo); err != nil {
+			return err
+		}
+	}
+	e.MovEaxImm32(0xFFFFFFFF)
+	e.Ret()
 	return nil
+}
+
+func emitNetRejectInvalidTCPPort(e *x64.Emitter) ([]int, error) {
+	var failJumps []int
+	e.Emit(0x85, 0xF6) // test esi, esi
+	nonNegativeAt := e.JgeRel32()
+	failJumps = append(failJumps, e.JmpRel32())
+	nonNegativeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, nonNegativeAt, nonNegativeTo); err != nil {
+		return nil, err
+	}
+	e.Emit(0x81, 0xFE, 0xFF, 0xFF, 0x00, 0x00) // cmp esi, 65535
+	failJumps = append(failJumps, e.JaRel32())
+	return failJumps, nil
 }
 
 func emitNetListen(e *x64.Emitter) error {

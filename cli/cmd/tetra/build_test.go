@@ -386,6 +386,43 @@ func TestBuildAndRunCommandsAcceptExplicitProjectDirectory(t *testing.T) {
 	}
 }
 
+func TestBuildCheckRunCommandsAcceptExplicitProjectSourceFile(t *testing.T) {
+	if _, ok := hostTarget(); !ok {
+		t.Skip("host target unsupported")
+	}
+	srcPath := filepath.Join("..", "..", "..", "examples", "projects", "dogfood_cli", "src", "main.tetra")
+	if _, err := os.Stat(srcPath); err != nil {
+		t.Fatalf("missing dogfood source %s: %v", srcPath, err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"check", srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("check exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	out := filepath.Join(t.TempDir(), "dogfood-cli")
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"build", "--target", mustHostTarget(t), "-o", out, srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("build exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("expected build output %s: %v", out, err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runCLI([]string{"run", "--target", mustHostTarget(t), srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("run exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "tetra dogfood cli: ok") {
+		t.Fatalf("run stdout = %q", stdout.String())
+	}
+}
+
 func TestBuildCommandUsesCapsuleInterfaceAndObjectArtifacts(t *testing.T) {
 	target := mustHostTarget(t)
 	dir := t.TempDir()

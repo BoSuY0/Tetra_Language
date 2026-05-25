@@ -23,6 +23,14 @@ type Pool struct {
 	connector Connector
 }
 
+type PoolStats struct {
+	MaxOpen int
+	Open    int
+	InUse   int
+	Idle    int
+	Closed  bool
+}
+
 type PooledConn struct {
 	Conn     *Conn
 	pool     *Pool
@@ -70,6 +78,26 @@ func (p *Pool) Checkout(ctx context.Context) (*PooledConn, error) {
 		return nil, err
 	}
 	return &PooledConn{Conn: conn, pool: p}, nil
+}
+
+func (p *Pool) Stats() PoolStats {
+	if p == nil {
+		return PoolStats{Closed: true}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	idle := len(p.idle)
+	inUse := p.open - idle
+	if inUse < 0 {
+		inUse = 0
+	}
+	return PoolStats{
+		MaxOpen: p.maxOpen,
+		Open:    p.open,
+		InUse:   inUse,
+		Idle:    idle,
+		Closed:  p.closed,
+	}
 }
 
 func (pc *PooledConn) Release(err error) error {

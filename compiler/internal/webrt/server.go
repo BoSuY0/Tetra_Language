@@ -14,11 +14,12 @@ import (
 const httpDateLayout = "Mon, 02 Jan 2006 15:04:05 GMT"
 
 type Config struct {
-	Address    [4]byte
-	Port       int
-	Backlog    int
-	ServerName string
-	DateFunc   func() string
+	Address      [4]byte
+	Port         int
+	Backlog      int
+	ServerName   string
+	MaxBodyBytes int
+	DateFunc     func() string
 }
 
 type Server struct {
@@ -213,16 +214,22 @@ func (s *Server) readReady(conn *connState) error {
 }
 
 func (s *Server) processInput(conn *connState) error {
-	limits := httprt.Limits{MaxHeaderBytes: 8192, MaxHeaders: 64}
+	limits := httprt.Limits{MaxHeaderBytes: 8192, MaxHeaders: 64, MaxBodyBytes: s.MaxBodyBytes}
 	for len(conn.input) > 0 {
 		req, consumed, err := httprt.ParseRequest(conn.input, limits)
 		if errors.Is(err, httprt.ErrIncomplete) {
 			return nil
 		}
 		if err != nil {
+			statusCode := 400
+			body := []byte("Bad Request")
+			if errors.Is(err, httprt.ErrBodyTooLarge) {
+				statusCode = 413
+				body = []byte("Payload Too Large")
+			}
 			conn.output = httprt.AppendResponse(conn.output, s.decorateResponse(httprt.Response{
-				StatusCode: 400,
-				Body:       []byte("Bad Request"),
+				StatusCode: statusCode,
+				Body:       body,
 				KeepAlive:  false,
 			}))
 			conn.input = conn.input[:0]

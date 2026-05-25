@@ -64,6 +64,12 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	paths := fs.Args()
 	explicitPaths := len(paths) > 0
 	explicitTarget := testArgsIncludeTargetFlag(args)
+	explicitSingleFileInput := false
+	if len(paths) == 1 {
+		if info, err := os.Stat(paths[0]); err == nil && !info.IsDir() {
+			explicitSingleFileInput = true
+		}
+	}
 	var projectCtx *cliProjectContext
 	var worldOpt compiler.WorldOptions
 	if len(paths) == 0 {
@@ -157,7 +163,8 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 			start := time.Now()
 			srcPath := filepath.Join(tmpDir, fmt.Sprintf("test_%d.t4", total))
 			runnerSource := runner.Source
-			if modulePath := modulePathFromSource(runner.Source); modulePath != "" {
+			sourceModule := modulePathFromSource(runner.Source)
+			if sourceModule != "" {
 				var err error
 				srcPath, runnerSource, err = runnerSourcePathForModuleFile(file, runner.Source, total)
 				if err != nil {
@@ -176,14 +183,58 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 				return 1
 			}
 			if modulePathFromSource(runnerSource) != "" && projectCtx != nil && projectCtx.Found {
-				opt := compiler.BuildOptions{
-					Jobs:            1,
-					ProjectRoot:     worldOpt.Root,
-					SourceRoots:     append([]string(nil), worldOpt.SourceRoots...),
-					DependencyRoots: append([]compiler.ModuleRoot(nil), worldOpt.DependencyRoots...),
-					LinkObjectPaths: append([]string(nil), targetLinkObjects...),
+				runnerProjectCtx := projectCtx
+				runnerWorldOpt := worldOpt
+				runnerLinkObjects := targetLinkObjects
+				if runnerProjectCtx == nil {
+					var err error
+					runnerProjectCtx, runnerWorldOpt, runnerLinkObjects, err = testProjectContextForFile(file, sourceModule, tgt.Triple)
+					if err != nil {
+						writeDiagnostic(stderr, *diagnostics, err)
+						return 1
+					}
 				}
-				if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, opt); err != nil {
+				if runnerProjectCtx != nil && runnerProjectCtx.Found {
+					opt := compiler.BuildOptions{
+						Jobs:            1,
+						ProjectRoot:     runnerWorldOpt.Root,
+						SourceRoots:     append([]string(nil), runnerWorldOpt.SourceRoots...),
+						DependencyRoots: append([]compiler.ModuleRoot(nil), runnerWorldOpt.DependencyRoots...),
+						LinkObjectPaths: append([]string(nil), runnerLinkObjects...),
+					}
+					if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, opt); err != nil {
+						writeDiagnostic(stderr, *diagnostics, err)
+						return 1
+					}
+				} else if err := compiler.BuildFile(srcPath, outPath, tgt.Triple); err != nil {
+					writeDiagnostic(stderr, *diagnostics, err)
+					return 1
+				}
+			} else if modulePathFromSource(runnerSource) != "" {
+				var runnerProjectCtx *cliProjectContext
+				var runnerWorldOpt compiler.WorldOptions
+				var runnerLinkObjects []string
+				if !explicitSingleFileInput {
+					var err error
+					runnerProjectCtx, runnerWorldOpt, runnerLinkObjects, err = testProjectContextForFile(file, sourceModule, tgt.Triple)
+					if err != nil {
+						writeDiagnostic(stderr, *diagnostics, err)
+						return 1
+					}
+				}
+				if runnerProjectCtx != nil && runnerProjectCtx.Found {
+					opt := compiler.BuildOptions{
+						Jobs:            1,
+						ProjectRoot:     runnerWorldOpt.Root,
+						SourceRoots:     append([]string(nil), runnerWorldOpt.SourceRoots...),
+						DependencyRoots: append([]compiler.ModuleRoot(nil), runnerWorldOpt.DependencyRoots...),
+						LinkObjectPaths: append([]string(nil), runnerLinkObjects...),
+					}
+					if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, tgt.Triple, opt); err != nil {
+						writeDiagnostic(stderr, *diagnostics, err)
+						return 1
+					}
+				} else if err := compiler.BuildFile(srcPath, outPath, tgt.Triple); err != nil {
 					writeDiagnostic(stderr, *diagnostics, err)
 					return 1
 				}
@@ -230,6 +281,61 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func testProjectContextForFile(file string, module string, target string) (*cliProjectContext, compiler.WorldOptions, []string, error) {
+	ctx, err := discoverCLIProject(filepath.Dir(file))
+	if err != nil {
+		return nil, compiler.WorldOptions{}, nil, err
+	}
+	if ctx == nil || !ctx.Found || !fileModuleMatchesProjectSourceRoots(file, module, ctx) {
+		return nil, compiler.WorldOptions{}, nil, nil
+	}
+	if err := validateDiscoveredProjectLock(ctx, target); err != nil {
+		return nil, compiler.WorldOptions{}, nil, err
+	}
+	linkObjects, err := projectLinkObjects(ctx, target, nil)
+	if err != nil {
+		return nil, compiler.WorldOptions{}, nil, err
+	}
+	opt := compiler.WorldOptions{
+		Root:            ctx.Root,
+		SourceRoots:     append([]string(nil), ctx.SourceRoots...),
+		DependencyRoots: append([]compiler.ModuleRoot(nil), ctx.DependencyRoots...),
+	}
+	return ctx, opt, linkObjects, nil
+}
+
+func fileModuleMatchesProjectSourceRoots(file string, module string, ctx *cliProjectContext) bool {
+	if module == "" || ctx == nil || !ctx.Found {
+		return false
+	}
+	abs, err := filepath.Abs(file)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(ctx.Root, abs)
+	if err != nil {
+		return false
+	}
+	cleanRel := filepath.Clean(rel)
+	if cleanRel == "." || strings.HasPrefix(cleanRel, ".."+string(filepath.Separator)) || filepath.IsAbs(cleanRel) {
+		return false
+	}
+	for _, root := range ctx.SourceRoots {
+		cleanRoot := filepath.Clean(filepath.FromSlash(root))
+		moduleRel := cleanRel
+		if root != "" && cleanRoot != "." {
+			if cleanRel == cleanRoot || !strings.HasPrefix(cleanRel, cleanRoot+string(filepath.Separator)) {
+				continue
+			}
+			moduleRel = strings.TrimPrefix(cleanRel, cleanRoot+string(filepath.Separator))
+		}
+		if cliModuleRelPathMatches(module, moduleRel) {
+			return true
+		}
+	}
+	return false
 }
 
 func testArgsIncludeTargetFlag(args []string) bool {

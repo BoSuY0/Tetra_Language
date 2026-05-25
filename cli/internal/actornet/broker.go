@@ -42,6 +42,7 @@ type Broker struct {
 	nodes  map[uint16]*nodeConn
 	report Report
 	closed bool
+	wg     sync.WaitGroup
 
 	closeOnce sync.Once
 	closeErr  error
@@ -100,7 +101,11 @@ func (b *Broker) Serve(ctx context.Context) error {
 			return err
 		}
 		b.recordAcceptedConnection()
-		go b.handleConn(conn)
+		b.wg.Add(1)
+		go func() {
+			defer b.wg.Done()
+			b.handleConn(conn)
+		}()
 	}
 }
 
@@ -112,14 +117,9 @@ func (b *Broker) Close() error {
 			return
 		}
 		b.closed = true
-		b.report.StoppedAt = time.Now().UTC()
 		conns := make([]net.Conn, 0, len(b.nodes))
 		for _, node := range b.nodes {
 			conns = append(conns, node.conn)
-		}
-		b.report.ConnectedNodes = len(b.nodes)
-		if b.cfg.ReportPath != "" {
-			b.closeErr = b.writeReportLocked()
 		}
 		b.mu.Unlock()
 
@@ -129,6 +129,15 @@ func (b *Broker) Close() error {
 		for _, conn := range conns {
 			_ = conn.Close()
 		}
+		b.wg.Wait()
+
+		b.mu.Lock()
+		b.report.StoppedAt = time.Now().UTC()
+		b.report.ConnectedNodes = len(b.nodes)
+		if b.cfg.ReportPath != "" {
+			b.closeErr = b.writeReportLocked()
+		}
+		b.mu.Unlock()
 	})
 	return b.closeErr
 }

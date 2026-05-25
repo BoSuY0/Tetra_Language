@@ -85,6 +85,9 @@ func TestRunBenchmarkRecordsLatencyPercentilesAndIntegrityMetadata(t *testing.T)
 		if endpoint.P50LatencyMS < 0 || endpoint.P90LatencyMS < 0 || endpoint.P95LatencyMS < 0 || endpoint.P99LatencyMS < 0 || endpoint.P999LatencyMS < 0 || endpoint.MaxLatencyMS < 0 {
 			t.Fatalf("endpoint missing latency percentiles: %#v", endpoint)
 		}
+		if endpoint.ObservedContentType == "" || len(endpoint.SemanticChecks) == 0 {
+			t.Fatalf("endpoint missing semantic report evidence: %#v", endpoint)
+		}
 	}
 }
 
@@ -160,6 +163,14 @@ func TestRunBenchmarkChecksEndpointsAndWritesReport(t *testing.T) {
 	if report.Status != "pass" || report.Summary.EndpointCount != 6 || report.Summary.TotalRequests != 48 {
 		t.Fatalf("summary = %#v status=%s", report.Summary, report.Status)
 	}
+	for _, endpoint := range report.Endpoints {
+		if endpoint.ObservedContentType == "" {
+			t.Fatalf("endpoint %s missing observed content type", endpoint.Path)
+		}
+		if len(endpoint.SemanticChecks) == 0 {
+			t.Fatalf("endpoint %s missing semantic checks", endpoint.Path)
+		}
+	}
 }
 
 func TestRunBenchmarkFailsWhenThresholdIsMissed(t *testing.T) {
@@ -202,27 +213,29 @@ func validTestReport() Report {
 	endpoints := make([]EndpointReport, 0, len(defaultEndpoints(false)))
 	for _, endpoint := range defaultEndpoints(false) {
 		endpoints = append(endpoints, EndpointReport{
-			Name:          endpoint.Name,
-			Path:          endpoint.Path,
-			Kind:          endpoint.Kind,
-			Status:        "pass",
-			HTTPStatus:    200,
-			Requests:      4,
-			Successes:     4,
-			Failures:      0,
-			Bytes:         52,
-			RPS:           100,
-			AvgLatencyMS:  1,
-			P50LatencyMS:  1,
-			P90LatencyMS:  2,
-			P95LatencyMS:  2,
-			P99LatencyMS:  2,
-			P999LatencyMS: 2,
-			MaxLatencyMS:  2,
-			Threshold:     "min_rps >= 1",
-			Evidence:      "real HTTP request/response validation and concurrent load completed",
-			Validation:    "protocol/body contract checked",
-			ThresholdPass: true,
+			Name:                endpoint.Name,
+			Path:                endpoint.Path,
+			Kind:                endpoint.Kind,
+			Status:              "pass",
+			HTTPStatus:          200,
+			Requests:            4,
+			Successes:           4,
+			Failures:            0,
+			Bytes:               52,
+			RPS:                 100,
+			AvgLatencyMS:        1,
+			P50LatencyMS:        1,
+			P90LatencyMS:        2,
+			P95LatencyMS:        2,
+			P99LatencyMS:        2,
+			P999LatencyMS:       2,
+			MaxLatencyMS:        2,
+			ObservedContentType: expectedContentType(endpoint.Path),
+			SemanticChecks:      semanticChecksForPath(endpoint.Path),
+			Threshold:           "min_rps >= 1",
+			Evidence:            "real HTTP request/response validation and concurrent load completed",
+			Validation:          "protocol/body contract checked",
+			ThresholdPass:       true,
 		})
 	}
 	return Report{
@@ -252,5 +265,16 @@ func validTestReport() Report {
 			Decision:       "pass",
 		},
 		Limitations: []string{"local harness report; official TechEmpower submission not implied"},
+	}
+}
+
+func expectedContentType(path string) string {
+	switch path {
+	case "/plaintext":
+		return "text/plain"
+	case "/fortunes":
+		return "text/html; charset=utf-8"
+	default:
+		return "application/json"
 	}
 }

@@ -415,6 +415,43 @@ func ActorRuntimeTriples() []string {
 	return []string{"linux-x64", "macos-x64", "windows-x64"}
 }
 
+func UIRuntimeContract(triple string) string {
+	switch normalizeAlias(triple) {
+	case "linux-x64", "windows-x64", "macos-x64", "wasm32-web":
+		return "tetra.ui.platform.v1"
+	default:
+		return ""
+	}
+}
+
+func UIRuntimeStatus(triple string) string {
+	switch normalizeAlias(triple) {
+	case "linux-x64", "wasm32-web":
+		return "production"
+	case "windows-x64", "macos-x64":
+		return "requires_target_host_evidence"
+	default:
+		return "unsupported"
+	}
+}
+
+func UIRuntimeEvidence(triple string) string {
+	switch normalizeAlias(triple) {
+	case "linux-x64":
+		return "scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh"
+	case "windows-x64":
+		return "scripts/release/full_platform/windows-ui-runtime-smoke.sh --evidence <windows-target-host-report>"
+	case "macos-x64":
+		return "scripts/release/full_platform/macos-ui-runtime-smoke.sh --evidence <macos-target-host-report>"
+	case "wasm32-web":
+		return "scripts/release/v1_0/web-smoke.sh"
+	case "wasm32-wasi":
+		return "wasm32-wasi does not provide UI event dispatch runtime"
+	default:
+		return "target does not provide production UI runtime"
+	}
+}
+
 func Parse(triple string) (Target, error) {
 	rawTriple := strings.TrimSpace(triple)
 	canonical := normalizeAlias(rawTriple)

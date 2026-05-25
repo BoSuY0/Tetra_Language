@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -31,6 +34,7 @@ type appConfig struct {
 	PostgresPassword    string
 	PostgresPoolSize    int
 	PostgresDialTimeout time.Duration
+	PprofAddr           string
 }
 
 type randomWorldIDs struct {
@@ -87,9 +91,14 @@ func serve(parent context.Context, cfg appConfig) error {
 		return err
 	}
 	defer workers.Close()
-
 	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	pprofServer, err := startPprofServer(ctx, cfg.PprofAddr)
+	if err != nil {
+		return err
+	}
+	defer shutdownPprofServer(pprofServer)
+
 	fmt.Fprintf(os.Stderr, "tetra-techempower listening on %d with %d workers\n", workers.Port(), workers.Count())
 	err = workers.Serve(ctx)
 	if errors.Is(err, context.Canceled) {
@@ -129,6 +138,10 @@ func configFromEnv(getenv func(string) string) (appConfig, error) {
 	if err != nil || timeout <= 0 {
 		return appConfig{}, fmt.Errorf("TETRA_TE_PG_DIAL_TIMEOUT: must be a positive duration")
 	}
+	pprofAddr := getenv("TETRA_TE_PPROF_ADDR")
+	if err := validatePprofAddr(pprofAddr); err != nil {
+		return appConfig{}, fmt.Errorf("TETRA_TE_PPROF_ADDR: %w", err)
+	}
 	return appConfig{
 		ListenAddress:       host,
 		ListenPort:          port,
@@ -142,7 +155,70 @@ func configFromEnv(getenv func(string) string) (appConfig, error) {
 		PostgresPassword:    getenv("TETRA_TE_PG_PASSWORD"),
 		PostgresPoolSize:    poolSize,
 		PostgresDialTimeout: timeout,
+		PprofAddr:           pprofAddr,
 	}, nil
+}
+
+func validatePprofAddr(addr string) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	host, portRaw, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+	if _, err := parsePositiveInt(portRaw, 65535); err != nil {
+		return err
+	}
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return fmt.Errorf("%q must bind to localhost or a loopback IP", addr)
+	}
+	return nil
+}
+
+func newPprofHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	return mux
+}
+
+func startPprofServer(ctx context.Context, addr string) (*http.Server, error) {
+	if strings.TrimSpace(addr) == "" {
+		return nil, nil
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{Handler: newPprofHandler()}
+	go func() {
+		<-ctx.Done()
+		shutdownPprofServer(server)
+	}()
+	go func() {
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			fmt.Fprintf(os.Stderr, "tetra-techempower pprof server error: %v\n", err)
+		}
+	}()
+	fmt.Fprintf(os.Stderr, "tetra-techempower pprof listening on %s\n", listener.Addr().String())
+	return server, nil
+}
+
+func shutdownPprofServer(server *http.Server) {
+	if server == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_ = server.Shutdown(ctx)
 }
 
 func envOr(getenv func(string) string, key string, fallback string) string {

@@ -1056,6 +1056,8 @@ func emitMakeSlice(e *emitter, kind ir.IRInstrKind, pop func(int) error, push fu
 		return err
 	}
 	e.popEcx()
+	e.cmpEcxImm8(0)
+	emptyAt := e.jzRel32()
 	e.pushEcx()
 	switch kind {
 	case ir.IRMakeSliceI32:
@@ -1072,7 +1074,21 @@ func emitMakeSlice(e *emitter, kind ir.IRInstrKind, pop func(int) error, push fu
 	e.pushEax()
 	e.pushEcx()
 	push(2)
-	return patchExitBranch(e, failAt, 2)
+	doneAt := e.jmpRel32()
+	failOff := len(e.buf)
+	emitExit(e, 2)
+	emptyOff := len(e.buf)
+	e.movEaxImm32(0)
+	e.pushEax()
+	e.pushEcx()
+	doneOff := len(e.buf)
+	if err := e.patchRel32(emptyAt, emptyOff); err != nil {
+		return err
+	}
+	if err := e.patchRel32(failAt, failOff); err != nil {
+		return err
+	}
+	return e.patchRel32(doneAt, doneOff)
 }
 
 func emitIslandNew(e *emitter, pop func(int) error, push func(int), opt x64.CodegenOptions) error {

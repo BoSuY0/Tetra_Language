@@ -155,6 +155,7 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 		writeValidationDiagnostic(stderr, *diagnostics, "build accepts at most one input path")
 		return 2
 	}
+	requestedInput := input
 
 	input, worldOpt, projectCtx, err := resolveCLIInput(input)
 	if err != nil {
@@ -172,7 +173,7 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 			return 1
 		}
 		fmt.Fprintf(stdout, "Artifacts repaired: %s\n", projectCtx.CapsulePath)
-		input, worldOpt, projectCtx, err = resolveCLIInput(input)
+		input, worldOpt, projectCtx, err = resolveCLIInput(requestedInput)
 		if err != nil {
 			writeDiagnostic(stderr, *diagnostics, err)
 			return 1

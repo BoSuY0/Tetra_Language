@@ -120,6 +120,55 @@ func TestServerRejectsMalformedRequest(t *testing.T) {
 	}
 }
 
+func TestServerRejectsRequestBodyOverConfiguredLimit(t *testing.T) {
+	srv := NewServer(Config{
+		Address:      [4]byte{127, 0, 0, 1},
+		Port:         0,
+		ServerName:   "Tetra-Test",
+		MaxBodyBytes: 4,
+		DateFunc: func() string {
+			return "Wed, 20 May 2026 12:00:00 GMT"
+		},
+	})
+	srv.Router.Handle("POST", "/echo", func(req httprt.Request) httprt.Response {
+		return httprt.Response{StatusCode: 200, ContentType: "text/plain", Body: req.Body}
+	})
+	if err := srv.Listen(); err != nil {
+		t.Fatalf("Listen: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- srv.Serve(ctx)
+	}()
+	defer func() {
+		cancel()
+		if err := srv.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		select {
+		case err := <-done:
+			if err != nil && err != context.Canceled {
+				t.Fatalf("Serve returned %v", err)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("server did not stop")
+		}
+	}()
+
+	conn := dialServer(t, srv.Port())
+	defer conn.Close()
+	if _, err := conn.Write([]byte("POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")); err != nil {
+		t.Fatalf("client write oversized body: %v", err)
+	}
+	got := readUntil(t, conn, func(s string) bool {
+		return strings.Contains(s, "HTTP/1.1 413 Payload Too Large")
+	})
+	if !strings.Contains(got, "Connection: close") {
+		t.Fatalf("oversized body response missing close header:\n%s", got)
+	}
+}
+
 func startBenchmarkServer(t *testing.T) (*Server, func()) {
 	t.Helper()
 	srv := NewServer(Config{

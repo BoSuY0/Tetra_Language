@@ -30,9 +30,10 @@ func GenerateAPIDocs(paths []string) ([]byte, error) {
 		file.Path = path
 		parsed = append(parsed, file)
 	}
+	titles := apiDocTitles(parsed)
 	var body bytes.Buffer
-	for _, file := range parsed {
-		writeFileAPIDocs(&body, file)
+	for i, file := range parsed {
+		writeFileAPIDocs(&body, file, titles[i])
 	}
 	var b bytes.Buffer
 	writeAPIDocsHeader(&b, len(parsed), body.String())
@@ -47,11 +48,50 @@ func GenerateAPIDocsFromSource(src []byte, filename string) ([]byte, error) {
 	}
 	file.Path = filename
 	var body bytes.Buffer
-	writeFileAPIDocs(&body, file)
+	writeFileAPIDocs(&body, file, apiDocTitles([]*frontend.FileAST{file})[0])
 	var b bytes.Buffer
 	writeAPIDocsHeader(&b, 1, body.String())
 	b.Write(body.Bytes())
 	return b.Bytes(), nil
+}
+
+type apiDocTitle struct {
+	Heading      string
+	Experimental bool
+}
+
+func apiDocTitles(files []*frontend.FileAST) []apiDocTitle {
+	baseTitles := make([]string, len(files))
+	counts := map[string]int{}
+	for i, file := range files {
+		title := file.Path
+		if file.Module != "" {
+			title = file.Module
+		}
+		baseTitles[i] = title
+		counts[title]++
+	}
+	titles := make([]apiDocTitle, len(files))
+	for i, file := range files {
+		base := baseTitles[i]
+		heading := base
+		if counts[base] > 1 {
+			path := filepath.ToSlash(file.Path)
+			if path == "" {
+				path = base
+			}
+			heading = fmt.Sprintf("%s (%s)", base, path)
+		}
+		experimental := isExperimentalModuleTitle(base)
+		if experimental {
+			heading += " (experimental)"
+		}
+		titles[i] = apiDocTitle{
+			Heading:      heading,
+			Experimental: experimental,
+		}
+	}
+	return titles
 }
 
 func writeAPIDocsHeader(b *bytes.Buffer, moduleCount int, body string) {
@@ -129,17 +169,9 @@ func isDocSourceFile(path string) bool {
 	return base != CapsuleFileName && base != LegacyCapsuleFileName
 }
 
-func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST) {
-	title := file.Path
-	if file.Module != "" {
-		title = file.Module
-	}
-	experimental := isExperimentalModuleTitle(title)
-	if experimental {
-		title += " (experimental)"
-	}
-	fmt.Fprintf(b, "## %s\n\n", title)
-	if experimental {
+func writeFileAPIDocs(b *bytes.Buffer, file *frontend.FileAST, title apiDocTitle) {
+	fmt.Fprintf(b, "## %s\n\n", title.Heading)
+	if title.Experimental {
 		b.WriteString("Experimental module: compatibility is not guaranteed for v1.x.\n\n")
 	}
 	if len(file.Structs) > 0 {

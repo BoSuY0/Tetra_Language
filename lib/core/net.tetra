@@ -131,11 +131,18 @@ func epoll_event_hup() -> Int:
 
 func epoll_event_fd(event: []i32) -> Int
 uses mem:
-    return event[0]
+    for value in event:
+        return value
+    return -1
 
 func epoll_event_flags(event: []i32) -> Int
 uses mem:
-    return event[1]
+    var index: Int = 0
+    for value in event:
+        if index == 1:
+            return value
+        index = index + 1
+    return -1
 
 func epoll_event_readable(flags: Int) -> Bool:
     return flag_set(flags, epoll_event_in())
@@ -152,7 +159,7 @@ func epoll_event_hung_up(flags: Int) -> Bool:
 func flag_set(flags: Int, bit: Int) -> Bool:
     if flags < 0 || bit <= 0:
         return false
-    return (flags / bit) % 2 == 1
+    return flags / bit % 2 == 1
 
 func set_nonblocking(fd: Int, io_cap: cap.io) -> Int
 uses io:

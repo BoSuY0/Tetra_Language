@@ -465,6 +465,29 @@ func TestCodegenObjectLinuxX86EmitsSliceMakeLoadStore(t *testing.T) {
 	}
 }
 
+func TestCodegenObjectLinuxX86MakeSliceZeroLengthBypassesMmap(t *testing.T) {
+	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
+		Name:        "make_i32_empty",
+		ReturnSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRMakeSliceI32},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("codegen zero-length slice object: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0x83, 0xF9, 0x00, 0x0F, 0x84},             // cmp ecx,0; jz empty-slice
+		{0xB8, 0x00, 0x00, 0x00, 0x00, 0x50, 0x51}, // mov eax,0; push ptr; push len
+	} {
+		if !bytes.Contains(obj.Code, want) {
+			t.Fatalf("zero-length slice code missing % x in:\n% x", want, obj.Code)
+		}
+	}
+}
+
 func TestCodegenObjectLinuxX86EmitsRawMemoryOps(t *testing.T) {
 	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
 		Name:        "main",

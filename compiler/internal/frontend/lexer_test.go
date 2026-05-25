@@ -138,6 +138,8 @@ func TestLexStringEscapes(t *testing.T) {
 		{`"a\\b"`, "a\\b", false},
 		{`"a\"b"`, "a\"b", false},
 		{`"a\rb"`, "a\rb", false},
+		{`"a\x00b"`, "a\x00b", false},
+		{`"a\x1fb"`, "a\x1fb", false},
 		{`"hello`, "", true},     // unterminated
 		{`"bad\q"`, "", true},    // unsupported escape
 		{`"trailing\`, "", true}, // unterminated escape
@@ -382,6 +384,7 @@ func TestPlan250LexStringEscapeCornerPositions(t *testing.T) {
 	}{
 		{name: "valid escaped quote and slash", src: `"a\"\\b"`, lit: "a\"\\b"},
 		{name: "valid carriage return escape", src: `"a\rb"`, lit: "a\rb"},
+		{name: "valid hex control escape", src: `"a\x1fb"`, lit: "a\x1fb"},
 		{name: "unsupported escape", src: `"bad\q"`, want: "unsupported escape: \\q", col: 1},
 		{name: "unterminated escape", src: `"bad\`, want: "unterminated escape sequence", col: 1},
 	}
