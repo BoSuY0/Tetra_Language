@@ -25,6 +25,32 @@ func TestValidateReportRequiresExplicitSkipDBAllowance(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsCommandSkipDBMismatch(t *testing.T) {
+	skipReport := reportFixture(true)
+	original := skipReport.Command
+	skipReport.Command = strings.Replace(skipReport.Command, " --skip-db", "", 1)
+	if skipReport.Command == original {
+		t.Fatalf("test did not remove benchmark command skip-db flag")
+	}
+	err := ValidateReport(mustReportJSON(t, skipReport), Options{AllowSkipDB: true})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted skip-db report without command skip-db flag")
+	}
+	if !strings.Contains(err.Error(), "command skip-db") {
+		t.Fatalf("ValidateReport skip-db command error = %v, want command skip-db rejection", err)
+	}
+
+	fullReport := reportFixture(false)
+	fullReport.Command += " --skip-db"
+	err = ValidateReport(mustReportJSON(t, fullReport), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted full report with command skip-db flag")
+	}
+	if !strings.Contains(err.Error(), "command skip-db") {
+		t.Fatalf("ValidateReport full report skip-db command error = %v, want command skip-db rejection", err)
+	}
+}
+
 func TestValidateReportRejectsWeakEvidenceAndBadCounters(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].Evidence = "placeholder"
@@ -838,13 +864,17 @@ func reportFixture(skipDB bool) Report {
 	if skipDB {
 		limitations = append(limitations, "skip-db enabled: report covers only /plaintext and /json")
 	}
+	command := "tetra-techempower-bench --base-url http://127.0.0.1:8080 --requests 4"
+	if skipDB {
+		command += " --skip-db"
+	}
 	return Report{
 		Schema:           SchemaV1,
 		Status:           "pass",
 		GeneratedAt:      "2026-05-20T12:00:00Z",
 		GeneratedLocalAt: "2026-05-20T15:00:00+03:00",
 		BaseURL:          "http://127.0.0.1:8080",
-		Command:          "tetra-techempower-bench --base-url http://127.0.0.1:8080 --requests 4",
+		Command:          command,
 		Environment: BenchmarkEnvironment{
 			OS:        "linux",
 			Arch:      "amd64",

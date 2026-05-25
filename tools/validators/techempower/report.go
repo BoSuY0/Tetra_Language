@@ -155,6 +155,7 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 	issues = append(issues, validateSummary(report.Summary, len(report.Endpoints), totalRequests, totalSuccesses, totalFailures)...)
 	issues = append(issues, validateBenchmarkCommandBaseURL(report.Command, report.BaseURL)...)
 	issues = append(issues, validateBenchmarkCommandRequests(report.Command, report.Endpoints)...)
+	issues = append(issues, validateBenchmarkCommandSkipDB(report.Command, report.Endpoints)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -220,6 +221,25 @@ func validateBenchmarkCommandRequests(command string, endpoints []EndpointReport
 		}
 	}
 	return issues
+}
+
+func validateBenchmarkCommandSkipDB(command string, endpoints []EndpointReport) []string {
+	if strings.TrimSpace(command) == "" || len(endpoints) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	for _, endpoint := range endpoints {
+		seen[endpoint.Path] = true
+	}
+	reportSkipsDB := isSkipDBReport(seen)
+	_, commandSkipsDB := parseCommandFlags(command)["skip-db"]
+	if reportSkipsDB && !commandSkipsDB {
+		return []string{"benchmark command skip-db flag --skip-db is required for skip-db endpoint reports"}
+	}
+	if !reportSkipsDB && commandSkipsDB {
+		return []string{"benchmark command skip-db flag --skip-db is present for a full endpoint report"}
+	}
+	return nil
 }
 
 func validateEndpointSet(report Report, opt Options) []string {
