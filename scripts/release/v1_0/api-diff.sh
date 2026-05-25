@@ -9,7 +9,7 @@ report_dir=""
 baseline="docs/baselines/api-diff-baseline.v1alpha1.json"
 enforce_mode="no-change"
 write_baseline="false"
-release_artifact="tetra.release.v0_3_0.api-diff-report.v1alpha1"
+release_artifact="tetra.release.v1_0.api-diff-report.v1alpha1"
 
 usage() {
   cat <<'USAGE'
@@ -22,7 +22,7 @@ Options:
   --write-baseline    Regenerate baseline JSON from current docs before diff.
 
 Artifact mapping:
-  tetra.release.v0_3_0.api-diff-report.v1alpha1
+  tetra.release.v1_0.api-diff-report.v1alpha1
 USAGE
 }
 

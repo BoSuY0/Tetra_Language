@@ -20,7 +20,7 @@ func TestReleaseV10APIDiffWorkflowLivesInVersionedReleaseScript(t *testing.T) {
 	versionedText := string(versionedRaw)
 	for _, want := range []string{
 		"Usage: bash scripts/release/v1_0/api-diff.sh",
-		`release_artifact="tetra.release.v0_3_0.api-diff-report.v1alpha1"`,
+		`release_artifact="tetra.release.v1_0.api-diff-report.v1alpha1"`,
 		"git ls-files 'examples/*.tetra'",
 		"go run ./tools/cmd/gen-docs",
 		"node scripts/tools/api_diff_report.mjs",
@@ -257,8 +257,9 @@ func TestAPIDiffReportClassifiesSignatureDriftAsChanged(t *testing.T) {
 			ReviewNote   string `json:"review_note"`
 		} `json:"changes"`
 		Review struct {
-			Status    string   `json:"status"`
-			Checklist []string `json:"checklist"`
+			Status           string   `json:"status"`
+			ReleaseChecklist string   `json:"release_checklist"`
+			Checklist        []string `json:"checklist"`
 		} `json:"review"`
 	}
 	if err := json.Unmarshal(raw, &diff); err != nil {
@@ -281,6 +282,9 @@ func TestAPIDiffReportClassifiesSignatureDriftAsChanged(t *testing.T) {
 	}
 	if diff.Review.Status != "needs_review" || len(diff.Review.Checklist) < 3 {
 		t.Fatalf("diff should include review checklist: %#v", diff.Review)
+	}
+	if diff.Review.ReleaseChecklist != "docs/checklists/v1_0_release_gate.md" {
+		t.Fatalf("diff should point at the v1 release checklist: %#v", diff.Review)
 	}
 }
 

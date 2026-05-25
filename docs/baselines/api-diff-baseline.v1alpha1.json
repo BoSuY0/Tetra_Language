@@ -2,13 +2,13 @@
   "schema": "tetra.api.diff-baseline.v1alpha1",
   "created_at": "1970-01-01T00:00:00Z",
   "timestamp_policy": "deterministic (SOURCE_DATE_EPOCH, fallback 1970-01-01T00:00:00Z)",
-  "source_docs": "reports/stabilization/api-diff-baseline-refresh-20260524-1416/api-docs.md",
-  "source_docs_sha256": "sha256:4ad4aabca940a71bacb35ffaf66d16a272e9a9e87b01b14e65574b2b87dec1f4",
+  "source_docs": "reports/stabilization/api-diff-baseline-refresh-20260525-071705/api-docs.md",
+  "source_docs_sha256": "sha256:f19bb1eac5a3b24c11d486602b1e822fcce9d63e7598b8a59cd09c09d57ef243",
   "api_metadata": {
     "schema": "tetra.api.v1alpha1",
-    "api_hash": "sha256:4eb04d6f05e56b0303b10513a7265888fe0aa8bd031d4e7bae14bacbad97dae0",
-    "module_count": 498,
-    "entry_count": 1580
+    "api_hash": "sha256:52e241ae635e863e1f61fb9f70d8ab5ef7d781542a9edb1f3eea260a862c3bff",
+    "module_count": 588,
+    "entry_count": 1918
   },
   "symbols": [
     {
@@ -31,6 +31,13 @@
       "section": "Implementations",
       "entry": "impl core.Vec2: core.Score",
       "symbol_hash": "sha256:2090cb635975c81657e4b08c380ba1094217b52a4b346af48d6194e9e8c11203"
+    },
+    {
+      "id": "app.main (examples/microservices/backend_capsule_source_root_service/src/app/main.tetra)::Functions::func main",
+      "module": "app.main (examples/microservices/backend_capsule_source_root_service/src/app/main.tetra)",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:0d0c828165b3011798bc328f6d02a8ce6b7046e892d43e1d1a30475092667799"
     },
     {
       "id": "app.main (examples/microservices/compiler_actor_error_memory_pack/app/main.tetra)::Functions::func main",
@@ -1851,6 +1858,1679 @@
       "section": "Functions",
       "entry": "func wide_actor_worker() -> i32 uses actors",
       "symbol_hash": "sha256:ffc0383a6a4750b54ed68fa5aab55d081bbc01897b628bb09194f04cb910970b"
+    },
+    {
+      "id": "examples.microservices.backend_crypto_mix_min_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_crypto_mix_min_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:b9d81bc8f776a207cd25393c4ffe125f7a9928cba0dac3f03fdd032cc9620abd"
+    },
+    {
+      "id": "examples.microservices.backend_crypto_serialization_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_crypto_serialization_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:bac7c58a8008f70ccc23bb656166b1f4a81f2e829e1779ca33fe55c9565b79fe"
+    },
+    {
+      "id": "examples.microservices.backend_experimental_buffer_mirror_service::Functions::func async_buffer_probe",
+      "module": "examples.microservices.backend_experimental_buffer_mirror_service",
+      "section": "Functions",
+      "entry": "async func async_buffer_probe(seed: i32) -> i32",
+      "symbol_hash": "sha256:2d2c481fb4decad1b6bbd3af4865bc1f406818d38603493f716a2685b86aad4a"
+    },
+    {
+      "id": "examples.microservices.backend_experimental_buffer_mirror_service::Functions::func main",
+      "module": "examples.microservices.backend_experimental_buffer_mirror_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, io, mem, mmio",
+      "symbol_hash": "sha256:153bdcc089ae2e442446687a86b02477a5544b7a528c0a78ffddfeff76e5a6dd"
+    },
+    {
+      "id": "examples.microservices.backend_experimental_route_policy_service::Functions::func main",
+      "module": "examples.microservices.backend_experimental_route_policy_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses capability, io",
+      "symbol_hash": "sha256:dc91efeb1f63cd959cee3c7966618976b2ba760d186792a62cf6459abf2f2925"
+    },
+    {
+      "id": "examples.microservices.backend_filesystem_nul_exists_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_filesystem_nul_exists_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses capability, io",
+      "symbol_hash": "sha256:f968e172f7e0478afa1fb8301e5e418f6652d32d6095178556e46fc2b24466dd"
+    },
+    {
+      "id": "examples.microservices.backend_filesystem_path_policy_service::Functions::func main",
+      "module": "examples.microservices.backend_filesystem_path_policy_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses capability, io",
+      "symbol_hash": "sha256:5b3cd49804026e83a6465c9a564ff53f052945da74aabfb722840b67e3d81079"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_body_scope_service::Functions::func check_byte_body_scope",
+      "module": "examples.microservices.backend_http_connection_body_scope_service",
+      "section": "Functions",
+      "entry": "func check_byte_body_scope() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9e4190f478f49fc01033cc4c59d0a5edee47aca0b657c6945f80043b39f1123c"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_body_scope_service::Functions::func check_string_body_scope",
+      "module": "examples.microservices.backend_http_connection_body_scope_service",
+      "section": "Functions",
+      "entry": "func check_string_body_scope() -> i32",
+      "symbol_hash": "sha256:ac3b46d133e9a172b485d3286a22bc985657641abe6baa0590c2dcf954399412"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_body_scope_service::Functions::func main",
+      "module": "examples.microservices.backend_http_connection_body_scope_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:a565c751e16507d4b968ddb7873e513db99c053f68ee8cc33479fa1154d56b60"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_list_service::Functions::func check_byte_headers",
+      "module": "examples.microservices.backend_http_connection_list_service",
+      "section": "Functions",
+      "entry": "func check_byte_headers() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:59b0a6169225e6a3a9e0cbe58c8ce83e95e4091b72db97c05471faa0db674e18"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_list_service::Functions::func check_string_headers",
+      "module": "examples.microservices.backend_http_connection_list_service",
+      "section": "Functions",
+      "entry": "func check_string_headers() -> i32",
+      "symbol_hash": "sha256:2614db19aab4fe57b2ffef794da6ddc9dc7cf98bb5f519b91ea0209a3d74a470"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_list_service::Functions::func main",
+      "module": "examples.microservices.backend_http_connection_list_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:1d89f3ca3cb2332ae324ac95e7dd4a59b31656c950eb389f7c59f55a2947296c"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_scope_service::Functions::func check_byte_scope",
+      "module": "examples.microservices.backend_http_connection_scope_service",
+      "section": "Functions",
+      "entry": "func check_byte_scope() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:57f7b5484dc02db3b7b046fb45895fd2035d41e4285e06a026d665f55d8e6a11"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_scope_service::Functions::func check_string_scope",
+      "module": "examples.microservices.backend_http_connection_scope_service",
+      "section": "Functions",
+      "entry": "func check_string_scope() -> i32",
+      "symbol_hash": "sha256:3bccbdc4e8d052414a43cd3c51de303db7e88daa24fe0d8ca992f39049f8f06a"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_scope_service::Functions::func main",
+      "module": "examples.microservices.backend_http_connection_scope_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:38df461efb0b045c681e4bd812cc68cc608a691e943b7f9d8ce4cb1e5bd12852"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_token_boundary_service::Functions::func check_byte_boundaries",
+      "module": "examples.microservices.backend_http_connection_token_boundary_service",
+      "section": "Functions",
+      "entry": "func check_byte_boundaries() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:020f91479aadeb037c58562df118ca23cf0297c269182f0a8e6cf666a12f3574"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_token_boundary_service::Functions::func check_string_boundaries",
+      "module": "examples.microservices.backend_http_connection_token_boundary_service",
+      "section": "Functions",
+      "entry": "func check_string_boundaries() -> i32",
+      "symbol_hash": "sha256:1217fee4ee38f6f6bafc93c6eb3936ffd480ce4bb04c32d4f49bdc94060714c6"
+    },
+    {
+      "id": "examples.microservices.backend_http_connection_token_boundary_service::Functions::func main",
+      "module": "examples.microservices.backend_http_connection_token_boundary_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b545cef9d1ba0d344cfffebb5e3417d06d7e1fc0007ef2cefd92d807163d0cf9"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_control_guard_service::Functions::func all_bytes_equal",
+      "module": "examples.microservices.backend_http_header_control_guard_service",
+      "section": "Functions",
+      "entry": "func all_bytes_equal(src: []u8, count: i32, value: i32) -> bool uses mem",
+      "symbol_hash": "sha256:8afbee2d2307df7eb00c3707dd775365ade7bd38e9ad1c33d5d60a20b7ccbc63"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_control_guard_service::Functions::func check_full_response_rejects",
+      "module": "examples.microservices.backend_http_header_control_guard_service",
+      "section": "Functions",
+      "entry": "func check_full_response_rejects() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:f8fcb69d97552499b1718ac281b9877662b96efd65223b325dbb9d6809221b91"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_control_guard_service::Functions::func check_header_value_rejects",
+      "module": "examples.microservices.backend_http_header_control_guard_service",
+      "section": "Functions",
+      "entry": "func check_header_value_rejects(code: i32) -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e1d568ee47f5956af8a0e44e7915c69d22d26c03fa271af2e95954800c37a0c4"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_control_guard_service::Functions::func check_htab_value_allowed",
+      "module": "examples.microservices.backend_http_header_control_guard_service",
+      "section": "Functions",
+      "entry": "func check_htab_value_allowed() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:45c1e9174355bbc759f5c4f1b89f6b0c6e7c46a46f24236c17c15f88af40838a"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_control_guard_service::Functions::func check_response_rejects",
+      "module": "examples.microservices.backend_http_header_control_guard_service",
+      "section": "Functions",
+      "entry": "func check_response_rejects(reason: str, server: str, content_type: str, code: i32) -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:7bdb8cce658e01b640dd0961498d93a6c54ba13202d7c84b0a02b323e0dd8089"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_control_guard_service::Functions::func control_value",
+      "module": "examples.microservices.backend_http_header_control_guard_service",
+      "section": "Functions",
+      "entry": "func control_value() -> str",
+      "symbol_hash": "sha256:16ce7f248e299295a7ca37e183772903b03f08c5a837cb7caed3d5798f4c3941"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_control_guard_service::Functions::func fill_bytes",
+      "module": "examples.microservices.backend_http_header_control_guard_service",
+      "section": "Functions",
+      "entry": "func fill_bytes(dst: inout []u8, count: i32, value: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:1905f58f8bcb0b48b9bbc79d352ae38542b93682edc8082b3864e00aca4507e0"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_control_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_header_control_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ac90bb0789a1cd7c7b0f948fb886339e20ccf7fd7ba5ec3d7dc07d1515b529c0"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_injection_guard_service::Functions::func all_bytes_equal",
+      "module": "examples.microservices.backend_http_header_injection_guard_service",
+      "section": "Functions",
+      "entry": "func all_bytes_equal(src: []u8, count: i32, value: i32) -> bool uses mem",
+      "symbol_hash": "sha256:11a2cb66b5eedda1c9c16b22e5cb7b621cb80bb3087e539dd84b41bb93472875"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_injection_guard_service::Functions::func check_full_response_rejects",
+      "module": "examples.microservices.backend_http_header_injection_guard_service",
+      "section": "Functions",
+      "entry": "func check_full_response_rejects() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6dd4da90a562d2f722da71916b4e4ca296bd6ae74034ba326107524c5acb2eab"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_injection_guard_service::Functions::func check_header_rejects",
+      "module": "examples.microservices.backend_http_header_injection_guard_service",
+      "section": "Functions",
+      "entry": "func check_header_rejects(name: str, value: str, code: i32) -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e43040e4ed3a4a66fb04dff1b19fb77f3d6567e135f5442b7d5ed13f1e331b26"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_injection_guard_service::Functions::func check_response_rejects",
+      "module": "examples.microservices.backend_http_header_injection_guard_service",
+      "section": "Functions",
+      "entry": "func check_response_rejects(reason: str, server: str, content_type: str, code: i32) -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:c90544a551f14f0c0dae5f984facdc5bf5835528d2ccb5dcdaad4d731a4b723b"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_injection_guard_service::Functions::func check_valid_writers",
+      "module": "examples.microservices.backend_http_header_injection_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_writers() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:1c27e4773a82d85b78ea0dcda2bf48e5856baaffbe436aea8a87cfa37dc3cfd1"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_injection_guard_service::Functions::func fill_bytes",
+      "module": "examples.microservices.backend_http_header_injection_guard_service",
+      "section": "Functions",
+      "entry": "func fill_bytes(dst: inout []u8, count: i32, value: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:decb2cc3f5e8821fcedfa8bd06125d29acf85b086825f3184de94a7781773b0c"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_injection_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_header_injection_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6adf47e0d4f64ea4bebf7bc77476028db9a502126b40d59fac832f5f6e79e0b8"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_whitespace_service::Functions::func check_byte_headers",
+      "module": "examples.microservices.backend_http_header_whitespace_service",
+      "section": "Functions",
+      "entry": "func check_byte_headers() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:a07b271ff6dd497e446d8270e37900b6bd6b9bfdb2d409b1535c7945f270d5d4"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_whitespace_service::Functions::func check_string_headers",
+      "module": "examples.microservices.backend_http_header_whitespace_service",
+      "section": "Functions",
+      "entry": "func check_string_headers() -> i32",
+      "symbol_hash": "sha256:63d2e1b001ed76d51c3e7b27f07bdde1205005be14d1d72a7e29a6fe811c3bcd"
+    },
+    {
+      "id": "examples.microservices.backend_http_header_whitespace_service::Functions::func main",
+      "module": "examples.microservices.backend_http_header_whitespace_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:2d513b647c6679ddddd574228816f8efb0be4d89c5a41e3b28d5da9f50c364bd"
+    },
+    {
+      "id": "examples.microservices.backend_http_json_i32_min_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_json_i32_min_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:7dc854c409f10d1150e34c2a72c817cb7ec53cc4ea287e3471ec1d2913bf7ef7"
+    },
+    {
+      "id": "examples.microservices.backend_http_keep_alive_method_guard_service::Functions::func check_byte_method_tokens",
+      "module": "examples.microservices.backend_http_keep_alive_method_guard_service",
+      "section": "Functions",
+      "entry": "func check_byte_method_tokens() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:eed44a4b9b8baeb4ee2e740de327baaa1f244bddead62bfb8ea8552ddf512eb6"
+    },
+    {
+      "id": "examples.microservices.backend_http_keep_alive_method_guard_service::Functions::func check_string_method_tokens",
+      "module": "examples.microservices.backend_http_keep_alive_method_guard_service",
+      "section": "Functions",
+      "entry": "func check_string_method_tokens() -> i32",
+      "symbol_hash": "sha256:90a6817757456b7f55d9b59fbcd1a6892cde833ab5b351e5edde8a7ec5dd4518"
+    },
+    {
+      "id": "examples.microservices.backend_http_keep_alive_method_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_keep_alive_method_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b0db93661bd4110f24a53758cd91881bfe2937c3aa901a14b2e002d8df35998d"
+    },
+    {
+      "id": "examples.microservices.backend_http_keep_alive_target_guard_service::Functions::func check_byte_keep_alive_targets",
+      "module": "examples.microservices.backend_http_keep_alive_target_guard_service",
+      "section": "Functions",
+      "entry": "func check_byte_keep_alive_targets() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ed2ade3fadc71c438a66cb942535370a1b3ffd0a90b16f5dab7e5a10b3ccb835"
+    },
+    {
+      "id": "examples.microservices.backend_http_keep_alive_target_guard_service::Functions::func check_string_keep_alive_targets",
+      "module": "examples.microservices.backend_http_keep_alive_target_guard_service",
+      "section": "Functions",
+      "entry": "func check_string_keep_alive_targets() -> i32",
+      "symbol_hash": "sha256:1f480262465a92efed015a51785795811d0251319b0c2a7aca1ce3252d46f33b"
+    },
+    {
+      "id": "examples.microservices.backend_http_keep_alive_target_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_keep_alive_target_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e325ada2bd6b6655bde2bb599573970cbab1ec69f240a1e2123bbfc58776ebd1"
+    },
+    {
+      "id": "examples.microservices.backend_http_negative_content_length_guard_service::Functions::func all_bytes_equal",
+      "module": "examples.microservices.backend_http_negative_content_length_guard_service",
+      "section": "Functions",
+      "entry": "func all_bytes_equal(src: []u8, count: i32, value: i32) -> bool uses mem",
+      "symbol_hash": "sha256:651962f685f261b4ad5183561e004612e3c419fa8deb34236bd617d08d3a20e0"
+    },
+    {
+      "id": "examples.microservices.backend_http_negative_content_length_guard_service::Functions::func check_negative_content_length",
+      "module": "examples.microservices.backend_http_negative_content_length_guard_service",
+      "section": "Functions",
+      "entry": "func check_negative_content_length() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:3abed25107d6fe34c438cbdc759ee9e34f1cf49fea42e6159737760900664cbb"
+    },
+    {
+      "id": "examples.microservices.backend_http_negative_content_length_guard_service::Functions::func check_valid_content_lengths",
+      "module": "examples.microservices.backend_http_negative_content_length_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_content_lengths() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4bc172ed0cb67236f6e05bee9ce14be98ce22cb7d59c2119ba481e01a49b395b"
+    },
+    {
+      "id": "examples.microservices.backend_http_negative_content_length_guard_service::Functions::func fill_bytes",
+      "module": "examples.microservices.backend_http_negative_content_length_guard_service",
+      "section": "Functions",
+      "entry": "func fill_bytes(dst: inout []u8, count: i32, value: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:0098a7ad93e790c2f881ec4e53dcb6b1e90d300c20565e3593ce15384e209336"
+    },
+    {
+      "id": "examples.microservices.backend_http_negative_content_length_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_negative_content_length_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:21c77832b1d27f0d56f87748fa0e2fc6d74c95c2e2489fa4229d4a070e29e612"
+    },
+    {
+      "id": "examples.microservices.backend_http_pipeline_gateway_service::Functions::func main",
+      "module": "examples.microservices.backend_http_pipeline_gateway_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6c50bc6e6bdd729833912dec24e2278a567863279ca37c4c1d8d321ad7c3dac4"
+    },
+    {
+      "id": "examples.microservices.backend_http_pipeline_gateway_service::Functions::func require_route",
+      "module": "examples.microservices.backend_http_pipeline_gateway_service",
+      "section": "Functions",
+      "entry": "func require_route(buffer: []u8, start: i32, length: i32, expected: i32, expected_keep_alive: bool) -> bool uses mem",
+      "symbol_hash": "sha256:2997f42609c49f85c42da2d1b550176505f40e8b94f2e41dd8755eec5333dbf9"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_crlf_guard_service::Functions::func check_byte_line_endings",
+      "module": "examples.microservices.backend_http_request_crlf_guard_service",
+      "section": "Functions",
+      "entry": "func check_byte_line_endings() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:82f971eab8cdd06a5a2eedccfc70aeec97e7b6d576fe377d6627e59a2271d16b"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_crlf_guard_service::Functions::func check_string_line_endings",
+      "module": "examples.microservices.backend_http_request_crlf_guard_service",
+      "section": "Functions",
+      "entry": "func check_string_line_endings() -> i32",
+      "symbol_hash": "sha256:3a56b4cdff29b43dc087bbf662bcff11743c9857e9af7d4411ca84c32b388701"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_crlf_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_request_crlf_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:3a1595f65331b857d4b3f342c9cefc60639d8502d46956ace742ae9f7d05caba"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_line_token_guard_service::Functions::func check_byte_line_tokens",
+      "module": "examples.microservices.backend_http_request_line_token_guard_service",
+      "section": "Functions",
+      "entry": "func check_byte_line_tokens() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:df710339f0dac579c4af29b5deea707bfa462d4d40046af16490fba1052c8508"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_line_token_guard_service::Functions::func check_string_line_tokens",
+      "module": "examples.microservices.backend_http_request_line_token_guard_service",
+      "section": "Functions",
+      "entry": "func check_string_line_tokens() -> i32",
+      "symbol_hash": "sha256:88a8d947cfda382915744ef97c325626f8d52465936415b5b55d902b83407b26"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_line_token_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_request_line_token_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:df995940dedafc9a47de94537145b5e595a15f3d7eab56b4ce86df83a6d6fade"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_short_guard_service::Functions::func check_empty_request_windows",
+      "module": "examples.microservices.backend_http_request_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_request_windows() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:a3df652e725d11942d3042f4f18ae41b869d756ff80ca407fed00f2b80cfa204"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_short_guard_service::Functions::func check_offset_short_request_windows",
+      "module": "examples.microservices.backend_http_request_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_offset_short_request_windows() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:c5c34c7910f591655031bc2e4dda68b149ca726e1067d9007059b82fbdf28fcf"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_short_guard_service::Functions::func check_overstated_request_windows",
+      "module": "examples.microservices.backend_http_request_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_overstated_request_windows() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:40e1e5c316e281b6c2ec2045eae69d6992c8fac7c92222d935e29bc3bad5ea37"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_short_guard_service::Functions::func check_valid_request_windows",
+      "module": "examples.microservices.backend_http_request_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_request_windows() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:518005405e1ba6f471e0b5087b3269a6476b4e1e1c023f0b2ee27506f0383929"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_request_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:30cdba78c6a1e2bf44d1810abd434ffdfb635688a1ea869fffe86ad88ae27bbb"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_target_char_guard_service::Functions::func check_byte_target_chars",
+      "module": "examples.microservices.backend_http_request_target_char_guard_service",
+      "section": "Functions",
+      "entry": "func check_byte_target_chars() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ca1e86de854e8f9a34f04078b5c1fea38ccd65cd443bc9e842ce82ccbe73669c"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_target_char_guard_service::Functions::func check_string_target_chars",
+      "module": "examples.microservices.backend_http_request_target_char_guard_service",
+      "section": "Functions",
+      "entry": "func check_string_target_chars() -> i32",
+      "symbol_hash": "sha256:06483cb75f06230650c7e8dd6e32f5f92e52542f7c927ed8a47468abee540657"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_target_char_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_request_target_char_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:fa9378f5b5072ffcafbb18f8ac79f304ec7e5c1a69f5e386ddf510ea4b55bd70"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_target_guard_service::Functions::func check_byte_targets",
+      "module": "examples.microservices.backend_http_request_target_guard_service",
+      "section": "Functions",
+      "entry": "func check_byte_targets() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:2d66701472a4dea4ef589f74d32b49e29a787c7894d7061fef85ebd48f438e9c"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_target_guard_service::Functions::func check_string_targets",
+      "module": "examples.microservices.backend_http_request_target_guard_service",
+      "section": "Functions",
+      "entry": "func check_string_targets() -> i32",
+      "symbol_hash": "sha256:b4597b6640b96e0ac8fc040de3f95eb06fe56bad5ae0b0121c56014336cd957f"
+    },
+    {
+      "id": "examples.microservices.backend_http_request_target_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_request_target_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b0ee4a6241d366a7512782b3960d475222e1c156e1adba3bf7f3293f02ab5e2e"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_guard_service::Functions::func check_head",
+      "module": "examples.microservices.backend_http_response_guard_service",
+      "section": "Functions",
+      "entry": "func check_head(dst: []u8, written: i32) -> bool uses mem",
+      "symbol_hash": "sha256:bf6f1a86fe0bc9ca595d287b99f39e667f5b8af244bad3a7712f6136baec7923"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_response_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b35ad9be514be70ee08d74c238e655d5d8451607a13957d34e956c82fa073ae8"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_writer_short_guard_service::Functions::func all_bytes_equal",
+      "module": "examples.microservices.backend_http_response_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func all_bytes_equal(src: []u8, count: i32, value: i32) -> bool uses mem",
+      "symbol_hash": "sha256:e2f05b9a5c78b32bbf402e2d23bf34588c5eaee782d08ddab25e28339d2c4b36"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_writer_short_guard_service::Functions::func check_body_short_response_writes",
+      "module": "examples.microservices.backend_http_response_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_body_short_response_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6658515a55a031aa1c580c8836fce6a10341f80379caaca02665e7ace8c20438"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_writer_short_guard_service::Functions::func check_empty_response_writes",
+      "module": "examples.microservices.backend_http_response_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_response_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9c52737ecf62ecdac81efdae258f42c7325f59e01f9fe919eddd1debd53708b4"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_writer_short_guard_service::Functions::func check_prefix_short_head_write",
+      "module": "examples.microservices.backend_http_response_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_prefix_short_head_write() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ea285b71d41de48b5bdd536251e0ccac8ea2eda4613a4ed288a813f1d3010204"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_writer_short_guard_service::Functions::func check_valid_responses",
+      "module": "examples.microservices.backend_http_response_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_responses() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:5549c50f72935159d74ebcc9eb5a769fe61d85443847a61b4f5f43d033dcd88c"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_writer_short_guard_service::Functions::func fill_bytes",
+      "module": "examples.microservices.backend_http_response_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func fill_bytes(dst: inout []u8, count: i32, value: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:0937435a90c90ed643476f8ae944b088078611650e6ec3840a2461b8f536fd4a"
+    },
+    {
+      "id": "examples.microservices.backend_http_response_writer_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_response_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:d718618515c4f083e55bb652f2fc7cd1bf6ce676a51a869c722df583c6fdbb5d"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_code_guard_service::Functions::func all_bytes_equal",
+      "module": "examples.microservices.backend_http_status_code_guard_service",
+      "section": "Functions",
+      "entry": "func all_bytes_equal(src: []u8, count: i32, value: i32) -> bool uses mem",
+      "symbol_hash": "sha256:290f72fb6ae023e5d4776ceb08dc2764b14ddf9e938f89c1f2b525eca95198d7"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_code_guard_service::Functions::func check_invalid_status_len",
+      "module": "examples.microservices.backend_http_status_code_guard_service",
+      "section": "Functions",
+      "entry": "func check_invalid_status_len(status: i32, code: i32) -> i32",
+      "symbol_hash": "sha256:a079fd34eb0ad001f69a7f6c8ec9aba680c39fd8f74331f770873eece1595b87"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_code_guard_service::Functions::func check_invalid_status_write",
+      "module": "examples.microservices.backend_http_status_code_guard_service",
+      "section": "Functions",
+      "entry": "func check_invalid_status_write(status: i32, code: i32) -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b3df18fa17e9a2de3f95a404431b7bae110fd87b397c617f12e642680b48cd8c"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_code_guard_service::Functions::func check_valid_status_codes",
+      "module": "examples.microservices.backend_http_status_code_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_status_codes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e736843f7363b0729f071ad3e25c153bee4c298bb48daa3413933f884fa91614"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_code_guard_service::Functions::func fill_bytes",
+      "module": "examples.microservices.backend_http_status_code_guard_service",
+      "section": "Functions",
+      "entry": "func fill_bytes(dst: inout []u8, count: i32, value: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:192d0cafce4e0f0c46978b0bab3425bc07696ef313f826d624e5c508765e1900"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_code_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_status_code_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:68e96b06cd694cd074488f71438bbb8c37e02081c7913c3f835769686e5c83f1"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_matrix_service::Functions::func check_connection_matrix",
+      "module": "examples.microservices.backend_http_status_matrix_service",
+      "section": "Functions",
+      "entry": "func check_connection_matrix() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:5aa45abb009fb52421a0c64b7d54021d25d588f645f46d95364f212a6d3e8b60"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_matrix_service::Functions::func check_decimal_matrix",
+      "module": "examples.microservices.backend_http_status_matrix_service",
+      "section": "Functions",
+      "entry": "func check_decimal_matrix() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:5cde15528560be23b6ddab97a35571212b84a016642ec07ac7e6d5604cf886a1"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_matrix_service::Functions::func check_response_matrix",
+      "module": "examples.microservices.backend_http_status_matrix_service",
+      "section": "Functions",
+      "entry": "func check_response_matrix() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:a80df70266300fb5ed951fe1962ea65caaab64e207d4a52c008419b7dc970d35"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_matrix_service::Functions::func check_route_chars",
+      "module": "examples.microservices.backend_http_status_matrix_service",
+      "section": "Functions",
+      "entry": "func check_route_chars() -> i32",
+      "symbol_hash": "sha256:883c29d98ebdcdcef4e19b03bd57989da87afa1de82f8be203c8efd854a064ca"
+    },
+    {
+      "id": "examples.microservices.backend_http_status_matrix_service::Functions::func main",
+      "module": "examples.microservices.backend_http_status_matrix_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:c8260ad93972464e1d88bef07646ce9f93a80d5fc92bc4bd8da0f688d0d36124"
+    },
+    {
+      "id": "examples.microservices.backend_http_version_scope_service::Functions::func check_byte_versions",
+      "module": "examples.microservices.backend_http_version_scope_service",
+      "section": "Functions",
+      "entry": "func check_byte_versions() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:37c71fadfb0cb7962f251a860cebe4dfcaec8d6cd0823d6ded6b0308b5b8f115"
+    },
+    {
+      "id": "examples.microservices.backend_http_version_scope_service::Functions::func check_string_versions",
+      "module": "examples.microservices.backend_http_version_scope_service",
+      "section": "Functions",
+      "entry": "func check_string_versions() -> i32",
+      "symbol_hash": "sha256:6ef791c52b30e898a3b22cb120d8137397ed755d949adc0403f2c6aee243af08"
+    },
+    {
+      "id": "examples.microservices.backend_http_version_scope_service::Functions::func main",
+      "module": "examples.microservices.backend_http_version_scope_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:8115b9bfcb21e6de17070f6b02cd55717ebc1c0738ee3876009ac630229d9f84"
+    },
+    {
+      "id": "examples.microservices.backend_http_writer_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_writer_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:f759609473a861f8c6ab1714977cd7dfb000f09e81b0712e53bc1da343664cfb"
+    },
+    {
+      "id": "examples.microservices.backend_http_writer_short_guard_service::Functions::func check_empty_writes",
+      "module": "examples.microservices.backend_http_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6b0ba8d1e03623c9b6a90f95a6810a859daf974ede73ef26a3d31808ba3a90e5"
+    },
+    {
+      "id": "examples.microservices.backend_http_writer_short_guard_service::Functions::func check_truncated_ascii_and_crlf",
+      "module": "examples.microservices.backend_http_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_ascii_and_crlf() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:0d14c3beaba96f3c8776d619408c55b47754a11ff722868fd30c4aabe0693734"
+    },
+    {
+      "id": "examples.microservices.backend_http_writer_short_guard_service::Functions::func check_truncated_decimal",
+      "module": "examples.microservices.backend_http_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_decimal() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:1b9024e8a0637ebab8c8b5302dca95a7d10c76fe2282c647fdd70e2aa2937452"
+    },
+    {
+      "id": "examples.microservices.backend_http_writer_short_guard_service::Functions::func check_truncated_header",
+      "module": "examples.microservices.backend_http_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_header() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:cab091dc73fb09a2cb9e39cf12003097fa170924ee0139c363185fd86d82aa8c"
+    },
+    {
+      "id": "examples.microservices.backend_http_writer_short_guard_service::Functions::func check_valid_writes",
+      "module": "examples.microservices.backend_http_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_writes() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:f058f892271d1b6d6a53b9abddd058be61778162a7ff12210c5ee93f62788118"
+    },
+    {
+      "id": "examples.microservices.backend_http_writer_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_http_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:db4e9c0e7b45b099e972dd0ba45a6d2b8e9d5f66e30713b7276a093f3fe54405"
+    },
+    {
+      "id": "examples.microservices.backend_json_control_matrix_service::Functions::func check_control_string",
+      "module": "examples.microservices.backend_json_control_matrix_service",
+      "section": "Functions",
+      "entry": "func check_control_string() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9c2d54ea3814fcff1bb8ca3e401f101edd72dd5ca8dab6b331fa07ae11dd1a14"
+    },
+    {
+      "id": "examples.microservices.backend_json_control_matrix_service::Functions::func check_message_object",
+      "module": "examples.microservices.backend_json_control_matrix_service",
+      "section": "Functions",
+      "entry": "func check_message_object() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ee09ad02b40ea6d18db233017b9ca2d801a3299e9360d4c8c35b434a73f02d24"
+    },
+    {
+      "id": "examples.microservices.backend_json_control_matrix_service::Functions::func check_number_helpers",
+      "module": "examples.microservices.backend_json_control_matrix_service",
+      "section": "Functions",
+      "entry": "func check_number_helpers() -> i32",
+      "symbol_hash": "sha256:395886321e0d7bf24f1e2159217484debac963fbbba2c2d5b4de2690fb1319bd"
+    },
+    {
+      "id": "examples.microservices.backend_json_control_matrix_service::Functions::func main",
+      "module": "examples.microservices.backend_json_control_matrix_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:273ab0b48731c8681273e20126811ec8d86efff63ac544d2cb2b26f8c4ed4986"
+    },
+    {
+      "id": "examples.microservices.backend_json_escape_guard_service::Functions::func check_escape_buffer",
+      "module": "examples.microservices.backend_json_escape_guard_service",
+      "section": "Functions",
+      "entry": "func check_escape_buffer(buf: []u8, start: i32, written: i32) -> bool uses mem",
+      "symbol_hash": "sha256:04fda8e012cfce58991741b8aa78b1870668179aa31b89a4952e2aa399cb0612"
+    },
+    {
+      "id": "examples.microservices.backend_json_escape_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_json_escape_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:3fa8e1242f3f3c949a104bd3bdac35960d86ba312bace18fa798818617ad9ca5"
+    },
+    {
+      "id": "examples.microservices.backend_json_hex_digit_guard_service::Functions::func check_hex_digit_bounds",
+      "module": "examples.microservices.backend_json_hex_digit_guard_service",
+      "section": "Functions",
+      "entry": "func check_hex_digit_bounds() -> i32",
+      "symbol_hash": "sha256:976b22893ad843b6014b9e6cdb9078eba9e592e98eb39350cdca4a27e9d5e7a6"
+    },
+    {
+      "id": "examples.microservices.backend_json_hex_digit_guard_service::Functions::func check_message_object_control",
+      "module": "examples.microservices.backend_json_hex_digit_guard_service",
+      "section": "Functions",
+      "entry": "func check_message_object_control() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:cb0b7cd31fe4d64fdd95fdcca4d76e96706f1d6f8519e0aa7fadd3f432fba05d"
+    },
+    {
+      "id": "examples.microservices.backend_json_hex_digit_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_json_hex_digit_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9b0e974c83d20854e9b5b8b2eb75ea544d830af545445cff817a8829b59b4513"
+    },
+    {
+      "id": "examples.microservices.backend_json_writer_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_json_writer_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:8cc9718c844caf72f27ca0baa53e43b851b8f22e401eea191acf0da53612afb3"
+    },
+    {
+      "id": "examples.microservices.backend_json_writer_short_guard_service::Functions::func check_empty_writes",
+      "module": "examples.microservices.backend_json_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:98375c52d6341788f91b4a51ee2038345f944147119a02148e2c1562f07ca796"
+    },
+    {
+      "id": "examples.microservices.backend_json_writer_short_guard_service::Functions::func check_truncated_escape_write",
+      "module": "examples.microservices.backend_json_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_escape_write() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ddd662c68a4c6cc84b82f4d52c01ebc6e4ed757bcf0ca47b18989b6a21354421"
+    },
+    {
+      "id": "examples.microservices.backend_json_writer_short_guard_service::Functions::func check_truncated_object_write",
+      "module": "examples.microservices.backend_json_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_object_write() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ea40e9e3137112f11d5b739070569aaf44ebb81ab23df1a117c12a1cf61cef73"
+    },
+    {
+      "id": "examples.microservices.backend_json_writer_short_guard_service::Functions::func check_truncated_string_write",
+      "module": "examples.microservices.backend_json_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_string_write() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:2a1b7dd6e54674b758471e41e129bf3082025e0b46ff07a57fef477da953de27"
+    },
+    {
+      "id": "examples.microservices.backend_json_writer_short_guard_service::Functions::func check_valid_writes",
+      "module": "examples.microservices.backend_json_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_writes() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:e6d6454706711480b9d6a6c1b2dca69c819b56d8bab0449e4bb8d99b0a27cf26"
+    },
+    {
+      "id": "examples.microservices.backend_json_writer_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_json_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4852aa2ab32a77aa6c5f8d834036fc36236d58fdb3d090a415cc21484551e0e6"
+    },
+    {
+      "id": "examples.microservices.backend_math_testing_decision_service::Functions::func main",
+      "module": "examples.microservices.backend_math_testing_decision_service",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:395d07937436c9e4b5b03e0db36f5318496a536849b470287e2ebaaa7e455a5d"
+    },
+    {
+      "id": "examples.microservices.backend_memory_io_buffer_service::Functions::func main",
+      "module": "examples.microservices.backend_memory_io_buffer_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, io, mem, mmio",
+      "symbol_hash": "sha256:3954ed35566e077ff2f7e4fc7806912381b5db5e6b8cc4e00def42ac913874ca"
+    },
+    {
+      "id": "examples.microservices.backend_modular_web_stack_pack.app.main::Functions::func main",
+      "module": "examples.microservices.backend_modular_web_stack_pack.app.main",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:2a0b2bf212fcb91dd480c017cb4d08419e548d96b8d0033c670cc47ccb9d878d"
+    },
+    {
+      "id": "examples.microservices.backend_modular_web_stack_pack.lib.gateway::Functions::func probe_gateway",
+      "module": "examples.microservices.backend_modular_web_stack_pack.lib.gateway",
+      "section": "Functions",
+      "entry": "func probe_gateway() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:0025ab99dad3347a591fb3b089675af3a8c93a41d241817e516003f8aa7ea97b"
+    },
+    {
+      "id": "examples.microservices.backend_modular_web_stack_pack.lib.storage::Functions::func probe_storage",
+      "module": "examples.microservices.backend_modular_web_stack_pack.lib.storage",
+      "section": "Functions",
+      "entry": "func probe_storage() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:975484018ccbc14d8cd2291b26ebe65659060f86fc02f4f3d2addccdbd9805e3"
+    },
+    {
+      "id": "examples.microservices.backend_modular_web_stack_pack.lib.storage::Functions::func require_frame",
+      "module": "examples.microservices.backend_modular_web_stack_pack.lib.storage",
+      "section": "Functions",
+      "entry": "func require_frame(frame: []u8, expected_type: i32, expected_total_len: i32) -> bool uses mem",
+      "symbol_hash": "sha256:0ad33cce9c5c5ee4ca0c2dd967fd0a9b734bc27d77306c6aafe01b8af13301a4"
+    },
+    {
+      "id": "examples.microservices.backend_net_epoll_event_bounds_guard_service::Functions::func check_malformed_events",
+      "module": "examples.microservices.backend_net_epoll_event_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func check_malformed_events() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:fc5af5d1cc7a588192f4914a49248410313ae3490bbd5a64652f5dc3299f8427"
+    },
+    {
+      "id": "examples.microservices.backend_net_epoll_event_bounds_guard_service::Functions::func check_valid_event",
+      "module": "examples.microservices.backend_net_epoll_event_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_event() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:d703b266749af79f9e59ffac4ba908c08478c8b701fba7134f7dfff8b095f418"
+    },
+    {
+      "id": "examples.microservices.backend_net_epoll_event_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_net_epoll_event_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:07b066a5dd90a60ea38c1350d4e58cd393b2943973bfb65097fcc021673e341e"
+    },
+    {
+      "id": "examples.microservices.backend_net_epoll_lifecycle_service::Functions::func check_event_flags",
+      "module": "examples.microservices.backend_net_epoll_lifecycle_service",
+      "section": "Functions",
+      "entry": "func check_event_flags(fd: i32) -> bool uses alloc, mem",
+      "symbol_hash": "sha256:11a80333ae7ca886173d5a66f1d33adbb23689249ef6f939a5c0c5bd506bffb3"
+    },
+    {
+      "id": "examples.microservices.backend_net_epoll_lifecycle_service::Functions::func main",
+      "module": "examples.microservices.backend_net_epoll_lifecycle_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, io, mem",
+      "symbol_hash": "sha256:7e6bed6d9eda4a197461ad9eccea680882f06f5b3f0725fdd0eda17033eeffc8"
+    },
+    {
+      "id": "examples.microservices.backend_net_port_bounds_guard_service::Functions::func check_invalid_bind_port",
+      "module": "examples.microservices.backend_net_port_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func check_invalid_bind_port(io_cap: cap.io, port: i32, code: i32) -> i32 uses io",
+      "symbol_hash": "sha256:dfe9a7bea206774963c09d10c20b80d56ef26b325526191427c430a9890570bb"
+    },
+    {
+      "id": "examples.microservices.backend_net_port_bounds_guard_service::Functions::func check_valid_ephemeral_bind",
+      "module": "examples.microservices.backend_net_port_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_ephemeral_bind(io_cap: cap.io) -> i32 uses io",
+      "symbol_hash": "sha256:de24ceace9e2df1488a654782387d95092f29333f693181bc5b4982137a8eb25"
+    },
+    {
+      "id": "examples.microservices.backend_net_port_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_net_port_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses capability, io",
+      "symbol_hash": "sha256:3cc6d0f7067cf7c53eb45e7795495f8785f4bb0ca4fb9abf56b91ae0c9d5e1ab"
+    },
+    {
+      "id": "examples.microservices.backend_network_backoff_overflow_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_network_backoff_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:869d67a77d6851b996651b8032d7b1adc85bd735f05c34d57d72b58ef243e958"
+    },
+    {
+      "id": "examples.microservices.backend_network_policy_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_network_policy_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:5e77f7d6106951a06cb1de0d342514be9c993c543ecb858379416b3774e1a07a"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ascii_i32_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_ascii_i32_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:a139ac5b636f02a6725aac97051ffbc09445f4f2d46415e6a908fcdbe0bd55ce"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ascii_i32_min_guard_service::Functions::func check_data_row_parse",
+      "module": "examples.microservices.backend_postgres_ascii_i32_min_guard_service",
+      "section": "Functions",
+      "entry": "func check_data_row_parse() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4719cd2fa3255b69ea83cee9f0a0618d9ce44d21c588460a14654cb24907541e"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ascii_i32_min_guard_service::Functions::func check_direct_parse",
+      "module": "examples.microservices.backend_postgres_ascii_i32_min_guard_service",
+      "section": "Functions",
+      "entry": "func check_direct_parse() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:36e25130f908cdaa788f451486e6d79b18be025e50b34e8ba5e433ddee068f81"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ascii_i32_min_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_ascii_i32_min_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ca3a8fe512f24e6f508e29132874bb4f95e1a8b18d06f39543e55bb4ad86d5da"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ascii_i32_overflow_guard_service::Functions::func check_data_row_overflow",
+      "module": "examples.microservices.backend_postgres_ascii_i32_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func check_data_row_overflow() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4ef91dedbed7e588fb348ab2851f6ee4fbddb3859f8658de59ac8409c577d099"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ascii_i32_overflow_guard_service::Functions::func check_direct_overflow",
+      "module": "examples.microservices.backend_postgres_ascii_i32_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func check_direct_overflow() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:da20e9f398df6c3690f464216a358f59b9f9d2c35b8ed253db0b48075ffffa45"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ascii_i32_overflow_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_ascii_i32_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:7b1ef569f274e299d5d7138a0f531eea0e6560fa208373f23228e4a12ed3b047"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_column_count_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_column_count_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4d32167c4352c22d15a2bebbbe99778824300c782805a0225bf8c22a4291705f"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_column_count_signed_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_column_count_signed_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9a6ea57c2ff14565b514e2e35781bf255704af591d2f6486f9da96b3afdfff27"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_command_tag_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_command_tag_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:055e9975b2c8b2d080f4cabfd582bef1a83c2c32e9719d36fd047997b616cc80"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_command_tag_overflow_guard_service::Functions::func check_direct_tags",
+      "module": "examples.microservices.backend_postgres_command_tag_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func check_direct_tags() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9cb7cf74abc265e3fa6f98ea3d1df2bc444c60e627f28427fcc214de7b34b228"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_command_tag_overflow_guard_service::Functions::func check_subranges",
+      "module": "examples.microservices.backend_postgres_command_tag_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func check_subranges() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9747881888baa03733fc64bf1146cfb42bf826aac58953f37b33fb248bf23690"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_command_tag_overflow_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_command_tag_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:a7b80b9cd71f8fa1fd2016fc79f96925e70cf4a971f71d0dea8a714d874d702a"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_command_tag_trailing_guard_service::Functions::func check_malformed_trailing_counts",
+      "module": "examples.microservices.backend_postgres_command_tag_trailing_guard_service",
+      "section": "Functions",
+      "entry": "func check_malformed_trailing_counts() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:53ad05714242eb176acf3b17872a7e4e78793ddbac6a9b3d5e8344ad89071ba5"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_command_tag_trailing_guard_service::Functions::func check_valid_trailing_counts",
+      "module": "examples.microservices.backend_postgres_command_tag_trailing_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_trailing_counts() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:19de93133495ebd9d5ece9536986f1fff1546d9502ada73c37a01b2543923acb"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_command_tag_trailing_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_command_tag_trailing_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:5da8ce177909b9f81b9fe8547c3cc137180a2c1b37bdcc476c86c2072120c6b5"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_cstring_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_cstring_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ff82127ce38e466648029b3a0b1a7ff365ea06c10349ed4abab6da10aeacfd12"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_cstring_nul_guard_service::Functions::func check_frame_lengths",
+      "module": "examples.microservices.backend_postgres_cstring_nul_guard_service",
+      "section": "Functions",
+      "entry": "func check_frame_lengths() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:3c08becc5dc91099dae490da46872e7c1823e84b3a6cb68376b9590deacb8876"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_cstring_nul_guard_service::Functions::func check_frame_writers",
+      "module": "examples.microservices.backend_postgres_cstring_nul_guard_service",
+      "section": "Functions",
+      "entry": "func check_frame_writers() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:2c8ad548827536c8b7e0b6cdea4a98d71bd0442c3989af366963be0f184d0d8e"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_cstring_nul_guard_service::Functions::func check_low_level_writers",
+      "module": "examples.microservices.backend_postgres_cstring_nul_guard_service",
+      "section": "Functions",
+      "entry": "func check_low_level_writers() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:501feaf51710ac455c9f1bfe4d8f4735361d5e5c6cbfd0c4c5a7070d5d596f69"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_cstring_nul_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_cstring_nul_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:0c11adb6750c249c493d2e60ada265811ab69ae43f3d3617ef30ebb058169ae9"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_cstring_nul_guard_service::Functions::func untouched",
+      "module": "examples.microservices.backend_postgres_cstring_nul_guard_service",
+      "section": "Functions",
+      "entry": "func untouched(bytes: []u8, a: i32, b: i32, c: i32, d: i32) -> bool uses mem",
+      "symbol_hash": "sha256:5f9bf9ec2214280631b3b946fda3f3dc05075926eee0e8732b83dea70bef9c18"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_data_row_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_data_row_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:07a4f1723398d2e38596a54d030fa4834521b0a8a07ce9f034533559a350471c"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_data_row_length_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_data_row_length_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:22d839b4309ca73da676f7509341078f03477ef0d0e1b1fdf32dca7807335be3"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_data_row_length_guard_service::Functions::func write_negative_two_len_at",
+      "module": "examples.microservices.backend_postgres_data_row_length_guard_service",
+      "section": "Functions",
+      "entry": "func write_negative_two_len_at(dst: inout []u8, start: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:07e90b3785069537d7b66d8ea11ff608056870d65ef46c60da26c7176a01b076"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_data_row_truncated_value_guard_service::Functions::func check_empty_value_window",
+      "module": "examples.microservices.backend_postgres_data_row_truncated_value_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_value_window() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:5ff1ae2b5a69f7dff48840f04e23e2e4a03deafd321eab959ae20b6fb7d11bb3"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_data_row_truncated_value_guard_service::Functions::func check_truncated_value_window",
+      "module": "examples.microservices.backend_postgres_data_row_truncated_value_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_value_window() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b7a1dee225efc25edf78962a626c0340832056c3b7a7823d0a84900267db9629"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_data_row_truncated_value_guard_service::Functions::func check_valid_value_window",
+      "module": "examples.microservices.backend_postgres_data_row_truncated_value_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_value_window() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6cad66fe06493780ee33a55d57e65dd478a12d76050d01c439124aa3076951cf"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_data_row_truncated_value_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_data_row_truncated_value_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:8c908927d2e1687c11959b1edbd5df5cfdeb07c84c700ff623501196b5b777bc"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_header_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_frame_header_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:cf273d8d10443d5bed73693ccf3f4ddd679d2c49b1d9298eaf7878bf8723d13d"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_short_guard_service::Functions::func check_empty_frame",
+      "module": "examples.microservices.backend_postgres_frame_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_frame() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:cb1b48895c2f9fb94f5c629803abb810987976676cd26c4d4cf63bec49ce4a94"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_short_guard_service::Functions::func check_tag_only_frame",
+      "module": "examples.microservices.backend_postgres_frame_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_tag_only_frame() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e5ad5c510ca7229d3383d98478e9554339267bd63cafaa3dbb568adb0af66e14"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_short_guard_service::Functions::func check_truncated_length_frame",
+      "module": "examples.microservices.backend_postgres_frame_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_length_frame() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:f662a4a4d157aa9a42e9ccfba8ab73eb899aedf7bf79044bea20292346d4bcd7"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_short_guard_service::Functions::func check_valid_sync_frame",
+      "module": "examples.microservices.backend_postgres_frame_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_sync_frame() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:2cfc3fee2537cdd4dac85620b434982dbdebf53a170e4f25dbd6a74058ad29b1"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_frame_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:81e2eee5e63e4410bba747cea06d80c195f4a4cc1fc2781df0d4341e2832b31a"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_signed_length_guard_service::Functions::func check_negative_frame_length",
+      "module": "examples.microservices.backend_postgres_frame_signed_length_guard_service",
+      "section": "Functions",
+      "entry": "func check_negative_frame_length(value: i32, code: i32) -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e111c2761bd89b4b3be967c1e400fa7e6f1c1fd5898028314500200e3b6e848d"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_signed_length_guard_service::Functions::func check_valid_frame_lengths",
+      "module": "examples.microservices.backend_postgres_frame_signed_length_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_frame_lengths() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:abf1fe176a7a22a667db0baf7c7a3900391d8d2771d7a7923fe468f9b0c15e80"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_signed_length_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_frame_signed_length_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:246ec2ce41c386c9e2e4845105355635722385dd422386a3ac10f1327933c33c"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_total_overflow_guard_service::Functions::func check_max_valid_total",
+      "module": "examples.microservices.backend_postgres_frame_total_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func check_max_valid_total() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b27c45f616a02c8e56d2d9edf06a629cf26badec03ac61c2f62d742d9e626c4d"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_total_overflow_guard_service::Functions::func check_overflow_total",
+      "module": "examples.microservices.backend_postgres_frame_total_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func check_overflow_total() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:8fc3f67e14f4bc61da482ddb404bec1356fd449adea3f3442a2a439b702291b3"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_total_overflow_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_frame_total_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:f91e4b01180aa75c334cd59ec00f94e5abbabae7aded1eb43dae0ee843afcf4e"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_writer_short_guard_service::Functions::func check_empty_writers",
+      "module": "examples.microservices.backend_postgres_frame_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_writers() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:c3a16af7464de279a50097a2bed434ed08a2d1e75699058d9b593bb837da1f26"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_writer_short_guard_service::Functions::func check_truncated_payload_writes",
+      "module": "examples.microservices.backend_postgres_frame_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_payload_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4b9f9df046d3ff00176ad37efa6d70b9619a87ef4b6e694f34104c5b6fe9b246"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_writer_short_guard_service::Functions::func check_truncated_typed_writes",
+      "module": "examples.microservices.backend_postgres_frame_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_typed_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e97c36d1c029f05962f6e5979b2c26acadc6244acf55b61afe381a9607f01a51"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_writer_short_guard_service::Functions::func check_valid_frames",
+      "module": "examples.microservices.backend_postgres_frame_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_frames() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:cae48f319127da5a48971ccab11b3b0fff9c7808836dab547f2f91df43dca520"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_frame_writer_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_frame_writer_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:5551a44d1f4de8cf0642bd3e924d41356804c1564e08481cde9e39f7a0a2d5f1"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_high_bit_read_guard_service::Functions::func check_high_bit_i32_reads",
+      "module": "examples.microservices.backend_postgres_high_bit_read_guard_service",
+      "section": "Functions",
+      "entry": "func check_high_bit_i32_reads() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4df19a65763d6ea89072556af26beb43f31d5ac6898c81f6211d848cb0de5ee2"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_high_bit_read_guard_service::Functions::func check_max_positive_i32",
+      "module": "examples.microservices.backend_postgres_high_bit_read_guard_service",
+      "section": "Functions",
+      "entry": "func check_max_positive_i32() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:d13594f9a66aeda587381f2317488536d168e46584890472a129634f37540355"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_high_bit_read_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_high_bit_read_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:0ce70cdcfbf94d4d31844ad2381452b0ae931090e45aeeae069731dfeb015d9f"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parse_count_guard_service::Functions::func all_bytes_equal",
+      "module": "examples.microservices.backend_postgres_parse_count_guard_service",
+      "section": "Functions",
+      "entry": "func all_bytes_equal(src: []u8, count: i32, value: i32) -> bool uses mem",
+      "symbol_hash": "sha256:6b16dba3626b063f211f1f6c548275b40eed03ce9dd74d8a6570080c1f53a337"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parse_count_guard_service::Functions::func check_overflow_parse_count",
+      "module": "examples.microservices.backend_postgres_parse_count_guard_service",
+      "section": "Functions",
+      "entry": "func check_overflow_parse_count() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:978f14561022e9bb0edb470e5fcf969a416b361775d9aff02543c0deef3935b0"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parse_count_guard_service::Functions::func check_valid_parse_count",
+      "module": "examples.microservices.backend_postgres_parse_count_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_parse_count() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:41d0aa7e771a0603fdaef46f1d8e715b2ad233814ef02d84c942baefec9e974b"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parse_count_guard_service::Functions::func fill_bytes",
+      "module": "examples.microservices.backend_postgres_parse_count_guard_service",
+      "section": "Functions",
+      "entry": "func fill_bytes(dst: inout []u8, count: i32, value: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:58d4fc571d2a73eee68d2a615fe7c8a86fc172728157ed0443060ec4348445e6"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parse_count_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_parse_count_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9fb7176759c4cd1d614a3a887a0457e2410d8a92598c20b928f35934f0e9f9a6"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parse_count_guard_service::Functions::func old_overflow_parse_frame_len",
+      "module": "examples.microservices.backend_postgres_parse_count_guard_service",
+      "section": "Functions",
+      "entry": "func old_overflow_parse_frame_len() -> i32",
+      "symbol_hash": "sha256:b2a5f9f475549d2cb2d6f83e8ee319395d8ac5a36e9771cb46d12bf70de17512"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parse_count_guard_service::Functions::func overflow_param_count",
+      "module": "examples.microservices.backend_postgres_parse_count_guard_service",
+      "section": "Functions",
+      "entry": "func overflow_param_count() -> i32",
+      "symbol_hash": "sha256:9be718b6054c17125728e263f2184a4584cc5872f0aa61ec2d3e1e4d0a0c3a14"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parser_short_guard_service::Functions::func check_ascii_i32_short_count",
+      "module": "examples.microservices.backend_postgres_parser_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_ascii_i32_short_count() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6ab041fef1abc22f1e14c9c1e71826616e890b6e2d4bf9345f4e60a6f95d2736"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parser_short_guard_service::Functions::func check_command_complete_short_payload",
+      "module": "examples.microservices.backend_postgres_parser_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_command_complete_short_payload() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b341ec95cb85319f6f6ac697fad3b7dcf0294887edf6d98dc6423aac624800fc"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parser_short_guard_service::Functions::func check_cstring_short_limit",
+      "module": "examples.microservices.backend_postgres_parser_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_cstring_short_limit() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ed460c2cf500992f174cb172b2dee7980bf0beff5272d6fa7d96c0d871435344"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parser_short_guard_service::Functions::func check_valid_parsers",
+      "module": "examples.microservices.backend_postgres_parser_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_parsers() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:b51a5dc5bf322c3cce0614667864c5c6b3f979b707266395c45c30a4119142b5"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_parser_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_parser_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:2bd7c1f13b6ad0f16f3d19739d3bb6e92104debca7e158f0e97fe4d35a85ca26"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_prepared_pipeline_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_prepared_pipeline_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:958dc8ae1a132b288046a1d2085d19cb4fdd4c284b31df2cf501bd974cf3f4c8"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_prepared_pipeline_service::Functions::func require_frame",
+      "module": "examples.microservices.backend_postgres_prepared_pipeline_service",
+      "section": "Functions",
+      "entry": "func require_frame(frame: []u8, expected_type: i32, expected_total_len: i32) -> bool uses mem",
+      "symbol_hash": "sha256:d5a03022c6dc44b8c17ba5830838c19813bacf08b3726ef04705301629b7f18d"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_read_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_read_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4e16a0c4846568ad943d134f0b96e3b62a0b423a23eabe50735670f1825bf3a2"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_read_short_guard_service::Functions::func check_empty_reads",
+      "module": "examples.microservices.backend_postgres_read_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_reads() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:57a646f7f419d20f0db6924d1355e440d8b0674a7f819d3e02ca37996713fd56"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_read_short_guard_service::Functions::func check_truncated_i32_reads",
+      "module": "examples.microservices.backend_postgres_read_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_i32_reads() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:6b5e5a95910088095876b1b4a77b104ed0175ae3f9406f20405c28aa9fdaf421"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_read_short_guard_service::Functions::func check_truncated_offset_reads",
+      "module": "examples.microservices.backend_postgres_read_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_offset_reads() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:c914306d83d1dd8ba7eb3adf8a862d3e7e34a8797598a396440f603646e68708"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_read_short_guard_service::Functions::func check_valid_reads",
+      "module": "examples.microservices.backend_postgres_read_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_reads() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:02ef91d04b368467b71b54cc60df57b45459e000fbe09a6a78acd8b75e7dec4d"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_read_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_read_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:c2b0778b6960047bf98a7c786c4429f7ac0eeefcb405b568425719239d733ffe"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ready_status_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_ready_status_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:674798153806f1dd461c709c5fe1d1776bfd0c356ec339c56253ac6d08dcdb9a"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ready_status_short_guard_service::Functions::func check_short_status_reads",
+      "module": "examples.microservices.backend_postgres_ready_status_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_short_status_reads() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:c9b9e82d1719a911e552bbdfdb69813cdfcf64a2dd9dad4fb7ab686b0d6226e9"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ready_status_short_guard_service::Functions::func check_valid_statuses",
+      "module": "examples.microservices.backend_postgres_ready_status_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_statuses() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:eef75b43627c86311df95692a6a45b37286b6a06471cb3b959044e84cf7575c5"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_ready_status_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_ready_status_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:ec50ab7b04f789b39282f427ed3f3dca3ba82e8e90983bd88e470794548e0466"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_result_guard_service::Functions::func check_command_tags",
+      "module": "examples.microservices.backend_postgres_result_guard_service",
+      "section": "Functions",
+      "entry": "func check_command_tags() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:cd55e3af9bd7011f2c9efae8e61a17251e263a0e7a2d23010b3c96441eb279bd"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_result_guard_service::Functions::func check_data_row_nulls",
+      "module": "examples.microservices.backend_postgres_result_guard_service",
+      "section": "Functions",
+      "entry": "func check_data_row_nulls() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:036e84065f1b7df9975a05ec5f9f8ffe2e681e7c9fa0cc90f723d76fce0e2228"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_result_guard_service::Functions::func check_row_description_guards",
+      "module": "examples.microservices.backend_postgres_result_guard_service",
+      "section": "Functions",
+      "entry": "func check_row_description_guards() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:86ab0586cb034a313b29d5ade5123bf9eff6de2c38a08b16080f75321e533367"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_result_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_result_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4f33d8b82201e8ab5ef78a0d7c7f3f330f5ba6c68f64ce0fdcca3a581cec25c6"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_result_guard_service::Functions::func write_column",
+      "module": "examples.microservices.backend_postgres_result_guard_service",
+      "section": "Functions",
+      "entry": "func write_column(dst: inout []u8, start: i32, name: str, type_oid: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:495790350e9a7d64a2e4fb89319b97947c37b6599fb05931d2198c2a70ac681a"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_result_guard_service::Functions::func write_null_i32_at",
+      "module": "examples.microservices.backend_postgres_result_guard_service",
+      "section": "Functions",
+      "entry": "func write_null_i32_at(dst: inout []u8, start: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:4be0ce62553319904796824d0cc4b3d59ce2ed8dfe5cf6dfbdec7a1fe0416bfb"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_row_description_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_row_description_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9c484ae45b89864562b39d9bbd70d6a61d4f18371f0588c7163586acc95d5ede"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_row_description_bounds_guard_service::Functions::func write_column",
+      "module": "examples.microservices.backend_postgres_row_description_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func write_column(dst: inout []u8, start: i32, name: str, type_oid: i32) -> i32 uses mem",
+      "symbol_hash": "sha256:eea487a495348c4ffbd6580ebdbf84c424e765ff72c73a4b45629505ad88b564"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_session_state_service::Functions::func check_query_and_control_frames",
+      "module": "examples.microservices.backend_postgres_session_state_service",
+      "section": "Functions",
+      "entry": "func check_query_and_control_frames() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:bbc119ede79f3d604b186cb58f8b20aee5c6ba3dc9304619aa8923d386bc4718"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_session_state_service::Functions::func check_ready_states",
+      "module": "examples.microservices.backend_postgres_session_state_service",
+      "section": "Functions",
+      "entry": "func check_ready_states() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e10901e51fa44a84b595cd00da4ea03d373e643f5d62693d2d6356d516985988"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_session_state_service::Functions::func check_startup_message",
+      "module": "examples.microservices.backend_postgres_session_state_service",
+      "section": "Functions",
+      "entry": "func check_startup_message() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:7bd8fdaded21efdbbdc8ae89f612247fa72adbf5e1b916169ea4f9dc8a652083"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_session_state_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_session_state_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b7c299a569274b81001cb0a50e02e55739098f07b3ce6375401197adcde16fb3"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_session_state_service::Functions::func require_frame",
+      "module": "examples.microservices.backend_postgres_session_state_service",
+      "section": "Functions",
+      "entry": "func require_frame(frame: []u8, expected_type: i32, expected_total_len: i32) -> bool uses mem",
+      "symbol_hash": "sha256:aef2e8a999afa3150a95aea5a6fec34214602cf1477f14325364480cfd67ba37"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_signed_write_guard_service::Functions::func check_negative_i16_writes",
+      "module": "examples.microservices.backend_postgres_signed_write_guard_service",
+      "section": "Functions",
+      "entry": "func check_negative_i16_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:8db1ae6fe30f5c0151d439a94fc8c10cdae6644293e19fa11558da926cfb77c6"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_signed_write_guard_service::Functions::func check_negative_i32_writes",
+      "module": "examples.microservices.backend_postgres_signed_write_guard_service",
+      "section": "Functions",
+      "entry": "func check_negative_i32_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:cf44f9911b4bcedfea2a9a3d088cf2cddd7a2b877a883d27d8495c1110577f50"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_signed_write_guard_service::Functions::func check_positive_controls",
+      "module": "examples.microservices.backend_postgres_signed_write_guard_service",
+      "section": "Functions",
+      "entry": "func check_positive_controls() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:f1f7203c4d4d78433d3515d55dd51e4429e5c049e982e40bda80a8c222a3ade3"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_signed_write_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_signed_write_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9a93288a477222b4fa1e8cb9339a01f35ef6655891c22628643d2d0becba0efc"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_text_write_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_text_write_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e316459b9c68a42b0560787d0a9bf5dbf3a10a3233adc086986624fb34a9362f"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_text_write_short_guard_service::Functions::func check_empty_writes",
+      "module": "examples.microservices.backend_postgres_text_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:9a596d672e2327d8441a708be5212c5b8d4fe586a74d3815fd2c077e018a58a0"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_text_write_short_guard_service::Functions::func check_truncated_ascii_write",
+      "module": "examples.microservices.backend_postgres_text_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_ascii_write() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:b2ec6837abb72658775d79d2e5b6bed2aeb10f7b34d61306536d0656912359b6"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_text_write_short_guard_service::Functions::func check_truncated_cstring_write",
+      "module": "examples.microservices.backend_postgres_text_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_cstring_write() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:f9a36d97be004d66712d1d76f2b6e5f2c965bb0d863fe3355a0a0d6064a9652b"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_text_write_short_guard_service::Functions::func check_truncated_pair_write",
+      "module": "examples.microservices.backend_postgres_text_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_pair_write() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:2eb7237f730cc0e041d6427a4c6a40250ea664d5f2050d1c41c4fd4a3b6f1999"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_text_write_short_guard_service::Functions::func check_valid_writes",
+      "module": "examples.microservices.backend_postgres_text_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_writes() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:c34da4d9ad53106767bfa6858caa4aa931a7cd5e4e0fdec5ea4762a51e3ff0cf"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_text_write_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_text_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:85eddd133d9dcdd89420e9d6994e89a821bcb3b23be02d27a2596ba58ed772c3"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_write_bounds_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_write_bounds_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:51f4cfbc5be5f0aa6a985cfd29668cd5a3f5edafe4d2e53fe0ce32f6e444db8c"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_write_short_guard_service::Functions::func check_empty_writes",
+      "module": "examples.microservices.backend_postgres_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_empty_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:effcf9e5c9a5ad9efdaf92d2e974a0aa602cedddafef75de82a9b99c11a5073f"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_write_short_guard_service::Functions::func check_offset_truncated_writes",
+      "module": "examples.microservices.backend_postgres_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_offset_truncated_writes() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:a7a9531b0a133094a8702be7e65d93c2802793acf3239bd95be10066a154645d"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_write_short_guard_service::Functions::func check_truncated_i32_write",
+      "module": "examples.microservices.backend_postgres_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_truncated_i32_write() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:4f3664f9698feb5a99e85ffce917d4fe43b1eace7f6c4e073add314383265308"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_write_short_guard_service::Functions::func check_valid_writes",
+      "module": "examples.microservices.backend_postgres_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func check_valid_writes() -> bool uses alloc, mem",
+      "symbol_hash": "sha256:73e709ad919cdd849595929e080c7479f171523578215933b41eb2d3135d36ce"
+    },
+    {
+      "id": "examples.microservices.backend_postgres_write_short_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_postgres_write_short_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:5630309d0224a10d373e1fdcb5bcb2ab2d05c18403004f2f6b4e9f7c642b4676"
+    },
+    {
+      "id": "examples.microservices.backend_slice_capability_window_service::Functions::func main",
+      "module": "examples.microservices.backend_slice_capability_window_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, capability, io, islands, mem, mmio",
+      "symbol_hash": "sha256:a7b1ab54ae8ef57470de893993e3677b6e9866fa7332ebcd1be5af1ba7039c68"
+    },
+    {
+      "id": "examples.microservices.backend_sync_async_status_service::Functions::func async_status_probe",
+      "module": "examples.microservices.backend_sync_async_status_service",
+      "section": "Functions",
+      "entry": "async func async_status_probe(left: i32, right: i32) -> i32",
+      "symbol_hash": "sha256:2a95de54e931eb84d7a10ea5a9345c04c5d46f9a3518b7d82ccec76e5aee484b"
+    },
+    {
+      "id": "examples.microservices.backend_sync_async_status_service::Functions::func main",
+      "module": "examples.microservices.backend_sync_async_status_service",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:deaba518f09f10b61451e5446d7fcb3fd572233a9c56a9d66bbf5de5da3bd05f"
+    },
+    {
+      "id": "examples.microservices.backend_time_collection_window_service::Functions::func main",
+      "module": "examples.microservices.backend_time_collection_window_service",
+      "section": "Functions",
+      "entry": "func main() -> i32 uses alloc, mem",
+      "symbol_hash": "sha256:e2007e3c1fd8c1058e2e253a937bbd3515c8fc09542981767d6f57523ddecb6e"
+    },
+    {
+      "id": "examples.microservices.backend_time_negative_base_delta_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_time_negative_base_delta_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:4635229eeb4a56f72e1c5113952ea3cbe6260f396af16191268bacdbc1a50b32"
+    },
+    {
+      "id": "examples.microservices.backend_time_overflow_guard_service::Functions::func main",
+      "module": "examples.microservices.backend_time_overflow_guard_service",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:5c1e18a60d40aaa14039640980c109a6e702e099e570fcad46d9dce9de21b084"
     },
     {
       "id": "examples.microservices.callable_identity_router_service::Functions::func add_one",
@@ -7460,6 +9140,629 @@
       "symbol_hash": "sha256:1d683ef0dd53bca858229b9f181bc9a1b3c106ef402dae3e62bb0a84768a3296"
     },
     {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Functions::func main",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Functions",
+      "entry": "func main() -> i32",
+      "symbol_hash": "sha256:e5ab015dc3c82217ed8f06dd1c7c725aa5b08edc5719ef49fe3210c185f55397"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::state ControlCenterState",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "state ControlCenterState",
+      "symbol_hash": "sha256:dd23ece04a29315901071a47cd200f3e2d35c00e4a23d2c41513e2d6583a307f"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val batteryText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val batteryText: str",
+      "symbol_hash": "sha256:f49a6de556bf29ee9ea7e8dafbe916699cc440acc7a38db998ef2bd8d021fd3a"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val cpuText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val cpuText: str",
+      "symbol_hash": "sha256:898323d3cc1e1927706d7064e7b36e204174eec586cccac2cb231005f2ba04dd"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val diagnosticText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val diagnosticText: str",
+      "symbol_hash": "sha256:198a4df9f32182c20d734e0f557ff13c63d839cba60afa5575b300d2ac667ed2"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val driverSupportText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val driverSupportText: str",
+      "symbol_hash": "sha256:5204243c6c0f686799a97b0637bbbe78a11de1ad835956284d7f05e81fe84182"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val fanSupportText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val fanSupportText: str",
+      "symbol_hash": "sha256:ee993fc7974567a28361cb405c655582699fdbd74346b2db41fdf4063d89971b"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val gpuText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val gpuText: str",
+      "symbol_hash": "sha256:d9b6417f4396aeec1abb801080c3d3dd3cf895f0db11123450873fbcd82032f6"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val logsText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val logsText: str",
+      "symbol_hash": "sha256:36ef404ab762c8f1220e5fc20a329098241b298c058cc3f2d10254a27c87a454"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val memoryText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val memoryText: str",
+      "symbol_hash": "sha256:b6f7f32f7263ae076bb9f91a2479e94d5e3141b0a36a2f8ada5405a0d8174dc9"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val powerText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val powerText: str",
+      "symbol_hash": "sha256:54642abd4a5ec29b8b0f0b5d25d6adc413e5db2f7e6d5febbbc86af5109e26b4"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val profileBalanced",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val profileBalanced: str",
+      "symbol_hash": "sha256:d60dd2c18f5a14ea8bde4e3ad4de034f67e47730d53d7a46816addb3a063b05a"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val profileCustom",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val profileCustom: str",
+      "symbol_hash": "sha256:eb9e0fd7d80e1c74ce28688387e41ec33d8aa4a376049acd95420b5d05aae2e3"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val profilePerformance",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val profilePerformance: str",
+      "symbol_hash": "sha256:7987afea479b69bdd55422c41f7a28445aebfdec02c2904d12c5d3875d456277"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val profileQuiet",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val profileQuiet: str",
+      "symbol_hash": "sha256:c7e7898f44ddbe7b4e4bc3482c691bc95b5e6ef03b5a9ef0734c2646d2f94279"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val screenDashboard",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val screenDashboard: str",
+      "symbol_hash": "sha256:9652e832314389b53c3ea0eca1dd531580dba0deb6a371c5cfb930541ef66e75"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val screenDiagnostics",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val screenDiagnostics: str",
+      "symbol_hash": "sha256:8a1948ed669f2a3a18c2d3fb91ee9f3e5a3b21053f5e23c16d5057d33921d1c3"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val screenFans",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val screenFans: str",
+      "symbol_hash": "sha256:0780d6d3ce0823525ae3aec0bf0bda76f419e05d67461d12124b88805e00426e"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val screenLogs",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val screenLogs: str",
+      "symbol_hash": "sha256:4a33e652f875d25a2d57b2338c9fc25e80ad0e941e9717246b22dca535808363"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val screenProfiles",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val screenProfiles: str",
+      "symbol_hash": "sha256:061e8a9fe7c608a742287a4280954750474c5055fb0a3c52664437b921fabaf9"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val screenSettings",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val screenSettings: str",
+      "symbol_hash": "sha256:962d01c68c22af5b946cafbf31436af46ea85af8e59f6dc6ff4b4531ea10fc88"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val sensorText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val sensorText: str",
+      "symbol_hash": "sha256:4174e71a1da5ed5698c7d9e482f6b909029ccfcc837a0f35daa1a5bbd615e0d7"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::val settingsText",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "val settingsText: str",
+      "symbol_hash": "sha256:84dc6fc1cb6982df2ac94a3be0e19b873e4ada3477fdc9e4420737f4ef2e5c17"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::var activeScreen",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "var activeScreen: str",
+      "symbol_hash": "sha256:771da8f3f99baa81f3e8d57a0f343e86c0b4e18acff700b32b5c35b1ed45a5fd"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::var dryRunMode",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "var dryRunMode: str",
+      "symbol_hash": "sha256:c2b51eed60fb9f05828e74a5198f388902f01f0b6b3be821e9eca974a5229abf"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::var lastAction",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "var lastAction: str",
+      "symbol_hash": "sha256:26bf9c7dc8986df3a27948adf70f9dafde08367b7fae7065cecea1fc548e5f9a"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::var profileRequest",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "var profileRequest: str",
+      "symbol_hash": "sha256:48c76ce0b829e751ca7d0ac4a98c9577c3282d585d8f7c7a955f3f2e4e8b32f7"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::var refreshCount",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "var refreshCount: i32",
+      "symbol_hash": "sha256:17e76abfb7887d736f35c9b6630e9859a0899b66014c0946e59627ffe0071956"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::States::var selectedProfile",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "States",
+      "entry": "var selectedProfile: str",
+      "symbol_hash": "sha256:ebbb7f534c8b6601fab08a6fe8a919c3d395024537b1dd277f680bfefb8d52e3"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::accessibility label: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "accessibility label: str",
+      "symbol_hash": "sha256:a8a90c6c18887812a2fa2009a5e5e86399a07ddc27a26e62a587411b9cdbf3cf"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::accessibility role: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "accessibility role: str",
+      "symbol_hash": "sha256:24e952772f56a92df54e934d49d4466dca3533db47bbf1c3e76e887ca1a6efda"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind activeScreenText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind activeScreenText: str",
+      "symbol_hash": "sha256:8569a38d546bdc388e9143106ef7057a868e630bb261093c5d7966d109c539b1"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind balancedProfileText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind balancedProfileText: str",
+      "symbol_hash": "sha256:e7f85790b01daa5e2e36f81d7bdde7e3178c2055a72faedf124e1e954da7aa34"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind batterySummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind batterySummaryText: str",
+      "symbol_hash": "sha256:80ddbf17a72c79d931dad4c34e317e82074ddd5947143c435b798ed39c970387"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind cpuSummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind cpuSummaryText: str",
+      "symbol_hash": "sha256:aa012c822542da80cd7346db0ecbdc81653ca270a4a53cf97121a14b8e22054c"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind customProfileText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind customProfileText: str",
+      "symbol_hash": "sha256:74420a3879c16a6183f4f07896b6acfcaf034498baff04a9212ebdbc1c9587e8"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind dashboardScreenText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind dashboardScreenText: str",
+      "symbol_hash": "sha256:4b2a1798aec13d0b36416fef351303aa38c6821c2ef691be0efc86b4d561ce3d"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind diagnosticsScreenText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind diagnosticsScreenText: str",
+      "symbol_hash": "sha256:fb5b6e12cb59fedf0b512db2c9f72e004dc56435765b0b82b388c33cdef8279c"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind diagnosticSummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind diagnosticSummaryText: str",
+      "symbol_hash": "sha256:d90ebfaf05caa4af29c3a254e9a5473c28de610b4a3ef377c1fd15ccef0f9789"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind driverSupportText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind driverSupportText: str",
+      "symbol_hash": "sha256:3ea8fadabb2a1787540afeca7f080c8522553d1920abc9527402e752bbabdd96"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind dryRunText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind dryRunText: str",
+      "symbol_hash": "sha256:9003fb201a9c45f3f6292729c200041e0f914027a3e0454882f532f1a0ffdee6"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind fansScreenText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind fansScreenText: str",
+      "symbol_hash": "sha256:e24ad75d61cc59abb9c50a1ecd042ef865505819ececb4504835d891335b15b8"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind fanSupportText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind fanSupportText: str",
+      "symbol_hash": "sha256:2141c48303b5a4cd36d15bd1ef2514a82992af27008556874825dc234fea73b7"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind gpuSummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind gpuSummaryText: str",
+      "symbol_hash": "sha256:0c43318463bff5349d17e1803ef86422ce8953b9759e3667ab17b3504bd240df"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind lastActionText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind lastActionText: str",
+      "symbol_hash": "sha256:f3dc6ccb9ac139869d9e6d4bf3d7dd8e7c63497b4bd387576952014fe93e0789"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind logsScreenText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind logsScreenText: str",
+      "symbol_hash": "sha256:337162e94575ee114fd6a1280f6c5af90cdfad21530ce1301c60320fddbd14a4"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind logsSummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind logsSummaryText: str",
+      "symbol_hash": "sha256:93a5fa1305a32ec390dc79140db8fdb0fa5ab3d00009d06216ed9091a62ac03a"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind memorySummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind memorySummaryText: str",
+      "symbol_hash": "sha256:2d6ac3c839fa770d39faa2e5fa7ab17c4f83e39f98cf30cc13c3033d2652c39a"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind performanceProfileText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind performanceProfileText: str",
+      "symbol_hash": "sha256:9f6cc87ebeb640dc4da53d266cb5f05626d8b3d4f60f515e65b97927c89b4f58"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind powerSummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind powerSummaryText: str",
+      "symbol_hash": "sha256:3ede67edd15dbcf0e7c15b9c4453c47b1af523efaf17ab794b479d556b3e6b41"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind profileRequestText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind profileRequestText: str",
+      "symbol_hash": "sha256:05528a2a8fe9cf784d569d6bdda5d3634a21aadd47af2d552231a8ca1d4a94b9"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind profilesScreenText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind profilesScreenText: str",
+      "symbol_hash": "sha256:8088ec66eba6209bddf70a9ca4342752eabdc0a2bfee8a6dcabe2c469ad30b23"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind quietProfileText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind quietProfileText: str",
+      "symbol_hash": "sha256:9c03f6ae29d3f1d691df874aca83c4b740164f93231d6c45a89ab9a0780fbd91"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind refreshCountValue: i32",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind refreshCountValue: i32",
+      "symbol_hash": "sha256:5c5a99b01309bfaca133201bf32c12b30dba80f1cf8295c88e5aaf3debf1cce0"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind selectedProfileText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind selectedProfileText: str",
+      "symbol_hash": "sha256:632c391b70153d6902df7721741defbc264193c11990dbe745a007a11a3c1ca7"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind sensorSummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind sensorSummaryText: str",
+      "symbol_hash": "sha256:c8d6a93fef161ccc9e94df4fd234f62557960f986a15c44adabc47533454d982"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind settingsScreenText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind settingsScreenText: str",
+      "symbol_hash": "sha256:fed206df41f28ae2a7242acde637e7917958a3d13dc7afff50baf325dafdb80c"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::bind settingsSummaryText: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "bind settingsSummaryText: str",
+      "symbol_hash": "sha256:56b03f0410abc0292be7681f1a77c6ad04b673cd2751ff8924ae7bc382344704"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command chooseBalanced",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command chooseBalanced",
+      "symbol_hash": "sha256:29437ae08f18f3f9c0236d6648112a54f75377ebf8f72dac7aacfefea55fd0f1"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command chooseCustom",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command chooseCustom",
+      "symbol_hash": "sha256:6d94edb1d3f37556028d002b1eaf088fc1d567f98b4b14e966ec621570df7ef7"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command choosePerformance",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command choosePerformance",
+      "symbol_hash": "sha256:649493f12dd3070e5944a2dcdf32f7792674f06000dc5442bf2b4c9d2aa8c042"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command chooseQuiet",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command chooseQuiet",
+      "symbol_hash": "sha256:41974f7b3d1d7d3aab4c77440f6a2ceb5227322b17860a94a0530a5f8102e7f1"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command disableDryRun",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command disableDryRun",
+      "symbol_hash": "sha256:926945204f790966e7b84990f479ff25b5635bab0b6c1e300d9d5addfc7ec716"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command enableDryRun",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command enableDryRun",
+      "symbol_hash": "sha256:4b13fdeeaacaa7b56c74b6dc90bb844494543a4e34bddb626c6fc218f235e809"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command refreshSnapshot",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command refreshSnapshot",
+      "symbol_hash": "sha256:565e72af92358d7a7801f18b3d9017e4aca8924a7798fd169aca30b9cd18cbfd"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command showDashboard",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command showDashboard",
+      "symbol_hash": "sha256:51d98e6f3217e292ce4c6ee60069bee03d4e05c635cc4743f085e5a93d0e4b9f"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command showDiagnostics",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command showDiagnostics",
+      "symbol_hash": "sha256:04c2128d4fde3455cc896df9a1ef93b51b33aa730e6cb2ec7752e9e11b0e4d3d"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command showFans",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command showFans",
+      "symbol_hash": "sha256:69e12a9b461f330ab2f532280252c0e4ab164ac59d0b0566e3bc7737f73212b0"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command showLogs",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command showLogs",
+      "symbol_hash": "sha256:f1e0f44dc4cebde66f6167d9b33f05ac2b108245a860c359ded9056b8a7d509c"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command showProfiles",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command showProfiles",
+      "symbol_hash": "sha256:aac3ea40ba8ea9f414c6c6bd78da105e8614b87b6c814ee07ce8764c76c7dff1"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::command showSettings",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "command showSettings",
+      "symbol_hash": "sha256:b7bc5e77cfb6521b90e969558c756683f9cd152a11545bcb48a0c45286ce09f7"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event chooseBalanced -> chooseBalanced",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event chooseBalanced -> chooseBalanced",
+      "symbol_hash": "sha256:2ec53fbaadd7a87c7ae2d052e4c6a13fe9f7dae35ac5dad1b283e1d150c06fac"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event chooseCustom -> chooseCustom",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event chooseCustom -> chooseCustom",
+      "symbol_hash": "sha256:143f4dde2ff22b3d654d516cf13aacf5667e029ec70166d7a4fc7764adb4db33"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event choosePerformance -> choosePerformance",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event choosePerformance -> choosePerformance",
+      "symbol_hash": "sha256:66ccadf96d531094cc8b9077a817dd172b8c60552e83d69fac5f96101e0eba6a"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event chooseQuiet -> chooseQuiet",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event chooseQuiet -> chooseQuiet",
+      "symbol_hash": "sha256:eec46facb83e0a95df00fa3d9d494092f96b9da1b28d3a260836be6b697c9c30"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event disableDryRun -> disableDryRun",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event disableDryRun -> disableDryRun",
+      "symbol_hash": "sha256:a9800e0139f22c205ae0921cd2d21ad5af4a2f4eebab29a8865a11ca68e57818"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event enableDryRun -> enableDryRun",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event enableDryRun -> enableDryRun",
+      "symbol_hash": "sha256:3756bf2210b5d4df1503c3dab11bb58389bbbf5cce3880f178e01cbd8affafd6"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event openDashboard -> showDashboard",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event openDashboard -> showDashboard",
+      "symbol_hash": "sha256:0daa438d6c44a7d6a1fb0c98f1a0c4488caea23a42fc3860553d5570f463201c"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event openDiagnostics -> showDiagnostics",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event openDiagnostics -> showDiagnostics",
+      "symbol_hash": "sha256:c47d0c8b9981a43f55e0d4da1b28b52962f2192692f661b2b2e7554272857dcc"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event openFans -> showFans",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event openFans -> showFans",
+      "symbol_hash": "sha256:cef927243bb3c936ee324a0574f0a36499df62788e24d4eeeb1e0275b263fcef"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event openLogs -> showLogs",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event openLogs -> showLogs",
+      "symbol_hash": "sha256:0647c82a3b4ebd6accc520d4430f271592458e1d40f3834057581d5e1ebc1753"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event openProfiles -> showProfiles",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event openProfiles -> showProfiles",
+      "symbol_hash": "sha256:b5e487582de1bcb07cb7b2b5a66d6bed7e35eb86a17587ee96f9b41888220130"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event openSettings -> showSettings",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event openSettings -> showSettings",
+      "symbol_hash": "sha256:0726c1f3b3e1ed5a206cad0d06c0c6ecbb5c0cc746f0bc470bac9aa4f5ba8135"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::event refreshSnapshot -> refreshSnapshot",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "event refreshSnapshot -> refreshSnapshot",
+      "symbol_hash": "sha256:a2c4981cde8c3342baabe8bfe9577a13510bae9eeb5e6f48c346e4d4494386c9"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::style density: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "style density: str",
+      "symbol_hash": "sha256:16cd48bdab82130967d3ed0db91f85a7a3e5e5ee3f4f82d96368c59a608f8a64"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::style height: i32",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "style height: i32",
+      "symbol_hash": "sha256:8d6da357aaadf5d5f1975aee2f5d4616bdd1b9b3c12914e87b993ab2e83e6996"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::style theme: str",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "style theme: str",
+      "symbol_hash": "sha256:b6f8b1cde1e65fb06d0f801acb21dca812b4cc10e9eea232194917239d4045df"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::style width: i32",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "style width: i32",
+      "symbol_hash": "sha256:685c197f24153e396553eeb5c62e7e633092ae9476e39e4eae24320941e0c6b7"
+    },
+    {
+      "id": "examples/projects/tetra_control_center/src/main.tetra::Views::view ControlCenterView",
+      "module": "examples/projects/tetra_control_center/src/main.tetra",
+      "section": "Views",
+      "entry": "view ControlCenterView(state: ControlCenterState)",
+      "symbol_hash": "sha256:ac57e7e444026ef5ba7a0a18aade1ea88999cec73a7eb86340799f382907f311"
+    },
+    {
       "id": "examples/protocol_impl_smoke.tetra::Extensions::func Vec2.draw(self: Vec2) -> i32",
       "module": "examples/protocol_impl_smoke.tetra",
       "section": "Extensions",
@@ -8116,6 +10419,13 @@
       "section": "Globals",
       "entry": "var title: str",
       "symbol_hash": "sha256:0e992009c4524796ab268a8fc52e912c52a9ee179e26442a8a69ca82366176b9"
+    },
+    {
+      "id": "gateway_routes::Tests::capsule gateway routes",
+      "module": "gateway_routes",
+      "section": "Tests",
+      "entry": "capsule gateway routes",
+      "symbol_hash": "sha256:88120c5caf365576203db115823f0a76902ba3dcbf447df0261add2cef5eb375"
     },
     {
       "id": "lib.actors (examples/microservices/compiler_actor_generic_pack/lib/actors.tetra)::Functions::func alias_actor",
@@ -11070,6 +13380,62 @@
       "section": "Functions",
       "entry": "func offset_worker() -> i32",
       "symbol_hash": "sha256:19f315e62a5600be27d8139e4253cbe5304a639e02eac517d111145cd14c9a0f"
+    },
+    {
+      "id": "policy_clamps::Tests::capsule policy clamps queries",
+      "module": "policy_clamps",
+      "section": "Tests",
+      "entry": "capsule policy clamps queries",
+      "symbol_hash": "sha256:4cf04547bed483cb6e7437994877465f29b4939416729e61ff9e2e97cf5991fe"
+    },
+    {
+      "id": "services.gateway::Functions::func probe",
+      "module": "services.gateway",
+      "section": "Functions",
+      "entry": "func probe() -> i32",
+      "symbol_hash": "sha256:b6c53a3f117d9bf73f9c0688449c01eaa746488379c65d1ccbec962807ed0671"
+    },
+    {
+      "id": "services.gateway::Functions::func retry_budget",
+      "module": "services.gateway",
+      "section": "Functions",
+      "entry": "func retry_budget(raw_queries: i32) -> i32",
+      "symbol_hash": "sha256:0810f7c5e2e6824ebca2b13e9a3c8318ba3d6a04db201f08bd94f1307dfaf38e"
+    },
+    {
+      "id": "services.gateway::Functions::func route_status",
+      "module": "services.gateway",
+      "section": "Functions",
+      "entry": "func route_status(method: i32, path: i32, raw_queries: i32) -> i32",
+      "symbol_hash": "sha256:f7095f935cd99d1b243447c1cf22b054f1e2942fa821a4b7cb82939f0864ac08"
+    },
+    {
+      "id": "services.policy::Enums::`Route`: health, update, reject",
+      "module": "services.policy",
+      "section": "Enums",
+      "entry": "`Route`: health, update, reject",
+      "symbol_hash": "sha256:6389ba016f8482916268ef1515c44d90505727b4e60389a05156e8070de5ebfe"
+    },
+    {
+      "id": "services.policy::Functions::func classify",
+      "module": "services.policy",
+      "section": "Functions",
+      "entry": "func classify(method: i32, path: i32, raw_queries: i32) -> Route",
+      "symbol_hash": "sha256:561e502877a419bb04b5365f522fa85e26af73424afc0cc40d741416a3e00acd"
+    },
+    {
+      "id": "services.policy::Functions::func normalize_queries",
+      "module": "services.policy",
+      "section": "Functions",
+      "entry": "func normalize_queries(raw: i32) -> i32",
+      "symbol_hash": "sha256:fb7fac24982ca81b29a5d1d7fb0f255e6c08b3ac3695f212b93ee73d8c83e336"
+    },
+    {
+      "id": "services.policy::Functions::func status",
+      "module": "services.policy",
+      "section": "Functions",
+      "entry": "func status(route: Route) -> i32",
+      "symbol_hash": "sha256:8d6a0f99b2154e11598624de990fc0accc5b490bedd1f9f5fa31b8105b9d3a83"
     }
   ]
 }
