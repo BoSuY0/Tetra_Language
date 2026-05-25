@@ -117,6 +117,20 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutDocsVerificati
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithReorderedRequiredSteps(t *testing.T) {
+	order := v040GateStepNames()
+	order[3], order[4] = order[4], order[3]
+	dir := makeV040PassingReleaseGateSummaryReportInOrder(t, order)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `required step 04 = "techempower report schemas", want "docs verification"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
@@ -362,24 +376,19 @@ func makeV040PassingReleaseGateSummaryReportExcept(t *testing.T, omittedSteps ..
 		omitted[step] = true
 	}
 
-	var steps []releaseGateStep
-	var logs []string
+	var order []string
 	for _, fixture := range v040GateStepFixtures {
 		if omitted[fixture.Name] {
 			continue
 		}
-		log := fmt.Sprintf("logs/%02d-%s.log", len(steps)+1, stepLogSlug(fixture.Name))
-		steps = append(steps, releaseGateStep{
-			Name:            fixture.Name,
-			Status:          "pass",
-			DurationSeconds: 1,
-			ExitCode:        0,
-			Command:         fixture.Command,
-			Log:             log,
-		})
-		logs = append(logs, log)
+		order = append(order, fixture.Name)
 	}
+	return makeV040PassingReleaseGateSummaryReportInOrder(t, order)
+}
 
+func makeV040PassingReleaseGateSummaryReportInOrder(t *testing.T, order []string) string {
+	t.Helper()
+	steps, logs := v040GateStepsForOrder(t, order)
 	summary := releaseGateSummary{
 		Status:             "pass",
 		ReleaseVersion:     "v0.4.0",
@@ -397,6 +406,33 @@ func makeV040PassingReleaseGateSummaryReportExcept(t *testing.T, omittedSteps ..
 		t.Fatal(err)
 	}
 	return makeReleaseGateSummaryReport(t, string(raw), logs...)
+}
+
+func v040GateStepsForOrder(t *testing.T, order []string) ([]releaseGateStep, []string) {
+	t.Helper()
+	commands := make(map[string]string, len(v040GateStepFixtures))
+	for _, fixture := range v040GateStepFixtures {
+		commands[fixture.Name] = fixture.Command
+	}
+	var steps []releaseGateStep
+	var logs []string
+	for _, name := range order {
+		command, ok := commands[name]
+		if !ok {
+			t.Fatalf("unknown v0.4 step fixture %q", name)
+		}
+		log := fmt.Sprintf("logs/%02d-%s.log", len(steps)+1, stepLogSlug(name))
+		steps = append(steps, releaseGateStep{
+			Name:            name,
+			Status:          "pass",
+			DurationSeconds: 1,
+			ExitCode:        0,
+			Command:         command,
+			Log:             log,
+		})
+		logs = append(logs, log)
+	}
+	return steps, logs
 }
 
 func v040ReleaseGateSummaryExpectations() releaseGateSummaryExpectations {
@@ -436,6 +472,14 @@ var v040GateStepFixtures = []struct {
 	{Name: "diff check", Command: "git diff --check"},
 }
 
+func v040GateStepNames() []string {
+	names := make([]string, 0, len(v040GateStepFixtures))
+	for _, fixture := range v040GateStepFixtures {
+		names = append(names, fixture.Name)
+	}
+	return names
+}
+
 func stepLogSlug(name string) string {
 	slug := strings.ToLower(name)
 	slug = strings.NewReplacer(" ", "-", "/", "-", ".", "-").Replace(slug)
@@ -446,11 +490,36 @@ func v040ProductionArtifactHashesManifest() string {
 	return v040ArtifactHashesManifestExcept()
 }
 
+func v040ArtifactHashesManifestForSummary(t *testing.T, dir string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(dir, "summary.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var summary releaseGateSummary
+	if err := json.Unmarshal(raw, &summary); err != nil {
+		t.Fatal(err)
+	}
+	var logs []string
+	for _, step := range summary.Steps {
+		logs = append(logs, step.Log)
+	}
+	return v040ArtifactHashesManifestWithLogs(logs)
+}
+
 func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {
 	omitted := make(map[string]bool, len(omittedPaths))
 	for _, path := range omittedPaths {
 		omitted[path] = true
 	}
+	return v040ArtifactHashesManifestWithOmissionsAndLogs(omitted, v040CanonicalStepLogs())
+}
+
+func v040ArtifactHashesManifestWithLogs(logs []string) string {
+	return v040ArtifactHashesManifestWithOmissionsAndLogs(map[string]bool{}, logs)
+}
+
+func v040ArtifactHashesManifestWithOmissionsAndLogs(omitted map[string]bool, logs []string) string {
 	manifest := releaseArtifactHashesManifest{
 		Schema: releaseArtifactHashesSchema,
 		Root:   ".",
@@ -465,8 +534,7 @@ func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {
 		manifest.Artifacts = append(manifest.Artifacts, artifact)
 	}
 	offset := len(v040ArtifactHashFixtures)
-	for i, fixture := range v040GateStepFixtures {
-		path := fmt.Sprintf("logs/%02d-%s.log", i+1, stepLogSlug(fixture.Name))
+	for i, path := range logs {
 		if omitted[path] {
 			continue
 		}
@@ -481,6 +549,15 @@ func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {
 		panic(err)
 	}
 	return string(raw)
+}
+
+func v040CanonicalStepLogs() []string {
+	logs := make([]string, 0, len(v040GateStepFixtures))
+	for i, fixture := range v040GateStepFixtures {
+		path := fmt.Sprintf("logs/%02d-%s.log", i+1, stepLogSlug(fixture.Name))
+		logs = append(logs, path)
+	}
+	return logs
 }
 
 var v040ArtifactHashFixtures = []releaseHashArtifact{

@@ -134,6 +134,9 @@ go run ./tools/cmd/validate-release-gate-summary \
   --expected-command 'bash scripts/release/v0_4_0/gate.sh'
 ```
 
+For a passing `v0.4.0` summary, `summary.steps` must follow the canonical
+`scripts/release/v0_4_0/gate.sh` step order.
+
 The hash manifest must validate with:
 
 ```sh

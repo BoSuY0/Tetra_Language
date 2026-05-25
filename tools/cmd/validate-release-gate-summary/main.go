@@ -249,6 +249,14 @@ func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
 			return fmt.Errorf("passing v0.4.0 summary required step %q status = %q, want pass", required, step.Status)
 		}
 	}
+	for i, required := range v040RequiredPassingSteps {
+		if i >= len(summary.Steps) {
+			return fmt.Errorf("passing v0.4.0 summary missing required step %q", required)
+		}
+		if summary.Steps[i].Name != required {
+			return fmt.Errorf("passing v0.4.0 summary required step %02d = %q, want %q", i+1, summary.Steps[i].Name, required)
+		}
+	}
 	return nil
 }
 
