@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -156,6 +157,7 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 	issues = append(issues, validateBenchmarkCommandBaseURL(report.Command, report.BaseURL)...)
 	issues = append(issues, validateBenchmarkCommandRequests(report.Command, report.Endpoints)...)
 	issues = append(issues, validateBenchmarkCommandSkipDB(report.Command, report.Endpoints)...)
+	issues = append(issues, validateBenchmarkCommandMinRPS(report.Command, report.Summary, report.Endpoints)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -240,6 +242,48 @@ func validateBenchmarkCommandSkipDB(command string, endpoints []EndpointReport) 
 		return []string{"benchmark command skip-db flag --skip-db is present for a full endpoint report"}
 	}
 	return nil
+}
+
+func validateBenchmarkCommandMinRPS(command string, summary Summary, endpoints []EndpointReport) []string {
+	if strings.TrimSpace(command) == "" {
+		return nil
+	}
+	flags := parseCommandFlags(command)
+	rawMinRPS := strings.TrimSpace(flags["min-rps"])
+	if rawMinRPS == "" {
+		return []string{"benchmark command min-rps flag --min-rps is required"}
+	}
+	expected, err := strconv.ParseFloat(rawMinRPS, 64)
+	if err != nil || expected <= 0 {
+		return []string{fmt.Sprintf("benchmark command min-rps %q is invalid", rawMinRPS)}
+	}
+	var issues []string
+	if summary.MinRPS > 0 && math.Abs(summary.MinRPS-expected) > 0.001 {
+		issues = append(issues, fmt.Sprintf("benchmark command min-rps = %g, want %g from summary.min_rps", expected, summary.MinRPS))
+	}
+	for _, endpoint := range endpoints {
+		threshold, err := parseBenchmarkMinRPSThreshold(endpoint.Threshold)
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("endpoint %s threshold %q is invalid: %v", endpoint.Path, endpoint.Threshold, err))
+			continue
+		}
+		if math.Abs(threshold-expected) > 0.001 {
+			issues = append(issues, fmt.Sprintf("benchmark command min-rps for endpoint %s = %g, want %g from threshold", endpoint.Path, expected, threshold))
+		}
+	}
+	return issues
+}
+
+func parseBenchmarkMinRPSThreshold(threshold string) (float64, error) {
+	fields := strings.Fields(threshold)
+	if len(fields) != 3 || fields[0] != "min_rps" || fields[1] != ">=" {
+		return 0, errors.New("want format 'min_rps >= <value>'")
+	}
+	value, err := strconv.ParseFloat(fields[2], 64)
+	if err != nil || value <= 0 {
+		return 0, fmt.Errorf("value %q is invalid", fields[2])
+	}
+	return value, nil
 }
 
 func validateEndpointSet(report Report, opt Options) []string {

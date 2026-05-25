@@ -93,7 +93,8 @@ must also match the report `base_url`, after the same trailing-slash
 normalization the harness applies to generated reports. Endpoint benchmark
 command `--skip-db` must be present only for the explicit two-endpoint
 `/plaintext` plus `/json` no-database smoke report and absent for full endpoint
-reports.
+reports. Endpoint benchmark command `--min-rps` must match `summary.min_rps`
+and every endpoint `threshold` value.
 Matrix run evidence must also carry a positive `repeat` number; warmup evidence
 uses `repeat=0` and is not counted as a matrix run. The validator rejects
 warmup evidence with any other repeat value. Matrix run identities must be
