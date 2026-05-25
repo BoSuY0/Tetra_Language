@@ -375,6 +375,10 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 	var issues []string
 	if strings.TrimSpace(endpoint.Name) == "" || strings.TrimSpace(endpoint.Path) == "" || strings.TrimSpace(endpoint.Kind) == "" {
 		issues = append(issues, "endpoint identity is required")
+	} else if expected, ok := expectedEndpointIdentity(endpoint.Path); ok {
+		if endpoint.Name != expected.name || endpoint.Kind != expected.kind {
+			issues = append(issues, fmt.Sprintf("endpoint identity for %s is name=%q kind=%q, want name=%q kind=%q", endpoint.Path, endpoint.Name, endpoint.Kind, expected.name, expected.kind))
+		}
 	}
 	if endpoint.Status != "pass" {
 		issues = append(issues, fmt.Sprintf("endpoint %s status is %q, want pass", endpoint.Path, endpoint.Status))
@@ -429,6 +433,30 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 		issues = append(issues, fmt.Sprintf("endpoint %s has error: %s", endpoint.Path, endpoint.Error))
 	}
 	return issues
+}
+
+type endpointIdentity struct {
+	name string
+	kind string
+}
+
+func expectedEndpointIdentity(path string) (endpointIdentity, bool) {
+	switch path {
+	case "/plaintext":
+		return endpointIdentity{name: "plaintext", kind: "plaintext"}, true
+	case "/json":
+		return endpointIdentity{name: "json", kind: "json"}, true
+	case "/db":
+		return endpointIdentity{name: "db", kind: "single-query"}, true
+	case "/queries?queries=2":
+		return endpointIdentity{name: "queries", kind: "multiple-queries"}, true
+	case "/updates?queries=2":
+		return endpointIdentity{name: "updates", kind: "updates"}, true
+	case "/fortunes":
+		return endpointIdentity{name: "fortunes", kind: "fortunes"}, true
+	default:
+		return endpointIdentity{}, false
+	}
 }
 
 func validateLatencyPercentiles(label string, p50, p90, p95, p99, p999, max float64) []string {

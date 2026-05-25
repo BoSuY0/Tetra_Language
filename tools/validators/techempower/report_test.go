@@ -141,6 +141,20 @@ func TestValidateReportRejectsUnsupportedEndpointPath(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsSpoofedEndpointIdentity(t *testing.T) {
+	report := reportFixture(false)
+	report.Endpoints[2].Name = "plaintext"
+	report.Endpoints[2].Kind = "plaintext"
+
+	err := ValidateReport(mustReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted spoofed endpoint identity")
+	}
+	if !strings.Contains(err.Error(), "endpoint identity") {
+		t.Fatalf("ValidateReport endpoint identity error = %v, want identity rejection", err)
+	}
+}
+
 func TestValidateReportRejectsWeakEvidenceAndBadCounters(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].Evidence = "placeholder"
@@ -1000,7 +1014,7 @@ func reportFixture(skipDB bool) Report {
 		endpoints = append(endpoints, EndpointReport{
 			Name:                endpointName(path),
 			Path:                path,
-			Kind:                "contract",
+			Kind:                endpointKind(path),
 			Status:              "pass",
 			HTTPStatus:          200,
 			Requests:            4,
@@ -1099,6 +1113,17 @@ func endpointName(path string) string {
 		return "updates"
 	default:
 		return strings.TrimPrefix(path, "/")
+	}
+}
+
+func endpointKind(path string) string {
+	switch path {
+	case "/db":
+		return "single-query"
+	case "/queries?queries=2":
+		return "multiple-queries"
+	default:
+		return endpointName(path)
 	}
 }
 

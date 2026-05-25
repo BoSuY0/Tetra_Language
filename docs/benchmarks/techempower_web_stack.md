@@ -102,7 +102,10 @@ and every endpoint `threshold` value. Each endpoint `rps` value must also meet
 or exceed its declared `threshold`. Semantic reports must use only the
 TechEmpower endpoint allowlist: full reports cover `/plaintext`, `/json`,
 `/db`, `/queries?queries=2`, `/updates?queries=2`, and `/fortunes`; explicit
-skip-db smoke reports cover only `/plaintext` and `/json`.
+skip-db smoke reports cover only `/plaintext` and `/json`. Each semantic
+endpoint's `name` and `kind` must match its documented endpoint path, for
+example `/db` is `db`/`single-query` and `/queries?queries=2` is
+`queries`/`multiple-queries`.
 Matrix run evidence must also carry a positive `repeat` number; warmup evidence
 uses `repeat=0` and is not counted as a matrix run. The validator rejects
 warmup evidence with any other repeat value. Matrix run identities must be
