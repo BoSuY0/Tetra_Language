@@ -2304,16 +2304,16 @@
     "hash": "e1107b630dcde4accc37946335309153"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/report_test.go": {
-    "mtime": 1779732098.0558398,
-    "hash": "c1cbe95646d8baa5a25986311d7ee7b9"
+    "mtime": 1779733002.2381682,
+    "hash": "67f774cefa41d108067e6ab029256cbb"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/report.go": {
     "mtime": 1779717528.408185,
     "hash": "dfdaa1928dc85021536f37da562987ee"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/matrix.go": {
-    "mtime": 1779732125.6492455,
-    "hash": "2f41f48cf1d2da464b810a1c5ff8de70"
+    "mtime": 1779733061.957861,
+    "hash": "17167b64c06893e7222f71a6e2b61274"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/uiplatform/report_test.go": {
     "mtime": 1779435798.811178,
@@ -17880,7 +17880,7 @@
     "hash": "b51ac8326c1e3f43ce740c78cc062d0d"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/AGENTS.md": {
-    "mtime": 1779732569.1656272,
+    "mtime": 1779733680.0502295,
     "hash": "d9d8b88b408e147673efdd3ba3d69e0b"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/cli/internal/README.md": {
@@ -18612,8 +18612,8 @@
     "hash": "bc0397e517925c0c72b27e55275be7a6"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/benchmarks/techempower_web_stack.md": {
-    "mtime": 1779732131.2301252,
-    "hash": "925b9c4d3ec9a7beda9cf749730ee835"
+    "mtime": 1779733069.9776855,
+    "hash": "ecf79af6dc89ec7e405c32abcdbd1443"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/benchmarks/techempower_full_local_attempt_2026-05-20.md": {
     "mtime": 1779298631.1285932,
@@ -18880,8 +18880,8 @@
     "hash": "c9772588d4ad832bd0b09d18f0aa2923"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/README.md": {
-    "mtime": 1779732131.3601222,
-    "hash": "74b7e3feecd1b3d5a33786ad95f294a8"
+    "mtime": 1779733070.090683,
+    "hash": "233190eff51ee8899a186a080a8c5563"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/uiplatform/README.md": {
     "mtime": 1779435849.0510535,
@@ -25708,12 +25708,12 @@
     "hash": "5c259395c6046762b1fc076c3643c7f2"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/evidence_log.md": {
-    "mtime": 1779732465.9758737,
-    "hash": "5a16f207d50e6393cc5bd26d5e2f812a"
+    "mtime": 1779733558.179498,
+    "hash": "91dba626d4bc22ba86ce4de43bfe0f8c"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/final_handoff.md": {
-    "mtime": 1779732466.1528697,
-    "hash": "6c3c13bbfbe6ba1951e1a07675295814"
+    "mtime": 1779733624.6567028,
+    "hash": "0ce3c474a95278964e751706fc3a1328"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/README.md": {
     "mtime": 1779690506.074283,
@@ -25812,8 +25812,8 @@
     "hash": "e8f569cdea6499b3f21515a12633ef9f"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/benchmark_matrix.md": {
-    "mtime": 1779732465.7908776,
-    "hash": "4d46bade90b948684eb7e6824b2ce8bf"
+    "mtime": 1779733558.0575013,
+    "hash": "6060fd9b1da80ca2fd73826b797e1037"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/peer_http_baseline.md": {
     "mtime": 1779648057.550025,
@@ -25868,8 +25868,8 @@
     "hash": "06111b106e985d53a0f142679fe3ff55"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/test_matrix.md": {
-    "mtime": 1779732465.6728802,
-    "hash": "8370d8a30bcbb05ce7be6252b266da7c"
+    "mtime": 1779733557.9305048,
+    "hash": "f2393a1bf4d84695302f202fc7b2d75e"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/v0_4_0_dirty_gate_release_truth.md": {
     "mtime": 1779655843.8549523,
@@ -26148,8 +26148,12 @@
     "hash": "d5227c55681227a45c66472b51d6e231"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/techempower_artifact_grid_validator_slice.md": {
-    "mtime": 1779732465.5218835,
-    "hash": "014dfdd25f2e6a5a93178bdfc6af8fe2"
+    "mtime": 1779732707.486611,
+    "hash": "f3f653d818e361bdfaecde245a12ecb0"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/techempower_command_duration_validator_slice.md": {
+    "mtime": 1779733557.809508,
+    "hash": "78c99b36a78de7f6cf6d596744c6c280"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/logs/commands/v0_4_0_dirty_gate_latest_report_dir.txt": {
     "mtime": 1779655440.1762073,
