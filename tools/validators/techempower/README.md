@@ -8,10 +8,11 @@ incomplete endpoint sets, inconsistent counters, and reports that omit latency
 percentiles (`p50`, `p90`, `p95`, `p99`, `p99.9`, `max`), positive and unique
 matrix run repeat metadata with contiguous per-grid repeat coverage, zeroed
 warmup repeat metadata, RPS evidence derived from successes over elapsed
-seconds, elapsed timing evidence that covers the declared run duration,
-observed content types, endpoint semantic check lists, SCRAM evidence, matrix
-semantic probes, resource snapshots, declared matrix grid coverage, or clean
-shutdown evidence when a soak is present.
+seconds, soak RPS evidence derived from successes over duration seconds,
+elapsed timing evidence that covers the declared run duration, observed
+content types, endpoint semantic check lists, SCRAM evidence, matrix semantic
+probes, resource snapshots, declared matrix grid coverage, or clean shutdown
+evidence when a soak is present.
 
 Use the CLI release gate from the repository root:
 

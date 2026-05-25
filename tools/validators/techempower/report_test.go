@@ -221,6 +221,29 @@ func TestValidateSCRAMMatrixRejectsInconsistentSoakCounters(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsInflatedSoakRPS(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if report.Soak == nil {
+		t.Fatalf("checked-in SCRAM matrix report has no soak evidence")
+	}
+
+	report.Soak.RPS = report.Soak.RPS * 2
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted inflated soak RPS")
+	}
+	if !strings.Contains(err.Error(), "soak rps evidence") {
+		t.Fatalf("ValidateReport soak RPS error = %v, want rps evidence rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsInvalidResourceSnapshots(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {

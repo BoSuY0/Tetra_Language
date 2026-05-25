@@ -618,6 +618,7 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	if soak.Successes <= 0 || soak.Failures != 0 || soak.RPS <= 0 {
 		issues = append(issues, "soak evidence did not pass")
 	}
+	issues = append(issues, validateMatrixSoakRPS(soak)...)
 	if soak.AvgLatencyMS < 0 || soak.P99LatencyMS < 0 || soak.P999LatencyMS < 0 || soak.MaxLatencyMS < 0 || soak.FirstHalfAvgMS < 0 || soak.SecondHalfAvgMS < 0 {
 		issues = append(issues, "soak has invalid timing metrics")
 	}
@@ -642,6 +643,18 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	}
 	issues = append(issues, validateMatrixResourceSpan("soak.resource", soak.ResourceStart, soak.ResourceEnd)...)
 	return issues
+}
+
+func validateMatrixSoakRPS(soak MatrixSoak) []string {
+	if soak.DurationSeconds <= 0 || soak.Successes <= 0 || soak.RPS <= 0 {
+		return nil
+	}
+	expected := float64(soak.Successes) / soak.DurationSeconds
+	tolerance := math.Max(0.001, expected*0.0001)
+	if math.Abs(soak.RPS-expected) > tolerance {
+		return []string{fmt.Sprintf("soak rps evidence = %g, want %g from successes/duration_seconds", soak.RPS, expected)}
+	}
+	return nil
 }
 
 func validateMatrixResourceSpan(name string, start MatrixResourceSnapshot, end MatrixResourceSnapshot) []string {

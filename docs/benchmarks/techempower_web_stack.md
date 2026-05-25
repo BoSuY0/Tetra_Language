@@ -96,7 +96,8 @@ contiguous repeat sequence starting at `1`. Matrix run RPS must match
 `successes / elapsed_seconds` within validator tolerance, and
 `elapsed_seconds` must not be shorter than `duration_seconds`.
 Soak evidence carries tail latency only and must keep
-`p99 <= p99.9 <= max`.
+`p99 <= p99.9 <= max`. Soak RPS must match
+`successes / duration_seconds` within validator tolerance.
 Soak reports also require positive duration and concurrency/connection levels
 with non-negative timing metrics, internally consistent request counters, and
 zero failures.
