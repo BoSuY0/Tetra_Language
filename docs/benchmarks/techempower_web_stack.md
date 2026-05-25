@@ -85,8 +85,8 @@ endpoint, correctness validation, observed content types, semantic check lists,
 concurrent request counts, latency summaries including p99.9, and threshold
 decisions. The default artifact path is
 `reports/techempower/tetra-local-benchmark.json`.
-Semantic reports must include a real `git.head`; `unknown` is not acceptable
-release evidence.
+Semantic and matrix reports must include a real `git.head`; `unknown` is not
+acceptable release evidence.
 The validator rejects non-monotonic latency percentile evidence, so endpoint and
 matrix-run reports must keep `p50 <= p90 <= p95 <= p99 <= p99.9 <= max`.
 Endpoint benchmark command evidence must start with `tetra-techempower-bench`.
