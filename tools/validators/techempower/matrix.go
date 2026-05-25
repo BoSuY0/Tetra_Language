@@ -340,7 +340,10 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	if soak.DurationSeconds <= 0 {
 		issues = append(issues, "soak duration evidence is required")
 	}
-	if soak.Requests <= 0 || soak.Successes <= 0 || soak.Failures != 0 || soak.RPS <= 0 {
+	if soak.Requests <= 0 || soak.Successes < 0 || soak.Failures < 0 || soak.Successes+soak.Failures != soak.Requests {
+		issues = append(issues, "soak request counters are inconsistent")
+	}
+	if soak.Successes <= 0 || soak.Failures != 0 || soak.RPS <= 0 {
 		issues = append(issues, "soak evidence did not pass")
 	}
 	if soak.AvgLatencyMS < 0 || soak.P99LatencyMS < 0 || soak.P999LatencyMS < 0 || soak.MaxLatencyMS < 0 || soak.FirstHalfAvgMS < 0 || soak.SecondHalfAvgMS < 0 {

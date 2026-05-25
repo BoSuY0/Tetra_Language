@@ -198,6 +198,29 @@ func TestValidateSCRAMMatrixRejectsInvalidSoakMetrics(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsInconsistentSoakCounters(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if report.Soak == nil {
+		t.Fatalf("checked-in SCRAM matrix report has no soak evidence")
+	}
+
+	report.Soak.Successes--
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted inconsistent soak counters")
+	}
+	if !strings.Contains(err.Error(), "soak request counters") {
+		t.Fatalf("ValidateReport soak error = %v, want request counter rejection", err)
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {

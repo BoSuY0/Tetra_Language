@@ -90,7 +90,8 @@ matrix-run reports must keep `p50 <= p90 <= p95 <= p99 <= p99.9 <= max`.
 Soak evidence carries tail latency only and must keep
 `p99 <= p99.9 <= max`.
 Soak reports also require positive duration and concurrency/connection levels
-with non-negative timing metrics.
+with non-negative timing metrics, internally consistent request counters, and
+zero failures.
 
 Validate a checked report before treating it as release evidence:
 
