@@ -307,6 +307,26 @@ func TestValidateSCRAMMatrixRejectsInvalidEndpointIdentity(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsMissingArtifacts(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+
+	report.Artifacts = nil
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report without artifacts")
+	}
+	if !strings.Contains(err.Error(), "matrix artifacts") {
+		t.Fatalf("ValidateReport artifacts error = %v, want matrix artifacts rejection", err)
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {

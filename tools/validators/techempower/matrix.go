@@ -221,11 +221,26 @@ func ValidateMatrixReport(raw []byte) error {
 		}
 	}
 	issues = append(issues, validateMatrixSummary(report.Summary, len(report.Runs), totalRequests, totalFailures, bestRPS, worstP99, worstP999)...)
+	issues = append(issues, validateMatrixArtifacts(report.Artifacts)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateMatrixArtifacts(artifacts map[string]string) []string {
+	var issues []string
+	required := []string{"semantic_report", "matrix_report", "endpoints", "levels", "worker_levels"}
+	if len(artifacts) == 0 {
+		return []string{"matrix artifacts are required"}
+	}
+	for _, key := range required {
+		if strings.TrimSpace(artifacts[key]) == "" {
+			issues = append(issues, "matrix artifacts missing "+key)
+		}
+	}
+	return issues
 }
 
 func validateMatrixBuild(build MatrixBuild) []string {

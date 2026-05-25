@@ -95,6 +95,9 @@ zero failures.
 Matrix run and soak endpoint identities must match the SCRAM matrix harness
 allowlist: `/db`, `/queries?queries=2`, `/updates?queries=2`, or `/fortunes`
 with their expected endpoint names and run kinds.
+Matrix artifacts must include non-empty `semantic_report`, `matrix_report`,
+`endpoints`, `levels`, and `worker_levels` entries so the reported benchmark
+can be traced back to its generated evidence shape.
 Matrix resource snapshots require live positive-PID process evidence and
 non-negative TCP, CPU, and goroutine counters. Matrix start/end resource spans
 must have increasing timestamps and non-regressing CPU counters.
