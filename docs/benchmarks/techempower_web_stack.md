@@ -88,7 +88,8 @@ decisions. The default artifact path is
 The validator rejects non-monotonic latency percentile evidence, so endpoint and
 matrix-run reports must keep `p50 <= p90 <= p95 <= p99 <= p99.9 <= max`.
 Matrix run evidence must also carry a positive `repeat` number; warmup evidence
-uses `repeat=0` and is not counted as a matrix run.
+uses `repeat=0` and is not counted as a matrix run. Matrix run identities must
+be unique by endpoint, worker count, concurrency/connection level, and repeat.
 Soak evidence carries tail latency only and must keep
 `p99 <= p99.9 <= max`.
 Soak reports also require positive duration and concurrency/connection levels

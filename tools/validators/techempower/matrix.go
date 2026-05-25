@@ -279,11 +279,18 @@ func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, ru
 	}
 
 	seen := make(map[string]bool, len(runs))
+	seenRuns := make(map[string]bool, len(runs))
 	for _, run := range runs {
 		if !declaredEndpoints[run.Endpoint] || !declaredWorkers[run.Workers] || !declaredLevels[matrixLevelKey(run.Level)] {
 			issues = append(issues, fmt.Sprintf("matrix coverage includes undeclared endpoint %s workers=%d c%d/k%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections))
 			continue
 		}
+		runKey := matrixRunIdentityKey(run)
+		if seenRuns[runKey] {
+			issues = append(issues, fmt.Sprintf("duplicate matrix run endpoint %s workers=%d c%d/k%d repeat=%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat))
+			continue
+		}
+		seenRuns[runKey] = true
 		seen[matrixCoverageKey(run.Endpoint, run.Workers, run.Level)] = true
 	}
 
@@ -400,6 +407,10 @@ func sameIntSet(left []int, right []int) bool {
 
 func matrixCoverageKey(endpoint string, workers int, level MatrixLevel) string {
 	return fmt.Sprintf("%s|%d|%d|%d", endpoint, workers, level.Concurrency, level.Connections)
+}
+
+func matrixRunIdentityKey(run MatrixRun) string {
+	return fmt.Sprintf("%s|%d|%d|%d|%d", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat)
 }
 
 func matrixLevelKey(level MatrixLevel) string {
