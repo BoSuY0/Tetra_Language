@@ -221,6 +221,37 @@ func TestValidateSCRAMMatrixRejectsInconsistentSoakCounters(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsInvalidResourceSnapshots(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if len(report.Runs) == 0 {
+		t.Fatalf("checked-in SCRAM matrix report has no runs")
+	}
+	if report.Soak == nil {
+		t.Fatalf("checked-in SCRAM matrix report has no soak evidence")
+	}
+
+	report.Resource.Start.PID = 0
+	report.Resource.Start.ProcessAlive = false
+	report.Runs[0].Resource.TCPConnections = -1
+	report.Soak.ResourceEnd.CPUUserSeconds = -1
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted invalid matrix resource snapshots")
+	}
+	for _, want := range []string{"resource.start process evidence", "resource counters"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateReport resource error missing %q: %v", want, err)
+		}
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {

@@ -281,13 +281,23 @@ func validateMatrixResource(resource MatrixResource) []string {
 }
 
 func validateMatrixResourceSnapshot(name string, snapshot MatrixResourceSnapshot) error {
+	var issues []string
 	if snapshot.RSSKB <= 0 || snapshot.FDCount <= 0 || snapshot.Threads <= 0 {
-		return fmt.Errorf("%s RSS/FD/thread evidence is required", name)
+		issues = append(issues, fmt.Sprintf("%s RSS/FD/thread evidence is required", name))
+	}
+	if snapshot.PID <= 0 || !snapshot.ProcessAlive {
+		issues = append(issues, fmt.Sprintf("%s process evidence is required", name))
+	}
+	if snapshot.TCPConnections < 0 || snapshot.CPUUserSeconds < 0 || snapshot.CPUSystemSeconds < 0 || snapshot.Goroutines < 0 {
+		issues = append(issues, fmt.Sprintf("%s resource counters must be non-negative", name))
 	}
 	if strings.TrimSpace(snapshot.Timestamp) != "" {
 		if _, err := time.Parse(time.RFC3339, snapshot.Timestamp); err != nil {
-			return fmt.Errorf("%s timestamp is not RFC3339: %v", name, err)
+			issues = append(issues, fmt.Sprintf("%s timestamp is not RFC3339: %v", name, err))
 		}
+	}
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
 }
