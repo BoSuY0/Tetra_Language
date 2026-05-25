@@ -552,10 +552,10 @@ func validateMatrixResourceSnapshot(name string, snapshot MatrixResourceSnapshot
 	if snapshot.TCPConnections < 0 || snapshot.CPUUserSeconds < 0 || snapshot.CPUSystemSeconds < 0 || snapshot.Goroutines < 0 {
 		issues = append(issues, fmt.Sprintf("%s resource counters must be non-negative", name))
 	}
-	if strings.TrimSpace(snapshot.Timestamp) != "" {
-		if _, err := time.Parse(time.RFC3339, snapshot.Timestamp); err != nil {
-			issues = append(issues, fmt.Sprintf("%s timestamp is not RFC3339: %v", name, err))
-		}
+	if strings.TrimSpace(snapshot.Timestamp) == "" {
+		issues = append(issues, fmt.Sprintf("%s timestamp is required", name))
+	} else if _, err := time.Parse(time.RFC3339, snapshot.Timestamp); err != nil {
+		issues = append(issues, fmt.Sprintf("%s timestamp is not RFC3339: %v", name, err))
 	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
