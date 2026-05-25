@@ -92,7 +92,8 @@ uses `repeat=0` and is not counted as a matrix run. The validator rejects
 warmup evidence with any other repeat value. Matrix run identities must be
 unique by endpoint, worker count, concurrency/connection level, and repeat.
 For repeatability, every declared matrix grid cell must carry the same
-contiguous repeat sequence starting at `1`.
+contiguous repeat sequence starting at `1`. Matrix run RPS must match
+`successes / elapsed_seconds` within validator tolerance.
 Soak evidence carries tail latency only and must keep
 `p99 <= p99.9 <= max`.
 Soak reports also require positive duration and concurrency/connection levels

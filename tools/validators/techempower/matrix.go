@@ -3,6 +3,7 @@ package techempower
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -714,6 +715,7 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 	if run.RPS <= 0 || run.AvgLatencyMS < 0 || run.P50LatencyMS < 0 || run.P90LatencyMS < 0 || run.P95LatencyMS < 0 || run.P99LatencyMS < 0 || run.P999LatencyMS < 0 || run.MaxLatencyMS < 0 {
 		issues = append(issues, label+" has invalid timing metrics")
 	}
+	issues = append(issues, validateMatrixRunRPS(label, run)...)
 	issues = append(issues, validateLatencyPercentiles(label, run.P50LatencyMS, run.P90LatencyMS, run.P95LatencyMS, run.P99LatencyMS, run.P999LatencyMS, run.MaxLatencyMS)...)
 	if run.MaxLatencyMS > 0 && run.P99LatencyMS > run.MaxLatencyMS {
 		issues = append(issues, label+" p99 exceeds max")
@@ -731,6 +733,18 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 		issues = append(issues, err.Error())
 	}
 	return issues
+}
+
+func validateMatrixRunRPS(label string, run MatrixRun) []string {
+	if run.ElapsedSeconds <= 0 || run.Successes <= 0 || run.RPS <= 0 {
+		return nil
+	}
+	expected := float64(run.Successes) / run.ElapsedSeconds
+	tolerance := math.Max(0.001, expected*0.0001)
+	if math.Abs(run.RPS-expected) > tolerance {
+		return []string{fmt.Sprintf("%s rps evidence = %g, want %g from successes/elapsed_seconds", label, run.RPS, expected)}
+	}
+	return nil
 }
 
 func validateMatrixEndpointIdentity(label string, endpoint string, path string, kind string) []string {
