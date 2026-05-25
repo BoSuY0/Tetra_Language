@@ -13,6 +13,8 @@ import (
 var fuzzStepNames = []string{
 	"compiler-frontend-lexer",
 	"compiler-frontend-parser",
+	"compiler-format",
+	"compiler-lowering",
 	"compiler-linker-linkcore",
 	"http-runtime",
 	"json-runtime",
@@ -328,6 +330,10 @@ func expectedFuzzCommand(name string, fuzztime string, mode string) string {
 		return "go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -fuzztime=" + fuzztime + parallel
 	case "compiler-frontend-parser":
 		return "go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=" + fuzztime + parallel
+	case "compiler-format":
+		return "go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzFormatSourceIdempotent -fuzztime=" + fuzztime + parallel
+	case "compiler-lowering":
+		return "go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzLoweringPipelineVerifiesIR -fuzztime=" + fuzztime + parallel
 	case "compiler-linker-linkcore":
 		return "go test ./compiler/internal/linker/linkcore -run \\^\\$ -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=" + fuzztime + parallel
 	case "http-runtime":

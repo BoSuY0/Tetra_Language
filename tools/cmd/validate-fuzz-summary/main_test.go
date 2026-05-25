@@ -106,7 +106,7 @@ func TestValidateFuzzSummaryRejectsUnknownStep(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "step 7 name = \"surprise\", want \"validate-manifest\"") {
+	if !strings.Contains(string(out), "step 9 name = \"surprise\", want \"validate-manifest\"") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
@@ -173,6 +173,8 @@ during this run.
 		"unstable_seed_log":                "- unstable_seed_log: `" + filepath.ToSlash(filepath.Join(dir, "unstable-seeds.md")) + "`",
 		"step-compiler-frontend-lexer":     "- `compiler-frontend-lexer`: pass, command `go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-frontend-lexer.log")) + "`",
 		"step-compiler-frontend-parser":    "- `compiler-frontend-parser`: pass, command `go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-frontend-parser.log")) + "`",
+		"step-compiler-format":             "- `compiler-format`: pass, command `go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzFormatSourceIdempotent -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-format.log")) + "`",
+		"step-compiler-lowering":           "- `compiler-lowering`: pass, command `go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzLoweringPipelineVerifiesIR -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-lowering.log")) + "`",
 		"step-compiler-linker-linkcore":    "- `compiler-linker-linkcore`: pass, command `go test ./compiler/internal/linker/linkcore -run \\^\\$ -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-linker-linkcore.log")) + "`",
 		"step-http-runtime":                "- `http-runtime`: pass, command `go test ./compiler/internal/httprt -run \\^\\$ -fuzz=FuzzHTTPParseRequest -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "http-runtime.log")) + "`",
 		"step-json-runtime":                "- `json-runtime`: pass, command `go test ./compiler/internal/jsonrt -run \\^\\$ -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "json-runtime.log")) + "`",
@@ -197,6 +199,8 @@ during this run.
 		"## Steps",
 		lines["step-compiler-frontend-lexer"],
 		lines["step-compiler-frontend-parser"],
+		lines["step-compiler-format"],
+		lines["step-compiler-lowering"],
 		lines["step-compiler-linker-linkcore"],
 		lines["step-http-runtime"],
 		lines["step-json-runtime"],
@@ -217,7 +221,7 @@ during this run.
   "started_at": "2026-04-29T00:00:00Z",
   "ended_at": "2026-04-29T00:00:01Z",
   "fuzztime": "2s",
-  "step_count": 9,
+  "step_count": 11,
   "failed_count": 0,
 	"artifacts": {
 	    "summary_md": "` + filepath.ToSlash(filepath.Join(dir, "summary.md")) + `",
@@ -230,6 +234,8 @@ during this run.
   "steps": [
     {"name":"compiler-frontend-lexer","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -fuzztime=2s -parallel=1","log":"logs/compiler-frontend-lexer.log"},
     {"name":"compiler-frontend-parser","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=2s -parallel=1","log":"logs/compiler-frontend-parser.log"},
+    {"name":"compiler-format","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzFormatSourceIdempotent -fuzztime=2s -parallel=1","log":"logs/compiler-format.log"},
+    {"name":"compiler-lowering","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/tests/fuzz -run \\^\\$ -fuzz=FuzzLoweringPipelineVerifiesIR -fuzztime=2s -parallel=1","log":"logs/compiler-lowering.log"},
     {"name":"compiler-linker-linkcore","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/linker/linkcore -run \\^\\$ -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=2s -parallel=1","log":"logs/compiler-linker-linkcore.log"},
     {"name":"http-runtime","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/httprt -run \\^\\$ -fuzz=FuzzHTTPParseRequest -fuzztime=2s -parallel=1","log":"logs/http-runtime.log"},
     {"name":"json-runtime","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/jsonrt -run \\^\\$ -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=2s -parallel=1","log":"logs/json-runtime.log"},

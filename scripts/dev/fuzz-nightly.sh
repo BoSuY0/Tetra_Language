@@ -252,6 +252,7 @@ fuzz_inventory_roots=(
   "compiler/internal/jsonrt/testdata/fuzz"
   "compiler/internal/linker/linkcore/testdata/fuzz"
   "compiler/internal/pgrt/testdata/fuzz"
+  "compiler/tests/fuzz/testdata/fuzz"
   "tools/cmd/validate-manifest/testdata/fuzz"
 )
 
@@ -427,6 +428,8 @@ run_step() {
 
 run_step "compiler-frontend-lexer" go test ./compiler/internal/frontend -run '^$' -fuzz=FuzzLexer "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "compiler-frontend-parser" go test ./compiler/internal/frontend -run '^$' -fuzz=FuzzParser "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
+run_step "compiler-format" go test ./compiler/tests/fuzz -run '^$' -fuzz=FuzzFormatSourceIdempotent "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
+run_step "compiler-lowering" go test ./compiler/tests/fuzz -run '^$' -fuzz=FuzzLoweringPipelineVerifiesIR "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "compiler-linker-linkcore" go test ./compiler/internal/linker/linkcore -run '^$' -fuzz=FuzzLinkX64ObjectsDoesNotPanic "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "http-runtime" go test ./compiler/internal/httprt -run '^$' -fuzz=FuzzHTTPParseRequest "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "json-runtime" go test ./compiler/internal/jsonrt -run '^$' -fuzz=FuzzAppendStringProducesValidJSON "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"

@@ -13,13 +13,14 @@ go test ./compiler/... ./cli/... ./tools/... -run 'Fuzz|Property|Stress' -count=
 Coverage:
 
 - lexer/parser seed fuzzing in `compiler/internal/frontend`
+- formatter idempotence fuzzing in `compiler/tests/fuzz`
+- parser/checker/lowerer/IR verifier pipeline fuzzing in `compiler/tests/fuzz`
 - linker object fuzzing in `compiler/internal/linker/linkcore`
 - HTTP request-line parsing fuzzing in `compiler/internal/httprt`
 - JSON string escaping fuzzing in `compiler/internal/jsonrt`
 - PostgreSQL wire-frame parsing fuzzing in `compiler/internal/pgrt`
 - manifest parser fuzz and negative property checks in `tools/cmd/validate-manifest`
 - Eco capsule parser fuzzing in `cli/cmd/tetra`
-- formatter idempotence property checks in `compiler`
 - bounded actor/task stress examples in `compiler`
 
 ## Nightly Fuzz Commands
@@ -68,6 +69,8 @@ to the right surface:
 ```sh
 go test ./compiler/internal/frontend -run '^$' -fuzz=FuzzLexer -fuzztime=10m
 go test ./compiler/internal/frontend -run '^$' -fuzz=FuzzParser -fuzztime=10m
+go test ./compiler/tests/fuzz -run '^$' -fuzz=FuzzFormatSourceIdempotent -fuzztime=10m
+go test ./compiler/tests/fuzz -run '^$' -fuzz=FuzzLoweringPipelineVerifiesIR -fuzztime=10m
 go test ./compiler/internal/linker/linkcore -run '^$' -fuzz=. -fuzztime=10m
 go test ./compiler/internal/linker/linkcore -run '^$' -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=10m
 go test ./compiler/internal/httprt -run '^$' -fuzz=FuzzHTTPParseRequest -fuzztime=10m
