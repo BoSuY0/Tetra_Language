@@ -148,6 +148,29 @@ func TestValidateSCRAMMatrixRejectsNonMonotonicLatencyPercentiles(t *testing.T) 
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsNonMonotonicSoakTailLatency(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if report.Soak == nil {
+		t.Fatalf("checked-in SCRAM matrix report has no soak evidence")
+	}
+
+	report.Soak.P999LatencyMS = report.Soak.P99LatencyMS - 0.1
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted non-monotonic soak tail latency")
+	}
+	if !strings.Contains(err.Error(), "latency percentiles") {
+		t.Fatalf("ValidateReport soak error = %v, want latency percentiles rejection", err)
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {

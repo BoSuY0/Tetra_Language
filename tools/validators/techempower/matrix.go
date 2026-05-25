@@ -337,6 +337,7 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	if soak.Requests <= 0 || soak.Successes <= 0 || soak.Failures != 0 || soak.RPS <= 0 {
 		issues = append(issues, "soak evidence did not pass")
 	}
+	issues = append(issues, validateTailLatencyPercentiles("soak "+soak.Path, soak.P99LatencyMS, soak.P999LatencyMS, soak.MaxLatencyMS)...)
 	if !soak.ShutdownClean {
 		issues = append(issues, "soak shutdown_clean is false")
 	}
@@ -354,6 +355,25 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	}
 	if err := validateMatrixResourceSnapshot("soak.resource_end", soak.ResourceEnd); err != nil {
 		issues = append(issues, err.Error())
+	}
+	return issues
+}
+
+func validateTailLatencyPercentiles(label string, p99, p999, max float64) []string {
+	ordered := []struct {
+		name  string
+		value float64
+	}{
+		{name: "p99", value: p99},
+		{name: "p999", value: p999},
+		{name: "max", value: max},
+	}
+	var issues []string
+	for i := 1; i < len(ordered); i++ {
+		if ordered[i].value < ordered[i-1].value {
+			issues = append(issues, fmt.Sprintf("%s latency percentiles are not monotonic: %s=%g < %s=%g", label, ordered[i].name, ordered[i].value, ordered[i-1].name, ordered[i-1].value))
+			break
+		}
 	}
 	return issues
 }

@@ -87,6 +87,8 @@ decisions. The default artifact path is
 `reports/techempower/tetra-local-benchmark.json`.
 The validator rejects non-monotonic latency percentile evidence, so endpoint and
 matrix-run reports must keep `p50 <= p90 <= p95 <= p99 <= p99.9 <= max`.
+Soak evidence carries tail latency only and must keep
+`p99 <= p99.9 <= max`.
 
 Validate a checked report before treating it as release evidence:
 
