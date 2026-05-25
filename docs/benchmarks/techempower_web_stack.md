@@ -99,7 +99,10 @@ for the explicit two-endpoint
 `/plaintext` plus `/json` no-database smoke report and absent for full endpoint
 reports. Endpoint benchmark command `--min-rps` must match `summary.min_rps`
 and every endpoint `threshold` value. Each endpoint `rps` value must also meet
-or exceed its declared `threshold`.
+or exceed its declared `threshold`. Semantic reports must use only the
+TechEmpower endpoint allowlist: full reports cover `/plaintext`, `/json`,
+`/db`, `/queries?queries=2`, `/updates?queries=2`, and `/fortunes`; explicit
+skip-db smoke reports cover only `/plaintext` and `/json`.
 Matrix run evidence must also carry a positive `repeat` number; warmup evidence
 uses `repeat=0` and is not counted as a matrix run. The validator rejects
 warmup evidence with any other repeat value. Matrix run identities must be

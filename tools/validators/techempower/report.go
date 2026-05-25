@@ -330,9 +330,16 @@ func parseBenchmarkMinRPSThreshold(threshold string) (float64, error) {
 func validateEndpointSet(report Report, opt Options) []string {
 	var issues []string
 	required := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
+	allowed := map[string]bool{}
+	for _, path := range required {
+		allowed[path] = true
+	}
 	seen := map[string]bool{}
 	for _, endpoint := range report.Endpoints {
 		seen[endpoint.Path] = true
+		if !allowed[endpoint.Path] {
+			issues = append(issues, "unsupported endpoint "+endpoint.Path)
+		}
 	}
 	if isSkipDBReport(seen) {
 		if !hasSkipDBLimitation(report.Limitations) {

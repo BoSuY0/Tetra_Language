@@ -118,6 +118,29 @@ func TestValidateReportRejectsEndpointRPSBelowThreshold(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsUnsupportedEndpointPath(t *testing.T) {
+	report := reportFixture(false)
+	extra := report.Endpoints[0]
+	extra.Name = "health"
+	extra.Path = "/health"
+	extra.Kind = "contract"
+	extra.ObservedContentType = "text/plain"
+	extra.SemanticChecks = []string{"status 200", "content-type text/plain", "body equals ok"}
+	report.Endpoints = append(report.Endpoints, extra)
+	report.Summary.EndpointCount = len(report.Endpoints)
+	report.Summary.TotalRequests += extra.Requests
+	report.Summary.TotalSuccesses += extra.Successes
+	report.Summary.TotalFailures += extra.Failures
+
+	err := ValidateReport(mustReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted unsupported endpoint path")
+	}
+	if !strings.Contains(err.Error(), "unsupported endpoint") {
+		t.Fatalf("ValidateReport endpoint set error = %v, want unsupported endpoint rejection", err)
+	}
+}
+
 func TestValidateReportRejectsWeakEvidenceAndBadCounters(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].Evidence = "placeholder"
