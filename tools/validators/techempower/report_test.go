@@ -79,6 +79,20 @@ func TestValidateReportRejectsSpoofedBenchmarkCommandExecutable(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsMissingGitHead(t *testing.T) {
+	for _, head := range []string{"", "unknown"} {
+		report := reportFixture(false)
+		report.Git.Head = head
+		err := ValidateReport(mustReportJSON(t, report), Options{})
+		if err == nil {
+			t.Fatalf("ValidateReport accepted git head %q", head)
+		}
+		if !strings.Contains(err.Error(), "git head") {
+			t.Fatalf("ValidateReport git head error = %v, want git head rejection", err)
+		}
+	}
+}
+
 func TestValidateReportRejectsEndpointRPSBelowThreshold(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].RPS = 0.50
