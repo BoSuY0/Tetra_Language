@@ -111,7 +111,9 @@ declared endpoint, worker, and concurrency/connection levels and rejects matrix
 reports whose `runs` omit or exceed that declared grid.
 Matrix resource snapshots require RFC3339 timestamps, live positive-PID process
 evidence, and non-negative TCP, CPU, and goroutine counters. Matrix start/end
-resource spans must have increasing timestamps and non-regressing CPU counters.
+resource spans must have increasing timestamps and non-regressing CPU counters;
+per-run, warmup, and soak resource timestamps must fall within the report
+resource window.
 
 Validate a checked report before treating it as release evidence:
 

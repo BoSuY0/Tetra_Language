@@ -331,6 +331,33 @@ func TestValidateSCRAMMatrixRejectsRegressingResourceSpans(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsResourceTimestampsOutsideReportWindow(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if len(report.Runs) == 0 {
+		t.Fatalf("checked-in SCRAM matrix report has no runs")
+	}
+	if report.Soak == nil {
+		t.Fatalf("checked-in SCRAM matrix report has no soak evidence")
+	}
+
+	report.Runs[0].Resource.Timestamp = "2000-01-01T00:00:00Z"
+	report.Soak.ResourceEnd.Timestamp = "2999-01-01T00:00:00Z"
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted resource timestamps outside report window")
+	}
+	if !strings.Contains(err.Error(), "resource window") {
+		t.Fatalf("ValidateReport resource window error = %v, want resource window rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsInvalidEndpointIdentity(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {

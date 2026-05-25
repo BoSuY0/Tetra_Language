@@ -226,6 +226,7 @@ func ValidateMatrixReport(raw []byte) error {
 	issues = append(issues, validateMatrixSummary(report.Summary, len(report.Runs), totalRequests, totalFailures, bestRPS, worstP99, worstP999)...)
 	issues = append(issues, validateMatrixArtifacts(report.Artifacts)...)
 	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
+	issues = append(issues, validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -676,6 +677,39 @@ func parseMatrixResourceTimestamp(snapshot MatrixResourceSnapshot) (time.Time, b
 	}
 	parsed, err := time.Parse(time.RFC3339, snapshot.Timestamp)
 	return parsed, err == nil
+}
+
+func validateMatrixResourceWindow(resource MatrixResource, warmup *MatrixRun, soak *MatrixSoak, runs []MatrixRun) []string {
+	start, startOK := parseMatrixResourceTimestamp(resource.Start)
+	end, endOK := parseMatrixResourceTimestamp(resource.End)
+	if !startOK || !endOK || !end.After(start) {
+		return nil
+	}
+
+	var issues []string
+	if warmup != nil {
+		issues = append(issues, validateMatrixResourceTimestampInWindow("warmup resource", warmup.Resource, start, end)...)
+	}
+	for _, run := range runs {
+		label := fmt.Sprintf("run %s workers=%d c%d/k%d repeat=%d resource", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat)
+		issues = append(issues, validateMatrixResourceTimestampInWindow(label, run.Resource, start, end)...)
+	}
+	if soak != nil {
+		issues = append(issues, validateMatrixResourceTimestampInWindow("soak.resource_start", soak.ResourceStart, start, end)...)
+		issues = append(issues, validateMatrixResourceTimestampInWindow("soak.resource_end", soak.ResourceEnd, start, end)...)
+	}
+	return issues
+}
+
+func validateMatrixResourceTimestampInWindow(label string, snapshot MatrixResourceSnapshot, start time.Time, end time.Time) []string {
+	timestamp, ok := parseMatrixResourceTimestamp(snapshot)
+	if !ok {
+		return nil
+	}
+	if timestamp.Before(start) || timestamp.After(end) {
+		return []string{fmt.Sprintf("%s timestamp %s outside report resource window", label, snapshot.Timestamp)}
+	}
+	return nil
 }
 
 func validateTailLatencyPercentiles(label string, p99, p999, max float64) []string {
