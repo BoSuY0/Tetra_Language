@@ -27,6 +27,10 @@ var v040RequiredProductionArtifacts = []struct {
 	{Path: "artifacts/compiler-production-linux-x64.json", Schema: "tetra.compiler.production.v1"},
 }
 
+var v040RequiredPassingSteps = []string{
+	"techempower report schemas",
+}
+
 type releaseGateSummaryExpectations struct {
 	ReleaseVersion     string
 	ReleaseArtifact    string
@@ -188,8 +192,28 @@ func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, ex
 		return fmt.Errorf("pass summary contains failing steps")
 	}
 	if summary.Status == "pass" && summary.ReleaseVersion == "v0.4.0" {
+		if err := validateV040RequiredPassingSteps(summary); err != nil {
+			return err
+		}
 		if err := validateV040ProductionArtifacts(reportDir); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
+	steps := make(map[string]releaseGateStep, len(summary.Steps))
+	for _, step := range summary.Steps {
+		steps[step.Name] = step
+	}
+	for _, required := range v040RequiredPassingSteps {
+		step, ok := steps[required]
+		if !ok {
+			return fmt.Errorf("passing v0.4.0 summary missing required step %q", required)
+		}
+		if step.Status != "pass" {
+			return fmt.Errorf("passing v0.4.0 summary required step %q status = %q, want pass", required, step.Status)
 		}
 	}
 	return nil

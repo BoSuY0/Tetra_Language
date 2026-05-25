@@ -83,13 +83,14 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutCompilerProduc
   "release_gate_command": "bash scripts/release/v0_4_0/gate.sh",
   "started_at": "2026-05-20T10:00:00Z",
   "ended_at": "2026-05-20T10:00:02Z",
-  "step_count": 1,
+  "step_count": 2,
   "failed_count": 0,
   "report_dir": "reports/release-v0.4.0-gate",
   "steps": [
-    {"name":"readiness preflight","status":"pass","duration_seconds":1,"exit_code":0,"command":"go run ./tools/cmd/validate-v0-4-readiness","log":"logs/01-readiness-preflight.log"}
+    {"name":"techempower report schemas","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_techempower_reports","log":"logs/01-techempower-report-schemas.log"},
+    {"name":"readiness preflight","status":"pass","duration_seconds":1,"exit_code":0,"command":"go run ./tools/cmd/validate-v0-4-readiness","log":"logs/02-readiness-preflight.log"}
   ]
-}`, "logs/01-readiness-preflight.log")
+}`, "logs/01-techempower-report-schemas.log", "logs/02-readiness-preflight.log")
 	writeReleaseGateArtifactHashes(t, dir, `{
   "schema": "tetra.release-artifact-hashes.v1alpha1",
   "root": ".",
@@ -117,6 +118,31 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutCompilerProduc
 		t.Fatalf("expected validator failure")
 	}
 	if !strings.Contains(err.Error(), "artifacts/compiler-production-linux-x64.json") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutTechEmpowerReportStep(t *testing.T) {
+	dir := makeReleaseGateSummaryReport(t, `{
+  "status": "pass",
+  "release_version": "v0.4.0",
+  "release_artifact": "tetra.release.v0_4_0.gate-report.v1",
+  "release_gate_command": "bash scripts/release/v0_4_0/gate.sh",
+  "started_at": "2026-05-20T10:00:00Z",
+  "ended_at": "2026-05-20T10:00:02Z",
+  "step_count": 1,
+  "failed_count": 0,
+  "report_dir": "reports/release-v0.4.0-gate",
+  "steps": [
+    {"name":"validate compiler production","status":"pass","duration_seconds":1,"exit_code":0,"command":"go run ./tools/cmd/validate-compiler-production --report reports/release-v0.4.0-gate/artifacts/compiler-production-linux-x64.json","log":"logs/01-validate-compiler-production.log"}
+  ]
+}`, "logs/01-validate-compiler-production.log")
+	writeReleaseGateArtifactHashes(t, dir, v040ProductionArtifactHashesManifest())
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `missing required step "techempower report schemas"`) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -187,13 +213,14 @@ func TestValidateReleaseGateSummaryAcceptsPassingV040ReportWithCompilerProductio
   "release_gate_command": "bash scripts/release/v0_4_0/gate.sh",
   "started_at": "2026-05-20T10:00:00Z",
   "ended_at": "2026-05-20T10:00:02Z",
-  "step_count": 1,
+  "step_count": 2,
   "failed_count": 0,
   "report_dir": "reports/release-v0.4.0-gate",
   "steps": [
-    {"name":"validate compiler production","status":"pass","duration_seconds":1,"exit_code":0,"command":"go run ./tools/cmd/validate-compiler-production --report reports/release-v0.4.0-gate/artifacts/compiler-production-linux-x64.json","log":"logs/01-validate-compiler-production.log"}
+    {"name":"techempower report schemas","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_techempower_reports","log":"logs/01-techempower-report-schemas.log"},
+    {"name":"validate compiler production","status":"pass","duration_seconds":1,"exit_code":0,"command":"go run ./tools/cmd/validate-compiler-production --report reports/release-v0.4.0-gate/artifacts/compiler-production-linux-x64.json","log":"logs/02-validate-compiler-production.log"}
   ]
-}`, "logs/01-validate-compiler-production.log")
+}`, "logs/01-techempower-report-schemas.log", "logs/02-validate-compiler-production.log")
 	writeReleaseGateArtifactHashes(t, dir, `{
   "schema": "tetra.release-artifact-hashes.v1alpha1",
   "root": ".",
@@ -409,13 +436,14 @@ func makeV040PassingReleaseGateSummaryReport(t *testing.T) string {
   "release_gate_command": "bash scripts/release/v0_4_0/gate.sh",
   "started_at": "2026-05-20T10:00:00Z",
   "ended_at": "2026-05-20T10:00:02Z",
-  "step_count": 1,
+  "step_count": 2,
   "failed_count": 0,
   "report_dir": "reports/release-v0.4.0-gate",
   "steps": [
-    {"name":"readiness preflight","status":"pass","duration_seconds":1,"exit_code":0,"command":"go run ./tools/cmd/validate-v0-4-readiness","log":"logs/01-readiness-preflight.log"}
+    {"name":"techempower report schemas","status":"pass","duration_seconds":1,"exit_code":0,"command":"check_techempower_reports","log":"logs/01-techempower-report-schemas.log"},
+    {"name":"readiness preflight","status":"pass","duration_seconds":1,"exit_code":0,"command":"go run ./tools/cmd/validate-v0-4-readiness","log":"logs/02-readiness-preflight.log"}
   ]
-}`, "logs/01-readiness-preflight.log")
+}`, "logs/01-techempower-report-schemas.log", "logs/02-readiness-preflight.log")
 }
 
 func v040ReleaseGateSummaryExpectations() releaseGateSummaryExpectations {
@@ -424,6 +452,33 @@ func v040ReleaseGateSummaryExpectations() releaseGateSummaryExpectations {
 		ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
 		ReleaseGateCommand: "bash scripts/release/v0_4_0/gate.sh",
 	}
+}
+
+func v040ProductionArtifactHashesManifest() string {
+	return `{
+  "schema": "tetra.release-artifact-hashes.v1alpha1",
+  "root": ".",
+  "artifacts": [
+    {
+      "path": "artifacts/memory-production-linux-x64.json",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 0,
+      "schema": "tetra.memory.production.v1"
+    },
+    {
+      "path": "artifacts/parallel-production-linux-x64.json",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 0,
+      "schema": "tetra.parallel.production.v1"
+    },
+    {
+      "path": "artifacts/compiler-production-linux-x64.json",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 0,
+      "schema": "tetra.compiler.production.v1"
+    }
+  ]
+}`
 }
 
 func writeReleaseGateArtifactHashes(t *testing.T, dir string, manifest string) {
