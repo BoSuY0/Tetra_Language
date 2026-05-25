@@ -92,6 +92,9 @@ Soak evidence carries tail latency only and must keep
 Soak reports also require positive duration and concurrency/connection levels
 with non-negative timing metrics, internally consistent request counters, and
 zero failures.
+Matrix run and soak endpoint identities must match the SCRAM matrix harness
+allowlist: `/db`, `/queries?queries=2`, `/updates?queries=2`, or `/fortunes`
+with their expected endpoint names and run kinds.
 Matrix resource snapshots require live positive-PID process evidence and
 non-negative TCP, CPU, and goroutine counters. Matrix start/end resource spans
 must have increasing timestamps and non-regressing CPU counters.

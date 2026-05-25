@@ -345,6 +345,7 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	if strings.TrimSpace(soak.Endpoint) == "" || strings.TrimSpace(soak.Path) == "" || soak.Workers <= 0 {
 		issues = append(issues, "soak endpoint/path/workers are required")
 	}
+	issues = append(issues, validateMatrixEndpointIdentity("soak", soak.Endpoint, soak.Path, "")...)
 	if soak.Level.Concurrency <= 0 || soak.Level.Connections <= 0 {
 		issues = append(issues, "soak level concurrency/connections must be positive")
 	}
@@ -432,6 +433,7 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 	if strings.TrimSpace(run.Endpoint) == "" || strings.TrimSpace(run.Path) == "" || strings.TrimSpace(run.Kind) == "" || run.Workers <= 0 {
 		issues = append(issues, label+" endpoint/path/kind/workers metadata is incomplete")
 	}
+	issues = append(issues, validateMatrixEndpointIdentity(label, run.Endpoint, run.Path, run.Kind)...)
 	if run.Level.Concurrency <= 0 || run.Level.Connections <= 0 {
 		issues = append(issues, label+" level concurrency/connections must be positive")
 	}
@@ -464,6 +466,36 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 		issues = append(issues, err.Error())
 	}
 	return issues
+}
+
+func validateMatrixEndpointIdentity(label string, endpoint string, path string, kind string) []string {
+	spec, ok := matrixEndpointSpecs()[strings.TrimSpace(endpoint)]
+	if !ok {
+		return []string{label + " matrix endpoint identity is unsupported"}
+	}
+	var issues []string
+	if path != spec.path {
+		issues = append(issues, fmt.Sprintf("%s matrix endpoint identity path = %q, want %q", label, path, spec.path))
+	}
+	if strings.TrimSpace(kind) != "" && kind != spec.kind {
+		issues = append(issues, fmt.Sprintf("%s matrix endpoint identity kind = %q, want %q", label, kind, spec.kind))
+	}
+	return issues
+}
+
+func matrixEndpointSpecs() map[string]struct {
+	path string
+	kind string
+} {
+	return map[string]struct {
+		path string
+		kind string
+	}{
+		"db":       {path: "/db", kind: "single-query"},
+		"queries":  {path: "/queries?queries=2", kind: "multiple-queries"},
+		"updates":  {path: "/updates?queries=2", kind: "updates"},
+		"fortunes": {path: "/fortunes", kind: "fortunes"},
+	}
 }
 
 func validateMatrixSummary(summary MatrixSummary, runCount int, totalRequests int, totalFailures int, bestRPS float64, worstP99 float64, worstP999 float64) []string {
