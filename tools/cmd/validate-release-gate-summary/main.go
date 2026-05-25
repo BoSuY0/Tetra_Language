@@ -381,6 +381,9 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 	artifacts := make(map[string]releaseHashArtifact, len(manifest.Artifacts))
 	for _, artifact := range manifest.Artifacts {
 		path := filepath.ToSlash(artifact.Path)
+		if path == "" || filepath.IsAbs(artifact.Path) || strings.Contains(path, "..") {
+			return fmt.Errorf("unsafe artifact path %q in artifact-hashes.json", artifact.Path)
+		}
 		if _, ok := artifacts[path]; ok {
 			return fmt.Errorf("duplicate artifact path %q in artifact-hashes.json", path)
 		}

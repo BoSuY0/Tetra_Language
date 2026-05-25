@@ -207,6 +207,18 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithDuplicateArtifact
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsafeArtifactHashPath(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithExtraPath(t, dir, "../outside.txt"))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `unsafe artifact path "../outside.txt" in artifact-hashes.json`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
@@ -665,6 +677,25 @@ func v040ArtifactHashesManifestWithDuplicatePath(t *testing.T, dir string, path 
 	}
 	t.Fatalf("artifact path %q not found", path)
 	return ""
+}
+
+func v040ArtifactHashesManifestWithExtraPath(t *testing.T, dir string, path string) string {
+	t.Helper()
+	raw := v040ArtifactHashesManifestForSummary(t, dir)
+	var manifest releaseArtifactHashesManifest
+	if err := json.Unmarshal([]byte(raw), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Artifacts = append(manifest.Artifacts, releaseHashArtifact{
+		Path:   path,
+		SHA256: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		Size:   1,
+	})
+	out, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
 }
 
 func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {
