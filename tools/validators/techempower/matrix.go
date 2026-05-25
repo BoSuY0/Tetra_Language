@@ -12,6 +12,13 @@ import (
 
 const MatrixSchemaV1 = "tetra.techempower.single_query_matrix.v1"
 
+const (
+	matrixHarnessGoRunTarget    = "./benchmarks/techempower/tetra/cmd/scram-local-bench"
+	matrixHarnessGoRunTargetRel = "benchmarks/techempower/tetra/cmd/scram-local-bench"
+	matrixHarnessScript         = "./benchmarks/techempower/tetra/run-scram-local-bench.sh"
+	matrixHarnessScriptRel      = "benchmarks/techempower/tetra/run-scram-local-bench.sh"
+)
+
 type MatrixReport struct {
 	Schema           string               `json:"schema"`
 	Status           string               `json:"status"`
@@ -174,11 +181,7 @@ func ValidateMatrixReport(raw []byte) error {
 	if _, err := time.Parse(time.RFC3339, report.GeneratedLocalAt); err != nil {
 		issues = append(issues, fmt.Sprintf("generated_local_at is not RFC3339: %v", err))
 	}
-	if strings.TrimSpace(report.Command) == "" {
-		issues = append(issues, "command is required")
-	} else if !strings.Contains(report.Command, "scram-local-bench") {
-		issues = append(issues, "command must include scram-local-bench")
-	}
+	issues = append(issues, validateMatrixCommandExecutable(report.Command)...)
 	if len(report.Limitations) == 0 {
 		issues = append(issues, "limitations are required")
 	}
@@ -255,6 +258,46 @@ func validateMatrixArtifacts(artifacts map[string]string) []string {
 		}
 	}
 	return issues
+}
+
+func validateMatrixCommandExecutable(command string) []string {
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return []string{"command is required"}
+	}
+
+	executableIndex := 0
+	for executableIndex < len(fields) && isCommandEnvAssignment(fields[executableIndex]) {
+		executableIndex++
+	}
+	if executableIndex >= len(fields) {
+		return []string{"matrix command executable is missing"}
+	}
+
+	executable := fields[executableIndex]
+	if executable == "go" {
+		if executableIndex+2 < len(fields) && fields[executableIndex+1] == "run" && isMatrixHarnessGoRunTarget(fields[executableIndex+2]) {
+			return nil
+		}
+		return []string{fmt.Sprintf("matrix command executable is %q, want go run %s", executable, matrixHarnessGoRunTarget)}
+	}
+	if isMatrixHarnessScript(executable) {
+		return nil
+	}
+	return []string{fmt.Sprintf("matrix command executable is %q, want scram-local-bench harness", executable)}
+}
+
+func isCommandEnvAssignment(field string) bool {
+	name, _, ok := strings.Cut(field, "=")
+	return ok && name != "" && !strings.HasPrefix(field, "--")
+}
+
+func isMatrixHarnessGoRunTarget(target string) bool {
+	return target == matrixHarnessGoRunTarget || target == matrixHarnessGoRunTargetRel
+}
+
+func isMatrixHarnessScript(executable string) bool {
+	return executable == matrixHarnessScript || executable == matrixHarnessScriptRel
 }
 
 func validateMatrixCommandArtifacts(command string, artifacts map[string]string) []string {

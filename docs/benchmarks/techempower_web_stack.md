@@ -122,7 +122,10 @@ Matrix artifacts must include non-empty `semantic_report`, `matrix_report`,
 can be traced back to its generated evidence shape. The validator parses the
 declared endpoint, worker, and concurrency/connection levels and rejects matrix
 reports whose `runs` omit or exceed that declared grid. Matrix report `command`
-provenance must include `scram-local-bench`, and the command's
+provenance must launch the SCRAM local benchmark harness through
+`go run ./benchmarks/techempower/tetra/cmd/scram-local-bench` or
+`benchmarks/techempower/tetra/run-scram-local-bench.sh`; merely mentioning
+`scram-local-bench` in another command is rejected. The command's
 `--semantic-report` and `--matrix-report` paths must match the recorded
 artifact paths. The command's `--endpoints`, `--levels`, and
 `--worker-levels` grid flags must also match the recorded artifact grid, and
