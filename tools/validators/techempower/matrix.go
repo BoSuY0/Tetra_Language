@@ -185,9 +185,7 @@ func ValidateMatrixReport(raw []byte) error {
 	if report.Environment.OS == "" || report.Environment.Arch == "" || report.Environment.GoVersion == "" || report.Environment.Hostname == "" {
 		issues = append(issues, "environment os/arch/go_version/hostname are required")
 	}
-	if strings.TrimSpace(report.Git.Head) == "" || report.Git.Head == "unknown" {
-		issues = append(issues, "git head is required")
-	}
+	issues = append(issues, validateGitHead(report.Git.Head)...)
 	if report.Git.WorktreeStatus != "clean" && report.Git.WorktreeStatus != "dirty" {
 		issues = append(issues, fmt.Sprintf("git worktree_status is %q, want clean or dirty", report.Git.WorktreeStatus))
 	}

@@ -93,6 +93,18 @@ func TestValidateReportRejectsMissingGitHead(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsNonHexGitHead(t *testing.T) {
+	report := reportFixture(false)
+	report.Git.Head = "test-head"
+	err := ValidateReport(mustReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted semantic report with non-hex git head")
+	}
+	if !strings.Contains(err.Error(), "git head") {
+		t.Fatalf("ValidateReport semantic git head error = %v, want git head rejection", err)
+	}
+}
+
 func TestValidateReportRejectsEndpointRPSBelowThreshold(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].RPS = 0.50
@@ -247,6 +259,26 @@ func TestValidateSCRAMMatrixRejectsMissingGitHead(t *testing.T) {
 	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
 	if err == nil {
 		t.Fatalf("ValidateReport accepted matrix report without git head")
+	}
+	if !strings.Contains(err.Error(), "git head") {
+		t.Fatalf("ValidateReport matrix git head error = %v, want git head rejection", err)
+	}
+}
+
+func TestValidateSCRAMMatrixRejectsNonHexGitHead(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+
+	report.Git.Head = "test-head"
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report with non-hex git head")
 	}
 	if !strings.Contains(err.Error(), "git head") {
 		t.Fatalf("ValidateReport matrix git head error = %v, want git head rejection", err)
@@ -970,7 +1002,7 @@ func reportFixture(skipDB bool) Report {
 			Hostname:  "test-host",
 		},
 		Git: GitState{
-			Head:           "test-head",
+			Head:           "abcdef123456",
 			WorktreeStatus: "dirty",
 		},
 		Endpoints: endpoints,

@@ -130,9 +130,7 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 	if report.Environment.OS == "" || report.Environment.Arch == "" || report.Environment.GoVersion == "" || report.Environment.Hostname == "" {
 		issues = append(issues, "environment os/arch/go_version/hostname are required")
 	}
-	if strings.TrimSpace(report.Git.Head) == "" || report.Git.Head == "unknown" {
-		issues = append(issues, "git head is required")
-	}
+	issues = append(issues, validateGitHead(report.Git.Head)...)
 	if report.Git.WorktreeStatus != "clean" && report.Git.WorktreeStatus != "dirty" {
 		issues = append(issues, fmt.Sprintf("git worktree_status is %q, want clean or dirty", report.Git.WorktreeStatus))
 	}
@@ -195,6 +193,22 @@ func validateBenchmarkCommandExecutable(command string) []string {
 	}
 	if fields[0] != "tetra-techempower-bench" {
 		return []string{fmt.Sprintf("benchmark command executable is %q, want tetra-techempower-bench", fields[0])}
+	}
+	return nil
+}
+
+func validateGitHead(head string) []string {
+	head = strings.TrimSpace(head)
+	if head == "" || head == "unknown" {
+		return []string{"git head is required"}
+	}
+	if len(head) < 7 || len(head) > 40 {
+		return []string{fmt.Sprintf("git head %q is not a Git object id or abbreviation", head)}
+	}
+	for _, r := range head {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return []string{fmt.Sprintf("git head %q is not a Git object id or abbreviation", head)}
+		}
 	}
 	return nil
 }

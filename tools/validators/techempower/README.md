@@ -9,7 +9,7 @@ percentiles (`p50`, `p90`, `p95`, `p99`, `p99.9`, `max`), positive and unique
 matrix run repeat metadata with contiguous per-grid repeat coverage, zeroed
 warmup repeat metadata, RPS evidence derived from successes over elapsed
 seconds, soak RPS evidence derived from successes over duration seconds,
-real semantic and matrix git HEAD provenance,
+real semantic and matrix hex git HEAD provenance,
 benchmark command executable provenance,
 benchmark command/base-url consistency, benchmark command/request consistency,
 benchmark command/concurrency presence,
