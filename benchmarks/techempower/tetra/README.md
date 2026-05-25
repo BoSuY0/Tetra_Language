@@ -86,6 +86,9 @@ The report schema is `tetra.techempower.benchmark.v1` and defaults to:
 reports/techempower/tetra-local-benchmark.json
 ```
 
+Each endpoint row records the observed content type, semantic checks,
+p50/p90/p95/p99/p99.9/max latency, request counters, and threshold decision.
+
 Useful overrides:
 
 ```sh
@@ -113,10 +116,13 @@ Single Query matrix. Use longer durations for release gates:
 
 ```sh
 benchmarks/techempower/tetra/run-scram-local-bench.sh \
-  --duration 30s \
-  --warmup 5s \
-  --repeats 2 \
-  --levels 64:64,128:128,256:256
+  --duration 60s \
+  --warmup 10s \
+  --soak 120s \
+  --repeats 1 \
+  --levels 8:8,16:16 \
+  --worker-levels 1,2 \
+  --endpoints db
 ```
 
 The checked-in SCRAM-SHA-256 local evidence lives at
@@ -124,7 +130,22 @@ The checked-in SCRAM-SHA-256 local evidence lives at
 notes in `docs/benchmarks/techempower_scram_single_query_local_2026-05-21.md`.
 It used PostgreSQL 16.9 with `scram-sha-256` host authentication and includes a
 passing Single Query `/db` matrix at
-`docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`.
+`docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`. A
+separate endpoint matrix for `/queries`, `/updates`, and `/fortunes` lives at
+`docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`.
+
+For Linux `perf` profiling, pass `--profile-build` to
+`run-scram-local-bench.sh`. This opt-in mode builds the app and benchmark helper
+without `-trimpath` or `-ldflags=-s -w`, and adds `-gcflags=all=-N -l` so
+profiles preserve Go symbols. Do not use profile-build RPS numbers as
+competitive benchmark claims; use it only to collect profiling evidence, then
+rerun release builds for performance comparisons.
+
+For live server Go pprof evidence, pass `--pprof-dir <dir>`. The runner binds a
+private loopback-only pprof endpoint for the benchmark server, records a CPU
+profile during the first DB-backed matrix load, captures a heap profile
+afterward, and writes artifact paths into the matrix report. Keep this opt-in
+for profiling runs only; default release/benchmark runs do not expose pprof.
 
 ## Docker
 
@@ -155,3 +176,7 @@ docker compose -f benchmarks/techempower/tetra/docker-compose.yml --profile benc
 The Compose database uses `POSTGRES_INITDB_ARGS` with SCRAM host/local auth and
 `password_encryption=scram-sha-256`; the app receives
 `TETRA_TE_PG_PASSWORD=benchmarkdbpass`.
+
+In the 2026-05-21 local environment, Compose static validation passed but the
+stack could not be executed because `docker info` could not connect to the
+Docker daemon at `/var/run/docker.sock`.

@@ -46,6 +46,9 @@ type options struct {
 	KeepWorkDir         bool
 	WorkDir             string
 	CacheDir            string
+	ProfileBuild        bool
+	PprofDir            string
+	PprofAddr           string
 }
 
 type benchLevel struct {
@@ -93,6 +96,14 @@ type buildEvidence struct {
 	BuildCommand    string `json:"build_command"`
 	GoBuildTrimpath bool   `json:"go_build_trimpath"`
 	Stripped        bool   `json:"stripped"`
+}
+
+type buildPlan struct {
+	Mode            string
+	Args            []string
+	BuildCommand    string
+	GoBuildTrimpath bool
+	Stripped        bool
 }
 
 type postgresEvidence struct {
@@ -209,6 +220,11 @@ type loadResult struct {
 	err     error
 }
 
+type pprofArtifacts struct {
+	CPUProfile  string
+	HeapProfile string
+}
+
 type endpointBenchmarkSpec struct {
 	Name     string
 	Path     string
@@ -240,6 +256,8 @@ func main() {
 	flag.BoolVar(&opt.KeepWorkDir, "keep-work-dir", false, "keep temporary build/PostgreSQL directory")
 	flag.StringVar(&opt.WorkDir, "work-dir", "", "work directory; defaults to a temporary directory")
 	flag.StringVar(&opt.CacheDir, "cache-dir", "", "embedded PostgreSQL binary cache directory")
+	flag.BoolVar(&opt.ProfileBuild, "profile-build", false, "build benchmark binaries with debug symbols for profiling; disables trimpath and stripping")
+	flag.StringVar(&opt.PprofDir, "pprof-dir", "", "optional directory for live server pprof CPU/heap profiles; enables localhost-only pprof on the benchmark server")
 	flag.Parse()
 
 	if err := run(context.Background(), opt); err != nil {
@@ -298,17 +316,25 @@ func run(ctx context.Context, opt options) error {
 	if err := os.MkdirAll(opt.CacheDir, 0o755); err != nil {
 		return err
 	}
+	pprofDir := ""
+	if strings.TrimSpace(opt.PprofDir) != "" {
+		pprofDir = absPath(root, opt.PprofDir)
+		if err := os.MkdirAll(pprofDir, 0o755); err != nil {
+			return err
+		}
+	}
 
 	appBin := filepath.Join(workDir, "bin", "tetra-techempower")
 	benchBin := filepath.Join(workDir, "bin", "tetra-techempower-bench")
 	if err := os.MkdirAll(filepath.Dir(appBin), 0o755); err != nil {
 		return err
 	}
-	buildCommand := "go build -trimpath -ldflags=-s -w"
-	if err := buildRelease(ctx, root, appBin, "./compiler/cmd/tetra-techempower"); err != nil {
+	buildPlan := buildPlanForMode(opt.ProfileBuild, appBin, "./compiler/cmd/tetra-techempower")
+	if err := buildBinary(ctx, root, buildPlan); err != nil {
 		return err
 	}
-	if err := buildRelease(ctx, root, benchBin, "./compiler/cmd/tetra-techempower-bench"); err != nil {
+	benchBuildPlan := buildPlanForMode(opt.ProfileBuild, benchBin, "./compiler/cmd/tetra-techempower-bench")
+	if err := buildBinary(ctx, root, benchBuildPlan); err != nil {
 		return err
 	}
 
@@ -341,17 +367,31 @@ func run(ctx context.Context, opt options) error {
 		return err
 	}
 
-	report := newMatrixReport(opt, levels, endpointNames, workerLevels, appBin, benchBin, buildCommand, pgInfo, "", nil)
+	report := newMatrixReport(opt, levels, endpointNames, workerLevels, appBin, benchBin, buildPlan, pgInfo, "", nil)
+	if pprofDir != "" {
+		report.Artifacts["pprof_dir"] = pprofDir
+	}
 	report.Resource.Start = detectResource(os.Getpid(), 0)
 	client := &http.Client{Timeout: 15 * time.Second}
 	semanticDone := false
 	soakDone := false
+	pprofCaptured := false
 	for _, workers := range workerLevels {
 		runOpt := opt
 		runOpt.Workers = workers
 		appPort, err = freeTCPPort()
 		if err != nil {
 			return err
+		}
+		pprofBaseURL := ""
+		if pprofDir != "" {
+			pprofPort, err := freeTCPPort()
+			if err != nil {
+				return err
+			}
+			runOpt.PprofAddr = "127.0.0.1:" + strconv.Itoa(pprofPort)
+			pprofBaseURL = "http://" + runOpt.PprofAddr
+			report.Artifacts["pprof_addr"] = runOpt.PprofAddr
 		}
 		server, serverLog, err := startServer(ctx, root, appBin, appPort, pgPort, runOpt)
 		if err != nil {
@@ -361,6 +401,12 @@ func run(ctx context.Context, opt options) error {
 		if err := waitForHTTP(ctx, baseURL+"/plaintext", 30*time.Second); err != nil {
 			stopProcess(server)
 			return fmt.Errorf("server did not become ready: %w\nserver log:\n%s", err, serverLog.String())
+		}
+		if pprofBaseURL != "" {
+			if err := waitForHTTP(ctx, pprofBaseURL+"/debug/pprof/", 30*time.Second); err != nil {
+				stopProcess(server)
+				return fmt.Errorf("pprof server did not become ready: %w\nserver log:\n%s", err, serverLog.String())
+			}
 		}
 		if !semanticDone {
 			report.Server.BaseURL = baseURL
@@ -396,7 +442,28 @@ func run(ctx context.Context, opt options) error {
 		for _, endpoint := range endpoints {
 			for _, level := range levels {
 				for repeat := 1; repeat <= opt.Repeats; repeat++ {
-					report.Runs = append(report.Runs, runEndpointLoad(ctx, baseURL, endpoint, workers, level, repeat, opt.Duration, server.Process.Pid, appPort))
+					if !pprofCaptured && pprofBaseURL != "" {
+						cpuDone, artifacts, err := startPprofCPUProfile(ctx, pprofBaseURL, pprofDir, opt.Duration)
+						if err != nil {
+							stopProcess(server)
+							return err
+						}
+						run := runEndpointLoad(ctx, baseURL, endpoint, workers, level, repeat, opt.Duration, server.Process.Pid, appPort)
+						if err := <-cpuDone; err != nil {
+							stopProcess(server)
+							return err
+						}
+						if err := capturePprofHeap(ctx, pprofBaseURL, artifacts.HeapProfile); err != nil {
+							stopProcess(server)
+							return err
+						}
+						report.Artifacts["pprof_cpu_profile"] = artifacts.CPUProfile
+						report.Artifacts["pprof_heap_profile"] = artifacts.HeapProfile
+						pprofCaptured = true
+						report.Runs = append(report.Runs, run)
+					} else {
+						report.Runs = append(report.Runs, runEndpointLoad(ctx, baseURL, endpoint, workers, level, repeat, opt.Duration, server.Process.Pid, appPort))
+					}
 				}
 			}
 		}
@@ -424,7 +491,7 @@ func run(ctx context.Context, opt options) error {
 	}
 	fmt.Fprintf(os.Stdout, "semantic report: %s\n", opt.SemanticReportPath)
 	fmt.Fprintf(os.Stdout, "matrix report: %s\n", opt.MatrixReportPath)
-	fmt.Fprintf(os.Stdout, "best /db rps: %.2f, worst p99: %.3f ms\n", report.Summary.BestRPS, report.Summary.WorstP99MS)
+	fmt.Fprintf(os.Stdout, "best endpoint rps: %.2f, worst p99: %.3f ms, worst p99.9: %.3f ms\n", report.Summary.BestRPS, report.Summary.WorstP99MS, report.Summary.WorstP999MS)
 	return nil
 }
 
@@ -580,8 +647,29 @@ func defaultEmbeddedPostgresCacheDir() string {
 	return filepath.Join(cacheRoot, "tetra", "embedded-postgres")
 }
 
-func buildRelease(ctx context.Context, root string, out string, pkg string) error {
-	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags=-s -w", "-o", out, pkg)
+func buildPlanForMode(profile bool, out string, pkg string) buildPlan {
+	args := []string{"build"}
+	plan := buildPlan{
+		Mode:            "release",
+		GoBuildTrimpath: true,
+		Stripped:        true,
+	}
+	if profile {
+		plan.Mode = "profile"
+		plan.GoBuildTrimpath = false
+		plan.Stripped = false
+		args = append(args, "-gcflags=all=-N -l")
+	} else {
+		args = append(args, "-trimpath", "-ldflags=-s -w")
+	}
+	args = append(args, "-o", out, pkg)
+	plan.Args = args
+	plan.BuildCommand = "go " + strings.Join(args, " ")
+	return plan
+}
+
+func buildBinary(ctx context.Context, root string, plan buildPlan) error {
+	cmd := exec.CommandContext(ctx, "go", plan.Args...)
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GOWORK="+filepath.Join(root, "go.work"))
 	var combined bytes.Buffer
@@ -741,17 +829,7 @@ func verifierPrefix(verifier string) string {
 func startServer(ctx context.Context, root string, appBin string, appPort int, pgPort int, opt options) (*exec.Cmd, *bytes.Buffer, error) {
 	cmd := exec.CommandContext(ctx, appBin)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(),
-		"TETRA_TE_HOST=127.0.0.1",
-		"TETRA_TE_PORT="+strconv.Itoa(appPort),
-		"TETRA_TE_WORKERS="+strconv.Itoa(opt.Workers),
-		"TETRA_TE_PG_HOST=127.0.0.1",
-		"TETRA_TE_PG_PORT="+strconv.Itoa(pgPort),
-		"TETRA_TE_PG_USER=benchmarkdbuser",
-		"TETRA_TE_PG_DATABASE=hello_world",
-		"TETRA_TE_PG_PASSWORD=benchmarkdbpass",
-		"TETRA_TE_PG_POOL="+strconv.Itoa(opt.PoolSize),
-	)
+	cmd.Env = append(os.Environ(), serverEnv(appPort, pgPort, opt)...)
 	var log bytes.Buffer
 	cmd.Stdout = &log
 	cmd.Stderr = &log
@@ -759,6 +837,24 @@ func startServer(ctx context.Context, root string, appBin string, appPort int, p
 		return nil, &log, err
 	}
 	return cmd, &log, nil
+}
+
+func serverEnv(appPort int, pgPort int, opt options) []string {
+	env := []string{
+		"TETRA_TE_HOST=127.0.0.1",
+		"TETRA_TE_PORT=" + strconv.Itoa(appPort),
+		"TETRA_TE_WORKERS=" + strconv.Itoa(opt.Workers),
+		"TETRA_TE_PG_HOST=127.0.0.1",
+		"TETRA_TE_PG_PORT=" + strconv.Itoa(pgPort),
+		"TETRA_TE_PG_USER=benchmarkdbuser",
+		"TETRA_TE_PG_DATABASE=hello_world",
+		"TETRA_TE_PG_PASSWORD=benchmarkdbpass",
+		"TETRA_TE_PG_POOL=" + strconv.Itoa(opt.PoolSize),
+	}
+	if strings.TrimSpace(opt.PprofAddr) != "" {
+		env = append(env, "TETRA_TE_PPROF_ADDR="+opt.PprofAddr)
+	}
+	return env
 }
 
 type shutdownEvidence struct {
@@ -1248,6 +1344,79 @@ func runEndpointLoad(ctx context.Context, baseURL string, endpoint endpointBench
 	return report
 }
 
+func capturePprofProfiles(ctx context.Context, baseURL string, dir string, duration time.Duration) (pprofArtifacts, error) {
+	done, artifacts, err := startPprofCPUProfile(ctx, baseURL, dir, duration)
+	if err != nil {
+		return artifacts, err
+	}
+	if err := <-done; err != nil {
+		return artifacts, err
+	}
+	if err := capturePprofHeap(ctx, baseURL, artifacts.HeapProfile); err != nil {
+		return artifacts, err
+	}
+	return artifacts, nil
+}
+
+func startPprofCPUProfile(ctx context.Context, baseURL string, dir string, duration time.Duration) (<-chan error, pprofArtifacts, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, pprofArtifacts{}, err
+	}
+	artifacts := pprofArtifacts{
+		CPUProfile:  filepath.Join(dir, "native-scram-live-db-cpu.pprof"),
+		HeapProfile: filepath.Join(dir, "native-scram-live-db-heap.pprof"),
+	}
+	seconds := int(math.Ceil(duration.Seconds()))
+	if seconds < 1 {
+		seconds = 1
+	}
+	done := make(chan error, 1)
+	go func() {
+		target := strings.TrimRight(baseURL, "/") + "/debug/pprof/profile?seconds=" + strconv.Itoa(seconds)
+		timeout := time.Duration(seconds+10) * time.Second
+		done <- downloadPprof(ctx, target, artifacts.CPUProfile, timeout)
+	}()
+	return done, artifacts, nil
+}
+
+func capturePprofHeap(ctx context.Context, baseURL string, path string) error {
+	target := strings.TrimRight(baseURL, "/") + "/debug/pprof/heap"
+	return downloadPprof(ctx, target, path, 10*time.Second)
+}
+
+func downloadPprof(ctx context.Context, target string, path string, timeout time.Duration) error {
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, target, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s returned HTTP %d", target, resp.StatusCode)
+	}
+	tmp := path + ".tmp"
+	out, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(out, resp.Body)
+	closeErr := out.Close()
+	if copyErr != nil {
+		_ = os.Remove(tmp)
+		return copyErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmp)
+		return closeErr
+	}
+	return os.Rename(tmp, path)
+}
+
 func oneEndpointRequest(ctx context.Context, client *http.Client, target string, endpoint endpointBenchmarkSpec) loadResult {
 	start := time.Now()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
@@ -1462,7 +1631,7 @@ func maxMS(values []time.Duration) float64 {
 	return float64(max) / float64(time.Millisecond)
 }
 
-func newMatrixReport(opt options, levels []benchLevel, endpointNames []string, workerLevels []int, appBin string, benchBin string, buildCommand string, pg postgresEvidence, baseURL string, probe []semanticCheck) matrixReport {
+func newMatrixReport(opt options, levels []benchLevel, endpointNames []string, workerLevels []int, appBin string, benchBin string, plan buildPlan, pg postgresEvidence, baseURL string, probe []semanticCheck) matrixReport {
 	now := time.Now()
 	return matrixReport{
 		Schema:           matrixSchema,
@@ -1475,10 +1644,10 @@ func newMatrixReport(opt options, levels []benchLevel, endpointNames []string, w
 		Build: buildEvidence{
 			AppBinary:       appBin,
 			BenchBinary:     benchBin,
-			Mode:            "release",
-			BuildCommand:    buildCommand,
-			GoBuildTrimpath: true,
-			Stripped:        true,
+			Mode:            plan.Mode,
+			BuildCommand:    plan.BuildCommand,
+			GoBuildTrimpath: plan.GoBuildTrimpath,
+			Stripped:        plan.Stripped,
 		},
 		Postgres: pg,
 		Server: serverEvidence{
@@ -1570,6 +1739,7 @@ func validateMatrixReport(report matrixReport) error {
 	if semanticFailed(report.SemanticProbe) {
 		issues = append(issues, "semantic probe failed")
 	}
+	issues = append(issues, validateSemanticProbeCoverage(report.SemanticProbe)...)
 	if report.Soak != nil {
 		if report.Soak.Requests <= 0 || report.Soak.Successes <= 0 || report.Soak.Failures != 0 || !report.Soak.ShutdownClean {
 			issues = append(issues, "soak evidence did not pass")
@@ -1602,6 +1772,31 @@ func validateMatrixReport(report matrixReport) error {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateSemanticProbeCoverage(checks []semanticCheck) []string {
+	seen := make(map[string]bool, len(checks))
+	for _, check := range checks {
+		seen[check.Name] = true
+	}
+	var issues []string
+	for _, name := range requiredSemanticProbeNames() {
+		if !seen[name] {
+			issues = append(issues, "semantic probe missing "+name)
+		}
+	}
+	return issues
+}
+
+func requiredSemanticProbeNames() []string {
+	return []string{
+		"plaintext headers/body",
+		"json headers/body",
+		"db real read",
+		"query clamping",
+		"updates persistence",
+		"fortunes insertion escaping sorting",
+	}
 }
 
 func writeJSON(root string, path string, value any) error {

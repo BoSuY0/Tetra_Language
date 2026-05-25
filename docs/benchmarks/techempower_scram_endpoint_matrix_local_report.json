@@ -1,0 +1,275 @@
+{
+  "schema": "tetra.techempower.single_query_matrix.v1",
+  "status": "pass",
+  "generated_at": "2026-05-21T13:53:50Z",
+  "generated_local_at": "2026-05-21T16:53:50+03:00",
+  "command": "GOWORK=off go run ./benchmarks/techempower/tetra/cmd/scram-local-bench --duration 60s --warmup 5s --repeats 1 --levels 8:8 --worker-levels 2 --endpoints queries,updates,fortunes --semantic-requests 32 --semantic-concurrency 4 --workers 2 --pool 64 --semantic-report reports/techempower/tetra-scram-endpoints-semantic-benchmark.json --matrix-report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json",
+  "environment": {
+    "os": "linux",
+    "arch": "amd64",
+    "go_version": "go1.26.3-X:nodwarf5",
+    "hostname": "tetra-4"
+  },
+  "git": {
+    "head": "be39ab2ab4e1",
+    "worktree_status": "dirty"
+  },
+  "build": {
+    "app_binary": "/tmp/tetra-techempower-scram-3652307642/bin/tetra-techempower",
+    "bench_binary": "/tmp/tetra-techempower-scram-3652307642/bin/tetra-techempower-bench",
+    "mode": "release",
+    "build_command": "go build -trimpath -ldflags=-s -w",
+    "go_build_trimpath": true,
+    "stripped": true
+  },
+  "postgres": {
+    "version": "16.9.0",
+    "auth_method": "scram-sha-256",
+    "password_encryption": "scram-sha-256",
+    "verifier_prefix": "SCRAM-SHA-256",
+    "world_rows": 10000,
+    "fortune_rows": 12,
+    "host": "127.0.0.1",
+    "port": 40293,
+    "database": "hello_world",
+    "user": "benchmarkdbuser",
+    "max_connections": "256"
+  },
+  "server": {
+    "base_url": "http://127.0.0.1:34005",
+    "workers": 2,
+    "worker_levels": [
+      2
+    ],
+    "pool_size": 64
+  },
+  "resource": {
+    "start": {
+      "timestamp": "2026-05-21T13:53:50Z",
+      "pid": 2903022,
+      "process_alive": true,
+      "rss_kb": 29704,
+      "fd_count": 9,
+      "threads": 16,
+      "tcp_connections": 0,
+      "cpu_user_seconds": 2.82,
+      "cpu_system_seconds": 0.1,
+      "goroutines": 2
+    },
+    "end": {
+      "timestamp": "2026-05-21T13:56:57Z",
+      "pid": 2903022,
+      "process_alive": true,
+      "rss_kb": 61928,
+      "fd_count": 8,
+      "threads": 23,
+      "tcp_connections": 0,
+      "cpu_user_seconds": 119.85,
+      "cpu_system_seconds": 43.22,
+      "goroutines": 2
+    }
+  },
+  "semantic_probe": [
+    {
+      "name": "plaintext headers/body",
+      "status": "pass",
+      "evidence": "status, text/plain body, Date, and Server headers validated"
+    },
+    {
+      "name": "json headers/body",
+      "status": "pass",
+      "evidence": "JSON object shape and content type validated"
+    },
+    {
+      "name": "db real read",
+      "status": "pass",
+      "evidence": "/db World[8517] matched PostgreSQL randomNumber=8517"
+    },
+    {
+      "name": "query clamping",
+      "status": "pass",
+      "evidence": "queries parameter clamps to 1..500"
+    },
+    {
+      "name": "updates persistence",
+      "status": "pass",
+      "evidence": "updates response persisted changed randomNumber values"
+    },
+    {
+      "name": "fortunes insertion escaping sorting",
+      "status": "pass",
+      "evidence": "request-time fortune, HTML escaping, and sorted message order validated"
+    }
+  ],
+  "warmup": {
+    "endpoint": "queries",
+    "path": "/queries?queries=2",
+    "kind": "multiple-queries",
+    "workers": 2,
+    "level": {
+      "concurrency": 8,
+      "connections": 8
+    },
+    "repeat": 0,
+    "duration_seconds": 5,
+    "elapsed_seconds": 5.000667266,
+    "requests": 116450,
+    "successes": 116450,
+    "failures": 0,
+    "bytes": 7518095,
+    "rps": 23286.892289705884,
+    "avg_latency_ms": 0.3423972238900816,
+    "p50_latency_ms": 0.309951,
+    "p90_latency_ms": 0.574214,
+    "p95_latency_ms": 0.671993,
+    "p99_latency_ms": 0.884813,
+    "p999_latency_ms": 1.343692,
+    "max_latency_ms": 2.551167,
+    "resource": {
+      "timestamp": "2026-05-21T13:53:55Z",
+      "pid": 2906500,
+      "process_alive": true,
+      "rss_kb": 13956,
+      "fd_count": 49,
+      "threads": 18,
+      "tcp_connections": 11,
+      "cpu_user_seconds": 1.91,
+      "cpu_system_seconds": 2.34
+    },
+    "validation": "real HTTP GET /queries?queries=2 responses validated against TechEmpower-compatible endpoint contract"
+  },
+  "runs": [
+    {
+      "endpoint": "queries",
+      "path": "/queries?queries=2",
+      "kind": "multiple-queries",
+      "workers": 2,
+      "level": {
+        "concurrency": 8,
+        "connections": 8
+      },
+      "repeat": 1,
+      "duration_seconds": 60,
+      "elapsed_seconds": 60.002930967,
+      "requests": 1180000,
+      "successes": 1180000,
+      "failures": 0,
+      "bytes": 76177860,
+      "rps": 19665.706007744328,
+      "avg_latency_ms": 0.40562214076694914,
+      "p50_latency_ms": 0.306293,
+      "p90_latency_ms": 0.768157,
+      "p95_latency_ms": 0.940876,
+      "p99_latency_ms": 1.523879,
+      "p999_latency_ms": 5.657515,
+      "max_latency_ms": 17.428599,
+      "resource": {
+        "timestamp": "2026-05-21T13:54:56Z",
+        "pid": 2906500,
+        "process_alive": true,
+        "rss_kb": 12200,
+        "fd_count": 57,
+        "threads": 21,
+        "tcp_connections": 11,
+        "cpu_user_seconds": 25.42,
+        "cpu_system_seconds": 30.48
+      },
+      "validation": "real HTTP GET /queries?queries=2 responses validated against TechEmpower-compatible endpoint contract"
+    },
+    {
+      "endpoint": "updates",
+      "path": "/updates?queries=2",
+      "kind": "updates",
+      "workers": 2,
+      "level": {
+        "concurrency": 8,
+        "connections": 8
+      },
+      "repeat": 1,
+      "duration_seconds": 60,
+      "elapsed_seconds": 60.006204638,
+      "requests": 661365,
+      "successes": 661365,
+      "failures": 0,
+      "bytes": 42696117,
+      "rps": 11021.61024830387,
+      "avg_latency_ms": 0.7244700978672897,
+      "p50_latency_ms": 0.602296,
+      "p90_latency_ms": 1.173695,
+      "p95_latency_ms": 1.418252,
+      "p99_latency_ms": 2.7451,
+      "p999_latency_ms": 8.281976,
+      "max_latency_ms": 21.288297,
+      "resource": {
+        "timestamp": "2026-05-21T13:55:56Z",
+        "pid": 2906500,
+        "process_alive": true,
+        "rss_kb": 11948,
+        "fd_count": 65,
+        "threads": 21,
+        "tcp_connections": 10,
+        "cpu_user_seconds": 42.75,
+        "cpu_system_seconds": 53.84
+      },
+      "validation": "real HTTP GET /updates?queries=2 responses validated against TechEmpower-compatible endpoint contract"
+    },
+    {
+      "endpoint": "fortunes",
+      "path": "/fortunes",
+      "kind": "fortunes",
+      "workers": 2,
+      "level": {
+        "concurrency": 8,
+        "connections": 8
+      },
+      "repeat": 1,
+      "duration_seconds": 60,
+      "elapsed_seconds": 60.005079676,
+      "requests": 1199025,
+      "successes": 1199025,
+      "failures": 0,
+      "bytes": 1471203675,
+      "rps": 19982.058293634254,
+      "avg_latency_ms": 0.39914159810929717,
+      "p50_latency_ms": 0.338971,
+      "p90_latency_ms": 0.675876,
+      "p95_latency_ms": 0.798829,
+      "p99_latency_ms": 1.180501,
+      "p999_latency_ms": 3.338541,
+      "max_latency_ms": 11.85496,
+      "resource": {
+        "timestamp": "2026-05-21T13:56:57Z",
+        "pid": 2906500,
+        "process_alive": true,
+        "rss_kb": 12196,
+        "fd_count": 73,
+        "threads": 21,
+        "tcp_connections": 10,
+        "cpu_user_seconds": 77.38,
+        "cpu_system_seconds": 82.62
+      },
+      "validation": "real HTTP GET /fortunes responses validated against TechEmpower-compatible endpoint contract"
+    }
+  ],
+  "summary": {
+    "run_count": 3,
+    "total_requests": 3040390,
+    "total_failures": 0,
+    "best_rps": 19982.058293634254,
+    "worst_p99_ms": 2.7451,
+    "worst_p999_ms": 8.281976,
+    "decision": "pass"
+  },
+  "artifacts": {
+    "endpoints": "queries,updates,fortunes",
+    "levels": "8:8",
+    "matrix_report": "docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json",
+    "semantic_report": "reports/techempower/tetra-scram-endpoints-semantic-benchmark.json",
+    "worker_levels": "2"
+  },
+  "limitations": [
+    "local embedded PostgreSQL harness; official TechEmpower publication is not implied",
+    "SCRAM-SHA-256-PLUS channel binding and SASLprep are not implemented in the Tetra PostgreSQL runtime",
+    "matrix duration and concurrency are caller controlled; use --duration 30s or --duration 60s for release gates"
+  ]
+}

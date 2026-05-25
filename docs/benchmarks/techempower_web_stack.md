@@ -10,17 +10,21 @@ official publication mechanics may require a fork or successor process.
 ## Runtime Pieces
 
 - `compiler/internal/netrt`: Linux TCP sockets and epoll-backed event polling.
-- `compiler/internal/httprt`: HTTP/1.1 parser, router, and response writer.
-- `compiler/internal/jsonrt`: byte-buffer JSON serializers.
+- `compiler/internal/httprt`: HTTP/1.1 parser, static and parameterized
+  router, middleware wrappers, request body limits, and response writer.
+- `compiler/internal/jsonrt`: byte-buffer JSON serializers and generic
+  deterministic JSON value parse/write helpers.
 - `compiler/internal/htmlrt`: Fortunes HTML escaping and rendering.
 - `compiler/internal/pgrt`: PostgreSQL wire protocol client, prepared statement
-  execution, TCP dial path, and connection pool.
+  execution, TCP dial path, connection pool, and pool stats.
 - `lib/core/postgres.tetra`: executable Tetra-source PostgreSQL startup,
   Simple Query, Parse/Bind/Describe/Execute/Sync,
   RowDescription/DataRow/CommandComplete/ReadyForQuery, Terminate, and endian
   byte-buffer helpers used to grow the stdlib-facing DB surface.
 - `compiler/internal/webrt`: HTTP server and TechEmpower endpoint handlers.
 - `compiler/cmd/tetra-techempower`: runnable benchmark server executable.
+
+The backend API surface is summarized in `docs/user/backend_web_platform.md`.
 
 ## Endpoints
 
@@ -77,8 +81,9 @@ benchmarks/techempower/tetra/run-bench.sh
 ```
 
 The harness writes `tetra.techempower.benchmark.v1` JSON with one row per
-endpoint, correctness validation, concurrent request counts, latency summaries,
-and threshold decisions. The default artifact path is
+endpoint, correctness validation, observed content types, semantic check lists,
+concurrent request counts, latency summaries including p99.9, and threshold
+decisions. The default artifact path is
 `reports/techempower/tetra-local-benchmark.json`.
 
 Validate a checked report before treating it as release evidence:
@@ -100,20 +105,23 @@ Generate the reproducible local SCRAM/PostgreSQL evidence without Docker:
 
 ```sh
 benchmarks/techempower/tetra/run-scram-local-bench.sh \
-  --duration 30s \
-  --warmup 5s \
-  --repeats 2 \
-  --levels 8:8,16:16,32:32 \
+  --duration 60s \
+  --warmup 10s \
+  --soak 120s \
+  --repeats 1 \
+  --levels 8:8,16:16 \
+  --worker-levels 1,2 \
+  --endpoints db \
   --semantic-requests 64 \
   --semantic-concurrency 8 \
-  --workers 2 \
+  --workers 1 \
   --pool 64 \
   --semantic-report docs/benchmarks/techempower_scram_single_query_local_report.json \
   --matrix-report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
 ```
 
-For release gates, raise the matrix duration to `--duration 30s` or
-`--duration 60s`.
+For endpoint coverage beyond `/db`, use `--endpoints queries,updates,fortunes`
+with a separate matrix report.
 
 Current local evidence:
 
@@ -124,6 +132,8 @@ Current local evidence:
   `docs/benchmarks/techempower_scram_single_query_local_report.json`
 - DB-backed SCRAM-SHA-256 `/db` matrix:
   `docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`
+- DB-backed SCRAM-SHA-256 `/queries`, `/updates`, `/fortunes` matrix:
+  `docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`
 - DB-backed SCRAM-SHA-256 run notes:
   `docs/benchmarks/techempower_scram_single_query_local_2026-05-21.md`
 - full DB-backed local attempt log:
@@ -135,10 +145,24 @@ The no-database smoke artifact intentionally uses `--skip-db`, so it covers only
 role verifier prefix of `SCRAM-SHA-256`. It passed all six endpoints and the
 matrix semantic probe verified real DB reads, `queries` clamping, update
 persistence, Fortune insertion, HTML escaping, and sorted Fortune rendering.
-The `/db` Single Query matrix completed 5263983 total requests, 0 failures, best
-run 32732.74687056707 rps, and worst p99 2.826155 ms across 8/16/32
-concurrency and connection levels. Full release evidence should still raise
-worker count and request volume before making competitive performance claims.
+The 60s `/db` Single Query matrix completed 7294387 total requests, 0 failures,
+best run 44435.284989964974 rps, worst p99 2.309208 ms, and worst p99.9
+4.76986 ms across 1/2 worker levels and 8/16 concurrency/connection levels. A
+120s `/db` soak completed 2194528 requests with 0 failures, RSS 14256 KB to
+14244 KB, 0 open sockets after shutdown, and clean shutdown evidence. The 60s
+endpoint matrix covered `/queries?queries=2`, `/updates?queries=2`, and
+`/fortunes` at 2 workers / 8 connections with 0 failures. Full release evidence
+should still add an external baseline and larger official-style hardware before
+making competitive performance claims.
+
+Backend hardening beyond the original benchmark slice now includes:
+
+- HTTP request body limits with `413 Payload Too Large`;
+- explicit unsupported-transfer diagnostics for chunked request bodies;
+- route parameters via `PathValue`;
+- router middleware extension points;
+- deterministic generic JSON object/array/string/number/bool/null parse/write;
+- PostgreSQL pool stats for leak checks.
 
 Docker Compose status in this environment:
 
@@ -161,6 +185,7 @@ go test ./compiler/cmd/tetra-techempower-bench -count=1
 go test ./tools/validators/techempower ./tools/cmd/validate-techempower-report -count=1
 go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_local_smoke_skip_db_report.json --allow-skip-db
 go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json
+go run ./tools/cmd/validate-techempower-report --report reports/techempower/tetra-scram-endpoints-semantic-benchmark.json
 GOWORK=off go test ./benchmarks/techempower/tetra/cmd/scram-local-bench -count=1
 docker compose -f benchmarks/techempower/tetra/docker-compose.yml config
 docker compose -f benchmarks/techempower/tetra/docker-compose.yml --profile benchmark config

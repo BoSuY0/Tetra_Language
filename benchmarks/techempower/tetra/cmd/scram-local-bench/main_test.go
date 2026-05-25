@@ -1,6 +1,10 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,6 +52,75 @@ func TestParseEndpointNamesAndWorkerLevels(t *testing.T) {
 	for _, raw := range []string{"", "1,0", "x", "1,"} {
 		if _, err := parsePositiveIntList(raw, "--worker-levels"); err == nil {
 			t.Fatalf("parsePositiveIntList(%q) succeeded, want error", raw)
+		}
+	}
+}
+
+func TestBuildPlanForModeKeepsReleaseDefaultAndAddsProfileSymbols(t *testing.T) {
+	release := buildPlanForMode(false, "/tmp/app", "./compiler/cmd/tetra-techempower")
+	if release.Mode != "release" {
+		t.Fatalf("release mode = %q, want release", release.Mode)
+	}
+	if !release.GoBuildTrimpath || !release.Stripped {
+		t.Fatalf("release evidence = trimpath %v stripped %v, want true/true", release.GoBuildTrimpath, release.Stripped)
+	}
+	releaseCommand := strings.Join(release.Args, " ")
+	if !strings.Contains(releaseCommand, "-trimpath") || !strings.Contains(releaseCommand, "-ldflags=-s -w") {
+		t.Fatalf("release command = %q, want trimpath and stripped ldflags", releaseCommand)
+	}
+
+	profile := buildPlanForMode(true, "/tmp/app", "./compiler/cmd/tetra-techempower")
+	if profile.Mode != "profile" {
+		t.Fatalf("profile mode = %q, want profile", profile.Mode)
+	}
+	if profile.GoBuildTrimpath || profile.Stripped {
+		t.Fatalf("profile evidence = trimpath %v stripped %v, want false/false", profile.GoBuildTrimpath, profile.Stripped)
+	}
+	profileCommand := strings.Join(profile.Args, " ")
+	if strings.Contains(profileCommand, "-trimpath") || strings.Contains(profileCommand, "-ldflags=-s -w") {
+		t.Fatalf("profile command = %q, want no trimpath or stripped ldflags", profileCommand)
+	}
+	if !strings.Contains(profileCommand, "-gcflags=all=-N -l") {
+		t.Fatalf("profile command = %q, want debug gcflags", profileCommand)
+	}
+}
+
+func TestServerEnvIncludesPprofAddrOnlyWhenRequested(t *testing.T) {
+	base := strings.Join(serverEnv(8080, 5432, options{Workers: 1, PoolSize: 4}), "\n")
+	if strings.Contains(base, "TETRA_TE_PPROF_ADDR") {
+		t.Fatalf("serverEnv without pprof includes pprof addr:\n%s", base)
+	}
+
+	withPprof := strings.Join(serverEnv(8080, 5432, options{Workers: 1, PoolSize: 4, PprofAddr: "127.0.0.1:6060"}), "\n")
+	if !strings.Contains(withPprof, "TETRA_TE_PPROF_ADDR=127.0.0.1:6060") {
+		t.Fatalf("serverEnv with pprof missing addr:\n%s", withPprof)
+	}
+}
+
+func TestCapturePprofProfilesWritesCPUAndHeap(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/debug/pprof/profile":
+			_, _ = w.Write([]byte("cpu profile"))
+		case "/debug/pprof/heap":
+			_, _ = w.Write([]byte("heap profile"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	artifacts, err := capturePprofProfiles(context.Background(), server.URL, t.TempDir(), time.Millisecond)
+	if err != nil {
+		t.Fatalf("capturePprofProfiles: %v", err)
+	}
+	for _, path := range []string{artifacts.CPUProfile, artifacts.HeapProfile} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read profile %s: %v", path, err)
+		}
+		if len(raw) == 0 {
+			t.Fatalf("profile %s is empty", path)
 		}
 	}
 }
@@ -123,7 +196,7 @@ func TestValidateMatrixReportRequiresSCRAMEvidenceAndPassingRuns(t *testing.T) {
 			Start: resourceSnapshot{RSSKB: 1024, FDCount: 8, Threads: 4},
 			End:   resourceSnapshot{RSSKB: 2048, FDCount: 8, Threads: 4},
 		},
-		SemanticProbe: []semanticCheck{{Name: "db", Status: "pass", Evidence: "real DB read"}},
+		SemanticProbe: validSemanticProbeFixture(),
 		Soak: &soakReport{
 			Endpoint:        "db",
 			DurationSeconds: 1,
@@ -159,5 +232,43 @@ func TestValidateMatrixReportRequiresSCRAMEvidenceAndPassingRuns(t *testing.T) {
 	report.Postgres.VerifierPrefix = "md5"
 	if err := validateMatrixReport(report); err == nil || !strings.Contains(err.Error(), "SCRAM") {
 		t.Fatalf("validateMatrixReport weak SCRAM evidence = %v, want SCRAM error", err)
+	}
+	report.Postgres.VerifierPrefix = "SCRAM-SHA-256"
+	report.SemanticProbe = report.SemanticProbe[:len(report.SemanticProbe)-1]
+	if err := validateMatrixReport(report); err == nil || !strings.Contains(err.Error(), "semantic probe missing") {
+		t.Fatalf("validateMatrixReport missing semantic probe = %v, want semantic coverage error", err)
+	}
+}
+
+func TestValidateCheckedInSCRAMMatrixReports(t *testing.T) {
+	for _, name := range []string{
+		"techempower_scram_single_query_matrix_local_report.json",
+		"techempower_scram_endpoint_matrix_local_report.json",
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join("..", "..", "..", "..", "..", "docs", "benchmarks", name)
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("ReadFile %s: %v", path, err)
+			}
+			var report matrixReport
+			if err := json.Unmarshal(raw, &report); err != nil {
+				t.Fatalf("json.Unmarshal %s: %v", path, err)
+			}
+			if err := validateMatrixReport(report); err != nil {
+				t.Fatalf("validateMatrixReport %s: %v", path, err)
+			}
+		})
+	}
+}
+
+func validSemanticProbeFixture() []semanticCheck {
+	return []semanticCheck{
+		{Name: "plaintext headers/body", Status: "pass", Evidence: "status, text/plain body, Date, and Server headers validated"},
+		{Name: "json headers/body", Status: "pass", Evidence: "JSON object shape and content type validated"},
+		{Name: "db real read", Status: "pass", Evidence: "/db World[1] matched PostgreSQL randomNumber=2"},
+		{Name: "query clamping", Status: "pass", Evidence: "queries parameter clamps to 1..500"},
+		{Name: "updates persistence", Status: "pass", Evidence: "updates response persisted changed randomNumber values"},
+		{Name: "fortunes insertion escaping sorting", Status: "pass", Evidence: "request-time fortune, HTML escaping, and sorted message order validated"},
 	}
 }
