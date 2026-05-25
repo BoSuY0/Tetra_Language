@@ -2044,12 +2044,12 @@
     "hash": "1b5f8a8263ea00762ca45676e37615bf"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-techempower-report/main_test.go": {
-    "mtime": 1779299087.2496104,
-    "hash": "e66168c4b0aa6d88ff0e9f6550f1d37f"
+    "mtime": 1779699226.219616,
+    "hash": "f5b42b558abef23190c7d808e3ede7a6"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-techempower-report/main.go": {
-    "mtime": 1779299252.6407304,
-    "hash": "f2c987c0a978dd754339313ac593b1b1"
+    "mtime": 1779699400.8085704,
+    "hash": "8c5cbd34e7f7931690dd1896f3c31565"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-cross-platform-ui-runtime/main_test.go": {
     "mtime": 1779454413.174309,
@@ -2304,12 +2304,16 @@
     "hash": "e1107b630dcde4accc37946335309153"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/report_test.go": {
-    "mtime": 1779350399.7014325,
-    "hash": "76365b7fb78985b5a275f556acc1a8f1"
+    "mtime": 1779699415.1412365,
+    "hash": "d6523a1afce420a34208d387335ed94c"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/report.go": {
-    "mtime": 1779350110.39176,
-    "hash": "676f8026486e117fdefd37cd2f2ec086"
+    "mtime": 1779699358.5125542,
+    "hash": "297f21feff81e2046d27f1d87a2110a0"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/matrix.go": {
+    "mtime": 1779699358.513554,
+    "hash": "6222da3211d133657050261158c279dc"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/uiplatform/report_test.go": {
     "mtime": 1779435798.811178,
@@ -17695,6 +17699,106 @@
     "mtime": 1779697500.2094474,
     "hash": "5b601e4a5ab44912523b02f618dc246d"
   },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/legacy_hello.mjs": {
+    "mtime": 1779699822.1946821,
+    "hash": "6e9dae2670398b34447bdd28924fca2d"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/effects_io_smoke.mjs": {
+    "mtime": 1779699822.195682,
+    "hash": "eb7bd7da44390aa3b49062a28d85043c"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.mjs": {
+    "mtime": 1779699822.195682,
+    "hash": "a87505a17c4ea936d0f920aed8c0d034"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.ui.web.mjs": {
+    "mtime": 1779699822.195682,
+    "hash": "e73a300d5c474931393ba34c9cf6a101"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/core_slices_smoke.mjs": {
+    "mtime": 1779699822.1976821,
+    "hash": "a5bc72a3deb4a233ad420343cfca157e"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/wasm_globals_smoke.mjs": {
+    "mtime": 1779699822.1976821,
+    "hash": "29e827ef7b7091208bc01f6f4ff3abd0"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_2_smoke.mjs": {
+    "mtime": 1779699822.198682,
+    "hash": "1fee044d4e83b9b8170898fc1ee02c23"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_3_smoke.mjs": {
+    "mtime": 1779699822.199682,
+    "hash": "41f6da3ef6ed27518d7b5d0e15ce5a01"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_4_smoke.mjs": {
+    "mtime": 1779699822.199682,
+    "hash": "c2926727e3b48b0ea3dcdac534df105a"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/dogfood_wasi.mjs": {
+    "mtime": 1779699822.200682,
+    "hash": "08482b7c76648be41a7f67efb8ebd6e4"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.mjs": {
+    "mtime": 1779699822.200682,
+    "hash": "fbce4cb63d3a96244d97eca34c4ffd06"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.ui.web.mjs": {
+    "mtime": 1779699822.200682,
+    "hash": "5b601e4a5ab44912523b02f618dc246d"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/web-ui-smoke.ui.web.mjs": {
+    "mtime": 1779700312.6142185,
+    "hash": "d224f77be5b6fea259ae4b7108a75332"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/legacy_hello.mjs": {
+    "mtime": 1779700262.812244,
+    "hash": "6e9dae2670398b34447bdd28924fca2d"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/effects_io_smoke.mjs": {
+    "mtime": 1779700262.812244,
+    "hash": "eb7bd7da44390aa3b49062a28d85043c"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.mjs": {
+    "mtime": 1779700262.8132439,
+    "hash": "a87505a17c4ea936d0f920aed8c0d034"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.ui.web.mjs": {
+    "mtime": 1779700262.8142438,
+    "hash": "e73a300d5c474931393ba34c9cf6a101"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/core_slices_smoke.mjs": {
+    "mtime": 1779700262.816244,
+    "hash": "a5bc72a3deb4a233ad420343cfca157e"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/wasm_globals_smoke.mjs": {
+    "mtime": 1779700262.816244,
+    "hash": "29e827ef7b7091208bc01f6f4ff3abd0"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_2_smoke.mjs": {
+    "mtime": 1779700262.8172438,
+    "hash": "1fee044d4e83b9b8170898fc1ee02c23"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_3_smoke.mjs": {
+    "mtime": 1779700262.8172438,
+    "hash": "41f6da3ef6ed27518d7b5d0e15ce5a01"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/wasm_multi_return_4_smoke.mjs": {
+    "mtime": 1779700262.8182437,
+    "hash": "c2926727e3b48b0ea3dcdac534df105a"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/dogfood_wasi.mjs": {
+    "mtime": 1779700262.8182437,
+    "hash": "08482b7c76648be41a7f67efb8ebd6e4"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.mjs": {
+    "mtime": 1779700262.8192437,
+    "hash": "fbce4cb63d3a96244d97eca34c4ffd06"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.ui.web.mjs": {
+    "mtime": 1779700262.8192437,
+    "hash": "5b601e4a5ab44912523b02f618dc246d"
+  },
   "/home/tetra/Desktop/Projects/Tetra_Language/benchmarks/techempower/tetra/setup-postgres.sql": {
     "mtime": 1779298562.41719,
     "hash": "e3ad20c5c3039b88eeeea324d4fa0dd3"
@@ -18460,8 +18564,8 @@
     "hash": "bc0397e517925c0c72b27e55275be7a6"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/benchmarks/techempower_web_stack.md": {
-    "mtime": 1779371892.044236,
-    "hash": "1dda0ca792e0ac8f9b1e9dc14ff8604f"
+    "mtime": 1779699400.8105705,
+    "hash": "0162ffdb08335d5e17acd3d11a8049b0"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/benchmarks/techempower_full_local_attempt_2026-05-20.md": {
     "mtime": 1779298631.1285932,
@@ -18728,8 +18832,8 @@
     "hash": "c9772588d4ad832bd0b09d18f0aa2923"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/README.md": {
-    "mtime": 1779350388.6975834,
-    "hash": "e8cd35f96f590928357aef3322349cd7"
+    "mtime": 1779699400.8095706,
+    "hash": "6393143e99f62ece3721ba7aa4614de6"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/uiplatform/README.md": {
     "mtime": 1779435849.0510535,
@@ -25556,12 +25660,12 @@
     "hash": "5c259395c6046762b1fc076c3643c7f2"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/evidence_log.md": {
-    "mtime": 1779696332.5568128,
-    "hash": "a3b185c98e91457112aa61481395a036"
+    "mtime": 1779699065.6652935,
+    "hash": "a453a4f527156a75f16a8e74e9c1f425"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/final_handoff.md": {
-    "mtime": 1779696332.5578127,
-    "hash": "a01a5a4fa0c6082a75ce994bbc4f37e1"
+    "mtime": 1779699065.6672933,
+    "hash": "1641b4d3e4037d6e1a9e3c4554e117eb"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/README.md": {
     "mtime": 1779690506.074283,
@@ -25660,8 +25764,8 @@
     "hash": "e8f569cdea6499b3f21515a12633ef9f"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/benchmark_matrix.md": {
-    "mtime": 1779648114.1827397,
-    "hash": "8ad5acc1f6a48cc947114b61428ac4c8"
+    "mtime": 1779699024.5702264,
+    "hash": "8301450142a0b6407d1f4751a23fa8f7"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/peer_http_baseline.md": {
     "mtime": 1779648057.550025,
@@ -25716,8 +25820,8 @@
     "hash": "f133d7f30a32c28a52a93e8c25049e11"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/test_matrix.md": {
-    "mtime": 1779690506.073621,
-    "hash": "a297b58dee3cc680122f5f7fedcc5dc5"
+    "mtime": 1779699024.5722263,
+    "hash": "416617cdb0ef48417c1691f66936fa01"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/v0_4_0_dirty_gate_release_truth.md": {
     "mtime": 1779655843.8549523,
@@ -25818,6 +25922,22 @@
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/runtime_fuzz_coverage_slice.md": {
     "mtime": 1779696332.5558128,
     "hash": "fc3aa193e126eda66629696af7fdc44c"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/v0_4_0_clean_candidate_format_lower_security_review.md": {
+    "mtime": 1779697924.4664638,
+    "hash": "f87abc15e7c6444f623981700b5e738c"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/format_lowering_fuzz_coverage_slice.md": {
+    "mtime": 1779698084.0144408,
+    "hash": "d4d58aa5b91eb6f55b578a6e59e82954"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/native_scram_clean_candidate_smoke.md": {
+    "mtime": 1779698380.0740619,
+    "hash": "f442082feea7dea76bd6675d11d57825"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/native_scram_clean_candidate_repeat_matrix.md": {
+    "mtime": 1779699024.5692265,
+    "hash": "9af0719c5ab57486b1b18b5461311100"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/logs/commands/v0_4_0_dirty_gate_latest_report_dir.txt": {
     "mtime": 1779655440.1762073,
@@ -27051,9 +27171,93 @@
     "mtime": 1779697552.2760682,
     "hash": "14d14c40e1b59f1a6d1cd5363c01f213"
   },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/v0.4.0-clean-candidate-20260525-format-lower-nosignoff/summary.md": {
+    "mtime": 1779697880.8735707,
+    "hash": "c7596cf8dc6c7e4dab7ba7c81a157594"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/v0.4.0-clean-candidate-20260525-format-lower-nosignoff/artifacts/release-state.txt": {
+    "mtime": 1779697880.8165722,
+    "hash": "90e6b00548ca4028de9fde7016a11a5d"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/v0.4.0-clean-candidate-20260525-format-lower-nosignoff/artifacts/security-review.md": {
+    "mtime": 1779697880.8325717,
+    "hash": "e18db080a7e05cbfee7b6523d82b429b"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/v0.4.0-clean-candidate-20260525-format-lower-signoff/summary.md": {
+    "mtime": 1779698037.4776099,
+    "hash": "0ccf1cbc6eb33ba95cfa1569fe6742a5"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/v0.4.0-clean-candidate-20260525-format-lower-signoff/artifacts/release-state.txt": {
+    "mtime": 1779698037.3576128,
+    "hash": "d5d6d0051c15c25b5cc219c557a75a84"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/v0.4.0-clean-candidate-20260525-format-lower-signoff/artifacts/security-review.md": {
+    "mtime": 1779698037.3776124,
+    "hash": "f87abc15e7c6444f623981700b5e738c"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-quick/summary.md": {
+    "mtime": 1779699725.629959,
+    "hash": "e2da7119d578afad24f0e1fa002e5622"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/tetra-docs.md": {
+    "mtime": 1779699821.2177052,
+    "hash": "092d857315dee1ac419b1bc9c4254ab6"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/api-docs.md": {
+    "mtime": 1779699821.3377023,
+    "hash": "092d857315dee1ac419b1bc9c4254ab6"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/tooling-summary.md": {
+    "mtime": 1779699822.405677,
+    "hash": "ab7a174ffaa12fa0eba9c7365d9424ea"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/summary.md": {
+    "mtime": 1779699822.410677,
+    "hash": "2d6cce0958739a1e72324b41fee249c3"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.ui.html": {
+    "mtime": 1779699822.195682,
+    "hash": "8326dfc93bd6f85ab651b03905c04a86"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-full/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.ui.html": {
+    "mtime": 1779699822.200682,
+    "hash": "3f14e4d1eb648c5066a406aa79f295ad"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/tetra-docs.md": {
+    "mtime": 1779700261.7882683,
+    "hash": "092d857315dee1ac419b1bc9c4254ab6"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/api-docs.md": {
+    "mtime": 1779700261.9362648,
+    "hash": "092d857315dee1ac419b1bc9c4254ab6"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/web-ui-smoke.dom.html": {
+    "mtime": 1779700312.6105325,
+    "hash": "0be2dc328eec0dc6c3c7ca5263315878"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/tooling-summary.md": {
+    "mtime": 1779700313.0050514,
+    "hash": "f3ab2ac6d97a3530ba5d403dd5cd8a04"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/summary.md": {
+    "mtime": 1779700313.0110514,
+    "hash": "51c238083b9a789353a2bee4b2376e7b"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/ui_web_smoke.ui.html": {
+    "mtime": 1779700262.8142438,
+    "hash": "8326dfc93bd6f85ab651b03905c04a86"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/wasm32-web-artifact-smoke-artifacts/dogfood_web_ui.ui.html": {
+    "mtime": 1779700262.8192437,
+    "hash": "3f14e4d1eb648c5066a406aa79f295ad"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/test-all-20260525-matrix-validator-stabilization-rerun/api-diff/api-docs.md": {
+    "mtime": 1779700312.8060563,
+    "hash": "14d14c40e1b59f1a6d1cd5363c01f213"
+  },
   "/home/tetra/Desktop/Projects/Tetra_Language/benchmarks/techempower/tetra/README.md": {
-    "mtime": 1779641565.5845847,
-    "hash": "cab33aa047a996a20782fac3a9af3a0b"
+    "mtime": 1779699400.8105705,
+    "hash": "3f8d849a02edbf4304e792a03c407986"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/benchmarks/techempower/tetra/docker-compose.yml": {
     "mtime": 1779318806.8772016,
