@@ -692,6 +692,9 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 	if strings.TrimSpace(run.Endpoint) == "" || strings.TrimSpace(run.Path) == "" || strings.TrimSpace(run.Kind) == "" || run.Workers <= 0 {
 		issues = append(issues, label+" endpoint/path/kind/workers metadata is incomplete")
 	}
+	if warmup && run.Repeat != 0 {
+		issues = append(issues, label+" repeat must be 0")
+	}
 	if !warmup && run.Repeat <= 0 {
 		issues = append(issues, label+" repeat must be positive")
 	}

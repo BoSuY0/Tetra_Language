@@ -374,6 +374,29 @@ func TestValidateSCRAMMatrixRejectsInvalidRunRepeat(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsWarmupRepeatMetadata(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if report.Warmup == nil {
+		t.Fatalf("checked-in SCRAM matrix report has no warmup")
+	}
+
+	report.Warmup.Repeat = 1
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted warmup repeat metadata")
+	}
+	if !strings.Contains(err.Error(), "repeat must be 0") {
+		t.Fatalf("ValidateReport warmup repeat error = %v, want repeat zero rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsDuplicateRunIdentity(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {
