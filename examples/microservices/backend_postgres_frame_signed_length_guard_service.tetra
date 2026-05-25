@@ -1,0 +1,55 @@
+// Backend PostgreSQL signed frame-length guard microservice.
+module examples.microservices.backend_postgres_frame_signed_length_guard_service
+
+import lib.core.postgres as pg
+
+func check_valid_frame_lengths() -> Bool
+uses alloc, mem:
+    var sync: []u8 = core.make_u8(pg.sync_frame_len())
+    if pg.write_sync(sync) != pg.sync_frame_len():
+        return false
+    if pg.frame_type_at(sync, 0) != pg.frame_sync():
+        return false
+    if pg.frame_length_at(sync, 0) != 4:
+        return false
+    if pg.frame_payload_len_at(sync, 0) != 0:
+        return false
+    if pg.frame_total_len_at(sync, 0) != 5:
+        return false
+    var malformed_short: []u8 = core.make_u8(5)
+    malformed_short[0] = pg.frame_sync()
+    if pg.write_i32_be_at(malformed_short, 1, 3) != 5:
+        return false
+    if pg.frame_length_at(malformed_short, 0) != 3:
+        return false
+    if pg.frame_payload_len_at(malformed_short, 0) != -1:
+        return false
+    if pg.frame_total_len_at(malformed_short, 0) != -1:
+        return false
+    return true
+
+func check_negative_frame_length(value: Int, code: Int) -> Int
+uses alloc, mem:
+    var frame: []u8 = core.make_u8(5)
+    frame[0] = pg.frame_sync()
+    if pg.write_i32_be_at(frame, 1, value) != 5:
+        return code
+    if pg.frame_length_at(frame, 0) != -1:
+        return code + 1
+    if pg.frame_payload_len_at(frame, 0) != -1:
+        return code + 2
+    if pg.frame_total_len_at(frame, 0) != -1:
+        return code + 3
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_valid_frame_lengths():
+        return 1
+    let neg_two: Int = check_negative_frame_length(-2, 10)
+    if neg_two != 0:
+        return neg_two
+    let neg_min: Int = check_negative_frame_length(-2147483648, 20)
+    if neg_min != 0:
+        return neg_min
+    return 0

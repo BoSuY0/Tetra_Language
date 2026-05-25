@@ -17,7 +17,6 @@ uses alloc, mem:
     while i < 8:
         b[i] = a[i]
         i = i + 1
-
     var step: Int = 0
     while step < 4:
         i = 1
@@ -29,7 +28,6 @@ uses alloc, mem:
             a[i] = b[i]
             i = i + 1
         step = step + 1
-
     var checksum: Int = 0
     i = 0
     while i < 8:

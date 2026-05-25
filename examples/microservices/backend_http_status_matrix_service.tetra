@@ -1,0 +1,97 @@
+// Backend HTTP status/header matrix microservice smoke.
+module examples.microservices.backend_http_status_matrix_service
+
+import lib.core.http as http
+
+func check_decimal_matrix() -> Int
+uses alloc, mem:
+    if http.digits_i32(0) != 1:
+        return 1
+    if http.digits_i32(204) != 3:
+        return 2
+    if http.digits_i32(-17) != 3:
+        return 3
+    var out: []u8 = core.make_u8(16)
+    var pos: Int = http.write_decimal_i32_at(out, 2, -17)
+    if pos != 5:
+        return 4
+    if out[2] != 45 || out[3] != 49 || out[4] != 55:
+        return 5
+    pos = http.write_decimal_i32_at(out, pos, 0)
+    if pos != 6:
+        return 6
+    if out[5] != 48:
+        return 7
+    return 0
+
+func check_response_matrix() -> Int
+uses alloc, mem:
+    let date: String = "Tue, 02 Jan 2024 00:00:00 GMT"
+    let len_keep: Int = http.response_head_len(204, "No Content", "Tetra", date, "text/plain", 0, true)
+    var keep: []u8 = core.make_u8(len_keep)
+    let written_keep: Int = http.write_response_head(keep, 204, "No Content", "Tetra", date, "text/plain", 0, true)
+    if written_keep != len_keep:
+        return 8
+    if keep[9] != 50 || keep[10] != 48 || keep[11] != 52:
+        return 9
+    if keep[written_keep - 4] != 13 || keep[written_keep - 3] != 10:
+        return 10
+    if keep[written_keep - 2] != 13 || keep[written_keep - 1] != 10:
+        return 11
+    let len_close: Int = http.response_head_len(503, "Service Unavailable", "Tetra", date, "text/plain", 12, false)
+    var close: []u8 = core.make_u8(len_close)
+    let written_close: Int = http.write_response_head(close, 503, "Service Unavailable", "Tetra", date, "text/plain", 12, false)
+    if written_close != len_close:
+        return 12
+    if close[9] != 53 || close[10] != 48 || close[11] != 51:
+        return 13
+    return 0
+
+func check_route_chars() -> Int:
+    if http.route_path_len(http.route_plaintext()) != 10:
+        return 14
+    if http.route_path_char(http.route_plaintext(), 1) != 112:
+        return 15
+    if http.route_path_char(http.route_json(), 4) != 110:
+        return 16
+    if http.route_path_char(http.route_updates(), 7) != 115:
+        return 17
+    if http.route_path_char(http.route_fortunes(), 9) != -1:
+        return 18
+    if http.route_path_char(99, 0) != -1:
+        return 19
+    return 0
+
+func check_connection_matrix() -> Int
+uses alloc, mem:
+    if !http.request_keep_alive("GET /json HTTP/1.1\r\nHost: local\r\n\r\n"):
+        return 20
+    if http.request_keep_alive("GET /json HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n"):
+        return 21
+    if http.request_keep_alive("GET /json HTTP/1.1\r\nHost: local\r\nconnection: close\r\n\r\n"):
+        return 22
+    if http.request_keep_alive("GET /json HTTP/1.1\r\nHost: local\r\nConnection: Close\r\n\r\n"):
+        return 23
+    var req: []u8 = core.make_u8(96)
+    let req_len: Int = http.write_ascii_at(req, 0, "GET /json HTTP/1.1\r\nHost: local\r\ncOnNeCtIoN: ClOsE\r\n\r\n")
+    if http.request_keep_alive_bytes_at(req, 0, req_len):
+        return 24
+    if !http.contains_connection_close_bytes_at(req, 0, req_len):
+        return 25
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let decimals: Int = check_decimal_matrix()
+    if decimals != 0:
+        return decimals
+    let responses: Int = check_response_matrix()
+    if responses != 0:
+        return responses
+    let routes: Int = check_route_chars()
+    if routes != 0:
+        return routes
+    let connections: Int = check_connection_matrix()
+    if connections != 0:
+        return connections
+    return 0

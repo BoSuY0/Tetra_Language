@@ -1,0 +1,14 @@
+module examples.microservices.backend_modular_web_stack_pack.app.main
+
+import examples.microservices.backend_modular_web_stack_pack.lib.gateway as gateway
+import examples.microservices.backend_modular_web_stack_pack.lib.storage as storage
+
+func main() -> Int
+uses alloc, mem:
+    let gateway_status: Int = gateway.probe_gateway()
+    if gateway_status != 0:
+        return gateway_status
+    let storage_status: Int = storage.probe_storage()
+    if storage_status != 0:
+        return 100 + storage_status
+    return 0

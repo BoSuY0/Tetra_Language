@@ -1,0 +1,45 @@
+// Backend PostgreSQL high-bit big-endian reader guard microservice.
+module examples.microservices.backend_postgres_high_bit_read_guard_service
+
+import lib.core.postgres as pg
+
+func check_max_positive_i32() -> Bool
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(4)
+    bytes[0] = 127
+    bytes[1] = 255
+    bytes[2] = 255
+    bytes[3] = 255
+    if pg.read_i32_be(bytes, 0) != 2147483647:
+        return false
+    if pg.read_i32_be_signed(bytes, 0) != 2147483647:
+        return false
+    return true
+
+func check_high_bit_i32_reads() -> Int
+uses alloc, mem:
+    var min_signed: []u8 = core.make_u8(4)
+    min_signed[0] = 128
+    min_signed[1] = 0
+    min_signed[2] = 0
+    min_signed[3] = 0
+    if pg.read_i32_be(min_signed, 0) != -1:
+        return 11
+    if pg.read_i32_be_signed(min_signed, 0) != -1:
+        return 12
+    var neg_two: []u8 = core.make_u8(4)
+    neg_two[0] = 255
+    neg_two[1] = 255
+    neg_two[2] = 255
+    neg_two[3] = 254
+    if pg.read_i32_be(neg_two, 0) != -1:
+        return 13
+    if pg.read_i32_be_signed(neg_two, 0) != -1:
+        return 14
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_max_positive_i32():
+        return 1
+    return check_high_bit_i32_reads()

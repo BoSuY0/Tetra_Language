@@ -1,0 +1,20 @@
+// Backend networking retry backoff overflow guard microservice.
+module examples.microservices.backend_network_backoff_overflow_guard_service
+
+import lib.core.networking as networking
+
+func main() -> Int:
+    let capped_once: Int = networking.retry_backoff_ms(1, 1073741824, 2147483647)
+    if capped_once < 0:
+        return 21
+    if capped_once != 2147483647:
+        return 22
+    if networking.retry_backoff_ms(2, 1073741824, 2000000000) != 2000000000:
+        return 23
+    if networking.retry_backoff_ms(4, 15, 100) != 100:
+        return 24
+    if networking.retry_backoff_ms(2, 3, -1) != 12:
+        return 25
+    if networking.retry_backoff_ms(2, -5, 100) != 0:
+        return 26
+    return 0

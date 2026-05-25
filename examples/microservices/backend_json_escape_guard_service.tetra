@@ -1,0 +1,53 @@
+// Backend JSON escaping guard microservice smoke.
+module examples.microservices.backend_json_escape_guard_service
+
+import lib.core.json as json
+
+func check_escape_buffer(buf: []u8, start: Int, written: Int) -> Bool
+uses mem:
+    if written - start != json.encoded_string_len("A\n\"\\"):
+        return false
+    if buf[start] != 34:
+        return false
+    if buf[start + 1] != 65:
+        return false
+    if buf[start + 2] != 92 || buf[start + 3] != 110:
+        return false
+    if buf[start + 4] != 92 || buf[start + 5] != 34:
+        return false
+    if buf[start + 6] != 92 || buf[start + 7] != 92:
+        return false
+    if buf[written - 1] != 34:
+        return false
+    return true
+
+func main() -> Int
+uses alloc, mem:
+    let message: String = "A\n\"\\"
+    if json.encoded_string_len(message) != 9:
+        return 1
+    if json.message_object_len(message) != 21:
+        return 2
+    if json.world_object_len(0, 0) != 25:
+        return 3
+    if json.world_object_len(-7, 9001) != 29:
+        return 4
+    var string_buf: []u8 = core.make_u8(32)
+    let string_written: Int = json.write_json_string_at(string_buf, 3, message)
+    if !check_escape_buffer(string_buf, 3, string_written):
+        return 5
+    var object_buf: []u8 = core.make_u8(64)
+    let object_written: Int = json.write_message_object(object_buf, message)
+    if object_written != json.message_object_len(message):
+        return 6
+    if object_buf[0] != 123 || object_buf[1] != 34 || object_buf[10] != 58:
+        return 7
+    if object_buf[11] != 34 || object_buf[13] != 92 || object_buf[14] != 110:
+        return 8
+    if object_buf[15] != 92 || object_buf[16] != 34:
+        return 9
+    if object_buf[17] != 92 || object_buf[18] != 92:
+        return 10
+    if object_buf[object_written - 2] != 34 || object_buf[object_written - 1] != 125:
+        return 11
+    return 0

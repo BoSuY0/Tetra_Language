@@ -2,7 +2,7 @@
 module examples.benchmarks.plb2_sudoku_checksum
 
 func cell(row: Int, col: Int) -> Int:
-    return ((row * 3 + row / 3 + col) % 9) + 1
+    return (row * 3 + row / 3 + col) % 9 + 1
 
 func main() -> Int:
     var checksum: Int = 0
@@ -15,7 +15,6 @@ func main() -> Int:
             col = col + 1
         checksum = checksum + row_sum
         row = row + 1
-
     var col2: Int = 0
     while col2 < 9:
         var row2: Int = 0
@@ -25,7 +24,6 @@ func main() -> Int:
             row2 = row2 + 1
         checksum = checksum + col_sum
         col2 = col2 + 1
-
     var box_row: Int = 0
     while box_row < 3:
         var box_col: Int = 0
@@ -41,7 +39,6 @@ func main() -> Int:
             checksum = checksum + box_sum
             box_col = box_col + 1
         box_row = box_row + 1
-
     if checksum == 1215:
         return 0
     return checksum

@@ -1,0 +1,66 @@
+// Backend PostgreSQL signed big-endian writer guard microservice.
+module examples.microservices.backend_postgres_signed_write_guard_service
+
+import lib.core.postgres as pg
+
+func check_positive_controls() -> Bool
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(8)
+    var i: Int = pg.write_i32_be_at(bytes, 0, 16909060)
+    if i != 4:
+        return false
+    i = pg.write_i16_be_at(bytes, i, 258)
+    if i != 6:
+        return false
+    if bytes[0] != 1 || bytes[1] != 2 || bytes[2] != 3 || bytes[3] != 4:
+        return false
+    if bytes[4] != 1 || bytes[5] != 2:
+        return false
+    return true
+
+func check_negative_i32_writes() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(12)
+    if pg.write_i32_be_at(bytes, 0, -1) != 4:
+        return 11
+    if bytes[0] != 255 || bytes[1] != 255 || bytes[2] != 255 || bytes[3] != 255:
+        return 12
+    if pg.write_i32_be_at(bytes, 4, -2) != 8:
+        return 13
+    if bytes[4] != 255 || bytes[5] != 255 || bytes[6] != 255 || bytes[7] != 254:
+        return 14
+    if pg.write_i32_be_at(bytes, 8, -2147483648) != 12:
+        return 15
+    if bytes[8] != 128 || bytes[9] != 0 || bytes[10] != 0 || bytes[11] != 0:
+        return 16
+    return 0
+
+func check_negative_i16_writes() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(8)
+    if pg.write_i16_be_at(bytes, 0, -1) != 2:
+        return 21
+    if bytes[0] != 255 || bytes[1] != 255:
+        return 22
+    if pg.write_i16_be_at(bytes, 2, -2) != 4:
+        return 23
+    if bytes[2] != 255 || bytes[3] != 254:
+        return 24
+    if pg.write_i16_be_at(bytes, 4, -32768) != 6:
+        return 25
+    if bytes[4] != 128 || bytes[5] != 0:
+        return 26
+    if pg.write_i16_be_at(bytes, 6, -2147483648) != 8:
+        return 27
+    if bytes[6] != 0 || bytes[7] != 0:
+        return 28
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_positive_controls():
+        return 1
+    let i32_result: Int = check_negative_i32_writes()
+    if i32_result != 0:
+        return i32_result
+    return check_negative_i16_writes()

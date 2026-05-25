@@ -1,13 +1,18 @@
 state TodoState:
     var count: Int = 0
+    var selected: String = "item-1"
     val title: String = "Dogfood Web UI"
 
 view TodoView(state: TodoState):
     bind countValue: Int = state.count
+    bind selectedText: String = state.selected
     bind titleText: String = state.title
     event click -> increment
+    event select -> selectSecond
     command increment:
         state.count = state.count + 1
+    command selectSecond:
+        state.selected = "item-2"
     style width: Int = 360
     style theme: String = "release"
     accessibility role: String = "button"

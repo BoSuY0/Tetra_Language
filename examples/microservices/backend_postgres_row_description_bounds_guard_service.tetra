@@ -1,0 +1,40 @@
+// Backend PostgreSQL RowDescription bounds guard microservice.
+module examples.microservices.backend_postgres_row_description_bounds_guard_service
+
+import lib.core.postgres as pg
+
+func write_column(dst: inout []u8, start: Int, name: String, type_oid: Int) -> Int
+uses mem:
+    var i: Int = pg.write_cstring_at(dst, start, name)
+    i = pg.write_i32_be_at(dst, i, 0)
+    i = pg.write_i16_be_at(dst, i, 0)
+    i = pg.write_i32_be_at(dst, i, type_oid)
+    i = pg.write_i16_be_at(dst, i, 4)
+    i = pg.write_i32_be_at(dst, i, 0)
+    return pg.write_i16_be_at(dst, i, 0)
+
+func main() -> Int
+uses alloc, mem:
+    var desc: []u8 = core.make_u8(96)
+    var i: Int = pg.write_i16_be_at(desc, 0, 2)
+    i = write_column(desc, i, "id", pg.int4_oid())
+    i = write_column(desc, i, "message", pg.text_oid())
+    if pg.row_description_column_count(desc, 0) != 2:
+        return 10
+    if pg.row_description_type_oid_at(desc, 0, i, 0) != pg.int4_oid():
+        return 11
+    if pg.row_description_type_oid_at(desc, 0, i, 1) != pg.text_oid():
+        return 12
+    if pg.row_description_type_oid_at(desc, 0, i, -1) != -1:
+        return 13
+    if pg.row_description_type_oid_at(desc, 0, i, 2) != -1:
+        return 14
+    if pg.row_description_type_oid_at(desc, 0, i - 13, 1) != -1:
+        return 15
+    if pg.row_description_type_oid_at(desc, 0, 0, 0) != -1:
+        return 16
+    if pg.row_description_type_oid_at(desc, -1, i, 0) != -1:
+        return 17
+    if pg.row_description_type_oid_at(desc, 0, -1, 0) != -1:
+        return 18
+    return 0

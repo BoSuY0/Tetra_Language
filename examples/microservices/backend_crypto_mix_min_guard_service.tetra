@@ -1,0 +1,16 @@
+// Backend crypto mix i32 minimum guard microservice.
+module examples.microservices.backend_crypto_mix_min_guard_service
+
+import lib.core.crypto as crypto
+
+func main() -> Int:
+    let min_mix: Int = crypto.mix_seed(-65075262, -2)
+    if min_mix < 0:
+        return 21
+    if min_mix != 2147483647:
+        return 22
+    if crypto.mix_seed(-2, 1) != 65:
+        return 23
+    if crypto.mix_seed(42, crypto.interface_strength()) != 1407:
+        return 24
+    return 0

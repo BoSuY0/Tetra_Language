@@ -1,0 +1,16 @@
+// Backend filesystem embedded-NUL exists guard microservice.
+module examples.microservices.backend_filesystem_nul_exists_guard_service
+
+import lib.core.filesystem as filesystem
+
+func main() -> Int
+uses capability, io:
+    unsafe:
+        let cap: cap.io = core.cap_io()
+        if !filesystem.exists("/", cap):
+            return 1
+        if filesystem.exists("/\x00_suffix", cap):
+            return 2
+        if filesystem.exists("/__tetra_missing_filesystem_nul_exists_guard__", cap):
+            return 3
+    return 0

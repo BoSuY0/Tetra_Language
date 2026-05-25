@@ -1,0 +1,43 @@
+// Backend PostgreSQL CommandComplete trailing-count guard microservice.
+module examples.microservices.backend_postgres_command_tag_trailing_guard_service
+
+import lib.core.postgres as pg
+
+func check_valid_trailing_counts() -> Int
+uses alloc, mem:
+    var update_tag: []u8 = core.make_u8(16)
+    let update_len: Int = pg.write_cstring_at(update_tag, 0, "UPDATE 12")
+    if pg.command_complete_affected_rows(update_tag, 0, update_len) != 12:
+        return 10
+    var insert_tag: []u8 = core.make_u8(16)
+    let insert_len: Int = pg.write_cstring_at(insert_tag, 0, "INSERT 0 3")
+    if pg.command_complete_affected_rows(insert_tag, 0, insert_len) != 3:
+        return 11
+    if pg.command_complete_affected_rows(update_tag, 7, 2) != 12:
+        return 12
+    return 0
+
+func check_malformed_trailing_counts() -> Int
+uses alloc, mem:
+    var update_text: []u8 = core.make_u8(24)
+    let update_text_len: Int = pg.write_cstring_at(update_text, 0, "UPDATE 12 rows")
+    if pg.command_complete_affected_rows(update_text, 0, update_text_len) != 0:
+        return 20
+    var insert_text: []u8 = core.make_u8(24)
+    let insert_text_len: Int = pg.write_cstring_at(insert_text, 0, "INSERT 0 3 rows")
+    if pg.command_complete_affected_rows(insert_text, 0, insert_text_len) != 0:
+        return 21
+    var update_space: []u8 = core.make_u8(16)
+    let update_space_len: Int = pg.write_cstring_at(update_space, 0, "UPDATE 12 ")
+    if pg.command_complete_affected_rows(update_space, 0, update_space_len) != 0:
+        return 22
+    if pg.command_complete_affected_rows(update_text, 7, 3) != 0:
+        return 23
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let valid: Int = check_valid_trailing_counts()
+    if valid != 0:
+        return valid
+    return check_malformed_trailing_counts()

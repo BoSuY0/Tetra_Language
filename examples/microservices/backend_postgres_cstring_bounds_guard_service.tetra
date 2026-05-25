@@ -1,0 +1,27 @@
+// Backend PostgreSQL C-string bounds guard microservice.
+module examples.microservices.backend_postgres_cstring_bounds_guard_service
+
+import lib.core.postgres as pg
+
+func main() -> Int
+uses alloc, mem:
+    var payload: []u8 = core.make_u8(6)
+    payload[0] = 65
+    payload[1] = 66
+    payload[2] = 0
+    payload[3] = 67
+    payload[4] = 0
+    payload[5] = 68
+    if pg.cstring_end_at(payload, 0, 6) != 2:
+        return 1
+    if pg.cstring_end_at(payload, 3, 6) != 4:
+        return 2
+    if pg.cstring_end_at(payload, 3, 4) != -1:
+        return 3
+    if pg.cstring_end_at(payload, 6, 6) != -1:
+        return 4
+    if pg.cstring_end_at(payload, -1, 6) != -1:
+        return 5
+    if pg.cstring_end_at(payload, 0, -1) != -1:
+        return 6
+    return 0

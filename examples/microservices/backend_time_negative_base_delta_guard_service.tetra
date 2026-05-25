@@ -1,0 +1,19 @@
+// Backend time negative-base duration guard microservice.
+module examples.microservices.backend_time_negative_base_delta_guard_service
+
+import lib.core.time as time_lib
+
+func main() -> Int:
+    if time_lib.add_duration_ms(-5, 10) != 5:
+        return 11
+    if time_lib.add_duration_ms(-2147483640, 2147483647) != 7:
+        return 12
+    if time_lib.add_duration_ms(-10, 3) != 0:
+        return 13
+    if time_lib.add_duration_ms(-10, 0) != 0:
+        return 14
+    if time_lib.add_duration_ms(10, -5) != 5:
+        return 15
+    if time_lib.add_duration_ms(2147483600, 100) != 2147483647:
+        return 16
+    return 0

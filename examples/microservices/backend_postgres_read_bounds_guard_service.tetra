@@ -1,0 +1,27 @@
+// Backend PostgreSQL big-endian reader bounds guard microservice.
+module examples.microservices.backend_postgres_read_bounds_guard_service
+
+import lib.core.postgres as pg
+
+func main() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(8)
+    var i: Int = pg.write_i32_be_at(bytes, 0, 16909060)
+    if i != 4:
+        return 10
+    i = pg.write_i16_be_at(bytes, i, 258)
+    if i != 6:
+        return 11
+    if pg.read_i32_be(bytes, 0) != 16909060:
+        return 12
+    if pg.read_i16_be(bytes, 4) != 258:
+        return 13
+    if pg.read_i32_be_signed(bytes, 0) != 16909060:
+        return 14
+    if pg.read_i32_be(bytes, -1) != -1:
+        return 15
+    if pg.read_i32_be_signed(bytes, -1) != -1:
+        return 16
+    if pg.read_i16_be(bytes, -1) != -1:
+        return 17
+    return 0

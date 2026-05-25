@@ -1,0 +1,98 @@
+// Backend PostgreSQL embedded-NUL C-string guard microservice.
+module examples.microservices.backend_postgres_cstring_nul_guard_service
+
+import lib.core.postgres as pg
+
+func untouched(bytes: []u8, a: Int, b: Int, c: Int, d: Int) -> Bool
+uses mem:
+    return bytes[0] == a && bytes[1] == b && bytes[2] == c && bytes[3] == d
+
+func check_low_level_writers() -> Int
+uses alloc, mem:
+    let clean: String = "clean"
+    let bad: String = "bad\x00field"
+    var bytes: []u8 = core.make_u8(24)
+    bytes[0] = 1
+    bytes[1] = 2
+    bytes[2] = 3
+    bytes[3] = 4
+    if pg.write_cstring_at(bytes, 4, clean) != 10:
+        return 10
+    if pg.cstring_end_at(bytes, 4, 10) != 9:
+        return 11
+    if pg.write_cstring_at(bytes, 0, bad) != -1:
+        return 12
+    if !untouched(bytes, 1, 2, 3, 4):
+        return 13
+    if pg.write_cstring_pair_at(bytes, 0, "name", bad) != -1:
+        return 14
+    if !untouched(bytes, 1, 2, 3, 4):
+        return 15
+    return 0
+
+func check_frame_lengths() -> Int
+uses alloc, mem:
+    let bad: String = "bad\x00field"
+    var oids: []i32 = core.make_i32(1)
+    oids[0] = pg.int4_oid()
+    if pg.startup_message_len("u", bad, "app") != -1:
+        return 20
+    if pg.simple_query_payload_len(bad) != -1:
+        return 21
+    if pg.simple_query_frame_len(bad) != -1:
+        return 22
+    if pg.parse_payload_len("stmt", bad, oids) != -1:
+        return 23
+    if pg.parse_frame_len("stmt", bad, oids) != -1:
+        return 24
+    if pg.bind_text_0_payload_len(bad, "stmt") != -1:
+        return 25
+    if pg.bind_text_1_frame_len("", bad, "42") != -1:
+        return 26
+    if pg.describe_portal_frame_len(bad) != -1:
+        return 27
+    if pg.execute_frame_len(bad, 0) != -1:
+        return 28
+    return 0
+
+func check_frame_writers() -> Int
+uses alloc, mem:
+    let bad: String = "bad\x00field"
+    var oids: []i32 = core.make_i32(1)
+    oids[0] = pg.int4_oid()
+    var frame: []u8 = core.make_u8(48)
+    frame[0] = 9
+    frame[1] = 8
+    frame[2] = 7
+    frame[3] = 6
+    if pg.write_simple_query(frame, bad) != -1:
+        return 30
+    if !untouched(frame, 9, 8, 7, 6):
+        return 31
+    if pg.write_parse(frame, "stmt", bad, oids) != -1:
+        return 32
+    if !untouched(frame, 9, 8, 7, 6):
+        return 33
+    if pg.write_describe_portal(frame, bad) != -1:
+        return 34
+    if !untouched(frame, 9, 8, 7, 6):
+        return 35
+    if pg.write_execute(frame, bad, 0) != -1:
+        return 36
+    if !untouched(frame, 9, 8, 7, 6):
+        return 37
+    if pg.write_startup_message(frame, "u", bad, "app") != -1:
+        return 38
+    if !untouched(frame, 9, 8, 7, 6):
+        return 39
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let low_level: Int = check_low_level_writers()
+    if low_level != 0:
+        return low_level
+    let lengths: Int = check_frame_lengths()
+    if lengths != 0:
+        return lengths
+    return check_frame_writers()

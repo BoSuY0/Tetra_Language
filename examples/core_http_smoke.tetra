@@ -14,18 +14,18 @@ uses alloc, mem:
     let plain_written: Int = http.write_plaintext_response(plain, "Tetra", date, true)
     let json_len: Int = http.json_message_response_len("Tetra", date, "Hello, World!", false)
     let json_written: Int = http.write_json_message_response(json_buf, "Tetra", date, "Hello, World!", false)
-    let req_len: Int = http.write_ascii_at(req, 0, "GET /plaintext HTTP/1.1\nHost: localhost\n\n")
+    let req_len: Int = http.write_ascii_at(req, 0, "GET /plaintext HTTP/1.1\r\nHost: localhost\r\n\r\n")
     var pipe_len: Int = http.write_ascii_at(pipe, 0, "GET /plaintext HTTP/1.1\r\nHost: localhost\r\n\r\n")
     let pipe_first_len: Int = http.request_head_len_bytes(pipe, pipe_len)
     pipe_len = http.write_ascii_at(pipe, pipe_len, "GET /json HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
     let pipe_second_len: Int = http.request_head_len_bytes_at(pipe, pipe_first_len, pipe_len - pipe_first_len)
-    let route_plain: Int = http.route_tech_empower("GET /plaintext HTTP/1.1\nHost: localhost\n\n")
+    let route_plain: Int = http.route_tech_empower("GET /plaintext HTTP/1.1\r\nHost: localhost\r\n\r\n")
     let route_plain_bytes: Int = http.route_tech_empower_bytes(req, req_len)
     let route_pipe_json: Int = http.route_tech_empower_bytes_at(pipe, pipe_first_len, pipe_second_len)
-    let route_json: Int = http.route_tech_empower("GET /json HTTP/1.1\nHost: localhost\n\n")
-    let route_queries: Int = http.route_tech_empower("GET /queries?queries=7 HTTP/1.1\nHost: localhost\n\n")
-    let route_missing: Int = http.route_tech_empower("GET /missing HTTP/1.1\nHost: localhost\n\n")
-    let route_bad: Int = http.route_tech_empower("POST /plaintext HTTP/1.1\nHost: localhost\n\n")
+    let route_json: Int = http.route_tech_empower("GET /json HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    let route_queries: Int = http.route_tech_empower("GET /queries?queries=7 HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    let route_missing: Int = http.route_tech_empower("GET /missing HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    let route_bad: Int = http.route_tech_empower("POST /plaintext HTTP/1.1\r\nHost: localhost\r\n\r\n")
     if plain_len != 154 || plain_written != 154:
         return 1
     if json_len != 169 || json_written != 169:
@@ -46,9 +46,9 @@ uses alloc, mem:
         return 1
     if route_missing != http.route_not_found() || route_bad != http.route_bad_request():
         return 1
-    if !http.request_keep_alive("GET /json HTTP/1.1\nHost: localhost\n\n"):
+    if !http.request_keep_alive("GET /json HTTP/1.1\r\nHost: localhost\r\n\r\n"):
         return 1
-    if http.request_keep_alive("GET /json HTTP/1.1\nConnection: close\n\n"):
+    if http.request_keep_alive("GET /json HTTP/1.1\r\nConnection: close\r\n\r\n"):
         return 1
     if !http.request_keep_alive_bytes(req, req_len):
         return 1

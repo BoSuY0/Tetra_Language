@@ -1,0 +1,32 @@
+module services.gateway
+
+import services.policy as policy
+
+func route_status(method: Int, path: Int, raw_queries: Int) -> Int:
+    let route: policy.Route = policy.classify(method, path, raw_queries)
+    return policy.status(route)
+
+func retry_budget(raw_queries: Int) -> Int:
+    let queries: Int = policy.normalize_queries(raw_queries)
+    if queries <= 1:
+        return 0
+    if queries > 10:
+        return 10
+    return queries - 1
+
+func probe() -> Int:
+    if route_status(1, 1, 3) != 200:
+        return 1
+    if route_status(1, 2, 700) != 202:
+        return 2
+    if route_status(1, 99, 3) != 404:
+        return 3
+    if route_status(9, 1, 3) != 405:
+        return 4
+    if retry_budget(0) != 0:
+        return 5
+    if retry_budget(4) != 3:
+        return 6
+    if retry_budget(700) != 10:
+        return 7
+    return 0

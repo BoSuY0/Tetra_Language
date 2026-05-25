@@ -1,0 +1,44 @@
+// Backend PostgreSQL signed column-count guard microservice.
+module examples.microservices.backend_postgres_column_count_signed_guard_service
+
+import lib.core.postgres as pg
+
+func main() -> Int
+uses alloc, mem:
+    var desc: []u8 = core.make_u8(32)
+    var i: Int = pg.write_i16_be_at(desc, 0, 1)
+    i = pg.write_cstring_at(desc, i, "id")
+    i = pg.write_i32_be_at(desc, i, 0)
+    i = pg.write_i16_be_at(desc, i, 0)
+    i = pg.write_i32_be_at(desc, i, pg.int4_oid())
+    i = pg.write_i16_be_at(desc, i, 4)
+    i = pg.write_i32_be_at(desc, i, 0)
+    i = pg.write_i16_be_at(desc, i, 0)
+    if pg.row_description_column_count(desc, 0) != 1:
+        return 10
+    if pg.row_description_type_oid_at(desc, 0, i, 0) != pg.int4_oid():
+        return 11
+    var row: []u8 = core.make_u8(16)
+    var r: Int = pg.write_i16_be_at(row, 0, 1)
+    r = pg.write_i32_be_at(row, r, 2)
+    r = pg.write_ascii_at(row, r, "42")
+    if pg.data_row_column_count(row, 0) != 1:
+        return 12
+    if pg.data_row_i32_at(row, 0, 0) != 42:
+        return 13
+    var malformed: []u8 = core.make_u8(8)
+    malformed[0] = 128
+    malformed[1] = 0
+    if pg.row_description_column_count(malformed, 0) != -1:
+        return 20
+    if pg.row_description_type_oid_at(malformed, 0, 2, 0) != -1:
+        return 21
+    if pg.data_row_column_count(malformed, 0) != -1:
+        return 22
+    if pg.data_row_value_len_at(malformed, 0, 0) != -1:
+        return 23
+    if pg.data_row_value_start_at(malformed, 0, 0) != -1:
+        return 24
+    if pg.data_row_i32_at(malformed, 0, 0) != 0:
+        return 25
+    return 0

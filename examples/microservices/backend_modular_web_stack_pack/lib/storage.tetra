@@ -1,0 +1,56 @@
+module examples.microservices.backend_modular_web_stack_pack.lib.storage
+
+import lib.core.postgres as pg
+
+func require_frame(frame: []u8, expected_type: Int, expected_total_len: Int) -> Bool
+uses mem:
+    if pg.frame_type_at(frame, 0) != expected_type:
+        return false
+    if pg.frame_total_len_at(frame, 0) != expected_total_len:
+        return false
+    if pg.frame_payload_len_at(frame, 0) != expected_total_len - 5:
+        return false
+    return true
+
+func probe_storage() -> Int
+uses alloc, mem:
+    let statement: String = "update_world"
+    let query: String = "UPDATE world SET randomNumber=$1 WHERE id=$2"
+    var oids: []i32 = core.make_i32(2)
+    oids[0] = pg.int4_oid()
+    oids[1] = pg.int4_oid()
+    var parse_frame: []u8 = core.make_u8(pg.parse_frame_len(statement, query, oids))
+    let parse_written: Int = pg.write_parse(parse_frame, statement, query, oids)
+    if !require_frame(parse_frame, pg.frame_parse(), parse_written):
+        return 1
+    if pg.read_i16_be(parse_frame, parse_written - 10) != 2:
+        return 2
+    if pg.read_i32_be(parse_frame, parse_written - 8) != pg.int4_oid():
+        return 3
+    if pg.read_i32_be(parse_frame, parse_written - 4) != pg.int4_oid():
+        return 4
+    var bind_frame: []u8 = core.make_u8(pg.bind_text_2_frame_len("", statement, "777", "42"))
+    let bind_written: Int = pg.write_bind_text_2(bind_frame, "", statement, "777", "42")
+    if !require_frame(bind_frame, pg.frame_bind(), bind_written):
+        return 5
+    if pg.read_i16_be(bind_frame, bind_written - 2) != 0:
+        return 6
+    var row_payload: []u8 = core.make_u8(48)
+    var row_pos: Int = 2
+    row_pos = pg.write_i16_be_at(row_payload, row_pos, 2)
+    row_pos = pg.write_i32_be_at(row_payload, row_pos, 2)
+    row_pos = pg.write_ascii_at(row_payload, row_pos, "42")
+    row_pos = pg.write_i32_be_at(row_payload, row_pos, 3)
+    row_pos = pg.write_ascii_at(row_payload, row_pos, "777")
+    if pg.data_row_column_count(row_payload, 2) != 2:
+        return 7
+    if pg.data_row_i32_at(row_payload, 2, 0) != 42:
+        return 8
+    if pg.data_row_i32_at(row_payload, 2, 1) != 777:
+        return 9
+    var command_payload: []u8 = core.make_u8(16)
+    let command_len: Int = pg.write_ascii_at(command_payload, 0, "UPDATE 2")
+    command_payload[command_len] = 0
+    if pg.command_complete_affected_rows(command_payload, 0, command_len + 1) != 2:
+        return 10
+    return 0

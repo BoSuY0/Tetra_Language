@@ -18,7 +18,6 @@ uses alloc, mem:
     queries[1] = 12
     queries[2] = 22
     queries[3] = 40
-
     var q: Int = 0
     var checksum: Int = 0
     while q < 4:

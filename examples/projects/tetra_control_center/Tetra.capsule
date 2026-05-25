@@ -1,0 +1,5 @@
+manifest "tetra.capsule.v1"
+capsule TetraControlCenter:
+    id "tetra://examples/tetra-control-center"
+    version "0.1.0"
+    target "wasm32-web"

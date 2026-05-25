@@ -1,0 +1,59 @@
+// Backend HTTP request-target character guard microservice smoke.
+module examples.microservices.backend_http_request_target_char_guard_service
+
+import lib.core.http as http
+
+func check_string_target_chars() -> Int:
+    if http.route_tech_empower("GET /json\t HTTP/1.1\r\nHost: local\r\n\r\n") != http.route_bad_request():
+        return 1
+    if http.request_keep_alive("GET /json\t HTTP/1.1\r\nHost: local\r\n\r\n"):
+        return 2
+    if http.route_tech_empower("GET /json?\tdebug=1 HTTP/1.1\r\nHost: local\r\n\r\n") != http.route_bad_request():
+        return 3
+    if http.request_keep_alive("GET /json?\tdebug=1 HTTP/1.1\r\nHost: local\r\n\r\n"):
+        return 4
+    if http.route_tech_empower("GET /json?debug=1 HTTP/1.1\r\nHost: local\r\n\r\n") != http.route_json():
+        return 5
+    if !http.request_keep_alive("GET /queries?queries=7 HTTP/1.1\r\nHost: local\r\n\r\n"):
+        return 6
+    return 0
+
+func check_byte_target_chars() -> Int
+uses alloc, mem:
+    var req: []u8 = core.make_u8(384)
+    var pos: Int = 0
+    let first_start: Int = pos
+    pos = http.write_ascii_at(req, pos, "GET /db")
+    req[pos] = 1
+    pos = pos + 1
+    pos = http.write_ascii_at(req, pos, " HTTP/1.1\r\nHost: local\r\n\r\n")
+    let first_len: Int = pos - first_start
+    let second_start: Int = pos
+    pos = http.write_ascii_at(req, pos, "GET /plaintext\t HTTP/1.1\r\nHost: local\r\n\r\n")
+    let second_len: Int = pos - second_start
+    let third_start: Int = pos
+    pos = http.write_ascii_at(req, pos, "GET /plaintext?ok=1 HTTP/1.1\r\nHost: local\r\n\r\n")
+    let third_len: Int = pos - third_start
+    if http.route_tech_empower_bytes_at(req, first_start, first_len) != http.route_bad_request():
+        return 7
+    if http.request_keep_alive_bytes_at(req, first_start, first_len):
+        return 8
+    if http.route_tech_empower_bytes_at(req, second_start, second_len) != http.route_bad_request():
+        return 9
+    if http.request_keep_alive_bytes_at(req, second_start, second_len):
+        return 10
+    if http.route_tech_empower_bytes_at(req, third_start, third_len) != http.route_plaintext():
+        return 11
+    if !http.request_keep_alive_bytes_at(req, third_start, third_len):
+        return 12
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let strings: Int = check_string_target_chars()
+    if strings != 0:
+        return strings
+    let bytes: Int = check_byte_target_chars()
+    if bytes != 0:
+        return bytes
+    return 0

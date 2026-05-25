@@ -1,0 +1,86 @@
+// Backend PostgreSQL prepared wire-frame microservice smoke.
+module examples.microservices.backend_postgres_prepared_pipeline_service
+
+import lib.core.postgres as pg
+
+func require_frame(frame: []u8, expected_type: Int, expected_total_len: Int) -> Bool
+uses mem:
+    if pg.frame_type_at(frame, 0) != expected_type:
+        return false
+    if pg.frame_total_len_at(frame, 0) != expected_total_len:
+        return false
+    if pg.frame_payload_len_at(frame, 0) != expected_total_len - 5:
+        return false
+    return true
+
+func main() -> Int
+uses alloc, mem:
+    let statement: String = "world_by_id"
+    let query: String = "SELECT id, randomNumber FROM world WHERE id=$1"
+    var oids: []i32 = core.make_i32(1)
+    oids[0] = pg.int4_oid()
+    var parse_frame: []u8 = core.make_u8(pg.parse_frame_len(statement, query, oids))
+    let parse_written: Int = pg.write_parse(parse_frame, statement, query, oids)
+    if parse_written != pg.parse_frame_len(statement, query, oids):
+        return 1
+    if !require_frame(parse_frame, pg.frame_parse(), parse_written):
+        return 2
+    if pg.read_i16_be(parse_frame, parse_written - 6) != 1:
+        return 3
+    if pg.read_i32_be(parse_frame, parse_written - 4) != pg.int4_oid():
+        return 4
+    var bind_frame: []u8 = core.make_u8(pg.bind_text_1_frame_len("", statement, "42"))
+    let bind_written: Int = pg.write_bind_text_1(bind_frame, "", statement, "42")
+    if bind_written != pg.bind_text_1_frame_len("", statement, "42"):
+        return 5
+    if !require_frame(bind_frame, pg.frame_bind(), bind_written):
+        return 6
+    if pg.read_i16_be(bind_frame, bind_written - 2) != 0:
+        return 7
+    var describe_frame: []u8 = core.make_u8(pg.describe_portal_frame_len(""))
+    let describe_written: Int = pg.write_describe_portal(describe_frame, "")
+    if describe_written != pg.describe_portal_frame_len(""):
+        return 8
+    if !require_frame(describe_frame, pg.frame_describe(), describe_written):
+        return 9
+    if describe_frame[5] != pg.describe_kind_portal():
+        return 10
+    var execute_frame: []u8 = core.make_u8(pg.execute_frame_len("", 1))
+    let execute_written: Int = pg.write_execute(execute_frame, "", 1)
+    if execute_written != pg.execute_frame_len("", 1):
+        return 11
+    if !require_frame(execute_frame, pg.frame_execute(), execute_written):
+        return 12
+    if pg.read_i32_be(execute_frame, execute_written - 4) != 1:
+        return 13
+    var sync_frame: []u8 = core.make_u8(pg.sync_frame_len())
+    let sync_written: Int = pg.write_sync(sync_frame)
+    if sync_written != pg.sync_frame_len():
+        return 14
+    if !require_frame(sync_frame, pg.frame_sync(), sync_written):
+        return 15
+    var row_payload: []u8 = core.make_u8(48)
+    var row_pos: Int = 3
+    row_pos = pg.write_i16_be_at(row_payload, row_pos, 2)
+    row_pos = pg.write_i32_be_at(row_payload, row_pos, 2)
+    row_pos = pg.write_ascii_at(row_payload, row_pos, "42")
+    row_pos = pg.write_i32_be_at(row_payload, row_pos, 3)
+    row_pos = pg.write_ascii_at(row_payload, row_pos, "777")
+    if pg.data_row_column_count(row_payload, 3) != 2:
+        return 16
+    if pg.data_row_value_len_at(row_payload, 3, 0) != 2:
+        return 17
+    if pg.data_row_i32_at(row_payload, 3, 0) != 42:
+        return 18
+    if pg.data_row_i32_at(row_payload, 3, 1) != 777:
+        return 19
+    var command_payload: []u8 = core.make_u8(16)
+    let command_len: Int = pg.write_ascii_at(command_payload, 0, "UPDATE 12")
+    command_payload[command_len] = 0
+    if pg.command_complete_affected_rows(command_payload, 0, command_len + 1) != 12:
+        return 20
+    var ready_payload: []u8 = core.make_u8(1)
+    ready_payload[0] = pg.ready_for_query_idle_status()
+    if pg.ready_for_query_status(ready_payload, 0) != pg.ready_for_query_idle_status():
+        return 21
+    return 0

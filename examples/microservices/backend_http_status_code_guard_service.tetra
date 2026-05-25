@@ -1,0 +1,81 @@
+// Backend HTTP response status-code guard microservice.
+module examples.microservices.backend_http_status_code_guard_service
+
+import lib.core.http as http
+
+func fill_bytes(dst: inout []u8, count: Int, value: Int) -> Int
+uses mem:
+    var i: Int = 0
+    while i < count:
+        dst[i] = value
+        i = i + 1
+    return count
+
+func all_bytes_equal(src: []u8, count: Int, value: Int) -> Bool
+uses mem:
+    var i: Int = 0
+    while i < count:
+        if src[i] != value:
+            return false
+        i = i + 1
+    return true
+
+func check_valid_status_codes() -> Int
+uses alloc, mem:
+    let date: String = "Thu, 04 Jan 2024 00:00:00 GMT"
+    let min_len: Int = http.response_head_len(100, "Continue", "Tetra", date, "text/plain", 0, true)
+    var min_status: []u8 = core.make_u8(min_len)
+    if http.write_response_head(min_status, 100, "Continue", "Tetra", date, "text/plain", 0, true) != min_len:
+        return 1
+    if min_status[9] != 49 || min_status[10] != 48 || min_status[11] != 48:
+        return 2
+    let ok_len: Int = http.response_head_len(200, "OK", "Tetra", date, "text/plain", 0, true)
+    var ok_status: []u8 = core.make_u8(ok_len)
+    if http.write_response_head(ok_status, 200, "OK", "Tetra", date, "text/plain", 0, true) != ok_len:
+        return 3
+    let max_len: Int = http.response_head_len(999, "Max", "Tetra", date, "text/plain", 0, false)
+    var max_status: []u8 = core.make_u8(max_len)
+    if http.write_response_head(max_status, 999, "Max", "Tetra", date, "text/plain", 0, false) != max_len:
+        return 4
+    if max_status[9] != 57 || max_status[10] != 57 || max_status[11] != 57:
+        return 5
+    return 0
+
+func check_invalid_status_len(status: Int, code: Int) -> Int:
+    let date: String = "Thu, 04 Jan 2024 00:00:00 GMT"
+    if http.response_head_len(status, "Bad", "Tetra", date, "text/plain", 0, true) != -1:
+        return code
+    return 0
+
+func check_invalid_status_write(status: Int, code: Int) -> Int
+uses alloc, mem:
+    let date: String = "Thu, 04 Jan 2024 00:00:00 GMT"
+    var head: []u8 = core.make_u8(96)
+    fill_bytes(head, 96, 7)
+    if http.write_response_head(head, status, "Bad", "Tetra", date, "text/plain", 0, true) != -1:
+        return code
+    if !all_bytes_equal(head, 96, 7):
+        return code + 1
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let valid: Int = check_valid_status_codes()
+    if valid != 0:
+        return valid
+    let low_len: Int = check_invalid_status_len(99, 11)
+    if low_len != 0:
+        return low_len
+    let high_len: Int = check_invalid_status_len(1000, 12)
+    if high_len != 0:
+        return high_len
+    let negative_len: Int = check_invalid_status_len(-1, 13)
+    if negative_len != 0:
+        return negative_len
+    let low_write: Int = check_invalid_status_write(99, 21)
+    if low_write != 0:
+        return low_write
+    let high_write: Int = check_invalid_status_write(1000, 23)
+    if high_write != 0:
+        return high_write
+    return check_invalid_status_write(-1, 25)

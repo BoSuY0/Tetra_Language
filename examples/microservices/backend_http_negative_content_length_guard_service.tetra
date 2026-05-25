@@ -1,0 +1,54 @@
+// Backend HTTP negative Content-Length guard microservice.
+module examples.microservices.backend_http_negative_content_length_guard_service
+
+import lib.core.http as http
+
+func fill_bytes(dst: inout []u8, count: Int, value: Int) -> Int
+uses mem:
+    var i: Int = 0
+    while i < count:
+        dst[i] = value
+        i = i + 1
+    return count
+
+func all_bytes_equal(src: []u8, count: Int, value: Int) -> Bool
+uses mem:
+    var i: Int = 0
+    while i < count:
+        if src[i] != value:
+            return false
+        i = i + 1
+    return true
+
+func check_valid_content_lengths() -> Int
+uses alloc, mem:
+    let date: String = "Wed, 03 Jan 2024 00:00:00 GMT"
+    let zero_len: Int = http.response_head_len(200, "OK", "Tetra", date, "text/plain", 0, true)
+    var zero: []u8 = core.make_u8(zero_len)
+    if http.write_response_head(zero, 200, "OK", "Tetra", date, "text/plain", 0, true) != zero_len:
+        return 1
+    let positive_len: Int = http.response_head_len(503, "Service Unavailable", "Tetra", date, "text/plain", 12, false)
+    var positive: []u8 = core.make_u8(positive_len)
+    if http.write_response_head(positive, 503, "Service Unavailable", "Tetra", date, "text/plain", 12, false) != positive_len:
+        return 2
+    return 0
+
+func check_negative_content_length() -> Int
+uses alloc, mem:
+    let date: String = "Wed, 03 Jan 2024 00:00:00 GMT"
+    if http.response_head_len(200, "OK", "Tetra", date, "text/plain", -1, true) != -1:
+        return 11
+    var head: []u8 = core.make_u8(96)
+    fill_bytes(head, 96, 7)
+    if http.write_response_head(head, 200, "OK", "Tetra", date, "text/plain", -1, true) != -1:
+        return 12
+    if !all_bytes_equal(head, 96, 7):
+        return 13
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let valid: Int = check_valid_content_lengths()
+    if valid != 0:
+        return valid
+    return check_negative_content_length()

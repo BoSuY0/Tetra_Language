@@ -1,0 +1,6 @@
+module gateway_routes
+
+import services.gateway as gateway
+
+test "capsule gateway routes":
+    expect gateway.route_status(1, 1, 7) == 200 && gateway.route_status(1, 2, 7) == 202 && gateway.route_status(2, 1, 7) == 405

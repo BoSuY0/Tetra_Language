@@ -1,0 +1,7 @@
+module policy_clamps
+
+import services.gateway as gateway
+import services.policy as policy
+
+test "capsule policy clamps queries":
+    expect policy.normalize_queries(-4) == 1 && policy.normalize_queries(700) == 500 && gateway.probe() == 0

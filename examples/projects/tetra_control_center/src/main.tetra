@@ -1,0 +1,122 @@
+state ControlCenterState:
+    var activeScreen: String = "Dashboard"
+    var selectedProfile: String = "Balanced"
+    var profileRequest: String = "balanced"
+    var dryRunMode: String = "enabled"
+    var refreshCount: Int = 0
+    var lastAction: String = "Read-only diagnostics loaded"
+    val screenDashboard: String = "Dashboard"
+    val screenProfiles: String = "Profiles"
+    val screenFans: String = "Fans/Backends"
+    val screenDiagnostics: String = "Diagnostics"
+    val screenLogs: String = "Logs"
+    val screenSettings: String = "Settings"
+    val profileQuiet: String = "Quiet"
+    val profileBalanced: String = "Balanced"
+    val profilePerformance: String = "Performance"
+    val profileCustom: String = "Custom"
+    val cpuText: String = "CPU live data comes from the safe helper snapshot"
+    val gpuText: String = "GPU data uses nvidia-smi only when available"
+    val memoryText: String = "RAM data comes from /proc/meminfo"
+    val batteryText: String = "Battery data comes from /sys/class/power_supply"
+    val sensorText: String = "Sensors are discovered from hwmon read-only files"
+    val powerText: String = "powerprofilesctl is used when available"
+    val driverSupportText: String = "Support status is evidence-based and split by backend"
+    val fanSupportText: String = "Fan control is unsupported unless NBFC-Linux status works"
+    val diagnosticText: String = "DMI, modules, sysfs capabilities, TUXEDO, and NBFC are reported"
+    val logsText: String = "Profile actions write JSON audit log entries"
+    val settingsText: String = "Writes are disabled unless the helper starts with allow-writes"
+
+view ControlCenterView(state: ControlCenterState):
+    bind activeScreenText: String = state.activeScreen
+    bind selectedProfileText: String = state.selectedProfile
+    bind profileRequestText: String = state.profileRequest
+    bind dryRunText: String = state.dryRunMode
+    bind refreshCountValue: Int = state.refreshCount
+    bind lastActionText: String = state.lastAction
+    bind dashboardScreenText: String = state.screenDashboard
+    bind profilesScreenText: String = state.screenProfiles
+    bind fansScreenText: String = state.screenFans
+    bind diagnosticsScreenText: String = state.screenDiagnostics
+    bind logsScreenText: String = state.screenLogs
+    bind settingsScreenText: String = state.screenSettings
+    bind quietProfileText: String = state.profileQuiet
+    bind balancedProfileText: String = state.profileBalanced
+    bind performanceProfileText: String = state.profilePerformance
+    bind customProfileText: String = state.profileCustom
+    bind cpuSummaryText: String = state.cpuText
+    bind gpuSummaryText: String = state.gpuText
+    bind memorySummaryText: String = state.memoryText
+    bind batterySummaryText: String = state.batteryText
+    bind sensorSummaryText: String = state.sensorText
+    bind powerSummaryText: String = state.powerText
+    bind driverSupportText: String = state.driverSupportText
+    bind fanSupportText: String = state.fanSupportText
+    bind diagnosticSummaryText: String = state.diagnosticText
+    bind logsSummaryText: String = state.logsText
+    bind settingsSummaryText: String = state.settingsText
+    event openDashboard -> showDashboard
+    event openProfiles -> showProfiles
+    event openFans -> showFans
+    event openDiagnostics -> showDiagnostics
+    event openLogs -> showLogs
+    event openSettings -> showSettings
+    event chooseQuiet -> chooseQuiet
+    event chooseBalanced -> chooseBalanced
+    event choosePerformance -> choosePerformance
+    event chooseCustom -> chooseCustom
+    event enableDryRun -> enableDryRun
+    event disableDryRun -> disableDryRun
+    event refreshSnapshot -> refreshSnapshot
+    command showDashboard:
+        state.activeScreen = "Dashboard"
+        state.lastAction = "Dashboard selected"
+    command showProfiles:
+        state.activeScreen = "Profiles"
+        state.lastAction = "Profiles selected"
+    command showFans:
+        state.activeScreen = "Fans/Backends"
+        state.lastAction = "Fan and backend status selected"
+    command showDiagnostics:
+        state.activeScreen = "Diagnostics"
+        state.lastAction = "Diagnostics selected"
+    command showLogs:
+        state.activeScreen = "Logs"
+        state.lastAction = "Logs selected"
+    command showSettings:
+        state.activeScreen = "Settings"
+        state.lastAction = "Settings selected"
+    command chooseQuiet:
+        state.selectedProfile = "Quiet"
+        state.profileRequest = "quiet"
+        state.lastAction = "Quiet profile staged"
+    command chooseBalanced:
+        state.selectedProfile = "Balanced"
+        state.profileRequest = "balanced"
+        state.lastAction = "Balanced profile staged"
+    command choosePerformance:
+        state.selectedProfile = "Performance"
+        state.profileRequest = "performance"
+        state.lastAction = "Performance profile staged"
+    command chooseCustom:
+        state.selectedProfile = "Custom"
+        state.profileRequest = "custom"
+        state.lastAction = "Custom profile staged"
+    command enableDryRun:
+        state.dryRunMode = "enabled"
+        state.lastAction = "Dry-run mode enabled"
+    command disableDryRun:
+        state.dryRunMode = "disabled"
+        state.lastAction = "Dry-run mode disabled"
+    command refreshSnapshot:
+        state.refreshCount = state.refreshCount + 1
+        state.lastAction = "Snapshot refresh requested"
+    style width: Int = 1180
+    style height: Int = 760
+    style theme: String = "control-center"
+    style density: String = "workstation"
+    accessibility role: String = "application"
+    accessibility label: String = "Tetra Control Center"
+
+func main() -> Int:
+    return 0

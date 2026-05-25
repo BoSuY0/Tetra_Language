@@ -1,0 +1,42 @@
+// Backend PostgreSQL frame-header bounds guard microservice.
+module examples.microservices.backend_postgres_frame_header_bounds_guard_service
+
+import lib.core.postgres as pg
+
+func main() -> Int
+uses alloc, mem:
+    var frame: []u8 = core.make_u8(pg.sync_frame_len())
+    let written: Int = pg.write_sync(frame)
+    if written != pg.sync_frame_len():
+        return 10
+    if pg.frame_type_at(frame, 0) != pg.frame_sync():
+        return 11
+    if pg.frame_length_at(frame, 0) != 4:
+        return 12
+    if pg.frame_payload_len_at(frame, 0) != 0:
+        return 13
+    if pg.frame_total_len_at(frame, 0) != 5:
+        return 14
+    if pg.frame_payload_start(0) != 5:
+        return 15
+    if pg.frame_type_at(frame, -1) != -1:
+        return 16
+    if pg.frame_length_at(frame, -1) != -1:
+        return 17
+    if pg.frame_payload_len_at(frame, -1) != -1:
+        return 18
+    if pg.frame_total_len_at(frame, -1) != -1:
+        return 19
+    var malformed: []u8 = core.make_u8(5)
+    malformed[0] = pg.frame_sync()
+    malformed[1] = 0
+    malformed[2] = 0
+    malformed[3] = 0
+    malformed[4] = 3
+    if pg.frame_length_at(malformed, 0) != 3:
+        return 20
+    if pg.frame_payload_len_at(malformed, 0) != -1:
+        return 21
+    if pg.frame_total_len_at(malformed, 0) != -1:
+        return 22
+    return 0

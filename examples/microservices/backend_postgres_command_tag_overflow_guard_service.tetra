@@ -1,0 +1,51 @@
+// Backend PostgreSQL CommandComplete affected-row overflow guard microservice.
+module examples.microservices.backend_postgres_command_tag_overflow_guard_service
+
+import lib.core.postgres as pg
+
+func check_direct_tags() -> Int
+uses alloc, mem:
+    var max_tag: []u8 = core.make_u8(24)
+    let max_len: Int = pg.write_cstring_at(max_tag, 0, "UPDATE 2147483647")
+    if max_len != 18:
+        return 10
+    if pg.command_complete_affected_rows(max_tag, 0, max_len) != 2147483647:
+        return 11
+    var positive_overflow: []u8 = core.make_u8(24)
+    let positive_len: Int = pg.write_cstring_at(positive_overflow, 0, "UPDATE 2147483648")
+    if positive_len != 18:
+        return 12
+    if pg.command_complete_affected_rows(positive_overflow, 0, positive_len) != 0:
+        return 13
+    var insert_overflow: []u8 = core.make_u8(28)
+    let insert_len: Int = pg.write_cstring_at(insert_overflow, 0, "INSERT 0 2147483648")
+    if insert_len != 20:
+        return 14
+    if pg.command_complete_affected_rows(insert_overflow, 0, insert_len) != 0:
+        return 15
+    var insert_valid: []u8 = core.make_u8(28)
+    let insert_valid_len: Int = pg.write_cstring_at(insert_valid, 0, "INSERT 0 2147483647")
+    if insert_valid_len != 20:
+        return 16
+    if pg.command_complete_affected_rows(insert_valid, 0, insert_valid_len) != 2147483647:
+        return 17
+    return 0
+
+func check_subranges() -> Int
+uses alloc, mem:
+    var tag: []u8 = core.make_u8(32)
+    let tag_len: Int = pg.write_cstring_at(tag, 0, "DELETE 2147483648")
+    if tag_len != 18:
+        return 20
+    if pg.command_complete_affected_rows(tag, 7, 10) != 0:
+        return 21
+    if pg.command_complete_affected_rows(tag, 7, 9) != 214748364:
+        return 22
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let direct: Int = check_direct_tags()
+    if direct != 0:
+        return direct
+    return check_subranges()

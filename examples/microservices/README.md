@@ -753,6 +753,201 @@ Examples:
   actor nested enum/struct payload messages, aliases the received field into a
   memory offset, and builds under executable and `--interface-only` `Jobs: 4`
   compiler modes.
+- `backend_postgres_session_state_service.tetra`: builds PostgreSQL startup,
+  simple query, describe, execute, sync, terminate, and ready-for-query
+  session-state frames through the stable backend wire helpers.
+- `backend_postgres_cstring_bounds_guard_service.tetra`: verifies PostgreSQL
+  bounded C-string scanning returns `-1` for empty, reversed, and negative
+  search ranges instead of reading outside the caller-owned payload.
+- `backend_postgres_cstring_nul_guard_service.tetra`: verifies PostgreSQL
+  C-string length and writer helpers reject embedded NUL bytes before writing
+  startup, query, statement, portal, or low-level C-string fields.
+- `backend_postgres_data_row_length_guard_service.tetra`: verifies PostgreSQL
+  signed DataRow length helpers normalize malformed negative length fields to
+  `-1` while preserving valid and NULL column controls.
+- `backend_postgres_ascii_i32_bounds_guard_service.tetra`: verifies PostgreSQL
+  bounded ASCII integer parsing returns `0` for negative or empty ranges while
+  preserving signed, unsigned, and non-digit controls.
+- `backend_postgres_ascii_i32_min_guard_service.tetra`: verifies PostgreSQL
+  bounded ASCII integer parsing preserves `-2147483648` through both direct
+  parser and DataRow integer paths while preserving the positive max control.
+- `backend_postgres_ascii_i32_overflow_guard_service.tetra`: verifies
+  PostgreSQL bounded ASCII integer parsing returns `0` for out-of-range
+  positive and negative i32 text while preserving max/min boundary controls.
+- `backend_postgres_command_tag_bounds_guard_service.tetra`: verifies
+  PostgreSQL CommandComplete affected-row parsing returns `0` for negative or
+  empty ranges while preserving `INSERT` and `UPDATE` count controls.
+- `backend_postgres_command_tag_overflow_guard_service.tetra`: verifies
+  PostgreSQL CommandComplete affected-row parsing returns `0` for out-of-range
+  counts while preserving `2147483647` boundary controls.
+- `backend_postgres_command_tag_trailing_guard_service.tetra`: verifies
+  PostgreSQL CommandComplete affected-row parsing only returns a digit run
+  that actually trails the bounded tag payload.
+- `backend_postgres_parse_count_guard_service.tetra`: verifies PostgreSQL
+  Parse frame sizing and writing reject parameter type counts above the signed
+  i16 protocol range while preserving small valid Parse frames.
+- `backend_postgres_row_description_bounds_guard_service.tetra`: verifies
+  PostgreSQL RowDescription type-OID scanning returns `-1` for negative,
+  empty, truncated, or out-of-range metadata requests.
+- `backend_postgres_data_row_bounds_guard_service.tetra`: verifies PostgreSQL
+  DataRow value length/start helpers return `-1` for negative starts and
+  missing columns while preserving valid integer columns.
+- `backend_postgres_data_row_truncated_value_guard_service.tetra`: verifies
+  PostgreSQL DataRow value helpers reject advertised positive lengths whose
+  value bytes are not physically present in the caller-owned buffer.
+- `backend_postgres_parser_short_guard_service.tetra`: verifies PostgreSQL
+  bounded C-string, ASCII integer, and CommandComplete parsers return sentinel
+  values for overstated limits/counts while preserving valid parser controls.
+- `backend_postgres_frame_header_bounds_guard_service.tetra`: verifies
+  PostgreSQL frame header readers return `-1` for negative starts and
+  malformed short length fields while preserving valid Sync frame controls.
+- `backend_postgres_frame_signed_length_guard_service.tetra`: verifies
+  PostgreSQL frame length readers normalize malformed negative signed length
+  fields to `-1` while preserving valid Sync and short-length controls.
+- `backend_postgres_frame_total_overflow_guard_service.tetra`: verifies
+  PostgreSQL frame total-length readers reject signed maximum length fields
+  whose total byte count would overflow `Int`.
+- `backend_postgres_frame_short_guard_service.tetra`: verifies PostgreSQL
+  frame header readers return `-1` for empty, tag-only, and truncated length
+  buffers while preserving valid Sync frame controls.
+- `backend_postgres_ready_status_bounds_guard_service.tetra`: verifies
+  PostgreSQL ReadyForQuery status reads return `-1` for negative starts while
+  preserving idle, in-transaction, and failed-transaction status bytes.
+- `backend_postgres_ready_status_short_guard_service.tetra`: verifies
+  PostgreSQL ReadyForQuery status reads return `-1` for empty and offset-short
+  payloads while preserving idle, in-transaction, and failed-transaction status
+  bytes.
+- `backend_postgres_column_count_bounds_guard_service.tetra`: verifies
+  PostgreSQL RowDescription and DataRow column-count readers return `-1` for
+  negative starts while preserving valid count fields.
+- `backend_postgres_column_count_signed_guard_service.tetra`: verifies
+  PostgreSQL RowDescription and DataRow column-count readers reject high-bit
+  signed i16 count fields while preserving valid one-column payloads.
+- `backend_postgres_read_bounds_guard_service.tetra`: verifies PostgreSQL
+  big-endian i32/i16 readers return `-1` for negative starts while preserving
+  valid unsigned and signed read controls.
+- `backend_postgres_read_short_guard_service.tetra`: verifies PostgreSQL
+  big-endian i32/i16 readers return `-1` for empty and truncated buffers while
+  preserving valid unsigned and signed read controls.
+- `backend_postgres_high_bit_read_guard_service.tetra`: verifies PostgreSQL
+  big-endian i32 readers return `-1` for high-bit/unrepresentable values while
+  preserving the `2147483647` positive control.
+- `backend_postgres_write_bounds_guard_service.tetra`: verifies PostgreSQL
+  big-endian i32/i16 writers return `-1` for negative starts while preserving
+  valid writes and existing buffer contents.
+- `backend_postgres_signed_write_guard_service.tetra`: verifies PostgreSQL
+  big-endian i32/i16 writers emit two's-complement bytes for negative values
+  while preserving positive write controls.
+- `backend_postgres_write_short_guard_service.tetra`: verifies PostgreSQL
+  big-endian i32/i16 writers return `-1` for empty and truncated buffers while
+  preserving valid writes and existing buffer contents.
+- `backend_postgres_text_write_bounds_guard_service.tetra`: verifies
+  PostgreSQL ASCII and C-string writers return `-1` for negative starts while
+  preserving valid text writes and existing buffer contents.
+- `backend_postgres_text_write_short_guard_service.tetra`: verifies
+  PostgreSQL ASCII and C-string writers return `-1` for empty and truncated
+  buffers while preserving valid text writes and existing buffer contents.
+- `backend_postgres_frame_writer_short_guard_service.tetra`: verifies
+  PostgreSQL startup, simple-query, extended-query, Sync, and Terminate frame
+  writers return `-1` for empty and truncated buffers while preserving valid
+  frames and existing buffer contents.
+- `backend_http_writer_bounds_guard_service.tetra`: verifies HTTP ASCII, CRLF,
+  header, and decimal writers return `-1` for negative starts while preserving
+  valid writes and existing buffer contents.
+- `backend_http_writer_short_guard_service.tetra`: verifies HTTP ASCII, CRLF,
+  header, and decimal writers return `-1` for empty and truncated buffers
+  while preserving valid writes and existing buffer contents.
+- `backend_http_response_writer_short_guard_service.tetra`: verifies HTTP
+  response-head, plaintext-response, and JSON-response writers return `-1` for
+  empty or truncated buffers while preserving valid responses and existing
+  buffer contents.
+- `backend_http_negative_content_length_guard_service.tetra`: verifies HTTP
+  response-head sizing and writing reject negative `Content-Length` values
+  while preserving zero and positive length controls.
+- `backend_http_status_code_guard_service.tetra`: verifies HTTP response-head
+  sizing and writing reject non-three-digit status codes while preserving
+  `100`, `200`, and `999` controls.
+- `backend_http_header_injection_guard_service.tetra`: verifies HTTP header and
+  response-head writers reject CR/LF header injection in names, values, reason
+  text, and response header fields.
+- `backend_http_header_control_guard_service.tetra`: verifies HTTP header and
+  response-head writers reject non-HTAB control bytes in values, reason text,
+  and response header fields while preserving valid HTAB values.
+- `backend_http_status_matrix_service.tetra`: checks HTTP status head
+  serialization, decimal byte writes, route path character tables, and
+  case-insensitive `Connection: close` keep-alive detection.
+- `backend_http_json_i32_min_guard_service.tetra`: verifies HTTP and JSON i32
+  decimal digit helpers plus HTTP decimal byte writes preserve `-2147483648`.
+- `backend_http_header_whitespace_service.tetra`: verifies string and
+  byte-buffer keep-alive detection for exact, multi-space, and tabbed
+  `Connection: close` headers.
+- `backend_http_connection_list_service.tetra`: verifies string and byte-buffer
+  keep-alive detection for comma-separated `Connection` token lists such as
+  `keep-alive, close` and `upgrade, Close`.
+- `backend_http_connection_scope_service.tetra`: verifies `Connection: close`
+  is scoped to the actual `Connection` header and does not trigger from
+  `X-Connection`, `Proxy-Connection`, or `Connection-Mode`.
+- `backend_http_connection_token_boundary_service.tetra`: verifies `close`
+  only disables keep-alive when it is a complete `Connection` token, not a
+  prefix inside `closex` or `close-upgrade`.
+- `backend_http_version_scope_service.tetra`: verifies HTTP/1.1 detection is
+  scoped to the request line and rejects header-only `HTTP/1.1` markers or
+  `HTTP/1.10` version prefixes.
+- `backend_http_request_target_guard_service.tetra`: verifies malformed empty
+  or query-only request targets are bad requests while `/` and `/?query`
+  remain valid not-found targets.
+- `backend_http_request_target_char_guard_service.tetra`: verifies HTTP
+  request-target scanning rejects tab/control target bytes as bad requests
+  while preserving valid query-string target controls.
+- `backend_http_request_line_token_guard_service.tetra`: verifies HTTP/1.1
+  detection only accepts the version as the third request-line token and
+  rejects extra tokens such as `GET /json debug HTTP/1.1`.
+- `backend_http_request_crlf_guard_service.tetra`: verifies HTTP request-line
+  detection rejects LF-only and bare-CR `HTTP/1.1` terminators while preserving
+  valid CRLF request controls.
+- `backend_http_request_short_guard_service.tetra`: verifies byte-buffer HTTP
+  request scanners return sentinel values for empty, offset-short, and
+  overstated request windows while preserving valid pipelined request controls.
+- `backend_http_keep_alive_target_guard_service.tetra`: verifies keep-alive
+  detection rejects malformed request targets such as `noslash` and
+  query-only targets while preserving `/`, `/?query`, and `/json` controls.
+- `backend_http_connection_body_scope_service.tetra`: verifies
+  `Connection: close` only disables keep-alive while it appears in the header
+  section, not in the body after the empty header terminator.
+- `backend_http_keep_alive_method_guard_service.tetra`: verifies keep-alive
+  detection rejects malformed method tokens containing separators or tabs
+  while preserving valid `GET` and `POST` request-lines.
+- `backend_json_control_matrix_service.tetra`: validates JSON string length and
+  byte serialization for tab, carriage-return, newline, empty-message objects,
+  signed integer length helpers, and lowercase hex digit helpers.
+- `backend_json_hex_digit_guard_service.tetra`: verifies public lowercase hex
+  digit helper bounds for negative and over-15 inputs while preserving message
+  object serialization controls.
+- `backend_json_writer_bounds_guard_service.tetra`: verifies JSON string and
+  message-object writers return `-1` for negative starts while preserving valid
+  escaped string and object serialization.
+- `backend_json_writer_short_guard_service.tetra`: verifies JSON string and
+  message-object writers return `-1` for empty and truncated buffers while
+  preserving valid escaped string and object serialization.
+- `backend_net_epoll_event_bounds_guard_service.tetra`: verifies epoll event
+  fd/flag extractors return `-1` for missing slots while preserving valid
+  event flag controls.
+- `backend_net_port_bounds_guard_service.tetra`: verifies TCP loopback bind
+  rejects negative and above-range ports while preserving ephemeral port `0`.
+- `backend_network_backoff_overflow_guard_service.tetra`: verifies retry backoff
+  caps are honored before i32 doubling overflow and ordinary retry controls stay
+  stable.
+- `backend_crypto_mix_min_guard_service.tetra`: verifies crypto seed mixing stays
+  non-negative when `seed * 33 + value` reaches the i32 minimum value.
+- `backend_filesystem_nul_exists_guard_service.tetra`: verifies filesystem
+  existence checks reject embedded-NUL paths instead of checking only the host
+  prefix before the NUL byte.
+- `backend_time_overflow_guard_service.tetra`: verifies duration helpers
+  saturate positive millisecond overflow to `Int` max and clamp negative
+  duration underflow to `0`.
+- `backend_time_negative_base_delta_guard_service.tetra`: verifies duration
+  addition applies positive deltas to negative bases before clamping the summed
+  result, while preserving underflow and overflow controls.
 
 Each program is an independent Linux-x64 entrypoint and exits `0` when its
 service contract passes.

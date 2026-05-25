@@ -1,0 +1,89 @@
+// Backend JSON writer short-buffer guard microservice.
+module examples.microservices.backend_json_writer_short_guard_service
+
+import lib.core.json as json
+
+func check_valid_writes() -> Bool
+uses alloc, mem:
+    var buf: []u8 = core.make_u8(32)
+    if json.write_json_string_at(buf, 0, "A\n\"") != 7:
+        return false
+    if buf[0] != 34 || buf[1] != 65 || buf[2] != 92 || buf[3] != 110 || buf[4] != 92 || buf[5] != 34 || buf[6] != 34:
+        return false
+    if json.write_message_object_at(buf, 8, "OK") != 24:
+        return false
+    if buf[8] != 123 || buf[18] != 58 || buf[19] != 34 || buf[20] != 79 || buf[21] != 75 || buf[22] != 34 || buf[23] != 125:
+        return false
+    return true
+
+func check_empty_writes() -> Int
+uses alloc, mem:
+    var empty: []u8 = core.make_u8(0)
+    if json.write_json_string_at(empty, 0, "Z") != -1:
+        return 21
+    if json.write_message_object_at(empty, 0, "Z") != -1:
+        return 22
+    return 0
+
+func check_truncated_string_write() -> Int
+uses alloc, mem:
+    var buf: []u8 = core.make_u8(2)
+    buf[0] = 9
+    buf[1] = 8
+    if json.write_json_string_at(buf, 0, "ABC") != -1:
+        return 31
+    if buf[0] != 9 || buf[1] != 8:
+        return 32
+    return 0
+
+func check_truncated_escape_write() -> Int
+uses alloc, mem:
+    var buf: []u8 = core.make_u8(5)
+    buf[0] = 1
+    buf[1] = 2
+    buf[2] = 3
+    buf[3] = 4
+    buf[4] = 5
+    if json.write_json_string_at(buf, 0, "\n\t\r") != -1:
+        return 41
+    if buf[0] != 1 || buf[1] != 2 || buf[2] != 3 || buf[3] != 4 || buf[4] != 5:
+        return 42
+    return 0
+
+func check_truncated_object_write() -> Int
+uses alloc, mem:
+    var buf: []u8 = core.make_u8(12)
+    buf[0] = 7
+    buf[1] = 6
+    buf[2] = 5
+    buf[3] = 4
+    buf[4] = 3
+    buf[5] = 2
+    buf[6] = 1
+    buf[7] = 9
+    buf[8] = 8
+    buf[9] = 7
+    buf[10] = 6
+    buf[11] = 5
+    if json.write_message_object_at(buf, 0, "OK") != -1:
+        return 51
+    if buf[0] != 7 || buf[1] != 6 || buf[2] != 5 || buf[3] != 4 || buf[4] != 3 || buf[5] != 2:
+        return 52
+    if buf[6] != 1 || buf[7] != 9 || buf[8] != 8 || buf[9] != 7 || buf[10] != 6 || buf[11] != 5:
+        return 53
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    if !check_valid_writes():
+        return 1
+    let empty_result: Int = check_empty_writes()
+    if empty_result != 0:
+        return empty_result
+    let string_result: Int = check_truncated_string_write()
+    if string_result != 0:
+        return string_result
+    let escape_result: Int = check_truncated_escape_write()
+    if escape_result != 0:
+        return escape_result
+    return check_truncated_object_write()

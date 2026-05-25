@@ -1,0 +1,47 @@
+// Backend PostgreSQL ASCII i32 minimum parser guard microservice.
+module examples.microservices.backend_postgres_ascii_i32_min_guard_service
+
+import lib.core.postgres as pg
+
+func check_direct_parse() -> Int
+uses alloc, mem:
+    let min_i32: Int = -2147483648
+    var min_bytes: []u8 = core.make_u8(12)
+    let min_end: Int = pg.write_ascii_at(min_bytes, 0, "-2147483648")
+    if min_end != 11:
+        return 10
+    if pg.parse_ascii_i32_at(min_bytes, 0, 11) != min_i32:
+        return 11
+    if pg.parse_ascii_i32_at(min_bytes, 0, 12) != min_i32:
+        return 12
+    var max_bytes: []u8 = core.make_u8(10)
+    let max_end: Int = pg.write_ascii_at(max_bytes, 0, "2147483647")
+    if max_end != 10:
+        return 13
+    if pg.parse_ascii_i32_at(max_bytes, 0, 10) != 2147483647:
+        return 14
+    return 0
+
+func check_data_row_parse() -> Int
+uses alloc, mem:
+    let min_i32: Int = -2147483648
+    var row: []u8 = core.make_u8(32)
+    var i: Int = pg.write_i16_be_at(row, 0, 1)
+    i = pg.write_i32_be_at(row, i, 11)
+    i = pg.write_ascii_at(row, i, "-2147483648")
+    if i != 17:
+        return 20
+    if pg.data_row_column_count(row, 0) != 1:
+        return 21
+    if pg.data_row_value_len_at(row, 0, 0) != 11:
+        return 22
+    if pg.data_row_i32_at(row, 0, 0) != min_i32:
+        return 23
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let direct: Int = check_direct_parse()
+    if direct != 0:
+        return direct
+    return check_data_row_parse()

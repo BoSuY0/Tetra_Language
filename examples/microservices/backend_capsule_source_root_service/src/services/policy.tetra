@@ -1,0 +1,32 @@
+module services.policy
+
+enum Route:
+    case health(Int)
+    case update(Int)
+    case reject(Int)
+
+func normalize_queries(raw: Int) -> Int:
+    if raw < 1:
+        return 1
+    if raw > 500:
+        return 500
+    return raw
+
+func classify(method: Int, path: Int, raw_queries: Int) -> Route:
+    if method != 1:
+        return Route.reject(405)
+    let queries: Int = normalize_queries(raw_queries)
+    if path == 1:
+        return Route.health(queries)
+    if path == 2:
+        return Route.update(queries)
+    return Route.reject(404)
+
+func status(route: Route) -> Int:
+    match route:
+    case Route.health(queries):
+        return 200 + queries * 0
+    case Route.update(queries):
+        return 202 + queries * 0
+    case Route.reject(code):
+        return code

@@ -12,7 +12,6 @@ uses alloc, mem:
         b[i] = 9 - i
         c[i] = 0
         i = i + 1
-
     var row: Int = 0
     while row < 3:
         var col: Int = 0
@@ -25,7 +24,6 @@ uses alloc, mem:
             c[row * 3 + col] = total
             col = col + 1
         row = row + 1
-
     var checksum: Int = 0
     i = 0
     while i < 9:

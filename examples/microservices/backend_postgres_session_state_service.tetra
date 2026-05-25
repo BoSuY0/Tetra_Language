@@ -1,0 +1,108 @@
+// Backend PostgreSQL session-state wire microservice smoke.
+module examples.microservices.backend_postgres_session_state_service
+
+import lib.core.postgres as pg
+
+func require_frame(frame: []u8, expected_type: Int, expected_total_len: Int) -> Bool
+uses mem:
+    if pg.frame_type_at(frame, 0) != expected_type:
+        return false
+    if pg.frame_total_len_at(frame, 0) != expected_total_len:
+        return false
+    if pg.frame_payload_len_at(frame, 0) != expected_total_len - 5:
+        return false
+    return true
+
+func check_startup_message() -> Int
+uses alloc, mem:
+    let startup_len: Int = pg.startup_message_len("tetra", "bench", "gateway")
+    var startup: []u8 = core.make_u8(startup_len)
+    let written: Int = pg.write_startup_message(startup, "tetra", "bench", "gateway")
+    if written != startup_len:
+        return 1
+    if pg.read_i32_be(startup, 0) != startup_len:
+        return 2
+    if pg.read_i32_be(startup, 4) != pg.protocol_version_3():
+        return 3
+    if pg.cstring_end_at(startup, 8, startup_len) != 12:
+        return 4
+    if pg.cstring_end_at(startup, 13, startup_len) != 18:
+        return 5
+    if pg.cstring_end_at(startup, 19, startup_len) != 27:
+        return 6
+    if pg.cstring_end_at(startup, 28, startup_len) != 33:
+        return 7
+    if pg.cstring_end_at(startup, 34, startup_len) != 50:
+        return 8
+    if pg.cstring_end_at(startup, 51, startup_len) != 58:
+        return 9
+    if startup[startup_len - 1] != 0:
+        return 10
+    return 0
+
+func check_query_and_control_frames() -> Int
+uses alloc, mem:
+    var query: []u8 = core.make_u8(pg.simple_query_frame_len("SELECT 1"))
+    let query_written: Int = pg.write_simple_query(query, "SELECT 1")
+    if !require_frame(query, pg.frame_simple_query(), query_written):
+        return 11
+    if pg.cstring_end_at(query, pg.frame_payload_start(0), query_written) != query_written - 1:
+        return 12
+    var portal_desc: []u8 = core.make_u8(pg.describe_portal_frame_len("p0"))
+    let portal_written: Int = pg.write_describe_portal(portal_desc, "p0")
+    if !require_frame(portal_desc, pg.frame_describe(), portal_written):
+        return 13
+    if portal_desc[pg.frame_payload_start(0)] != pg.describe_kind_portal():
+        return 14
+    if pg.cstring_end_at(portal_desc, pg.frame_payload_start(0) + 1, portal_written) != portal_written - 1:
+        return 15
+    var statement_desc: []u8 = core.make_u8(pg.describe_statement_frame_len("stmt"))
+    let statement_written: Int = pg.write_describe_statement(statement_desc, "stmt")
+    if !require_frame(statement_desc, pg.frame_describe(), statement_written):
+        return 16
+    if statement_desc[pg.frame_payload_start(0)] != pg.describe_kind_statement():
+        return 17
+    if pg.cstring_end_at(statement_desc, pg.frame_payload_start(0) + 1, statement_written) != statement_written - 1:
+        return 18
+    var execute: []u8 = core.make_u8(pg.execute_frame_len("p0", 16))
+    let execute_written: Int = pg.write_execute(execute, "p0", 16)
+    if !require_frame(execute, pg.frame_execute(), execute_written):
+        return 19
+    if pg.read_i32_be(execute, execute_written - 4) != 16:
+        return 20
+    var sync: []u8 = core.make_u8(pg.sync_frame_len())
+    let sync_written: Int = pg.write_sync(sync)
+    if !require_frame(sync, pg.frame_sync(), sync_written):
+        return 21
+    var terminate: []u8 = core.make_u8(pg.terminate_frame_len())
+    let terminate_written: Int = pg.write_terminate(terminate)
+    if !require_frame(terminate, pg.frame_terminate(), terminate_written):
+        return 22
+    return 0
+
+func check_ready_states() -> Int
+uses alloc, mem:
+    var states: []u8 = core.make_u8(3)
+    states[0] = pg.ready_for_query_idle_status()
+    states[1] = pg.ready_for_query_in_transaction_status()
+    states[2] = pg.ready_for_query_failed_transaction_status()
+    if pg.ready_for_query_status(states, 0) != 73:
+        return 23
+    if pg.ready_for_query_status(states, 1) != 84:
+        return 24
+    if pg.ready_for_query_status(states, 2) != 69:
+        return 25
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let startup: Int = check_startup_message()
+    if startup != 0:
+        return startup
+    let frames: Int = check_query_and_control_frames()
+    if frames != 0:
+        return frames
+    let states: Int = check_ready_states()
+    if states != 0:
+        return states
+    return 0

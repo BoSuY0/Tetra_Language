@@ -1,0 +1,40 @@
+module examples.microservices.backend_modular_web_stack_pack.lib.gateway
+
+import lib.core.http as http
+import lib.core.json as json
+
+func probe_gateway() -> Int
+uses alloc, mem:
+    let date: String = "Mon, 01 Jan 2024 00:00:00 GMT"
+    var requests: []u8 = core.make_u8(256)
+    var pos: Int = 0
+    let json_start: Int = pos
+    pos = http.write_ascii_at(requests, pos, "GET /json HTTP/1.1\r\nHost: local\r\n\r\n")
+    let json_len: Int = pos - json_start
+    let updates_start: Int = pos
+    pos = http.write_ascii_at(requests, pos, "GET /updates?queries=4 HTTP/1.1\r\nHost: local\r\nConnection: close\r\n\r\n")
+    let updates_len: Int = pos - updates_start
+    if http.request_head_len_bytes_at(requests, json_start, json_len) != json_len:
+        return 1
+    if http.route_tech_empower_bytes_at(requests, json_start, json_len) != http.route_json():
+        return 2
+    if !http.request_keep_alive_bytes_at(requests, json_start, json_len):
+        return 3
+    if http.request_head_len_bytes_at(requests, updates_start, updates_len) != updates_len:
+        return 4
+    if http.route_tech_empower_bytes_at(requests, updates_start, updates_len) != http.route_updates():
+        return 5
+    if http.request_keep_alive_bytes_at(requests, updates_start, updates_len):
+        return 6
+    let message: String = "pack\nroute"
+    let expected_len: Int = http.json_message_response_len("Tetra", date, message, true)
+    var response: []u8 = core.make_u8(expected_len)
+    let written: Int = http.write_json_message_response(response, "Tetra", date, message, true)
+    if written != expected_len:
+        return 7
+    let body_start: Int = written - json.message_object_len(message)
+    if response[body_start] != 123 || response[written - 1] != 125:
+        return 8
+    if json.encoded_string_len(message) != 13:
+        return 9
+    return 0

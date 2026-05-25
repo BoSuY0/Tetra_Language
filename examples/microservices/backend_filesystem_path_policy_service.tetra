@@ -1,0 +1,37 @@
+// Backend filesystem path-policy microservice smoke.
+module examples.microservices.backend_filesystem_path_policy_service
+
+import lib.core.filesystem as filesystem
+import lib.core.strings as strings
+
+func main() -> Int
+uses capability, io:
+    let route: String = "GET /health"
+    if strings.ascii_len(route) != 11:
+        return 1
+    if strings.ascii_sum(route) != 933:
+        return 2
+    if !strings.is_empty(""):
+        return 3
+    if strings.is_empty(route):
+        return 4
+    let absolute: String = "/srv//api/v1/"
+    if !filesystem.has_leading_slash(absolute):
+        return 5
+    if !filesystem.ends_with_slash(absolute):
+        return 6
+    if filesystem.slash_count(absolute) != 5:
+        return 7
+    if filesystem.directory_depth(absolute) != 3:
+        return 8
+    if filesystem.directory_depth("relative/cache/item") != 3:
+        return 9
+    if filesystem.has_leading_slash("") || filesystem.ends_with_slash(""):
+        return 10
+    if !filesystem.is_root("/") || filesystem.is_root("//"):
+        return 11
+    unsafe:
+        let cap: cap.io = core.cap_io()
+        if filesystem.exists("__tetra_missing_backend_path_policy__", cap):
+            return 12
+    return 0

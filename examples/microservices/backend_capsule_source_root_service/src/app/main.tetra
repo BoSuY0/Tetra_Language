@@ -1,0 +1,6 @@
+module app.main
+
+import services.gateway as gateway
+
+func main() -> Int:
+    return gateway.probe()

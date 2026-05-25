@@ -1,0 +1,8 @@
+manifest "tetra.capsule.v1"
+capsule BackendCapsuleSourceRootService:
+    id "tetra://examples/backend-capsule-source-root-service"
+    version "0.1.0"
+    entry "src/app/main.tetra"
+    source "src"
+    source "tests"
+    target "linux-x64"

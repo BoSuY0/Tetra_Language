@@ -1,0 +1,45 @@
+// Backend PostgreSQL text writer bounds guard microservice.
+module examples.microservices.backend_postgres_text_write_bounds_guard_service
+
+import lib.core.postgres as pg
+
+func main() -> Int
+uses alloc, mem:
+    var bytes: []u8 = core.make_u8(16)
+    if pg.write_ascii_at(bytes, 0, "OK") != 2:
+        return 10
+    if bytes[0] != 79:
+        return 11
+    if bytes[1] != 75:
+        return 12
+    if pg.write_cstring_at(bytes, 2, "x") != 4:
+        return 13
+    if bytes[2] != 120:
+        return 14
+    if bytes[3] != 0:
+        return 15
+    if pg.write_cstring_pair_at(bytes, 4, "a", "b") != 8:
+        return 16
+    if bytes[4] != 97:
+        return 17
+    if bytes[5] != 0:
+        return 18
+    if bytes[6] != 98:
+        return 19
+    if bytes[7] != 0:
+        return 20
+    if pg.write_ascii_at(bytes, -1, "Z") != -1:
+        return 21
+    if pg.write_cstring_at(bytes, -1, "Z") != -1:
+        return 22
+    if pg.write_cstring_pair_at(bytes, -1, "a", "b") != -1:
+        return 23
+    if bytes[0] != 79:
+        return 24
+    if bytes[2] != 120:
+        return 25
+    if bytes[4] != 97:
+        return 26
+    if bytes[6] != 98:
+        return 27
+    return 0
