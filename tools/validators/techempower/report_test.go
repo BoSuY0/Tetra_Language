@@ -155,6 +155,19 @@ func TestValidateReportRejectsSpoofedEndpointIdentity(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsInvalidContentTypePrefix(t *testing.T) {
+	report := reportFixture(false)
+	report.Endpoints[1].ObservedContentType = "application/json-bogus"
+
+	err := ValidateReport(mustReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted invalid observed content type prefix")
+	}
+	if !strings.Contains(err.Error(), "observed content type") {
+		t.Fatalf("ValidateReport content type error = %v, want observed content type rejection", err)
+	}
+}
+
 func TestValidateReportRejectsWeakEvidenceAndBadCounters(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].Evidence = "placeholder"

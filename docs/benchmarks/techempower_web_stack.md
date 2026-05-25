@@ -89,6 +89,9 @@ Semantic and matrix reports must include a real hex Git object id in
 `git.head`; `unknown` is not acceptable release evidence.
 The validator rejects non-monotonic latency percentile evidence, so endpoint and
 matrix-run reports must keep `p50 <= p90 <= p95 <= p99 <= p99.9 <= max`.
+Observed content types must match the documented media type exactly or include
+valid parameters after `;`; lookalike prefixes such as `application/json-bogus`
+are rejected.
 Endpoint benchmark command evidence must start with `tetra-techempower-bench`.
 Command `--requests` must match every endpoint `requests` count in the
 generated semantic report, and command `--concurrency` must be a positive

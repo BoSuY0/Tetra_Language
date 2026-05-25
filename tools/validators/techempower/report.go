@@ -407,8 +407,8 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 	}
 	if strings.TrimSpace(endpoint.ObservedContentType) == "" {
 		issues = append(issues, fmt.Sprintf("endpoint %s missing observed content type", endpoint.Path))
-	} else if expected := expectedContentTypePrefix(endpoint.Path); expected != "" && !strings.HasPrefix(endpoint.ObservedContentType, expected) {
-		issues = append(issues, fmt.Sprintf("endpoint %s observed content type = %q, want prefix %q", endpoint.Path, endpoint.ObservedContentType, expected))
+	} else if expected := expectedContentTypePrefix(endpoint.Path); expected != "" && !matchesContentType(endpoint.ObservedContentType, expected) {
+		issues = append(issues, fmt.Sprintf("endpoint %s observed content type = %q, want media type %q", endpoint.Path, endpoint.ObservedContentType, expected))
 	}
 	if len(endpoint.SemanticChecks) == 0 {
 		issues = append(issues, fmt.Sprintf("endpoint %s missing semantic checks", endpoint.Path))
@@ -492,6 +492,18 @@ func expectedContentTypePrefix(path string) string {
 	default:
 		return ""
 	}
+}
+
+func matchesContentType(observed string, expected string) bool {
+	observed = strings.ToLower(strings.TrimSpace(observed))
+	expected = strings.ToLower(strings.TrimSpace(expected))
+	if observed == expected {
+		return true
+	}
+	if !strings.HasPrefix(observed, expected) {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(observed[len(expected):]), ";")
 }
 
 func validateSemanticChecks(path string, checks []string) []string {

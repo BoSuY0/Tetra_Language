@@ -54,7 +54,7 @@ go run ./tools/cmd/validate-techempower-report \
 
 Matrix reports are also validated by the SCRAM runner before it exits; the CLI
 validator gives release gates and stabilization evidence a standalone check for
-the semantic endpoint allowlist and endpoint identity, SCRAM evidence, semantic
-probes, p99.9 latency, resource snapshots, optional soak evidence, shutdown
-cleanup checks, and command executable provenance for the SCRAM local benchmark
-harness.
+the semantic endpoint allowlist, endpoint identity, observed content media
+types, SCRAM evidence, semantic probes, p99.9 latency, resource snapshots,
+optional soak evidence, shutdown cleanup checks, and command executable
+provenance for the SCRAM local benchmark harness.
