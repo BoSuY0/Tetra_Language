@@ -106,7 +106,7 @@ func TestValidateFuzzSummaryRejectsUnknownStep(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected validator failure\n%s", out)
 	}
-	if !strings.Contains(string(out), "step 4 name = \"surprise\", want \"validate-manifest\"") {
+	if !strings.Contains(string(out), "step 7 name = \"surprise\", want \"validate-manifest\"") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
@@ -174,6 +174,9 @@ during this run.
 		"step-compiler-frontend-lexer":     "- `compiler-frontend-lexer`: pass, command `go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-frontend-lexer.log")) + "`",
 		"step-compiler-frontend-parser":    "- `compiler-frontend-parser`: pass, command `go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-frontend-parser.log")) + "`",
 		"step-compiler-linker-linkcore":    "- `compiler-linker-linkcore`: pass, command `go test ./compiler/internal/linker/linkcore -run \\^\\$ -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "compiler-linker-linkcore.log")) + "`",
+		"step-http-runtime":                "- `http-runtime`: pass, command `go test ./compiler/internal/httprt -run \\^\\$ -fuzz=FuzzHTTPParseRequest -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "http-runtime.log")) + "`",
+		"step-json-runtime":                "- `json-runtime`: pass, command `go test ./compiler/internal/jsonrt -run \\^\\$ -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "json-runtime.log")) + "`",
+		"step-postgres-wire":               "- `postgres-wire`: pass, command `go test ./compiler/internal/pgrt -run \\^\\$ -fuzz=FuzzReadFrameDoesNotPanic -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "postgres-wire.log")) + "`",
 		"step-validate-manifest":           "- `validate-manifest`: pass, command `go test ./tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "validate-manifest.log")) + "`",
 		"step-eco-capsule":                 "- `eco-capsule`: pass, command `go test ./cli/cmd/tetra -run \\^\\$ -fuzz=FuzzParseCapsuleDoesNotPanic -fuzztime=2s -parallel=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "eco-capsule.log")) + "`",
 		"step-property-stress-regressions": "- `property-stress-regressions`: pass, command `go test ./compiler/... ./cli/... ./tools/cmd/validate-manifest -run Fuzz\\|Property\\|Stress -count=1`, log `" + filepath.ToSlash(filepath.Join(dir, "logs", "property-stress-regressions.log")) + "`",
@@ -195,6 +198,9 @@ during this run.
 		lines["step-compiler-frontend-lexer"],
 		lines["step-compiler-frontend-parser"],
 		lines["step-compiler-linker-linkcore"],
+		lines["step-http-runtime"],
+		lines["step-json-runtime"],
+		lines["step-postgres-wire"],
 		lines["step-validate-manifest"],
 		lines["step-eco-capsule"],
 		lines["step-property-stress-regressions"],
@@ -211,7 +217,7 @@ during this run.
   "started_at": "2026-04-29T00:00:00Z",
   "ended_at": "2026-04-29T00:00:01Z",
   "fuzztime": "2s",
-  "step_count": 6,
+  "step_count": 9,
   "failed_count": 0,
 	"artifacts": {
 	    "summary_md": "` + filepath.ToSlash(filepath.Join(dir, "summary.md")) + `",
@@ -225,6 +231,9 @@ during this run.
     {"name":"compiler-frontend-lexer","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzLexer -fuzztime=2s -parallel=1","log":"logs/compiler-frontend-lexer.log"},
     {"name":"compiler-frontend-parser","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=2s -parallel=1","log":"logs/compiler-frontend-parser.log"},
     {"name":"compiler-linker-linkcore","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/linker/linkcore -run \\^\\$ -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=2s -parallel=1","log":"logs/compiler-linker-linkcore.log"},
+    {"name":"http-runtime","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/httprt -run \\^\\$ -fuzz=FuzzHTTPParseRequest -fuzztime=2s -parallel=1","log":"logs/http-runtime.log"},
+    {"name":"json-runtime","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/jsonrt -run \\^\\$ -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=2s -parallel=1","log":"logs/json-runtime.log"},
+    {"name":"postgres-wire","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/internal/pgrt -run \\^\\$ -fuzz=FuzzReadFrameDoesNotPanic -fuzztime=2s -parallel=1","log":"logs/postgres-wire.log"},
     {"name":"validate-manifest","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -fuzztime=2s -parallel=1","log":"logs/validate-manifest.log"},
     {"name":"eco-capsule","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./cli/cmd/tetra -run \\^\\$ -fuzz=FuzzParseCapsuleDoesNotPanic -fuzztime=2s -parallel=1","log":"logs/eco-capsule.log"},
     {"name":"property-stress-regressions","status":"pass","duration_seconds":0,"exit_code":0,"command":"go test ./compiler/... ./cli/... ./tools/cmd/validate-manifest -run Fuzz\\|Property\\|Stress -count=1","log":"logs/property-stress-regressions.log"}

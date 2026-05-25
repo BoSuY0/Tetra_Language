@@ -248,7 +248,10 @@ record_step_json() {
 fuzz_inventory_roots=(
   "cli/cmd/tetra/testdata/fuzz"
   "compiler/internal/frontend/testdata/fuzz"
+  "compiler/internal/httprt/testdata/fuzz"
+  "compiler/internal/jsonrt/testdata/fuzz"
   "compiler/internal/linker/linkcore/testdata/fuzz"
+  "compiler/internal/pgrt/testdata/fuzz"
   "tools/cmd/validate-manifest/testdata/fuzz"
 )
 
@@ -425,6 +428,9 @@ run_step() {
 run_step "compiler-frontend-lexer" go test ./compiler/internal/frontend -run '^$' -fuzz=FuzzLexer "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "compiler-frontend-parser" go test ./compiler/internal/frontend -run '^$' -fuzz=FuzzParser "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "compiler-linker-linkcore" go test ./compiler/internal/linker/linkcore -run '^$' -fuzz=FuzzLinkX64ObjectsDoesNotPanic "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
+run_step "http-runtime" go test ./compiler/internal/httprt -run '^$' -fuzz=FuzzHTTPParseRequest "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
+run_step "json-runtime" go test ./compiler/internal/jsonrt -run '^$' -fuzz=FuzzAppendStringProducesValidJSON "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
+run_step "postgres-wire" go test ./compiler/internal/pgrt -run '^$' -fuzz=FuzzReadFrameDoesNotPanic "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "validate-manifest" go test ./tools/cmd/validate-manifest -run '^$' -fuzz=. "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "eco-capsule" go test ./cli/cmd/tetra -run '^$' -fuzz=FuzzParseCapsuleDoesNotPanic "-fuzztime=$fuzztime" "${fuzz_parallel_args[@]}"
 run_step "property-stress-regressions" go test ./compiler/... ./cli/... ./tools/cmd/validate-manifest -run 'Fuzz|Property|Stress' -count=1

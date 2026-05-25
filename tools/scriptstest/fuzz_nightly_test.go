@@ -71,6 +71,9 @@ func TestFuzzNightlyWrapperDocumentsBoundedCommands(t *testing.T) {
 		"FuzzParser",
 		"compiler-linker-linkcore",
 		"FuzzLinkX64ObjectsDoesNotPanic",
+		"FuzzHTTPParseRequest",
+		"FuzzAppendStringProducesValidJSON",
+		"FuzzReadFrameDoesNotPanic",
 		"FuzzParseCapsuleDoesNotPanic",
 		"property-stress-regressions",
 		"crasher_archive_path",
@@ -164,7 +167,7 @@ printf 'fake go %s\n' "$*" >&2
 	if inventory.SchemaVersion != 1 || inventory.Kind != "go-testdata-fuzz-inventory" {
 		t.Fatalf("unexpected inventory identity: %+v", inventory)
 	}
-	if len(inventory.ScannedRoots) != 4 || inventory.Counts.Roots != 4 || inventory.Counts.Existing != 2 {
+	if len(inventory.ScannedRoots) != 7 || inventory.Counts.Roots != 7 || inventory.Counts.Existing != 2 {
 		t.Fatalf("unexpected root counts: counts=%+v roots=%+v", inventory.Counts, inventory.ScannedRoots)
 	}
 	if inventory.Counts.Targets != 3 || inventory.Counts.CorpusFiles != 3 || inventory.Counts.CrasherFiles != 1 || inventory.Counts.TotalFiles != 4 {
@@ -173,7 +176,10 @@ printf 'fake go %s\n' "$*" >&2
 	wantRoots := []string{
 		"cli/cmd/tetra/testdata/fuzz",
 		"compiler/internal/frontend/testdata/fuzz",
+		"compiler/internal/httprt/testdata/fuzz",
+		"compiler/internal/jsonrt/testdata/fuzz",
 		"compiler/internal/linker/linkcore/testdata/fuzz",
+		"compiler/internal/pgrt/testdata/fuzz",
 		"tools/cmd/validate-manifest/testdata/fuzz",
 	}
 	for i, want := range wantRoots {
@@ -224,7 +230,7 @@ printf 'fake go %s\n' "$*" >&2
 	if summary.Mode != "short" || summary.Status != "pass" || summary.ExitCode != 0 || summary.Fuzztime != "2s" {
 		t.Fatalf("unexpected top-level summary fields: %+v", summary)
 	}
-	if summary.StepCount != 6 || summary.FailedCount != 0 || len(summary.Steps) != summary.StepCount {
+	if summary.StepCount != 9 || summary.FailedCount != 0 || len(summary.Steps) != summary.StepCount {
 		t.Fatalf("unexpected summary counts: step_count=%d failed_count=%d len=%d", summary.StepCount, summary.FailedCount, len(summary.Steps))
 	}
 	if summary.Artifacts.SummaryMD != filepath.Join(outDir, "summary.md") ||

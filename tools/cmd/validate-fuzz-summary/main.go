@@ -14,6 +14,9 @@ var fuzzStepNames = []string{
 	"compiler-frontend-lexer",
 	"compiler-frontend-parser",
 	"compiler-linker-linkcore",
+	"http-runtime",
+	"json-runtime",
+	"postgres-wire",
 	"validate-manifest",
 	"eco-capsule",
 	"property-stress-regressions",
@@ -155,8 +158,9 @@ func parseFuzzSummary(text string) (fuzzSummary, error) {
 			lines = append(lines, line)
 		}
 	}
-	if len(lines) != 14 {
-		return fuzzSummary{}, fmt.Errorf("summary.md has malformed shape: got %d non-empty lines, want 14", len(lines))
+	wantLineCount := 8 + len(fuzzStepNames)
+	if len(lines) != wantLineCount {
+		return fuzzSummary{}, fmt.Errorf("summary.md has malformed shape: got %d non-empty lines, want %d", len(lines), wantLineCount)
 	}
 	if lines[0] != "# Fuzz Nightly Summary" {
 		return fuzzSummary{}, fmt.Errorf("summary.md missing title")
@@ -326,6 +330,12 @@ func expectedFuzzCommand(name string, fuzztime string, mode string) string {
 		return "go test ./compiler/internal/frontend -run \\^\\$ -fuzz=FuzzParser -fuzztime=" + fuzztime + parallel
 	case "compiler-linker-linkcore":
 		return "go test ./compiler/internal/linker/linkcore -run \\^\\$ -fuzz=FuzzLinkX64ObjectsDoesNotPanic -fuzztime=" + fuzztime + parallel
+	case "http-runtime":
+		return "go test ./compiler/internal/httprt -run \\^\\$ -fuzz=FuzzHTTPParseRequest -fuzztime=" + fuzztime + parallel
+	case "json-runtime":
+		return "go test ./compiler/internal/jsonrt -run \\^\\$ -fuzz=FuzzAppendStringProducesValidJSON -fuzztime=" + fuzztime + parallel
+	case "postgres-wire":
+		return "go test ./compiler/internal/pgrt -run \\^\\$ -fuzz=FuzzReadFrameDoesNotPanic -fuzztime=" + fuzztime + parallel
 	case "validate-manifest":
 		return "go test ./tools/cmd/validate-manifest -run \\^\\$ -fuzz=. -fuzztime=" + fuzztime + parallel
 	case "eco-capsule":
