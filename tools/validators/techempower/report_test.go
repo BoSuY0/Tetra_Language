@@ -351,6 +351,29 @@ func TestValidateSCRAMMatrixRejectsMissingDeclaredGridCoverage(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsInvalidRunRepeat(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if len(report.Runs) == 0 {
+		t.Fatalf("checked-in SCRAM matrix report has no runs")
+	}
+
+	report.Runs[0].Repeat = 0
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix run with invalid repeat")
+	}
+	if !strings.Contains(err.Error(), "repeat must be positive") {
+		t.Fatalf("ValidateReport repeat error = %v, want positive repeat rejection", err)
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {

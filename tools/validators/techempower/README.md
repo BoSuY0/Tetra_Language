@@ -5,10 +5,10 @@ emitted by `compiler/cmd/tetra-techempower-bench` and
 `tetra.techempower.single_query_matrix.v1` matrix reports emitted by the SCRAM
 runner. It rejects weak placeholder evidence, missing integrity metadata,
 incomplete endpoint sets, inconsistent counters, and reports that omit latency
-percentiles (`p50`, `p90`, `p95`, `p99`, `p99.9`, `max`), observed content
-types, endpoint semantic check lists, SCRAM evidence, matrix semantic probes,
-resource snapshots, declared matrix grid coverage, or clean shutdown evidence
-when a soak is present.
+percentiles (`p50`, `p90`, `p95`, `p99`, `p99.9`, `max`), positive matrix run
+repeat metadata, observed content types, endpoint semantic check lists, SCRAM
+evidence, matrix semantic probes, resource snapshots, declared matrix grid
+coverage, or clean shutdown evidence when a soak is present.
 
 Use the CLI release gate from the repository root:
 
