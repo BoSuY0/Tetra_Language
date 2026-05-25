@@ -17,6 +17,10 @@ type Options struct {
 	AllowSkipDB bool
 }
 
+type schemaEnvelope struct {
+	Schema string `json:"schema"`
+}
+
 type Report struct {
 	Schema           string               `json:"schema"`
 	Status           string               `json:"status"`
@@ -80,6 +84,21 @@ type Summary struct {
 }
 
 func ValidateReport(raw []byte, opt Options) error {
+	var envelope schemaEnvelope
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return err
+	}
+	switch envelope.Schema {
+	case SchemaV1:
+		return validateBenchmarkReport(raw, opt)
+	case MatrixSchemaV1:
+		return ValidateMatrixReport(raw)
+	default:
+		return fmt.Errorf("schema is %q, want %q or %q", envelope.Schema, SchemaV1, MatrixSchemaV1)
+	}
+}
+
+func validateBenchmarkReport(raw []byte, opt Options) error {
 	var report Report
 	if err := decodeStrict(raw, &report); err != nil {
 		return err

@@ -82,6 +82,39 @@ func TestValidateCheckedInSCRAMReport(t *testing.T) {
 	}
 }
 
+func TestValidateCheckedInSCRAMMatrixReport(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	if err := ValidateReport(raw, Options{}); err != nil {
+		t.Fatalf("ValidateReport checked-in SCRAM matrix report: %v", err)
+	}
+}
+
+func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+
+	weak := report
+	weak.Postgres.VerifierPrefix = "md5"
+	if err := ValidateReport(mustMatrixReportJSON(t, weak), Options{}); err == nil || !strings.Contains(err.Error(), "SCRAM") {
+		t.Fatalf("ValidateReport weak matrix SCRAM evidence = %v, want SCRAM error", err)
+	}
+
+	mismatch := report
+	mismatch.Summary.TotalRequests--
+	if err := ValidateReport(mustMatrixReportJSON(t, mismatch), Options{}); err == nil || !strings.Contains(err.Error(), "summary.total_requests") {
+		t.Fatalf("ValidateReport matrix summary mismatch = %v, want summary.total_requests error", err)
+	}
+}
+
 func reportFixture(skipDB bool) Report {
 	paths := []string{"/plaintext", "/json", "/db", "/queries?queries=2", "/updates?queries=2", "/fortunes"}
 	if skipDB {
@@ -191,6 +224,15 @@ func endpointName(path string) string {
 }
 
 func mustReportJSON(t *testing.T, report Report) []byte {
+	t.Helper()
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	return raw
+}
+
+func mustMatrixReportJSON(t *testing.T, report MatrixReport) []byte {
 	t.Helper()
 	raw, err := json.Marshal(report)
 	if err != nil {

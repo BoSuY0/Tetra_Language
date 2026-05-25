@@ -14,6 +14,13 @@ func TestRunValidatesCheckedInSmokeReportWithAllowance(t *testing.T) {
 	}
 }
 
+func TestRunValidatesCheckedInSCRAMMatrixReport(t *testing.T) {
+	report := filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json")
+	if err := run([]string{"--report", report}); err != nil {
+		t.Fatalf("run matrix report: %v", err)
+	}
+}
+
 func TestRunRejectsSkipDBReportWithoutAllowance(t *testing.T) {
 	report := filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_local_smoke_skip_db_report.json")
 	err := run([]string{"--report", report})

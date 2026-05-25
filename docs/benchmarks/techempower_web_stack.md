@@ -185,6 +185,8 @@ go test ./compiler/cmd/tetra-techempower-bench -count=1
 go test ./tools/validators/techempower ./tools/cmd/validate-techempower-report -count=1
 go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_local_smoke_skip_db_report.json --allow-skip-db
 go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json
+go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
+go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json
 go run ./tools/cmd/validate-techempower-report --report reports/techempower/tetra-scram-endpoints-semantic-benchmark.json
 GOWORK=off go test ./benchmarks/techempower/tetra/cmd/scram-local-bench -count=1
 docker compose -f benchmarks/techempower/tetra/docker-compose.yml config

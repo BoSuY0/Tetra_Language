@@ -1,10 +1,13 @@
 # TechEmpower Report Validator
 
-`ValidateReport` checks `tetra.techempower.benchmark.v1` JSON reports emitted by
-`compiler/cmd/tetra-techempower-bench`. It rejects weak placeholder evidence,
-missing integrity metadata, incomplete endpoint sets, inconsistent counters, and
-reports that omit latency percentiles (`p50`, `p90`, `p95`, `p99`, `p99.9`,
-`max`), observed content types, or endpoint semantic check lists.
+`ValidateReport` checks both `tetra.techempower.benchmark.v1` semantic reports
+emitted by `compiler/cmd/tetra-techempower-bench` and
+`tetra.techempower.single_query_matrix.v1` matrix reports emitted by the SCRAM
+runner. It rejects weak placeholder evidence, missing integrity metadata,
+incomplete endpoint sets, inconsistent counters, and reports that omit latency
+percentiles (`p50`, `p90`, `p95`, `p99`, `p99.9`, `max`), observed content
+types, endpoint semantic check lists, SCRAM evidence, matrix semantic probes,
+resource snapshots, or clean shutdown evidence when a soak is present.
 
 Use the CLI release gate from the repository root:
 
@@ -29,8 +32,11 @@ report plus separate matrix reports:
 benchmarks/techempower/tetra/run-scram-local-bench.sh
 go run ./tools/cmd/validate-techempower-report \
   --report docs/benchmarks/techempower_scram_single_query_local_report.json
+go run ./tools/cmd/validate-techempower-report \
+  --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
 ```
 
-The matrix reports are validated by the SCRAM runner itself and include SCRAM
-evidence, semantic probes, p99.9 latency, resource snapshots, optional soak
-evidence, and shutdown cleanup checks.
+Matrix reports are also validated by the SCRAM runner before it exits; the CLI
+validator gives release gates and stabilization evidence a standalone check for
+SCRAM evidence, semantic probes, p99.9 latency, resource snapshots, optional
+soak evidence, and shutdown cleanup checks.

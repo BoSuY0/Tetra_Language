@@ -132,7 +132,9 @@ It used PostgreSQL 16.9 with `scram-sha-256` host authentication and includes a
 passing Single Query `/db` matrix at
 `docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`. A
 separate endpoint matrix for `/queries`, `/updates`, and `/fortunes` lives at
-`docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`.
+`docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`. Validate
+both semantic and matrix JSON reports with
+`go run ./tools/cmd/validate-techempower-report --report <path>`.
 
 For Linux `perf` profiling, pass `--profile-build` to
 `run-scram-local-bench.sh`. This opt-in mode builds the app and benchmark helper
