@@ -28,7 +28,29 @@ var v040RequiredProductionArtifacts = []struct {
 }
 
 var v040RequiredPassingSteps = []string{
+	"readiness preflight",
+	"version parity",
+	"readiness validator tests",
+	"docs verification",
 	"techempower report schemas",
+	"compiler cli tools baseline",
+	"memory production linux x64 smoke",
+	"validate memory production",
+	"parallel production linux x64 smoke",
+	"validate parallel production",
+	"compiler production linux x64 smoke",
+	"validate compiler production",
+	"linux host smoke",
+	"distributed actors linux x64 smoke",
+	"validate distributed actor runtime",
+	"native ui linux x64 smoke",
+	"validate native ui runtime",
+	"readiness final",
+	"completion audit validation",
+	"release state",
+	"security review signoff",
+	"security review detached hash",
+	"diff check",
 }
 
 type releaseGateSummaryExpectations struct {
