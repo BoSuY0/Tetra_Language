@@ -123,11 +123,7 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 	if err := validateBaseURL(report.BaseURL); err != nil {
 		issues = append(issues, err.Error())
 	}
-	if strings.TrimSpace(report.Command) == "" {
-		issues = append(issues, "command is required")
-	} else if !strings.Contains(report.Command, "tetra-techempower-bench") {
-		issues = append(issues, "command must include tetra-techempower-bench")
-	}
+	issues = append(issues, validateBenchmarkCommandExecutable(report.Command)...)
 	if len(report.Limitations) == 0 {
 		issues = append(issues, "limitations are required")
 	}
@@ -185,6 +181,17 @@ func validateBenchmarkCommandBaseURL(command string, baseURL string) []string {
 	}
 	if expected != actual {
 		return []string{fmt.Sprintf("benchmark command base-url = %q, want %q from base_url", expected, actual)}
+	}
+	return nil
+}
+
+func validateBenchmarkCommandExecutable(command string) []string {
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return []string{"command is required"}
+	}
+	if fields[0] != "tetra-techempower-bench" {
+		return []string{fmt.Sprintf("benchmark command executable is %q, want tetra-techempower-bench", fields[0])}
 	}
 	return nil
 }

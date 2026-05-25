@@ -67,6 +67,18 @@ func TestValidateReportRejectsCommandMinRPSMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsSpoofedBenchmarkCommandExecutable(t *testing.T) {
+	report := reportFixture(false)
+	report.Command = "echo " + report.Command
+	err := ValidateReport(mustReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted spoofed benchmark command executable")
+	}
+	if !strings.Contains(err.Error(), "command executable") {
+		t.Fatalf("ValidateReport executable error = %v, want command executable rejection", err)
+	}
+}
+
 func TestValidateReportRejectsEndpointRPSBelowThreshold(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].RPS = 0.50
