@@ -1940,12 +1940,12 @@
     "hash": "26c402e1b15a6a5343b5e956fe59b408"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-release-gate-summary/main.go": {
-    "mtime": 1779715080.4796462,
-    "hash": "2e4eb13a315e75cc33b507d2c605491b"
+    "mtime": 1779715931.4212942,
+    "hash": "30e347364a7cb82faa94eb1cbd2b963a"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-release-gate-summary/main_test.go": {
-    "mtime": 1779715085.896511,
-    "hash": "e9e3ddd614f4a24f9f31a0ba3763fd18"
+    "mtime": 1779715908.9508183,
+    "hash": "9717760035deafe03d962090954f236b"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-residual-risks/main.go": {
     "mtime": 1779257359.5169282,
@@ -17863,10 +17863,6 @@
     "mtime": 1777273980.867326,
     "hash": "657294452403496584f5f2a2a6ab8c6e"
   },
-  "/home/tetra/Desktop/Projects/Tetra_Language/AGENTS.md": {
-    "mtime": 1779257357.295485,
-    "hash": "d9d8b88b408e147673efdd3ba3d69e0b"
-  },
   "/home/tetra/Desktop/Projects/Tetra_Language/README.md": {
     "mtime": 1779257357.295485,
     "hash": "93f894e49a3b6bb5ee0df3fd0b3d86aa"
@@ -17882,6 +17878,10 @@
   "/home/tetra/Desktop/Projects/Tetra_Language/security-review.md": {
     "mtime": 1779349166.6827552,
     "hash": "b51ac8326c1e3f43ce740c78cc062d0d"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/AGENTS.md": {
+    "mtime": 1779716447.2233448,
+    "hash": "d9d8b88b408e147673efdd3ba3d69e0b"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/cli/internal/README.md": {
     "mtime": 1779257357.3034847,
@@ -18088,8 +18088,8 @@
     "hash": "15cd1f84b7290ea78df18321475c371d"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/checklists/v0_4_0_release_gate.md": {
-    "mtime": 1779715090.306506,
-    "hash": "b52f5291ac126ab071797c07edfd52c6"
+    "mtime": 1779715935.7981923,
+    "hash": "f9ac796fa4945adc0fcef9e555caa0c5"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/checklists/v0_5_release_gate.md": {
     "mtime": 1779257357.3159919,
@@ -25696,8 +25696,8 @@
     "hash": "4aa3f981e9789a4021ddee07cefe1664"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/03_ci_release_gap_audit.md": {
-    "mtime": 1779715323.6676767,
-    "hash": "183455aff8484acc0063bdb2239afba0"
+    "mtime": 1779716154.8081036,
+    "hash": "da3278d2530512f0c371637a3dcdbcb1"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/04_generated_artifact_policy.md": {
     "mtime": 1779628038.445664,
@@ -25708,12 +25708,12 @@
     "hash": "5c259395c6046762b1fc076c3643c7f2"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/evidence_log.md": {
-    "mtime": 1779715293.3514113,
-    "hash": "a280219e610424263af7d4832707abf8"
+    "mtime": 1779716136.0775375,
+    "hash": "72c736f402f180063103c0d77d122bc8"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/final_handoff.md": {
-    "mtime": 1779715311.686967,
-    "hash": "96782d220bea1bb8caa6ae61bdf3c2be"
+    "mtime": 1779716145.3653224,
+    "hash": "8b2dfa581154d69aaf197fcd296d1702"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/README.md": {
     "mtime": 1779690506.074283,
@@ -25868,8 +25868,8 @@
     "hash": "06111b106e985d53a0f142679fe3ff55"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/test_matrix.md": {
-    "mtime": 1779715276.0362115,
-    "hash": "76f285ed8bc4219a021f2abf9b66439f"
+    "mtime": 1779716122.4978526,
+    "hash": "789408f42663270d0eb302adb8362e40"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/v0_4_0_dirty_gate_release_truth.md": {
     "mtime": 1779655843.8549523,
@@ -26056,8 +26056,12 @@
     "hash": "1af7f23407eee78aaea5166cecfdfd91"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/release_summary_artifact_hash_sorted_path_validator_slice.md": {
-    "mtime": 1779715263.2661426,
-    "hash": "e235dc333b7b58485223fa10e8a07d02"
+    "mtime": 1779715766.5621486,
+    "hash": "7427a2ca223a9a1b2f3fbb51d9619da7"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/release_summary_artifact_hash_metadata_validator_slice.md": {
+    "mtime": 1779716253.0068302,
+    "hash": "76d687fe35e9b93998d2c56b260cd368"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/logs/commands/v0_4_0_dirty_gate_latest_report_dir.txt": {
     "mtime": 1779655440.1762073,
