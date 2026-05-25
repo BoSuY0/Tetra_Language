@@ -111,7 +111,8 @@ declared endpoint, worker, and concurrency/connection levels and rejects matrix
 reports whose `runs` omit or exceed that declared grid. Matrix report `command`
 provenance must include `scram-local-bench`, and the command's
 `--semantic-report` and `--matrix-report` paths must match the recorded
-artifact paths.
+artifact paths. The command's `--endpoints`, `--levels`, and
+`--worker-levels` grid flags must also match the recorded artifact grid.
 Matrix resource snapshots require RFC3339 timestamps, live positive-PID process
 evidence, and non-negative TCP, CPU, and goroutine counters. Matrix start/end
 resource spans must have increasing timestamps and non-regressing CPU counters;

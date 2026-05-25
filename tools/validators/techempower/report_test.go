@@ -146,6 +146,31 @@ func TestValidateSCRAMMatrixRejectsArtifactReportPathMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsArtifactGridFlagMismatch(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+
+	original := report.Command
+	report.Command = strings.Replace(report.Command, "--levels 8:8,16:16", "--levels 8:8", 1)
+	report.Command = strings.Replace(report.Command, "--worker-levels 1,2", "--worker-levels 1", 1)
+	if report.Command == original {
+		t.Fatalf("test did not mutate matrix command grid flags")
+	}
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report with command/artifact grid flag mismatch")
+	}
+	if !strings.Contains(err.Error(), "command artifact") {
+		t.Fatalf("ValidateReport matrix artifact grid error = %v, want command artifact rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {

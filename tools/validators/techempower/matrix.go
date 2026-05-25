@@ -256,23 +256,29 @@ func validateMatrixCommandArtifacts(command string, artifacts map[string]string)
 		return nil
 	}
 	flags := parseMatrixCommandFlags(command)
-	checks := map[string]string{
-		"semantic_report": "semantic-report",
-		"matrix_report":   "matrix-report",
+	checks := []struct {
+		artifactKey string
+		flagName    string
+	}{
+		{artifactKey: "semantic_report", flagName: "semantic-report"},
+		{artifactKey: "matrix_report", flagName: "matrix-report"},
+		{artifactKey: "endpoints", flagName: "endpoints"},
+		{artifactKey: "levels", flagName: "levels"},
+		{artifactKey: "worker_levels", flagName: "worker-levels"},
 	}
 	var issues []string
-	for artifactKey, flagName := range checks {
-		artifactPath := strings.TrimSpace(artifacts[artifactKey])
-		if artifactPath == "" {
+	for _, check := range checks {
+		artifactValue := strings.TrimSpace(artifacts[check.artifactKey])
+		if artifactValue == "" {
 			continue
 		}
-		flagValue, ok := flags[flagName]
+		flagValue, ok := flags[check.flagName]
 		if !ok || strings.TrimSpace(flagValue) == "" {
-			issues = append(issues, fmt.Sprintf("matrix command artifact %s flag --%s is required", artifactKey, flagName))
+			issues = append(issues, fmt.Sprintf("matrix command artifact %s flag --%s is required", check.artifactKey, check.flagName))
 			continue
 		}
-		if flagValue != artifactPath {
-			issues = append(issues, fmt.Sprintf("matrix command artifact %s = %q, want %q", artifactKey, flagValue, artifactPath))
+		if flagValue != artifactValue {
+			issues = append(issues, fmt.Sprintf("matrix command artifact %s = %q, want %q", check.artifactKey, flagValue, artifactValue))
 		}
 	}
 	return issues
