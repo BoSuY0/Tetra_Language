@@ -260,8 +260,22 @@ func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
 		if summary.Steps[i].Name != required {
 			return fmt.Errorf("passing v0.4.0 summary required step %02d = %q, want %q", i+1, summary.Steps[i].Name, required)
 		}
+		expectedLog := expectedV040RequiredStepLog(i+1, required)
+		if filepath.ToSlash(summary.Steps[i].Log) != expectedLog {
+			return fmt.Errorf("passing v0.4.0 summary required step %q log = %q, want %q", required, summary.Steps[i].Log, expectedLog)
+		}
 	}
 	return nil
+}
+
+func expectedV040RequiredStepLog(index int, name string) string {
+	return fmt.Sprintf("logs/%02d-%s.log", index, v040StepLogSlug(name))
+}
+
+func v040StepLogSlug(name string) string {
+	slug := strings.ToLower(name)
+	slug = strings.NewReplacer(" ", "-", "/", "-", ".", "-").Replace(slug)
+	return strings.Trim(slug, "-")
 }
 
 func expectedV040RequiredStepCommand(name, summaryReportDir string) (string, bool) {

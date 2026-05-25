@@ -146,6 +146,22 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStep
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStepLogPath(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	mutateV040ReleaseGateSummaryStep(t, dir, "docs verification", func(step *releaseGateStep) {
+		step.Log = "logs/04-docs.log"
+	})
+	writeReleaseGateLog(t, dir, "logs/04-docs.log")
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `required step "docs verification" log = "logs/04-docs.log", want "logs/04-docs-verification.log"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
@@ -377,6 +393,17 @@ func makeReleaseGateSummaryReport(t *testing.T, summary string, logs ...string) 
 		t.Fatal(err)
 	}
 	return dir
+}
+
+func writeReleaseGateLog(t *testing.T, dir, log string) {
+	t.Helper()
+	path := filepath.Join(dir, filepath.FromSlash(log))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("ok\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func makeV040PassingReleaseGateSummaryReport(t *testing.T) string {
