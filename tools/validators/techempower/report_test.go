@@ -67,6 +67,19 @@ func TestValidateReportRejectsCommandMinRPSMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsEndpointRPSBelowThreshold(t *testing.T) {
+	report := reportFixture(false)
+	report.Endpoints[0].RPS = 0.50
+	raw := mustReportJSON(t, report)
+	err := ValidateReport(raw, Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted endpoint RPS below threshold")
+	}
+	if !strings.Contains(err.Error(), "below threshold") {
+		t.Fatalf("ValidateReport endpoint threshold error = %v, want below threshold rejection", err)
+	}
+}
+
 func TestValidateReportRejectsWeakEvidenceAndBadCounters(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].Evidence = "placeholder"

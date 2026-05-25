@@ -366,6 +366,14 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 	if strings.TrimSpace(endpoint.Threshold) == "" || strings.TrimSpace(endpoint.Validation) == "" || strings.TrimSpace(endpoint.Evidence) == "" {
 		issues = append(issues, fmt.Sprintf("endpoint %s missing threshold/validation/evidence", endpoint.Path))
 	}
+	if strings.TrimSpace(endpoint.Threshold) != "" {
+		threshold, err := parseBenchmarkMinRPSThreshold(endpoint.Threshold)
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("endpoint %s threshold %q is invalid: %v", endpoint.Path, endpoint.Threshold, err))
+		} else if endpoint.RPS+0.001 < threshold {
+			issues = append(issues, fmt.Sprintf("endpoint %s rps = %g, below threshold %g", endpoint.Path, endpoint.RPS, threshold))
+		}
+	}
 	if !endpoint.ThresholdPass {
 		issues = append(issues, fmt.Sprintf("endpoint %s threshold_pass is false", endpoint.Path))
 	}

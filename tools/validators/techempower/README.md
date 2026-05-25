@@ -12,6 +12,7 @@ seconds, soak RPS evidence derived from successes over duration seconds,
 benchmark command/base-url consistency, benchmark command/request consistency,
 benchmark command/skip-db consistency,
 benchmark command/min-rps consistency,
+endpoint RPS/threshold consistency,
 elapsed timing evidence that covers the declared run duration, observed
 content types, endpoint semantic check lists, SCRAM evidence, matrix semantic
 probes, timestamped resource snapshots inside the report resource window,
