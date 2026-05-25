@@ -228,6 +228,7 @@ func ValidateMatrixReport(raw []byte) error {
 	issues = append(issues, validateMatrixSummary(report.Summary, len(report.Runs), totalRequests, totalFailures, bestRPS, worstP99, worstP999)...)
 	issues = append(issues, validateMatrixArtifacts(report.Artifacts)...)
 	issues = append(issues, validateMatrixCommandArtifacts(report.Command, report.Artifacts)...)
+	issues = append(issues, validateMatrixCommandDuration(report.Command, report.Runs)...)
 	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
 	issues = append(issues, validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
 
@@ -306,6 +307,29 @@ func parseMatrixCommandFlags(command string) map[string]string {
 		flags[nameValue] = ""
 	}
 	return flags
+}
+
+func validateMatrixCommandDuration(command string, runs []MatrixRun) []string {
+	if strings.TrimSpace(command) == "" || len(runs) == 0 {
+		return nil
+	}
+	flags := parseMatrixCommandFlags(command)
+	rawDuration := strings.TrimSpace(flags["duration"])
+	if rawDuration == "" {
+		return []string{"matrix command duration flag --duration is required"}
+	}
+	duration, err := time.ParseDuration(rawDuration)
+	if err != nil || duration <= 0 {
+		return []string{fmt.Sprintf("matrix command duration %q is invalid", rawDuration)}
+	}
+	expected := duration.Seconds()
+	var issues []string
+	for _, run := range runs {
+		if math.Abs(run.DurationSeconds-expected) > 0.001 {
+			issues = append(issues, fmt.Sprintf("matrix command duration for run %s workers=%d c%d/k%d repeat=%d = %g, want %g from --duration", run.Endpoint, run.Workers, run.Level.Concurrency, run.Level.Connections, run.Repeat, run.DurationSeconds, expected))
+		}
+	}
+	return issues
 }
 
 func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, runs []MatrixRun) []string {

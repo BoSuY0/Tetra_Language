@@ -171,6 +171,30 @@ func TestValidateSCRAMMatrixRejectsArtifactGridFlagMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsCommandDurationMismatch(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+
+	original := report.Command
+	report.Command = strings.Replace(report.Command, "--duration 60s", "--duration 1s", 1)
+	if report.Command == original {
+		t.Fatalf("test did not mutate matrix command duration")
+	}
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report with command/run duration mismatch")
+	}
+	if !strings.Contains(err.Error(), "command duration") {
+		t.Fatalf("ValidateReport matrix duration error = %v, want command duration rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {
