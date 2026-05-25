@@ -391,6 +391,9 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 		if lastPath != "" && path < lastPath {
 			return fmt.Errorf("artifact-hashes.json artifacts must be sorted by path: %s appears before %s", path, lastPath)
 		}
+		if err := validateReleaseHashArtifactMetadata(artifact, path); err != nil {
+			return err
+		}
 		lastPath = path
 		artifacts[path] = artifact
 	}
@@ -407,6 +410,25 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 		log := filepath.ToSlash(step.Log)
 		if _, ok := artifacts[log]; !ok {
 			return fmt.Errorf("passing v0.4.0 summary missing step log %s in artifact-hashes.json", log)
+		}
+	}
+	return nil
+}
+
+func validateReleaseHashArtifactMetadata(artifact releaseHashArtifact, path string) error {
+	if artifact.Size < 0 {
+		return fmt.Errorf("artifact %s has negative size", path)
+	}
+	if !strings.HasPrefix(artifact.SHA256, "sha256:") {
+		return fmt.Errorf("artifact %s has invalid sha256 format %q", path, artifact.SHA256)
+	}
+	hexPart := strings.TrimPrefix(artifact.SHA256, "sha256:")
+	if len(hexPart) != 64 {
+		return fmt.Errorf("artifact %s sha256 must contain 64 hex chars", path)
+	}
+	for _, ch := range hexPart {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
+			return fmt.Errorf("artifact %s sha256 has non-hex characters", path)
 		}
 	}
 	return nil

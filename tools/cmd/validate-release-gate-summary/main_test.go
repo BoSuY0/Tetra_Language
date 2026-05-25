@@ -232,6 +232,34 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsortedArtifactH
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithInvalidArtifactHashDigest(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithMutatedArtifact(t, dir, "artifacts/features.json", func(artifact *releaseHashArtifact) {
+		artifact.SHA256 = "not-a-digest"
+	}))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `artifact artifacts/features.json has invalid sha256 format`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNegativeArtifactHashSize(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithMutatedArtifact(t, dir, "artifacts/features.json", func(artifact *releaseHashArtifact) {
+		artifact.Size = -1
+	}))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `artifact artifacts/features.json has negative size`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
@@ -730,6 +758,27 @@ func v040ArtifactHashesManifestWithUnsortedPaths(t *testing.T, dir string) strin
 		t.Fatal(err)
 	}
 	return string(out)
+}
+
+func v040ArtifactHashesManifestWithMutatedArtifact(t *testing.T, dir string, path string, mutate func(*releaseHashArtifact)) string {
+	t.Helper()
+	raw := v040ArtifactHashesManifestForSummary(t, dir)
+	var manifest releaseArtifactHashesManifest
+	if err := json.Unmarshal([]byte(raw), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for i := range manifest.Artifacts {
+		if manifest.Artifacts[i].Path == path {
+			mutate(&manifest.Artifacts[i])
+			out, err := json.MarshalIndent(manifest, "", "  ")
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(out)
+		}
+	}
+	t.Fatalf("artifact path %q not found", path)
+	return ""
 }
 
 func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {

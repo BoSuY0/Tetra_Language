@@ -176,6 +176,9 @@ required release-gate artifacts:
 - `artifacts/security-review.md.sha256`
 
 It must also list every step log referenced by `summary.json` under `logs/`.
+Every listed artifact must carry a canonical `sha256:<64 lowercase hex>` digest
+and a non-negative byte size; `validate-artifact-hashes` remains authoritative
+for matching those metadata fields to files on disk.
 
 ## Security Review
 
