@@ -382,6 +382,7 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 	if run.RPS <= 0 || run.AvgLatencyMS < 0 || run.P50LatencyMS < 0 || run.P90LatencyMS < 0 || run.P95LatencyMS < 0 || run.P99LatencyMS < 0 || run.P999LatencyMS < 0 || run.MaxLatencyMS < 0 {
 		issues = append(issues, label+" has invalid timing metrics")
 	}
+	issues = append(issues, validateLatencyPercentiles(label, run.P50LatencyMS, run.P90LatencyMS, run.P95LatencyMS, run.P99LatencyMS, run.P999LatencyMS, run.MaxLatencyMS)...)
 	if run.MaxLatencyMS > 0 && run.P99LatencyMS > run.MaxLatencyMS {
 		issues = append(issues, label+" p99 exceeds max")
 	}

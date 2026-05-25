@@ -62,6 +62,19 @@ func TestValidateReportRequiresLatencyPercentilesAndIntegrityMetadata(t *testing
 	}
 }
 
+func TestValidateReportRejectsNonMonotonicLatencyPercentiles(t *testing.T) {
+	report := reportFixture(false)
+	report.Endpoints[0].P90LatencyMS = report.Endpoints[0].P50LatencyMS - 0.1
+	raw := mustReportJSON(t, report)
+	err := ValidateReport(raw, Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted non-monotonic latency percentiles")
+	}
+	if !strings.Contains(err.Error(), "latency percentiles") {
+		t.Fatalf("ValidateReport error = %v, want latency percentiles rejection", err)
+	}
+}
+
 func TestValidateCheckedInSmokeReport(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_local_smoke_skip_db_report.json"))
 	if err != nil {
@@ -112,6 +125,26 @@ func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) 
 	mismatch.Summary.TotalRequests--
 	if err := ValidateReport(mustMatrixReportJSON(t, mismatch), Options{}); err == nil || !strings.Contains(err.Error(), "summary.total_requests") {
 		t.Fatalf("ValidateReport matrix summary mismatch = %v, want summary.total_requests error", err)
+	}
+}
+
+func TestValidateSCRAMMatrixRejectsNonMonotonicLatencyPercentiles(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+
+	report.Runs[0].P90LatencyMS = report.Runs[0].P50LatencyMS - 0.1
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted non-monotonic matrix latency percentiles")
+	}
+	if !strings.Contains(err.Error(), "latency percentiles") {
+		t.Fatalf("ValidateReport matrix error = %v, want latency percentiles rejection", err)
 	}
 }
 

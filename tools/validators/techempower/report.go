@@ -219,6 +219,7 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 	if endpoint.RPS <= 0 || endpoint.AvgLatencyMS < 0 || endpoint.P50LatencyMS < 0 || endpoint.P90LatencyMS < 0 || endpoint.P95LatencyMS < 0 || endpoint.P99LatencyMS < 0 || endpoint.P999LatencyMS < 0 || endpoint.MaxLatencyMS < 0 {
 		issues = append(issues, fmt.Sprintf("endpoint %s has invalid timing metrics", endpoint.Path))
 	}
+	issues = append(issues, validateLatencyPercentiles("endpoint "+endpoint.Path, endpoint.P50LatencyMS, endpoint.P90LatencyMS, endpoint.P95LatencyMS, endpoint.P99LatencyMS, endpoint.P999LatencyMS, endpoint.MaxLatencyMS)...)
 	if endpoint.MaxLatencyMS > 0 && endpoint.P99LatencyMS > endpoint.MaxLatencyMS {
 		issues = append(issues, fmt.Sprintf("endpoint %s p99 latency exceeds max latency", endpoint.Path))
 	}
@@ -243,6 +244,28 @@ func validateEndpointReport(endpoint EndpointReport) []string {
 	}
 	if strings.TrimSpace(endpoint.Error) != "" {
 		issues = append(issues, fmt.Sprintf("endpoint %s has error: %s", endpoint.Path, endpoint.Error))
+	}
+	return issues
+}
+
+func validateLatencyPercentiles(label string, p50, p90, p95, p99, p999, max float64) []string {
+	ordered := []struct {
+		name  string
+		value float64
+	}{
+		{name: "p50", value: p50},
+		{name: "p90", value: p90},
+		{name: "p95", value: p95},
+		{name: "p99", value: p99},
+		{name: "p999", value: p999},
+		{name: "max", value: max},
+	}
+	var issues []string
+	for i := 1; i < len(ordered); i++ {
+		if ordered[i].value < ordered[i-1].value {
+			issues = append(issues, fmt.Sprintf("%s latency percentiles are not monotonic: %s=%g < %s=%g", label, ordered[i].name, ordered[i].value, ordered[i-1].name, ordered[i-1].value))
+			break
+		}
 	}
 	return issues
 }
