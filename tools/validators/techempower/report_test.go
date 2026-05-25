@@ -421,6 +421,31 @@ func TestValidateSCRAMMatrixRejectsInflatedRunRPS(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsShortElapsedRunDuration(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if len(report.Runs) == 0 {
+		t.Fatalf("checked-in SCRAM matrix report has no runs")
+	}
+
+	report.Runs[0].ElapsedSeconds = report.Runs[0].DurationSeconds / 2
+	report.Runs[0].RPS = float64(report.Runs[0].Successes) / report.Runs[0].ElapsedSeconds
+	report.Summary = summarizeMatrixRunsForTest(report.Runs)
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix run with elapsed shorter than duration")
+	}
+	if !strings.Contains(err.Error(), "elapsed evidence") {
+		t.Fatalf("ValidateReport elapsed error = %v, want elapsed evidence rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsDuplicateRunIdentity(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {

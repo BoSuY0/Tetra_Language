@@ -706,6 +706,7 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 	if run.DurationSeconds <= 0 || run.ElapsedSeconds <= 0 {
 		issues = append(issues, label+" duration evidence is required")
 	}
+	issues = append(issues, validateMatrixRunElapsed(label, run)...)
 	if run.Requests <= 0 || run.Successes <= 0 || run.Failures != 0 || run.Successes+run.Failures != run.Requests {
 		issues = append(issues, label+" request counters are inconsistent")
 	}
@@ -733,6 +734,17 @@ func validateMatrixRun(run MatrixRun, warmup bool) []string {
 		issues = append(issues, err.Error())
 	}
 	return issues
+}
+
+func validateMatrixRunElapsed(label string, run MatrixRun) []string {
+	if run.DurationSeconds <= 0 || run.ElapsedSeconds <= 0 {
+		return nil
+	}
+	tolerance := 0.001
+	if run.ElapsedSeconds+tolerance < run.DurationSeconds {
+		return []string{fmt.Sprintf("%s elapsed evidence = %g, want at least duration_seconds %g", label, run.ElapsedSeconds, run.DurationSeconds)}
+	}
+	return nil
 }
 
 func validateMatrixRunRPS(label string, run MatrixRun) []string {
