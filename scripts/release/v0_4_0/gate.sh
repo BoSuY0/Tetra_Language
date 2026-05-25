@@ -395,6 +395,23 @@ check_go_test_packages() {
     go test ./compiler/... ./cli/... ./tools/... -count=1
 }
 
+check_techempower_reports() {
+  local report
+  local reports=(
+    "docs/benchmarks/techempower_local_smoke_skip_db_report.json"
+    "docs/benchmarks/techempower_scram_single_query_local_report.json"
+    "docs/benchmarks/techempower_scram_single_query_matrix_local_report.json"
+    "docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json"
+  )
+  for report in "${reports[@]}"; do
+    if [[ "$report" == "docs/benchmarks/techempower_local_smoke_skip_db_report.json" ]]; then
+      go run ./tools/cmd/validate-techempower-report --report "$report" --allow-skip-db
+    else
+      go run ./tools/cmd/validate-techempower-report --report "$report"
+    fi
+  done
+}
+
 run_linux_host_smoke() {
   go run ./cli/cmd/tetra smoke --target linux-x64 --run=true --report "$report_dir/artifacts/linux-host-smoke.json"
 }
@@ -557,6 +574,7 @@ record_known_step "readiness preflight" "pass" "$readiness_duration" 0 "$readine
 run_step "version parity" check_versions
 run_step "readiness validator tests" go test ./tools/cmd/validate-v0-4-readiness ./tools/cmd/validate-v0-4-completion-audit -count=1
 run_step "docs verification" go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+run_step "techempower report schemas" check_techempower_reports
 run_step "compiler cli tools baseline" check_go_test_packages
 run_step "memory production linux x64 smoke" run_memory_production_smoke
 run_step "validate memory production" go run ./tools/cmd/validate-memory-production --report "$report_dir/artifacts/memory-production-linux-x64.json"

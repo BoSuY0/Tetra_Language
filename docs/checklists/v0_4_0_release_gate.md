@@ -57,6 +57,10 @@ The final gate must collect or validate these checks in the same branch state:
 ```sh
 go test ./compiler/... ./cli/... ./tools/... -count=1
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_local_smoke_skip_db_report.json --allow-skip-db
+go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json
+go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
+go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json
 go run ./cli/cmd/tetra smoke --target linux-x64 --run=true --report reports/v0.4.0/linux-host-smoke.json
 bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir reports/v0.4.0
 go run ./tools/cmd/validate-memory-production --report reports/v0.4.0/memory-production-linux-x64.json
