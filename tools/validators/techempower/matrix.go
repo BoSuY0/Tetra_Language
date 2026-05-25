@@ -231,6 +231,7 @@ func ValidateMatrixReport(raw []byte) error {
 	issues = append(issues, validateMatrixCommandDuration(report.Command, report.Runs)...)
 	issues = append(issues, validateMatrixCommandRepeats(report.Command, report.Runs)...)
 	issues = append(issues, validateMatrixCommandWarmup(report.Command, report.Warmup)...)
+	issues = append(issues, validateMatrixCommandSoak(report.Command, report.Soak)...)
 	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
 	issues = append(issues, validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
 
@@ -384,6 +385,35 @@ func validateMatrixCommandWarmup(command string, warmup *MatrixRun) []string {
 	}
 	if math.Abs(warmup.DurationSeconds-expected) > 0.001 {
 		return []string{fmt.Sprintf("matrix command warmup = %g, want %g from warmup duration_seconds", expected, warmup.DurationSeconds)}
+	}
+	return nil
+}
+
+func validateMatrixCommandSoak(command string, soak *MatrixSoak) []string {
+	if strings.TrimSpace(command) == "" {
+		return nil
+	}
+	flags := parseMatrixCommandFlags(command)
+	rawSoak := strings.TrimSpace(flags["soak"])
+	if rawSoak == "" {
+		if soak == nil {
+			return nil
+		}
+		return []string{"matrix command soak flag --soak is required"}
+	}
+	duration, err := time.ParseDuration(rawSoak)
+	if err != nil || duration < 0 {
+		return []string{fmt.Sprintf("matrix command soak %q is invalid", rawSoak)}
+	}
+	expected := duration.Seconds()
+	if soak == nil {
+		if expected > 0.001 {
+			return []string{fmt.Sprintf("matrix command soak = %g, want 0 because soak evidence is absent", expected)}
+		}
+		return nil
+	}
+	if math.Abs(soak.DurationSeconds-expected) > 0.001 {
+		return []string{fmt.Sprintf("matrix command soak = %g, want %g from soak duration_seconds", expected, soak.DurationSeconds)}
 	}
 	return nil
 }

@@ -15,7 +15,8 @@ probes, timestamped resource snapshots inside the report resource window,
 declared matrix grid coverage, matrix command provenance, command/artifact
 report-path consistency, command/artifact grid consistency, command/run
 duration consistency, command/run repeat consistency, command/warmup
-consistency, or clean shutdown evidence when a soak is present.
+consistency, command/soak consistency, or clean shutdown evidence when a soak is
+present.
 
 Use the CLI release gate from the repository root:
 
