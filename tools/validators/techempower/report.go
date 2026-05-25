@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -152,11 +153,34 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 	}
 	issues = append(issues, validateEndpointSet(report, opt)...)
 	issues = append(issues, validateSummary(report.Summary, len(report.Endpoints), totalRequests, totalSuccesses, totalFailures)...)
+	issues = append(issues, validateBenchmarkCommandRequests(report.Command, report.Endpoints)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateBenchmarkCommandRequests(command string, endpoints []EndpointReport) []string {
+	if strings.TrimSpace(command) == "" || len(endpoints) == 0 {
+		return nil
+	}
+	flags := parseCommandFlags(command)
+	rawRequests := strings.TrimSpace(flags["requests"])
+	if rawRequests == "" {
+		return []string{"benchmark command requests flag --requests is required"}
+	}
+	expected, err := strconv.Atoi(rawRequests)
+	if err != nil || expected <= 0 {
+		return []string{fmt.Sprintf("benchmark command requests %q is invalid", rawRequests)}
+	}
+	var issues []string
+	for _, endpoint := range endpoints {
+		if endpoint.Requests != expected {
+			issues = append(issues, fmt.Sprintf("benchmark command requests for endpoint %s = %d, want %d from --requests", endpoint.Path, endpoint.Requests, expected))
+		}
+	}
+	return issues
 }
 
 func validateEndpointSet(report Report, opt Options) []string {

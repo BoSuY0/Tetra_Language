@@ -260,7 +260,7 @@ func validateMatrixCommandArtifacts(command string, artifacts map[string]string)
 	if strings.TrimSpace(command) == "" || len(artifacts) == 0 {
 		return nil
 	}
-	flags := parseMatrixCommandFlags(command)
+	flags := parseCommandFlags(command)
 	checks := []struct {
 		artifactKey string
 		flagName    string
@@ -289,7 +289,7 @@ func validateMatrixCommandArtifacts(command string, artifacts map[string]string)
 	return issues
 }
 
-func parseMatrixCommandFlags(command string) map[string]string {
+func parseCommandFlags(command string) map[string]string {
 	fields := strings.Fields(command)
 	flags := make(map[string]string)
 	for i := 0; i < len(fields); i++ {
@@ -317,7 +317,7 @@ func validateMatrixCommandDuration(command string, runs []MatrixRun) []string {
 	if strings.TrimSpace(command) == "" || len(runs) == 0 {
 		return nil
 	}
-	flags := parseMatrixCommandFlags(command)
+	flags := parseCommandFlags(command)
 	rawDuration := strings.TrimSpace(flags["duration"])
 	if rawDuration == "" {
 		return []string{"matrix command duration flag --duration is required"}
@@ -340,7 +340,7 @@ func validateMatrixCommandRepeats(command string, runs []MatrixRun) []string {
 	if strings.TrimSpace(command) == "" || len(runs) == 0 {
 		return nil
 	}
-	flags := parseMatrixCommandFlags(command)
+	flags := parseCommandFlags(command)
 	rawRepeats := strings.TrimSpace(flags["repeats"])
 	if rawRepeats == "" {
 		return []string{"matrix command repeats flag --repeats is required"}
@@ -365,7 +365,7 @@ func validateMatrixCommandWarmup(command string, warmup *MatrixRun) []string {
 	if strings.TrimSpace(command) == "" {
 		return nil
 	}
-	flags := parseMatrixCommandFlags(command)
+	flags := parseCommandFlags(command)
 	rawWarmup := strings.TrimSpace(flags["warmup"])
 	if rawWarmup == "" {
 		if warmup == nil {
@@ -394,7 +394,7 @@ func validateMatrixCommandSoak(command string, soak *MatrixSoak) []string {
 	if strings.TrimSpace(command) == "" {
 		return nil
 	}
-	flags := parseMatrixCommandFlags(command)
+	flags := parseCommandFlags(command)
 	rawSoak := strings.TrimSpace(flags["soak"])
 	if rawSoak == "" {
 		if soak == nil {
@@ -423,7 +423,7 @@ func validateMatrixCommandPool(command string, server MatrixServer) []string {
 	if strings.TrimSpace(command) == "" {
 		return nil
 	}
-	flags := parseMatrixCommandFlags(command)
+	flags := parseCommandFlags(command)
 	rawPool := strings.TrimSpace(flags["pool"])
 	if rawPool == "" {
 		return []string{"matrix command pool flag --pool is required"}

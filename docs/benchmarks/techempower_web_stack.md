@@ -87,6 +87,8 @@ decisions. The default artifact path is
 `reports/techempower/tetra-local-benchmark.json`.
 The validator rejects non-monotonic latency percentile evidence, so endpoint and
 matrix-run reports must keep `p50 <= p90 <= p95 <= p99 <= p99.9 <= max`.
+Endpoint benchmark command `--requests` must match every endpoint `requests`
+count in the generated semantic report.
 Matrix run evidence must also carry a positive `repeat` number; warmup evidence
 uses `repeat=0` and is not counted as a matrix run. The validator rejects
 warmup evidence with any other repeat value. Matrix run identities must be

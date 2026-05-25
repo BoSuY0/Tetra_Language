@@ -41,6 +41,23 @@ func TestValidateReportRejectsWeakEvidenceAndBadCounters(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsCommandRequestsMismatch(t *testing.T) {
+	report := reportFixture(false)
+	original := report.Command
+	report.Command = strings.Replace(report.Command, "--requests 4", "--requests 1", 1)
+	if report.Command == original {
+		t.Fatalf("test did not mutate benchmark command requests")
+	}
+	raw := mustReportJSON(t, report)
+	err := ValidateReport(raw, Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted report with command/request count mismatch")
+	}
+	if !strings.Contains(err.Error(), "command requests") {
+		t.Fatalf("ValidateReport requests error = %v, want command requests rejection", err)
+	}
+}
+
 func TestValidateReportRequiresLatencyPercentilesAndIntegrityMetadata(t *testing.T) {
 	report := reportFixture(false)
 	report.GeneratedLocalAt = ""
