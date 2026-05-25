@@ -88,10 +88,11 @@ decisions. The default artifact path is
 The validator rejects non-monotonic latency percentile evidence, so endpoint and
 matrix-run reports must keep `p50 <= p90 <= p95 <= p99 <= p99.9 <= max`.
 Endpoint benchmark command `--requests` must match every endpoint `requests`
-count in the generated semantic report. Endpoint benchmark command `--base-url`
-must also match the report `base_url`, after the same trailing-slash
-normalization the harness applies to generated reports. Endpoint benchmark
-command `--skip-db` must be present only for the explicit two-endpoint
+count in the generated semantic report, and command `--concurrency` must be a
+positive integer. Endpoint benchmark command `--base-url` must also match the
+report `base_url`, after the same trailing-slash normalization the harness
+applies to generated reports. Endpoint benchmark command `--skip-db` must be
+present only for the explicit two-endpoint
 `/plaintext` plus `/json` no-database smoke report and absent for full endpoint
 reports. Endpoint benchmark command `--min-rps` must match `summary.min_rps`
 and every endpoint `threshold` value. Each endpoint `rps` value must also meet

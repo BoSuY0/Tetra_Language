@@ -156,6 +156,7 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 	issues = append(issues, validateSummary(report.Summary, len(report.Endpoints), totalRequests, totalSuccesses, totalFailures)...)
 	issues = append(issues, validateBenchmarkCommandBaseURL(report.Command, report.BaseURL)...)
 	issues = append(issues, validateBenchmarkCommandRequests(report.Command, report.Endpoints)...)
+	issues = append(issues, validateBenchmarkCommandConcurrency(report.Command)...)
 	issues = append(issues, validateBenchmarkCommandSkipDB(report.Command, report.Endpoints)...)
 	issues = append(issues, validateBenchmarkCommandMinRPS(report.Command, report.Summary, report.Endpoints)...)
 
@@ -223,6 +224,22 @@ func validateBenchmarkCommandRequests(command string, endpoints []EndpointReport
 		}
 	}
 	return issues
+}
+
+func validateBenchmarkCommandConcurrency(command string) []string {
+	if strings.TrimSpace(command) == "" {
+		return nil
+	}
+	flags := parseCommandFlags(command)
+	rawConcurrency := strings.TrimSpace(flags["concurrency"])
+	if rawConcurrency == "" {
+		return []string{"benchmark command concurrency flag --concurrency is required"}
+	}
+	concurrency, err := strconv.Atoi(rawConcurrency)
+	if err != nil || concurrency <= 0 {
+		return []string{fmt.Sprintf("benchmark command concurrency %q is invalid", rawConcurrency)}
+	}
+	return nil
 }
 
 func validateBenchmarkCommandSkipDB(command string, endpoints []EndpointReport) []string {

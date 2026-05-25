@@ -113,6 +113,19 @@ func TestValidateReportRejectsCommandRequestsMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsMissingCommandConcurrency(t *testing.T) {
+	report := reportFixture(false)
+	report.Command = strings.Replace(report.Command, " --concurrency 2", "", 1)
+	raw := mustReportJSON(t, report)
+	err := ValidateReport(raw, Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted report without command concurrency")
+	}
+	if !strings.Contains(err.Error(), "command concurrency") {
+		t.Fatalf("ValidateReport concurrency error = %v, want command concurrency rejection", err)
+	}
+}
+
 func TestValidateReportRejectsCommandBaseURLMismatch(t *testing.T) {
 	report := reportFixture(false)
 	original := report.Command
@@ -893,7 +906,7 @@ func reportFixture(skipDB bool) Report {
 	if skipDB {
 		limitations = append(limitations, "skip-db enabled: report covers only /plaintext and /json")
 	}
-	command := "tetra-techempower-bench --base-url http://127.0.0.1:8080 --requests 4 --min-rps 1.00"
+	command := "tetra-techempower-bench --base-url http://127.0.0.1:8080 --requests 4 --concurrency 2 --min-rps 1.00"
 	if skipDB {
 		command += " --skip-db"
 	}
