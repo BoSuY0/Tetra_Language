@@ -105,6 +105,26 @@ func TestValidateCheckedInSCRAMMatrixReport(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsWrongCommandProvenance(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+
+	report.Command = "tetra-techempower-bench --base-url http://127.0.0.1:8080"
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report with non-matrix command")
+	}
+	if !strings.Contains(err.Error(), "scram-local-bench") {
+		t.Fatalf("ValidateReport matrix command error = %v, want scram-local-bench rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {

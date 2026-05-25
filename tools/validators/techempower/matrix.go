@@ -176,6 +176,8 @@ func ValidateMatrixReport(raw []byte) error {
 	}
 	if strings.TrimSpace(report.Command) == "" {
 		issues = append(issues, "command is required")
+	} else if !strings.Contains(report.Command, "scram-local-bench") {
+		issues = append(issues, "command must include scram-local-bench")
 	}
 	if len(report.Limitations) == 0 {
 		issues = append(issues, "limitations are required")
