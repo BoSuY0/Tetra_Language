@@ -398,6 +398,31 @@ check_performance_report() {
   go run ./tools/cmd/validate-performance-report --report "$report"
 }
 
+check_techempower_reports() {
+  local found=false
+  local report
+  local reports=(
+    "docs/benchmarks/techempower_local_smoke_skip_db_report.json"
+    "docs/benchmarks/techempower_scram_single_query_local_report.json"
+    "docs/benchmarks/techempower_scram_single_query_matrix_local_report.json"
+    "docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json"
+  )
+  for report in "${reports[@]}"; do
+    if [[ ! -f "$report" ]]; then
+      continue
+    fi
+    found=true
+    if [[ "$report" == "docs/benchmarks/techempower_local_smoke_skip_db_report.json" ]]; then
+      go run ./tools/cmd/validate-techempower-report --report "$report" --allow-skip-db
+    else
+      go run ./tools/cmd/validate-techempower-report --report "$report"
+    fi
+  done
+  if [[ "$found" != true ]]; then
+    echo "techempower reports not found; skipping in compatibility mode"
+  fi
+}
+
 check_lsp_stdio() {
   local lsp_init
   local lsp_open
@@ -664,6 +689,7 @@ if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "safety readiness evidence" check_safety_readiness
   run_step "ownership production audit" go run ./tools/cmd/validate-ownership-audit --audit docs/release/ownership_production_audit.md --expected-status achieved
   run_step "performance report schema" check_performance_report
+  run_step "techempower report schemas" check_techempower_reports
   run_step "lsp stdio smoke" check_lsp_smoke
   run_step "lsp json-rpc stdio" check_lsp_stdio
   run_step "tetra doc examples" check_tetra_doc

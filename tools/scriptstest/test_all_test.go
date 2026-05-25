@@ -1070,6 +1070,71 @@ func TestTestAllFullValidatesPerformanceReportWhenPresent(t *testing.T) {
 	}
 }
 
+func TestTestAllFullValidatesTechEmpowerReportsWhenPresent(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test_all: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`check_techempower_reports()`,
+		`docs/benchmarks/techempower_local_smoke_skip_db_report.json`,
+		`docs/benchmarks/techempower_scram_single_query_local_report.json`,
+		`docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`,
+		`docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`,
+		`go run ./tools/cmd/validate-techempower-report --report "$report"`,
+		`go run ./tools/cmd/validate-techempower-report --report "$report" --allow-skip-db`,
+		`run_step "techempower report schemas" check_techempower_reports`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("test_all missing TechEmpower report wiring %q", want)
+		}
+	}
+}
+
+func TestTestAllFullRunsTechEmpowerReportValidationForPresentReports(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	for _, report := range []string{
+		"docs/benchmarks/techempower_local_smoke_skip_db_report.json",
+		"docs/benchmarks/techempower_scram_single_query_local_report.json",
+		"docs/benchmarks/techempower_scram_single_query_matrix_local_report.json",
+		"docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json",
+	} {
+		path := filepath.Join(root, report)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reportDir := filepath.Join(root, "report")
+	goLog := filepath.Join(root, "go.log")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_GO_LOG=" + goLog}, "--full", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all full failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if !hasTestAllStep(summary, "techempower report schemas") {
+		t.Fatalf("full test_all summary missing TechEmpower report schema step: %#v", summary.Steps)
+	}
+	rawLog, err := os.ReadFile(goLog)
+	if err != nil {
+		t.Fatalf("read fake go log: %v", err)
+	}
+	log := string(rawLog)
+	for _, want := range []string{
+		`run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_local_smoke_skip_db_report.json --allow-skip-db`,
+		`run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json`,
+		`run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`,
+		`run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`,
+	} {
+		if !strings.Contains(log, want) {
+			t.Fatalf("full gate missing TechEmpower validator call %q in log:\n%s", want, log)
+		}
+	}
+}
+
 func TestTestAllFullRunsDocsManifestDiffStep(t *testing.T) {
 	root := testAllFakeRepo(t, false)
 	reportDir := filepath.Join(root, "report")
