@@ -93,7 +93,8 @@ Soak reports also require positive duration and concurrency/connection levels
 with non-negative timing metrics, internally consistent request counters, and
 zero failures.
 Matrix resource snapshots require live positive-PID process evidence and
-non-negative TCP, CPU, and goroutine counters.
+non-negative TCP, CPU, and goroutine counters. Matrix start/end resource spans
+must have increasing timestamps and non-regressing CPU counters.
 
 Validate a checked report before treating it as release evidence:
 

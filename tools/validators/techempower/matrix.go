@@ -277,6 +277,7 @@ func validateMatrixResource(resource MatrixResource) []string {
 	if err := validateMatrixResourceSnapshot("resource.end", resource.End); err != nil {
 		issues = append(issues, err.Error())
 	}
+	issues = append(issues, validateMatrixResourceSpan("resource", resource.Start, resource.End)...)
 	return issues
 }
 
@@ -378,7 +379,29 @@ func validateMatrixSoak(soak MatrixSoak) []string {
 	if err := validateMatrixResourceSnapshot("soak.resource_end", soak.ResourceEnd); err != nil {
 		issues = append(issues, err.Error())
 	}
+	issues = append(issues, validateMatrixResourceSpan("soak.resource", soak.ResourceStart, soak.ResourceEnd)...)
 	return issues
+}
+
+func validateMatrixResourceSpan(name string, start MatrixResourceSnapshot, end MatrixResourceSnapshot) []string {
+	var issues []string
+	startTime, startOK := parseMatrixResourceTimestamp(start)
+	endTime, endOK := parseMatrixResourceTimestamp(end)
+	if startOK && endOK && !endTime.After(startTime) {
+		issues = append(issues, name+" timestamps are not increasing")
+	}
+	if end.CPUUserSeconds < start.CPUUserSeconds || end.CPUSystemSeconds < start.CPUSystemSeconds {
+		issues = append(issues, name+" resource CPU counters regressed")
+	}
+	return issues
+}
+
+func parseMatrixResourceTimestamp(snapshot MatrixResourceSnapshot) (time.Time, bool) {
+	if strings.TrimSpace(snapshot.Timestamp) == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339, snapshot.Timestamp)
+	return parsed, err == nil
 }
 
 func validateTailLatencyPercentiles(label string, p99, p999, max float64) []string {
