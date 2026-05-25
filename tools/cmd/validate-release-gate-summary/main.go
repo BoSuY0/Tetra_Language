@@ -228,7 +228,7 @@ func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, ex
 		if err := validateV040RequiredPassingSteps(summary); err != nil {
 			return err
 		}
-		if err := validateV040ReleaseArtifacts(reportDir); err != nil {
+		if err := validateV040ReleaseArtifacts(summary, reportDir); err != nil {
 			return err
 		}
 	}
@@ -252,7 +252,7 @@ func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
 	return nil
 }
 
-func validateV040ReleaseArtifacts(reportDir string) error {
+func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) error {
 	manifestPath := filepath.Join(reportDir, "artifact-hashes.json")
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -279,6 +279,12 @@ func validateV040ReleaseArtifacts(reportDir string) error {
 		}
 		if required.Schema != "" && artifact.Schema != required.Schema {
 			return fmt.Errorf("artifact %s schema = %q, want %q", required.Path, artifact.Schema, required.Schema)
+		}
+	}
+	for _, step := range summary.Steps {
+		log := filepath.ToSlash(step.Log)
+		if _, ok := artifacts[log]; !ok {
+			return fmt.Errorf("passing v0.4.0 summary missing step log %s in artifact-hashes.json", log)
 		}
 	}
 	return nil

@@ -129,6 +129,18 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifa
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutStepLogArtifact(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("logs/04-docs-verification.log"))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), "logs/04-docs-verification.log") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutMemoryProductionArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/memory-production-linux-x64.json"))
@@ -451,6 +463,18 @@ func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {
 		artifact.SHA256 = fmt.Sprintf("sha256:%064x", i+1)
 		artifact.Size = int64(i + 1)
 		manifest.Artifacts = append(manifest.Artifacts, artifact)
+	}
+	offset := len(v040ArtifactHashFixtures)
+	for i, fixture := range v040GateStepFixtures {
+		path := fmt.Sprintf("logs/%02d-%s.log", i+1, stepLogSlug(fixture.Name))
+		if omitted[path] {
+			continue
+		}
+		manifest.Artifacts = append(manifest.Artifacts, releaseHashArtifact{
+			Path:   path,
+			SHA256: fmt.Sprintf("sha256:%064x", offset+i+1),
+			Size:   int64(offset + i + 1),
+		})
 	}
 	raw, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {

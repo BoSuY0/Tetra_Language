@@ -165,6 +165,8 @@ the required release-gate artifacts, including:
 - `artifacts/security-review.md`
 - `artifacts/security-review.md.sha256`
 
+It must also list every step log referenced by `summary.json` under `logs/`.
+
 ## Security Review
 
 Security signoff is mandatory for the exact `v0.4.0` candidate. The signoff
