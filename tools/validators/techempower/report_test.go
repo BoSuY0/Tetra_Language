@@ -125,6 +125,27 @@ func TestValidateSCRAMMatrixRejectsWrongCommandProvenance(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsArtifactReportPathMismatch(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+
+	report.Artifacts["semantic_report"] = "reports/techempower/semantic-report-from-another-run.json"
+	report.Artifacts["matrix_report"] = "reports/techempower/matrix-report-from-another-run.json"
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report with command/artifact report path mismatch")
+	}
+	if !strings.Contains(err.Error(), "command artifact") {
+		t.Fatalf("ValidateReport matrix artifact error = %v, want command artifact rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsWeakEvidenceAndSummaryMismatch(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {

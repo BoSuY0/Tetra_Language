@@ -227,6 +227,7 @@ func ValidateMatrixReport(raw []byte) error {
 	}
 	issues = append(issues, validateMatrixSummary(report.Summary, len(report.Runs), totalRequests, totalFailures, bestRPS, worstP99, worstP999)...)
 	issues = append(issues, validateMatrixArtifacts(report.Artifacts)...)
+	issues = append(issues, validateMatrixCommandArtifacts(report.Command, report.Artifacts)...)
 	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
 	issues = append(issues, validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
 
@@ -248,6 +249,57 @@ func validateMatrixArtifacts(artifacts map[string]string) []string {
 		}
 	}
 	return issues
+}
+
+func validateMatrixCommandArtifacts(command string, artifacts map[string]string) []string {
+	if strings.TrimSpace(command) == "" || len(artifacts) == 0 {
+		return nil
+	}
+	flags := parseMatrixCommandFlags(command)
+	checks := map[string]string{
+		"semantic_report": "semantic-report",
+		"matrix_report":   "matrix-report",
+	}
+	var issues []string
+	for artifactKey, flagName := range checks {
+		artifactPath := strings.TrimSpace(artifacts[artifactKey])
+		if artifactPath == "" {
+			continue
+		}
+		flagValue, ok := flags[flagName]
+		if !ok || strings.TrimSpace(flagValue) == "" {
+			issues = append(issues, fmt.Sprintf("matrix command artifact %s flag --%s is required", artifactKey, flagName))
+			continue
+		}
+		if flagValue != artifactPath {
+			issues = append(issues, fmt.Sprintf("matrix command artifact %s = %q, want %q", artifactKey, flagValue, artifactPath))
+		}
+	}
+	return issues
+}
+
+func parseMatrixCommandFlags(command string) map[string]string {
+	fields := strings.Fields(command)
+	flags := make(map[string]string)
+	for i := 0; i < len(fields); i++ {
+		field := fields[i]
+		if !strings.HasPrefix(field, "--") {
+			continue
+		}
+		nameValue := strings.TrimPrefix(field, "--")
+		name, value, ok := strings.Cut(nameValue, "=")
+		if ok {
+			flags[name] = value
+			continue
+		}
+		if i+1 < len(fields) && !strings.HasPrefix(fields[i+1], "--") {
+			flags[nameValue] = fields[i+1]
+			i++
+			continue
+		}
+		flags[nameValue] = ""
+	}
+	return flags
 }
 
 func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, runs []MatrixRun) []string {

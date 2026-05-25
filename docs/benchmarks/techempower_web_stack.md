@@ -109,7 +109,9 @@ Matrix artifacts must include non-empty `semantic_report`, `matrix_report`,
 can be traced back to its generated evidence shape. The validator parses the
 declared endpoint, worker, and concurrency/connection levels and rejects matrix
 reports whose `runs` omit or exceed that declared grid. Matrix report `command`
-provenance must include `scram-local-bench`.
+provenance must include `scram-local-bench`, and the command's
+`--semantic-report` and `--matrix-report` paths must match the recorded
+artifact paths.
 Matrix resource snapshots require RFC3339 timestamps, live positive-PID process
 evidence, and non-negative TCP, CPU, and goroutine counters. Matrix start/end
 resource spans must have increasing timestamps and non-regressing CPU counters;
