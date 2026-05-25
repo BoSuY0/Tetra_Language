@@ -88,7 +88,9 @@ decisions. The default artifact path is
 The validator rejects non-monotonic latency percentile evidence, so endpoint and
 matrix-run reports must keep `p50 <= p90 <= p95 <= p99 <= p99.9 <= max`.
 Endpoint benchmark command `--requests` must match every endpoint `requests`
-count in the generated semantic report.
+count in the generated semantic report. Endpoint benchmark command `--base-url`
+must also match the report `base_url`, after the same trailing-slash
+normalization the harness applies to generated reports.
 Matrix run evidence must also carry a positive `repeat` number; warmup evidence
 uses `repeat=0` and is not counted as a matrix run. The validator rejects
 warmup evidence with any other repeat value. Matrix run identities must be

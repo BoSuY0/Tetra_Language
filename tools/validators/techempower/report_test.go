@@ -58,6 +58,23 @@ func TestValidateReportRejectsCommandRequestsMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsCommandBaseURLMismatch(t *testing.T) {
+	report := reportFixture(false)
+	original := report.Command
+	report.Command = strings.Replace(report.Command, "--base-url http://127.0.0.1:8080", "--base-url http://127.0.0.1:9090", 1)
+	if report.Command == original {
+		t.Fatalf("test did not mutate benchmark command base-url")
+	}
+	raw := mustReportJSON(t, report)
+	err := ValidateReport(raw, Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted report with command/base_url mismatch")
+	}
+	if !strings.Contains(err.Error(), "command base-url") {
+		t.Fatalf("ValidateReport base-url error = %v, want command base-url rejection", err)
+	}
+}
+
 func TestValidateReportRequiresLatencyPercentilesAndIntegrityMetadata(t *testing.T) {
 	report := reportFixture(false)
 	report.GeneratedLocalAt = ""

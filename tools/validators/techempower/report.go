@@ -153,12 +153,51 @@ func validateBenchmarkReport(raw []byte, opt Options) error {
 	}
 	issues = append(issues, validateEndpointSet(report, opt)...)
 	issues = append(issues, validateSummary(report.Summary, len(report.Endpoints), totalRequests, totalSuccesses, totalFailures)...)
+	issues = append(issues, validateBenchmarkCommandBaseURL(report.Command, report.BaseURL)...)
 	issues = append(issues, validateBenchmarkCommandRequests(report.Command, report.Endpoints)...)
 
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateBenchmarkCommandBaseURL(command string, baseURL string) []string {
+	if strings.TrimSpace(command) == "" || strings.TrimSpace(baseURL) == "" {
+		return nil
+	}
+	flags := parseCommandFlags(command)
+	rawBaseURL := strings.TrimSpace(flags["base-url"])
+	if rawBaseURL == "" {
+		return []string{"benchmark command base-url flag --base-url is required"}
+	}
+	expected, err := canonicalBenchmarkBaseURL(rawBaseURL)
+	if err != nil {
+		return []string{fmt.Sprintf("benchmark command base-url %q is invalid: %v", rawBaseURL, err)}
+	}
+	actual, err := canonicalBenchmarkBaseURL(baseURL)
+	if err != nil {
+		return []string{fmt.Sprintf("benchmark base_url %q is invalid: %v", baseURL, err)}
+	}
+	if expected != actual {
+		return []string{fmt.Sprintf("benchmark command base-url = %q, want %q from base_url", expected, actual)}
+	}
+	return nil
+}
+
+func canonicalBenchmarkBaseURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf("scheme is %q, want http or https", parsed.Scheme)
+	}
+	if parsed.Host == "" {
+		return "", errors.New("host is required")
+	}
+	return strings.TrimRight(raw, "/"), nil
 }
 
 func validateBenchmarkCommandRequests(command string, endpoints []EndpointReport) []string {
