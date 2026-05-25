@@ -114,6 +114,7 @@ provenance must include `scram-local-bench`, and the command's
 artifact paths. The command's `--endpoints`, `--levels`, and
 `--worker-levels` grid flags must also match the recorded artifact grid, and
 `--duration` must match every recorded matrix run `duration_seconds`.
+`--repeats` must also match the recorded matrix run repeat evidence.
 Matrix resource snapshots require RFC3339 timestamps, live positive-PID process
 evidence, and non-negative TCP, CPU, and goroutine counters. Matrix start/end
 resource spans must have increasing timestamps and non-regressing CPU counters;

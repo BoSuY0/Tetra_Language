@@ -229,6 +229,7 @@ func ValidateMatrixReport(raw []byte) error {
 	issues = append(issues, validateMatrixArtifacts(report.Artifacts)...)
 	issues = append(issues, validateMatrixCommandArtifacts(report.Command, report.Artifacts)...)
 	issues = append(issues, validateMatrixCommandDuration(report.Command, report.Runs)...)
+	issues = append(issues, validateMatrixCommandRepeats(report.Command, report.Runs)...)
 	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
 	issues = append(issues, validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
 
@@ -330,6 +331,31 @@ func validateMatrixCommandDuration(command string, runs []MatrixRun) []string {
 		}
 	}
 	return issues
+}
+
+func validateMatrixCommandRepeats(command string, runs []MatrixRun) []string {
+	if strings.TrimSpace(command) == "" || len(runs) == 0 {
+		return nil
+	}
+	flags := parseMatrixCommandFlags(command)
+	rawRepeats := strings.TrimSpace(flags["repeats"])
+	if rawRepeats == "" {
+		return []string{"matrix command repeats flag --repeats is required"}
+	}
+	expected, err := strconv.Atoi(rawRepeats)
+	if err != nil || expected <= 0 {
+		return []string{fmt.Sprintf("matrix command repeats %q is invalid", rawRepeats)}
+	}
+	actual := 0
+	for _, run := range runs {
+		if run.Repeat > actual {
+			actual = run.Repeat
+		}
+	}
+	if actual != expected {
+		return []string{fmt.Sprintf("matrix command repeats = %d, want %d from run repeat evidence", expected, actual)}
+	}
+	return nil
 }
 
 func validateMatrixCoverage(artifacts map[string]string, server MatrixServer, runs []MatrixRun) []string {
