@@ -2304,16 +2304,16 @@
     "hash": "e1107b630dcde4accc37946335309153"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/report_test.go": {
-    "mtime": 1779699415.1412365,
-    "hash": "d6523a1afce420a34208d387335ed94c"
+    "mtime": 1779717725.9689064,
+    "hash": "12c8a5e5048886ee265ff097f48ef694"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/report.go": {
-    "mtime": 1779699358.5125542,
-    "hash": "297f21feff81e2046d27f1d87a2110a0"
+    "mtime": 1779717528.408185,
+    "hash": "dfdaa1928dc85021536f37da562987ee"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/techempower/matrix.go": {
-    "mtime": 1779699358.513554,
-    "hash": "6222da3211d133657050261158c279dc"
+    "mtime": 1779717749.6943893,
+    "hash": "fb54abb821f0e113927f88ee30f753a1"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/validators/uiplatform/report_test.go": {
     "mtime": 1779435798.811178,
@@ -17880,7 +17880,7 @@
     "hash": "b51ac8326c1e3f43ce740c78cc062d0d"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/AGENTS.md": {
-    "mtime": 1779717167.5169404,
+    "mtime": 1779718079.6391509,
     "hash": "d9d8b88b408e147673efdd3ba3d69e0b"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/cli/internal/README.md": {
@@ -18612,8 +18612,8 @@
     "hash": "bc0397e517925c0c72b27e55275be7a6"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/benchmarks/techempower_web_stack.md": {
-    "mtime": 1779699400.8105705,
-    "hash": "0162ffdb08335d5e17acd3d11a8049b0"
+    "mtime": 1779717749.8083868,
+    "hash": "770a94e5ed688f956e4f6d2e2703a09b"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/benchmarks/techempower_full_local_attempt_2026-05-20.md": {
     "mtime": 1779298631.1285932,
@@ -25708,12 +25708,12 @@
     "hash": "5c259395c6046762b1fc076c3643c7f2"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/evidence_log.md": {
-    "mtime": 1779717095.3683052,
-    "hash": "e5eb1c71a3272a3014553d678315e94d"
+    "mtime": 1779718016.5165415,
+    "hash": "f04537159433bbc3993bc01dd2b7c4c1"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/final_handoff.md": {
-    "mtime": 1779717105.2411032,
-    "hash": "ca3280ff96cc3619640d3f9f304de6dc"
+    "mtime": 1779718016.6415389,
+    "hash": "df98f6e879286f9b671320e4dd0586b0"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/README.md": {
     "mtime": 1779690506.074283,
@@ -25812,8 +25812,8 @@
     "hash": "e8f569cdea6499b3f21515a12633ef9f"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/benchmark_matrix.md": {
-    "mtime": 1779699024.5702264,
-    "hash": "8301450142a0b6407d1f4751a23fa8f7"
+    "mtime": 1779718016.7815356,
+    "hash": "3f5bafe784713c5401379cd33cad4694"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/peer_http_baseline.md": {
     "mtime": 1779648057.550025,
@@ -25868,8 +25868,8 @@
     "hash": "06111b106e985d53a0f142679fe3ff55"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/test_matrix.md": {
-    "mtime": 1779717080.9086006,
-    "hash": "1c2ce573d0e869b8b1c3cd6ac4da01ef"
+    "mtime": 1779718016.3945441,
+    "hash": "592c996658efbe648c8f37db4136374b"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/v0_4_0_dirty_gate_release_truth.md": {
     "mtime": 1779655843.8549523,
@@ -26064,8 +26064,12 @@
     "hash": "f510a6626ff9b8b15f86dddf7ada8988"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/release_summary_security_review_detached_hash_validator_slice.md": {
-    "mtime": 1779717069.5148327,
-    "hash": "bd6fc36767bc4349ea68d9f1db9430e3"
+    "mtime": 1779717356.4868586,
+    "hash": "71fe6f92350552e214993d094ae3d487"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/techempower_latency_percentile_validator_slice.md": {
+    "mtime": 1779718016.2576632,
+    "hash": "739149bcd84be57108f1085f4ea54dc8"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/logs/commands/v0_4_0_dirty_gate_latest_report_dir.txt": {
     "mtime": 1779655440.1762073,
