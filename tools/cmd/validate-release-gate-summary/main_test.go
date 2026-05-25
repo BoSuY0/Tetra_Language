@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -215,6 +216,18 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsafeArtifactHas
 		t.Fatalf("expected validator failure")
 	}
 	if !strings.Contains(err.Error(), `unsafe artifact path "../outside.txt" in artifact-hashes.json`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithUnsortedArtifactHashPaths(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithUnsortedPaths(t, dir))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), "artifact-hashes.json artifacts must be sorted by path") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -698,6 +711,27 @@ func v040ArtifactHashesManifestWithExtraPath(t *testing.T, dir string, path stri
 	return string(out)
 }
 
+func v040ArtifactHashesManifestWithUnsortedPaths(t *testing.T, dir string) string {
+	t.Helper()
+	raw := v040ArtifactHashesManifestForSummary(t, dir)
+	var manifest releaseArtifactHashesManifest
+	if err := json.Unmarshal([]byte(raw), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	sort.Slice(manifest.Artifacts, func(i, j int) bool {
+		return manifest.Artifacts[i].Path < manifest.Artifacts[j].Path
+	})
+	if len(manifest.Artifacts) < 2 {
+		t.Fatalf("need at least two artifacts to make unsorted manifest")
+	}
+	manifest.Artifacts[0], manifest.Artifacts[1] = manifest.Artifacts[1], manifest.Artifacts[0]
+	out, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
+}
+
 func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {
 	omitted := make(map[string]bool, len(omittedPaths))
 	for _, path := range omittedPaths {
@@ -735,6 +769,9 @@ func v040ArtifactHashesManifestWithOmissionsAndLogs(omitted map[string]bool, log
 			Size:   int64(offset + i + 1),
 		})
 	}
+	sort.Slice(manifest.Artifacts, func(i, j int) bool {
+		return manifest.Artifacts[i].Path < manifest.Artifacts[j].Path
+	})
 	raw, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		panic(err)

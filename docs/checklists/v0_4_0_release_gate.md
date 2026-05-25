@@ -151,8 +151,8 @@ go run ./tools/cmd/validate-artifact-hashes \
 ```
 
 For a passing `v0.4.0` summary, `<report-dir>/artifact-hashes.json` must list
-unique safe artifact paths from manifest root `.`, including the required
-release-gate artifacts:
+unique safe artifact paths sorted by path from manifest root `.`, including the
+required release-gate artifacts:
 
 - `summary.json`
 - `summary.md`

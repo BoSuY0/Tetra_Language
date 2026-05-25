@@ -379,6 +379,7 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 		return fmt.Errorf("artifact-hashes.json root = %q, want %q", manifest.Root, ".")
 	}
 	artifacts := make(map[string]releaseHashArtifact, len(manifest.Artifacts))
+	lastPath := ""
 	for _, artifact := range manifest.Artifacts {
 		path := filepath.ToSlash(artifact.Path)
 		if path == "" || filepath.IsAbs(artifact.Path) || strings.Contains(path, "..") {
@@ -387,6 +388,10 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 		if _, ok := artifacts[path]; ok {
 			return fmt.Errorf("duplicate artifact path %q in artifact-hashes.json", path)
 		}
+		if lastPath != "" && path < lastPath {
+			return fmt.Errorf("artifact-hashes.json artifacts must be sorted by path: %s appears before %s", path, lastPath)
+		}
+		lastPath = path
 		artifacts[path] = artifact
 	}
 	for _, required := range v040RequiredArtifacts {
