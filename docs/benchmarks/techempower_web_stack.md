@@ -117,7 +117,7 @@ artifact paths. The command's `--endpoints`, `--levels`, and
 `--repeats` must also match the recorded matrix run repeat evidence.
 `--warmup` must match the recorded warmup `duration_seconds` when warmup
 evidence is present. `--soak` must match the recorded soak `duration_seconds`
-when soak evidence is present.
+when soak evidence is present. `--pool` must match recorded `server.pool_size`.
 Matrix resource snapshots require RFC3339 timestamps, live positive-PID process
 evidence, and non-negative TCP, CPU, and goroutine counters. Matrix start/end
 resource spans must have increasing timestamps and non-regressing CPU counters;

@@ -232,6 +232,7 @@ func ValidateMatrixReport(raw []byte) error {
 	issues = append(issues, validateMatrixCommandRepeats(report.Command, report.Runs)...)
 	issues = append(issues, validateMatrixCommandWarmup(report.Command, report.Warmup)...)
 	issues = append(issues, validateMatrixCommandSoak(report.Command, report.Soak)...)
+	issues = append(issues, validateMatrixCommandPool(report.Command, report.Server)...)
 	issues = append(issues, validateMatrixCoverage(report.Artifacts, report.Server, report.Runs)...)
 	issues = append(issues, validateMatrixResourceWindow(report.Resource, report.Warmup, report.Soak, report.Runs)...)
 
@@ -414,6 +415,25 @@ func validateMatrixCommandSoak(command string, soak *MatrixSoak) []string {
 	}
 	if math.Abs(soak.DurationSeconds-expected) > 0.001 {
 		return []string{fmt.Sprintf("matrix command soak = %g, want %g from soak duration_seconds", expected, soak.DurationSeconds)}
+	}
+	return nil
+}
+
+func validateMatrixCommandPool(command string, server MatrixServer) []string {
+	if strings.TrimSpace(command) == "" {
+		return nil
+	}
+	flags := parseMatrixCommandFlags(command)
+	rawPool := strings.TrimSpace(flags["pool"])
+	if rawPool == "" {
+		return []string{"matrix command pool flag --pool is required"}
+	}
+	expected, err := strconv.Atoi(rawPool)
+	if err != nil || expected <= 0 {
+		return []string{fmt.Sprintf("matrix command pool %q is invalid", rawPool)}
+	}
+	if server.PoolSize > 0 && expected != server.PoolSize {
+		return []string{fmt.Sprintf("matrix command pool = %d, want %d from server.pool_size", expected, server.PoolSize)}
 	}
 	return nil
 }

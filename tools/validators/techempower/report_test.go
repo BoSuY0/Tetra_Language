@@ -412,6 +412,33 @@ func TestValidateSCRAMMatrixRejectsCommandSoakMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateSCRAMMatrixRejectsCommandPoolMismatch(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile checked-in SCRAM matrix report: %v", err)
+	}
+	var report MatrixReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("json.Unmarshal matrix report: %v", err)
+	}
+	if report.Server.PoolSize != 64 {
+		t.Fatalf("checked-in SCRAM matrix server pool_size = %d, want 64", report.Server.PoolSize)
+	}
+
+	original := report.Command
+	report.Command = strings.Replace(report.Command, "--pool 64", "--pool 1", 1)
+	if report.Command == original {
+		t.Fatalf("test did not mutate matrix command pool")
+	}
+	err = ValidateReport(mustMatrixReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted matrix report with command/server pool mismatch")
+	}
+	if !strings.Contains(err.Error(), "command pool") {
+		t.Fatalf("ValidateReport matrix pool error = %v, want command pool rejection", err)
+	}
+}
+
 func TestValidateSCRAMMatrixRejectsInvalidResourceSnapshots(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "benchmarks", "techempower_scram_single_query_matrix_local_report.json"))
 	if err != nil {
