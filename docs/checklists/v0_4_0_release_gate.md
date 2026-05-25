@@ -143,7 +143,7 @@ Required `summary.steps[].log` values must use the canonical
 Required `summary.steps[].command` values must match the canonical gate command
 surface, including report-directory-scoped artifact paths for validation steps.
 
-The hash manifest must validate with:
+The hash manifest must be a single strict JSON document and must validate with:
 
 ```sh
 go run ./tools/cmd/validate-artifact-hashes \

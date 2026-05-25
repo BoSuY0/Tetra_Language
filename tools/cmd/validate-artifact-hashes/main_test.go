@@ -146,3 +146,27 @@ func TestArtifactHashManifestRejectsInvalidHashFormat(t *testing.T) {
 		t.Fatalf("expected hash format failure, got %v", err)
 	}
 }
+
+func TestArtifactHashManifestRejectsTrailingJSONDocument(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "summary.json"), []byte(`{"schema":"example"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := buildHashManifest(root, "artifact-hashes.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, []byte("\n{}\n")...)
+	manifestPath := filepath.Join(root, "artifact-hashes.json")
+	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err = validateHashManifest(manifestPath)
+	if err == nil || !strings.Contains(err.Error(), "manifest must contain a single JSON document") {
+		t.Fatalf("expected single-document failure, got %v", err)
+	}
+}

@@ -192,7 +192,13 @@ func validateHashManifest(manifestPath string) error {
 func decodeStrictJSON(raw []byte, out any) error {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+	if err := dec.Decode(out); err != nil {
+		return err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return fmt.Errorf("manifest must contain a single JSON document")
+	}
+	return nil
 }
 
 func validateSHA256(value string, path string) error {
