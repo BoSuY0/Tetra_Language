@@ -79,24 +79,7 @@ func TestValidateReleaseGateSummaryAcceptsV040ReportWithExpectedIdentity(t *test
 
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutCompilerProductionArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, `{
-  "schema": "tetra.release-artifact-hashes.v1alpha1",
-  "root": ".",
-  "artifacts": [
-    {
-      "path": "artifacts/memory-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.memory.production.v1"
-    },
-    {
-      "path": "artifacts/parallel-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.parallel.production.v1"
-    }
-  ]
-}`)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/compiler-production-linux-x64.json"))
 	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, releaseGateSummaryExpectations{
 		ReleaseVersion:     "v0.4.0",
 		ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
@@ -134,26 +117,21 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutDocsVerificati
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), "artifacts/features.json") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutMemoryProductionArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, `{
-  "schema": "tetra.release-artifact-hashes.v1alpha1",
-  "root": ".",
-  "artifacts": [
-    {
-      "path": "artifacts/compiler-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.compiler.production.v1"
-    },
-    {
-      "path": "artifacts/parallel-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.parallel.production.v1"
-    }
-  ]
-}`)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/memory-production-linux-x64.json"))
 	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
 	if err == nil {
 		t.Fatalf("expected validator failure")
@@ -165,24 +143,7 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutMemoryProducti
 
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutParallelProductionArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, `{
-  "schema": "tetra.release-artifact-hashes.v1alpha1",
-  "root": ".",
-  "artifacts": [
-    {
-      "path": "artifacts/memory-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.memory.production.v1"
-    },
-    {
-      "path": "artifacts/compiler-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.compiler.production.v1"
-    }
-  ]
-}`)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/parallel-production-linux-x64.json"))
 	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
 	if err == nil {
 		t.Fatalf("expected validator failure")
@@ -194,30 +155,7 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutParallelProduc
 
 func TestValidateReleaseGateSummaryAcceptsPassingV040ReportWithCompilerProductionArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
-	writeReleaseGateArtifactHashes(t, dir, `{
-  "schema": "tetra.release-artifact-hashes.v1alpha1",
-  "root": ".",
-  "artifacts": [
-    {
-      "path": "artifacts/memory-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.memory.production.v1"
-    },
-    {
-      "path": "artifacts/parallel-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.parallel.production.v1"
-    },
-    {
-      "path": "artifacts/compiler-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.compiler.production.v1"
-    }
-  ]
-}`)
+	writeReleaseGateArtifactHashes(t, dir, v040ProductionArtifactHashesManifest())
 	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, releaseGateSummaryExpectations{
 		ReleaseVersion:     "v0.4.0",
 		ReleaseArtifact:    "tetra.release.v0_4_0.gate-report.v1",
@@ -493,30 +431,49 @@ func stepLogSlug(name string) string {
 }
 
 func v040ProductionArtifactHashesManifest() string {
-	return `{
-  "schema": "tetra.release-artifact-hashes.v1alpha1",
-  "root": ".",
-  "artifacts": [
-    {
-      "path": "artifacts/memory-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.memory.production.v1"
-    },
-    {
-      "path": "artifacts/parallel-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.parallel.production.v1"
-    },
-    {
-      "path": "artifacts/compiler-production-linux-x64.json",
-      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      "size": 0,
-      "schema": "tetra.compiler.production.v1"
-    }
-  ]
-}`
+	return v040ArtifactHashesManifestExcept()
+}
+
+func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {
+	omitted := make(map[string]bool, len(omittedPaths))
+	for _, path := range omittedPaths {
+		omitted[path] = true
+	}
+	manifest := releaseArtifactHashesManifest{
+		Schema: releaseArtifactHashesSchema,
+		Root:   ".",
+	}
+	for i, fixture := range v040ArtifactHashFixtures {
+		if omitted[fixture.Path] {
+			continue
+		}
+		artifact := fixture
+		artifact.SHA256 = fmt.Sprintf("sha256:%064x", i+1)
+		artifact.Size = int64(i + 1)
+		manifest.Artifacts = append(manifest.Artifacts, artifact)
+	}
+	raw, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	return string(raw)
+}
+
+var v040ArtifactHashFixtures = []releaseHashArtifact{
+	{Path: "summary.json"},
+	{Path: "summary.md"},
+	{Path: "artifacts/features.json", Schema: "tetra.features.v1"},
+	{Path: "artifacts/targets.json"},
+	{Path: "artifacts/linux-host-smoke.json"},
+	{Path: "artifacts/memory-production-linux-x64.json", Schema: "tetra.memory.production.v1"},
+	{Path: "artifacts/parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
+	{Path: "artifacts/compiler-production-linux-x64.json", Schema: "tetra.compiler.production.v1"},
+	{Path: "artifacts/distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
+	{Path: "artifacts/native-ui-linux-x64.json", Schema: "tetra.ui.native-runtime.v1"},
+	{Path: "artifacts/release-state.json", Schema: "tetra.release.v0_4_0.release-state.v1"},
+	{Path: "artifacts/release-state.txt"},
+	{Path: "artifacts/security-review.md"},
+	{Path: "artifacts/security-review.md.sha256"},
 }
 
 func writeReleaseGateArtifactHashes(t *testing.T, dir string, manifest string) {

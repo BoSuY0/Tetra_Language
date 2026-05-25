@@ -18,13 +18,24 @@ const expectedReleaseArtifact = "tetra.release.v0_3_0.gate-report.v1"
 const expectedReleaseGateCommand = "bash scripts/release/v0_3_0/gate.sh"
 const releaseArtifactHashesSchema = "tetra.release-artifact-hashes.v1alpha1"
 
-var v040RequiredProductionArtifacts = []struct {
+var v040RequiredArtifacts = []struct {
 	Path   string
 	Schema string
 }{
+	{Path: "summary.json"},
+	{Path: "summary.md"},
+	{Path: "artifacts/features.json", Schema: "tetra.features.v1"},
+	{Path: "artifacts/targets.json"},
+	{Path: "artifacts/linux-host-smoke.json"},
 	{Path: "artifacts/memory-production-linux-x64.json", Schema: "tetra.memory.production.v1"},
 	{Path: "artifacts/parallel-production-linux-x64.json", Schema: "tetra.parallel.production.v1"},
 	{Path: "artifacts/compiler-production-linux-x64.json", Schema: "tetra.compiler.production.v1"},
+	{Path: "artifacts/distributed-actors-linux-x64.json", Schema: "tetra.actors.distributed-runtime.v1"},
+	{Path: "artifacts/native-ui-linux-x64.json", Schema: "tetra.ui.native-runtime.v1"},
+	{Path: "artifacts/release-state.json", Schema: "tetra.release.v0_4_0.release-state.v1"},
+	{Path: "artifacts/release-state.txt"},
+	{Path: "artifacts/security-review.md"},
+	{Path: "artifacts/security-review.md.sha256"},
 }
 
 var v040RequiredPassingSteps = []string{
@@ -217,7 +228,7 @@ func validateReleaseGateSummaryWithExpectations(raw []byte, reportDir string, ex
 		if err := validateV040RequiredPassingSteps(summary); err != nil {
 			return err
 		}
-		if err := validateV040ProductionArtifacts(reportDir); err != nil {
+		if err := validateV040ReleaseArtifacts(reportDir); err != nil {
 			return err
 		}
 	}
@@ -241,7 +252,7 @@ func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
 	return nil
 }
 
-func validateV040ProductionArtifacts(reportDir string) error {
+func validateV040ReleaseArtifacts(reportDir string) error {
 	manifestPath := filepath.Join(reportDir, "artifact-hashes.json")
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -257,17 +268,17 @@ func validateV040ProductionArtifacts(reportDir string) error {
 	if manifest.Schema != releaseArtifactHashesSchema {
 		return fmt.Errorf("artifact-hashes.json schema = %q, want %q", manifest.Schema, releaseArtifactHashesSchema)
 	}
-	artifactSchemas := make(map[string]string, len(manifest.Artifacts))
+	artifacts := make(map[string]releaseHashArtifact, len(manifest.Artifacts))
 	for _, artifact := range manifest.Artifacts {
-		artifactSchemas[filepath.ToSlash(artifact.Path)] = artifact.Schema
+		artifacts[filepath.ToSlash(artifact.Path)] = artifact
 	}
-	for _, required := range v040RequiredProductionArtifacts {
-		schema, ok := artifactSchemas[required.Path]
+	for _, required := range v040RequiredArtifacts {
+		artifact, ok := artifacts[required.Path]
 		if !ok {
 			return fmt.Errorf("passing v0.4.0 summary missing required artifact %s in artifact-hashes.json", required.Path)
 		}
-		if schema != required.Schema {
-			return fmt.Errorf("artifact %s schema = %q, want %q", required.Path, schema, required.Schema)
+		if required.Schema != "" && artifact.Schema != required.Schema {
+			return fmt.Errorf("artifact %s schema = %q, want %q", required.Path, artifact.Schema, required.Schema)
 		}
 	}
 	return nil

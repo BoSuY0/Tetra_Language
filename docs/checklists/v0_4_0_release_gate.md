@@ -142,14 +142,28 @@ go run ./tools/cmd/validate-artifact-hashes \
 ```
 
 For a passing `v0.4.0` summary, `<report-dir>/artifact-hashes.json` must list
-the production-core artifacts with these schemas:
+the required release-gate artifacts, including:
 
+- `summary.json`
+- `summary.md`
+- `artifacts/features.json`: `tetra.features.v1`
+- `artifacts/targets.json`
+- `artifacts/linux-host-smoke.json`
 - `artifacts/memory-production-linux-x64.json`:
   `tetra.memory.production.v1`
 - `artifacts/parallel-production-linux-x64.json`:
   `tetra.parallel.production.v1`
 - `artifacts/compiler-production-linux-x64.json`:
   `tetra.compiler.production.v1`
+- `artifacts/distributed-actors-linux-x64.json`:
+  `tetra.actors.distributed-runtime.v1`
+- `artifacts/native-ui-linux-x64.json`:
+  `tetra.ui.native-runtime.v1`
+- `artifacts/release-state.json`:
+  `tetra.release.v0_4_0.release-state.v1`
+- `artifacts/release-state.txt`
+- `artifacts/security-review.md`
+- `artifacts/security-review.md.sha256`
 
 ## Security Review
 
