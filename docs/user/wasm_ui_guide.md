@@ -6,6 +6,8 @@ artifact/import preflight and runner-backed runtime proof. `wasm32-wasi`
 runtime support is conditional on a discoverable WASI runner, `wasm32-web`
 runtime proof comes from the browser runner smoke trace, and Linux-x64 native
 UI runtime proof comes from `tetra.ui.native-runtime.v1` smoke evidence.
+The post-v0.4 full-platform promotion contract is `tetra.ui.platform.v1`;
+Windows/macOS require real target-host reports before production can be claimed.
 
 ## WASM
 
@@ -39,11 +41,15 @@ validated `blocked` report and remains a release blocker for web UI evidence.
 
 For a `pass` web UI smoke report, validator-enforced evidence now includes:
 
+- a fresh RFC3339 `generated_at` timestamp
 - `ui_schema: "tetra.ui.v1"`
 - `ui_bundle_path` ending in `.ui.json`
 - `ui_module_path` ending in `.ui.web.mjs`
 - `dom_snapshot` ending in `.html`
 - `runtime_trace` containing `ui-event-dispatch:web-command-dispatch`
+- full-platform runtime trace markers for window/root mount, layout, text,
+  button, input, list, panel, focus, change, select, click, timer, async
+  command, redraw/update, and error recovery
 
 Support boundary for v0.3.0:
 
@@ -74,6 +80,9 @@ event/command failure negatives, closes the runtime, and writes
 Do not use `tetra.ui.v1` metadata, wasm/web UI reports, or
 `tetra.ui.native-shell.v1` sidecars alone as native runtime proof. macOS and
 Windows native UI runtime support still need their own host-native reports.
+The full-platform scripts under `scripts/release/full_platform/` accept
+target-host evidence via `--evidence`; blocked reports document the missing
+runner path but do not count as production runtime evidence.
 
 ## Plan250 Smoke Snapshot
 

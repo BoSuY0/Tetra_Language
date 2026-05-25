@@ -271,6 +271,13 @@ Chromium-compatible browser runner; `targets --format=json` reports
 is produced by `scripts/release/v1_0/web-smoke.sh` and remains host/browser
 dependent.
 
+UI runtime target metadata is intentionally separate from general target
+build/run support. `ui_runtime_status` is `production` for Linux-x64 native UI
+runtime and wasm32-web browser UI runtime evidence, `requires_target_host_evidence`
+for Windows/macOS until real target-host `tetra.ui.platform.v1` reports exist,
+and `unsupported` for WASI/build-only targets that do not provide UI event
+dispatch runtime behavior.
+
 ## Actors runtime surface (MVP)
 
 The actors MVP links a runtime object that exports:

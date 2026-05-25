@@ -74,10 +74,10 @@ runtime, host, or security guarantee.
 | `lib.core.collections` | `func count_i32(values: []i32, needle: Int) -> Int` | `mem` | stable `v0.3.0` core | `[]i32` scan helper only; not a generic collection API. |
 | `lib.core.collections` | `func first_or_i32(values: []i32, fallback: Int) -> Int` | `mem` | stable `v0.3.0` core | `[]i32` scan helper only; returns fallback for an empty slice. |
 | `lib.core.crypto` | `func interface_strength() -> Int` | none | stable `v0.3.0` core | Stable interface marker for examples and API docs. |
-| `lib.core.crypto` | `func mix_seed(seed: Int, value: Int) -> Int` | none | stable `v0.3.0` core | Deterministic mixer for reproducible interface tests; no encryption or authentication claim. |
+| `lib.core.crypto` | `func mix_seed(seed: Int, value: Int) -> Int` | none | stable `v0.3.0` core | Deterministic non-negative mixer for reproducible interface tests, saturating the i32 minimum normalization case; no encryption or authentication claim. |
 | `lib.core.crypto` | `func checksum_u8(values: []u8) -> Int` | `mem` | stable `v0.3.0` core | Deterministic byte checksum for examples and API-shape tests. |
 | `lib.core.crypto` | `func constant_time_eq_u8(lhs: []u8, rhs: []u8) -> Bool` | `mem` | stable `v0.3.0` core | Equality helper for byte slices; scans equal-length inputs without early value mismatch exit. |
-| `lib.core.filesystem` | `func exists(path: String, io_cap: cap.io) -> Bool` | `io` | stable `v0.4.0` linux-x64 slice | Host-backed existence check through `__tetra_fs_exists`; requires an explicit `cap.io` token and returns false for missing, invalid, or unsupported paths. |
+| `lib.core.filesystem` | `func exists(path: String, io_cap: cap.io) -> Bool` | `io` | stable `v0.4.0` linux-x64 slice | Host-backed existence check through `__tetra_fs_exists`; requires an explicit `cap.io` token and returns false for missing, embedded-NUL, invalid, too-long, or unsupported paths. |
 | `lib.core.filesystem` | `func has_leading_slash(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; no host access. |
 | `lib.core.filesystem` | `func ends_with_slash(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; no host access. |
 | `lib.core.filesystem` | `func is_root(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; treats `/` as root. |
@@ -87,8 +87,8 @@ runtime, host, or security guarantee.
 | `lib.core.io` | `func mmio_read_i32(addr: ptr, io_cap: cap.io) -> Int` | `io, mmio` | stable `v0.3.0` core | Unsafe MMIO wrapper over caller-selected address and token. |
 | `lib.core.io` | `func mmio_write_i32(addr: ptr, value: Int, io_cap: cap.io) -> Int` | `io, mmio` | stable `v0.3.0` core | Unsafe MMIO wrapper over caller-selected address and token. |
 | `lib.core.net` | `func socket_tcp4(io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Opens a real IPv4 TCP stream socket through the linux-x64 runtime and returns the fd or a negative errno-style syscall result. |
-| `lib.core.net` | `func bind_tcp4_loopback(fd: Int, port: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Binds a caller-owned fd to `127.0.0.1:port`; pass `0` to let the kernel choose an ephemeral port. |
-| `lib.core.net` | `func connect_tcp4_loopback(fd: Int, port: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Connects a caller-owned fd to `127.0.0.1:port` through Linux `connect` and returns the syscall status. |
+| `lib.core.net` | `func bind_tcp4_loopback(fd: Int, port: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Binds a caller-owned fd to `127.0.0.1:port`; pass `0` to let the kernel choose an ephemeral port. Returns `-1` before the syscall for ports outside `0..65535`. |
+| `lib.core.net` | `func connect_tcp4_loopback(fd: Int, port: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Connects a caller-owned fd to `127.0.0.1:port` through Linux `connect` and returns the syscall status. Returns `-1` before the syscall for ports outside `0..65535`. |
 | `lib.core.net` | `func listen(fd: Int, backlog: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Calls Linux `listen` on a bound TCP fd and returns the syscall status. |
 | `lib.core.net` | `func accept4(fd: Int, flags: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Calls Linux `accept4` with caller-provided flags and returns the accepted fd or negative syscall result. |
 | `lib.core.net` | `func accept(fd: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Convenience wrapper for `accept4(fd, 0, io_cap)`. |
@@ -111,8 +111,8 @@ runtime, host, or security guarantee.
 | `lib.core.net` | `func epoll_event_out() -> Int` | none | stable `v0.4.0` linux-x64 slice | Linux `EPOLLOUT` flag value. |
 | `lib.core.net` | `func epoll_event_err() -> Int` | none | stable `v0.4.0` linux-x64 slice | Linux `EPOLLERR` flag value. |
 | `lib.core.net` | `func epoll_event_hup() -> Int` | none | stable `v0.4.0` linux-x64 slice | Linux `EPOLLHUP` flag value. |
-| `lib.core.net` | `func epoll_event_fd(event: []i32) -> Int` | `mem` | stable `v0.4.0` linux-x64 slice | Reads the fd slot written by `epoll_wait_one_into`. |
-| `lib.core.net` | `func epoll_event_flags(event: []i32) -> Int` | `mem` | stable `v0.4.0` linux-x64 slice | Reads the flags slot written by `epoll_wait_one_into`. |
+| `lib.core.net` | `func epoll_event_fd(event: []i32) -> Int` | `mem` | stable `v0.4.0` linux-x64 slice | Reads the fd slot written by `epoll_wait_one_into`, or returns `-1` for an empty event buffer. |
+| `lib.core.net` | `func epoll_event_flags(event: []i32) -> Int` | `mem` | stable `v0.4.0` linux-x64 slice | Reads the flags slot written by `epoll_wait_one_into`, or returns `-1` when the flags slot is missing. |
 | `lib.core.net` | `func epoll_event_readable(flags: Int) -> Bool` | none | stable `v0.4.0` linux-x64 slice | Tests whether a Linux epoll flags word contains `EPOLLIN`. |
 | `lib.core.net` | `func epoll_event_writable(flags: Int) -> Bool` | none | stable `v0.4.0` linux-x64 slice | Tests whether a Linux epoll flags word contains `EPOLLOUT`. |
 | `lib.core.net` | `func epoll_event_has_error(flags: Int) -> Bool` | none | stable `v0.4.0` linux-x64 slice | Tests whether a Linux epoll flags word contains `EPOLLERR`. |
@@ -129,35 +129,35 @@ runtime, host, or security guarantee.
 | `lib.core.http` | `func route_queries() -> Int` | none | stable `v0.4.0` core | Route ID for `/queries`, including query-string requests such as `/queries?queries=7`. |
 | `lib.core.http` | `func route_updates() -> Int` | none | stable `v0.4.0` core | Route ID for `/updates`, including query-string requests. |
 | `lib.core.http` | `func route_fortunes() -> Int` | none | stable `v0.4.0` core | Route ID for `/fortunes`. |
-| `lib.core.http` | `func route_tech_empower(request: String) -> Int` | none | stable `v0.4.0` core | Parses a GET request line enough to classify TechEmpower benchmark paths; this is not a full HTTP message parser. |
-| `lib.core.http` | `func route_tech_empower_bytes(request: []u8, request_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Parses a GET request line directly from a caller-owned byte buffer after `net.read`, using only `request[0:request_len]`; this is not a full HTTP message parser. |
-| `lib.core.http` | `func route_tech_empower_bytes_at(request: []u8, start: Int, request_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Offset variant for classifying one request inside a caller-owned byte buffer, including pipelined request buffers. |
-| `lib.core.http` | `func request_keep_alive(request: String) -> Bool` | none | stable `v0.4.0` core | HTTP/1.1 keep-alive policy helper with `Connection: close` detection for smoke-covered request text. |
-| `lib.core.http` | `func request_keep_alive_bytes(request: []u8, request_len: Int) -> Bool` | `mem` | stable `v0.4.0` core | Byte-buffer variant of the HTTP/1.1 keep-alive policy helper for data read from sockets. |
-| `lib.core.http` | `func request_keep_alive_bytes_at(request: []u8, start: Int, request_len: Int) -> Bool` | `mem` | stable `v0.4.0` core | Offset keep-alive helper for one request inside a larger byte buffer. |
-| `lib.core.http` | `func request_head_len_bytes(request: []u8, request_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Returns the first complete HTTP request-head length through `\r\n\r\n`, or `0` when the buffer does not contain a complete head. |
-| `lib.core.http` | `func request_head_len_bytes_at(request: []u8, start: Int, request_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Offset variant for locating the next request-head boundary in a pipelined byte buffer. |
+| `lib.core.http` | `func route_tech_empower(request: String) -> Int` | none | stable `v0.4.0` core | Parses a GET request line enough to classify TechEmpower benchmark paths; the HTTP/1.1 request line must end with CRLF and the slash-prefixed target must use visible ASCII bytes before its separating space. This is not a full HTTP message parser. |
+| `lib.core.http` | `func route_tech_empower_bytes(request: []u8, request_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Parses a GET request line directly from a caller-owned byte buffer after `net.read`, using only `request[0:request_len]`; returns `route_bad_request()` when the requested byte range is missing or malformed, including LF-only, bare-CR, or non-visible request-target bytes. |
+| `lib.core.http` | `func route_tech_empower_bytes_at(request: []u8, start: Int, request_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Offset variant for classifying one request inside a caller-owned byte buffer, including pipelined request buffers; returns `route_bad_request()` for negative, wrapped, physically missing, non-CRLF, or non-visible-target request-line windows. |
+| `lib.core.http` | `func request_keep_alive(request: String) -> Bool` | none | stable `v0.4.0` core | HTTP/1.1 keep-alive policy helper with `Connection: close` detection for smoke-covered request text whose request line has a visible-ASCII slash-prefixed target and ends with CRLF. |
+| `lib.core.http` | `func request_keep_alive_bytes(request: []u8, request_len: Int) -> Bool` | `mem` | stable `v0.4.0` core | Byte-buffer variant of the HTTP/1.1 keep-alive policy helper for data read from sockets; returns `false` for missing physical request bytes or malformed request targets. |
+| `lib.core.http` | `func request_keep_alive_bytes_at(request: []u8, start: Int, request_len: Int) -> Bool` | `mem` | stable `v0.4.0` core | Offset keep-alive helper for one request inside a larger byte buffer; returns `false` for negative, wrapped, physically missing, or malformed request-line windows. |
+| `lib.core.http` | `func request_head_len_bytes(request: []u8, request_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Returns the first complete HTTP request-head length through `\r\n\r\n`, or `0` when the buffer does not contain a complete head or the requested byte range is missing. |
+| `lib.core.http` | `func request_head_len_bytes_at(request: []u8, start: Int, request_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Offset variant for locating the next request-head boundary in a pipelined byte buffer; returns `0` for negative, wrapped, or physically missing request windows. |
 | `lib.core.http` | `func plaintext_body_len() -> Int` | none | stable `v0.4.0` core | Exact byte count for the TechEmpower plaintext body. |
-| `lib.core.http` | `func response_head_len(status: Int, reason: String, server: String, date: String, content_type: String, content_len: Int, keep_alive: Bool) -> Int` | none | stable `v0.4.0` core | Exact byte count for a compact HTTP/1.1 response head with Server, Date, Content-Type, Content-Length, and Connection headers. |
-| `lib.core.http` | `func plaintext_response_len(server: String, date: String, keep_alive: Bool) -> Int` | none | stable `v0.4.0` core | Exact byte count for a complete `/plaintext` response. |
-| `lib.core.http` | `func json_message_response_len(server: String, date: String, message: String, keep_alive: Bool) -> Int` | none | stable `v0.4.0` core | Exact byte count for a complete `/json` message response. |
-| `lib.core.http` | `func write_plaintext_response(dst: inout []u8, server: String, date: String, keep_alive: Bool) -> Int` | `mem` | stable `v0.4.0` core | Writes a complete HTTP/1.1 plaintext response into a caller-owned byte buffer. |
-| `lib.core.http` | `func write_json_message_response(dst: inout []u8, server: String, date: String, message: String, keep_alive: Bool) -> Int` | `mem` | stable `v0.4.0` core | Writes a complete HTTP/1.1 JSON message response into a caller-owned byte buffer. |
-| `lib.core.http` | `func write_response_head(dst: inout []u8, status: Int, reason: String, server: String, date: String, content_type: String, content_len: Int, keep_alive: Bool) -> Int` | `mem` | stable `v0.4.0` core | Writes an HTTP/1.1 response head and returns the next byte index. |
-| `lib.core.http` | `func header_line_len(name: String, value: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a single `Name: Value\\r\\n` header line. |
-| `lib.core.http` | `func write_header_at(dst: inout []u8, start: Int, name: String, value: String) -> Int` | `mem` | stable `v0.4.0` core | Writes one HTTP header line at `start`. |
-| `lib.core.http` | `func write_crlf_at(dst: inout []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes CRLF at `start`. |
-| `lib.core.http` | `func write_ascii_at(dst: inout []u8, start: Int, text: String) -> Int` | `mem` | stable `v0.4.0` core | Writes ASCII text into a caller-owned byte buffer. |
-| `lib.core.http` | `func write_decimal_i32_at(dst: inout []u8, start: Int, value: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes decimal integer text into a caller-owned byte buffer. |
-| `lib.core.http` | `func digits_i32(value: Int) -> Int` | none | stable `v0.4.0` core | Decimal digit count helper for HTTP status and length fields. |
+| `lib.core.http` | `func response_head_len(status: Int, reason: String, server: String, date: String, content_type: String, content_len: Int, keep_alive: Bool) -> Int` | none | stable `v0.4.0` core | Exact byte count for a compact HTTP/1.1 response head with Server, Date, Content-Type, Content-Length, and Connection headers, or `-1` for non-three-digit status codes, negative Content-Length values, or malformed reason/header values containing CR/LF, non-HTAB controls, or DEL. |
+| `lib.core.http` | `func plaintext_response_len(server: String, date: String, keep_alive: Bool) -> Int` | none | stable `v0.4.0` core | Exact byte count for a complete `/plaintext` response, or `-1` for malformed response header values. |
+| `lib.core.http` | `func json_message_response_len(server: String, date: String, message: String, keep_alive: Bool) -> Int` | none | stable `v0.4.0` core | Exact byte count for a complete `/json` message response, or `-1` for malformed response header values. |
+| `lib.core.http` | `func write_plaintext_response(dst: inout []u8, server: String, date: String, keep_alive: Bool) -> Int` | `mem` | stable `v0.4.0` core | Writes a complete HTTP/1.1 plaintext response into a caller-owned byte buffer, returning `-1` without mutation when the complete response window is missing or response header values are malformed. |
+| `lib.core.http` | `func write_json_message_response(dst: inout []u8, server: String, date: String, message: String, keep_alive: Bool) -> Int` | `mem` | stable `v0.4.0` core | Writes a complete HTTP/1.1 JSON message response into a caller-owned byte buffer, returning `-1` without mutation when the complete response window is missing or response header values are malformed. |
+| `lib.core.http` | `func write_response_head(dst: inout []u8, status: Int, reason: String, server: String, date: String, content_type: String, content_len: Int, keep_alive: Bool) -> Int` | `mem` | stable `v0.4.0` core | Writes an HTTP/1.1 response head and returns the next byte index, or `-1` without mutation when the complete head window is missing, status code is not three digits, Content-Length is negative, or reason/header values contain CR/LF, non-HTAB controls, or DEL. |
+| `lib.core.http` | `func header_line_len(name: String, value: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a single `Name: Value\\r\\n` header line, or `-1` for invalid field names or malformed header values containing CR/LF, non-HTAB controls, or DEL. |
+| `lib.core.http` | `func write_header_at(dst: inout []u8, start: Int, name: String, value: String) -> Int` | `mem` | stable `v0.4.0` core | Writes one HTTP header line at `start`, or `-1` for negative starts, invalid field names, malformed header values containing CR/LF, non-HTAB controls, or DEL, wrapped offsets, or missing destination bytes. |
+| `lib.core.http` | `func write_crlf_at(dst: inout []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes CRLF at `start`, or `-1` for negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.http` | `func write_ascii_at(dst: inout []u8, start: Int, text: String) -> Int` | `mem` | stable `v0.4.0` core | Writes ASCII text into a caller-owned byte buffer, or `-1` for negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.http` | `func write_decimal_i32_at(dst: inout []u8, start: Int, value: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes decimal integer text, including `-2147483648`, into a caller-owned byte buffer, or `-1` for negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.http` | `func digits_i32(value: Int) -> Int` | none | stable `v0.4.0` core | Decimal digit count helper for HTTP status and length fields, including the i32 minimum value. |
 | `lib.core.json` | `func encoded_string_len(text: String) -> Int` | none | stable `v0.4.0` core | JSON string serializer sizing helper, including quotes and escape expansion. |
 | `lib.core.json` | `func message_object_len(message: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for `{"message":...}` response bodies. |
-| `lib.core.json` | `func digits_i32(value: Int) -> Int` | none | stable `v0.4.0` core | Decimal digit count helper for JSON integer field sizing. |
-| `lib.core.json` | `func world_object_len(id: Int, random_number: Int) -> Int` | none | stable `v0.4.0` core | Exact byte count for TechEmpower-style `World` JSON objects. |
-| `lib.core.json` | `func write_message_object(dst: inout []u8, message: String) -> Int` | `mem` | stable `v0.4.0` core | Writes compact `{"message":...}` JSON into a caller-owned byte buffer and returns bytes written. |
-| `lib.core.json` | `func write_message_object_at(dst: inout []u8, start: Int, message: String) -> Int` | `mem` | stable `v0.4.0` core | Writes compact `{"message":...}` JSON at `start` and returns the next byte index. |
-| `lib.core.json` | `func write_json_string(dst: inout []u8, text: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a compact escaped JSON string at the start of a caller-owned byte buffer. |
-| `lib.core.json` | `func write_json_string_at(dst: inout []u8, start: Int, text: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a compact escaped JSON string at `start` and returns the next byte index. |
+| `lib.core.json` | `func digits_i32(value: Int) -> Int` | none | stable `v0.4.0` core | Decimal digit count helper for JSON integer field sizing, including the i32 minimum value. |
+| `lib.core.json` | `func world_object_len(id: Int, random_number: Int) -> Int` | none | stable `v0.4.0` core | Exact byte count for TechEmpower-style `World` JSON objects, including i32 minimum field values. |
+| `lib.core.json` | `func write_message_object(dst: inout []u8, message: String) -> Int` | `mem` | stable `v0.4.0` core | Writes compact `{"message":...}` JSON into a caller-owned byte buffer and returns bytes written, or `-1` when the destination is too short. |
+| `lib.core.json` | `func write_message_object_at(dst: inout []u8, start: Int, message: String) -> Int` | `mem` | stable `v0.4.0` core | Writes compact `{"message":...}` JSON at `start` and returns the next byte index, or `-1` for negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.json` | `func write_json_string(dst: inout []u8, text: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a compact escaped JSON string at the start of a caller-owned byte buffer, or returns `-1` when the destination is too short. |
+| `lib.core.json` | `func write_json_string_at(dst: inout []u8, start: Int, text: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a compact escaped JSON string at `start` and returns the next byte index, or `-1` for negative starts, wrapped offsets, or missing destination bytes. |
 | `lib.core.postgres` | `func protocol_version_3() -> Int` | none | stable `v0.4.0` core | PostgreSQL protocol version 3.0 integer for startup messages. |
 | `lib.core.postgres` | `func int4_oid() -> Int` | none | stable `v0.4.0` core | PostgreSQL `int4` type OID used by TechEmpower prepared-statement paths. |
 | `lib.core.postgres` | `func text_oid() -> Int` | none | stable `v0.4.0` core | PostgreSQL `text` type OID used by Fortunes result metadata. |
@@ -184,55 +184,58 @@ runtime, host, or security guarantee.
 | `lib.core.postgres` | `func describe_kind_portal() -> Int` | none | stable `v0.4.0` core | PostgreSQL Describe payload kind for portals (`P`). |
 | `lib.core.postgres` | `func describe_kind_statement() -> Int` | none | stable `v0.4.0` core | PostgreSQL Describe payload kind for prepared statements (`S`). |
 | `lib.core.postgres` | `func startup_message_len(user: String, database: String, application_name: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a protocol 3.0 startup message with user, database, and application_name parameters. |
-| `lib.core.postgres` | `func write_startup_message(dst: inout []u8, user: String, database: String, application_name: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL startup message into a caller-owned byte buffer. |
-| `lib.core.postgres` | `func simple_query_payload_len(query: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Simple Query length field value for `query`. |
-| `lib.core.postgres` | `func simple_query_frame_len(query: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a typed Simple Query frontend frame. |
-| `lib.core.postgres` | `func write_simple_query(dst: inout []u8, query: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a typed PostgreSQL Simple Query frame into a caller-owned byte buffer. |
-| `lib.core.postgres` | `func parse_payload_len(statement: String, query: String, param_type_oids: []i32) -> Int` | `mem` | stable `v0.4.0` core | PostgreSQL Parse length field value for a prepared statement and parameter type OIDs. |
-| `lib.core.postgres` | `func parse_frame_len(statement: String, query: String, param_type_oids: []i32) -> Int` | `mem` | stable `v0.4.0` core | Exact byte count for a typed Parse frontend frame. |
-| `lib.core.postgres` | `func write_parse(dst: inout []u8, statement: String, query: String, param_type_oids: []i32) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Parse frame for extended-query prepared statements. |
-| `lib.core.postgres` | `func bind_text_0_payload_len(portal: String, statement: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Bind length field value for no text parameters. |
-| `lib.core.postgres` | `func bind_text_0_frame_len(portal: String, statement: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Bind frame with no text parameters. |
-| `lib.core.postgres` | `func bind_text_1_payload_len(portal: String, statement: String, value0: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Bind length field value for one text parameter. |
-| `lib.core.postgres` | `func bind_text_1_frame_len(portal: String, statement: String, value0: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Bind frame with one text parameter. |
-| `lib.core.postgres` | `func bind_text_2_payload_len(portal: String, statement: String, value0: String, value1: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Bind length field value for two text parameters. |
-| `lib.core.postgres` | `func bind_text_2_frame_len(portal: String, statement: String, value0: String, value1: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Bind frame with two text parameters. |
-| `lib.core.postgres` | `func write_bind_text_0(dst: inout []u8, portal: String, statement: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Bind frame with no text parameters. |
-| `lib.core.postgres` | `func write_bind_text_1(dst: inout []u8, portal: String, statement: String, value0: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Bind frame with one text parameter. |
-| `lib.core.postgres` | `func write_bind_text_2(dst: inout []u8, portal: String, statement: String, value0: String, value1: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Bind frame with two text parameters for update-style paths. |
-| `lib.core.postgres` | `func describe_portal_payload_len(portal: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Describe Portal length field value. |
-| `lib.core.postgres` | `func describe_portal_frame_len(portal: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Describe Portal frontend frame. |
-| `lib.core.postgres` | `func write_describe_portal(dst: inout []u8, portal: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Describe Portal frame. |
-| `lib.core.postgres` | `func describe_statement_payload_len(statement: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Describe Statement length field value. |
-| `lib.core.postgres` | `func describe_statement_frame_len(statement: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Describe Statement frontend frame. |
-| `lib.core.postgres` | `func write_describe_statement(dst: inout []u8, statement: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Describe Statement frame. |
-| `lib.core.postgres` | `func execute_payload_len(portal: String, max_rows: Int) -> Int` | none | stable `v0.4.0` core | PostgreSQL Execute length field value. |
-| `lib.core.postgres` | `func execute_frame_len(portal: String, max_rows: Int) -> Int` | none | stable `v0.4.0` core | Exact byte count for an Execute frontend frame. |
-| `lib.core.postgres` | `func write_execute(dst: inout []u8, portal: String, max_rows: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Execute frame. |
+| `lib.core.postgres` | `func write_startup_message(dst: inout []u8, user: String, database: String, application_name: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL startup message into a caller-owned byte buffer, or returns `-1` when the destination is too short or a startup C-string field contains an embedded NUL. |
+| `lib.core.postgres` | `func simple_query_payload_len(query: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Simple Query length field value for `query`, or `-1` when `query` contains an embedded NUL. |
+| `lib.core.postgres` | `func simple_query_frame_len(query: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a typed Simple Query frontend frame, or `-1` when `query` contains an embedded NUL. |
+| `lib.core.postgres` | `func write_simple_query(dst: inout []u8, query: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a typed PostgreSQL Simple Query frame into a caller-owned byte buffer, or returns `-1` when the destination is too short or `query` contains an embedded NUL. |
+| `lib.core.postgres` | `func parse_payload_len(statement: String, query: String, param_type_oids: []i32) -> Int` | `mem` | stable `v0.4.0` core | PostgreSQL Parse length field value for a prepared statement and parameter type OIDs, or `-1` when the OID count exceeds the signed i16 protocol range or a statement/query C-string contains an embedded NUL. |
+| `lib.core.postgres` | `func parse_frame_len(statement: String, query: String, param_type_oids: []i32) -> Int` | `mem` | stable `v0.4.0` core | Exact byte count for a typed Parse frontend frame, or `-1` when the OID count exceeds the signed i16 protocol range or a statement/query C-string contains an embedded NUL. |
+| `lib.core.postgres` | `func write_parse(dst: inout []u8, statement: String, query: String, param_type_oids: []i32) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Parse frame for extended-query prepared statements, or returns `-1` when the destination is too short, the OID count exceeds the signed i16 protocol range, or a statement/query C-string contains an embedded NUL. |
+| `lib.core.postgres` | `func bind_text_0_payload_len(portal: String, statement: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Bind length field value for no text parameters, or `-1` when portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func bind_text_0_frame_len(portal: String, statement: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Bind frame with no text parameters, or `-1` when portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func bind_text_1_payload_len(portal: String, statement: String, value0: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Bind length field value for one text parameter, or `-1` when portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func bind_text_1_frame_len(portal: String, statement: String, value0: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Bind frame with one text parameter, or `-1` when portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func bind_text_2_payload_len(portal: String, statement: String, value0: String, value1: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Bind length field value for two text parameters, or `-1` when portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func bind_text_2_frame_len(portal: String, statement: String, value0: String, value1: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Bind frame with two text parameters, or `-1` when portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func write_bind_text_0(dst: inout []u8, portal: String, statement: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Bind frame with no text parameters, or returns `-1` when the destination is too short or portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func write_bind_text_1(dst: inout []u8, portal: String, statement: String, value0: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Bind frame with one text parameter, or returns `-1` when the destination is too short or portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func write_bind_text_2(dst: inout []u8, portal: String, statement: String, value0: String, value1: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Bind frame with two text parameters for update-style paths, or returns `-1` when the destination is too short or portal/statement C-string fields contain an embedded NUL. |
+| `lib.core.postgres` | `func describe_portal_payload_len(portal: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Describe Portal length field value, or `-1` when `portal` contains an embedded NUL. |
+| `lib.core.postgres` | `func describe_portal_frame_len(portal: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Describe Portal frontend frame, or `-1` when `portal` contains an embedded NUL. |
+| `lib.core.postgres` | `func write_describe_portal(dst: inout []u8, portal: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Describe Portal frame, or returns `-1` when the destination is too short or `portal` contains an embedded NUL. |
+| `lib.core.postgres` | `func describe_statement_payload_len(statement: String) -> Int` | none | stable `v0.4.0` core | PostgreSQL Describe Statement length field value, or `-1` when `statement` contains an embedded NUL. |
+| `lib.core.postgres` | `func describe_statement_frame_len(statement: String) -> Int` | none | stable `v0.4.0` core | Exact byte count for a Describe Statement frontend frame, or `-1` when `statement` contains an embedded NUL. |
+| `lib.core.postgres` | `func write_describe_statement(dst: inout []u8, statement: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Describe Statement frame, or returns `-1` when the destination is too short or `statement` contains an embedded NUL. |
+| `lib.core.postgres` | `func execute_payload_len(portal: String, max_rows: Int) -> Int` | none | stable `v0.4.0` core | PostgreSQL Execute length field value, or `-1` when `portal` contains an embedded NUL. |
+| `lib.core.postgres` | `func execute_frame_len(portal: String, max_rows: Int) -> Int` | none | stable `v0.4.0` core | Exact byte count for an Execute frontend frame, or `-1` when `portal` contains an embedded NUL. |
+| `lib.core.postgres` | `func write_execute(dst: inout []u8, portal: String, max_rows: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Execute frame, or returns `-1` when the destination is too short or `portal` contains an embedded NUL. |
 | `lib.core.postgres` | `func sync_frame_len() -> Int` | none | stable `v0.4.0` core | Exact byte count for a PostgreSQL Sync frontend frame. |
-| `lib.core.postgres` | `func write_sync(dst: inout []u8) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Sync frame. |
+| `lib.core.postgres` | `func write_sync(dst: inout []u8) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Sync frame, or returns `-1` when the destination is too short. |
 | `lib.core.postgres` | `func terminate_frame_len() -> Int` | none | stable `v0.4.0` core | Exact byte count for a PostgreSQL Terminate frontend frame. |
-| `lib.core.postgres` | `func write_terminate(dst: inout []u8) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Terminate frontend frame into a caller-owned byte buffer. |
-| `lib.core.postgres` | `func frame_type_at(frame: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a typed PostgreSQL frame tag at `start`. |
-| `lib.core.postgres` | `func frame_length_at(frame: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a typed PostgreSQL frame length field. |
-| `lib.core.postgres` | `func frame_payload_len_at(frame: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Returns payload byte count for a typed PostgreSQL frame. |
-| `lib.core.postgres` | `func frame_total_len_at(frame: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Returns total byte count for a typed PostgreSQL frame. |
+| `lib.core.postgres` | `func write_terminate(dst: inout []u8) -> Int` | `mem` | stable `v0.4.0` core | Writes a PostgreSQL Terminate frontend frame into a caller-owned byte buffer, or returns `-1` when the destination is too short. |
+| `lib.core.postgres` | `func frame_type_at(frame: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a typed PostgreSQL frame tag at `start`, or `-1` for negative or missing starts. |
+| `lib.core.postgres` | `func frame_length_at(frame: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a typed PostgreSQL frame length field, or `-1` for negative starts, wrapped offsets, missing length bytes, or malformed negative signed lengths. |
+| `lib.core.postgres` | `func frame_payload_len_at(frame: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Returns payload byte count for a typed PostgreSQL frame, or `-1` for invalid, short, or negative-start frame lengths. |
+| `lib.core.postgres` | `func frame_total_len_at(frame: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Returns total byte count for a typed PostgreSQL frame, or `-1` for invalid, short, negative-start, or total-overflow frame lengths. |
 | `lib.core.postgres` | `func frame_payload_start(start: Int) -> Int` | none | stable `v0.4.0` core | Returns the payload offset for a typed PostgreSQL frame. |
-| `lib.core.postgres` | `func row_description_column_count(payload: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads RowDescription column count from a backend payload. |
-| `lib.core.postgres` | `func row_description_type_oid_at(payload: []u8, start: Int, payload_len: Int, column_index: Int) -> Int` | `mem` | stable `v0.4.0` core | Scans RowDescription metadata and returns one column type OID, or `-1` on missing/malformed input. |
-| `lib.core.postgres` | `func data_row_column_count(payload: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads DataRow column count from a backend payload. |
-| `lib.core.postgres` | `func data_row_value_len_at(payload: []u8, start: Int, column_index: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads one DataRow value length, returning `-1` for NULL or missing indexes. |
-| `lib.core.postgres` | `func data_row_value_start_at(payload: []u8, start: Int, column_index: Int) -> Int` | `mem` | stable `v0.4.0` core | Returns one DataRow value start offset, or `-1` for NULL/missing indexes. |
+| `lib.core.postgres` | `func row_description_column_count(payload: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads RowDescription column count from a backend payload, or `-1` for negative starts, missing bytes, or high-bit signed count fields. |
+| `lib.core.postgres` | `func row_description_type_oid_at(payload: []u8, start: Int, payload_len: Int, column_index: Int) -> Int` | `mem` | stable `v0.4.0` core | Scans RowDescription metadata and returns one column type OID, or `-1` on missing, malformed, negative-start, or wrapped input. |
+| `lib.core.postgres` | `func data_row_column_count(payload: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads DataRow column count from a backend payload, or `-1` for negative starts, missing bytes, or high-bit signed count fields. |
+| `lib.core.postgres` | `func data_row_value_len_at(payload: []u8, start: Int, column_index: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads one DataRow value length, returning `-1` for NULL, malformed negative lengths, negative starts, missing indexes, or physically missing positive value bytes. |
+| `lib.core.postgres` | `func data_row_value_start_at(payload: []u8, start: Int, column_index: Int) -> Int` | `mem` | stable `v0.4.0` core | Returns one DataRow value start offset, or `-1` for NULL, negative starts, missing indexes, or physically missing positive value bytes. |
 | `lib.core.postgres` | `func data_row_i32_at(payload: []u8, start: Int, column_index: Int) -> Int` | `mem` | stable `v0.4.0` core | Parses an ASCII integer DataRow value for TechEmpower `World` rows. |
-| `lib.core.postgres` | `func command_complete_affected_rows(payload: []u8, start: Int, payload_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Parses the trailing affected-row count from CommandComplete text. |
-| `lib.core.postgres` | `func ready_for_query_status(payload: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads ReadyForQuery transaction status byte. |
-| `lib.core.postgres` | `func cstring_end_at(src: []u8, start: Int, limit: Int) -> Int` | `mem` | stable `v0.4.0` core | Finds a NUL terminator inside a bounded byte range, or `-1`. |
-| `lib.core.postgres` | `func parse_ascii_i32_at(src: []u8, start: Int, count: Int) -> Int` | `mem` | stable `v0.4.0` core | Parses a bounded ASCII integer from a byte buffer. |
-| `lib.core.postgres` | `func write_i32_be_at(dst: inout []u8, start: Int, value: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes a big-endian i32 field and returns the next byte index. |
-| `lib.core.postgres` | `func write_i16_be_at(dst: inout []u8, start: Int, value: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes a big-endian i16 field and returns the next byte index. |
-| `lib.core.postgres` | `func read_i32_be(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a big-endian i32 field from a caller-owned byte buffer. |
-| `lib.core.postgres` | `func read_i32_be_signed(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a PostgreSQL i32 length field, recognizing `0xffffffff` as `-1`. |
-| `lib.core.postgres` | `func read_i16_be(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a big-endian i16 field from a caller-owned byte buffer. |
+| `lib.core.postgres` | `func command_complete_affected_rows(payload: []u8, start: Int, payload_len: Int) -> Int` | `mem` | stable `v0.4.0` core | Parses the trailing affected-row count from CommandComplete text, returning `0` for empty, negative-start, wrapped, physically missing, out-of-range i32, or non-trailing digit ranges. |
+| `lib.core.postgres` | `func ready_for_query_status(payload: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads ReadyForQuery transaction status byte, or `-1` for negative starts or missing payload bytes. |
+| `lib.core.postgres` | `func cstring_end_at(src: []u8, start: Int, limit: Int) -> Int` | `mem` | stable `v0.4.0` core | Finds a NUL terminator inside a bounded byte range, or `-1` for missing, negative-start, reversed, or physically missing ranges. |
+| `lib.core.postgres` | `func parse_ascii_i32_at(src: []u8, start: Int, count: Int) -> Int` | `mem` | stable `v0.4.0` core | Parses a bounded ASCII integer from a byte buffer, returning `0` for empty, negative-start, wrapped, physically missing, or out-of-range i32 ranges. |
+| `lib.core.postgres` | `func write_ascii_at(dst: inout []u8, start: Int, text: String) -> Int` | `mem` | stable `v0.4.0` core | Writes ASCII text into a caller-owned byte buffer, or `-1` for negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.postgres` | `func write_cstring_at(dst: inout []u8, start: Int, value: String) -> Int` | `mem` | stable `v0.4.0` core | Writes a NUL-terminated C string into a caller-owned byte buffer, or `-1` for embedded NUL bytes, negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.postgres` | `func write_cstring_pair_at(dst: inout []u8, start: Int, name: String, value: String) -> Int` | `mem` | stable `v0.4.0` core | Writes two NUL-terminated C strings into a caller-owned byte buffer, or `-1` for embedded NUL bytes, negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.postgres` | `func write_i32_be_at(dst: inout []u8, start: Int, value: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes a signed big-endian i32 field using two's-complement bytes and returns the next byte index, or `-1` for negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.postgres` | `func write_i16_be_at(dst: inout []u8, start: Int, value: Int) -> Int` | `mem` | stable `v0.4.0` core | Writes a signed big-endian i16 field using the low two's-complement bytes and returns the next byte index, or `-1` for negative starts, wrapped offsets, or missing destination bytes. |
+| `lib.core.postgres` | `func read_i32_be(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a non-negative big-endian i32 field from a caller-owned byte buffer, or `-1` for negative starts, wrapped offsets, missing bytes, or high-bit values that cannot be represented as a non-negative `Int`. |
+| `lib.core.postgres` | `func read_i32_be_signed(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a PostgreSQL i32 length field, normalizing any negative signed value, negative start, wrapped offset, or missing byte to `-1`. |
+| `lib.core.postgres` | `func read_i16_be(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a big-endian i16 field from a caller-owned byte buffer, or `-1` for negative starts, wrapped offsets, or missing bytes. |
 | `lib.core.math` | `func add_i32(a: Int, b: Int) -> Int` | none | stable `v0.3.0` core | Pure integer addition helper. |
 | `lib.core.math` | `func min_i32(a: Int, b: Int) -> Int` | none | stable `v0.3.0` core | Pure integer minimum helper. |
 | `lib.core.math` | `func max_i32(a: Int, b: Int) -> Int` | none | stable `v0.3.0` core | Pure integer maximum helper. |
@@ -244,7 +247,7 @@ runtime, host, or security guarantee.
 | `lib.core.networking` | `func clamp_port(port: Int) -> Int` | none | stable `v0.3.0` core | Deterministic port-range policy helper. |
 | `lib.core.networking` | `func is_valid_port(port: Int) -> Bool` | none | stable `v0.3.0` core | Port-range validation helper for endpoint configuration. |
 | `lib.core.networking` | `func choose_port(preferred: Int, fallback: Int) -> Int` | none | stable `v0.3.0` core | Endpoint configuration helper; `0` preferred port falls back. |
-| `lib.core.networking` | `func retry_backoff_ms(attempt: Int, base_ms: Int, max_ms: Int) -> Int` | none | stable `v0.3.0` core | Deterministic retry backoff policy helper. |
+| `lib.core.networking` | `func retry_backoff_ms(attempt: Int, base_ms: Int, max_ms: Int) -> Int` | none | stable `v0.3.0` core | Deterministic retry backoff policy helper; negative bases clamp to `0`, non-negative caps are honored before overflow, and uncapped overflow saturates to `2147483647`. |
 | `lib.core.serialization` | `func clamp_u8(value: Int) -> Int` | none | stable `v0.3.0` core | Pure packing helper; not a general serializer. |
 | `lib.core.serialization` | `func pack_u8_pair(high: Int, low: Int) -> Int` | none | stable `v0.3.0` core | Pure two-byte packing helper; not a wire-format guarantee. |
 | `lib.core.serialization` | `func unpack_u8_high(packed: Int) -> Int` | none | stable `v0.3.0` core | Pure unpack helper; negative packed input returns `0`. |
@@ -264,10 +267,10 @@ runtime, host, or security guarantee.
 | `lib.core.testing` | `func assert_false(value: Bool) -> Int` | none | stable `v0.3.0` core | Status-code helper; `0` means pass and `1` means fail. |
 | `lib.core.testing` | `func assert_eq_i32(actual: Int, expected: Int) -> Int` | none | stable `v0.3.0` core | Status-code helper; `0` means pass and `1` means fail. |
 | `lib.core.testing` | `func combine(lhs: Int, rhs: Int) -> Int` | none | stable `v0.3.0` core | Status-code helper; returns first non-zero status. |
-| `lib.core.time` | `func millis_from_seconds(seconds: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; negative input clamps to `0`. |
+| `lib.core.time` | `func millis_from_seconds(seconds: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; negative input clamps to `0` and positive overflow saturates to `Int` max. |
 | `lib.core.time` | `func seconds_from_millis(milliseconds: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; negative input clamps to `0`. |
 | `lib.core.time` | `func clamp_timeout_ms(value: Int, lo: Int, hi: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; assumes caller chooses sensible bounds. |
-| `lib.core.time` | `func add_duration_ms(base: Int, delta: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; negative result clamps to `0`. |
+| `lib.core.time` | `func add_duration_ms(base: Int, delta: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; adds `delta` to `base`, clamps a negative summed result to `0`, and saturates positive overflow to `Int` max. |
 
 ## `lib.core.math`
 
@@ -329,6 +332,8 @@ a zero-timeout wait, exercises fd/flag extraction helpers, closes the fds, and p
 Compiler integration coverage also runs real local TCP
 client/server exchanges through `connect`/`accept4`/`read`/`recv`/`write`/`send`, an epoll readiness
 path, nonblocking `accept4` convenience, and a socket-option smoke.
+Loopback bind/connect helpers reject ports outside `0..65535` before serializing
+the TCP port field.
 
 Calls require a caller-provided `cap.io` token plus `uses io`; buffer-writing
 helpers such as `epoll_wait_one_into` also require `uses mem`. The current
@@ -390,7 +395,10 @@ sockets, locates `\r\n\r\n` request-head boundaries for pipelined byte buffers,
 applies small HTTP/1.1 keep-alive policy helpers, and writes compact response
 heads plus full TechEmpower-style `/plaintext` and `/json` responses into
 caller-owned byte buffers, including Server, Date, Content-Type, Content-Length,
-and Connection headers. It does not open sockets, accept clients, parse full
+and Connection headers. Response-head helpers reject non-three-digit status
+codes, negative Content-Length values, CR/LF header injection, and non-HTAB
+control-byte header values instead of serializing malformed headers. It does
+not open sockets, accept clients, parse full
 HTTP header maps or request bodies, schedule event loops, or talk to PostgreSQL.
 
 For verifier stability: callers own destination buffer capacity. Writer helpers
@@ -407,7 +415,11 @@ Simple Query frontend frames, extended-query Parse/Bind/Describe/Execute/Sync
 frontend frames, RowDescription/DataRow/CommandComplete/ReadyForQuery backend
 payloads, Terminate frontend frames, and big-endian i16/i32 fields. These
 helpers are intended as the first Tetra-source layer for the TechEmpower
-PostgreSQL path.
+PostgreSQL path. Parse-frame helpers return sentinels instead of wrapping
+parameter type counts that exceed the signed i16 protocol range; backend
+RowDescription/DataRow count readers also reject high-bit signed i16 fields.
+PostgreSQL C-string length and writer helpers reject embedded NUL bytes before
+writing startup, query, statement, or portal fields.
 
 For verifier stability: this module does not open sockets, authenticate, own
 connection state, manage prepared statement state, or pool connections. The

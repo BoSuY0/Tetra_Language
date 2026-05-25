@@ -843,8 +843,8 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   records before/after state and widget updates, covers runtime close, and
   writes `reports/v0.4.0/native-ui-linux-x64.json` using the strict
   `tetra.ui.native-runtime.v1` schema. The validator rejects metadata-only,
-  web-only, native-shell sidecar-only, fake/mock/placeholder, missing event
-  execution, and missing state-transition evidence.
+  web-only, native-shell sidecar-only, synthetic-only, missing event execution,
+  and missing state-transition evidence.
 - WASM runtime execution is supported when the required host runner is
   discoverable. `wasm32-wasi` uses `run_mode: "wasi_runner"` and runs through
   `wasmtime` or the Node WASI fallback. `wasm32-web` uses
@@ -854,6 +854,16 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `targets --format=json`; Linux-x64 native UI runtime evidence remains a
   separate `ui.native-runtime` release artifact and does not promote
   macOS/Windows native UI claims.
+- Cross-platform UI runtime promotion is tracked by `ui.platform-runtime` and
+  the `tetra.ui.platform.v1` evidence contract. Target metadata records
+  `ui_runtime_status`: `linux-x64` and `wasm32-web` are production-backed by
+  their current runtime smokes, `windows-x64` and `macos-x64` require real
+  target-host reports before production claims, and `wasm32-wasi` plus
+  build-only Linux x86/x32 targets are unsupported for UI event-dispatch
+  runtime behavior. The full gate at
+  `scripts/release/full_platform/ui-runtime-gate.sh` rejects blocked,
+  build-only, metadata-only, runtime-less, docs-only, sidecar-only,
+  synthetic-only, and `startup_failure` evidence.
 - Build-only Linux x86/x32 target metadata uses `run_mode: "host_probed"`:
   `run_supported` is true only when the current host can execute that exact
   ABI (`i386` compatibility for x86, Linux x32 ABI support for x32), and

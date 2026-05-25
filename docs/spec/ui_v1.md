@@ -1,9 +1,11 @@
 # UI v1 Surface
 
 Status: current `v0.4.0` metadata UI surface with web and native shell scalar
-command-dispatch previews plus a Linux-x64 native runtime smoke path. This does
-not claim GTK/Qt/OS widget backends, macOS/Windows native UI runtimes, or
-platform accessibility integration.
+command-dispatch previews plus Linux-x64 native and wasm32-web browser-backed
+runtime smoke paths. The post-v0.4 full-platform promotion contract is
+`tetra.ui.platform.v1`, but Windows/macOS are not production UI runtime targets
+until real target-host reports pass the full-platform gate. This does not claim
+GTK/Qt/OS widget backends or platform accessibility integration.
 
 This document defines the UI syntax and backend artifact contract that is in
 scope for the `v0.4.0` metadata contract. It intentionally describes a
@@ -87,7 +89,9 @@ DOM preview attributes such as `data-tetra-style-*`,
 `data-tetra-accessibility-*`, `role`, and `aria-label`; full styling/layout
 engines and platform accessibility API integration remain outside this surface.
 Passing web UI smoke evidence must carry the runtime trace marker
-`ui-event-dispatch:web-command-dispatch`.
+`ui-event-dispatch:web-command-dispatch` plus the full-platform runtime markers
+for window/root mount, layout, text, button, input, list, panel, focus, change,
+select, click, timer, async command, redraw/update, and error recovery.
 
 Native shell UI is a deterministic text-mode command-dispatch preview backend.
 It renders the same validated state/view metadata into a sidecar, hydrates
@@ -134,6 +138,31 @@ The native runtime validator rejects metadata-only, web-only, native-shell
 sidecar-only, fake/mock/placeholder, missing event execution, and missing state
 transition evidence. macOS/Windows native UI runtime claims require separate
 host-native reports and are not promoted by the Linux-x64 report.
+
+## Full-Platform Promotion Contract
+
+The post-v0.4 promotion gate uses `tetra.ui.platform.v1` for target-host
+Windows/macOS runtime evidence and preserves `tetra.ui.v1` as the
+compiler-to-runtime metadata contract. Linux-x64 continues to use the stricter
+`tetra.ui.desktop-runtime.v1` production report, and wasm32-web continues to
+use browser-backed `tetra.web-ui-smoke.v1alpha1` evidence.
+
+Target metadata exposes `ui_runtime_status`:
+
+- `linux-x64`: `production`, backed by Linux native runtime smokes.
+- `wasm32-web`: `production`, backed by real browser/WASM UI smoke evidence.
+- `windows-x64` and `macos-x64`: `requires_target_host_evidence`; build-only,
+  startup, or remote-blocked reports are blockers, not runtime proof.
+- `wasm32-wasi` and build-only Linux x86/x32 targets: `unsupported` for UI
+  event-dispatch runtime behavior.
+
+The full-platform gate is
+`scripts/release/full_platform/ui-runtime-gate.sh`. It must reject missing,
+blocked, stale, build-only, metadata-only, runtime-less, docs-only,
+sidecar-only, fake/mock/placeholder, or `startup_failure` evidence.
+Target-host `tetra.ui.platform.v1` reports include an RFC3339 `generated_at`
+timestamp so validators can reject stale evidence instead of reusing old
+Windows/macOS runtime reports.
 
 `wasm32-wasi` in this wave remains non-UI runtime: it may compile UI metadata
 for artifact inspection, but it does not ship web/native UI preview sidecars

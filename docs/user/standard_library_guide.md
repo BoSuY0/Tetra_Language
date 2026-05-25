@@ -6,6 +6,8 @@ The stable module list and examples are documented in `docs/spec/stdlib.md`.
 Module naming and versioning rules are documented in
 `docs/spec/stdlib_naming_versioning.md`. The current support boundary is
 `docs/spec/current_supported_surface.md`.
+The production backend web stack and its runtime/server API are summarized in
+`docs/user/backend_web_platform.md`.
 
 ## Finding Stable Modules
 
@@ -94,7 +96,10 @@ For TechEmpower request-line classification, use
 `http.route_tech_empower(request)` for request text or
 `http.route_tech_empower_bytes(buffer, length)` for bytes read from a socket,
 then compare the result with route sentinels such as `http.route_plaintext()`
-or `http.route_queries()`. For pipelined buffers, first split complete
+or `http.route_queries()`. The HTTP/1.1 request line must end with CRLF;
+LF-only or bare-CR terminators are malformed. Request targets must start with
+`/` and use visible ASCII bytes before their separating space; tab/control
+target bytes are malformed. For pipelined buffers, first split complete
 request heads with `http.request_head_len_bytes(buffer, length)` and then use
 the `_at` helpers for each request window.
 
@@ -110,13 +115,30 @@ read/write/error/hangup flag predicates through a caller-provided `cap.io` token
 `lib.core.http` is a stable executable helper surface for TechEmpower
 String and byte-buffer request-line routing, request-head framing for pipelined
 buffers, keep-alive policy, compact HTTP/1.1 response heads, and
-TechEmpower-style plaintext/JSON responses.
+TechEmpower-style plaintext/JSON responses. Response-head helpers return
+sentinels for non-three-digit status codes and negative Content-Length values
+rather than serializing malformed headers, and reject CR/LF header injection in
+reason text and response header values plus non-HTAB control-byte header
+values.
 `lib.core.postgres` is a stable executable helper surface for PostgreSQL
 startup, Simple Query, extended-query Parse/Bind/Describe/Execute/Sync,
 RowDescription/DataRow/CommandComplete/ReadyForQuery inspection, Terminate,
-and big-endian wire-frame byte buffers.
+and big-endian wire-frame byte buffers. Its bounded ASCII i32 parser returns
+`0` for malformed, missing, or out-of-range integer text while preserving
+`-2147483648` and `2147483647`; CommandComplete affected-row parsing uses the
+same i32 boundary policy and only returns counts from a trailing digit run.
+DataRow value helpers return sentinels when a positive advertised value length
+is not physically present in the caller-owned byte buffer. Frame total-length
+helpers also return sentinels when the typed frame length would overflow `Int`.
+Parse-frame helpers return sentinels when the parameter type OID count exceeds
+the signed i16 protocol range, and RowDescription/DataRow count readers return
+sentinels for high-bit signed i16 count fields. PostgreSQL C-string length and
+writer helpers return sentinels for embedded NUL bytes in startup, query,
+statement, or portal fields instead of truncating the wire payload.
 `lib.core.json` is a stable executable byte-buffer helper surface for compact
-JSON response bodies.
+JSON response bodies. The runtime package used by backend services also has a
+generic deterministic JSON value parser/writer for objects, arrays, strings,
+numbers, booleans, and null.
 
 ## Capability Unsafe Boundary Recipe
 
@@ -290,9 +312,9 @@ exercised Linux-x64 path.
 string-scanning helpers. `filesystem.exists(path, io_cap)` calls the runtime
 `__tetra_fs_exists(path_ptr, path_len, io_cap)` ABI, requires an explicit
 `cap.io` token, returns true when the host path exists, and returns false when
-the path is missing, invalid, too long, or unsupported by the target runtime.
-The runtime copies `ptr,len` into a bounded NUL-terminated buffer before using
-the host filesystem API.
+the path is missing, contains an embedded NUL byte, is invalid, too long, or
+unsupported by the target runtime. The runtime copies `ptr,len` into a bounded
+NUL-terminated buffer before using the host filesystem API.
 
 The path-shape helpers scan the ASCII slash character `/`. They do not inspect
 permissions, normalize path syntax, resolve `.` or `..`, follow symlinks, or
@@ -312,7 +334,8 @@ configuration defaults:
   by `/`. Leading, trailing, and repeated slash characters do not add empty
   segments.
 - `filesystem.exists(path, io_cap)` checks host existence on linux-x64 through
-  the runtime ABI. Unsupported native targets report a filesystem runtime
+  the runtime ABI. Embedded NUL bytes are rejected instead of truncating to a
+  host prefix. Unsupported native targets report a filesystem runtime
   diagnostic; WASM targets reject the filesystem runtime builtin.
 
 | Path | `has_leading_slash` | `ends_with_slash` | `is_root` | `slash_count` | `directory_depth` |
@@ -421,6 +444,10 @@ HTTP String and byte-buffer request-line routing, request-head framing, and resp
 `lib.core.http`; JSON response byte-buffer helpers are available separately
 through `lib.core.json`.
 
+For `lib.core.net`, loopback bind/connect ports must be in `0..65535`; `0`
+remains the ephemeral-port sentinel, while negative and above-range ports return
+`-1` before the runtime serializes a TCP port field.
+
 ## Crypto Interface Contract
 
 `lib.core.crypto` is a stable interface-helper surface for deterministic
@@ -472,15 +499,18 @@ integer milliseconds or seconds and has no effects.
 
 - `time.millis_from_seconds(seconds)` converts seconds to milliseconds by
   multiplying by `1000`. A negative seconds value is treated as a negative
-  duration and clamps to `0`.
+  duration and clamps to `0`; values that would overflow `Int` saturate to
+  `2147483647`.
 - `time.seconds_from_millis(milliseconds)` converts milliseconds to seconds by
   integer division by `1000`. A negative milliseconds value is treated as a
   negative duration and clamps to `0`.
 - `time.clamp_timeout_ms(value, lo, hi)` clamps a millisecond timeout to the
   inclusive `lo`/`hi` range supplied by the caller.
 - `time.add_duration_ms(base, delta)` adds the millisecond `delta` to `base`.
-  If the result would be negative, it returns `0`; otherwise it returns the
-  summed millisecond duration.
+  If the result would be negative, it returns `0`; if a positive result would
+  overflow `Int`, it returns `2147483647`; otherwise it returns the summed
+  millisecond duration. A negative `base` can still recover when a positive
+  `delta` makes the sum non-negative.
 
 ## Experimental Mirrors
 

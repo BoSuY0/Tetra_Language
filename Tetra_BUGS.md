@@ -2,7 +2,7 @@
 
 Status: fixed bug ledger for microservice-driven Tetra language testing.
 
-Updated: 2026-05-20. All entries below are fixed and verified by promoted
+Updated: 2026-05-23. All entries below are fixed and verified by promoted
 regressions plus the microservice bug ledger. The final coverage set is
 recorded in the 2026-05-20 closure row under Microservice Bug-Hunt Runs.
 
@@ -1976,8 +1976,8 @@ func main() -> Int:
     return add(40, 2)
 EOF
 go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/original" "$tmp/app/main.tetra"
-go run ./cli/cmd/tetra fmt "$tmp/app/main.tetra" > "$tmp/app/formatted_main.tetra"
-go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/formatted" "$tmp/app/formatted_main.tetra"
+go run ./cli/cmd/tetra fmt -write "$tmp/app/main.tetra"
+go run ./cli/cmd/tetra build --target linux-x64 -o "$tmp/formatted" "$tmp/app/main.tetra"
 ```
 
 - Expected: `tetra fmt` preserves the selective import or rewrites it to a
@@ -2747,6 +2747,2480 @@ uses mem:
   optional-string, or generic-string returns until the return-expression
   checker preserves the `await`/`try` wrappers for those result types.
 
+### TETRA-BUG-0056: Go workspace validation fails the SCRAM local benchmark package
+
+- Status: fixed, verified.
+- Area: tooling / Go workspace module configuration.
+- Found while verifying backend web-stack microservice and TechEmpower-adjacent
+  bug-hunt tests after adding:
+  `examples/microservices/backend_http_pipeline_gateway_service.tetra` and
+  `examples/microservices/backend_postgres_prepared_pipeline_service.tetra`.
+- Reproduction command:
+
+```sh
+go test ./benchmarks/techempower/tetra/cmd/scram-local-bench -count=1
+```
+
+- Expected: the SCRAM local benchmark package tests run under the repository
+  `go.work` workspace, matching the nearby backend runtime package checks.
+- Actual: workspace-mode dependency validation fails before the package tests
+  run:
+
+```text
+tetra_language/compiler@v0.0.0: malformed module path "tetra_language/compiler": missing dot in first path element
+```
+
+- Control case: running the same package with `GOWORK=off` passes, proving the
+  package itself builds and the failure begins at the workspace/module boundary.
+- Root cause: `cli/go.mod` required the local `tetra_language/compiler`
+  workspace module without an explicit local `replace`, so newer Go workspace
+  validation treated the underscore module path as a remote dependency path.
+- Fix: add `replace tetra_language/compiler => ../compiler` to `cli/go.mod`.
+- Verification:
+
+```sh
+go test ./benchmarks/techempower/tetra/cmd/scram-local-bench -count=1
+go list -m all
+```
+
+- Workaround before the fix: run the benchmark package with `GOWORK=off`, but
+  that bypasses the repository workspace and does not verify workspace
+  compatibility.
+
+### TETRA-BUG-0057: Zero-length heap slice constructors call mmap with length 0
+
+- Status: fixed, verified.
+- Area: compiler / native backend slice allocation.
+- Found while creating:
+  `examples/microservices/backend_time_collection_window_service.tetra`.
+- Reproduction command:
+
+```sh
+go test ./compiler -run TestBuildMakeZeroLengthSlices -count=1
+```
+
+- Expected: zero-length heap slice constructors produce an empty slice that can
+  be iterated without element access, matching `lib.core.collections` fallback
+  helpers for empty `[]i32` values.
+- Actual before the fix: the program exits with code `2` before reaching the
+  empty iteration fallback.
+- Control case: non-empty `make_i32` slices continued to build and run through
+  `TestBuildMakeI32Slice`; zero-length stdlib memory helper examples also
+  already treated length `0` as a non-accessing operation.
+- Root cause: native make-slice emitters passed byte length `0` directly to
+  `mmap`; Linux/macOS reject zero-length mappings, and the existing mmap
+  failure guard converted that into runtime exit code `2`.
+- Fix: native make-slice emission now returns `(ptr=0, len=0)` without calling
+  `mmap` when the requested logical slice length is zero. The same guard was
+  added to the linux-x86 and Win64 emitter paths, and the compiler cache ABI
+  discriminator was bumped so stale native objects compiled with the old
+  allocation path are not reused.
+- Verification:
+
+```sh
+go test ./compiler -run 'TestBuildMakeZeroLengthSlices|TestMicroserviceExamplesAndBugLedger' -count=1
+go test ./compiler/internal/backend/linux_x86 ./compiler/internal/backend/x64abi ./compiler/internal/backend/x64core ./compiler/internal/cache -count=1
+```
+
+- Workaround before the fix: avoid constructing zero-length heap slices with
+  `make_u8(0)`, `make_u16(0)`, `make_i32(0)`, or `make_bool(0)` on native
+  targets.
+
+### TETRA-BUG-0058: Explicit source-file CLI inputs inherit capsule source roots
+
+- Status: fixed, verified.
+- Area: CLI / project discovery.
+- Found while verifying:
+  `examples/microservices/backend_capsule_source_root_service`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra check examples/projects/dogfood_cli/src/main.tetra
+```
+
+- Expected: an explicit source-file input is checked as the requested file,
+  matching `tetra test examples/projects/dogfood_cli/src/main.tetra` and the
+  direct file smoke registry behavior.
+- Actual before the fix: `check`, `build`, and `run` discovered the surrounding
+  capsule and forced the file through capsule source-root validation:
+
+```text
+module 'examples.projects.dogfood_cli.src.main' must be in src/examples/projects/dogfood_cli/src/main.t4
+```
+
+- Control case: `go run ./cli/cmd/tetra test --target linux-x64
+  examples/projects/dogfood_cli/src/main.tetra` passed because the test command
+  already treated explicit source-file inputs as standalone files.
+- Root cause: `resolveCLIInput` returned project `WorldOptions` for explicit
+  file paths inside a discovered capsule unless the input was outside the
+  project. That made `check`, `build`, and `run` disagree with `test` and with
+  explicit-file expectations.
+- Fix: `resolveCLIInput` now applies capsule project options only to project
+  references (empty input, project directory, or capsule manifest path). Explicit
+  non-project source files are returned as standalone inputs with no project
+  world options.
+- Verification:
+
+```sh
+go test ./cli/cmd/tetra -run TestBuildCheckRunCommandsAcceptExplicitProjectSourceFile -count=1
+go run ./cli/cmd/tetra check examples/projects/dogfood_cli/src/main.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-dogfood-cli-file examples/projects/dogfood_cli/src/main.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/projects/dogfood_cli/src/main.tetra
+```
+
+### TETRA-BUG-0059: HTTP Connection-close detection is case-sensitive
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_status_matrix_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+```
+
+- Expected: `lib.core.http.request_keep_alive(...)` and
+  `request_keep_alive_bytes_at(...)` treat `Connection: close` case
+  insensitively for ASCII header names and values, matching HTTP header
+  semantics and the existing exact-case close behavior.
+- Actual before the fix: the service exited with status `22` because
+  `connection: close` was not recognized as a close request, so keep-alive
+  stayed enabled.
+- Control cases: exact `Connection: close` returned non-keep-alive, and a
+  request without the header remained keep-alive.
+- Root cause: `connection_close_next_state` compared raw byte values for the
+  literal `Connection: close` pattern. The state machine started with uppercase
+  `C` and then required lowercase letters, so lowercase header names and mixed
+  case values missed the close path.
+- Fix: normalize ASCII letters inside `connection_close_next_state` before
+  comparing the pattern. Both string and byte-buffer helpers share this state
+  machine.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0060: HTTP Connection-close detection rejects optional whitespace
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_header_whitespace_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+```
+
+- Expected: `lib.core.http.request_keep_alive(...)` and
+  `request_keep_alive_bytes_at(...)` recognize `Connection: close` when the
+  colon is followed by HTTP optional whitespace such as multiple spaces or a
+  horizontal tab.
+- Actual before the fix: the service exited with status `3` because
+  `Connection:   close` was not recognized as a close request, so keep-alive
+  stayed enabled. The tab variant was behind the same state-machine boundary.
+- Control cases: exact `Connection: close` returned non-keep-alive, and a
+  request without the header remained keep-alive.
+- Root cause: after matching `Connection:`, `connection_close_next_state`
+  required exactly one ASCII space before matching `close`.
+- Fix: keep the state machine in the whitespace state for ASCII space and tab,
+  and transition to the `close` matcher once the first `c` arrives. The string
+  and byte-buffer helpers share this state machine.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0061: HTTP Connection-close detection ignores close after comma
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_connection_list_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
+```
+
+- Expected: `lib.core.http.request_keep_alive(...)` and
+  `request_keep_alive_bytes_at(...)` recognize `close` as a token in a
+  comma-separated `Connection` header value such as `Connection: keep-alive,
+  close`.
+- Actual before the fix: the service exited with status `4` because
+  `Connection: keep-alive, close` was not recognized as a close request, so
+  keep-alive stayed enabled.
+- Control cases: exact `Connection: close` returned non-keep-alive,
+  `Connection: keep-alive` remained keep-alive, and the previously fixed
+  case-insensitive/optional-whitespace paths continued to pass.
+- Root cause: after matching `Connection:`, `connection_close_next_state`
+  required the next value token to be `close`; any other token reset the state
+  instead of scanning the header value until a comma introduced the next token.
+- Fix: add a value-scan state that skips non-matching `Connection` tokens until
+  a comma, then re-enters the optional-whitespace/token matcher. The string and
+  byte-buffer helpers share this state machine.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0062: HTTP Connection-close detection matches suffix headers
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_connection_scope_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
+```
+
+- Expected: `lib.core.http.request_keep_alive(...)` and
+  `request_keep_alive_bytes_at(...)` only apply close semantics to the
+  `Connection` header field, not suffix matches inside unrelated fields such as
+  `X-Connection: close` or `Proxy-Connection: close`.
+- Actual before the fix: the service exited with status `1` because
+  `X-Connection: close` was treated as a real `Connection: close` header.
+- Control cases: exact `Connection: close` still returned non-keep-alive, while
+  the previously fixed case-insensitive, optional-whitespace, and token-list
+  paths continued to pass.
+- Root cause: `connection_close_next_state` started matching `Connection` at
+  any `c` byte in the request buffer, so suffix header names could trigger the
+  close path.
+- Fix: add an in-line scan state so the matcher only starts at the beginning of
+  the input or immediately after LF. Non-matching header lines are skipped until
+  the next LF before matching can begin again.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0063: HTTP Connection-close detection accepts close token prefixes
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_connection_token_boundary_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra
+```
+
+- Expected: `lib.core.http.request_keep_alive(...)` and
+  `request_keep_alive_bytes_at(...)` only treat `close` as a complete
+  comma-separated `Connection` token. Values such as `closex` or
+  `close-upgrade` should not disable keep-alive.
+- Actual before the fix: the service exited with status `1` because
+  `Connection: closex` was treated as a close request.
+- Control cases: `Connection: close, keep-alive` and `Connection: close   `
+  still returned non-keep-alive, while `enclose` stayed keep-alive.
+- Root cause: `connection_close_next_state` returned the terminal matched state
+  immediately after reading the `e` in `close`, without checking the next byte
+  for a token delimiter.
+- Fix: add a pending-close state after `close`; it only becomes a terminal
+  close match when the next byte is a valid token delimiter: space, tab, comma,
+  CR, or LF. Non-delimiter bytes fall back to scanning the rest of the header
+  value.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0064: HTTP/1.1 detection scans beyond the request line
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_version_scope_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+```
+
+- Expected: `lib.core.http.route_tech_empower(...)` and
+  `request_keep_alive(...)` should only accept an exact `HTTP/1.1` version on
+  the request line. `HTTP/1.1` inside a header value, or a request-line version
+  prefix such as `HTTP/1.10`, should not make the request HTTP/1.1.
+- Actual before the fix: the service exited with status `1` because
+  `GET /plaintext HTTP/1.0` with `X-Debug: HTTP/1.1` was routed as plaintext.
+- Control cases: real `GET /queries?queries=7 HTTP/1.1` and byte-buffer
+  `GET /db HTTP/1.1` requests still route correctly and remain keep-alive by
+  default.
+- Root cause: `contains_http11_marker` and `contains_http11_marker_bytes_at`
+  scanned the entire request buffer for ` HTTP/1.1`, returned success as soon
+  as the final `1` was read, and did not require the match to be on the first
+  line or followed by a line terminator.
+- Fix: make both helpers stop at the first request-line CR/LF unless an exact
+  ` HTTP/1.1` has just been matched, and only return success when that exact
+  version is followed by CR or LF.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0065: HTTP route helper classifies empty request targets as not found
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_request_target_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
+```
+
+- Expected: `lib.core.http.route_tech_empower(...)` and
+  `route_tech_empower_bytes_at(...)` should return `route_bad_request()` for
+  malformed request lines whose request target is empty or starts with `?`.
+- Actual before the fix: the service exited with status `1` because
+  `GET  /json HTTP/1.1` ended the target before any path byte and returned
+  `route_not_found()` instead of `route_bad_request()`.
+- Control cases: `GET / HTTP/1.1` and `GET /?debug=1 HTTP/1.1` still return
+  `route_not_found()`, while `/plaintext?debug=1` and `/json` continue to
+  route normally.
+- Root cause: both route helpers treated the first space or `?` after `GET `
+  as a valid target terminator even when `path_pos == 0`, then fell through to
+  the normal route-miss result.
+- Fix: return `route_bad_request()` when the target terminator appears before
+  any path byte in both the string and byte-buffer routing paths.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0066: HTTP/1.1 detection accepts extra request-line tokens
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_request_line_token_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
+```
+
+- Expected: `lib.core.http.route_tech_empower(...)`,
+  `route_tech_empower_bytes_at(...)`, and keep-alive helpers should only treat
+  `HTTP/1.1` as valid when it is the third request-line token.
+- Actual before the fix: the service exited with status `1` because
+  `GET /json debug HTTP/1.1` was routed as `/json` instead of being rejected as
+  a bad request.
+- Control cases: valid `GET /plaintext HTTP/1.1`,
+  `GET /queries?queries=7 HTTP/1.1`, and byte-buffer `/db` requests still
+  route normally and remain keep-alive by default.
+- Root cause: `contains_http11_marker` and `contains_http11_marker_bytes_at`
+  still matched ` HTTP/1.1` after any space on the request line. The route
+  helpers had already stopped parsing the target at the first post-target
+  space, so extra middle tokens were ignored.
+- Fix: make both helpers parse the first line as method token, request-target
+  token, then exact `HTTP/1.1`; if the version token is not immediately after
+  the target token or is not followed by CR/LF, the helper returns false.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0067: HTTP keep-alive detection accepts malformed request targets
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_keep_alive_target_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra
+```
+
+- Expected: `lib.core.http.request_keep_alive(...)` and
+  `request_keep_alive_bytes_at(...)` should reject malformed request-lines
+  whose request target does not start with `/`.
+- Actual before the fix: the service exited with status `1` because
+  `GET noslash HTTP/1.1` returned keep-alive even though routing and the Go
+  HTTP parser classify that target as malformed.
+- Control cases: `GET / HTTP/1.1`, `GET /?debug=1 HTTP/1.1`, and
+  `GET /json HTTP/1.1` still remain keep-alive by default, while
+  `Connection: close` still disables keep-alive.
+- Root cause: `contains_http11_marker` and `contains_http11_marker_bytes_at`
+  only required a non-empty second request-line token before `HTTP/1.1`; they
+  did not verify that the request target was origin-form and started with `/`.
+- Fix: require the first request-target byte to be `/` in both string and
+  byte-buffer HTTP/1.1 marker scanners.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0068: HTTP Connection-close detection scans request bodies
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_connection_body_scope_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra
+```
+
+- Expected: `lib.core.http.contains_connection_close(...)` and
+  `contains_connection_close_bytes_at(...)` should only match
+  `Connection: close` before the empty header terminator.
+- Actual before the fix: the service exited with status `1` because
+  `Connection: close` in the request body after `\r\n\r\n` disabled
+  keep-alive.
+- Control cases: real header `Connection: close` still disables keep-alive,
+  while requests whose body merely contains that text remain keep-alive.
+- Root cause: the Connection-close matcher scanned the whole request buffer and
+  had no independent header-end state, so body lines could start a fresh
+  `Connection` header match after the blank line.
+- Fix: add a shared header-end state helper and stop both string and
+  byte-buffer Connection-close scans at CRLFCRLF or LF-only blank-line
+  terminators unless a real header match has already returned true.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0069: HTTP keep-alive detection accepts malformed method tokens
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP helpers.
+- Found while creating:
+  `examples/microservices/backend_http_keep_alive_method_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra
+```
+
+- Expected: `lib.core.http.request_keep_alive(...)` and
+  `request_keep_alive_bytes_at(...)` should reject request-lines whose method
+  token contains invalid HTTP token bytes such as `:` or tab.
+- Actual before the fix: the service exited with status `1` because
+  `GE:T /json HTTP/1.1` returned keep-alive.
+- Control cases: valid `GET /json HTTP/1.1` and `POST /json HTTP/1.1` remain
+  keep-alive by default, while `POST ... Connection: close` still disables
+  keep-alive.
+- Root cause: `contains_http11_marker` and `contains_http11_marker_bytes_at`
+  counted every non-space byte before the first space as part of the method
+  token, without applying HTTP token-character validation.
+- Fix: add a shared HTTP token-character predicate and reject invalid method
+  bytes before accepting the request-line as HTTP/1.1.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0070: JSON lowercase hex digit helper returns non-hex bytes out of range
+
+- Status: fixed, verified.
+- Area: stdlib / backend JSON helpers.
+- Found while creating:
+  `examples/microservices/backend_json_hex_digit_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_hex_digit_guard_service.tetra
+```
+
+- Expected: public `lib.core.json.hex_digit_lower(...)` should always return
+  a lowercase hexadecimal ASCII byte. Out-of-range inputs should saturate to
+  `0` for negatives and `f` for values above `15`.
+- Actual before the fix: the service exited with status `5` because
+  `hex_digit_lower(-1)` returned a byte before ASCII `0`; values above `15`
+  could similarly return non-hex letters.
+- Control cases: normal `0`, `9`, `10`, and `15` inputs still return
+  `0`, `9`, `a`, and `f`; message-object serialization still writes expected
+  escaped newline output.
+- Root cause: `hex_digit_lower` assumed callers always pass a nibble and
+  directly calculated `48 + value` or `87 + value`.
+- Fix: saturate negative inputs to ASCII `0` and values above `15` to ASCII
+  `f` before the existing digit/letter calculation.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_hex_digit_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_escape_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/jsonrt -count=1
+```
+
+### TETRA-BUG-0071: Time duration helpers wrap positive overflow
+
+- Status: fixed, verified.
+- Area: stdlib / backend time helpers.
+- Found while creating:
+  `examples/microservices/backend_time_overflow_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra
+```
+
+- Expected: duration helpers should keep non-negative duration arithmetic
+  within the `Int` range: `millis_from_seconds(2147484)` and overflowing
+  positive `add_duration_ms` calls should saturate to `2147483647`, while
+  negative duration underflow should clamp to `0`.
+- Actual before the fix: the service exited with status `2` because
+  `millis_from_seconds(2147484)` multiplied past `Int` max and wrapped instead
+  of saturating; positive `add_duration_ms` overflow could similarly wrap
+  negative and be misclassified as a zero-duration clamp.
+- Control cases: the last safe second conversion `2147483 -> 2147483000`,
+  safe positive addition near max, negative delta subtraction, and
+  `seconds_from_millis(2147483647) -> 2147483` remain stable.
+- Root cause: `millis_from_seconds` multiplied before checking the overflow
+  boundary, and `add_duration_ms` added before guarding positive overflow.
+- Fix: pre-check the seconds conversion boundary, pre-check positive
+  millisecond addition against `2147483647 - delta`, and keep negative
+  duration results clamped to `0`.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_collection_window_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0072: PostgreSQL C-string scan traps on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.cstring_end_at(...)` should return `-1` for
+  ranges that cannot contain a bounded C-string terminator, including negative
+  start indexes and reversed `limit < start` ranges.
+- Actual before the fix: the service exited with runtime status `1` before it
+  could return its guard code because `cstring_end_at(payload, -1, 6)` read the
+  caller-owned payload at a negative index.
+- Control cases: valid searches from `0..6` and `3..6` still locate the
+  expected NUL bytes, and empty/reversed non-negative ranges return `-1`.
+- Root cause: `cstring_end_at` initialized `pos` from `start` and entered
+  `while pos < limit` without first rejecting negative `start`.
+- Fix: return `-1` when `start < 0` or `limit < start` before scanning.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0073: PostgreSQL signed DataRow length leaks malformed negative values
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_data_row_length_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+```
+
+- Expected: PostgreSQL signed DataRow length helpers should normalize any
+  negative signed length field to the public sentinel `-1`, including malformed
+  values such as `0xfffffffe`, while preserving valid positive lengths.
+- Actual before the fix: the service exited with status `4` because
+  `read_i32_be_signed(...)` recognized only `0xffffffff`; the malformed
+  `0xfffffffe` length leaked as a distinct negative value instead of the
+  stable `-1` sentinel.
+- Control cases: a valid `2` length still parses `"42"`, a valid following
+  column still parses `"7"`, and DataRow value start/i32 helpers keep treating
+  negative length fields as missing values.
+- Root cause: `read_i32_be_signed` special-cased only the PostgreSQL NULL
+  marker bytes instead of normalizing the signed i32 result whenever the high
+  bit is set.
+- Fix: read the big-endian i32 once and return `-1` for any negative result.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0074: PostgreSQL ASCII i32 parser traps on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.parse_ascii_i32_at(...)` should return `0` for
+  invalid bounded parse ranges such as negative `start`, just as it already
+  returns `0` for empty ranges and non-digit leading bytes.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `parse_ascii_i32_at(bytes, -1, 2)`
+  trapped before it could produce the expected `0`.
+- Control cases: signed `-79`, unsigned `79`, non-digit start, and zero-count
+  ranges still return their existing values.
+- Root cause: `parse_ascii_i32_at` assigned `pos = start` and read `src[pos]`
+  for the optional sign check without first rejecting negative `start`.
+- Fix: return `0` for `start < 0`, and also return `0` if `start + count`
+  wraps below `start`.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0075: PostgreSQL CommandComplete parser traps on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.command_complete_affected_rows(...)` should
+  return `0` for invalid bounded parse ranges such as negative `start`,
+  zero/negative `payload_len`, or wrapped `start + payload_len`.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so
+  `command_complete_affected_rows(update_tag, -1, 4)` trapped before it could
+  return the expected `0`.
+- Control cases: `INSERT 0 3`, `UPDATE 12`, no-digit tags, empty ranges, and a
+  digit-only subrange still return their existing values.
+- Root cause: `command_complete_affected_rows` initialized `pos` from `start`
+  and read `payload[pos]` in the loop condition without first rejecting
+  negative or wrapped ranges.
+- Fix: return `0` for negative starts, non-positive payload lengths, or
+  wrapped limits before scanning.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0076: PostgreSQL RowDescription type-OID scan traps on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.row_description_type_oid_at(...)` should return
+  `-1` for malformed RowDescription requests, including negative `start`,
+  short payload lengths, wrapped ranges, and out-of-range column indexes.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so
+  `row_description_type_oid_at(desc, -1, i, 0)` trapped before it could return
+  the expected `-1`.
+- Control cases: valid `id` and `message` column type OIDs still return
+  `int4_oid()` and `text_oid()`, while negative/out-of-range column indexes and
+  truncated metadata still return `-1`.
+- Root cause: `row_description_type_oid_at` read the RowDescription column
+  count at `start` before rejecting negative or malformed ranges.
+- Fix: reject negative starts, too-short payload lengths, negative column
+  indexes, and wrapped limits before reading the column count.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0077: PostgreSQL DataRow value helpers trap on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.data_row_value_len_at(...)` and
+  `data_row_value_start_at(...)` should return `-1` for malformed DataRow
+  requests such as negative `start`; `data_row_i32_at(...)` should return `0`
+  for the same missing value.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `data_row_value_len_at(row, -1, 0)`
+  trapped before it could return the expected `-1`.
+- Control cases: valid `42` and `7` DataRow columns still expose expected
+  lengths, start offsets, and parsed integer values; negative and out-of-range
+  column indexes still return missing-value sentinels.
+- Root cause: DataRow value helpers read the column count at `start` before
+  rejecting negative starts or negative column indexes.
+- Fix: reject negative starts and negative column indexes before reading the
+  DataRow column count in both value length and value start helpers.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0078: PostgreSQL frame header readers trap on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.frame_type_at(...)` and
+  `frame_length_at(...)` should return `-1` for malformed typed-frame requests
+  such as negative `start`; derived `frame_payload_len_at(...)` and
+  `frame_total_len_at(...)` should also return `-1` when the underlying length
+  is invalid or shorter than the PostgreSQL four-byte length field.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `frame_type_at(frame, -1)` trapped
+  before it could return the expected `-1`.
+- Control cases: a valid Sync frame still reports type `frame_sync()`, length
+  `4`, payload length `0`, total length `5`, and payload start `5`; a
+  malformed length field of `3` still remains readable through
+  `frame_length_at(...)` but derived payload and total lengths are rejected.
+- Root cause: typed-frame header helpers read `frame[start]` and
+  `read_i32_be(frame, start + 1)` before rejecting negative starts; derived
+  length helpers also accepted sub-header length fields.
+- Fix: reject negative starts before reading typed-frame headers, and make
+  payload/total length helpers return `-1` for any frame length below `4`.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0079: PostgreSQL ReadyForQuery status reader traps on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.ready_for_query_status(...)` should return
+  `-1` for malformed ReadyForQuery status requests such as negative `start`,
+  while preserving the PostgreSQL status bytes for idle, in-transaction, and
+  failed-transaction states.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `ready_for_query_status(states, -1)`
+  trapped before it could return the expected `-1`.
+- Control cases: valid ReadyForQuery bytes still report
+  `ready_for_query_idle_status()`, `ready_for_query_in_transaction_status()`,
+  and `ready_for_query_failed_transaction_status()`.
+- Root cause: `ready_for_query_status` read `payload[start]` before rejecting
+  negative starts.
+- Fix: reject negative starts before reading the caller-owned payload.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0080: PostgreSQL column-count readers trap on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.row_description_column_count(...)` and
+  `data_row_column_count(...)` should return `-1` for malformed backend payload
+  requests such as negative `start`, while preserving valid two-byte count
+  fields.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `row_description_column_count(desc, -1)`
+  trapped before it could return the expected `-1`.
+- Control cases: valid RowDescription and DataRow payloads still report column
+  count `2`, and the existing RowDescription/DataRow/result guard services
+  still pass.
+- Root cause: the column-count helpers read `read_i16_be(payload, start)`
+  before rejecting negative starts.
+- Fix: reject negative starts before reading the two-byte count field in both
+  RowDescription and DataRow column-count helpers.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0081: PostgreSQL big-endian readers trap on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_read_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
+```
+
+- Expected: exported `lib.core.postgres.read_i32_be(...)`,
+  `read_i32_be_signed(...)`, and `read_i16_be(...)` should return `-1` for
+  malformed caller-owned byte-buffer reads such as negative `start`, while
+  preserving valid big-endian reads.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `read_i32_be(bytes, -1)` trapped before
+  it could return the expected `-1`.
+- Control cases: valid big-endian i32 and i16 fields still round-trip through
+  `write_i32_be_at(...)`, `write_i16_be_at(...)`, `read_i32_be(...)`,
+  `read_i32_be_signed(...)`, and `read_i16_be(...)`; column-count,
+  frame-header, and prepared-pipeline PostgreSQL guard services still pass.
+- Root cause: the big-endian readers read `src[start]` before rejecting
+  negative starts; `read_i32_be_signed(...)` delegated to the unsafe unsigned
+  reader before normalizing signed values.
+- Fix: reject negative starts in `read_i32_be(...)` and `read_i16_be(...)`;
+  `read_i32_be_signed(...)` inherits the same sentinel through `read_i32_be`.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0082: PostgreSQL big-endian writers trap on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_write_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra
+```
+
+- Expected: exported `lib.core.postgres.write_i32_be_at(...)` and
+  `write_i16_be_at(...)` should return `-1` for malformed caller-owned
+  byte-buffer writes such as negative `start`, while preserving valid
+  big-endian writes and existing buffer contents.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `write_i32_be_at(bytes, -1, 1)` trapped
+  before it could return the expected `-1`.
+- Control cases: valid big-endian i32 and i16 writes still round-trip through
+  the reader helpers; failed negative-start writes leave the existing valid
+  bytes readable.
+- Root cause: the big-endian writers wrote `dst[start]` before rejecting
+  negative starts.
+- Fix: reject negative starts in `write_i32_be_at(...)` and
+  `write_i16_be_at(...)` before writing to the caller-owned buffer.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0083: PostgreSQL text writers trap on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra
+```
+
+- Expected: exported `lib.core.postgres.write_ascii_at(...)`,
+  `write_cstring_at(...)`, and `write_cstring_pair_at(...)` should return `-1`
+  for malformed caller-owned byte-buffer writes such as negative `start`,
+  while preserving valid ASCII and C-string writes.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `write_ascii_at(bytes, -1, "Z")`
+  trapped before it could return the expected `-1`.
+- Control cases: valid ASCII, C-string, and C-string pair writes still produce
+  the expected bytes; failed negative-start writes leave the existing valid
+  bytes readable.
+- Root cause: `write_ascii_at(...)` wrote `dst[i]` with `i = start` before
+  rejecting negative starts; C-string helpers delegated into it and then kept
+  writing without checking for a failed sentinel.
+- Fix: reject negative starts before text writes, and propagate `-1` from
+  nested C-string writer calls before touching the caller-owned buffer again.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0084: HTTP writer helpers trap on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP wire helpers.
+- Found while creating:
+  `examples/microservices/backend_http_writer_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra
+```
+
+- Expected: exported `lib.core.http.write_ascii_at(...)`,
+  `write_crlf_at(...)`, `write_header_at(...)`, and
+  `write_decimal_i32_at(...)` should return `-1` for malformed caller-owned
+  byte-buffer writes such as negative `start`, while preserving valid writes.
+- Actual before the fix: the service exited with runtime status `1`; the
+  service has no `return 1` branch, so `write_ascii_at(out, -1, "Z")` trapped
+  before it could return the expected `-1`.
+- Control cases: valid ASCII, CRLF, header, and decimal writes still produce
+  the expected bytes; failed negative-start writes leave earlier valid bytes
+  readable.
+- Root cause: HTTP writer helpers wrote `dst[start]` or `dst[i]` before
+  rejecting negative starts; `write_header_at(...)` also kept writing after a
+  nested writer could have returned a failed sentinel.
+- Fix: reject negative starts before low-level HTTP writes and propagate `-1`
+  from nested header writer calls before touching the caller-owned buffer.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0085: JSON writers trap on negative start
+
+- Status: fixed, verified.
+- Area: stdlib / backend JSON wire helpers.
+- Found while creating:
+  `examples/microservices/backend_json_writer_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra
+```
+
+- Expected: exported `lib.core.json.write_json_string_at(...)` and
+  `write_message_object_at(...)` should return `-1` for malformed caller-owned
+  byte-buffer writes such as negative `start`, while preserving valid escaped
+  string and message-object writes.
+- Actual before the fix: the corrected service exited with runtime status `1`;
+  the service has no `return 1` branch, so `write_json_string_at(buf, -1, "Z")`
+  trapped before it could return the expected `-1`.
+- Control cases: valid escaped string `A\n\"` still serializes to `"A\n\""`;
+  `write_message_object_at(buf, 8, "OK")` still writes `{"message":"OK"}`
+  ending at index `24`; failed negative-start writes leave earlier valid bytes
+  readable.
+- Root cause: JSON writers wrote `dst[start]` before rejecting negative starts;
+  `write_message_object_at(...)` also kept writing after the nested string
+  writer could have returned a failed sentinel.
+- Fix: reject negative starts before JSON writer output and propagate `-1` from
+  nested string writer calls before writing the closing object byte.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_escape_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_hex_digit_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0086: HTTP/JSON i32 digit helpers collapse minimum value
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP and JSON decimal helpers.
+- Found while creating:
+  `examples/microservices/backend_http_json_i32_min_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra
+```
+
+- Expected: `http.digits_i32(-2147483648)` and
+  `json.digits_i32(-2147483648)` should return `11`; JSON world-object length
+  sizing and HTTP decimal byte writes should preserve the full
+  `-2147483648` text.
+- Actual before the fix: the service exited `21` because
+  `http.digits_i32(min_i32)` did not return `11`; a diagnostic variant that
+  returned the helper result exited `1`.
+- Control cases: the same service verifies `json.world_object_len(...)`,
+  byte-for-byte HTTP decimal output for `-2147483648`, negative-start writer
+  rejection, and preserved buffer contents after the rejected write.
+- Root cause: HTTP and JSON `digits_i32(...)` converted negatives with
+  `0 - n`; the i32 minimum value cannot be represented as a positive i32, so
+  the magnitude stayed negative and the digit loop reported only the sign.
+  `http.write_decimal_i32_at(...)` had the same unsafe magnitude conversion.
+- Fix: special-case `-2147483648` in both digit helpers and write its decimal
+  literal through the existing HTTP ASCII writer path.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0087: Crypto mix_seed overflows normalizing i32 minimum
+
+- Status: fixed, verified.
+- Area: stdlib / backend crypto interface helpers.
+- Found while creating:
+  `examples/microservices/backend_crypto_mix_min_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_mix_min_guard_service.tetra
+```
+
+- Expected: `crypto.mix_seed(...)` should keep the negative-normalization branch
+  non-negative even when `seed * 33 + value` is exactly `-2147483648`.
+- Actual before the fix: the service exited `21` because
+  `crypto.mix_seed(-65075262, -2)` returned a negative value.
+- Control cases: existing negative and positive seed mixes still return `65` and
+  `1407`, and the experimental crypto mirror keeps passing through the stable
+  helper.
+- Root cause: `mix_seed(...)` converted negative `mixed` values with
+  `0 - mixed`; the i32 minimum value cannot be represented as a positive i32,
+  so the normalization overflowed back to a negative result.
+- Fix: special-case `mixed == -2147483648` and return `2147483647`, preserving
+  a deterministic non-negative saturating value.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_mix_min_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_serialization_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_buffer_mirror_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0088: Networking retry backoff overflows before cap
+
+- Status: fixed, verified.
+- Area: stdlib / backend networking policy helpers.
+- Found while creating:
+  `examples/microservices/backend_network_backoff_overflow_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_backoff_overflow_guard_service.tetra
+```
+
+- Expected: `retry_backoff_ms(...)` should honor a non-negative `max_ms` cap
+  before doubling can overflow, and should not return a negative backoff for
+  positive inputs.
+- Actual before the fix: the service exited `21`; the first capped case
+  `retry_backoff_ms(1, 1073741824, 2147483647)` returned a negative value.
+- Control cases: capped multi-step backoff, ordinary capped retry,
+  negative-`max_ms` uncapped behavior below overflow, and negative base clamping
+  remain stable; the experimental networking mirror still delegates correctly.
+- Root cause: `retry_backoff_ms(...)` doubled `value` before checking `max_ms`,
+  so `1073741824 * 2` overflowed to a negative i32 and escaped the later
+  `value > max_ms` cap check.
+- Fix: compute an effective cap (`max_ms` or `2147483647` for uncapped calls)
+  before the loop and return the cap when the next doubling would exceed it.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_backoff_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_policy_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_route_policy_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0089: Epoll event extractors trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend net epoll helpers.
+- Found while creating:
+  `examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra
+```
+
+- Expected: `net.epoll_event_fd(...)` should return `-1` for an empty event
+  buffer, and `net.epoll_event_flags(...)` should return `-1` when the flags
+  slot is missing.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the helpers indexed
+  short slices directly.
+- Control cases: a two-slot event still returns the stored fd and decodes
+  `EPOLLIN | EPOLLHUP`; a one-slot event still exposes the fd slot while
+  reporting missing flags as `-1`.
+- Root cause: `epoll_event_fd(...)` returned `event[0]` and
+  `epoll_event_flags(...)` returned `event[1]` without proving that the
+  caller-owned slice contained those slots.
+- Fix: scan the event slice for the requested slot and return `-1` when the
+  slot is absent.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_lifecycle_service.tetra
+go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger' -count=1
+```
+
+### TETRA-BUG-0090: PostgreSQL frame header readers trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL frame helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_frame_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
+```
+
+- Expected: `frame_type_at(...)` should return `-1` when the tag slot is
+  missing, and `frame_length_at(...)`, `frame_payload_len_at(...)`, and
+  `frame_total_len_at(...)` should return `-1` when the four-byte length field
+  is missing or truncated.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the frame header
+  helpers indexed short slices directly.
+- Control cases: a valid Sync frame still reports type `S`, length `4`,
+  payload length `0`, and total length `5`; a tag-only frame still exposes the
+  present tag while rejecting the missing length field.
+- Root cause: `frame_type_at(...)` returned `frame[start]`, and
+  `frame_length_at(...)` delegated to `read_i32_be(frame, start + 1)` without
+  proving that the caller-owned slice contained the requested header bytes.
+- Fix: scan the frame slice for the requested tag/length byte positions and
+  return `-1` when any required byte is absent or the computed offset wraps.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0091: PostgreSQL big-endian readers trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL byte readers.
+- Found while creating:
+  `examples/microservices/backend_postgres_read_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
+```
+
+- Expected: `read_i32_be(...)`, `read_i32_be_signed(...)`, and
+  `read_i16_be(...)` should return `-1` when a caller-owned byte buffer is
+  empty, truncated, or too short at the requested start offset.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the readers indexed
+  short slices directly.
+- Control cases: valid i32 and i16 big-endian fields still decode to
+  `16909060` and `258`; signed i32 reads still delegate through the same valid
+  path and preserve the negative-value normalization from the earlier reader
+  guard.
+- Root cause: `read_i32_be(...)` and `read_i16_be(...)` rejected negative
+  starts but did not prove that `start + n` remained in the caller-owned slice.
+- Fix: scan for each required byte position, reject wrapped offsets, and return
+  `-1` if any required byte is absent.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0092: PostgreSQL big-endian writers trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL byte writers.
+- Found while creating:
+  `examples/microservices/backend_postgres_write_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra
+```
+
+- Expected: `write_i32_be_at(...)` and `write_i16_be_at(...)` should return
+  `-1` when a caller-owned destination byte buffer is empty, truncated, or too
+  short at the requested start offset, without partially changing the rejected
+  buffer.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the writers indexed
+  short slices directly.
+- Control cases: valid i32 and i16 big-endian writes still return the next
+  byte indexes `4` and `6`, and the existing negative-start writer guard
+  remains stable.
+- Root cause: `write_i32_be_at(...)` and `write_i16_be_at(...)` rejected
+  negative starts but did not prove that every required destination byte
+  existed before writing.
+- Fix: share byte-window probes with the big-endian readers, reject wrapped
+  offsets or missing destination bytes before writing, and leave rejected
+  buffers unchanged.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0093: PostgreSQL text writers trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL text writers.
+- Found while creating:
+  `examples/microservices/backend_postgres_text_write_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_short_guard_service.tetra
+```
+
+- Expected: `write_ascii_at(...)`, `write_cstring_at(...)`, and
+  `write_cstring_pair_at(...)` should return `-1` when a caller-owned
+  destination byte buffer is empty, truncated, or too short at the requested
+  start offset, without partially changing the rejected buffer.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the text writers
+  indexed short slices directly.
+- Control cases: valid ASCII, C-string, and C-string-pair writes still return
+  the next byte indexes `2`, `4`, and `8`; the existing negative-start text
+  writer guard remains stable.
+- Root cause: the text writers rejected negative starts but did not prove that
+  the complete ASCII or NUL-terminated destination byte window existed before
+  writing.
+- Fix: add a shared byte-window probe and use it before ASCII, C-string, and
+  C-string-pair writes; rejected writes return `-1` before mutating the
+  destination.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0094: HTTP writer helpers trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP writers.
+- Found while creating:
+  `examples/microservices/backend_http_writer_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra
+```
+
+- Expected: `write_ascii_at(...)`, `write_crlf_at(...)`,
+  `write_header_at(...)`, and `write_decimal_i32_at(...)` should return `-1`
+  when a caller-owned destination byte buffer is empty, truncated, or too short
+  at the requested start offset, without partially changing the rejected
+  buffer.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the HTTP writers
+  indexed short slices directly.
+- Control cases: valid ASCII, CRLF, header, and decimal writes still return the
+  next byte indexes `2`, `4`, `10`, and `13`; the existing negative-start HTTP
+  writer guard remains stable, including the `-2147483648` decimal path.
+- Root cause: the HTTP writers rejected negative starts but did not prove that
+  the complete destination byte window existed before writing.
+- Fix: add a shared HTTP byte-window probe and use it before ASCII, CRLF,
+  header, and decimal writes; rejected writes return `-1` before mutating the
+  destination.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0095: JSON writers trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend JSON writers.
+- Found while creating:
+  `examples/microservices/backend_json_writer_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_short_guard_service.tetra
+```
+
+- Expected: `write_json_string_at(...)` and `write_message_object_at(...)`
+  should return `-1` when a caller-owned destination byte buffer is empty,
+  truncated, or too short at the requested start offset, without partially
+  changing the rejected buffer.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the JSON writers
+  indexed short slices directly.
+- Control cases: valid escaped JSON string and message-object writes still
+  return the next byte indexes `7` and `24`; the existing negative-start JSON
+  writer guard remains stable.
+- Root cause: the JSON writers rejected negative starts but did not prove that
+  the complete encoded string or message-object destination byte window existed
+  before writing.
+- Fix: add a shared JSON byte-window probe and use it before escaped-string and
+  message-object writes; rejected writes return `-1` before mutating the
+  destination.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0096: PostgreSQL frame writers trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL frame writers.
+- Found while creating:
+  `examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
+```
+
+- Expected: high-level PostgreSQL frontend writers such as
+  `write_startup_message(...)`, `write_simple_query(...)`, `write_parse(...)`,
+  `write_bind_text_1(...)`, `write_describe_portal(...)`,
+  `write_execute(...)`, `write_sync(...)`, and `write_terminate(...)` should
+  return `-1` when the caller-owned destination byte buffer is empty or too
+  short, without partially changing the rejected buffer.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because some frame writers
+  indexed `dst[0]` directly and `write_startup_message(...)` could continue to a
+  final `dst[i]` write after lower-level writers had returned `-1`.
+- Control cases: valid startup, Simple Query, Parse, Bind, Describe, Execute,
+  Sync, and Terminate frames still return their exact frame lengths; existing
+  PostgreSQL prepared pipeline and session-state examples remain stable.
+- Root cause: top-level frame writers delegated to guarded byte writers but did
+  not prove that the complete frame destination window existed before their own
+  direct writes.
+- Fix: preflight each high-level frame writer with the existing PostgreSQL
+  byte-window probe and exact frame-length helpers before writing the first
+  byte; startup-message writing also stops immediately after any nested `-1`.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0097: PostgreSQL bounded parsers trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL bounded parsers.
+- Found while creating:
+  `examples/microservices/backend_postgres_parser_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
+```
+
+- Expected: `cstring_end_at(...)`, `parse_ascii_i32_at(...)`, and
+  `command_complete_affected_rows(...)` should return their sentinel values
+  when caller-provided limits or counts extend past the physical byte buffer:
+  `-1` for missing C-string terminators and `0` for malformed integer or
+  CommandComplete ranges.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the parsers indexed
+  `src[pos]` or `payload[pos]` while trusting the oversized caller range.
+- Control cases: valid bounded C-string scans, signed/unsigned ASCII integer
+  parses, and CommandComplete affected-row extraction still return `2`, `4`,
+  `-42`, `42`, and `12` as expected; existing PostgreSQL parser guard examples
+  remain stable.
+- Root cause: the parsers validated negative, reversed, empty, and wrapped ranges
+  but did not prove that the requested byte window existed before direct
+  indexing.
+- Fix: preflight the requested byte window with the existing PostgreSQL
+  `has_u8_window` helper before scanning or parsing.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0098: PostgreSQL ReadyForQuery status reader traps on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL ReadyForQuery parser.
+- Found while creating:
+  `examples/microservices/backend_postgres_ready_status_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_short_guard_service.tetra
+```
+
+- Expected: `ready_for_query_status(...)` should return `-1` for empty payloads
+  or starts that point past the single status byte, while preserving valid idle,
+  in-transaction, and failed-transaction status reads.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because
+  `ready_for_query_status(...)` indexed `payload[start]` after only rejecting
+  negative starts.
+- Control cases: valid `I`, `T`, and `E` status bytes still return
+  `ready_for_query_idle_status()`, `ready_for_query_in_transaction_status()`,
+  and `ready_for_query_failed_transaction_status()`; the existing negative-start
+  ReadyForQuery guard remains stable.
+- Root cause: the status reader did not prove that the requested one-byte window
+  existed before direct indexing.
+- Fix: preflight `ready_for_query_status(...)` with the existing PostgreSQL
+  `has_u8_window` helper for a one-byte payload window.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0099: HTTP request scanners trap on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP request scanners.
+- Found while creating:
+  `examples/microservices/backend_http_request_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra
+```
+
+- Expected: byte-buffer HTTP request scanners should return their existing
+  sentinel values when caller-provided `request_len` ranges are empty,
+  offset-short, or extend past the physical request buffer: `0` for missing
+  request heads, `false` for keep-alive/version/header probes, and
+  `route_bad_request()` for route classification.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes because the scanners indexed
+  `request[start + pos]` while trusting the oversized caller range.
+- Control cases: valid pipelined `/json` and `/plaintext` HTTP/1.1 requests
+  still produce exact head lengths, route IDs, keep-alive decisions, and
+  `Connection: close` detection.
+- Root cause: `route_tech_empower_bytes_at(...)`,
+  `request_keep_alive_bytes_at(...)`, `request_head_len_bytes_at(...)`,
+  `contains_http11_marker_bytes_at(...)`, and
+  `contains_connection_close_bytes_at(...)` validated request syntax while
+  assuming that the complete caller-requested byte window existed.
+- Fix: preflight each byte-buffer request scanner with the existing HTTP
+  `has_u8_window` helper before any direct indexing.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0100: HTTP response writers trap or partially write on short buffers
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP response writers.
+- Found while creating:
+  `examples/microservices/backend_http_response_writer_short_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
+```
+
+- Expected: `write_response_head(...)`, `write_plaintext_response(...)`, and
+  `write_json_message_response(...)` should return `-1` when a caller-owned
+  destination byte buffer is empty or too short for the complete output, without
+  partially changing the rejected buffer.
+- Actual before the fix: the service terminated with runtime `exit status 1`
+  before reaching its explicit guard return codes. Later truncated response-body
+  paths could also write a complete head before returning `-1` for the missing
+  body bytes.
+- Control cases: valid response heads, plaintext responses, and JSON message
+  responses still return their exact byte counts and preserve the expected HTTP
+  prefix, CRLF terminator, plaintext body, and JSON object terminator.
+- Root cause: the high-level response writers delegated to guarded lower-level
+  byte writers but did not prove that the complete response destination window
+  existed before starting to write. `write_response_head(...)` also used the
+  lower writer result as a direct `dst[i]` index even when that result was `-1`.
+- Fix: preflight the exact complete destination window for response heads,
+  plaintext responses, and JSON message responses with the existing HTTP
+  `has_u8_window` helper before writing the first byte.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0101: PostgreSQL big-endian writers encode negative values incorrectly
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL big-endian writers.
+- Found while creating:
+  `examples/microservices/backend_postgres_signed_write_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+```
+
+- Expected: `write_i32_be_at(...)` and `write_i16_be_at(...)` should encode
+  negative `Int` values as signed two's-complement big-endian bytes, preserving
+  ordinary positive big-endian writes.
+- Actual before the fix: the service exited `12` because
+  `write_i32_be_at(bytes, 0, -1)` returned the next index but did not write
+  `255,255,255,255`. The same arithmetic affected other negative i32/i16
+  values such as `-2`, `-32768`, and the i32 minimum.
+- Control cases: positive `16909060` and `258` still serialize as
+  `01 02 03 04` and `01 02`; short-buffer and frame-writer guard services
+  remain stable.
+- Root cause: the writers computed bytes with division and modulo directly on
+  negative `Int` values, so high bytes collapsed toward zero or the final modulo
+  stayed negative instead of producing two's-complement byte values.
+- Fix: add negative-value paths that complement the positive magnitude bytes,
+  with explicit handling for `-2147483648`; the i16 writer emits the low
+  two's-complement bytes.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0102: PostgreSQL frame length reader leaks malformed signed lengths
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL frame helpers.
+- Found while creating:
+  `examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra
+```
+
+- Expected: `frame_length_at(...)` should normalize malformed negative signed
+  frame length fields to the public sentinel `-1`, and derived payload/total
+  length helpers should continue returning `-1` for those frames.
+- Actual before the fix: the service exited `11` because a frame whose length
+  bytes encode `-2` was returned as a raw negative length instead of `-1`.
+  The i32 minimum length encoding followed the same manual arithmetic path.
+- Control cases: valid Sync frame length `4`, payload length `0`, total length
+  `5`, and malformed positive short length `3` behavior remain unchanged.
+- Root cause: `frame_length_at(...)` reconstructed the i32 length field by
+  multiplying bytes directly, duplicating the unsigned/high-bit arithmetic path
+  instead of using the signed PostgreSQL length reader that maps negative
+  values to `-1`.
+- Fix: delegate `frame_length_at(...)` to `read_i32_be_signed(...)` after the
+  existing start/offset guard.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0103: PostgreSQL big-endian reader leaks high-bit i32 values
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL big-endian readers.
+- Found while creating:
+  `examples/microservices/backend_postgres_high_bit_read_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_high_bit_read_guard_service.tetra
+```
+
+- Expected: `read_i32_be(...)` should preserve max positive `0x7fffffff`
+  as `2147483647` and return `-1` for high-bit/unrepresentable i32 values
+  such as `0x80000000` and `0xfffffffe`; `read_i32_be_signed(...)` should
+  keep normalizing those to `-1`.
+- Actual before fix: the service exited `11` because `read_i32_be(...)`
+  leaked the high-bit value instead of returning the public sentinel.
+- Control cases: max positive control plus signed writer, frame signed-length,
+  and read short controls remain stable.
+- Root cause: `read_i32_be(...)` multiplied high-bit `b0` before checking
+  whether the result was representable as a non-negative `Int`, so i32
+  overflow produced arbitrary negative values.
+- Fix: after proving four bytes exist, return `-1` whenever `b0 >= 128`
+  before arithmetic.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_high_bit_read_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0104: Time duration addition clamps negative base before applying positive delta
+
+- Status: fixed, verified.
+- Area: stdlib / backend time helpers.
+- Found while creating:
+  `examples/microservices/backend_time_negative_base_delta_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_negative_base_delta_guard_service.tetra
+```
+
+- Expected: `add_duration_ms(base, delta)` should add `delta` to `base` first,
+  then clamp a negative summed result to `0` or saturate positive overflow to
+  `2147483647`. A negative base such as `-5` should therefore recover to `5`
+  when the positive delta is `10`.
+- Actual before fix: the service exited `11` because
+  `add_duration_ms(-5, 10)` returned `0` instead of the summed duration `5`.
+- Control cases: large negative-base recovery, still-negative sums, zero-delta
+  negative bases, negative-delta subtraction, and positive overflow saturation
+  remain stable.
+- Root cause: `add_duration_ms(...)` clamped every negative `base` to `0`
+  before checking whether a positive `delta` would make the final sum
+  non-negative.
+- Fix: handle the positive-delta branch before the negative-base clamp, keep
+  the existing positive overflow pre-check, and clamp the actual positive-delta
+  sum only if it remains negative.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_negative_base_delta_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_collection_window_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0105: HTTP request-line scanner accepts LF-only or bare-CR HTTP/1.1 terminators
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP request-line scanners.
+- Found while creating:
+  `examples/microservices/backend_http_request_crlf_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra
+```
+
+- Expected: route and keep-alive helpers should accept the `HTTP/1.1`
+  request-line version only when it is terminated by CRLF. LF-only
+  `HTTP/1.1\n` and bare-CR `HTTP/1.1\rHost` inputs should be malformed,
+  matching the documented `\r\n\r\n` request-head splitter boundary.
+- Actual before fix: the service exited `3` because
+  `route_tech_empower("GET /json HTTP/1.1\n...")` returned the JSON route
+  instead of `route_bad_request()`. Bare-CR request lines followed the same
+  early-success marker path.
+- Control cases: valid CRLF request-line routing, keep-alive detection, and
+  request-head length detection remain stable for string and byte-buffer
+  helpers.
+- Root cause: `contains_http11_marker(...)` and
+  `contains_http11_marker_bytes_at(...)` returned success immediately after
+  seeing either LF or CR after `HTTP/1.1`; they did not require CR to be
+  followed by LF.
+- Fix: add a post-CR state to both HTTP/1.1 marker scanners and return success
+  only when the next byte is LF.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0106: filesystem.exists accepts embedded-NUL paths and checks only the prefix
+
+- Status: fixed, verified.
+- Area: stdlib / backend filesystem runtime ABI.
+- Found while creating:
+  `examples/microservices/backend_filesystem_nul_exists_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_nul_exists_guard_service.tetra
+```
+
+- Expected: `filesystem.exists(path, cap)` should return `false` when the
+  Tetra `String` contains an embedded NUL byte. The host should not see only
+  the prefix before that NUL.
+- Actual before fix: the service exited `2` because
+  `filesystem.exists("/<NUL>_suffix", cap)` returned true by checking
+  the existing `/` prefix.
+- Control cases: normal existing-path lookup for `/`, missing-path
+  lookup, filesystem path-policy helper coverage, and the experimental
+  filesystem mirror remain stable.
+- Root cause: `emitFilesystemExists(...)` copied all `path_len` bytes into the
+  stack path buffer and appended a trailing NUL for Linux `access(2)`, but did
+  not reject NUL bytes already present inside the caller-provided string.
+- Fix: reject the runtime call during the copy loop when any copied byte is
+  zero, returning false before calling `access(2)`.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_nul_exists_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_path_policy_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_route_policy_service.tetra
+go test ./compiler -run 'TestFilesystemRuntimeExistsBuildAndRunLinuxX64|TestMicroserviceExamplesAndBugLedger' -count=1
+```
+
+### TETRA-BUG-0107: HTTP request-target scanners accept control bytes as route misses or keep-alive requests
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP request-line scanners.
+- Found while creating:
+  `examples/microservices/backend_http_request_target_char_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_char_guard_service.tetra
+```
+
+- Expected: route and keep-alive helpers should reject request targets
+  containing tab or other control bytes, such as `GET /json\t HTTP/1.1`,
+  before route classification or keep-alive policy.
+- Actual before fix: the service exited `1` because
+  `route_tech_empower("GET /json\t HTTP/1.1...")` returned a syntactic route
+  miss instead of `route_bad_request()`. Keep-alive marker scanning also
+  accepted tab/control bytes in the request target.
+- Control cases: valid `/json?debug=1`, `/queries?queries=7`, and
+  byte-buffer `/plaintext?ok=1` request targets still route and keep alive as
+  before.
+- Root cause: `contains_http11_marker(...)`,
+  `contains_http11_marker_bytes_at(...)`, `route_tech_empower(...)`, and
+  `route_tech_empower_bytes_at(...)` only required the target to start with
+  `/`; after that, non-space/non-CRLF target bytes were accepted by the
+  marker scanner and treated as ordinary path bytes by the route scanner.
+- Fix: add a shared visible-ASCII request-target character guard and apply it
+  in both string and byte-buffer marker and route scanners.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_http_request_target_char_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-request-target-char-guard examples/microservices/backend_http_request_target_char_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_char_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0108: PostgreSQL ASCII i32 parser wraps out-of-range values
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL ASCII integer parser.
+- Found while creating:
+  `examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.parse_ascii_i32_at(...)` and DataRow integer
+  parsing should return `0` for out-of-range i32 text such as `2147483648` or
+  `-2147483649`, while preserving `2147483647` and `-2147483648`.
+- Actual before fix: the service exited `14` because
+  `parse_ascii_i32_at("2147483648")` returned a wrapped negative value instead
+  of `0`.
+- Control cases: positive max, negative min, trailing non-digit sentinel
+  behavior, and DataRow parsing of a following valid column remain stable.
+- Root cause: `parse_ascii_i32_at(...)` multiplied the accumulated value by
+  ten and added the next digit before checking whether the i32 boundary would
+  be crossed.
+- Fix: preflight each digit against the signed i32 positive and negative
+  magnitude limits, preserving the special `-2147483648` boundary while
+  returning `0` for overflow/underflow.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-ascii-i32-overflow-guard examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_min_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+```
+
+### TETRA-BUG-0109: PostgreSQL CommandComplete affected-row parser wraps out-of-range values
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL CommandComplete parser.
+- Found while creating:
+  `examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.command_complete_affected_rows(...)` should
+  return `0` for out-of-range affected-row counts such as
+  `UPDATE 2147483648` or `INSERT 0 2147483648`, while preserving
+  `2147483647`.
+- Actual before fix: the service exited `13` because
+  `command_complete_affected_rows("UPDATE 2147483648")` returned a wrapped
+  negative value instead of `0`.
+- Control cases: `UPDATE 2147483647`, `INSERT 0 2147483647`, short valid
+  subranges, existing CommandComplete bounds controls, and bounded parser
+  short-buffer controls remain stable.
+- Root cause: `command_complete_affected_rows(...)` accumulated each digit run
+  with `current = current * 10 + digit` before checking the i32 maximum.
+- Fix: preflight each digit run against the i32 maximum, ignore overflowed
+  non-trailing digit runs, and return `0` when the trailing affected-row count
+  overflows.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-overflow-guard examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/pgrt -count=1
+```
+
+### TETRA-BUG-0110: PostgreSQL CommandComplete parser returns non-trailing digit runs
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL CommandComplete parser.
+- Found while creating:
+  `examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.command_complete_affected_rows(...)` should
+  return an affected-row count only when the digit run actually trails the
+  bounded CommandComplete tag payload. Malformed tags such as `UPDATE 12 rows`
+  or `UPDATE 12 ` should return `0`.
+- Actual before fix: the service exited `20` because
+  `command_complete_affected_rows("UPDATE 12 rows")` returned `12` even
+  though the digit run was followed by non-count text.
+- Control cases: valid `UPDATE 12`, `INSERT 0 3`, digit-only subranges,
+  out-of-range CommandComplete counts, and existing bounds/short-buffer
+  controls remain stable.
+- Root cause: `command_complete_affected_rows(...)` saved each completed digit
+  run in a `last` accumulator and returned it when the payload ended without an
+  active trailing digit run.
+- Fix: remove the non-trailing `last` fallback and return a count only when
+  the bounded payload ends while reading a valid, non-overflowed digit run.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-trailing-guard examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/pgrt -count=1
+```
+
+### TETRA-BUG-0111: PostgreSQL DataRow helpers accept truncated positive value windows
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL DataRow parser.
+- Found while creating:
+  `examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.data_row_value_len_at(...)` and
+  `data_row_value_start_at(...)` should return `-1` when a DataRow column
+  advertises a positive value length but the caller-owned buffer does not
+  physically contain that many value bytes; `data_row_i32_at(...)` should
+  return `0` for the same malformed value.
+- Actual before fix: the service exited `22` because a row with advertised
+  length `4` and only two physical value bytes made
+  `data_row_value_len_at(row, 0, 0)` return length `4` instead of `-1`.
+- Control cases: valid `"42"` DataRow values, empty values, negative/malformed
+  length sentinel handling, and existing DataRow bounds controls remain
+  stable.
+- Root cause: DataRow value length/start helpers trusted the advertised
+  positive value length after reading the 4-byte length field and did not
+  preflight the corresponding physical value byte window.
+- Fix: check positive DataRow value windows with the existing `has_u8_window`
+  helper before returning the target length/start or skipping a previous value
+  to reach a later column.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-data-row-truncated-value-guard examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/pgrt -count=1
+```
+
+### TETRA-BUG-0112: PostgreSQL frame total length overflows at max signed length
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL frame header parser.
+- Found while creating:
+  `examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.frame_total_len_at(...)` should return `-1`
+  when the typed frame length is `2147483647`, because adding the one-byte
+  frame tag would overflow the signed `Int` total length. Length `2147483646`
+  should remain the maximum valid total length.
+- Actual before fix: the service exited `23` because
+  `frame_total_len_at(frame, 0)` wrapped after `2147483647 + 1` instead of
+  returning `-1`.
+- Control cases: frame length and payload length readers still accept the
+  maximum positive signed length, total length `2147483647` from length
+  `2147483646` remains valid, and existing short/negative frame guards remain
+  stable.
+- Root cause: `frame_total_len_at(...)` only rejected lengths below the
+  PostgreSQL four-byte minimum and then returned `length + 1` without checking
+  the signed `Int` boundary.
+- Fix: reject `length == 2147483647` before adding the typed-frame tag byte.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-frame-total-overflow-guard examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/pgrt -count=1
+```
+
+### TETRA-BUG-0113: HTTP response writer accepts negative Content-Length
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP response writer.
+- Found while creating:
+  `examples/microservices/backend_http_negative_content_length_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
+```
+
+- Expected: `lib.core.http.response_head_len(...)` and
+  `write_response_head(...)` should return `-1` for negative
+  `Content-Length` values and leave the caller-owned destination buffer
+  untouched.
+- Actual before fix: the service exited `11` because
+  `response_head_len(200, "OK", "Tetra", date, "text/plain", -1, true)`
+  returned a normal serialized head length, allowing `write_response_head(...)`
+  to emit `Content-Length: -1`.
+- Control cases: zero and positive Content-Length response heads still size and
+  write exactly, generic decimal writing still supports negative values for
+  non-HTTP-header call sites, and existing HTTP response short-buffer controls
+  remain stable.
+- Root cause: response-head sizing reused the generic decimal digit helper
+  without first applying the HTTP Content-Length non-negative invariant; the
+  writer trusted that size and serialized the malformed negative value.
+- Fix: return `-1` from `response_head_len(...)` when `content_len < 0` and
+  have `write_response_head(...)` consume that sentinel before touching the
+  destination buffer.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-negative-content-length-guard examples/microservices/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0114: HTTP response writer accepts non-three-digit status codes
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP response writer.
+- Found while creating:
+  `examples/microservices/backend_http_status_code_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra
+```
+
+- Expected: `lib.core.http.response_head_len(...)` and
+  `write_response_head(...)` should return `-1` for response status codes
+  outside the three-digit HTTP status-code range (`100..999`) and leave the
+  caller-owned destination buffer untouched.
+- Actual before fix: the service exited `11` because
+  `response_head_len(99, "Bad", "Tetra", date, "text/plain", 0, true)`
+  returned a normal serialized head length, allowing malformed response lines
+  such as `HTTP/1.1 99 Bad` or `HTTP/1.1 1000 Bad`.
+- Control cases: boundary status codes `100` and `999`, ordinary `200`
+  response heads, negative Content-Length rejection, generic decimal writing,
+  and existing HTTP response matrix controls remain stable.
+- Root cause: response-head sizing reused the generic decimal digit helper for
+  the status field without first enforcing the HTTP status-code width
+  invariant; the writer trusted that size and serialized malformed status text.
+- Fix: return `-1` from `response_head_len(...)` when `status < 100` or
+  `status > 999`; `write_response_head(...)` already consumes that sentinel
+  before touching the destination buffer.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-status-code-guard examples/microservices/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0115: HTTP header writers accept CR/LF header injection
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP response writer.
+- Found while creating:
+  `examples/microservices/backend_http_header_injection_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra
+```
+
+- Expected: `lib.core.http.header_line_len(...)`, `write_header_at(...)`,
+  `response_head_len(...)`, and `write_response_head(...)` should return `-1`
+  for CR/LF header injection attempts in header names, header values, response
+  reason text, and response header values, leaving caller-owned destination
+  buffers untouched.
+- Actual before fix: the service exited `11` because
+  `header_line_len("X\rBad", "ok")` returned a normal serialized header length,
+  and calls such as `write_header_at(header, 0, "X\rBad", "ok")` could
+  serialize malformed names. Values such as `"ok\r\nX-Injected: yes"` could
+  become additional response header lines.
+- Control cases: ordinary `X-Test: ok` header writing, valid `200 OK` response
+  heads, status-code bounds, negative Content-Length rejection, and existing
+  HTTP writer short-buffer controls remain stable.
+- Root cause: header and response-head sizing reused raw ASCII lengths for
+  header names, header values, and reason text without enforcing HTTP token
+  syntax for field names or rejecting embedded CR/LF in line-bounded fields.
+- Fix: validate header names with the existing HTTP token character policy,
+  reject CR/LF inside header values and response reason/header fields, and
+  preserve `-1` sentinels through full plaintext/JSON response length helpers.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-injection-guard examples/microservices/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0116: HTTP header writers accept non-HTAB control bytes
+
+- Status: fixed, verified.
+- Area: stdlib / backend HTTP response writer.
+- Found while creating:
+  `examples/microservices/backend_http_header_control_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_control_guard_service.tetra
+```
+
+- Expected: `lib.core.http.header_line_len(...)`, `write_header_at(...)`,
+  `response_head_len(...)`, `write_response_head(...)`, and full
+  plaintext/JSON response helpers should return `-1` for header values and
+  response reason/header fields containing non-HTAB control bytes or DEL,
+  leaving caller-owned destination buffers untouched. HTAB remains valid inside
+  header values.
+- Actual before fix: the service exited `11` because a header value containing
+  ASCII 0x1f between `ok` and `bad` returned a normal serialized header length
+  instead of `-1`.
+- Control cases: ordinary header writing, HTAB inside a header value, CR/LF
+  injection rejection, status-code bounds, negative Content-Length rejection,
+  and HTTP response short-buffer controls remain stable.
+- Root cause: `http_header_value_valid` only rejected CR/LF after the CR/LF
+  injection fix, leaving other C0 control bytes and DEL accepted by response
+  header serializers.
+- Fix: reject every header value byte below 32 except HTAB (`9`) and reject
+  DEL (`127`) before any length or writer helper serializes the response.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_http_header_control_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-control-guard examples/microservices/backend_http_header_control_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_control_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1
+```
+
+### TETRA-BUG-0117: PostgreSQL Parse writer wraps parameter counts above signed i16 range
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire-frame writers.
+- Found while creating:
+  `examples/microservices/backend_postgres_parse_count_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parse_count_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.parse_payload_len(...)`,
+  `parse_frame_len(...)`, and `write_parse(...)` should return `-1` when the
+  parameter type OID count exceeds the signed i16 protocol range, leaving
+  caller-owned destination buffers untouched.
+- Actual before fix: the service exited `11` because
+  `parse_payload_len("", "SELECT 1", many)` returned a normal positive length
+  for `32768` OIDs. `write_parse(...)` could then encode the count through the
+  low two bytes as `0x8000` instead of rejecting the malformed Parse frame.
+- Control cases: small valid Parse frames still serialize with the correct
+  count and OID bytes; PostgreSQL prepared pipeline, parser short-buffer, frame
+  writer short-buffer, and signed writer controls remain stable.
+- Root cause: `parse_payload_len(...)` accumulated one four-byte OID slot per
+  slice element but never checked whether the element count fit the signed i16
+  PostgreSQL count field that `write_parse(...)` later serializes.
+- Fix: make Parse payload/frame length helpers return `-1` once the OID count
+  would exceed `32767`; `write_parse(...)` already preflights the frame length,
+  so it now returns `-1` before writing.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_postgres_parse_count_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-parse-count-guard examples/microservices/backend_postgres_parse_count_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parse_count_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/pgrt -count=1
+```
+
+### TETRA-BUG-0118: TCP loopback bind accepts out-of-range ports
+
+- Status: fixed, verified.
+- Area: runtime / backend net TCP helpers.
+- Found while creating:
+  `examples/microservices/backend_net_port_bounds_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_port_bounds_guard_service.tetra
+```
+
+- Expected: `lib.core.net.bind_tcp4_loopback(...)` should return a negative
+  result for ports outside `0..65535`, while preserving `0` as the
+  kernel-selected ephemeral-port sentinel.
+- Actual before fix: the service exited `13` because
+  `bind_tcp4_loopback(fd, 65536, io_cap)` succeeded by serializing only the low
+  16 bits of the port, effectively binding port `0` and letting the kernel pick
+  an unintended ephemeral port. Negative values with low 16 bits equal to `0`
+  had the same boundary leak.
+- Control cases: valid ephemeral bind, epoll lifecycle helpers, epoll event
+  extractors, and core net smoke remain stable.
+- Root cause: the linux-x64 TCP bind/connect emitter moved the caller port into
+  the sockaddr `sin_port` field after a byte swap without validating that the
+  signed Tetra `Int` fit the TCP port range.
+- Fix: reject negative ports and ports above `65535` in the bind/connect
+  runtime emitters before constructing the sockaddr.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_net_port_bounds_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-net-port-bounds-guard examples/microservices/backend_net_port_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_port_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_lifecycle_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra
+go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger|TestNetRuntimeSocketLifecycleBuildAndRunLinuxX64|TestNetRuntimeEpollWaitOneIntoBuildAndRunLinuxX64' -count=1
+go test ./compiler/internal/actorsrt -count=1
+```
+
+### TETRA-BUG-0119: PostgreSQL column-count readers accept high-bit signed counts
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL payload readers.
+- Found while creating:
+  `examples/microservices/backend_postgres_column_count_signed_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_signed_guard_service.tetra
+```
+
+- Expected: `lib.core.postgres.row_description_column_count(...)` and
+  `data_row_column_count(...)` should return `-1` for malformed backend count
+  fields whose signed i16 high bit is set, and dependent RowDescription/DataRow
+  helpers should propagate sentinel values instead of treating the count as a
+  huge positive column count.
+- Actual before fix: the service exited `20` because
+  `row_description_column_count(malformed, 0)` returned `32768` for bytes
+  `0x80 0x00`. `data_row_column_count(...)` shared the same reader path.
+- Control cases: valid one-column RowDescription and DataRow payloads still
+  decode correctly; negative-start, RowDescription bounds, and DataRow bounds
+  guard examples remain stable.
+- Root cause: the count helpers reused the generic `read_i16_be(...)` helper,
+  which intentionally exposes raw two-byte values up to `65535`; PostgreSQL
+  RowDescription/DataRow column-count fields are signed i16 protocol fields.
+- Fix: add a count-specific `read_i16_count_be(...)` guard that maps missing,
+  negative-start, and `>32767` values to `-1`, then route only the backend count
+  helpers through it.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_postgres_column_count_signed_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-column-count-signed-guard examples/microservices/backend_postgres_column_count_signed_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_signed_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/pgrt -count=1
+```
+
+### TETRA-BUG-0120: PostgreSQL C-string writers accept embedded NUL fields
+
+- Status: fixed, verified.
+- Area: stdlib / backend PostgreSQL wire-frame writers.
+- Found while creating:
+  `examples/microservices/backend_postgres_cstring_nul_guard_service.tetra`.
+- Reproduction command:
+
+```sh
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_nul_guard_service.tetra
+```
+
+- Expected: PostgreSQL C-string length and writer helpers should return `-1`
+  for embedded NUL bytes in startup, query, statement, or portal fields before
+  writing into caller-owned frame buffers. Low-level `write_cstring_at(...)` and
+  `write_cstring_pair_at(...)` should also reject embedded NUL values without
+  modifying existing bytes.
+- Actual before fix: the service exited `12` because
+  `write_cstring_at(bytes, 0, bad)` accepted a `bad<NUL>field` string and wrote
+  bytes that PostgreSQL would parse as the shorter `bad` C string plus trailing
+  payload data. Higher-level frame length helpers also returned positive lengths
+  for embedded-NUL C-string fields.
+- Control cases: valid C-string writing, startup/session-state frames, Parse
+  parameter-count rejection, and frame writer short-buffer guards remain stable.
+- Root cause: `cstring_len(...)` counted every byte in the Tetra `String` and
+  appended one final terminator, while `write_cstring_at(...)` delegated to the
+  raw ASCII writer without checking whether the value already contained `0`.
+  Frame length helpers composed those lengths directly, so writers could begin
+  serializing a frame before discovering a malformed C-string field.
+- Fix: make `cstring_len(...)` and `cstring_pair_len(...)` return `-1` for
+  embedded NUL bytes, propagate that sentinel through startup/query/Parse/Bind/
+  Describe/Execute length helpers, and let high-level writers reject malformed
+  C-string inputs before touching the destination buffer.
+- Verification:
+
+```sh
+go run ./cli/cmd/tetra check examples/microservices/backend_postgres_cstring_nul_guard_service.tetra
+go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-cstring-nul-guard examples/microservices/backend_postgres_cstring_nul_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_nul_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra
+go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra
+go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1
+go test ./compiler/internal/pgrt -count=1
+```
+
 ## Microservice Bug-Hunt Runs
 
 | Date | Scope | Evidence | Confirmed bugs |
@@ -2841,6 +5315,81 @@ uses mem:
 | 2026-05-20 | Added imported async string-memory compiler examples with awaited local `String` and `StringBox` usage plus scalar direct-return controls. | Direct run for the new async string-memory fallback; imported async string-memory `--jobs 4 --interface-only` compiler pack check; direct awaited `String` repro plus throwing `String`, `StringBox`, awaited string local, awaited `StringBox` local, and scalar direct controls | extended `TETRA-BUG-0055` |
 | 2026-05-20 | Added imported async optional/generic string compiler examples with awaited local `String?`, generic `String`, and generic `Box<String>` usage. | Direct run for the new async optional/generic string fallback; imported async optional/generic string `--jobs 4 --interface-only` compiler pack check; direct awaited `String?`, generic `String`, throwing generic `String`, generic `Box<String>`, and awaited local controls | extended `TETRA-BUG-0055` |
 | 2026-05-20 | Closed all active bug-ledger entries and promoted focused regressions for formatter output, callable/generic lowering, scoped binding reuse, resource provenance, task/actor wrappers, and async resource returns. | `go test ./compiler -run 'TestTetraBug|TestMicroserviceExamplesAndBugLedger' -count=1`; `go test ./compiler/tests/ownership ./compiler/internal/lower ./compiler/tests/callables -count=1` | all listed `TETRA-BUG` entries fixed and verified |
+| 2026-05-22 | Added backend HTTP/JSON pipeline and PostgreSQL prepared wire-frame microservice examples; verified adjacent TechEmpower SCRAM local bench package under `go.work`. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./benchmarks/techempower/tetra/cmd/scram-local-bench -count=1`; `go list -m all` | `TETRA-BUG-0056` |
+| 2026-05-22 | Added backend net epoll lifecycle and PostgreSQL result guard microservice examples; probed nonblocking accept-without-client, epoll flag helpers, row-description guard paths, NULL data-row values, and command tag parsing. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-22 | Added backend HTTP response guard and JSON escape guard microservice examples; probed offset request-head framing, keep-alive detection, query route classification, custom response heads, JSON string/object escaping, and integer length helpers. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-22 | Added backend networking policy and crypto/serialization guard microservice examples; probed port clamping, fallback port selection, retry backoff caps, constant-time byte equality, checksum parity, seed mixing, and u8 pair packing clamps. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-22 | Added backend filesystem path-policy and time/collection window microservice examples; probed ASCII route metrics, repeated-slash path depth, root detection, missing-file checks, zero-length i32 collections, fallback values, negative durations, and timeout clamps. | `go test ./compiler -run TestBuildMakeZeroLengthSlices -count=1`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0057` |
+| 2026-05-22 | Added backend math/testing decision and slice/capability window microservice examples; probed clamp/min/max/add decision chains, testing status combination, island and heap slice sums, zero-length slice fallbacks, capability wrapper tokens, heap stores, and MMIO round trips. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-22 | Added backend memory/io buffer and sync/async status microservice examples; probed zero-length and negative-length memory helpers, byte copy/fill round trips, IO capability wrappers, MMIO read/write, sync status merging, readiness gates, countdown clamps, barrier targets, and async helper lowering with sync fallback selection. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-22 | Added backend experimental route-policy and buffer mirror microservice examples; probed `lib.experimental.*` compatibility forwarding for route strings, filesystem path policy, networking/time/testing/sync decisions, heap slices, crypto/serialization checksums, memory copies, MMIO wrappers, and async helper lowering. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-22 | Added backend modular web-stack pack microservice example; probed local-module imports over HTTP routing/JSON response helpers and PostgreSQL prepared-frame/data-row helpers under direct execution and `--jobs 4 --interface-only`. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-23 | Added backend capsule source-root microservice project; probed `Capsule.t4` entry discovery, `src`/`tests` source roots, cross-source local imports, `tetra check`, `tetra build`, `tetra run`, `tetra test`, and explicit dogfood source-file CLI handling near capsule projects. | `go test ./cli/cmd/tetra -run 'TestTestCommandRunsMicroserviceCapsuleSourceRootExample|TestBuildCheckRunCommandsAcceptExplicitProjectSourceFile' -count=1`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0058` |
+| 2026-05-23 | Added backend PostgreSQL session-state wire microservice example; probed startup-message layout, simple-query frames, describe portal/statement frames, execute max-row encoding, sync/terminate frames, and ready-for-query state bytes. | `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-23 | Added backend HTTP status/header matrix microservice example; probed response status serialization, decimal writes, route path chars, string keep-alive detection, and byte-buffer mixed-case `Connection: close` handling. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0059` |
+| 2026-05-23 | Added backend JSON control-character matrix microservice example; probed tab, carriage-return, newline, empty-message object, signed integer digit, negative world-object length, and lowercase hex digit helper paths. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-23 | Added backend HTTP header-whitespace microservice example; probed string and byte-buffer keep-alive handling for exact, multi-space, and tabbed `Connection: close` headers plus request-head length controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0060` |
+| 2026-05-23 | Added backend HTTP Connection token-list microservice example; probed string and byte-buffer keep-alive handling for exact close, keep-alive-only, comma-separated `keep-alive, close`, and `upgrade, Close` header values. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0061` |
+| 2026-05-23 | Added backend HTTP Connection header-scope microservice example; probed `X-Connection`, `Proxy-Connection`, `Connection-Mode`, and exact `Connection` semantics through string and byte-buffer keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0062` |
+| 2026-05-23 | Added backend HTTP Connection token-boundary microservice example; probed `closex`, `close-upgrade`, `enclose`, `close, keep-alive`, and trailing-whitespace `close` values through string and byte-buffer keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0063` |
+| 2026-05-23 | Added backend HTTP request-version scope microservice example; probed HTTP/1.0 requests with header-only `HTTP/1.1` markers, `HTTP/1.10` request-line prefixes, query routes, and byte-buffer keep-alive routing. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0064` |
+| 2026-05-23 | Added backend HTTP request-target guard microservice example; probed double-space empty targets, query-only targets, root and root-query not-found controls, and byte-buffer plaintext/missing query routing. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0065` |
+| 2026-05-23 | Added backend HTTP request-line token guard microservice example; probed extra middle tokens before `HTTP/1.1`, HTTP/1.0 followed by a later `HTTP/1.1`, and valid string/byte-buffer route controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0066` |
+| 2026-05-23 | Added backend HTTP keep-alive request-target guard microservice example; probed malformed `noslash` and query-only targets in string/byte helpers plus `/`, `/?query`, `/json`, and `Connection: close` controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0067` |
+| 2026-05-23 | Added backend HTTP Connection header/body scope microservice example; probed body-only `Connection: close`, real header `Connection: close`, CRLF header terminators, and byte-buffer offset keep-alive helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_token_boundary_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_list_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_whitespace_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0068` |
+| 2026-05-23 | Added backend HTTP keep-alive method-token guard microservice example; probed malformed `GE:T`, tabbed method, and `GET@` method tokens in string/byte helpers plus valid `GET`, `POST`, and `Connection: close` controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_pipeline_gateway_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0069` |
+| 2026-05-23 | Added backend JSON hex-digit guard microservice example; probed lowercase hex helper bounds for `-1`, `16`, and `99` plus normal nibble inputs and message-object serialization controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_hex_digit_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_escape_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/jsonrt -count=1` | `TETRA-BUG-0070` |
+| 2026-05-23 | Added backend time overflow guard microservice example; probed `millis_from_seconds(2147483)`, `millis_from_seconds(2147484)`, positive `add_duration_ms` near `Int` max, and negative duration underflow controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_collection_window_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0071` |
+| 2026-05-23 | Added backend PostgreSQL C-string bounds guard microservice example; probed bounded NUL scans for valid subranges, empty/reversed ranges, and negative start indexes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0072` |
+| 2026-05-23 | Added backend PostgreSQL DataRow signed-length guard microservice example; probed valid DataRow columns, NULL-style negative sentinel handling, malformed `0xfffffffe` length normalization, and following-column recovery. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0073` |
+| 2026-05-23 | Added backend PostgreSQL ASCII i32 bounds guard microservice example; probed signed and unsigned ASCII integer parsing, non-digit stops, zero-count ranges, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0074` |
+| 2026-05-23 | Added backend PostgreSQL CommandComplete bounds guard microservice example; probed `INSERT 0 3`, `UPDATE 12`, no-digit tags, digit-only subranges, empty ranges, negative payload lengths, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0075` |
+| 2026-05-23 | Added backend PostgreSQL RowDescription bounds guard microservice example; probed valid type OID scans, negative/out-of-range column indexes, truncated metadata, empty payload lengths, negative payload lengths, and negative-start parser bounds. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0076` |
+| 2026-05-23 | Added backend PostgreSQL DataRow bounds guard microservice example; probed valid DataRow integer columns, negative/out-of-range column indexes, negative-start length/start helpers, and `data_row_i32_at` missing-value controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0077` |
+| 2026-05-23 | Added backend PostgreSQL frame-header bounds guard microservice example; probed valid Sync frame header reads, negative-start header reads, and malformed length fields below the PostgreSQL four-byte frame-length minimum. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0078` |
+| 2026-05-23 | Added backend PostgreSQL ReadyForQuery status bounds guard microservice example; probed valid idle, in-transaction, and failed-transaction status bytes plus negative-start status reads. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0079` |
+| 2026-05-23 | Added backend PostgreSQL column-count bounds guard microservice example; probed valid RowDescription and DataRow count fields plus negative-start count readers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0080` |
+| 2026-05-23 | Added backend PostgreSQL big-endian reader bounds guard microservice example; probed valid i32/i16 big-endian reads, signed i32 normalization, and negative-start reader sentinels. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0081` |
+| 2026-05-23 | Added backend PostgreSQL big-endian writer bounds guard microservice example; probed valid i32/i16 big-endian writes, negative-start writer sentinels, and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0082` |
+| 2026-05-23 | Added backend PostgreSQL text writer bounds guard microservice example; probed valid ASCII/C-string writes, negative-start text writer sentinels, and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0083` |
+| 2026-05-23 | Added backend HTTP writer bounds guard microservice example; probed valid ASCII, CRLF, header, and decimal writes plus negative-start writer sentinels and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0084` |
+| 2026-05-23 | Added backend JSON writer bounds guard microservice example; probed valid escaped JSON string and message-object writes plus negative-start writer sentinels and preserved buffer contents after rejected writes. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_escape_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0085` |
+| 2026-05-23 | Added backend HTTP/JSON i32 minimum guard microservice example; probed HTTP and JSON decimal digit helpers, JSON world-object sizing, HTTP decimal byte writes, and rejected negative-start writes for `-2147483648`. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0086` |
+| 2026-05-23 | Added backend crypto mix i32 minimum guard microservice example; probed stable crypto seed mixing when `seed * 33 + value` reaches `-2147483648` plus existing positive/negative controls and the experimental mirror. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_mix_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_crypto_serialization_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_buffer_mirror_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0087` |
+| 2026-05-23 | Added backend networking backoff overflow guard microservice example; probed capped retry backoff before i32 doubling overflow, ordinary capped backoff, uncapped below-overflow behavior, negative base clamping, and the experimental networking mirror. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_backoff_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_network_policy_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_route_policy_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0088` |
+| 2026-05-23 | Added backend net epoll event bounds guard microservice example; probed valid fd/flag extraction plus empty and one-slot event buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_lifecycle_service.tetra`; `go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger' -count=1` | `TETRA-BUG-0089` |
+| 2026-05-23 | Added backend PostgreSQL short frame-header guard microservice example; probed valid Sync frames plus empty, tag-only, and truncated typed-frame buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0090` |
+| 2026-05-23 | Added backend PostgreSQL big-endian reader short-buffer guard microservice example; probed valid i32/i16 reads plus empty, truncated, and offset-truncated buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0091` |
+| 2026-05-23 | Added backend PostgreSQL big-endian writer short-buffer guard microservice example; probed valid i32/i16 writes plus empty, truncated, and offset-truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0092` |
+| 2026-05-23 | Added backend PostgreSQL text writer short-buffer guard microservice example; probed valid ASCII/C-string writes plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0093` |
+| 2026-05-23 | Added backend HTTP writer short-buffer guard microservice example; probed valid ASCII, CRLF, header, and decimal writes plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0094` |
+| 2026-05-23 | Added backend JSON writer short-buffer guard microservice example; probed valid escaped strings and message objects plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_writer_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_json_control_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0095` |
+| 2026-05-23 | Added backend PostgreSQL frame writer short-buffer guard microservice example; probed valid startup, Simple Query, Parse, Bind, Describe, Execute, Sync, and Terminate frames plus empty and truncated destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0096` |
+| 2026-05-23 | Added backend PostgreSQL bounded parser short-buffer guard microservice example; probed valid bounded C-string, ASCII integer, and CommandComplete parsing plus overstated limits/counts for short physical buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0097` |
+| 2026-05-23 | Added backend PostgreSQL ReadyForQuery status short-buffer guard microservice example; probed valid idle/in-transaction/failed-transaction status bytes plus empty and offset-short payloads. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ready_status_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0098` |
+| 2026-05-23 | Added backend HTTP request short-buffer guard microservice example; probed valid pipelined requests plus empty, offset-short, and overstated request windows. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_connection_body_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0099` |
+| 2026-05-23 | Added backend HTTP response writer short-buffer guard microservice example; probed valid response heads, plaintext responses, and JSON responses plus empty, prefix-short, and body-short destination buffers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0100` |
+| 2026-05-23 | Added backend PostgreSQL signed big-endian writer guard microservice example; probed negative i32/i16 two's-complement bytes for `-1`, `-2`, `-32768`, and `-2147483648` while preserving positive controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_write_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0101` |
+| 2026-05-23 | Added backend PostgreSQL signed frame-length guard microservice example; probed malformed negative signed frame lengths for `-2` and `-2147483648` while preserving valid Sync and positive short-length controls. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0102` |
+| 2026-05-23 | Added backend PostgreSQL high-bit big-endian reader guard microservice example; probed `0x7fffffff` positive control plus `0x80000000` and `0xfffffffe` high-bit sentinels. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_high_bit_read_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_read_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0103` |
+| 2026-05-23 | Added backend PostgreSQL ASCII i32 minimum guard microservice example; probed direct bounded parser and DataRow integer parsing for `-2147483648` plus `2147483647` positive max control. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | none |
+| 2026-05-23 | Added backend time negative-base duration guard microservice example; probed negative-base positive-delta recovery, still-negative sums, zero-delta negative bases, negative-delta subtraction, and positive overflow saturation. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_negative_base_delta_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_time_collection_window_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0104` |
+| 2026-05-23 | Added backend HTTP request-line CRLF guard microservice example; probed valid CRLF request routing plus LF-only and bare-CR `HTTP/1.1` terminator rejection for string and byte-buffer helpers. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_version_scope_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0105` |
+| 2026-05-23 | Added backend filesystem embedded-NUL exists guard microservice example; probed normal existing/missing paths plus `/<NUL>_suffix` prefix-truncation rejection. | `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_nul_exists_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_filesystem_path_policy_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_experimental_route_policy_service.tetra`; `go test ./compiler -run 'TestFilesystemRuntimeExistsBuildAndRunLinuxX64|TestMicroserviceExamplesAndBugLedger' -count=1` | `TETRA-BUG-0106` |
+| 2026-05-23 | Added backend HTTP request-target character guard microservice example; probed tab and raw control-byte target rejection in string/byte helpers plus valid query-string target controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-request-target-char-guard examples/microservices/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_char_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_target_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_line_token_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_keep_alive_method_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_request_crlf_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0107` |
+| 2026-05-23 | Added backend PostgreSQL ASCII i32 overflow guard microservice example; probed out-of-range positive/negative ASCII integers in direct and DataRow parsing while preserving max/min i32 boundary controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-ascii-i32-overflow-guard examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_min_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1` | `TETRA-BUG-0108` |
+| 2026-05-23 | Added backend PostgreSQL CommandComplete affected-row overflow guard microservice example; probed out-of-range `UPDATE` and `INSERT` affected-row counts while preserving `2147483647` and valid subrange controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-overflow-guard examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_ascii_i32_overflow_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0109` |
+| 2026-05-23 | Added backend PostgreSQL CommandComplete trailing-count guard microservice example; probed malformed non-trailing digit runs such as `UPDATE 12 rows` while preserving valid trailing `UPDATE`, `INSERT`, and subrange controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-command-tag-trailing-guard examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_trailing_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_command_tag_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0110` |
+| 2026-05-23 | Added backend PostgreSQL DataRow truncated-value guard microservice example; probed advertised positive value lengths whose physical bytes are missing while preserving valid and empty DataRow value controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-data-row-truncated-value-guard examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_truncated_value_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_result_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0111` |
+| 2026-05-23 | Added backend PostgreSQL frame total-length overflow guard microservice example; probed maximum valid typed-frame total length plus signed maximum length whose tag-inclusive total would overflow. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-frame-total-overflow-guard examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_total_overflow_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_header_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_signed_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_short_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0112` |
+| 2026-05-23 | Added backend HTTP negative Content-Length guard microservice example; probed response-head sizing and writing for negative Content-Length rejection while preserving zero and positive length controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-negative-content-length-guard examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_json_i32_min_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0113` |
+| 2026-05-23 | Added backend HTTP status-code guard microservice example; probed response-head sizing and writing for non-three-digit status-code rejection while preserving `100`, `200`, and `999` controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-status-code-guard examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0114` |
+| 2026-05-23 | Added backend HTTP header injection guard microservice example; probed CR/LF injection rejection for header names, header values, response reason text, and response header fields while preserving valid header/response controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-injection-guard examples/microservices/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0115` |
+| 2026-05-23 | Added backend HTTP header control-byte guard microservice example; probed non-HTAB control-byte rejection for header values, response reason text, and response header fields while preserving valid HTAB values. | `go run ./cli/cmd/tetra check examples/microservices/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-http-header-control-guard examples/microservices/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_control_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_header_injection_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_code_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_negative_content_length_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_response_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_http_status_matrix_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/httprt ./compiler/internal/webrt -count=1` | `TETRA-BUG-0116` |
+| 2026-05-23 | Added backend PostgreSQL Parse parameter-count guard microservice example; probed signed i16 OID-count overflow rejection for Parse frame sizing and writing while preserving small valid Parse frames. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-parse-count-guard examples/microservices/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parse_count_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_parser_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_signed_write_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0117` |
+| 2026-05-23 | Added backend net TCP port bounds guard microservice example; probed rejection of negative and above-range loopback bind ports while preserving ephemeral port `0`. | `go run ./cli/cmd/tetra check examples/microservices/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-net-port-bounds-guard examples/microservices/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_port_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_lifecycle_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_net_epoll_event_bounds_guard_service.tetra`; `go test ./compiler -run 'TestBuildCoreNetSmoke|TestMicroserviceExamplesAndBugLedger|TestNetRuntimeSocketLifecycleBuildAndRunLinuxX64|TestNetRuntimeEpollWaitOneIntoBuildAndRunLinuxX64' -count=1`; `go test ./compiler/internal/actorsrt -count=1` | `TETRA-BUG-0118` |
+| 2026-05-23 | Added backend PostgreSQL signed column-count guard microservice example; probed high-bit RowDescription/DataRow count rejection while preserving one-column payload controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-column-count-signed-guard examples/microservices/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_signed_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_column_count_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_row_description_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_data_row_bounds_guard_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0119` |
+| 2026-05-23 | Added backend PostgreSQL embedded-NUL C-string guard microservice example; probed C-string length/writer rejection for startup, query, statement, and portal fields while preserving valid frame controls. | `go run ./cli/cmd/tetra check examples/microservices/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra build --target linux-x64 -o /tmp/tetra-postgres-cstring-nul-guard examples/microservices/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_cstring_nul_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_text_write_bounds_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_frame_writer_short_guard_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_session_state_service.tetra`; `go run ./cli/cmd/tetra run --target linux-x64 examples/microservices/backend_postgres_prepared_pipeline_service.tetra`; `go test ./compiler -run TestMicroserviceExamplesAndBugLedger -count=1`; `go test ./compiler/internal/pgrt -count=1` | `TETRA-BUG-0120` |
 
 ## Notes
 
