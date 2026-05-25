@@ -248,6 +248,10 @@ func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
 		if step.Status != "pass" {
 			return fmt.Errorf("passing v0.4.0 summary required step %q status = %q, want pass", required, step.Status)
 		}
+		expectedCommand, ok := expectedV040RequiredStepCommand(required, summary.ReportDir)
+		if ok && !v040RequiredStepCommandMatches(required, step.Command, expectedCommand) {
+			return fmt.Errorf("passing v0.4.0 summary required step %q command = %q, want %q", required, step.Command, expectedCommand)
+		}
 	}
 	for i, required := range v040RequiredPassingSteps {
 		if i >= len(summary.Steps) {
@@ -258,6 +262,73 @@ func validateV040RequiredPassingSteps(summary releaseGateSummary) error {
 		}
 	}
 	return nil
+}
+
+func expectedV040RequiredStepCommand(name, summaryReportDir string) (string, bool) {
+	artifactPath := func(path string) string {
+		reportDir := strings.TrimRight(filepath.ToSlash(summaryReportDir), "/")
+		return reportDir + "/artifacts/" + path
+	}
+	switch name {
+	case "readiness preflight":
+		return fmt.Sprintf("go run ./tools/cmd/validate-v0-4-readiness --expected-version v0.4.0 --features %s --targets %s --manifest docs/generated/manifest.json --scope-decisions docs/release/v0_4_0_scope_decisions.json",
+			artifactPath("features.json"),
+			artifactPath("targets.json"),
+		), true
+	case "version parity":
+		return "check_versions", true
+	case "readiness validator tests":
+		return "go test ./tools/cmd/validate-v0-4-readiness ./tools/cmd/validate-v0-4-completion-audit -count=1", true
+	case "docs verification":
+		return "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json", true
+	case "techempower report schemas":
+		return "check_techempower_reports", true
+	case "compiler cli tools baseline":
+		return "check_go_test_packages", true
+	case "memory production linux x64 smoke":
+		return "run_memory_production_smoke", true
+	case "validate memory production":
+		return fmt.Sprintf("go run ./tools/cmd/validate-memory-production --report %s", artifactPath("memory-production-linux-x64.json")), true
+	case "parallel production linux x64 smoke":
+		return "run_parallel_production_smoke", true
+	case "validate parallel production":
+		return fmt.Sprintf("go run ./tools/cmd/validate-parallel-production --report %s", artifactPath("parallel-production-linux-x64.json")), true
+	case "compiler production linux x64 smoke":
+		return "run_compiler_production_smoke", true
+	case "validate compiler production":
+		return fmt.Sprintf("go run ./tools/cmd/validate-compiler-production --report %s", artifactPath("compiler-production-linux-x64.json")), true
+	case "linux host smoke":
+		return "run_linux_host_smoke", true
+	case "distributed actors linux x64 smoke":
+		return "run_distributed_actor_smoke", true
+	case "validate distributed actor runtime":
+		return fmt.Sprintf("go run ./tools/cmd/validate-distributed-actor-runtime --report %s", artifactPath("distributed-actors-linux-x64.json")), true
+	case "native ui linux x64 smoke":
+		return "run_native_ui_smoke", true
+	case "validate native ui runtime":
+		return fmt.Sprintf("go run ./tools/cmd/validate-native-ui-runtime --report %s", artifactPath("native-ui-linux-x64.json")), true
+	case "readiness final":
+		return "check_readiness_final", true
+	case "completion audit validation":
+		return "go run ./tools/cmd/validate-v0-4-completion-audit --audit docs/release/v0_4_0_completion_audit.md --expected-status achieved", true
+	case "release state":
+		return "check_release_state", true
+	case "security review signoff":
+		return "check_security_review_signoff", true
+	case "security review detached hash":
+		return "write_security_review_hash", true
+	case "diff check":
+		return "git diff --check", true
+	default:
+		return "", false
+	}
+}
+
+func v040RequiredStepCommandMatches(name, got, expected string) bool {
+	if got == expected {
+		return true
+	}
+	return name == "readiness preflight" && strings.HasPrefix(got, expected+" --runtime-report ")
 }
 
 func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) error {

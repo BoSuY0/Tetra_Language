@@ -136,6 +136,8 @@ go run ./tools/cmd/validate-release-gate-summary \
 
 For a passing `v0.4.0` summary, `summary.steps` must follow the canonical
 `scripts/release/v0_4_0/gate.sh` step order.
+Required `summary.steps[].command` values must match the canonical gate command
+surface, including report-directory-scoped artifact paths for validation steps.
 
 The hash manifest must validate with:
 

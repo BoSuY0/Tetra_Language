@@ -131,6 +131,21 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithReorderedRequired
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithWrongRequiredStepCommand(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	mutateV040ReleaseGateSummaryStep(t, dir, "validate memory production", func(step *releaseGateStep) {
+		step.Command = "go run ./tools/cmd/validate-memory-production"
+	})
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestForSummary(t, dir))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `required step "validate memory production" command`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
@@ -388,7 +403,8 @@ func makeV040PassingReleaseGateSummaryReportExcept(t *testing.T, omittedSteps ..
 
 func makeV040PassingReleaseGateSummaryReportInOrder(t *testing.T, order []string) string {
 	t.Helper()
-	steps, logs := v040GateStepsForOrder(t, order)
+	reportDir := "reports/release-v0.4.0-gate"
+	steps, logs := v040GateStepsForOrder(t, order, reportDir)
 	summary := releaseGateSummary{
 		Status:             "pass",
 		ReleaseVersion:     "v0.4.0",
@@ -398,7 +414,7 @@ func makeV040PassingReleaseGateSummaryReportInOrder(t *testing.T, order []string
 		EndedAt:            "2026-05-20T10:00:02Z",
 		StepCount:          len(steps),
 		FailedCount:        0,
-		ReportDir:          "reports/release-v0.4.0-gate",
+		ReportDir:          reportDir,
 		Steps:              steps,
 	}
 	raw, err := json.MarshalIndent(summary, "", "  ")
@@ -408,18 +424,41 @@ func makeV040PassingReleaseGateSummaryReportInOrder(t *testing.T, order []string
 	return makeReleaseGateSummaryReport(t, string(raw), logs...)
 }
 
-func v040GateStepsForOrder(t *testing.T, order []string) ([]releaseGateStep, []string) {
+func mutateV040ReleaseGateSummaryStep(t *testing.T, dir string, name string, mutate func(*releaseGateStep)) {
 	t.Helper()
-	commands := make(map[string]string, len(v040GateStepFixtures))
-	for _, fixture := range v040GateStepFixtures {
-		commands[fixture.Name] = fixture.Command
+	path := filepath.Join(dir, "summary.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
 	}
+	var summary releaseGateSummary
+	if err := json.Unmarshal(raw, &summary); err != nil {
+		t.Fatal(err)
+	}
+	for i := range summary.Steps {
+		if summary.Steps[i].Name == name {
+			mutate(&summary.Steps[i])
+			raw, err := json.MarshalIndent(summary, "", "  ")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, raw, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+	t.Fatalf("summary missing step %q", name)
+}
+
+func v040GateStepsForOrder(t *testing.T, order []string, reportDir string) ([]releaseGateStep, []string) {
+	t.Helper()
 	var steps []releaseGateStep
 	var logs []string
 	for _, name := range order {
-		command, ok := commands[name]
+		command, ok := expectedV040RequiredStepCommand(name, reportDir)
 		if !ok {
-			t.Fatalf("unknown v0.4 step fixture %q", name)
+			t.Fatalf("unknown v0.4 command fixture %q", name)
 		}
 		log := fmt.Sprintf("logs/%02d-%s.log", len(steps)+1, stepLogSlug(name))
 		steps = append(steps, releaseGateStep{
@@ -444,32 +483,31 @@ func v040ReleaseGateSummaryExpectations() releaseGateSummaryExpectations {
 }
 
 var v040GateStepFixtures = []struct {
-	Name    string
-	Command string
+	Name string
 }{
-	{Name: "readiness preflight", Command: "go run ./tools/cmd/validate-v0-4-readiness"},
-	{Name: "version parity", Command: "check_versions"},
-	{Name: "readiness validator tests", Command: "go test ./tools/cmd/validate-v0-4-readiness ./tools/cmd/validate-v0-4-completion-audit -count=1"},
-	{Name: "docs verification", Command: "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json"},
-	{Name: "techempower report schemas", Command: "check_techempower_reports"},
-	{Name: "compiler cli tools baseline", Command: "check_go_test_packages"},
-	{Name: "memory production linux x64 smoke", Command: "run_memory_production_smoke"},
-	{Name: "validate memory production", Command: "go run ./tools/cmd/validate-memory-production"},
-	{Name: "parallel production linux x64 smoke", Command: "run_parallel_production_smoke"},
-	{Name: "validate parallel production", Command: "go run ./tools/cmd/validate-parallel-production"},
-	{Name: "compiler production linux x64 smoke", Command: "run_compiler_production_smoke"},
-	{Name: "validate compiler production", Command: "go run ./tools/cmd/validate-compiler-production"},
-	{Name: "linux host smoke", Command: "run_linux_host_smoke"},
-	{Name: "distributed actors linux x64 smoke", Command: "run_distributed_actor_smoke"},
-	{Name: "validate distributed actor runtime", Command: "go run ./tools/cmd/validate-distributed-actor-runtime"},
-	{Name: "native ui linux x64 smoke", Command: "run_native_ui_smoke"},
-	{Name: "validate native ui runtime", Command: "go run ./tools/cmd/validate-native-ui-runtime"},
-	{Name: "readiness final", Command: "check_readiness_final"},
-	{Name: "completion audit validation", Command: "go run ./tools/cmd/validate-v0-4-completion-audit"},
-	{Name: "release state", Command: "check_release_state"},
-	{Name: "security review signoff", Command: "check_security_review_signoff"},
-	{Name: "security review detached hash", Command: "write_security_review_hash"},
-	{Name: "diff check", Command: "git diff --check"},
+	{Name: "readiness preflight"},
+	{Name: "version parity"},
+	{Name: "readiness validator tests"},
+	{Name: "docs verification"},
+	{Name: "techempower report schemas"},
+	{Name: "compiler cli tools baseline"},
+	{Name: "memory production linux x64 smoke"},
+	{Name: "validate memory production"},
+	{Name: "parallel production linux x64 smoke"},
+	{Name: "validate parallel production"},
+	{Name: "compiler production linux x64 smoke"},
+	{Name: "validate compiler production"},
+	{Name: "linux host smoke"},
+	{Name: "distributed actors linux x64 smoke"},
+	{Name: "validate distributed actor runtime"},
+	{Name: "native ui linux x64 smoke"},
+	{Name: "validate native ui runtime"},
+	{Name: "readiness final"},
+	{Name: "completion audit validation"},
+	{Name: "release state"},
+	{Name: "security review signoff"},
+	{Name: "security review detached hash"},
+	{Name: "diff check"},
 }
 
 func v040GateStepNames() []string {
