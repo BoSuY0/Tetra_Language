@@ -67,6 +67,7 @@ func TestCIWorkflowHasLeastPrivilegeConcurrencyAndTimeouts(t *testing.T) {
 		"fuzz-short-linux:",
 		"fuzz-nightly-linux:",
 		"release-v0-4-0-readiness-linux:",
+		"techempower-report-schemas-linux:",
 		"lint-workflows-and-shell-linux:",
 	} {
 		if !workflowJobHasField(text, job, "timeout-minutes:") {
@@ -131,6 +132,28 @@ func TestCIWorkflowIncludesCurrentV040ReleaseReadinessJob(t *testing.T) {
 	}
 	if strings.Contains(text, "v0.3.0") || strings.Contains(text, "v0_3_0") {
 		t.Fatalf("ci workflow contains stale v0.3 release assumptions")
+	}
+}
+
+func TestCIWorkflowValidatesTechEmpowerReportSchemas(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"techempower-report-schemas-linux:",
+		"github.event_name != 'schedule'",
+		"timeout-minutes: 20",
+		"name: Validate TechEmpower report schemas",
+		"go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_local_smoke_skip_db_report.json --allow-skip-db",
+		"go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json",
+		"go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json",
+		"go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("ci workflow missing TechEmpower report schema detail %q", want)
+		}
 	}
 }
 
