@@ -151,7 +151,7 @@ go run ./tools/cmd/validate-artifact-hashes \
 ```
 
 For a passing `v0.4.0` summary, `<report-dir>/artifact-hashes.json` must list
-the required release-gate artifacts, including:
+the required release-gate artifacts from manifest root `.`, including:
 
 - `summary.json`
 - `summary.md`

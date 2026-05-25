@@ -183,6 +183,18 @@ func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithMismatchedReportD
 	}
 }
 
+func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithNonDotArtifactHashRoot(t *testing.T) {
+	dir := makeV040PassingReleaseGateSummaryReport(t)
+	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestWithRoot(t, dir, "artifacts"))
+	err := validateReleaseGateSummaryFileWithExpectations(filepath.Join(dir, "summary.json"), dir, v040ReleaseGateSummaryExpectations())
+	if err == nil {
+		t.Fatalf("expected validator failure")
+	}
+	if !strings.Contains(err.Error(), `artifact-hashes.json root = "artifacts", want "."`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateReleaseGateSummaryRejectsPassingV040ReportWithoutFeaturesArtifact(t *testing.T) {
 	dir := makeV040PassingReleaseGateSummaryReport(t)
 	writeReleaseGateArtifactHashes(t, dir, v040ArtifactHashesManifestExcept("artifacts/features.json"))
@@ -605,6 +617,21 @@ func v040ArtifactHashesManifestForSummary(t *testing.T, dir string) string {
 		logs = append(logs, step.Log)
 	}
 	return v040ArtifactHashesManifestWithLogs(logs)
+}
+
+func v040ArtifactHashesManifestWithRoot(t *testing.T, dir string, root string) string {
+	t.Helper()
+	raw := v040ArtifactHashesManifestForSummary(t, dir)
+	var manifest releaseArtifactHashesManifest
+	if err := json.Unmarshal([]byte(raw), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Root = root
+	out, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
 }
 
 func v040ArtifactHashesManifestExcept(omittedPaths ...string) string {

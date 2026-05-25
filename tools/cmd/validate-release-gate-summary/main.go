@@ -375,6 +375,9 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 	if manifest.Schema != releaseArtifactHashesSchema {
 		return fmt.Errorf("artifact-hashes.json schema = %q, want %q", manifest.Schema, releaseArtifactHashesSchema)
 	}
+	if manifest.Root != "." {
+		return fmt.Errorf("artifact-hashes.json root = %q, want %q", manifest.Root, ".")
+	}
 	artifacts := make(map[string]releaseHashArtifact, len(manifest.Artifacts))
 	for _, artifact := range manifest.Artifacts {
 		artifacts[filepath.ToSlash(artifact.Path)] = artifact
