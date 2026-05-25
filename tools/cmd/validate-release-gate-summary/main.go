@@ -380,7 +380,11 @@ func validateV040ReleaseArtifacts(summary releaseGateSummary, reportDir string) 
 	}
 	artifacts := make(map[string]releaseHashArtifact, len(manifest.Artifacts))
 	for _, artifact := range manifest.Artifacts {
-		artifacts[filepath.ToSlash(artifact.Path)] = artifact
+		path := filepath.ToSlash(artifact.Path)
+		if _, ok := artifacts[path]; ok {
+			return fmt.Errorf("duplicate artifact path %q in artifact-hashes.json", path)
+		}
+		artifacts[path] = artifact
 	}
 	for _, required := range v040RequiredArtifacts {
 		artifact, ok := artifacts[required.Path]
