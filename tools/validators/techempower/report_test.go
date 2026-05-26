@@ -231,6 +231,20 @@ func TestValidateReportRejectsCommandBaseURLMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsBaseURLWithPath(t *testing.T) {
+	report := reportFixture(false)
+	report.BaseURL = "http://127.0.0.1:8080/api"
+	report.Command = strings.Replace(report.Command, "--base-url http://127.0.0.1:8080", "--base-url http://127.0.0.1:8080/api", 1)
+
+	err := ValidateReport(mustReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted report with non-origin base_url")
+	}
+	if !strings.Contains(err.Error(), "base_url") {
+		t.Fatalf("ValidateReport base_url error = %v, want base_url rejection", err)
+	}
+}
+
 func TestValidateReportRequiresLatencyPercentilesAndIntegrityMetadata(t *testing.T) {
 	report := reportFixture(false)
 	report.GeneratedLocalAt = ""

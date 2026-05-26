@@ -95,10 +95,11 @@ are rejected.
 Endpoint benchmark command evidence must start with `tetra-techempower-bench`.
 Command `--requests` must match every endpoint `requests` count in the
 generated semantic report, and command `--concurrency` must be a positive
-integer. Endpoint benchmark command `--base-url` must also match the report
-`base_url`, after the same trailing-slash normalization the harness applies to
-generated reports. Endpoint benchmark command `--skip-db` must be present only
-for the explicit two-endpoint
+integer. Semantic report `base_url` and endpoint benchmark command `--base-url`
+must be the benchmark server origin only (`scheme://host[:port]` with optional
+trailing slash normalization); paths, query strings, and fragments are rejected
+so endpoint paths remain explicit report evidence. Endpoint benchmark command
+`--skip-db` must be present only for the explicit two-endpoint
 `/plaintext` plus `/json` no-database smoke report and absent for full endpoint
 reports. Endpoint benchmark command `--min-rps` must match `summary.min_rps`
 and every endpoint `threshold` value. Each endpoint `rps` value must also meet

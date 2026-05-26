@@ -214,18 +214,11 @@ func validateGitHead(head string) []string {
 }
 
 func canonicalBenchmarkBaseURL(raw string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	parsed, err := url.Parse(raw)
+	parsed, err := parseBenchmarkOriginURL(raw, "base URL")
 	if err != nil {
 		return "", err
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", fmt.Errorf("scheme is %q, want http or https", parsed.Scheme)
-	}
-	if parsed.Host == "" {
-		return "", errors.New("host is required")
-	}
-	return strings.TrimRight(raw, "/"), nil
+	return parsed.String(), nil
 }
 
 func validateBenchmarkCommandRequests(command string, endpoints []EndpointReport) []string {
@@ -563,20 +556,37 @@ func validateSummary(summary Summary, endpointCount int, totalRequests int, tota
 }
 
 func validateBaseURL(raw string) error {
+	_, err := parseBenchmarkOriginURL(raw, "base_url")
+	return err
+}
+
+func parseBenchmarkOriginURL(raw string, field string) (*url.URL, error) {
 	if strings.TrimSpace(raw) == "" {
-		return errors.New("base_url is required")
+		return nil, fmt.Errorf("%s is required", field)
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return fmt.Errorf("base_url scheme is %q, want http or https", parsed.Scheme)
+		return nil, fmt.Errorf("%s scheme is %q, want http or https", field, parsed.Scheme)
 	}
 	if parsed.Host == "" {
-		return errors.New("base_url host is required")
+		return nil, fmt.Errorf("%s host is required", field)
 	}
-	return nil
+	if parsed.Path != "" && parsed.Path != "/" {
+		return nil, fmt.Errorf("%s path is %q, want origin only", field, parsed.Path)
+	}
+	if parsed.RawQuery != "" {
+		return nil, fmt.Errorf("%s query is not allowed; want origin only", field)
+	}
+	if parsed.Fragment != "" {
+		return nil, fmt.Errorf("%s fragment is not allowed; want origin only", field)
+	}
+	parsed.Path = ""
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed, nil
 }
 
 func rejectWeakEvidence(raw []byte) []string {
