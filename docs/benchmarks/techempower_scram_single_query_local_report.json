@@ -184,7 +184,8 @@
         "status 200",
         "content-type text/html",
         "request-time fortune present",
-        "HTML escaping sentinel"
+        "HTML escaping sentinel",
+        "sorted Fortune rows"
       ],
       "threshold": "min_rps \u003e= 1.00",
       "threshold_pass": true,

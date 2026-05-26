@@ -109,7 +109,8 @@ TechEmpower endpoint allowlist: full reports cover `/plaintext`, `/json`,
 skip-db smoke reports cover only `/plaintext` and `/json`. Each semantic
 endpoint's `name` and `kind` must match its documented endpoint path, for
 example `/db` is `db`/`single-query` and `/queries?queries=2` is
-`queries`/`multiple-queries`.
+`queries`/`multiple-queries`. `/fortunes` semantic checks must also include
+sorted Fortune row evidence, not only request-time insertion and HTML escaping.
 Matrix run evidence must also carry a positive `repeat` number; warmup evidence
 uses `repeat=0` and is not counted as a matrix run. The validator rejects
 warmup evidence with any other repeat value. Matrix run identities must be

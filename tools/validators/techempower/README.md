@@ -18,7 +18,8 @@ benchmark command/min-rps consistency,
 endpoint RPS/threshold consistency,
 elapsed timing evidence that covers the declared run duration, observed
 content types, endpoint semantic check lists, SCRAM evidence, matrix semantic
-probes, timestamped resource snapshots inside the report resource window,
+probes, Fortunes sorted-row semantic evidence, timestamped resource snapshots
+inside the report resource window,
 declared matrix grid coverage, matrix command provenance, command/artifact
 report-path consistency, command/artifact grid consistency, command/run
 duration consistency, command/run repeat consistency, command/warmup

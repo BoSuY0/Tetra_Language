@@ -117,6 +117,26 @@ func TestValidateReportAllowsFailedEndpointWithZeroRPS(t *testing.T) {
 	}
 }
 
+func TestValidateFortunesRejectsUnsortedRows(t *testing.T) {
+	header := http.Header{"Content-Type": []string{"text/html; charset=utf-8"}}
+	body := []byte(`<!DOCTYPE html><html><body><table><tr><td>0</td><td>Additional fortune added at request time.</td></tr><tr><td>11</td><td>&lt;script&gt;alert(&quot;This should not be displayed in a browser alert box.&quot;);&lt;/script&gt;</td></tr></table></body></html>`)
+
+	err := validateFortunes(http.StatusOK, header, body)
+	if err == nil {
+		t.Fatalf("validateFortunes accepted unsorted fortune rows")
+	}
+	if !strings.Contains(err.Error(), "sorted") {
+		t.Fatalf("validateFortunes error = %v, want sorted rejection", err)
+	}
+}
+
+func TestSemanticChecksForFortunesIncludeSortingEvidence(t *testing.T) {
+	checks := strings.ToLower(strings.Join(semanticChecksForPath("/fortunes"), "\n"))
+	if !strings.Contains(checks, "sorted") {
+		t.Fatalf("fortunes semantic checks missing sorting evidence: %q", checks)
+	}
+}
+
 func TestRunBenchmarkChecksEndpointsAndWritesReport(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -137,7 +157,7 @@ func TestRunBenchmarkChecksEndpointsAndWritesReport(t *testing.T) {
 			_, _ = w.Write([]byte(`[{"id":1,"randomNumber":5},{"id":3,"randomNumber":6}]`))
 		case "/fortunes":
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = w.Write([]byte(`<!DOCTYPE html><html><body><table><tr><td>0</td><td>Additional fortune added at request time.</td></tr><tr><td>11</td><td>&lt;script&gt;alert(&quot;This should not be displayed in a browser alert box.&quot;);&lt;/script&gt;</td></tr></table></body></html>`))
+			_, _ = w.Write([]byte(`<!DOCTYPE html><html><body><table><tr><td>11</td><td>&lt;script&gt;alert(&quot;This should not be displayed in a browser alert box.&quot;);&lt;/script&gt;</td></tr><tr><td>0</td><td>Additional fortune added at request time.</td></tr></table></body></html>`))
 		default:
 			http.NotFound(w, r)
 		}

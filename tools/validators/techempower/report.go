@@ -523,7 +523,7 @@ func requiredSemanticCheckMarkers(path string) []string {
 	case "/updates?queries=2":
 		return []string{"status 200", "content-type application/json", "World update array shape"}
 	case "/fortunes":
-		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel"}
+		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel", "sorted Fortune rows"}
 	default:
 		return nil
 	}

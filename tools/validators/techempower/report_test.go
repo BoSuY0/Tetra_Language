@@ -168,6 +168,24 @@ func TestValidateReportRejectsInvalidContentTypePrefix(t *testing.T) {
 	}
 }
 
+func TestValidateReportRejectsFortunesWithoutSortingSemanticCheck(t *testing.T) {
+	report := reportFixture(false)
+	for i := range report.Endpoints {
+		if report.Endpoints[i].Path == "/fortunes" {
+			report.Endpoints[i].SemanticChecks = []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel"}
+			break
+		}
+	}
+
+	err := ValidateReport(mustReportJSON(t, report), Options{})
+	if err == nil {
+		t.Fatalf("ValidateReport accepted /fortunes evidence without sorting semantic check")
+	}
+	if !strings.Contains(err.Error(), "sorted") {
+		t.Fatalf("ValidateReport fortunes semantic error = %v, want sorting rejection", err)
+	}
+}
+
 func TestValidateReportRejectsWeakEvidenceAndBadCounters(t *testing.T) {
 	report := reportFixture(false)
 	report.Endpoints[0].Evidence = "placeholder"
@@ -1126,7 +1144,7 @@ func semanticChecksForPath(path string) []string {
 	case "/updates?queries=2":
 		return []string{"status 200", "content-type application/json", "World update array shape"}
 	case "/fortunes":
-		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel"}
+		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel", "sorted Fortune rows"}
 	default:
 		return []string{"status 200"}
 	}

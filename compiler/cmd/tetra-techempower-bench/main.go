@@ -368,7 +368,7 @@ func semanticChecksForPath(path string) []string {
 	case "/updates?queries=2":
 		return []string{"status 200", "content-type application/json", "World update array shape"}
 	case "/fortunes":
-		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel"}
+		return []string{"status 200", "content-type text/html", "request-time fortune present", "HTML escaping sentinel", "sorted Fortune rows"}
 	default:
 		return []string{"status 200"}
 	}
@@ -476,7 +476,22 @@ func validateFortunes(status int, header http.Header, body []byte) error {
 	if !strings.Contains(text, "&lt;script&gt;") {
 		return errors.New("fortunes HTML missing escaped XSS sentinel")
 	}
+	if !orderedMarkers(text, []string{"&lt;script&gt;", "Additional fortune added at request time."}) {
+		return errors.New("fortunes HTML rows are not sorted by message")
+	}
 	return nil
+}
+
+func orderedMarkers(text string, markers []string) bool {
+	offset := 0
+	for _, marker := range markers {
+		idx := strings.Index(text[offset:], marker)
+		if idx < 0 {
+			return false
+		}
+		offset += idx + len(marker)
+	}
+	return true
 }
 
 func validateReport(report Report) error {
