@@ -1,0 +1,715 @@
+{
+  "schema": "tetra.surface.runtime.v1",
+  "status": "pass",
+  "target": "headless",
+  "host": "linux-x64",
+  "runtime": "surface-headless",
+  "surface_schema": "tetra.surface.v1",
+  "host_abi": "tetra.surface.host-abi.v1",
+  "host_evidence": {
+    "level": "deterministic-headless",
+    "backend": "software-rgba",
+    "framebuffer": true,
+    "real_window": false,
+    "native_input": false,
+    "user_facing_platform_widgets": false
+  },
+  "source": "examples/surface_textbox_app.tetra",
+  "processes": [
+    {
+      "name": "tetra build",
+      "kind": "build",
+      "path": "tetra build --target linux-x64 /home/tetra/Desktop/Projects/Tetra_Language/examples/surface_textbox_app.tetra -o /home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/baseline-reports/surface-experimental/surface-headless-text-focus-input-artifacts/surface-textbox-app",
+      "ran": true,
+      "pass": true,
+      "exit_code": 0
+    },
+    {
+      "name": "surface component app",
+      "kind": "app",
+      "path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/baseline-reports/surface-experimental/surface-headless-text-focus-input-artifacts/surface-textbox-app",
+      "ran": true,
+      "pass": true,
+      "exit_code": 1,
+      "expected_exit_code": 1
+    },
+    {
+      "name": "surface headless runtime",
+      "kind": "runtime",
+      "path": "/home/tetra/Desktop/Projects/Tetra_Language/.cache/go-build-surface-release/25/25a30ee821c64399fbd2ff5f8a27feba0601fbd99f3d48fa17feeb6031d9cc54-d/surface-runtime-smoke",
+      "ran": true,
+      "pass": true,
+      "exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "component-app",
+      "path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/baseline-reports/surface-experimental/surface-headless-text-focus-input-artifacts/surface-textbox-app",
+      "sha256": "sha256:9df18156a48fbd8a9dfa1d0bb6211635446314c9be2280c3cfe53c53e4bd7195",
+      "size": 110633
+    },
+    {
+      "kind": "runner-trace",
+      "path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/baseline-reports/surface-experimental/surface-headless-text-focus-input-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:ebd7d9aa935121c05c37ed844cd326533668cc5eaa32f740eafdfadcacff13ac",
+      "size": 13015
+    }
+  ],
+  "artifact_scan": {
+    "root": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/baseline-reports/surface-experimental/surface-headless-text-focus-input-artifacts",
+    "files_checked": 2,
+    "forbidden_paths": [],
+    "pass": true
+  },
+  "components": [
+    {
+      "id": "TextInputApp",
+      "type": "examples.surface_textbox_app.TextInputApp",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "w": 400,
+        "h": 240
+      },
+      "abilities": [
+        "measure",
+        "layout",
+        "draw",
+        "event",
+        "focus",
+        "text",
+        "accessibility"
+      ],
+      "state": {
+        "accessibility_role": "none",
+        "focused_component": "SubmitButton",
+        "height": "240",
+        "resize_count": "1",
+        "width": "400"
+      }
+    },
+    {
+      "id": "TextBox",
+      "type": "examples.surface_textbox_app.TextBox",
+      "parent": "TextInputApp",
+      "bounds": {
+        "x": 32,
+        "y": 64,
+        "w": 224,
+        "h": 44
+      },
+      "abilities": [
+        "measure",
+        "layout",
+        "draw",
+        "event",
+        "focus",
+        "text",
+        "accessibility"
+      ],
+      "state": {
+        "accessibility_role": "label",
+        "backspace_count": "1",
+        "buffer": "Z",
+        "caret": "1",
+        "delete_count": "1",
+        "focused": "false",
+        "text_len": "1"
+      }
+    },
+    {
+      "id": "SubmitButton",
+      "type": "examples.surface_textbox_app.ActionButton",
+      "parent": "TextInputApp",
+      "bounds": {
+        "x": 32,
+        "y": 128,
+        "w": 128,
+        "h": 44
+      },
+      "abilities": [
+        "measure",
+        "layout",
+        "draw",
+        "event",
+        "focus",
+        "text",
+        "accessibility"
+      ],
+      "state": {
+        "accessibility_role": "button",
+        "focused": "true",
+        "key_count": "1",
+        "press_count": "1"
+      }
+    }
+  ],
+  "events": [
+    {
+      "order": 1,
+      "kind": "mouse_up",
+      "target_component": "TextBox",
+      "dispatch_path": [
+        "TextInputApp",
+        "TextBox"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 48,
+      "y": 96,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "timestamp_ms": 0,
+      "buffer_slots": [
+        5,
+        48,
+        96,
+        1,
+        0,
+        320,
+        200,
+        0,
+        0
+      ],
+      "before_state": {
+        "TextBox.focused": "false",
+        "TextInputApp.focused_component": "none"
+      },
+      "after_state": {
+        "TextBox.focused": "true",
+        "TextInputApp.focused_component": "TextBox"
+      }
+    },
+    {
+      "order": 2,
+      "kind": "text_input",
+      "target_component": "TextBox",
+      "dispatch_path": [
+        "TextInputApp",
+        "TextBox"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "timestamp_ms": 1,
+      "buffer_slots": [
+        8,
+        0,
+        0,
+        0,
+        0,
+        320,
+        200,
+        1,
+        2
+      ],
+      "text_len": 2,
+      "text_bytes_hex": "4f4b",
+      "before_state": {
+        "TextBox.buffer": "",
+        "TextBox.caret": "0",
+        "TextBox.text_len": "0"
+      },
+      "after_state": {
+        "TextBox.buffer": "OK",
+        "TextBox.caret": "2",
+        "TextBox.text_len": "2"
+      }
+    },
+    {
+      "order": 3,
+      "kind": "key_down",
+      "target_component": "TextBox",
+      "dispatch_path": [
+        "TextInputApp",
+        "TextBox"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 0,
+      "y": 0,
+      "key": 37,
+      "width": 320,
+      "height": 200,
+      "timestamp_ms": 2,
+      "buffer_slots": [
+        6,
+        0,
+        0,
+        0,
+        37,
+        320,
+        200,
+        2,
+        0
+      ],
+      "before_state": {
+        "TextBox.buffer": "OK",
+        "TextBox.caret": "2"
+      },
+      "after_state": {
+        "TextBox.buffer": "OK",
+        "TextBox.caret": "1"
+      }
+    },
+    {
+      "order": 4,
+      "kind": "key_down",
+      "target_component": "TextBox",
+      "dispatch_path": [
+        "TextInputApp",
+        "TextBox"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 0,
+      "y": 0,
+      "key": 8,
+      "width": 320,
+      "height": 200,
+      "timestamp_ms": 3,
+      "buffer_slots": [
+        6,
+        0,
+        0,
+        0,
+        8,
+        320,
+        200,
+        3,
+        0
+      ],
+      "before_state": {
+        "TextBox.buffer": "OK",
+        "TextBox.caret": "1"
+      },
+      "after_state": {
+        "TextBox.buffer": "K",
+        "TextBox.caret": "0"
+      }
+    },
+    {
+      "order": 5,
+      "kind": "key_down",
+      "target_component": "TextBox",
+      "dispatch_path": [
+        "TextInputApp",
+        "TextBox"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 0,
+      "y": 0,
+      "key": 46,
+      "width": 320,
+      "height": 200,
+      "timestamp_ms": 4,
+      "buffer_slots": [
+        6,
+        0,
+        0,
+        0,
+        46,
+        320,
+        200,
+        4,
+        0
+      ],
+      "before_state": {
+        "TextBox.buffer": "K",
+        "TextBox.caret": "0"
+      },
+      "after_state": {
+        "TextBox.buffer": "",
+        "TextBox.caret": "0"
+      }
+    },
+    {
+      "order": 6,
+      "kind": "text_input",
+      "target_component": "TextBox",
+      "dispatch_path": [
+        "TextInputApp",
+        "TextBox"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "timestamp_ms": 5,
+      "buffer_slots": [
+        8,
+        0,
+        0,
+        0,
+        0,
+        320,
+        200,
+        5,
+        1
+      ],
+      "text_len": 1,
+      "text_bytes_hex": "5a",
+      "before_state": {
+        "TextBox.buffer": "",
+        "TextBox.caret": "0",
+        "TextBox.text_len": "0"
+      },
+      "after_state": {
+        "TextBox.buffer": "Z",
+        "TextBox.caret": "1",
+        "TextBox.text_len": "1"
+      }
+    },
+    {
+      "order": 7,
+      "kind": "key_down",
+      "target_component": "TextInputApp",
+      "dispatch_path": [
+        "TextInputApp"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 200,
+      "timestamp_ms": 6,
+      "buffer_slots": [
+        6,
+        0,
+        0,
+        0,
+        9,
+        320,
+        200,
+        6,
+        0
+      ],
+      "before_state": {
+        "SubmitButton.focused": "false",
+        "TextBox.focused": "true",
+        "TextInputApp.focused_component": "TextBox"
+      },
+      "after_state": {
+        "SubmitButton.focused": "true",
+        "TextBox.focused": "false",
+        "TextInputApp.focused_component": "SubmitButton"
+      }
+    },
+    {
+      "order": 8,
+      "kind": "key_down",
+      "target_component": "SubmitButton",
+      "dispatch_path": [
+        "TextInputApp",
+        "SubmitButton"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 0,
+      "y": 0,
+      "key": 32,
+      "width": 320,
+      "height": 200,
+      "timestamp_ms": 7,
+      "buffer_slots": [
+        6,
+        0,
+        0,
+        0,
+        32,
+        320,
+        200,
+        7,
+        0
+      ],
+      "before_state": {
+        "SubmitButton.press_count": "0",
+        "TextBox.buffer": "Z"
+      },
+      "after_state": {
+        "SubmitButton.press_count": "1",
+        "TextBox.buffer": "Z"
+      }
+    },
+    {
+      "order": 9,
+      "kind": "resize",
+      "target_component": "TextInputApp",
+      "dispatch_path": [
+        "TextInputApp"
+      ],
+      "handled": true,
+      "pass": true,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 400,
+      "height": 240,
+      "timestamp_ms": 8,
+      "buffer_slots": [
+        2,
+        0,
+        0,
+        0,
+        0,
+        400,
+        240,
+        8,
+        0
+      ],
+      "before_state": {
+        "TextInputApp.focused_component": "SubmitButton",
+        "TextInputApp.width": "320"
+      },
+      "after_state": {
+        "TextInputApp.focused_component": "SubmitButton",
+        "TextInputApp.width": "400"
+      }
+    }
+  ],
+  "frames": [
+    {
+      "order": 1,
+      "width": 320,
+      "height": 200,
+      "stride": 1280,
+      "checksum": "d6e66603401285b0b0603805640fff55efa0ae8dea4267f1e64513220a420841",
+      "presented": true
+    },
+    {
+      "order": 2,
+      "width": 400,
+      "height": 240,
+      "stride": 1600,
+      "checksum": "98323a1076b8a8a01a018ab57a02c492e8a3d91dd9af4fb428d975c010c6379b",
+      "presented": true
+    }
+  ],
+  "state_transitions": [
+    {
+      "order": 1,
+      "component": "TextInputApp",
+      "field": "focused_component",
+      "before": "none",
+      "after": "TextBox",
+      "cause": "mouse_up"
+    },
+    {
+      "order": 2,
+      "component": "TextBox",
+      "field": "buffer",
+      "before": "",
+      "after": "OK",
+      "cause": "text_input"
+    },
+    {
+      "order": 3,
+      "component": "TextBox",
+      "field": "caret",
+      "before": "2",
+      "after": "1",
+      "cause": "key_down"
+    },
+    {
+      "order": 4,
+      "component": "TextBox",
+      "field": "buffer",
+      "before": "OK",
+      "after": "K",
+      "cause": "backspace"
+    },
+    {
+      "order": 5,
+      "component": "TextBox",
+      "field": "buffer",
+      "before": "K",
+      "after": "",
+      "cause": "delete"
+    },
+    {
+      "order": 6,
+      "component": "TextBox",
+      "field": "buffer",
+      "before": "",
+      "after": "Z",
+      "cause": "text_input"
+    },
+    {
+      "order": 7,
+      "component": "TextInputApp",
+      "field": "focused_component",
+      "before": "TextBox",
+      "after": "SubmitButton",
+      "cause": "tab"
+    },
+    {
+      "order": 8,
+      "component": "SubmitButton",
+      "field": "press_count",
+      "before": "0",
+      "after": "1",
+      "cause": "key_down"
+    },
+    {
+      "order": 9,
+      "component": "TextInputApp",
+      "field": "width",
+      "before": "320",
+      "after": "400",
+      "cause": "resize"
+    }
+  ],
+  "cases": [
+    {
+      "name": "pure Tetra component app",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "text focus input click focuses TextBox",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "text focus input Tab changes focus",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "text focus input keyboard routes only focused component",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "text focus input text insertion",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "text focus input caret movement",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "text focus input backspace delete",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "text focus input resize preserves focus",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "text focus input rendered frame update",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "host-provided pointer event dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "host event buffer poll_event",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "pre/post event frame sequence",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "component hierarchy dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "component text input scalar dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "host text payload buffer",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "component focus dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "component accessibility metadata",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "no legacy UI sidecar artifacts",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "state transition",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "reject legacy UI evidence",
+      "kind": "negative",
+      "ran": true,
+      "pass": true,
+      "expected_error": "legacy UI evidence rejected"
+    },
+    {
+      "name": "headless event dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "headless framebuffer checksum",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "headless actual runner trace",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    }
+  ]
+}

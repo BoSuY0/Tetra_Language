@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	compiler "tetra_language/compiler"
+	"tetra_language/compiler/internal/opt"
+	"tetra_language/compiler/internal/testkit"
 )
 
 func TestGenericFunctionParseCheckAndDocs(t *testing.T) {
@@ -76,6 +78,83 @@ func main() -> Int:
 	}
 }
 
+func TestP9GenericIdentityDisappearsAfterSmallPureInlining(t *testing.T) {
+	src := []byte(`
+func id<T>(x: T) -> T:
+    return x
+
+func main() -> Int:
+    return id(42)
+`)
+	prog, err := compiler.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := compiler.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	irProg, err := compiler.Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	before := findIRFunc(t, irProg.Funcs, "main")
+	if !hasIRCall(before, "id__T_i32") {
+		t.Fatalf("pre-optimization main did not call id__T_i32: %#v", before.Instrs)
+	}
+	if _, err := opt.NewManager().Run(irProg, opt.InlineSmallPurePass()); err != nil {
+		t.Fatalf("InlineSmallPurePass: %v", err)
+	}
+	after := findIRFunc(t, irProg.Funcs, "main")
+	if hasIRCall(after, "id__T_i32") {
+		t.Fatalf("generic identity call survived specialization/inlining: %#v", after.Instrs)
+	}
+}
+
+func TestP17GenericWrapperDisappearsAfterSmallPureInlining(t *testing.T) {
+	src := []byte(`
+func id<T>(x: T) -> T:
+    return x
+
+func wrap<T>(x: T) -> T:
+    return id(x)
+
+func main() -> Int:
+    return wrap(42)
+`)
+	prog, err := compiler.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := compiler.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	irProg, err := compiler.Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	before := findIRFunc(t, irProg.Funcs, "main")
+	if !hasIRCall(before, "wrap__T_i32") {
+		t.Fatalf("pre-optimization main did not call wrap__T_i32: %#v", before.Instrs)
+	}
+	report, err := opt.NewManager().Run(irProg, opt.InlineSmallPurePass())
+	if err != nil {
+		t.Fatalf("InlineSmallPurePass: %v", err)
+	}
+	row := report.Passes[0]
+	if !hasOptDecision(row.Decisions, "inlined", "main", "wrap__T_i32", "small_pure_wrapper") {
+		t.Fatalf("missing wrapper inline decision in %#v", row.Decisions)
+	}
+	if !hasOptDecision(row.Decisions, "inlined", "main", "id__T_i32", "small_pure") {
+		t.Fatalf("missing nested identity inline decision in %#v", row.Decisions)
+	}
+	after := findIRFunc(t, irProg.Funcs, "main")
+	if hasIRCall(after, "wrap__T_i32") || hasIRCall(after, "id__T_i32") {
+		t.Fatalf("generic wrapper call survived specialization/inlining: %#v", after.Instrs)
+	}
+}
+
 func TestGenericFunctionProtocolBoundConformancePasses(t *testing.T) {
 	src := []byte(`
 struct Vec2:
@@ -128,6 +207,15 @@ func main() -> Int:
 	if !hasIRCall(mainFn, "id__T_Vec2") {
 		t.Fatalf("main did not call protocol-bound id__T_Vec2: %#v", mainFn.Instrs)
 	}
+}
+
+func hasOptDecision(decisions []opt.PassDecision, action string, caller string, callee string, reason string) bool {
+	for _, decision := range decisions {
+		if decision.Action == action && decision.Caller == caller && decision.Callee == callee && decision.Reason == reason {
+			return true
+		}
+	}
+	return false
 }
 
 func TestGenericFunctionProtocolBoundRejectsMissingImpl(t *testing.T) {
@@ -495,6 +583,123 @@ func main() -> Int:
 	mainFn := findIRFunc(t, irProg.Funcs, "main")
 	if !hasIRCall(mainFn, "make__T_i32") {
 		t.Fatalf("main did not call monomorphized make__T_i32: %#v", mainFn.Instrs)
+	}
+}
+
+func TestGenericFunctionInfersThroughGenericStructParameter(t *testing.T) {
+	src := []byte(`
+struct Box<T>:
+    value: T
+
+func get_or<T>(box: Box<T>, fallback: T) -> T:
+    if fallback == 0:
+        return box.value
+    return fallback
+
+func main() -> Int:
+    let b: Box<Int> = Box<Int>{value: 42}
+    return get_or(b, 0)
+`)
+	prog, err := compiler.Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	checked, err := compiler.Check(prog)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if _, ok := checked.Types["Box__T_i32"]; !ok {
+		t.Fatalf("missing monomorphized Box type: %#v", checked.Types)
+	}
+	sig, ok := checked.FuncSigs["get_or__T_i32"]
+	if !ok {
+		t.Fatalf("missing generic-struct-parameter monomorphized function: %#v", checked.FuncSigs)
+	}
+	if sig.ReturnType != "i32" || sig.ParamSlots != 2 || sig.ReturnSlots != 1 {
+		t.Fatalf("get_or__T_i32 signature = %#v, want concrete i32 return with two params", sig)
+	}
+	irProg, err := compiler.Lower(checked)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	mainFn := findIRFunc(t, irProg.Funcs, "main")
+	if !hasIRCall(mainFn, "get_or__T_i32") {
+		t.Fatalf("main did not call get_or__T_i32: %#v", mainFn.Instrs)
+	}
+}
+
+func TestStableGenericCollectionSourceAPIMonomorphizesVecAndHashMap(t *testing.T) {
+	tmp := t.TempDir()
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.collections as collections
+
+func main() -> Int
+uses alloc, mem:
+    var nums: []i32 = core.make_i32(3)
+    nums[0] = 7
+    nums[1] = 42
+    nums[2] = 5
+    let vec: collections.Vec<Int> = collections.vec_from_slice(nums)
+    let second: Int = collections.vec_get_or(vec, 1, 0)
+    let first: Int = collections.vec_first_or(vec, 0)
+
+    var keys: []i32 = core.make_i32(2)
+    var values: []i32 = core.make_i32(2)
+    keys[0] = 7
+    keys[1] = 9
+    values[0] = 99
+    values[1] = 11
+    let map: collections.HashMap<Int, Int> = collections.hash_map_from_slices(keys, values)
+    let found: Int = collections.hash_map_get_i32_i32_or(map, 7, 0)
+
+    var byte_keys: []u8 = core.make_u8(1)
+    var byte_values: []i32 = core.make_i32(1)
+    byte_keys[0] = 2
+    byte_values[0] = 5
+    let byte_map: collections.HashMap<UInt8, Int> = collections.hash_map_from_slices(byte_keys, byte_values)
+    let byte_key: UInt8 = 2
+    let byte_found: Int = collections.hash_map_get_u8_i32_or(byte_map, byte_key, 0)
+
+    if collections.vec_len(vec) == 3 && collections.hash_map_len(map) == 2 && second == 42 && first == 7 && found == 99 && byte_found == 5:
+        return 42
+    return 1
+`,
+	})
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.t4"))
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{Root: testkit.RepoRoot(t)}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	checked, err := compiler.CheckWorld(world)
+	if err != nil {
+		t.Fatalf("CheckWorld: %v", err)
+	}
+	for _, want := range []string{
+		"lib.core.collections.Vec__T_i32",
+		"lib.core.collections.HashMap__K_i32__V_i32",
+		"lib.core.collections.HashMap__K_u8__V_i32",
+	} {
+		if _, ok := checked.Types[want]; !ok {
+			t.Fatalf("missing monomorphized collection type %q in %#v", want, checked.Types)
+		}
+	}
+	for _, want := range []string{
+		"lib.core.collections.vec_from_slice__T_i32",
+		"lib.core.collections.vec_get_or__T_i32",
+		"lib.core.collections.hash_map_from_slices__K_i32__V_i32",
+		"lib.core.collections.hash_map_from_slices__K_u8__V_i32",
+		"lib.core.collections.hash_map_get_i32_i32_or",
+		"lib.core.collections.hash_map_get_u8_i32_or",
+	} {
+		if _, ok := checked.FuncSigs[want]; !ok {
+			t.Fatalf("missing stable generic collection function %q in %#v", want, checked.FuncSigs)
+		}
+	}
+	if _, err := compiler.LowerModules(checked); err != nil {
+		t.Fatalf("LowerModules: %v", err)
 	}
 }
 

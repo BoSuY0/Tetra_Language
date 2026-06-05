@@ -1138,6 +1138,102 @@ func TestLinkObjectSupportsU8U16ArrayIR(t *testing.T) {
 	}
 }
 
+func TestLinkObjectMakeSliceLengthContractGuards(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{{
+		Name:        "main",
+		ParamSlots:  0,
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 536870912},
+			{Kind: ir.IRMakeSliceI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	mod, err := LinkObject(obj)
+	if err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0x48, 0x04, 0x40, 0x00, 0x0b}, // i32.lt_s; if; unreachable; end
+		{0x45, 0x04, 0x40},             // i32.eqz; if zero empty-slice path
+		{0x4a, 0x04, 0x40, 0x00, 0x0b}, // i32.gt_s; if; unreachable; end
+	} {
+		if !bytes.Contains(mod, want) {
+			t.Fatalf("wasm make_slice length contract missing % x in module:\n% x", want, mod)
+		}
+	}
+}
+
+func TestLinkObjectRawSliceFromPartsBuildsScopedView(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{{
+		Name:        "main",
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRRawSliceFromParts},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	mod, err := LinkObject(obj)
+	if err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+	viewProjection := []byte{0x21, 0x06, 0x21, 0x03, 0x21, 0x02, 0x20, 0x02, 0x20, 0x03}
+	if !bytes.Contains(mod, viewProjection) {
+		t.Fatalf("WASI raw_slice_from_parts missing scoped view projection % x in module:\n% x", viewProjection, mod)
+	}
+}
+
+func TestLinkObjectIslandMakeSliceLengthContractGuards(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{{
+		Name:        "main",
+		ParamSlots:  0,
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 4096},
+			{Kind: ir.IRConstI32, Imm: 536870912},
+			{Kind: ir.IRIslandMakeSliceI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	mod, err := LinkObject(obj)
+	if err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0x48, 0x04, 0x40, 0x00, 0x0b},
+		{0x45, 0x04, 0x40},
+		{0x4a, 0x04, 0x40, 0x00, 0x0b},
+	} {
+		if !bytes.Contains(mod, want) {
+			t.Fatalf("wasm island_make_slice length contract missing % x in module:\n% x", want, mod)
+		}
+	}
+}
+
 func wasmIRFuncForMetadataTest(name string, params int, locals int, returns int) ir.IRFunc {
 	return ir.IRFunc{
 		Name:        name,

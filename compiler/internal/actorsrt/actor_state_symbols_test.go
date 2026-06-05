@@ -79,6 +79,35 @@ func TestLinuxRuntimeExportsNetSymbols(t *testing.T) {
 	}
 }
 
+func TestLinuxRuntimeExportsSurfaceSymbols(t *testing.T) {
+	obj, err := BuildLinuxX64([]string{"main"})
+	if err != nil {
+		t.Fatalf("build runtime: %v", err)
+	}
+	for _, name := range []string{
+		"__tetra_surface_open",
+		"__tetra_surface_close",
+		"__tetra_surface_poll_event_kind",
+		"__tetra_surface_poll_event_x",
+		"__tetra_surface_poll_event_y",
+		"__tetra_surface_poll_event_button",
+		"__tetra_surface_poll_event_into",
+		"__tetra_surface_poll_event_text_len",
+		"__tetra_surface_poll_event_text_into",
+		"__tetra_surface_clipboard_write_text",
+		"__tetra_surface_clipboard_read_text_into",
+		"__tetra_surface_poll_composition_into",
+		"__tetra_surface_begin_frame",
+		"__tetra_surface_present_rgba",
+		"__tetra_surface_now_ms",
+		"__tetra_surface_request_redraw",
+	} {
+		if !hasSymbol(obj.Symbols, name) {
+			t.Fatalf("linux runtime missing %s", name)
+		}
+	}
+}
+
 func TestLinuxRuntimeExportsDistributedActorSymbols(t *testing.T) {
 	obj, err := BuildLinuxX64([]string{"main", "worker"})
 	if err != nil {

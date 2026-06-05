@@ -129,7 +129,7 @@ Gate evidence archive layout:
 
 ## Required Stdlib, Tooling, Docs, And Eco
 
-- [x] Stable stdlib modules have API docs, examples/doctests where required,
+- [x] Stable stdlib modules have API docs and example doctests where required,
       effects metadata, formatter coverage, and API diff metadata.
   - Evidence command: `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`.
   - Evidence artifacts: `<report-dir>/artifacts/tetra-docs.md`,

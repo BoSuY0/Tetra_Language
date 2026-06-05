@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "kind": "allocation_plan",
+  "target": "linux-x64",
+  "summary": {
+    "allocation_count": 1,
+    "storage_classes": {
+      "Stack": 1
+    },
+    "actual_lowering_storage_classes": {
+      "Stack": 1
+    },
+    "runtime_paths": {
+      "stack_frame": 1
+    },
+    "bytes_requested": 4,
+    "bytes_reserved": 4
+  },
+  "totals": {
+    "eliminated": 0,
+    "register": 0,
+    "stack": 1,
+    "region": 0,
+    "explicit_island": 0,
+    "task_region": 0,
+    "actor_move_region": 0,
+    "heap": 0,
+    "mmap_large": 0,
+    "external": 0,
+    "unknown": 0
+  },
+  "functions": [
+    {
+      "name": "examples.safe_view_borrow_return.main",
+      "allocations": [
+        {
+          "id": "xs",
+          "site_id": "allocsite:examples.safe_view_borrow_return.main:xs:_home_tetra_Desktop_Projects_Tetra_Language_examples_safe_view_borrow_return.tetra_5_20",
+          "value_id": "alloc_intent:xs",
+          "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:5:20",
+          "builtin": "core.make_u8",
+          "element_type": "u8",
+          "element_size": 1,
+          "length_expr": "4",
+          "length_status": "normal_allocation",
+          "zero_guard_status": "valid_empty_no_allocator",
+          "negative_guard_status": "reject_before_allocation",
+          "overflow_guard_status": "reject_before_allocation",
+          "byte_size": 4,
+          "escape": "NoEscape",
+          "storage": "Stack",
+          "planned_storage": "Stack",
+          "actual_lowering_storage": "Stack",
+          "reason": "fixed_small_no_escape: fixed-size no-escape allocation is 4 bytes, within stack threshold; allocation does not escape in the supported v0 intra-function scan",
+          "validation_status": "validated_no_escape",
+          "lowering_status": "stack_lowering",
+          "runtime_path": "stack_frame",
+          "bytes_requested": 4,
+          "bytes_reserved": 4
+        }
+      ]
+    }
+  ]
+}

@@ -172,10 +172,21 @@ MMIO, islands, linker/control, or privacy effects. IO and budget remain covered
 by their existing effect and budget-context checkers. This is an explicit
 diagnostic boundary, not a full interprocedural race-safety proof.
 
-Typed actor messages use the same value-only sendability rule across module
-boundaries. Imported enum payloads are checked after resolution, so a message
-case carrying `str`, slices, pointers, or other unsupported reference-shaped
-payloads is rejected even when the enum is declared in another module.
+Typed actor messages use the same P6.1 sendability rule across module
+boundaries. Imported enum payloads are checked after resolution: small scalar
+payloads copy, owned buffer or owned `String` payloads may copy or move,
+borrowed slice/String views are rejected unless the payload expression uses
+`.copy()`, owned regions/islands move and consume the source, and unknown unsafe
+provenance is rejected unless an audited unsafe send contract is present. P6.1
+also supports a local zero-copy move for a region-backed slice when the slice is
+known to come from `core.island_make_*` and the same typed actor payload carries
+the owning `island`; the sender loses both values after send and
+`--explain` records actor-transfer evidence. P6.2 evidence includes typed
+mailbox schema/capacity/backpressure metadata plus per-payload ownership rows
+for scalar copy, explicit view copy, island move, and zero-copy region-slice
+move behavior. Raw pointers, actor/task handles, distributed pointer transfer,
+and other unsupported runtime handles remain stable rejections even when the
+enum is declared in another module.
 
 ## Current Limits
 

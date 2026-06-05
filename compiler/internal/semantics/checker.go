@@ -37,7 +37,8 @@ func Check(prog *frontend.Program) (*CheckedProgram, error) {
 }
 
 type CheckOptions struct {
-	RequireMain bool
+	RequireMain              bool
+	EnableILP32NativeScalars bool
 }
 
 func worldFilesImportsFirst(world *module.World) []*frontend.FileAST {
@@ -490,7 +491,7 @@ func evalGlobalConstI32Wide(expr frontend.Expr, values map[string]globalConstVal
 
 func isSupportedGlobalScalarType(name string) bool {
 	switch name {
-	case "i32", "bool", "ptr", "fnptr", "str", "u8", "u16", "task.error":
+	case "i32", "bool", "ptr", "fnptr", "str", "u8", "u16", "c_int", "c_uint", "task.error":
 		return true
 	default:
 		return isSupportedSliceGlobalType(name) || isSupportedOptionalPtrGlobalType(name) || isSupportedOptionalSliceGlobalType(name)
@@ -622,7 +623,8 @@ func isSupportedSliceGlobalType(name string) bool {
 
 func isSupportedGlobalSliceElemType(sliceElem string) bool {
 	switch sliceElem {
-	case "i32", "u8", "u16", "bool":
+	case "i32", "u8", "u16", "c_int", "c_uint", "bool",
+		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong":
 		return true
 	default:
 		return false
@@ -631,7 +633,8 @@ func isSupportedGlobalSliceElemType(sliceElem string) bool {
 
 func isGlobalIntLikeType(name string) bool {
 	switch name {
-	case "i32", "u8", "u16", "task.error":
+	case "i32", "u8", "u16", "c_int", "c_uint", "task.error",
+		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong":
 		return true
 	default:
 		return false
@@ -647,6 +650,14 @@ func validateGlobalIntLikeRange(typeName, globalName, kind string, pos frontend.
 	case "u16":
 		if v < 0 || v > 65535 {
 			return fmt.Errorf("%s: global %s '%s' initializer must be within 0..65535 for type u16", frontend.FormatPos(pos), kind, globalName)
+		}
+	case "c_uint":
+		if v < 0 {
+			return fmt.Errorf("%s: global %s '%s' initializer must be non-negative for type c_uint", frontend.FormatPos(pos), kind, globalName)
+		}
+	case "usize", "size_t", "native_uint", "c_ulong":
+		if v < 0 {
+			return fmt.Errorf("%s: global %s '%s' initializer must be non-negative for type %s", frontend.FormatPos(pos), kind, globalName, typeName)
 		}
 	}
 	return nil
@@ -770,6 +781,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 	}
 
 	types := baseTypes()
+	if opt.EnableILP32NativeScalars {
+		addILP32NativeScalarTypes(types)
+	}
 
 	type structContext struct {
 		module  string
@@ -1003,9 +1017,13 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if err := ensureTypeVisible(resolved, fieldType, ctx.module, field.At); err != nil {
 				return nil, err
 			}
+			if surfaceType, ok := surfaceEphemeralValueType(resolved, types); ok && !surfaceAggregateFieldStorageAllowed(name, field.Name, resolved) {
+				return nil, lifetimeDiagnosticf(field.At, "surface value '%s' cannot be stored in struct field '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, field.Name)
+			}
 			functionParamTypes := []string(nil)
 			functionParamOwnership := []string(nil)
 			functionReturnType := ""
+			functionReturnOwnership := ""
 			functionThrowsType := ""
 			functionEffects := []string(nil)
 			if field.Type.Kind == frontend.TypeRefFunction {
@@ -1014,23 +1032,26 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					return nil, err
 				}
 				functionParamOwnership = functionTypeRefParamOwnership(field.Type)
+				functionReturnOwnership = functionTypeRefReturnOwnership(field.Type)
 				functionThrowsType, err = functionTypeRefThrowsType(field.Type, ctx.module, ctx.imports)
 				if err != nil {
 					return nil, err
 				}
 			}
 			info := FieldInfo{
-				Name:                   field.Name,
-				TypeName:               resolved,
-				Offset:                 slotCount,
-				SlotCount:              fieldType.SlotCount,
-				FunctionTypeValue:      field.Type.Kind == frontend.TypeRefFunction,
-				FunctionTypeRef:        field.Type,
-				FunctionParamTypes:     functionParamTypes,
-				FunctionParamOwnership: functionParamOwnership,
-				FunctionReturnType:     functionReturnType,
-				FunctionThrowsType:     functionThrowsType,
-				FunctionEffects:        functionEffects,
+				Name:                    field.Name,
+				TypeName:                resolved,
+				Offset:                  slotCount,
+				SlotCount:               fieldType.SlotCount,
+				UserAssignable:          true,
+				FunctionTypeValue:       field.Type.Kind == frontend.TypeRefFunction,
+				FunctionTypeRef:         field.Type,
+				FunctionParamTypes:      functionParamTypes,
+				FunctionParamOwnership:  functionParamOwnership,
+				FunctionReturnType:      functionReturnType,
+				FunctionReturnOwnership: functionReturnOwnership,
+				FunctionThrowsType:      functionThrowsType,
+				FunctionEffects:         functionEffects,
 			}
 			fieldMap[field.Name] = info
 			fields = append(fields, info)
@@ -1041,6 +1062,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			Name:      name,
 			Kind:      TypeStruct,
 			Public:    ctx.public,
+			Repr:      structReprOrDefault(ctx.decl.Repr),
 			Fields:    fields,
 			FieldMap:  fieldMap,
 			SlotCount: slotCount,
@@ -1132,6 +1154,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			caseInfo.PayloadFunctionParams = caseInfo.PayloadFunctionParams[:0]
 			caseInfo.PayloadFunctionOwns = caseInfo.PayloadFunctionOwns[:0]
 			caseInfo.PayloadFunctionReturns = caseInfo.PayloadFunctionReturns[:0]
+			caseInfo.PayloadFunctionReturnOwns = caseInfo.PayloadFunctionReturnOwns[:0]
 			caseInfo.PayloadFunctionThrows = caseInfo.PayloadFunctionThrows[:0]
 			caseInfo.PayloadFunctionEffects = caseInfo.PayloadFunctionEffects[:0]
 			totalPayloadSlots := 0
@@ -1141,6 +1164,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				functionParamTypes := []string(nil)
 				functionParamOwnership := []string(nil)
 				functionReturnType := ""
+				functionReturnOwnership := ""
 				functionThrowsType := ""
 				functionEffects := []string(nil)
 				if functionTypeValue {
@@ -1150,6 +1174,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 						return nil, err
 					}
 					functionParamOwnership = functionTypeRefParamOwnership(*payload)
+					functionReturnOwnership = functionTypeRefReturnOwnership(*payload)
 					functionThrowsType, err = functionTypeRefThrowsType(*payload, ctx.module, ctx.imports)
 					if err != nil {
 						return nil, err
@@ -1170,6 +1195,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				if err := ensureTypeVisible(resolved, payloadInfo, ctx.module, payload.At); err != nil {
 					return nil, err
 				}
+				if surfaceType, ok := surfaceEphemeralValueType(resolved, types); ok {
+					return nil, lifetimeDiagnosticf(payload.At, "surface value '%s' cannot be stored in enum payload '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, declCase.Name)
+				}
 				if payloadInfo.Kind == TypeEnum {
 					enumPayloadEdges[name][resolved] = payload.At
 				}
@@ -1180,6 +1208,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				caseInfo.PayloadFunctionParams = append(caseInfo.PayloadFunctionParams, functionParamTypes)
 				caseInfo.PayloadFunctionOwns = append(caseInfo.PayloadFunctionOwns, functionParamOwnership)
 				caseInfo.PayloadFunctionReturns = append(caseInfo.PayloadFunctionReturns, functionReturnType)
+				caseInfo.PayloadFunctionReturnOwns = append(caseInfo.PayloadFunctionReturnOwns, functionReturnOwnership)
 				caseInfo.PayloadFunctionThrows = append(caseInfo.PayloadFunctionThrows, functionThrowsType)
 				caseInfo.PayloadFunctionEffects = append(caseInfo.PayloadFunctionEffects, functionEffects)
 				totalPayloadSlots += payloadInfo.SlotCount
@@ -1306,6 +1335,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			functionParamTypes := []string(nil)
 			functionParamOwnership := []string(nil)
 			functionReturnType := ""
+			functionReturnOwnership := ""
 			functionThrowsType := ""
 			functionEffects := []string(nil)
 			if glob.Type.Name != "" || glob.Type.Elem != nil || functionTypeValue {
@@ -1316,6 +1346,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 						return nil, err
 					}
 					functionParamOwnership = functionTypeRefParamOwnership(glob.Type)
+					functionReturnOwnership = functionTypeRefReturnOwnership(glob.Type)
 					functionThrowsType, err = functionTypeRefThrowsType(glob.Type, module, imports)
 					if err != nil {
 						return nil, err
@@ -1349,6 +1380,9 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			typeInfo, err := ensureTypeInfo(resolved, types)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %v", frontend.FormatPos(glob.At), err)
+			}
+			if surfaceType, ok := surfaceEphemeralValueType(resolved, types); ok {
+				return nil, lifetimeDiagnosticf(glob.At, "surface value '%s' cannot be stored in global '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, glob.Name)
 			}
 			functionValue := ""
 			if functionTypeValue {
@@ -1407,21 +1441,22 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			dataIndex := len(dataBlobs)
 			arrayBackings := collectGlobalArrayBackings(resolved, 0, types, map[string]bool{})
 			globals[glob.Name] = GlobalInfo{
-				DataIndex:              dataIndex,
-				TypeName:               resolved,
-				Mutable:                glob.Mutable,
-				Const:                  glob.Const,
-				Public:                 declarationIsPublic(file, glob.Public),
-				FunctionValue:          functionValue,
-				FunctionTypeValue:      functionTypeValue,
-				FunctionParamTypes:     functionParamTypes,
-				FunctionParamOwnership: functionParamOwnership,
-				FunctionReturnType:     functionReturnType,
-				FunctionThrowsType:     functionThrowsType,
-				FunctionEffects:        functionEffects,
-				HasStringLiteralInit:   hasStringInit,
-				StringLiteralInit:      stringInit,
-				ArrayBackings:          arrayBackings,
+				DataIndex:               dataIndex,
+				TypeName:                resolved,
+				Mutable:                 glob.Mutable,
+				Const:                   glob.Const,
+				Public:                  declarationIsPublic(file, glob.Public),
+				FunctionValue:           functionValue,
+				FunctionTypeValue:       functionTypeValue,
+				FunctionParamTypes:      functionParamTypes,
+				FunctionParamOwnership:  functionParamOwnership,
+				FunctionReturnType:      functionReturnType,
+				FunctionReturnOwnership: functionReturnOwnership,
+				FunctionThrowsType:      functionThrowsType,
+				FunctionEffects:         functionEffects,
+				HasStringLiteralInit:    hasStringInit,
+				StringLiteralInit:       stringInit,
+				ArrayBackings:           arrayBackings,
 			}
 
 			slots := typeInfo.SlotCount
@@ -1436,7 +1471,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			if glob.Mutable {
 				if glob.Init != nil {
 					switch resolved {
-					case "i32", "u8", "u16", "task.error":
+					case "i32", "u8", "u16", "c_int", "c_uint", "task.error":
 						if err := validateGlobalConstExpr(glob.Init, constValues); err != nil {
 							return nil, err
 						}
@@ -1517,7 +1552,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				switch resolved {
 				case "ptr":
 					binary.LittleEndian.PutUint64(buf, 0)
-				case "i32", "u8", "u16", "task.error":
+				case "i32", "u8", "u16", "c_int", "c_uint", "task.error":
 					binary.LittleEndian.PutUint64(buf, 0)
 					constValues[glob.Name] = globalConstValue{TypeName: resolved, I32: 0}
 				case "bool":
@@ -1561,7 +1596,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					return nil, fmt.Errorf("%s: global val '%s' of type ptr only supports initializer 0", frontend.FormatPos(glob.Init.Pos()), glob.Name)
 				}
 				binary.LittleEndian.PutUint64(buf, 0)
-			case "i32", "u8", "u16", "task.error":
+			case "i32", "u8", "u16", "c_int", "c_uint", "task.error":
 				if err := validateGlobalConstExpr(glob.Init, constValues); err != nil {
 					return nil, err
 				}
@@ -1698,31 +1733,33 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					return nil, err
 				}
 				checked.FuncSigs[fullName] = FuncSig{
-					Generic:                true,
-					Public:                 declarationIsPublic(file, fn.Public),
-					HasNoAlloc:             policy.hasNoAlloc,
-					HasNoBlock:             policy.hasNoBlock,
-					HasRealtime:            policy.hasRealtime,
-					HasBudget:              policy.hasBudget,
-					Budget:                 policy.budget,
-					ParamNames:             genericParamNames(fn.Params),
-					ParamTypes:             genericParamTypeNames(fn.Params),
-					ParamFunctionTypes:     genericParamFunctionKinds(fn.Params),
-					ParamFunctionParams:    genericParamFunctionParamTypes(fn.Params),
-					ParamFunctionOwnership: genericParamFunctionOwnership(fn.Params),
-					ParamFunctionReturns:   genericParamFunctionReturnTypes(fn.Params),
-					ParamFunctionThrows:    genericParamFunctionThrowsTypes(fn.Params),
-					ParamFunctionEffects:   genericParamFunctionEffectTypes(fn.Params),
-					ParamOwnership:         genericParamOwnership(fn.Params),
-					ParamSlots:             0,
-					ReturnType:             fn.ReturnType.Name,
-					ThrowsType:             fn.Throws.Name,
-					Async:                  fn.Async,
-					ReturnSlots:            0,
-					ReturnRegionParam:      regionNone,
-					ReturnResourceParam:    regionNone,
-					ReturnResourcePath:     "",
-					Effects:                effects,
+					Generic:                      true,
+					Public:                       declarationIsPublic(file, fn.Public),
+					HasNoAlloc:                   policy.hasNoAlloc,
+					HasNoBlock:                   policy.hasNoBlock,
+					HasRealtime:                  policy.hasRealtime,
+					HasBudget:                    policy.hasBudget,
+					Budget:                       policy.budget,
+					ParamNames:                   genericParamNames(fn.Params),
+					ParamTypes:                   genericParamTypeNames(fn.Params),
+					ParamFunctionTypes:           genericParamFunctionKinds(fn.Params),
+					ParamFunctionParams:          genericParamFunctionParamTypes(fn.Params),
+					ParamFunctionOwnership:       genericParamFunctionOwnership(fn.Params),
+					ParamFunctionReturns:         genericParamFunctionReturnTypes(fn.Params),
+					ParamFunctionReturnOwnership: genericParamFunctionReturnOwnership(fn.Params),
+					ParamFunctionThrows:          genericParamFunctionThrowsTypes(fn.Params),
+					ParamFunctionEffects:         genericParamFunctionEffectTypes(fn.Params),
+					ParamOwnership:               genericParamOwnership(fn.Params),
+					ParamSlots:                   0,
+					ReturnType:                   fn.ReturnType.Name,
+					ReturnOwnership:              fn.ReturnOwnership,
+					ThrowsType:                   fn.Throws.Name,
+					Async:                        fn.Async,
+					ReturnSlots:                  0,
+					ReturnRegionParam:            regionNone,
+					ReturnResourceParam:          regionNone,
+					ReturnResourcePath:           "",
+					Effects:                      effects,
 				}
 				continue
 			}
@@ -1734,6 +1771,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 			returnFunctionParams := []string(nil)
 			returnFunctionParamOwnership := []string(nil)
 			returnFunctionReturn := ""
+			returnFunctionReturnOwnership := ""
 			returnFunctionThrows := ""
 			returnFunctionEffects := []string(nil)
 			if returnFunctionType {
@@ -1742,6 +1780,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					return nil, err
 				}
 				returnFunctionParamOwnership = functionTypeRefParamOwnership(fn.ReturnType)
+				returnFunctionReturnOwnership = functionTypeRefReturnOwnership(fn.ReturnType)
 				returnFunctionThrows, err = functionTypeRefThrowsType(fn.ReturnType, module, imports)
 				if err != nil {
 					return nil, err
@@ -1815,36 +1854,39 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				return nil, err
 			}
 			checked.FuncSigs[fullName] = FuncSig{
-				Public:                       declarationIsPublic(file, fn.Public),
-				HasNoAlloc:                   policy.hasNoAlloc,
-				HasNoBlock:                   policy.hasNoBlock,
-				HasRealtime:                  policy.hasRealtime,
-				HasBudget:                    policy.hasBudget,
-				Budget:                       policy.budget,
-				ParamNames:                   paramNames,
-				ParamTypes:                   paramTypes,
-				ParamFunctionTypes:           paramFunctionKinds(fn.Params),
-				ParamFunctionParams:          paramFunctionParamTypes(fn.Params),
-				ParamFunctionOwnership:       paramFunctionOwnership(fn.Params),
-				ParamFunctionReturns:         paramFunctionReturnTypes(fn.Params),
-				ParamFunctionThrows:          paramFunctionThrowsTypes(fn.Params, module, imports),
-				ParamFunctionEffects:         paramFunctionEffectTypes(fn.Params),
-				ParamOwnership:               paramOwnership,
-				ParamSlots:                   paramSlots,
-				ReturnType:                   retName,
-				ReturnFunctionType:           returnFunctionType,
-				ReturnFunctionParams:         returnFunctionParams,
-				ReturnFunctionParamOwnership: returnFunctionParamOwnership,
-				ReturnFunctionReturn:         returnFunctionReturn,
-				ReturnFunctionThrows:         returnFunctionThrows,
-				ReturnFunctionEffects:        returnFunctionEffects,
-				ThrowsType:                   throwsType,
-				Async:                        fn.Async,
-				ReturnSlots:                  returnSlots,
-				ReturnRegionParam:            regionNone,
-				ReturnResourceParam:          initialReturnResourceParam(retName, types),
-				ReturnResourcePath:           "",
-				Effects:                      effects,
+				Public:                        declarationIsPublic(file, fn.Public),
+				HasNoAlloc:                    policy.hasNoAlloc,
+				HasNoBlock:                    policy.hasNoBlock,
+				HasRealtime:                   policy.hasRealtime,
+				HasBudget:                     policy.hasBudget,
+				Budget:                        policy.budget,
+				ParamNames:                    paramNames,
+				ParamTypes:                    paramTypes,
+				ParamFunctionTypes:            paramFunctionKinds(fn.Params),
+				ParamFunctionParams:           paramFunctionParamTypes(fn.Params),
+				ParamFunctionOwnership:        paramFunctionOwnership(fn.Params),
+				ParamFunctionReturns:          paramFunctionReturnTypes(fn.Params),
+				ParamFunctionReturnOwnership:  paramFunctionReturnOwnership(fn.Params),
+				ParamFunctionThrows:           paramFunctionThrowsTypes(fn.Params, module, imports),
+				ParamFunctionEffects:          paramFunctionEffectTypes(fn.Params),
+				ParamOwnership:                paramOwnership,
+				ParamSlots:                    paramSlots,
+				ReturnType:                    retName,
+				ReturnOwnership:               fn.ReturnOwnership,
+				ReturnFunctionType:            returnFunctionType,
+				ReturnFunctionParams:          returnFunctionParams,
+				ReturnFunctionParamOwnership:  returnFunctionParamOwnership,
+				ReturnFunctionReturn:          returnFunctionReturn,
+				ReturnFunctionReturnOwnership: returnFunctionReturnOwnership,
+				ReturnFunctionThrows:          returnFunctionThrows,
+				ReturnFunctionEffects:         returnFunctionEffects,
+				ThrowsType:                    throwsType,
+				Async:                         fn.Async,
+				ReturnSlots:                   returnSlots,
+				ReturnRegionParam:             regionNone,
+				ReturnResourceParam:           initialReturnResourceParam(retName, types),
+				ReturnResourcePath:            "",
+				Effects:                       effects,
 			}
 		}
 	}
@@ -1979,6 +2021,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 					functionParamTypes := []string(nil)
 					functionParamOwnership := []string(nil)
 					functionReturnType := ""
+					functionReturnOwnership := ""
 					functionThrowsType := ""
 					functionEffects := []string(nil)
 					if functionTypeValue {
@@ -1987,26 +2030,28 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 							return nil, err
 						}
 						functionParamOwnership = functionTypeRefParamOwnership(param.Type)
+						functionReturnOwnership = functionTypeRefReturnOwnership(param.Type)
 						functionThrowsType, err = functionTypeRefThrowsType(param.Type, module, imports)
 						if err != nil {
 							return nil, err
 						}
 					}
 					locals[param.Name] = LocalInfo{
-						Base:                   slotIndex,
-						SlotCount:              info.SlotCount,
-						TypeName:               paramTypeName,
-						Mutable:                param.Ownership == "inout",
-						FunctionTypeValue:      functionTypeValue,
-						FunctionParamName:      functionParamNameForParam(param.Name, functionTypeValue),
-						FunctionParamTypes:     functionParamTypes,
-						FunctionParamOwnership: functionParamOwnership,
-						FunctionReturnType:     functionReturnType,
-						FunctionThrowsType:     functionThrowsType,
-						FunctionEffects:        functionEffects,
-						FunctionFields:         functionFieldsForStructParameter(param.Name, paramTypeName, types),
-						EnumPayloadFunctions:   enumPayloadFunctionsForEnumParameter(param.Name, paramTypeName, types),
-						EnumPayloadFields:      enumPayloadFieldsForStructParameter(param.Name, paramTypeName, types),
+						Base:                    slotIndex,
+						SlotCount:               info.SlotCount,
+						TypeName:                paramTypeName,
+						Mutable:                 param.Ownership == "inout",
+						FunctionTypeValue:       functionTypeValue,
+						FunctionParamName:       functionParamNameForParam(param.Name, functionTypeValue),
+						FunctionParamTypes:      functionParamTypes,
+						FunctionParamOwnership:  functionParamOwnership,
+						FunctionReturnType:      functionReturnType,
+						FunctionReturnOwnership: functionReturnOwnership,
+						FunctionThrowsType:      functionThrowsType,
+						FunctionEffects:         functionEffects,
+						FunctionFields:          functionFieldsForStructParameter(param.Name, paramTypeName, types),
+						EnumPayloadFunctions:    enumPayloadFunctionsForEnumParameter(param.Name, paramTypeName, types),
+						EnumPayloadFields:       enumPayloadFieldsForStructParameter(param.Name, paramTypeName, types),
 					}
 					scopeInfo.localScopes[param.Name] = regionNone
 					slotIndex += info.SlotCount
@@ -2274,6 +2319,7 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				functionParamTypes := []string(nil)
 				functionParamOwnership := []string(nil)
 				functionReturnType := ""
+				functionReturnOwnership := ""
 				functionThrowsType := ""
 				functionEffects := []string(nil)
 				if functionTypeValue {
@@ -2282,25 +2328,27 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 						return nil, err
 					}
 					functionParamOwnership = functionTypeRefParamOwnership(param.Type)
+					functionReturnOwnership = functionTypeRefReturnOwnership(param.Type)
 					functionThrowsType, err = functionTypeRefThrowsType(param.Type, module, imports)
 					if err != nil {
 						return nil, err
 					}
 				}
 				locals[param.Name] = LocalInfo{
-					Base:                   slotIndex,
-					SlotCount:              info.SlotCount,
-					TypeName:               paramTypeName,
-					Mutable:                false,
-					FunctionTypeValue:      functionTypeValue,
-					FunctionParamTypes:     functionParamTypes,
-					FunctionParamOwnership: functionParamOwnership,
-					FunctionReturnType:     functionReturnType,
-					FunctionThrowsType:     functionThrowsType,
-					FunctionEffects:        functionEffects,
-					FunctionFields:         functionFieldsForStructParameter(param.Name, paramTypeName, types),
-					EnumPayloadFunctions:   enumPayloadFunctionsForEnumParameter(param.Name, paramTypeName, types),
-					EnumPayloadFields:      enumPayloadFieldsForStructParameter(param.Name, paramTypeName, types),
+					Base:                    slotIndex,
+					SlotCount:               info.SlotCount,
+					TypeName:                paramTypeName,
+					Mutable:                 false,
+					FunctionTypeValue:       functionTypeValue,
+					FunctionParamTypes:      functionParamTypes,
+					FunctionParamOwnership:  functionParamOwnership,
+					FunctionReturnType:      functionReturnType,
+					FunctionReturnOwnership: functionReturnOwnership,
+					FunctionThrowsType:      functionThrowsType,
+					FunctionEffects:         functionEffects,
+					FunctionFields:          functionFieldsForStructParameter(param.Name, paramTypeName, types),
+					EnumPayloadFunctions:    enumPayloadFunctionsForEnumParameter(param.Name, paramTypeName, types),
+					EnumPayloadFields:       enumPayloadFieldsForStructParameter(param.Name, paramTypeName, types),
 				}
 				scopeInfo.localScopes[param.Name] = regionNone
 				slotIndex += info.SlotCount
@@ -2330,18 +2378,21 @@ func CheckWorldOpt(world *module.World, opt CheckOptions) (*CheckedProgram, erro
 				}
 			}
 			checked.Funcs = append(checked.Funcs, CheckedFunc{
-				Name:        fullName,
-				Module:      module,
-				Decl:        fn,
-				Imports:     cloneStringMap(imports),
-				Locals:      locals,
-				ActorState:  actorState,
-				LocalSlots:  localSlots,
-				ParamSlots:  sig.ParamSlots,
-				ReturnType:  sig.ReturnType,
-				ThrowsType:  sig.ThrowsType,
-				Async:       sig.Async,
-				ReturnSlots: sig.ReturnSlots,
+				Name:                  fullName,
+				Module:                module,
+				Decl:                  fn,
+				Imports:               cloneStringMap(imports),
+				Locals:                locals,
+				ActorState:            actorState,
+				LocalSlots:            localSlots,
+				ParamSlots:            sig.ParamSlots,
+				ReturnType:            sig.ReturnType,
+				ReturnOwnership:       sig.ReturnOwnership,
+				ThrowsType:            sig.ThrowsType,
+				Async:                 sig.Async,
+				ReturnSlots:           sig.ReturnSlots,
+				Effects:               append([]string(nil), sig.Effects...),
+				TouchesMutableGlobals: sig.TouchesMutableGlobals,
 			})
 		}
 	}
@@ -2511,6 +2562,13 @@ func refreshCompositeSlotLayouts(types map[string]*TypeInfo) error {
 		}
 	}
 	return fmt.Errorf("recursive composite type layout is not supported")
+}
+
+func structReprOrDefault(repr string) string {
+	if repr == "" {
+		return frontend.StructReprDefault
+	}
+	return repr
 }
 
 func fieldLayoutsEqual(a, b []FieldInfo) bool {
@@ -4290,6 +4348,26 @@ func validateExportedOpaqueABISignature(module string, fn *frontend.FuncDecl, pa
 			returnType,
 		)
 	}
+	for _, param := range fn.Params {
+		paramType := paramTypes[param.Name]
+		if exposure, ok := exportedDefaultStructABIExposureForType(paramType, types); ok {
+			return effectDiagnosticf(
+				param.At,
+				"exported function '%s' parameter '%s' type '%s' requires explicit repr(C); default Tetra layout is compiler-owned and has no public ABI",
+				fn.Name,
+				param.Name,
+				exposure.TypeName,
+			)
+		}
+	}
+	if exposure, ok := exportedDefaultStructABIExposureForType(returnType, types); ok {
+		return effectDiagnosticf(
+			fn.ReturnType.At,
+			"exported function '%s' return type '%s' requires explicit repr(C); default Tetra layout is compiler-owned and has no public ABI",
+			fn.Name,
+			exposure.TypeName,
+		)
+	}
 	return nil
 }
 
@@ -4417,6 +4495,43 @@ type exportedOpaqueABIExposure struct {
 
 func exportedOpaqueABIExposureForType(typeName string, types map[string]*TypeInfo, allowRuntimeHandles bool) (exportedOpaqueABIExposure, bool) {
 	return exportedOpaqueABIExposureForTypeVisiting(strings.TrimSpace(typeName), types, allowRuntimeHandles, map[string]bool{})
+}
+
+func exportedDefaultStructABIExposureForType(typeName string, types map[string]*TypeInfo) (exportedOpaqueABIExposure, bool) {
+	return exportedDefaultStructABIExposureForTypeVisiting(strings.TrimSpace(typeName), types, map[string]bool{})
+}
+
+func exportedDefaultStructABIExposureForTypeVisiting(typeName string, types map[string]*TypeInfo, visiting map[string]bool) (exportedOpaqueABIExposure, bool) {
+	typeName = strings.TrimSpace(typeName)
+	if elem, ok := optionalElemName(typeName); ok {
+		return exportedDefaultStructABIExposureForTypeVisiting(elem, types, visiting)
+	}
+	if _, elem, ok := parseArrayTypeName(typeName); ok {
+		return exportedDefaultStructABIExposureForTypeVisiting(elem, types, visiting)
+	}
+	info, ok := types[typeName]
+	if !ok {
+		return exportedOpaqueABIExposure{}, false
+	}
+	switch info.Kind {
+	case TypeStruct:
+		if info.Repr != frontend.StructReprC {
+			return exportedOpaqueABIExposure{Kind: "default-layout struct", TypeName: info.Name}, true
+		}
+		if visiting[typeName] {
+			return exportedOpaqueABIExposure{}, false
+		}
+		visiting[typeName] = true
+		defer delete(visiting, typeName)
+		for _, field := range info.Fields {
+			if exposure, ok := exportedDefaultStructABIExposureForTypeVisiting(field.TypeName, types, visiting); ok {
+				return exposure, true
+			}
+		}
+	case TypeArray, TypeOptional:
+		return exportedDefaultStructABIExposureForTypeVisiting(info.ElemType, types, visiting)
+	}
+	return exportedOpaqueABIExposure{}, false
 }
 
 func exportedOpaqueABIExposureForTypeVisiting(typeName string, types map[string]*TypeInfo, allowRuntimeHandles bool, visiting map[string]bool) (exportedOpaqueABIExposure, bool) {
@@ -5390,6 +5505,18 @@ func paramFunctionKinds(params []frontend.ParamDecl) []bool {
 	return out
 }
 
+func genericParamFunctionReturnOwnership(params []frontend.ParamDecl) []string {
+	out := make([]string, 0, len(params))
+	for _, param := range params {
+		if param.Type.Kind != frontend.TypeRefFunction {
+			out = append(out, "")
+			continue
+		}
+		out = append(out, functionTypeRefReturnOwnership(param.Type))
+	}
+	return out
+}
+
 func paramFunctionParamTypes(params []frontend.ParamDecl) [][]string {
 	out := make([][]string, 0, len(params))
 	for _, param := range params {
@@ -5426,6 +5553,18 @@ func paramFunctionReturnTypes(params []frontend.ParamDecl) []string {
 			continue
 		}
 		out = append(out, param.Type.Return.Name)
+	}
+	return out
+}
+
+func paramFunctionReturnOwnership(params []frontend.ParamDecl) []string {
+	out := make([]string, 0, len(params))
+	for _, param := range params {
+		if param.Type.Kind != frontend.TypeRefFunction {
+			out = append(out, "")
+			continue
+		}
+		out = append(out, functionTypeRefReturnOwnership(param.Type))
 	}
 	return out
 }
@@ -5536,7 +5675,9 @@ type functionAnalysisState struct {
 	returnFunctionFields                map[string]FunctionFieldInfo
 	returnEnumPayloadFunctions          map[string]FunctionFieldInfo
 	returnEnumPayloadFields             map[string]FunctionFieldInfo
+	borrowedReturnOwner                 string
 	secretTaint                         map[string]bool
+	surfaceFramePixels                  map[string]string
 	currentFuncName                     string
 	funcReturnSecretTaint               map[string]bool
 	funcParamSecretTaint                map[string]map[string]bool
@@ -5546,6 +5687,9 @@ type functionAnalysisState struct {
 	exportedFuncName                    string
 	returnSecretTaint                   bool
 	secretControlDepth                  int
+	surfacePresentedFrames              map[string]frontend.Position
+	surfaceFrameOwners                  map[string]string
+	surfaceHandleOwners                 map[string]string
 }
 
 func newFunctionAnalysisState(
@@ -6036,6 +6180,115 @@ func (analysis *functionAnalysisState) setLocalSecretTaint(name string, tainted 
 	delete(analysis.secretTaint, name)
 }
 
+func (analysis *functionAnalysisState) localSurfaceFramePixels(name string) bool {
+	_, ok := analysis.localSurfaceFramePixelsSource(name)
+	return ok
+}
+
+func (analysis *functionAnalysisState) localSurfaceFramePixelsSource(name string) (string, bool) {
+	if analysis == nil || analysis.surfaceFramePixels == nil {
+		return "", false
+	}
+	source, ok := analysis.surfaceFramePixels[name]
+	return source, ok
+}
+
+func (analysis *functionAnalysisState) setLocalSurfaceFramePixelsSource(name string, frameName string) {
+	if analysis == nil || name == "" {
+		return
+	}
+	if analysis.surfaceFramePixels == nil {
+		analysis.surfaceFramePixels = make(map[string]string)
+	}
+	if frameName != "" {
+		analysis.surfaceFramePixels[name] = frameName
+		return
+	}
+	delete(analysis.surfaceFramePixels, name)
+}
+
+func bindLocalSurfaceFramePixelsSource(locals map[string]LocalInfo, analysis *functionAnalysisState, name string, frameName string) {
+	if analysis != nil {
+		analysis.setLocalSurfaceFramePixelsSource(name, frameName)
+	}
+	if info, ok := locals[name]; ok {
+		info.SurfaceFramePixelsSource = frameName
+		locals[name] = info
+	}
+}
+
+func (analysis *functionAnalysisState) markSurfaceFramePresented(name string, pos frontend.Position) {
+	if analysis == nil || name == "" {
+		return
+	}
+	if analysis.surfacePresentedFrames == nil {
+		analysis.surfacePresentedFrames = make(map[string]frontend.Position)
+	}
+	analysis.surfacePresentedFrames[name] = pos
+}
+
+func (analysis *functionAnalysisState) clearSurfaceFramePresented(name string) {
+	if analysis == nil || name == "" {
+		return
+	}
+	delete(analysis.surfacePresentedFrames, name)
+}
+
+func (analysis *functionAnalysisState) localSurfaceFrameOwner(name string) (string, bool) {
+	if analysis == nil || analysis.surfaceFrameOwners == nil {
+		return "", false
+	}
+	owner, ok := analysis.surfaceFrameOwners[name]
+	return owner, ok
+}
+
+func (analysis *functionAnalysisState) setLocalSurfaceFrameOwner(name string, owner string) {
+	if analysis == nil || name == "" {
+		return
+	}
+	if analysis.surfaceFrameOwners == nil {
+		analysis.surfaceFrameOwners = make(map[string]string)
+	}
+	if owner != "" {
+		analysis.surfaceFrameOwners[name] = owner
+		return
+	}
+	delete(analysis.surfaceFrameOwners, name)
+}
+
+func (analysis *functionAnalysisState) localSurfaceHandleOwner(name string) (string, bool) {
+	if analysis == nil || analysis.surfaceHandleOwners == nil {
+		return "", false
+	}
+	owner, ok := analysis.surfaceHandleOwners[name]
+	return owner, ok
+}
+
+func (analysis *functionAnalysisState) setLocalSurfaceHandleOwner(name string, owner string) {
+	if analysis == nil || name == "" {
+		return
+	}
+	if analysis.surfaceHandleOwners == nil {
+		analysis.surfaceHandleOwners = make(map[string]string)
+	}
+	if owner != "" {
+		analysis.surfaceHandleOwners[name] = owner
+		return
+	}
+	delete(analysis.surfaceHandleOwners, name)
+}
+
+func (analysis *functionAnalysisState) checkSurfaceFramePixelsUsable(name string, pos frontend.Position) error {
+	frameName, ok := analysis.localSurfaceFramePixelsSource(name)
+	if !ok || frameName == "" || analysis.surfacePresentedFrames == nil {
+		return nil
+	}
+	if _, presented := analysis.surfacePresentedFrames[frameName]; !presented {
+		return nil
+	}
+	return lifetimeDiagnosticf(pos, "surface frame pixels alias '%s' cannot be used after frame '%s' was presented; keep Frame.pixels local to the active Surface frame", name, frameName)
+}
+
 func (analysis *functionAnalysisState) underSecretControl() bool {
 	return analysis != nil && analysis.secretControlDepth > 0
 }
@@ -6190,6 +6443,7 @@ func checkDeferBody(
 	savedMaybeConsumedVars := copyOwnershipJoinConflicts(state.maybeConsumedVars)
 	savedOwnershipAliases := copyStringMap(state.ownershipAliases)
 	savedBorrowedPtrAliases := copyStringMap(state.borrowedPtrAliases)
+	savedOwnedRegionSliceOwners := copyStringMap(state.ownedRegionSliceOwners)
 	savedConsumedResources := copyConsumedResources(state.consumedResources)
 	savedResourceVars := copyResourceVars(state.resourceVars)
 	savedUnknownResources := copyUnknownResources(state.unknownResources)
@@ -6216,6 +6470,7 @@ func checkDeferBody(
 		state.maybeConsumedVars = savedMaybeConsumedVars
 		state.ownershipAliases = savedOwnershipAliases
 		state.borrowedPtrAliases = savedBorrowedPtrAliases
+		state.ownedRegionSliceOwners = savedOwnedRegionSliceOwners
 		state.consumedResources = savedConsumedResources
 		state.resourceVars = savedResourceVars
 		state.unknownResources = savedUnknownResources
@@ -6679,15 +6934,16 @@ func earliestFinalization(a, b resourceFinalization) resourceFinalization {
 }
 
 type flowSnapshot struct {
-	reachable          bool
-	consumedVars       map[string]frontend.Position
-	maybeConsumedVars  map[string]ownershipJoinConflict
-	ownershipAliases   map[string]string
-	borrowedPtrAliases map[string]string
-	consumedResources  map[int]frontend.Position
-	resourceVars       map[string]int
-	unknownResources   map[int]bool
-	finalizedResources map[int]resourceFinalization
+	reachable              bool
+	consumedVars           map[string]frontend.Position
+	maybeConsumedVars      map[string]ownershipJoinConflict
+	ownershipAliases       map[string]string
+	borrowedPtrAliases     map[string]string
+	ownedRegionSliceOwners map[string]string
+	consumedResources      map[int]frontend.Position
+	resourceVars           map[string]int
+	unknownResources       map[int]bool
+	finalizedResources     map[int]resourceFinalization
 }
 
 type loopFlowExit struct {
@@ -6704,15 +6960,16 @@ type loopFlowFrame struct {
 
 func snapshotFlow(state *regionState) flowSnapshot {
 	return flowSnapshot{
-		reachable:          state.reachable,
-		consumedVars:       copyConsumedVars(state.consumedVars),
-		maybeConsumedVars:  copyOwnershipJoinConflicts(state.maybeConsumedVars),
-		ownershipAliases:   copyStringMap(state.ownershipAliases),
-		borrowedPtrAliases: copyStringMap(state.borrowedPtrAliases),
-		consumedResources:  copyConsumedResources(state.consumedResources),
-		resourceVars:       copyResourceVars(state.resourceVars),
-		unknownResources:   copyUnknownResources(state.unknownResources),
-		finalizedResources: copyFinalizedResources(state.finalizedResources),
+		reachable:              state.reachable,
+		consumedVars:           copyConsumedVars(state.consumedVars),
+		maybeConsumedVars:      copyOwnershipJoinConflicts(state.maybeConsumedVars),
+		ownershipAliases:       copyStringMap(state.ownershipAliases),
+		borrowedPtrAliases:     copyStringMap(state.borrowedPtrAliases),
+		ownedRegionSliceOwners: copyStringMap(state.ownedRegionSliceOwners),
+		consumedResources:      copyConsumedResources(state.consumedResources),
+		resourceVars:           copyResourceVars(state.resourceVars),
+		unknownResources:       copyUnknownResources(state.unknownResources),
+		finalizedResources:     copyFinalizedResources(state.finalizedResources),
 	}
 }
 
@@ -6722,6 +6979,7 @@ func restoreFlow(state *regionState, snap flowSnapshot) {
 	state.maybeConsumedVars = copyOwnershipJoinConflicts(snap.maybeConsumedVars)
 	state.ownershipAliases = copyStringMap(snap.ownershipAliases)
 	state.borrowedPtrAliases = copyStringMap(snap.borrowedPtrAliases)
+	state.ownedRegionSliceOwners = copyStringMap(snap.ownedRegionSliceOwners)
 	state.consumedResources = copyConsumedResources(snap.consumedResources)
 	state.resourceVars = copyResourceVars(snap.resourceVars)
 	state.unknownResources = copyUnknownResources(snap.unknownResources)
@@ -6754,6 +7012,7 @@ func mergeFlowWithLabels(state *regionState, a, b flowSnapshot, leftLabel, right
 	state.maybeConsumedVars = mergeMaybeConsumedVars(a, b, leftLabel, rightLabel)
 	state.ownershipAliases = mergeOwnershipAliases(a.ownershipAliases, b.ownershipAliases)
 	state.borrowedPtrAliases = mergeBorrowedPtrAliases(a.borrowedPtrAliases, b.borrowedPtrAliases)
+	state.ownedRegionSliceOwners = mergeOwnershipAliases(a.ownedRegionSliceOwners, b.ownedRegionSliceOwners)
 	state.consumedResources = consumedResources
 	state.unknownResources = unknownResources
 	state.finalizedResources = finalizedResources
@@ -6874,6 +7133,14 @@ func bindResourceFromExpr(
 	if !isResourceHandleType(typeName) {
 		state.bindResource(name, "", false)
 		return nil
+	}
+	if typeName == surfaceSurfaceTypeName {
+		if owner, ok := surfaceConstructedHandleOwnerPathExpr(expr); ok {
+			if _, exists := state.resourceID(owner); exists {
+				state.bindResource(name, owner, true)
+				return nil
+			}
+		}
 	}
 	source, err := resourceSourceForExpr(expr, funcs, module, imports, state)
 	if err != nil {
@@ -7004,6 +7271,140 @@ func bindResourceTreeFromExpr(
 	}
 	markResourceTreeUnknown(name, typeName, types, state)
 	return nil
+}
+
+func bindOwnedRegionSliceOwnerFromExpr(
+	name string,
+	typeName string,
+	expr frontend.Expr,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+) error {
+	if state == nil || name == "" {
+		return nil
+	}
+	info, ok := types[typeName]
+	if !ok {
+		state.clearOwnedRegionSliceOwnerTree(name)
+		return nil
+	}
+	switch info.Kind {
+	case TypeSlice:
+		owner := ownedRegionSliceOwnerForExpr(expr, state)
+		if owner == "" {
+			state.clearOwnedRegionSliceOwnerTree(name)
+			return nil
+		}
+		state.bindOwnedRegionSliceOwner(name, owner)
+		return nil
+	case TypeStruct:
+		state.clearOwnedRegionSliceOwnerTree(name)
+		if sourcePrefix, ok := resourcePathForExpr(expr); ok {
+			copyOwnedRegionSliceOwnerTreeFromPath(name, sourcePrefix, typeName, types, state)
+			return nil
+		}
+		if lit, ok := expr.(*frontend.StructLitExpr); ok {
+			byName := make(map[string]frontend.Expr, len(lit.Fields))
+			for _, field := range lit.Fields {
+				byName[field.Name] = field.Value
+			}
+			for _, field := range info.Fields {
+				value := byName[field.Name]
+				if value == nil {
+					continue
+				}
+				if err := bindOwnedRegionSliceOwnerFromExpr(resourceFieldPath(name, field.Name), field.TypeName, value, types, module, imports, state); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		if call, ok := expr.(*frontend.CallExpr); ok && call.Name == typeName {
+			for i, field := range info.Fields {
+				if i >= len(call.Args) {
+					break
+				}
+				if err := bindOwnedRegionSliceOwnerFromExpr(resourceFieldPath(name, field.Name), field.TypeName, call.Args[i], types, module, imports, state); err != nil {
+					return err
+				}
+			}
+		}
+	case TypeEnum:
+		state.clearOwnedRegionSliceOwnerTree(name)
+		if sourcePrefix, ok := resourcePathForExpr(expr); ok {
+			copyOwnedRegionSliceOwnerTreeFromPath(name, sourcePrefix, typeName, types, state)
+			return nil
+		}
+		call, ok := expr.(*frontend.CallExpr)
+		if !ok {
+			return nil
+		}
+		enumType, caseInfo, found, err := resolveEnumCaseConstructorCall(call, types, module, imports)
+		if err != nil {
+			return err
+		}
+		if !found || enumType != typeName {
+			return nil
+		}
+		for i, arg := range call.Args {
+			if i >= len(caseInfo.PayloadTypes) {
+				break
+			}
+			if err := bindOwnedRegionSliceOwnerFromExpr(resourceEnumPayloadPath(name, caseInfo.Ordinal, i), caseInfo.PayloadTypes[i], arg, types, module, imports, state); err != nil {
+				return err
+			}
+		}
+	case TypeOptional:
+		state.clearOwnedRegionSliceOwnerTree(name)
+		call, ok := expr.(*frontend.CallExpr)
+		if !ok || len(call.Args) == 0 {
+			return nil
+		}
+		return bindOwnedRegionSliceOwnerFromExpr(resourceFieldPath(name, "$elem"), info.ElemType, call.Args[0], types, module, imports, state)
+	default:
+		state.clearOwnedRegionSliceOwnerTree(name)
+	}
+	return nil
+}
+
+func copyOwnedRegionSliceOwnerTreeFromPath(dst string, src string, typeName string, types map[string]*TypeInfo, state *regionState) {
+	if state == nil || dst == "" || src == "" {
+		return
+	}
+	for _, leaf := range regionLeafPaths(typeName, types, "") {
+		srcLeaf := joinResourcePath(src, leaf)
+		if owner, ok := state.ownedRegionSliceOwner(srcLeaf); ok {
+			state.bindOwnedRegionSliceOwner(joinResourcePath(dst, leaf), owner)
+		}
+	}
+}
+
+func ownedRegionSliceOwnerForExpr(expr frontend.Expr, state *regionState) string {
+	if state == nil || expr == nil || isExplicitCopyExpr(expr) {
+		return ""
+	}
+	if path, ok := resourcePathForExpr(expr); ok {
+		if owner, found := state.ownedRegionSliceOwner(path); found {
+			return owner
+		}
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || len(call.Args) == 0 {
+		return ""
+	}
+	name := call.Name
+	if target, ok := ResolveBuiltinAlias(name); ok {
+		name = target
+	}
+	switch name {
+	case "core.island_make_u8", "core.island_make_u16", "core.island_make_i32", "core.island_make_bool":
+		if owner, ok := resourcePathForExpr(call.Args[0]); ok {
+			return owner
+		}
+	}
+	return ""
 }
 
 func bindResourceTreeFromCallSummary(
@@ -7308,6 +7709,9 @@ func ptrLeafPaths(typeName string, types map[string]*TypeInfo, prefix string) []
 }
 
 func resourceLeafPathsVisiting(typeName string, types map[string]*TypeInfo, prefix string, visiting map[string]bool) []string {
+	if typeName == surfaceFrameTypeName {
+		return nil
+	}
 	if isResourceHandleType(typeName) {
 		return []string{prefix}
 	}
@@ -7977,11 +8381,12 @@ func validateFunctionTypeNamedSymbolBinding(
 		}
 		if localInfo.FunctionValue == "" {
 			validationSig := FuncSig{
-				ParamTypes:     append([]string(nil), localInfo.FunctionParamTypes...),
-				ParamOwnership: append([]string(nil), localInfo.FunctionParamOwnership...),
-				ReturnType:     localInfo.FunctionReturnType,
-				ThrowsType:     localInfo.FunctionThrowsType,
-				Effects:        append([]string(nil), localInfo.FunctionEffects...),
+				ParamTypes:      append([]string(nil), localInfo.FunctionParamTypes...),
+				ParamOwnership:  append([]string(nil), localInfo.FunctionParamOwnership...),
+				ReturnType:      localInfo.FunctionReturnType,
+				ReturnOwnership: localInfo.FunctionReturnOwnership,
+				ThrowsType:      localInfo.FunctionThrowsType,
+				Effects:         append([]string(nil), localInfo.FunctionEffects...),
 			}
 			if err := validateFunctionTypeSymbolSignature(name, declared, validationSig, module, imports, init.At); err != nil {
 				return "", err
@@ -8014,6 +8419,7 @@ func validateFunctionTypeNamedSymbolBinding(
 			validationSig.ParamTypes = append([]string(nil), localInfo.FunctionParamTypes...)
 			validationSig.ParamOwnership = append([]string(nil), localInfo.FunctionParamOwnership...)
 			validationSig.ReturnType = localInfo.FunctionReturnType
+			validationSig.ReturnOwnership = localInfo.FunctionReturnOwnership
 		}
 		if err := validateFunctionTypeSymbolSignature(name, declared, validationSig, module, imports, init.At); err != nil {
 			return "", err
@@ -8172,6 +8578,7 @@ func validateFunctionTypeClosurePointerAssignment(
 		visibleSig.ParamOwnership = append([]string(nil), targetInfo.FunctionParamOwnership...)
 		visibleSig.ParamSlots = explicitSlots
 		visibleSig.ReturnType = targetInfo.FunctionReturnType
+		visibleSig.ReturnOwnership = targetInfo.FunctionReturnOwnership
 	}
 	if err := validateFunctionInfoAssignable(targetName, targetInfo, visibleSig, init.At); err != nil {
 		return "", err
@@ -8242,11 +8649,12 @@ func validateFunctionTypedAssignmentValue(
 			return unsupportedFunctionTypedAssignmentSourceError(v.At, targetName)
 		}
 		fieldSig := FuncSig{
-			ParamTypes:     append([]string(nil), fieldInfo.FunctionParamTypes...),
-			ParamOwnership: append([]string(nil), fieldInfo.FunctionParamOwnership...),
-			ReturnType:     fieldInfo.FunctionReturnType,
-			ThrowsType:     fieldInfo.FunctionThrowsType,
-			Effects:        append([]string(nil), fieldInfo.FunctionEffects...),
+			ParamTypes:      append([]string(nil), fieldInfo.FunctionParamTypes...),
+			ParamOwnership:  append([]string(nil), fieldInfo.FunctionParamOwnership...),
+			ReturnType:      fieldInfo.FunctionReturnType,
+			ReturnOwnership: fieldInfo.FunctionReturnOwnership,
+			ThrowsType:      fieldInfo.FunctionThrowsType,
+			Effects:         append([]string(nil), fieldInfo.FunctionEffects...),
 		}
 		return validateFunctionInfoAssignable(targetName, targetInfo, fieldSig, v.At)
 	}
@@ -8273,11 +8681,12 @@ func validateFunctionTypedAssignmentValue(
 		}
 		if sourceInfo.FunctionTypeValue && sourceInfo.FunctionValue == "" && allowCapturedLocalStorage {
 			sourceSig := FuncSig{
-				ParamTypes:     append([]string(nil), sourceInfo.FunctionParamTypes...),
-				ParamOwnership: append([]string(nil), sourceInfo.FunctionParamOwnership...),
-				ReturnType:     sourceInfo.FunctionReturnType,
-				ThrowsType:     sourceInfo.FunctionThrowsType,
-				Effects:        append([]string(nil), sourceInfo.FunctionEffects...),
+				ParamTypes:      append([]string(nil), sourceInfo.FunctionParamTypes...),
+				ParamOwnership:  append([]string(nil), sourceInfo.FunctionParamOwnership...),
+				ReturnType:      sourceInfo.FunctionReturnType,
+				ReturnOwnership: sourceInfo.FunctionReturnOwnership,
+				ThrowsType:      sourceInfo.FunctionThrowsType,
+				Effects:         append([]string(nil), sourceInfo.FunctionEffects...),
 			}
 			return validateFunctionInfoAssignable(targetName, targetInfo, sourceSig, id.At)
 		}
@@ -8285,11 +8694,12 @@ func validateFunctionTypedAssignmentValue(
 			return unsupportedFunctionTypedAssignmentSourceError(id.At, targetName)
 		}
 		sourceSig := FuncSig{
-			ParamTypes:     append([]string(nil), sourceInfo.FunctionParamTypes...),
-			ParamOwnership: append([]string(nil), sourceInfo.FunctionParamOwnership...),
-			ReturnType:     sourceInfo.FunctionReturnType,
-			ThrowsType:     sourceInfo.FunctionThrowsType,
-			Effects:        append([]string(nil), sourceInfo.FunctionEffects...),
+			ParamTypes:      append([]string(nil), sourceInfo.FunctionParamTypes...),
+			ParamOwnership:  append([]string(nil), sourceInfo.FunctionParamOwnership...),
+			ReturnType:      sourceInfo.FunctionReturnType,
+			ReturnOwnership: sourceInfo.FunctionReturnOwnership,
+			ThrowsType:      sourceInfo.FunctionThrowsType,
+			Effects:         append([]string(nil), sourceInfo.FunctionEffects...),
 		}
 		return validateFunctionInfoAssignable(targetName, targetInfo, sourceSig, id.At)
 	}
@@ -8853,6 +9263,7 @@ func updateFunctionTypedFieldAssignmentMetadata(
 		FunctionParamTypes:            append([]string(nil), targetInfo.FunctionParamTypes...),
 		FunctionParamOwnership:        append([]string(nil), targetInfo.FunctionParamOwnership...),
 		FunctionReturnType:            targetInfo.FunctionReturnType,
+		FunctionReturnOwnership:       targetInfo.FunctionReturnOwnership,
 		FunctionThrowsType:            targetInfo.FunctionThrowsType,
 		FunctionEffects:               append([]string(nil), targetInfo.FunctionEffects...),
 	}
@@ -9022,9 +9433,10 @@ func validateFunctionTypedClosureAssignment(
 		return fmt.Errorf("%s: %s parameter count mismatch: expected %d, got %d", frontend.FormatPos(closure.At), targetPhrase, len(targetInfo.FunctionParamTypes), len(explicitParams))
 	}
 	closureSig := FuncSig{
-		ParamTypes:     make([]string, 0, len(explicitParams)),
-		ParamOwnership: paramDeclOwnership(explicitParams),
-		ReturnType:     "",
+		ParamTypes:      make([]string, 0, len(explicitParams)),
+		ParamOwnership:  paramDeclOwnership(explicitParams),
+		ReturnType:      "",
+		ReturnOwnership: closure.Decl.ReturnOwnership,
 	}
 	for _, param := range explicitParams {
 		typeName, err := resolveTypeName(&param.Type, module, imports)
@@ -9148,11 +9560,12 @@ func validateFunctionTypedReturnCallAssignment(
 		}
 	}
 	returnedSig := FuncSig{
-		ParamTypes:     append([]string(nil), callSig.ReturnFunctionParams...),
-		ParamOwnership: append([]string(nil), callSig.ReturnFunctionParamOwnership...),
-		ReturnType:     callSig.ReturnFunctionReturn,
-		ThrowsType:     callSig.ReturnFunctionThrows,
-		Effects:        append([]string(nil), callSig.ReturnFunctionEffects...),
+		ParamTypes:      append([]string(nil), callSig.ReturnFunctionParams...),
+		ParamOwnership:  append([]string(nil), callSig.ReturnFunctionParamOwnership...),
+		ReturnType:      callSig.ReturnFunctionReturn,
+		ReturnOwnership: callSig.ReturnFunctionReturnOwnership,
+		ThrowsType:      callSig.ReturnFunctionThrows,
+		Effects:         append([]string(nil), callSig.ReturnFunctionEffects...),
 	}
 	return validateFunctionInfoAssignable(targetName, targetInfo, returnedSig, call.At)
 }
@@ -9422,6 +9835,12 @@ func validateFunctionInfoAssignableWithContext(targetName string, targetInfo Loc
 		}
 		return fmt.Errorf("%s: %s '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), context, targetName, targetInfo.FunctionReturnType, sig.ReturnType)
 	}
+	if targetInfo.FunctionReturnOwnership != sig.ReturnOwnership {
+		if context == "function-typed assignment" {
+			return fmt.Errorf("%s: function-typed assignment to '%s' return ownership mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), targetName, ownershipDisplay(targetInfo.FunctionReturnOwnership), ownershipDisplay(sig.ReturnOwnership))
+		}
+		return fmt.Errorf("%s: %s '%s' return ownership mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), context, targetName, ownershipDisplay(targetInfo.FunctionReturnOwnership), ownershipDisplay(sig.ReturnOwnership))
+	}
 	if targetInfo.FunctionThrowsType != sig.ThrowsType {
 		if context == "function-typed assignment" {
 			return fmt.Errorf("%s: function-typed assignment to '%s' throws type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), targetName, targetInfo.FunctionThrowsType, sig.ThrowsType)
@@ -9498,6 +9917,9 @@ func validateFunctionTypeSymbolSignature(
 	if wantRet != sig.ReturnType {
 		return fmt.Errorf("%s: function-typed local '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), localName, wantRet, sig.ReturnType)
 	}
+	if declared.ReturnOwnership != sig.ReturnOwnership {
+		return fmt.Errorf("%s: function-typed local '%s' return ownership mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), localName, ownershipDisplay(declared.ReturnOwnership), ownershipDisplay(sig.ReturnOwnership))
+	}
 	wantThrows := ""
 	if declared.Throws != nil {
 		wantThrows, err = resolveTypeName(declared.Throws, module, imports)
@@ -9554,6 +9976,15 @@ func validateReturnedFunctionSignature(
 			returnedSig.ReturnType,
 		)
 	}
+	if callerSig.ReturnFunctionReturnOwnership != returnedSig.ReturnOwnership {
+		return fmt.Errorf(
+			"%s: returned function symbol '%s' return ownership mismatch: expected '%s', got '%s'",
+			frontend.FormatPos(pos),
+			rawName,
+			ownershipDisplay(callerSig.ReturnFunctionReturnOwnership),
+			ownershipDisplay(returnedSig.ReturnOwnership),
+		)
+	}
 	if callerSig.ReturnFunctionThrows != returnedSig.ThrowsType {
 		return fmt.Errorf(
 			"%s: returned function symbol '%s' throws type mismatch: expected '%s', got '%s'",
@@ -9598,6 +10029,13 @@ func functionTypeRefParamOwnership(ref frontend.TypeRef) []string {
 	out := make([]string, len(ref.Params))
 	copy(out, ref.ParamOwnership)
 	return out
+}
+
+func functionTypeRefReturnOwnership(ref frontend.TypeRef) string {
+	if ref.Kind != frontend.TypeRefFunction {
+		return ""
+	}
+	return ref.ReturnOwnership
 }
 
 func functionTypeRefEffects(ref frontend.TypeRef, pos frontend.Position) ([]string, error) {
@@ -9807,6 +10245,234 @@ func exprMayHaveRuntimeSideEffects(expr frontend.Expr) bool {
 	}
 }
 
+func checkBorrowedReturnContract(
+	expr frontend.Expr,
+	returnType string,
+	callerSig FuncSig,
+	callerSigOK bool,
+	borrowedParams map[string]struct{},
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+	effects *effectContext,
+	analysis *functionAnalysisState,
+	pos frontend.Position,
+) error {
+	if callerSigOK && callerSig.ReturnOwnership == "borrow" {
+		borrowedName, borrowed, err := borrowedOwnerFromExpr(expr, locals, globals, funcs, types, module, imports, state, effects, analysis)
+		if err != nil {
+			return err
+		}
+		if !borrowed {
+			return nil
+		}
+		if borrowedName == "<borrow>" {
+			kind, _ := borrowedReturnTypeLabels(returnType, types)
+			return lifetimeDiagnosticf(pos, "borrowed %s return requires caller-visible borrow source", kind)
+		}
+		if _, ok := borrowedParams[borrowedName]; ok {
+			if err := recordBorrowedReturnOwner(analysis, borrowedName, pos); err != nil {
+				return err
+			}
+			return nil
+		}
+		kind, _ := borrowedReturnTypeLabels(returnType, types)
+		return lifetimeDiagnosticf(pos, "borrowed %s return derives from local owner '%s'", kind, borrowedName)
+	}
+	if err := checkBorrowedAggregateEscape(expr, returnType, "escape through owned return", locals, globals, funcs, types, module, imports, state, effects, analysis, pos); err != nil {
+		return err
+	}
+	return checkBorrowedEscape(expr, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+		kind, display, directView := borrowedReturnDirectViewLabels(returnType, types)
+		if directView {
+			return lifetimeDiagnosticf(pos, "borrowed %s return requires '-> borrow %s' or '.copy()'", kind, display)
+		}
+		return lifetimeDiagnosticf(pos, "borrowed local '%s' cannot escape via return", borrowedName)
+	})
+}
+
+func recordBorrowedReturnOwner(analysis *functionAnalysisState, owner string, pos frontend.Position) error {
+	if analysis == nil || owner == "" {
+		return nil
+	}
+	if analysis.borrowedReturnOwner == "" {
+		analysis.borrowedReturnOwner = owner
+		return nil
+	}
+	if analysis.borrowedReturnOwner != owner {
+		return lifetimeDiagnosticf(pos, "borrowed return has multiple possible owner sources ('%s', '%s'); named lifetimes are not supported in v1", analysis.borrowedReturnOwner, owner)
+	}
+	return nil
+}
+
+func checkBorrowedAggregateEscape(
+	expr frontend.Expr,
+	typeName string,
+	context string,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+	effects *effectContext,
+	analysis *functionAnalysisState,
+	pos frontend.Position,
+) error {
+	if explicitCopyResultExpr(expr) {
+		return nil
+	}
+	info, ok := types[typeName]
+	if !ok {
+		return nil
+	}
+	switch info.Kind {
+	case TypeStruct:
+		for _, field := range structFieldExprs(expr, info) {
+			if err := checkBorrowedAggregateFieldEscape(info.Name, field.name, field.typeName, field.value, context, locals, globals, funcs, types, module, imports, state, effects, analysis, pos); err != nil {
+				return err
+			}
+		}
+	case TypeEnum:
+		if call, ok := expr.(*frontend.CallExpr); ok {
+			_, caseInfo, found, err := resolveEnumCaseConstructorCall(call, types, module, imports)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return nil
+			}
+			for i, arg := range call.Args {
+				if i >= len(caseInfo.PayloadTypes) {
+					break
+				}
+				label := fmt.Sprintf("%s.%s[%d]", displayTypeName(typeName, module), caseInfo.Name, i+1)
+				if err := checkBorrowedAggregateFieldEscape(displayTypeName(typeName, module), label, caseInfo.PayloadTypes[i], arg, context, locals, globals, funcs, types, module, imports, state, effects, analysis, pos); err != nil {
+					return err
+				}
+			}
+		}
+	case TypeOptional:
+		if call, ok := expr.(*frontend.CallExpr); ok {
+			for _, arg := range call.Args {
+				if err := checkBorrowedAggregateFieldEscape(displayTypeName(typeName, module), "$elem", info.ElemType, arg, context, locals, globals, funcs, types, module, imports, state, effects, analysis, pos); err != nil {
+					return err
+				}
+			}
+		} else if borrowedEscapeShouldInspect(info.ElemType, types) {
+			if err := checkBorrowedAggregateFieldEscape(displayTypeName(typeName, module), "$elem", info.ElemType, expr, context, locals, globals, funcs, types, module, imports, state, effects, analysis, pos); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func checkBorrowedAggregateFieldEscape(
+	aggregateName string,
+	fieldName string,
+	fieldType string,
+	value frontend.Expr,
+	context string,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+	effects *effectContext,
+	analysis *functionAnalysisState,
+	pos frontend.Position,
+) error {
+	if !borrowedEscapeShouldInspect(fieldType, types) {
+		return nil
+	}
+	kind, _, directView := borrowedReturnDirectViewLabels(fieldType, types)
+	if directView {
+		if _, borrowed, err := borrowedOwnerFromExpr(value, locals, globals, funcs, types, module, imports, state, effects, analysis); err != nil {
+			return err
+		} else if borrowed {
+			return lifetimeDiagnosticf(pos, "aggregate '%s' contains borrowed %s field '%s' that cannot %s", displayTypeName(aggregateName, module), kind, fieldName, context)
+		}
+	}
+	return checkBorrowedAggregateEscape(value, fieldType, context, locals, globals, funcs, types, module, imports, state, effects, analysis, pos)
+}
+
+type structFieldExpr struct {
+	name     string
+	typeName string
+	value    frontend.Expr
+}
+
+func structFieldExprs(expr frontend.Expr, info *TypeInfo) []structFieldExpr {
+	if info == nil || info.Kind != TypeStruct || expr == nil {
+		return nil
+	}
+	switch e := expr.(type) {
+	case *frontend.StructLitExpr:
+		out := make([]structFieldExpr, 0, len(e.Fields))
+		for _, field := range e.Fields {
+			fieldInfo, ok := info.FieldMap[field.Name]
+			if !ok {
+				continue
+			}
+			out = append(out, structFieldExpr{name: field.Name, typeName: fieldInfo.TypeName, value: field.Value})
+		}
+		return out
+	case *frontend.CallExpr:
+		out := make([]structFieldExpr, 0, len(e.Args))
+		if len(e.ArgLabels) == len(e.Args) {
+			for i, arg := range e.Args {
+				label := e.ArgLabels[i]
+				if label == "" {
+					continue
+				}
+				fieldInfo, ok := info.FieldMap[label]
+				if !ok {
+					continue
+				}
+				out = append(out, structFieldExpr{name: label, typeName: fieldInfo.TypeName, value: arg})
+			}
+			return out
+		}
+		for i, arg := range e.Args {
+			if i >= len(info.Fields) {
+				break
+			}
+			field := info.Fields[i]
+			out = append(out, structFieldExpr{name: field.Name, typeName: field.TypeName, value: arg})
+		}
+		return out
+	}
+	return nil
+}
+
+func borrowedReturnTypeLabels(typeName string, types map[string]*TypeInfo) (kind string, display string) {
+	kind, display, _ = borrowedReturnDirectViewLabels(typeName, types)
+	return kind, display
+}
+
+func borrowedReturnDirectViewLabels(typeName string, types map[string]*TypeInfo) (kind string, display string, directView bool) {
+	if info, ok := types[typeName]; ok {
+		switch info.Kind {
+		case TypeStr:
+			return "String", "String", true
+		case TypeSlice:
+			return "slice", typeName, true
+		}
+	}
+	if typeName == "str" || typeName == "String" {
+		return "String", "String", true
+	}
+	return "value", typeName, false
+}
+
 func checkStmts(
 	stmts []frontend.Stmt,
 	locals map[string]LocalInfo,
@@ -9968,11 +10634,12 @@ func checkStmts(
 					}
 					if localInfo.FunctionValue == "" {
 						validationSig := FuncSig{
-							ParamTypes:     append([]string(nil), localInfo.FunctionParamTypes...),
-							ParamOwnership: append([]string(nil), localInfo.FunctionParamOwnership...),
-							ReturnType:     localInfo.FunctionReturnType,
-							ThrowsType:     localInfo.FunctionThrowsType,
-							Effects:        append([]string(nil), localInfo.FunctionEffects...),
+							ParamTypes:      append([]string(nil), localInfo.FunctionParamTypes...),
+							ParamOwnership:  append([]string(nil), localInfo.FunctionParamOwnership...),
+							ReturnType:      localInfo.FunctionReturnType,
+							ReturnOwnership: localInfo.FunctionReturnOwnership,
+							ThrowsType:      localInfo.FunctionThrowsType,
+							Effects:         append([]string(nil), localInfo.FunctionEffects...),
 						}
 						if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, id.Name); err != nil {
 							return err
@@ -10018,6 +10685,7 @@ func checkStmts(
 							validationSig.ParamOwnership = append([]string(nil), localInfo.FunctionParamOwnership...)
 							validationSig.ParamSlots = explicitSlots
 							validationSig.ReturnType = localInfo.FunctionReturnType
+							validationSig.ReturnOwnership = localInfo.FunctionReturnOwnership
 							validationSig.ThrowsType = localInfo.FunctionThrowsType
 							validationSig.Effects = append([]string(nil), localInfo.FunctionEffects...)
 						}
@@ -10104,11 +10772,12 @@ func checkStmts(
 						return unsupportedFunctionTypedGlobalTargetError(s.At, id.Name)
 					}
 					validationSig := FuncSig{
-						ParamTypes:     append([]string(nil), globalInfo.FunctionParamTypes...),
-						ParamOwnership: append([]string(nil), globalInfo.FunctionParamOwnership...),
-						ReturnType:     globalInfo.FunctionReturnType,
-						ThrowsType:     globalInfo.FunctionThrowsType,
-						Effects:        append([]string(nil), globalInfo.FunctionEffects...),
+						ParamTypes:      append([]string(nil), globalInfo.FunctionParamTypes...),
+						ParamOwnership:  append([]string(nil), globalInfo.FunctionParamOwnership...),
+						ReturnType:      globalInfo.FunctionReturnType,
+						ReturnOwnership: globalInfo.FunctionReturnOwnership,
+						ThrowsType:      globalInfo.FunctionThrowsType,
+						Effects:         append([]string(nil), globalInfo.FunctionEffects...),
 					}
 					if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, id.Name); err != nil {
 						return err
@@ -10214,6 +10883,7 @@ func checkStmts(
 							validationSig.ParamOwnership = append([]string(nil), fieldInfo.FunctionParamOwnership...)
 							validationSig.ParamSlots = explicitSlots
 							validationSig.ReturnType = fieldInfo.FunctionReturnType
+							validationSig.ReturnOwnership = fieldInfo.FunctionReturnOwnership
 							validationSig.Effects = append([]string(nil), fieldInfo.FunctionEffects...)
 						}
 						if err := validateReturnedFunctionSignature(callerSig, validationSig, s.At, callbackArgumentName(s.Value)); err != nil {
@@ -10283,10 +10953,14 @@ func checkStmts(
 			if err := checkWholeOwnershipValueAvailable(s.Value, types, module, imports, state); err != nil {
 				return err
 			}
+			if surfaceType, ok := surfaceEphemeralValueType(returnType, types); ok && !surfaceEphemeralReturnAllowed(analysis, surfaceType) {
+				return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via return; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType)
+			}
+			if surfaceFramePixelsEscapeExpr(s.Value, locals, globals, types, analysis) {
+				return lifetimeDiagnosticf(s.At, "surface frame pixels cannot escape via return; keep Frame.pixels local to the active Surface frame")
+			}
 			if typeMayContainRegion(tname, types) || typeMayContainPtr(tname, types) {
-				if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
-					return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via return", borrowedName)
-				}); err != nil {
+				if err := checkBorrowedReturnContract(s.Value, returnType, callerSig, callerSigOK, borrowedParams, locals, globals, funcs, types, module, imports, state, effects, analysis, s.At); err != nil {
 					return err
 				}
 			}
@@ -10403,6 +11077,15 @@ func checkStmts(
 			}
 			if !typesCompatibleWithNullPtr(state.throwType, tname, s.Value) {
 				return fmt.Errorf("%s: throw type mismatch: expected '%s', got '%s'", frontend.FormatPos(s.At), state.throwType, tname)
+			}
+			if surfaceType, ok := surfaceEphemeralValueType(state.throwType, types); ok {
+				return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via throw; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType)
+			}
+			if surfaceType, ok := surfaceEphemeralValueType(tname, types); ok {
+				return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via throw; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType)
+			}
+			if surfaceFramePixelsEscapeExpr(s.Value, locals, globals, types, analysis) {
+				return lifetimeDiagnosticf(s.At, "surface frame pixels cannot escape via throw; keep Frame.pixels local to the active Surface frame")
 			}
 			if typeMayContainRegion(tname, types) || typeMayContainPtr(tname, types) || typeMayContainRegion(state.throwType, types) || typeMayContainPtr(state.throwType, types) {
 				if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
@@ -10542,6 +11225,17 @@ func checkStmts(
 				secretTainted = true
 			}
 			analysis.setLocalSecretTaint(s.Name, secretTainted)
+			if source, ok := surfaceFramePixelsSourceExpr(s.Value, locals, globals, types, analysis); ok {
+				bindLocalSurfaceFramePixelsSource(locals, analysis, s.Name, source)
+			} else {
+				bindLocalSurfaceFramePixelsSource(locals, analysis, s.Name, "")
+			}
+			if owner, ok := surfaceHandleOwnerPathExprWithAnalysis(s.Value, locals, globals, types, analysis); ok {
+				analysis.setLocalSurfaceHandleOwner(s.Name, owner)
+			} else {
+				analysis.setLocalSurfaceHandleOwner(s.Name, "")
+			}
+			bindSurfaceFrameOwnerForLocal(s.Name, resolved, s.Value, analysis)
 			if typeMayContainRegion(resolved, types) {
 				scopeID := localScopeID(s.Name, state)
 				if err := checkRegionTreeWithinScope(regionTreeForExpr(resolved, s.Value, valRegion, types, state), scopeID, s.At, state); err != nil {
@@ -10554,11 +11248,17 @@ func checkStmts(
 			if err := bindResourceTreeFromExpr(s.Name, resolved, s.Value, funcs, types, module, imports, state); err != nil {
 				return err
 			}
+			if err := bindOwnedRegionSliceOwnerFromExpr(s.Name, resolved, s.Value, types, module, imports, state); err != nil {
+				return err
+			}
 		case *frontend.AssignStmt:
 			if s.CompoundValue != nil && compoundIndexTargetHasSideEffects(s.Target) {
 				return fmt.Errorf("%s: compound index assignment target with side effects is not supported; use an explicit temporary index", frontend.FormatPos(s.At))
 			}
 			if idx, ok := s.Target.(*frontend.IndexExpr); ok {
+				if err := rejectRepresentationMetadataExprAssignment(idx.Base, locals, globals, types); err != nil {
+					return err
+				}
 				indexType, _, err := checkExprWithEffects(idx.Index, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
 					return err
@@ -10586,14 +11286,15 @@ func checkStmts(
 							analysis.touchesMutableGlobals = true
 						}
 						targetInfo := LocalInfo{
-							TypeName:               g.TypeName,
-							SlotCount:              FnPtrSlotCount,
-							FunctionTypeValue:      true,
-							FunctionParamTypes:     append([]string(nil), g.FunctionParamTypes...),
-							FunctionParamOwnership: append([]string(nil), g.FunctionParamOwnership...),
-							FunctionReturnType:     g.FunctionReturnType,
-							FunctionThrowsType:     g.FunctionThrowsType,
-							FunctionEffects:        append([]string(nil), g.FunctionEffects...),
+							TypeName:                g.TypeName,
+							SlotCount:               FnPtrSlotCount,
+							FunctionTypeValue:       true,
+							FunctionParamTypes:      append([]string(nil), g.FunctionParamTypes...),
+							FunctionParamOwnership:  append([]string(nil), g.FunctionParamOwnership...),
+							FunctionReturnType:      g.FunctionReturnType,
+							FunctionReturnOwnership: g.FunctionReturnOwnership,
+							FunctionThrowsType:      g.FunctionThrowsType,
+							FunctionEffects:         append([]string(nil), g.FunctionEffects...),
 						}
 						allowCapturedGlobalSnapshot, err := allowCapturedGlobalFunctionSnapshot(s.Value, locals, types)
 						if err != nil {
@@ -10614,8 +11315,20 @@ func checkStmts(
 					if err := checkWholeOwnershipValueAvailable(s.Value, types, module, imports, state); err != nil {
 						return err
 					}
+					if surfaceType, ok := surfaceEphemeralValueType(g.TypeName, types); ok {
+						return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via global assignment to '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, id.Name)
+					}
+					if surfaceType, ok := surfaceEphemeralValueType(valType, types); ok {
+						return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via global assignment to '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, id.Name)
+					}
+					if surfaceFramePixelsEscapeExpr(s.Value, locals, globals, types, analysis) {
+						return lifetimeDiagnosticf(s.At, "surface frame pixels cannot escape via global assignment to '%s'; keep Frame.pixels local to the active Surface frame", id.Name)
+					}
 					if typeMayContainRegion(valType, types) || typeMayContainRegion(g.TypeName, types) ||
 						typeMayContainPtr(valType, types) || typeMayContainPtr(g.TypeName, types) {
+						if err := checkBorrowedAggregateEscape(s.Value, g.TypeName, "be stored in global", locals, globals, funcs, types, module, imports, state, effects, analysis, s.At); err != nil {
+							return err
+						}
 						if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
 							return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via global assignment to '%s'", borrowedName, id.Name)
 						}); err != nil {
@@ -10716,6 +11429,15 @@ func checkStmts(
 				return privacyDiagnosticf(s.At, "secret-tainted value cannot be stored in actor state field '%s'", targetInfo.Name)
 			}
 			if targetInfo.Global {
+				if surfaceType, ok := surfaceEphemeralValueType(targetType, types); ok {
+					return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via global assignment to '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, targetInfo.Name)
+				}
+				if surfaceType, ok := surfaceEphemeralValueType(valType, types); ok {
+					return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via global assignment to '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, targetInfo.Name)
+				}
+				if surfaceFramePixelsEscapeExpr(s.Value, locals, globals, types, analysis) {
+					return lifetimeDiagnosticf(s.At, "surface frame pixels cannot escape via global assignment to '%s'; keep Frame.pixels local to the active Surface frame", targetInfo.Name)
+				}
 				if typeMayContainRegion(valType, types) || typeMayContainRegion(targetType, types) ||
 					typeMayContainPtr(valType, types) || typeMayContainPtr(targetType, types) {
 					if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
@@ -10731,6 +11453,20 @@ func checkStmts(
 			}
 			if id, ok := s.Target.(*frontend.IdentExpr); ok {
 				analysis.setLocalSecretTaint(id.Name, secretTainted || typeUsesSecret(targetType, types))
+				if source, ok := surfaceFramePixelsSourceExpr(s.Value, locals, globals, types, analysis); ok {
+					bindLocalSurfaceFramePixelsSource(locals, analysis, id.Name, source)
+				} else {
+					bindLocalSurfaceFramePixelsSource(locals, analysis, id.Name, "")
+				}
+				if owner, ok := surfaceHandleOwnerPathExprWithAnalysis(s.Value, locals, globals, types, analysis); ok {
+					analysis.setLocalSurfaceHandleOwner(id.Name, owner)
+				} else {
+					analysis.setLocalSurfaceHandleOwner(id.Name, "")
+				}
+				if targetType == surfaceFrameTypeName {
+					analysis.clearSurfaceFramePresented(id.Name)
+				}
+				bindSurfaceFrameOwnerForLocal(id.Name, targetType, s.Value, analysis)
 				if localInfo, exists := locals[id.Name]; exists && localInfo.Mutable {
 					if fields, err := functionFieldsFromReturnedStructExpr(targetType, s.Value, locals, globals, funcs, types, module, imports); err != nil {
 						return err
@@ -10760,6 +11496,15 @@ func checkStmts(
 				analysis.setLocalSecretTaint(targetInfo.Name, true)
 			}
 			if _, outParam := inoutParams[targetInfo.Name]; outParam {
+				if surfaceType, ok := surfaceEphemeralValueType(targetType, types); ok {
+					return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via inout assignment to '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, targetInfo.Name)
+				}
+				if surfaceType, ok := surfaceEphemeralValueType(valType, types); ok {
+					return lifetimeDiagnosticf(s.At, "surface value '%s' cannot escape via inout assignment to '%s'; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType, targetInfo.Name)
+				}
+				if surfaceFramePixelsEscapeExpr(s.Value, locals, globals, types, analysis) {
+					return lifetimeDiagnosticf(s.At, "surface frame pixels cannot escape via inout assignment to '%s'; keep Frame.pixels local to the active Surface frame", targetInfo.Name)
+				}
 				if valRegion < regionNone || typeMayContainPtr(targetType, types) || typeMayContainPtr(valType, types) {
 					if err := checkBorrowedInoutEscape(s.Value, targetInfo.Name, s.At, locals, globals, funcs, types, module, imports, state, effects, analysis); err != nil {
 						return err
@@ -10771,6 +11516,10 @@ func checkStmts(
 				if path, ok := resourcePathForExpr(s.Target); ok {
 					targetResourceName = path
 				}
+				if targetType == surfaceFrameTypeName {
+					analysis.clearSurfaceFramePresented(targetResourceName)
+				}
+				bindSurfaceFrameOwnerForLocal(targetResourceName, targetType, s.Value, analysis)
 				if typeMayContainRegion(targetType, types) {
 					scopeID := localScopeID(targetInfo.Name, state)
 					if err := checkRegionTreeWithinScope(regionTreeForExpr(targetType, s.Value, valRegion, types, state), scopeID, s.At, state); err != nil {
@@ -10781,6 +11530,9 @@ func checkStmts(
 				state.bindRegion(targetResourceName, valRegion)
 				bindBorrowedPtrAliasFromExpr(targetResourceName, targetType, s.Value, types, module, imports, state, borrowedParams)
 				if err := bindResourceTreeFromExpr(targetResourceName, targetType, s.Value, funcs, types, module, imports, state); err != nil {
+					return err
+				}
+				if err := bindOwnedRegionSliceOwnerFromExpr(targetResourceName, targetType, s.Value, types, module, imports, state); err != nil {
 					return err
 				}
 			}
@@ -11378,6 +12130,7 @@ func localInfosShareScopedStorage(left, right LocalInfo) bool {
 		left.TypeName == right.TypeName &&
 		left.FunctionTypeValue == right.FunctionTypeValue &&
 		left.FunctionReturnType == right.FunctionReturnType &&
+		left.FunctionReturnOwnership == right.FunctionReturnOwnership &&
 		strings.Join(left.FunctionParamTypes, "\x00") == strings.Join(right.FunctionParamTypes, "\x00")
 }
 
@@ -11749,6 +12502,7 @@ func collectLocals(
 			functionParamTypes := []string(nil)
 			functionParamOwnership := []string(nil)
 			functionReturnType := ""
+			functionReturnOwnership := ""
 			functionThrowsType := ""
 			functionEffects := []string(nil)
 			if functionTypeValue {
@@ -11757,6 +12511,7 @@ func collectLocals(
 					return err
 				}
 				functionParamOwnership = functionTypeRefParamOwnership(s.Type)
+				functionReturnOwnership = functionTypeRefReturnOwnership(s.Type)
 				functionThrowsType, err = functionTypeRefThrowsType(s.Type, module, imports)
 				if err != nil {
 					return err
@@ -11881,12 +12636,13 @@ func collectLocals(
 					}
 					if ok && fieldInfo.FunctionValue == "" && functionFieldInfoHasTargetSet(fieldInfo) {
 						targetInfo := LocalInfo{
-							FunctionTypeValue:      true,
-							FunctionParamTypes:     append([]string(nil), functionParamTypes...),
-							FunctionParamOwnership: append([]string(nil), functionParamOwnership...),
-							FunctionReturnType:     functionReturnType,
-							FunctionThrowsType:     functionThrowsType,
-							FunctionEffects:        append([]string(nil), functionEffects...),
+							FunctionTypeValue:       true,
+							FunctionParamTypes:      append([]string(nil), functionParamTypes...),
+							FunctionParamOwnership:  append([]string(nil), functionParamOwnership...),
+							FunctionReturnType:      functionReturnType,
+							FunctionReturnOwnership: functionReturnOwnership,
+							FunctionThrowsType:      functionThrowsType,
+							FunctionEffects:         append([]string(nil), functionEffects...),
 						}
 						if err := validateFunctionInfoAssignable(s.Name, targetInfo, functionFieldInfoSig(fieldInfo), init.At); err != nil {
 							return err
@@ -11963,6 +12719,10 @@ func collectLocals(
 			if functionTypeValue && functionHandleValue {
 				localSlotCount = CallableHandleSlotCount
 			}
+			surfaceFramePixelsSource := ""
+			if source, ok := surfaceFramePixelsSourceExpr(s.Value, locals, globals, types, nil); ok {
+				surfaceFramePixelsSource = source
+			}
 			locals[s.Name] = LocalInfo{
 				Base:                          *slotIndex,
 				SlotCount:                     localSlotCount,
@@ -11983,11 +12743,13 @@ func collectLocals(
 				FunctionParamTypes:            functionParamTypes,
 				FunctionParamOwnership:        functionParamOwnership,
 				FunctionReturnType:            functionReturnType,
+				FunctionReturnOwnership:       functionReturnOwnership,
 				FunctionThrowsType:            functionThrowsType,
 				FunctionEffects:               functionEffects,
 				FunctionFields:                functionFields,
 				EnumPayloadFunctions:          enumPayloadFunctions,
 				EnumPayloadFields:             enumPayloadFields,
+				SurfaceFramePixelsSource:      surfaceFramePixelsSource,
 			}
 			if scopes != nil {
 				scopes.localScopes[s.Name] = scopes.currentScopeID()
@@ -12398,6 +13160,9 @@ func collectLocals(
 				return err
 			}
 		case *frontend.AssignStmt:
+			if err := rejectRepresentationMetadataExprAssignment(s.Target, locals, globals, types); err != nil {
+				return err
+			}
 			if err := collectExprLocals(s.Target, locals, slotIndex, funcs, types, module, imports, scopes, globals); err != nil {
 				return err
 			}

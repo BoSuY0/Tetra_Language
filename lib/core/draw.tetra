@@ -1,0 +1,98 @@
+// Planned Tetra Surface software RGBA draw helpers.
+// Effects: mem
+// ```tetra doctest
+// func draw_doctest() -> Int:
+//     let color: lib.core.draw.DebugColor = lib.core.draw.DebugColor(r: 1, g: 2, b: 3, a: 255)
+//     return color.r + color.g + color.b
+// ```
+module lib.core.draw
+
+import lib.core.surface as surface
+
+struct DrawContext:
+    frame: surface.Frame
+
+struct DebugColor:
+    r: Int
+    g: Int
+    b: Int
+    a: Int
+
+struct Color:
+    r: Int
+    g: Int
+    b: Int
+    a: Int
+
+func clear(ctx: inout DrawContext, color: surface.Color) -> Int
+uses mem:
+    var y: Int = 0
+    while y < ctx.frame.height:
+        var x: Int = 0
+        while x < ctx.frame.width:
+            let i: Int = y * ctx.frame.stride + x * 4
+            ctx.frame.pixels[i] = color.r
+            ctx.frame.pixels[i + 1] = color.g
+            ctx.frame.pixels[i + 2] = color.b
+            ctx.frame.pixels[i + 3] = color.a
+            x = x + 1
+        y = y + 1
+    return 0
+
+func rect(ctx: inout DrawContext, rect: surface.Rect, color: surface.Color) -> Int
+uses mem:
+    var y: Int = rect.y
+    let max_y: Int = rect.y + rect.h
+    let max_x: Int = rect.x + rect.w
+    while y < max_y:
+        var x: Int = rect.x
+        while x < max_x:
+            if x >= 0 && y >= 0 && x < ctx.frame.width && y < ctx.frame.height:
+                let i: Int = y * ctx.frame.stride + x * 4
+                ctx.frame.pixels[i] = color.r
+                ctx.frame.pixels[i + 1] = color.g
+                ctx.frame.pixels[i + 2] = color.b
+                ctx.frame.pixels[i + 3] = color.a
+            x = x + 1
+        y = y + 1
+    return 0
+
+func rect_outline(ctx: inout DrawContext, r: surface.Rect, color: surface.Color) -> Int
+uses mem:
+    let top: surface.Rect = surface.Rect(x: r.x, y: r.y, w: r.w, h: 1)
+    let bottom: surface.Rect = surface.Rect(x: r.x, y: r.y + r.h - 1, w: r.w, h: 1)
+    let left: surface.Rect = surface.Rect(x: r.x, y: r.y, w: 1, h: r.h)
+    let right: surface.Rect = surface.Rect(x: r.x + r.w - 1, y: r.y, w: 1, h: r.h)
+    let _: Int = rect(ctx, top, color)
+    let __: Int = rect(ctx, bottom, color)
+    let ___: Int = rect(ctx, left, color)
+    return rect(ctx, right, color)
+
+func line(ctx: inout DrawContext, x0: Int, y0: Int, x1: Int, y1: Int, color: surface.Color) -> Int
+uses mem:
+    if y0 == y1:
+        let x: Int = min_i32(x0, x1)
+        let w: Int = abs_i32(x1 - x0) + 1
+        return rect(ctx, surface.Rect(x: x, y: y0, w: w, h: 1), color)
+    if x0 == x1:
+        let y: Int = min_i32(y0, y1)
+        let h: Int = abs_i32(y1 - y0) + 1
+        return rect(ctx, surface.Rect(x: x0, y: y, w: 1, h: h), color)
+    let marker: surface.Rect = surface.Rect(x: x0, y: y0, w: 1, h: 1)
+    return rect(ctx, marker, color)
+
+func text(ctx: inout DrawContext, value: String, x: Int, y: Int, color: surface.Color) -> Int
+uses mem:
+    let marker: surface.Rect = surface.Rect(x: x, y: y, w: 48, h: 7)
+    let _: Int = rect(ctx, marker, color)
+    return 0
+
+func min_i32(a: Int, b: Int) -> Int:
+    if a < b:
+        return a
+    return b
+
+func abs_i32(value: Int) -> Int:
+    if value < 0:
+        return 0 - value
+    return value

@@ -520,33 +520,36 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			}
 			body.WriteByte(0x21) // local.set tempLen
 			writeULEB(&body, uint32(tempLen))
-			body.WriteByte(0x20) // local.get tempLen
-			writeULEB(&body, uint32(tempLen))
-			switch instr.Kind {
-			case ir.IRMakeSliceU16:
-				writeI32Const(&body, 1)
-				body.WriteByte(0x74) // i32.shl
-			case ir.IRMakeSliceI32:
-				writeI32Const(&body, 2)
-				body.WriteByte(0x74) // i32.shl
-			}
-			body.WriteByte(0x21) // local.set tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x21) // local.set tempPtr
-			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x20) // local.get tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x6a) // i32.add
-			body.WriteByte(0x24) // global.set heap
-			writeULEB(&body, heapGlobalIndex)
+			emitWasmMakeSliceContract(&body, instr.Kind, heapGlobalIndex, tempPtr, tempLen, tempByteLen)
 			body.WriteByte(0x20) // local.get tempPtr
 			writeULEB(&body, uint32(tempPtr))
 			body.WriteByte(0x20) // local.get tempLen
 			writeULEB(&body, uint32(tempLen))
+			push(2)
+		case ir.IRRawSliceFromParts:
+			if err := pop(3, "raw_slice_from_parts"); err != nil {
+				return nil, err
+			}
+			body.WriteByte(0x21) // local.set tempByteLen, discard cap.mem token
+			writeULEB(&body, uint32(tempByteLen))
+			body.WriteByte(0x21) // local.set tempLen
+			writeULEB(&body, uint32(tempLen))
+			body.WriteByte(0x21) // local.set tempPtr
+			writeULEB(&body, uint32(tempPtr))
+			body.WriteByte(0x20) // local.get tempPtr
+			writeULEB(&body, uint32(tempPtr))
+			body.WriteByte(0x20) // local.get tempLen
+			writeULEB(&body, uint32(tempLen))
+			push(2)
+		case ir.IRSliceWindow, ir.IRSlicePrefix, ir.IRSliceSuffix:
+			popSlots := 3
+			if instr.Kind == ir.IRSliceWindow {
+				popSlots = 4
+			}
+			if err := pop(popSlots, "slice_view"); err != nil {
+				return nil, err
+			}
+			emitWasmSliceView(&body, instr.Kind, byte(instr.Imm), tempPtr, tempLen, tempIdx, tempVal)
 			push(2)
 		case ir.IRIslandNew:
 			if err := pop(1, "island_new"); err != nil {
@@ -576,29 +579,7 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			writeULEB(&body, uint32(tempLen))
 			body.WriteByte(0x21) // local.set tempPtr (discard island handle)
 			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x20) // local.get tempLen
-			writeULEB(&body, uint32(tempLen))
-			switch instr.Kind {
-			case ir.IRIslandMakeSliceU16:
-				writeI32Const(&body, 1)
-				body.WriteByte(0x74) // i32.shl
-			case ir.IRIslandMakeSliceI32:
-				writeI32Const(&body, 2)
-				body.WriteByte(0x74) // i32.shl
-			}
-			body.WriteByte(0x21) // local.set tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x21) // local.set tempPtr
-			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x20) // local.get tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x6a) // i32.add
-			body.WriteByte(0x24) // global.set heap
-			writeULEB(&body, heapGlobalIndex)
+			emitWasmMakeSliceContract(&body, instr.Kind, heapGlobalIndex, tempPtr, tempLen, tempByteLen)
 			body.WriteByte(0x20) // local.get tempPtr
 			writeULEB(&body, uint32(tempPtr))
 			body.WriteByte(0x20) // local.get tempLen
@@ -608,7 +589,8 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			if err := pop(1, "island_free"); err != nil {
 				return nil, err
 			}
-		case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
+		case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
+			ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 			if err := pop(3, "index_load"); err != nil {
 				return nil, err
 			}
@@ -618,34 +600,37 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			writeULEB(&body, uint32(tempLen))
 			body.WriteByte(0x21) // local.set tempPtr
 			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x20) // local.get tempIdx
-			writeULEB(&body, uint32(tempIdx))
-			body.WriteByte(0x20) // local.get tempLen
-			writeULEB(&body, uint32(tempLen))
-			body.WriteByte(0x4f) // i32.ge_u
-			body.WriteByte(0x04) // if
-			body.WriteByte(0x40) // blocktype empty
-			body.WriteByte(0x00) // unreachable
-			body.WriteByte(0x0b) // end
+			checked := instr.Kind == ir.IRIndexLoadI32 || instr.Kind == ir.IRIndexLoadU8 || instr.Kind == ir.IRIndexLoadU16
+			if checked {
+				body.WriteByte(0x20) // local.get tempIdx
+				writeULEB(&body, uint32(tempIdx))
+				body.WriteByte(0x20) // local.get tempLen
+				writeULEB(&body, uint32(tempLen))
+				body.WriteByte(0x4f) // i32.ge_u
+				body.WriteByte(0x04) // if
+				body.WriteByte(0x40) // blocktype empty
+				body.WriteByte(0x00) // unreachable
+				body.WriteByte(0x0b) // end
+			}
 			body.WriteByte(0x20) // local.get tempPtr
 			writeULEB(&body, uint32(tempPtr))
 			body.WriteByte(0x20) // local.get tempIdx
 			writeULEB(&body, uint32(tempIdx))
 			switch instr.Kind {
-			case ir.IRIndexLoadI32:
+			case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 				writeI32Const(&body, 2)
 				body.WriteByte(0x74) // i32.shl
-			case ir.IRIndexLoadU16:
+			case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 				writeI32Const(&body, 1)
 				body.WriteByte(0x74) // i32.shl
 			}
 			body.WriteByte(0x6a) // i32.add
 			switch instr.Kind {
-			case ir.IRIndexLoadI32:
+			case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 				body.WriteByte(0x28) // i32.load
 				writeULEB(&body, 2)
 				writeULEB(&body, 0)
-			case ir.IRIndexLoadU16:
+			case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 				body.WriteByte(0x2f) // i32.load16_u
 				writeULEB(&body, 1)
 				writeULEB(&body, 0)
@@ -1089,33 +1074,36 @@ func emitWASINonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, 
 		}
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempLen))
+		emitWasmMakeSliceContract(body, instr.Kind, heapGlobalIndex, tempPtr, tempLen, tempByteLen)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempPtr))
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempLen))
-		switch instr.Kind {
-		case ir.IRMakeSliceU16:
-			writeI32Const(body, 1)
-			body.WriteByte(0x74)
-		case ir.IRMakeSliceI32:
-			writeI32Const(body, 2)
-			body.WriteByte(0x74)
+		push(2)
+	case ir.IRRawSliceFromParts:
+		if err := pop(3, "raw_slice_from_parts"); err != nil {
+			return 0, err
 		}
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempLen))
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x6a)
-		body.WriteByte(0x24)
-		writeULEB(body, heapGlobalIndex)
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempPtr))
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempLen))
+		push(2)
+	case ir.IRSliceWindow, ir.IRSlicePrefix, ir.IRSliceSuffix:
+		popSlots := 3
+		if instr.Kind == ir.IRSliceWindow {
+			popSlots = 4
+		}
+		if err := pop(popSlots, "slice_view"); err != nil {
+			return 0, err
+		}
+		emitWasmSliceView(body, instr.Kind, byte(instr.Imm), tempPtr, tempLen, tempIdx, tempVal)
 		push(2)
 	case ir.IRIslandNew:
 		if err := pop(1, "island_new"); err != nil {
@@ -1145,29 +1133,7 @@ func emitWASINonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, 
 		writeULEB(body, uint32(tempLen))
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempLen))
-		switch instr.Kind {
-		case ir.IRIslandMakeSliceU16:
-			writeI32Const(body, 1)
-			body.WriteByte(0x74)
-		case ir.IRIslandMakeSliceI32:
-			writeI32Const(body, 2)
-			body.WriteByte(0x74)
-		}
-		body.WriteByte(0x21)
-		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
-		body.WriteByte(0x21)
-		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x6a)
-		body.WriteByte(0x24)
-		writeULEB(body, heapGlobalIndex)
+		emitWasmMakeSliceContract(body, instr.Kind, heapGlobalIndex, tempPtr, tempLen, tempByteLen)
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempPtr))
 		body.WriteByte(0x20)
@@ -1177,7 +1143,8 @@ func emitWASINonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, 
 		if err := pop(1, "island_free"); err != nil {
 			return 0, err
 		}
-	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
+	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
+		ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 		if err := pop(3, "index_load"); err != nil {
 			return 0, err
 		}
@@ -1187,34 +1154,37 @@ func emitWASINonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, 
 		writeULEB(body, uint32(tempLen))
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempIdx))
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempLen))
-		body.WriteByte(0x4f)
-		body.WriteByte(0x04)
-		body.WriteByte(0x40)
-		body.WriteByte(0x00)
-		body.WriteByte(0x0b)
+		checked := instr.Kind == ir.IRIndexLoadI32 || instr.Kind == ir.IRIndexLoadU8 || instr.Kind == ir.IRIndexLoadU16
+		if checked {
+			body.WriteByte(0x20)
+			writeULEB(body, uint32(tempIdx))
+			body.WriteByte(0x20)
+			writeULEB(body, uint32(tempLen))
+			body.WriteByte(0x4f)
+			body.WriteByte(0x04)
+			body.WriteByte(0x40)
+			body.WriteByte(0x00)
+			body.WriteByte(0x0b)
+		}
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempPtr))
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempIdx))
 		switch instr.Kind {
-		case ir.IRIndexLoadI32:
+		case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 			writeI32Const(body, 2)
 			body.WriteByte(0x74)
-		case ir.IRIndexLoadU16:
+		case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 			writeI32Const(body, 1)
 			body.WriteByte(0x74)
 		}
 		body.WriteByte(0x6a)
 		switch instr.Kind {
-		case ir.IRIndexLoadI32:
+		case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 			body.WriteByte(0x28)
 			writeULEB(body, 2)
 			writeULEB(body, 0)
-		case ir.IRIndexLoadU16:
+		case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 			body.WriteByte(0x2f)
 			writeULEB(body, 1)
 			writeULEB(body, 0)
@@ -1362,13 +1332,20 @@ func wasmStackEffect(instr ir.IRInstr) (int, int, bool) {
 		return 0, 0, true
 	case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
 		return 1, 2, true
+	case ir.IRRawSliceFromParts:
+		return 3, 2, true
+	case ir.IRSliceWindow:
+		return 4, 2, true
+	case ir.IRSlicePrefix, ir.IRSliceSuffix:
+		return 3, 2, true
 	case ir.IRIslandNew:
 		return 1, 1, true
 	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
 		return 2, 2, true
 	case ir.IRIslandFree:
 		return 1, 0, true
-	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
+	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
+		ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 		return 3, 1, true
 	case ir.IRIndexStoreI32, ir.IRIndexStoreU8, ir.IRIndexStoreU16:
 		return 4, 0, true
@@ -1601,6 +1578,161 @@ func compileStartFunction(mainFuncIdx uint32, procExitImport int) []byte {
 	body.WriteByte(0x00) // unreachable
 	body.WriteByte(0x0b) // end
 	return body.Bytes()
+}
+
+func emitWasmMakeSliceContract(body *bytes.Buffer, kind ir.IRInstrKind, heapGlobalIndex uint32, tempPtr int, tempLen int, tempByteLen int) {
+	emitWasmLocalNonNegativeCheck(body, tempLen)
+	body.WriteByte(0x20) // local.get tempLen
+	writeULEB(body, uint32(tempLen))
+	body.WriteByte(0x45) // i32.eqz
+	body.WriteByte(0x04) // if
+	body.WriteByte(0x40)
+	writeI32Const(body, 0)
+	body.WriteByte(0x21) // local.set tempPtr
+	writeULEB(body, uint32(tempPtr))
+	body.WriteByte(0x05) // else
+	if max, ok := wasmMakeSliceMaxElements(kind); ok {
+		body.WriteByte(0x20) // local.get tempLen
+		writeULEB(body, uint32(tempLen))
+		writeI32Const(body, max)
+		body.WriteByte(0x4a) // i32.gt_s
+		emitWasmTrapIf(body)
+	}
+	body.WriteByte(0x20) // local.get tempLen
+	writeULEB(body, uint32(tempLen))
+	if shift := wasmMakeSliceShift(kind); shift > 0 {
+		writeI32Const(body, int32(shift))
+		body.WriteByte(0x74) // i32.shl
+	}
+	body.WriteByte(0x21) // local.set tempByteLen
+	writeULEB(body, uint32(tempByteLen))
+	body.WriteByte(0x23) // global.get heap
+	writeULEB(body, heapGlobalIndex)
+	body.WriteByte(0x21) // local.set tempPtr
+	writeULEB(body, uint32(tempPtr))
+	body.WriteByte(0x23) // global.get heap
+	writeULEB(body, heapGlobalIndex)
+	body.WriteByte(0x20) // local.get tempByteLen
+	writeULEB(body, uint32(tempByteLen))
+	body.WriteByte(0x6a) // i32.add
+	body.WriteByte(0x24) // global.set heap
+	writeULEB(body, heapGlobalIndex)
+	body.WriteByte(0x0b) // end if
+}
+
+func wasmMakeSliceShift(kind ir.IRInstrKind) byte {
+	switch kind {
+	case ir.IRMakeSliceU16, ir.IRIslandMakeSliceU16:
+		return 1
+	case ir.IRMakeSliceI32, ir.IRIslandMakeSliceI32:
+		return 2
+	default:
+		return 0
+	}
+}
+
+func wasmMakeSliceMaxElements(kind ir.IRInstrKind) (int32, bool) {
+	switch kind {
+	case ir.IRMakeSliceU16, ir.IRIslandMakeSliceU16:
+		return 2147483647 / 2, true
+	case ir.IRMakeSliceI32, ir.IRIslandMakeSliceI32:
+		return 2147483647 / 4, true
+	default:
+		return 0, false
+	}
+}
+
+func emitWasmSliceView(body *bytes.Buffer, kind ir.IRInstrKind, shift byte, tempPtr int, tempLen int, tempIdx int, tempVal int) {
+	switch kind {
+	case ir.IRSliceWindow:
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempVal))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempIdx))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempPtr))
+		emitWasmLocalNonNegativeCheck(body, tempIdx)
+		emitWasmLocalNonNegativeCheck(body, tempVal)
+		emitWasmGreaterThanTrap(body, tempIdx, tempLen)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempVal))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempIdx))
+		body.WriteByte(0x6b)
+		body.WriteByte(0x4a)
+		emitWasmTrapIf(body)
+		emitWasmWindowResult(body, shift, tempPtr, tempIdx)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempVal))
+	case ir.IRSlicePrefix:
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempVal))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempPtr))
+		emitWasmLocalNonNegativeCheck(body, tempVal)
+		emitWasmGreaterThanTrap(body, tempVal, tempLen)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempPtr))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempVal))
+	case ir.IRSliceSuffix:
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempIdx))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempPtr))
+		emitWasmLocalNonNegativeCheck(body, tempIdx)
+		emitWasmGreaterThanTrap(body, tempIdx, tempLen)
+		emitWasmWindowResult(body, shift, tempPtr, tempIdx)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempIdx))
+		body.WriteByte(0x6b)
+	}
+}
+
+func emitWasmLocalNonNegativeCheck(body *bytes.Buffer, local int) {
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(local))
+	writeI32Const(body, 0)
+	body.WriteByte(0x48)
+	emitWasmTrapIf(body)
+}
+
+func emitWasmGreaterThanTrap(body *bytes.Buffer, left int, right int) {
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(left))
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(right))
+	body.WriteByte(0x4a)
+	emitWasmTrapIf(body)
+}
+
+func emitWasmWindowResult(body *bytes.Buffer, shift byte, tempPtr int, tempIdx int) {
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(tempPtr))
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(tempIdx))
+	if shift > 0 {
+		writeI32Const(body, int32(shift))
+		body.WriteByte(0x74)
+	}
+	body.WriteByte(0x6a)
+}
+
+func emitWasmTrapIf(body *bytes.Buffer) {
+	body.WriteByte(0x04)
+	body.WriteByte(0x40)
+	body.WriteByte(0x00)
+	body.WriteByte(0x0b)
 }
 
 func writeSection(dst *bytes.Buffer, id byte, fn func(*bytes.Buffer)) {

@@ -6,6 +6,7 @@ import (
 	"tetra_language/compiler/internal/backend/x64"
 	"tetra_language/compiler/internal/backend/x64obj"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/runtimeabi"
 )
 
 type SysVUnix struct {
@@ -185,7 +186,7 @@ func (a *SysVUnix) EmitCall(e *x64.Emitter, instr ir.IRInstr, stackDepth *int, c
 		*stackDepth++
 	}
 	if instr.RetSlots > 9 {
-		e.PushR15()
+		e.PushRbx()
 		*stackDepth++
 	}
 	return nil
@@ -270,7 +271,13 @@ func (a *SysVUnix) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth
 	*stackDepth--
 	e.PopRax()
 	e.TestRaxRax()
+	negativeAt := e.JlRel32()
 	emptyAt := e.JzRel32()
+	overflowAt := -1
+	if makeSliceNeedsOverflowGuard(kind) {
+		e.CmpRaxImm32(makeSliceMaxElements(kind))
+		overflowAt = e.JgRel32()
+	}
 	e.PushRax()
 	*stackDepth++
 	if kind == ir.IRMakeSliceI32 {
@@ -296,10 +303,22 @@ func (a *SysVUnix) EmitMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth
 	e.PushRcx()
 	*stackDepth++
 	doneAt := e.JmpRel32()
+	lengthFailOff := len(e.Buf)
+	if err := a.EmitExit(e, allocationLengthTrapExitCode, 0, nil); err != nil {
+		return err
+	}
 	emptyOff := len(e.Buf)
 	e.PushRax()
 	e.PushRax()
 	doneOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, negativeAt, lengthFailOff); err != nil {
+		return err
+	}
+	if overflowAt >= 0 {
+		if err := x64.PatchRel32(e.Buf, overflowAt, lengthFailOff); err != nil {
+			return err
+		}
+	}
 	if err := x64.PatchRel32(e.Buf, emptyAt, emptyOff); err != nil {
 		return err
 	}
@@ -319,9 +338,15 @@ func (a *SysVUnix) EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.Codege
 	}
 	*stackDepth--
 	e.PopRax()
-	headerSize := int32(16)
-	if opt.IslandsDebug {
-		headerSize = x64.IslandsDebugPageSize
+	failStackDepth := *stackDepth
+	cfg := runtimeabi.RuntimeRegionAllocatorConfig(opt.IslandsDebug)
+	headerSize := cfg.HeaderBytes
+	e.TestRaxRax()
+	negativeAt := e.JlRel32()
+	e.CmpRaxImm32(cfg.MaxPayloadBytes)
+	overflowAt := e.JgRel32()
+	if opt.IslandsDebug && headerSize != x64.IslandsDebugPageSize {
+		return fmt.Errorf("internal error: island debug header size mismatch")
 	}
 	e.AddEaxImm32(headerSize)
 	e.MovRsiRax()
@@ -345,6 +370,21 @@ func (a *SysVUnix) EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.Codege
 	e.MovMem32RaxPtrImm32(12, 0)
 	e.PushRax()
 	*stackDepth++
+	doneAt := e.JmpRel32()
+	lengthFailOff := len(e.Buf)
+	if err := a.EmitExit(e, allocationLengthTrapExitCode, failStackDepth, nil); err != nil {
+		return err
+	}
+	doneOff := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, negativeAt, lengthFailOff); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, overflowAt, lengthFailOff); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -360,6 +400,14 @@ func (a *SysVUnix) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stac
 	*stackDepth -= 2
 	e.PopRcx()
 	e.PopRax()
+	e.TestRcxRcx()
+	negativeAt := e.JlRel32()
+	emptyAt := e.JzRel32()
+	overflowAt := -1
+	if makeSliceNeedsOverflowGuard(kind) {
+		e.CmpRcxImm32(makeSliceMaxElements(kind))
+		overflowAt = e.JgRel32()
+	}
 	e.PushRax()
 	*stackDepth++
 	e.PushRcx()
@@ -374,6 +422,8 @@ func (a *SysVUnix) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stac
 	e.MovR8dFromRaxPtrDisp4()
 	e.MovR9Rdx()
 	e.AddR9Rsi()
+	e.AddR9Imm32(runtimeabi.RegionAllocatorAlignmentBytes - 1)
+	e.AndR9Imm32(-runtimeabi.RegionAllocatorAlignmentBytes)
 	e.CmpR9R8()
 	failAt := e.JaRel32()
 	e.AddRdxRax()
@@ -388,12 +438,31 @@ func (a *SysVUnix) EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stac
 	*stackDepth++
 	doneAt := e.JmpRel32()
 
-	failOff := len(e.Buf)
+	lengthFailOff := len(e.Buf)
+	if err := a.EmitExit(e, allocationLengthTrapExitCode, 0, nil); err != nil {
+		return err
+	}
+	capacityFailOff := len(e.Buf)
 	if err := a.EmitExit(e, 1, *stackDepth, nil); err != nil {
 		return err
 	}
+	emptyOff := len(e.Buf)
+	e.MovEaxImm32(0)
+	e.PushRax()
+	e.PushRcx()
 	doneOff := len(e.Buf)
-	if err := x64.PatchRel32(e.Buf, failAt, failOff); err != nil {
+	if err := x64.PatchRel32(e.Buf, negativeAt, lengthFailOff); err != nil {
+		return err
+	}
+	if overflowAt >= 0 {
+		if err := x64.PatchRel32(e.Buf, overflowAt, lengthFailOff); err != nil {
+			return err
+		}
+	}
+	if err := x64.PatchRel32(e.Buf, emptyAt, emptyOff); err != nil {
+		return err
+	}
+	if err := x64.PatchRel32(e.Buf, failAt, capacityFailOff); err != nil {
 		return err
 	}
 	if err := x64.PatchRel32(e.Buf, doneAt, doneOff); err != nil {

@@ -6,12 +6,12 @@
 // For the “human-editable” version, see the repository root `__rt/` folder.
 module __rt.actors_sysv
 
-struct task_join_typed_3:
+repr(C) struct task_join_typed_3:
     r0: i32
     r1: i32
     r2: i32
 
-struct task_join_typed_4:
+repr(C) struct task_join_typed_4:
     r0: i32
     r1: i32
     r2: i32
@@ -25,11 +25,15 @@ val STATUS_WAITING_TASK: i32 = 4
 var g_sched_slot: ptr
 var g_main_slot: ptr
 var g_pong_slot: ptr
+var g_ping_slot: ptr
 var g_current: i32
 var g_main_status: i32
 var g_pong_status: i32
+var g_ping_status: i32
 var g_pong_spawned: i32
+var g_ping_spawned: i32
 var g_pong_entry_id: i32
+var g_ping_entry_id: i32
 var g_main_has: i32
 var g_main_val: i32
 var g_main_tag: i32
@@ -58,17 +62,39 @@ var g_pong_s6: i32
 var g_pong_s7: i32
 var g_pong_msg_sender: i32
 var g_pong_last_sender: i32
+var g_ping_has: i32
+var g_ping_val: i32
+var g_ping_tag: i32
+var g_ping_count: i32
+var g_ping_s0: i32
+var g_ping_s1: i32
+var g_ping_s2: i32
+var g_ping_s3: i32
+var g_ping_s4: i32
+var g_ping_s5: i32
+var g_ping_s6: i32
+var g_ping_s7: i32
+var g_ping_msg_sender: i32
+var g_ping_last_sender: i32
 var g_pending_send: i32
 var g_pending_recv: i32
 var g_main_exit: i32
 var g_pong_exit: i32
+var g_ping_exit: i32
 var g_time_ms: i32
 var g_main_wake_ms: i32
 var g_pong_wake_ms: i32
+var g_ping_wake_ms: i32
 var g_main_waiting_task: i32
 var g_pong_waiting_task: i32
+var g_ping_waiting_task: i32
+var g_group_status: i32
+var g_main_task_group: i32
+var g_pong_task_group: i32
+var g_ping_task_group: i32
 var g_main_state_ptr: ptr
 var g_pong_state_ptr: ptr
+var g_ping_state_ptr: ptr
 var g_task_result_count: i32
 var g_task_result_s0: i32
 var g_task_result_s1: i32
@@ -78,34 +104,75 @@ var g_task_result_s4: i32
 var g_task_result_s5: i32
 var g_task_result_s6: i32
 var g_task_result_s7: i32
+var g_pong_task_result_count: i32
+var g_pong_task_result_s0: i32
+var g_pong_task_result_s1: i32
+var g_pong_task_result_s2: i32
+var g_pong_task_result_s3: i32
+var g_pong_task_result_s4: i32
+var g_pong_task_result_s5: i32
+var g_pong_task_result_s6: i32
+var g_pong_task_result_s7: i32
+var g_ping_task_result_count: i32
+var g_ping_task_result_s0: i32
+var g_ping_task_result_s1: i32
+var g_ping_task_result_s2: i32
+var g_ping_task_result_s3: i32
+var g_ping_task_result_s4: i32
+var g_ping_task_result_s5: i32
+var g_ping_task_result_s6: i32
+var g_ping_task_result_s7: i32
+var g_task_result_actor: i32
 
 func actor_slot(idx: i32) -> ptr:
     if idx == 0:
         return g_main_slot
+    if idx == 1:
+        return g_pong_slot
+    if idx == 2:
+        return g_ping_slot
     return g_pong_slot
 
 func actor_status(idx: i32) -> i32:
     if idx == 0:
         return g_main_status
+    if idx == 1:
+        return g_pong_status
+    if idx == 2:
+        return g_ping_status
     return g_pong_status
 
 func set_actor_status(idx: i32, st: i32) -> i32:
     if idx == 0:
         g_main_status = st
         return 0
-    g_pong_status = st
+    if idx == 1:
+        g_pong_status = st
+        return 0
+    if idx == 2:
+        g_ping_status = st
+        return 0
     return 0
 
 func set_actor_wake_ms(idx: i32, wake: i32) -> i32:
     if idx == 0:
         g_main_wake_ms = wake
         return 0
-    g_pong_wake_ms = wake
+    if idx == 1:
+        g_pong_wake_ms = wake
+        return 0
+    if idx == 2:
+        g_ping_wake_ms = wake
+        return 0
     return 0
 
 func actor_wake_ms(idx: i32) -> i32:
     if idx == 0:
         return g_main_wake_ms
+    if idx == 1:
+        return g_pong_wake_ms
+    if idx == 2:
+        return g_ping_wake_ms
     return g_pong_wake_ms
 
 func actor_status_uses_wake_deadline(st: i32) -> i32:
@@ -121,7 +188,12 @@ func set_actor_waiting_task(idx: i32, task: i32) -> i32:
     if idx == 0:
         g_main_waiting_task = task
         return 0
-    g_pong_waiting_task = task
+    if idx == 1:
+        g_pong_waiting_task = task
+        return 0
+    if idx == 2:
+        g_ping_waiting_task = task
+        return 0
     return 0
 
 func wake_task_waiters() -> i32:
@@ -134,6 +206,11 @@ func wake_task_waiters() -> i32:
         if g_pong_status == STATUS_WAITING_TASK:
             if actor_status(g_pong_waiting_task) == STATUS_DONE:
                 g_pong_status = STATUS_READY
+                woke = 1
+    if g_ping_spawned == 1:
+        if g_ping_status == STATUS_WAITING_TASK:
+            if actor_status(g_ping_waiting_task) == STATUS_DONE:
+                g_ping_status = STATUS_READY
                 woke = 1
     return woke
 
@@ -149,6 +226,12 @@ func wake_due_sleepers() -> i32:
             if g_pong_wake_ms != 0:
                 if g_pong_wake_ms <= g_time_ms:
                     g_pong_status = STATUS_READY
+                    woke = 1
+    if g_ping_spawned == 1:
+        if actor_status_uses_wake_deadline(g_ping_status) == 1:
+            if g_ping_wake_ms != 0:
+                if g_ping_wake_ms <= g_time_ms:
+                    g_ping_status = STATUS_READY
                     woke = 1
     return woke
 
@@ -166,6 +249,8 @@ func next_sleep_wake_ms() -> i32:
     next = next_wake_candidate(next, g_main_status, g_main_wake_ms)
     if g_pong_spawned == 1:
         next = next_wake_candidate(next, g_pong_status, g_pong_wake_ms)
+    if g_ping_spawned == 1:
+        next = next_wake_candidate(next, g_ping_status, g_ping_wake_ms)
     return next
 
 func scheduler_advance_sleepers() -> i32:
@@ -184,6 +269,10 @@ func scheduler_advance_sleepers() -> i32:
 func mailbox_has(idx: i32) -> i32:
     if idx == 0:
         return g_main_has
+    if idx == 1:
+        return g_pong_has
+    if idx == 2:
+        return g_ping_has
     return g_pong_has
 
 func mailbox_take(idx: i32) -> i32:
@@ -191,6 +280,14 @@ func mailbox_take(idx: i32) -> i32:
         g_main_has = 0
         g_main_last_sender = g_main_msg_sender
         return g_main_val
+    if idx == 1:
+        g_pong_has = 0
+        g_pong_last_sender = g_pong_msg_sender
+        return g_pong_val
+    if idx == 2:
+        g_ping_has = 0
+        g_ping_last_sender = g_ping_msg_sender
+        return g_ping_val
     g_pong_has = 0
     g_pong_last_sender = g_pong_msg_sender
     return g_pong_val
@@ -206,19 +303,35 @@ func mailbox_put(idx: i32, v: i32, tag: i32, sender: i32) -> i32:
         if g_main_status == STATUS_BLOCKED:
             g_main_status = STATUS_READY
         return 0
-    g_pong_val = v
-    g_pong_tag = tag
-    g_pong_count = 1
-    g_pong_s0 = v
-    g_pong_msg_sender = sender
-    g_pong_has = 1
-    if g_pong_status == STATUS_BLOCKED:
-        g_pong_status = STATUS_READY
+    if idx == 1:
+        g_pong_val = v
+        g_pong_tag = tag
+        g_pong_count = 1
+        g_pong_s0 = v
+        g_pong_msg_sender = sender
+        g_pong_has = 1
+        if g_pong_status == STATUS_BLOCKED:
+            g_pong_status = STATUS_READY
+        return 0
+    if idx == 2:
+        g_ping_val = v
+        g_ping_tag = tag
+        g_ping_count = 1
+        g_ping_s0 = v
+        g_ping_msg_sender = sender
+        g_ping_has = 1
+        if g_ping_status == STATUS_BLOCKED:
+            g_ping_status = STATUS_READY
+        return 0
     return 0
 
 func mailbox_take_tag(idx: i32) -> i32:
     if idx == 0:
         return g_main_tag
+    if idx == 1:
+        return g_pong_tag
+    if idx == 2:
+        return g_ping_tag
     return g_pong_tag
 
 func mailbox_begin_typed(idx: i32, tag: i32, count: i32, sender: i32) -> i32:
@@ -232,13 +345,24 @@ func mailbox_begin_typed(idx: i32, tag: i32, count: i32, sender: i32) -> i32:
         if g_main_status == STATUS_BLOCKED:
             g_main_status = STATUS_READY
         return 0
-    g_pong_val = 0
-    g_pong_tag = tag
-    g_pong_count = count
-    g_pong_msg_sender = sender
-    g_pong_has = 1
-    if g_pong_status == STATUS_BLOCKED:
-        g_pong_status = STATUS_READY
+    if idx == 1:
+        g_pong_val = 0
+        g_pong_tag = tag
+        g_pong_count = count
+        g_pong_msg_sender = sender
+        g_pong_has = 1
+        if g_pong_status == STATUS_BLOCKED:
+            g_pong_status = STATUS_READY
+        return 0
+    if idx == 2:
+        g_ping_val = 0
+        g_ping_tag = tag
+        g_ping_count = count
+        g_ping_msg_sender = sender
+        g_ping_has = 1
+        if g_ping_status == STATUS_BLOCKED:
+            g_ping_status = STATUS_READY
+        return 0
     return 0
 
 func mailbox_put_slot(idx: i32, slot: i32, value: i32) -> i32:
@@ -261,23 +385,44 @@ func mailbox_put_slot(idx: i32, slot: i32, value: i32) -> i32:
         else:
             g_main_s7 = value
         return 0
-    if slot == 0:
-        g_pong_s0 = value
-        g_pong_val = value
-    else if slot == 1:
-        g_pong_s1 = value
-    else if slot == 2:
-        g_pong_s2 = value
-    else if slot == 3:
-        g_pong_s3 = value
-    else if slot == 4:
-        g_pong_s4 = value
-    else if slot == 5:
-        g_pong_s5 = value
-    else if slot == 6:
-        g_pong_s6 = value
-    else:
-        g_pong_s7 = value
+    if idx == 1:
+        if slot == 0:
+            g_pong_s0 = value
+            g_pong_val = value
+        else if slot == 1:
+            g_pong_s1 = value
+        else if slot == 2:
+            g_pong_s2 = value
+        else if slot == 3:
+            g_pong_s3 = value
+        else if slot == 4:
+            g_pong_s4 = value
+        else if slot == 5:
+            g_pong_s5 = value
+        else if slot == 6:
+            g_pong_s6 = value
+        else:
+            g_pong_s7 = value
+        return 0
+    if idx == 2:
+        if slot == 0:
+            g_ping_s0 = value
+            g_ping_val = value
+        else if slot == 1:
+            g_ping_s1 = value
+        else if slot == 2:
+            g_ping_s2 = value
+        else if slot == 3:
+            g_ping_s3 = value
+        else if slot == 4:
+            g_ping_s4 = value
+        else if slot == 5:
+            g_ping_s5 = value
+        else if slot == 6:
+            g_ping_s6 = value
+        else:
+            g_ping_s7 = value
+        return 0
     return 0
 
 func mailbox_take_begin(idx: i32) -> i32:
@@ -286,6 +431,14 @@ func mailbox_take_begin(idx: i32) -> i32:
         g_main_has = 0
         g_main_last_sender = g_main_msg_sender
         return g_main_tag
+    if idx == 1:
+        g_pong_has = 0
+        g_pong_last_sender = g_pong_msg_sender
+        return g_pong_tag
+    if idx == 2:
+        g_ping_has = 0
+        g_ping_last_sender = g_ping_msg_sender
+        return g_ping_tag
     g_pong_has = 0
     g_pong_last_sender = g_pong_msg_sender
     return g_pong_tag
@@ -307,38 +460,135 @@ func mailbox_take_slot(idx: i32, slot: i32) -> i32:
         else if slot == 6:
             return g_main_s6
         return g_main_s7
-    if slot == 0:
-        return g_pong_s0
-    else if slot == 1:
-        return g_pong_s1
-    else if slot == 2:
-        return g_pong_s2
-    else if slot == 3:
-        return g_pong_s3
-    else if slot == 4:
-        return g_pong_s4
-    else if slot == 5:
-        return g_pong_s5
-    else if slot == 6:
-        return g_pong_s6
-    return g_pong_s7
+    if idx == 1:
+        if slot == 0:
+            return g_pong_s0
+        else if slot == 1:
+            return g_pong_s1
+        else if slot == 2:
+            return g_pong_s2
+        else if slot == 3:
+            return g_pong_s3
+        else if slot == 4:
+            return g_pong_s4
+        else if slot == 5:
+            return g_pong_s5
+        else if slot == 6:
+            return g_pong_s6
+        return g_pong_s7
+    if idx == 2:
+        if slot == 0:
+            return g_ping_s0
+        else if slot == 1:
+            return g_ping_s1
+        else if slot == 2:
+            return g_ping_s2
+        else if slot == 3:
+            return g_ping_s3
+        else if slot == 4:
+            return g_ping_s4
+        else if slot == 5:
+            return g_ping_s5
+        else if slot == 6:
+            return g_ping_s6
+        return g_ping_s7
+    return 0
 
 func mailbox_take_count(idx: i32) -> i32:
     if idx == 0:
         return g_main_count
+    if idx == 1:
+        return g_pong_count
+    if idx == 2:
+        return g_ping_count
     return g_pong_count
 
 func mailbox_last_sender(idx: i32) -> i32:
     if idx == 0:
         return g_main_last_sender
+    if idx == 1:
+        return g_pong_last_sender
+    if idx == 2:
+        return g_ping_last_sender
     return g_pong_last_sender
 
 func actor_state_ptr(idx: i32) -> ptr:
     if idx == 0:
         return g_main_state_ptr
+    if idx == 1:
+        return g_pong_state_ptr
+    if idx == 2:
+        return g_ping_state_ptr
     return g_pong_state_ptr
 
-func task_result_slot_value(index: i32) -> i32:
+func actor_task_group(idx: i32) -> i32:
+    if idx == 0:
+        return g_main_task_group
+    if idx == 1:
+        return g_pong_task_group
+    if idx == 2:
+        return g_ping_task_group
+    return g_pong_task_group
+
+func set_actor_task_group(idx: i32, group: i32) -> i32:
+    if idx == 0:
+        g_main_task_group = group
+        return group
+    if idx == 1:
+        g_pong_task_group = group
+        return group
+    if idx == 2:
+        g_ping_task_group = group
+        return group
+    return group
+
+func task_group_status_value(group: i32) -> i32:
+    if group == 1:
+        return g_group_status
+    return 0
+
+func actor_task_group_canceled(idx: i32) -> i32:
+    if task_group_status_value(actor_task_group(idx)) == 2:
+        return 1
+    return 0
+
+func task_result_slot_value_for(actor: i32, index: i32) -> i32:
+    if actor == 1:
+        if index == 0:
+            return g_pong_task_result_s0
+        else if index == 1:
+            return g_pong_task_result_s1
+        else if index == 2:
+            return g_pong_task_result_s2
+        else if index == 3:
+            return g_pong_task_result_s3
+        else if index == 4:
+            return g_pong_task_result_s4
+        else if index == 5:
+            return g_pong_task_result_s5
+        else if index == 6:
+            return g_pong_task_result_s6
+        else if index == 7:
+            return g_pong_task_result_s7
+        return 0
+    if actor == 2:
+        if index == 0:
+            return g_ping_task_result_s0
+        else if index == 1:
+            return g_ping_task_result_s1
+        else if index == 2:
+            return g_ping_task_result_s2
+        else if index == 3:
+            return g_ping_task_result_s3
+        else if index == 4:
+            return g_ping_task_result_s4
+        else if index == 5:
+            return g_ping_task_result_s5
+        else if index == 6:
+            return g_ping_task_result_s6
+        else if index == 7:
+            return g_ping_task_result_s7
+        return 0
     if index == 0:
         return g_task_result_s0
     else if index == 1:
@@ -357,7 +607,46 @@ func task_result_slot_value(index: i32) -> i32:
         return g_task_result_s7
     return 0
 
-func set_task_result_slot(index: i32, value: i32) -> i32:
+func task_result_slot_value(index: i32) -> i32:
+    return task_result_slot_value_for(g_task_result_actor, index)
+
+func set_task_result_slot_for(actor: i32, index: i32, value: i32) -> i32:
+    if actor == 1:
+        if index == 0:
+            g_pong_task_result_s0 = value
+        else if index == 1:
+            g_pong_task_result_s1 = value
+        else if index == 2:
+            g_pong_task_result_s2 = value
+        else if index == 3:
+            g_pong_task_result_s3 = value
+        else if index == 4:
+            g_pong_task_result_s4 = value
+        else if index == 5:
+            g_pong_task_result_s5 = value
+        else if index == 6:
+            g_pong_task_result_s6 = value
+        else if index == 7:
+            g_pong_task_result_s7 = value
+        return value
+    if actor == 2:
+        if index == 0:
+            g_ping_task_result_s0 = value
+        else if index == 1:
+            g_ping_task_result_s1 = value
+        else if index == 2:
+            g_ping_task_result_s2 = value
+        else if index == 3:
+            g_ping_task_result_s3 = value
+        else if index == 4:
+            g_ping_task_result_s4 = value
+        else if index == 5:
+            g_ping_task_result_s5 = value
+        else if index == 6:
+            g_ping_task_result_s6 = value
+        else if index == 7:
+            g_ping_task_result_s7 = value
+        return value
     if index == 0:
         g_task_result_s0 = value
     else if index == 1:
@@ -375,6 +664,43 @@ func set_task_result_slot(index: i32, value: i32) -> i32:
     else if index == 7:
         g_task_result_s7 = value
     return value
+
+func set_task_result_slot(index: i32, value: i32) -> i32:
+    return set_task_result_slot_for(g_current, index, value)
+
+func reset_task_result_slots(actor: i32, slot_count: i32) -> i32:
+    if actor == 1:
+        g_pong_task_result_count = slot_count
+        g_pong_task_result_s0 = 0
+        g_pong_task_result_s1 = 0
+        g_pong_task_result_s2 = 0
+        g_pong_task_result_s3 = 0
+        g_pong_task_result_s4 = 0
+        g_pong_task_result_s5 = 0
+        g_pong_task_result_s6 = 0
+        g_pong_task_result_s7 = 0
+        return slot_count
+    if actor == 2:
+        g_ping_task_result_count = slot_count
+        g_ping_task_result_s0 = 0
+        g_ping_task_result_s1 = 0
+        g_ping_task_result_s2 = 0
+        g_ping_task_result_s3 = 0
+        g_ping_task_result_s4 = 0
+        g_ping_task_result_s5 = 0
+        g_ping_task_result_s6 = 0
+        g_ping_task_result_s7 = 0
+        return slot_count
+    g_task_result_count = slot_count
+    g_task_result_s0 = 0
+    g_task_result_s1 = 0
+    g_task_result_s2 = 0
+    g_task_result_s3 = 0
+    g_task_result_s4 = 0
+    g_task_result_s5 = 0
+    g_task_result_s6 = 0
+    g_task_result_s7 = 0
+    return slot_count
 
 func store_context_ptr_at(base: ptr, off: i32, value: ptr, mem: cap.mem) -> ptr:
     unsafe:
@@ -411,12 +737,20 @@ func actor_trampoline() -> i32:
             var _wake_main: i32 = wake_task_waiters()
             exit = core.ctx_switch(g_main_slot, g_sched_slot, mem)
             return 0
-        exit = core.actor_dispatch(g_pong_entry_id)
-        g_pong_exit = exit
-        g_pong_status = STATUS_DONE
-        var _wake_pong: i32 = wake_task_waiters()
-        exit = core.ctx_switch(g_pong_slot, g_sched_slot, mem)
-        return 0
+        if idx == 1:
+            exit = core.actor_dispatch(g_pong_entry_id)
+            g_pong_exit = exit
+            g_pong_status = STATUS_DONE
+            var _wake_pong: i32 = wake_task_waiters()
+            exit = core.ctx_switch(g_pong_slot, g_sched_slot, mem)
+            return 0
+        if idx == 2:
+            exit = core.actor_dispatch(g_ping_entry_id)
+            g_ping_exit = exit
+            g_ping_status = STATUS_DONE
+            var _wake_ping: i32 = wake_task_waiters()
+            exit = core.ctx_switch(g_ping_slot, g_sched_slot, mem)
+            return 0
     return 0
 
 @export("__tetra_entry")
@@ -429,16 +763,27 @@ func tetra_entry() -> i32:
         g_current = 0
         g_main_status = STATUS_READY
         g_pong_status = STATUS_DONE
+        g_ping_status = STATUS_DONE
         g_pong_spawned = 0
+        g_ping_spawned = 0
         g_main_has = 0
         g_pong_has = 0
+        g_ping_has = 0
         g_time_ms = 0
         g_main_wake_ms = 0
         g_pong_wake_ms = 0
+        g_ping_wake_ms = 0
         g_main_waiting_task = -1
         g_pong_waiting_task = -1
+        g_ping_waiting_task = -1
+        g_group_status = 0
+        g_main_task_group = 0
+        g_pong_task_group = 0
+        g_ping_task_group = 0
+        g_task_result_actor = 0
         g_main_state_ptr = core.alloc_bytes(4096)
         g_pong_state_ptr = core.alloc_bytes(4096)
+        g_ping_state_ptr = core.alloc_bytes(4096)
         var _ms: ptr = build_actor_stack(g_main_slot)
         sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
         while 1:
@@ -449,6 +794,18 @@ func tetra_entry() -> i32:
                     g_current = 1
                     sw = core.ctx_switch(g_sched_slot, g_pong_slot, mem)
                     g_current = 0
+                else if g_ping_spawned == 1:
+                    if g_ping_status == STATUS_READY:
+                        g_current = 2
+                        sw = core.ctx_switch(g_sched_slot, g_ping_slot, mem)
+                        g_current = 0
+                    else if g_main_status == STATUS_READY:
+                        g_current = 0
+                        sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
+                    else:
+                        var _wake_ping: i32 = scheduler_advance_sleepers()
+                        if _wake_ping == 0:
+                            return 1
                 else if g_main_status == STATUS_READY:
                     g_current = 0
                     sw = core.ctx_switch(g_sched_slot, g_main_slot, mem)
@@ -468,15 +825,25 @@ func tetra_entry() -> i32:
 @export("__tetra_actor_spawn")
 func actor_spawn(entry_id: i32) -> i32:
     unsafe:
-        if g_pong_spawned == 1:
+        if g_pong_spawned == 0:
+            g_pong_entry_id = entry_id
+            g_pong_slot = core.alloc_bytes(8)
+            var _ps: ptr = build_actor_stack(g_pong_slot)
+            g_pong_status = STATUS_READY
+            g_pong_waiting_task = -1
+            g_pong_task_group = actor_task_group(g_current)
+            g_pong_spawned = 1
             return 1
-        g_pong_entry_id = entry_id
-        g_pong_slot = core.alloc_bytes(8)
-        var _ps: ptr = build_actor_stack(g_pong_slot)
-        g_pong_status = STATUS_READY
-        g_pong_waiting_task = -1
-        g_pong_spawned = 1
-        return 1
+        if g_ping_spawned == 0:
+            g_ping_entry_id = entry_id
+            g_ping_slot = core.alloc_bytes(8)
+            var _pis: ptr = build_actor_stack(g_ping_slot)
+            g_ping_status = STATUS_READY
+            g_ping_waiting_task = -1
+            g_ping_task_group = actor_task_group(g_current)
+            g_ping_spawned = 1
+            return 2
+        return 0
     return 1
 
 @export("__tetra_actor_send")
@@ -640,12 +1007,56 @@ func actor_state_store(slot: i32, value: i32) -> i32:
 
 @export("__tetra_task_spawn_i32")
 func rt_task_spawn_i32(entry_id: i32) -> task.i32:
-    return task.i32(value: actor_spawn(entry_id), error: 0)
+    var handle: i32 = actor_spawn(entry_id)
+    if handle == 0:
+        return task.i32(value: 0, error: 1)
+    return task.i32(value: handle, error: 0)
+
+@export("__tetra_task_group_open")
+func rt_task_group_open() -> i32:
+    g_group_status = 1
+    return 1
+
+@export("__tetra_task_group_close")
+func rt_task_group_close(group: i32) -> i32:
+    if group != 1:
+        return 1
+    if g_group_status == 1:
+        g_group_status = 3
+    return 0
+
+@export("__tetra_task_group_cancel")
+func rt_task_group_cancel(group: i32) -> i32:
+    if group == 1:
+        if g_group_status != 0:
+            g_group_status = 2
+    return group
+
+@export("__tetra_task_group_current")
+func rt_task_group_current() -> i32:
+    return actor_task_group(g_current)
+
+@export("__tetra_task_group_status")
+func rt_task_group_status(group: i32) -> i32:
+    return task_group_status_value(group)
+
+@export("__tetra_task_spawn_group_i32")
+func rt_task_spawn_group_i32(group: i32, entry_id: i32) -> task.i32:
+    if task_group_status_value(group) == 2:
+        return task.i32(value: 0, error: 1)
+    var handle: i32 = actor_spawn(entry_id)
+    if handle == 0:
+        return task.i32(value: 0, error: 1)
+    if handle != 0:
+        var _group: i32 = set_actor_task_group(handle, group)
+    return task.i32(value: handle, error: 0)
 
 @export("__tetra_task_join_i32")
 func rt_task_join_i32(handle: i32, error: i32) -> i32:
     unsafe:
         if error != 0:
+            return 0
+        if actor_task_group_canceled(handle) == 1:
             return 0
         var mem: cap.mem = core.cap_mem()
         while actor_status(handle) != STATUS_DONE:
@@ -655,8 +1066,11 @@ func rt_task_join_i32(handle: i32, error: i32) -> i32:
             var _yield: i32 = core.ctx_switch(actor_slot(g_current), g_sched_slot, mem)
         var _clear: i32 = set_actor_waiting_task(g_current, -1)
         var _wake_done: i32 = set_actor_wake_ms(g_current, 0)
+        g_task_result_actor = handle
         if handle == 0:
             return g_main_exit
+        if handle == 2:
+            return g_ping_exit
         return g_pong_exit
     return 0
 
@@ -665,6 +1079,8 @@ func rt_task_join_result_i32(handle: i32, error: i32) -> task.result_i32:
     unsafe:
         if error != 0:
             return task.result_i32(value: 0, error: error)
+        if actor_task_group_canceled(handle) == 1:
+            return task.result_i32(value: 0, error: 1)
         var value: i32 = rt_task_join_i32(handle, error)
         return task.result_i32(value: value, error: 0)
     return task.result_i32(value: 0, error: 1)
@@ -674,6 +1090,8 @@ func rt_task_join_until_i32(handle: i32, error: i32, deadline: i32) -> task.resu
     unsafe:
         if error != 0:
             return task.result_i32(value: 0, error: error)
+        if actor_task_group_canceled(handle) == 1:
+            return task.result_i32(value: 0, error: 1)
         var until: i32 = deadline
         if until < 0:
             until = 0
@@ -689,8 +1107,11 @@ func rt_task_join_until_i32(handle: i32, error: i32, deadline: i32) -> task.resu
             var _yield: i32 = core.ctx_switch(actor_slot(g_current), g_sched_slot, mem)
         var _clear: i32 = set_actor_waiting_task(g_current, -1)
         var _wake_done: i32 = set_actor_wake_ms(g_current, 0)
+        g_task_result_actor = handle
         if handle == 0:
             return task.result_i32(value: g_main_exit, error: 0)
+        if handle == 2:
+            return task.result_i32(value: g_ping_exit, error: 0)
         return task.result_i32(value: g_pong_exit, error: 0)
     return task.result_i32(value: 0, error: 1)
 
@@ -700,30 +1121,29 @@ func rt_task_poll_i32(handle: i32, error: i32) -> task.result_i32:
         return task.result_i32(value: 0, error: error)
     if actor_status(handle) != STATUS_DONE:
         return task.result_i32(value: 0, error: 2)
+    g_task_result_actor = handle
     if handle == 0:
         return task.result_i32(value: g_main_exit, error: 0)
+    if handle == 2:
+        return task.result_i32(value: g_ping_exit, error: 0)
     return task.result_i32(value: g_pong_exit, error: 0)
 
 @export("__tetra_task_is_canceled")
 func rt_task_is_canceled() -> i32:
+    if actor_task_group_canceled(g_current) == 1:
+        return 1
     return 0
 
 @export("__tetra_task_checkpoint")
 func rt_task_checkpoint() -> task.error:
+    if actor_task_group_canceled(g_current) == 1:
+        return 1
     return 0
 
 @export("__tetra_task_result_begin")
 func rt_task_result_begin(slot_count: i32) -> i32:
-    g_task_result_count = slot_count
-    g_task_result_s0 = 0
-    g_task_result_s1 = 0
-    g_task_result_s2 = 0
-    g_task_result_s3 = 0
-    g_task_result_s4 = 0
-    g_task_result_s5 = 0
-    g_task_result_s6 = 0
-    g_task_result_s7 = 0
-    return slot_count
+    g_task_result_actor = g_current
+    return reset_task_result_slots(g_current, slot_count)
 
 @export("__tetra_task_result_slot")
 func rt_task_result_slot(index: i32, value: i32) -> i32:
@@ -735,33 +1155,27 @@ func rt_task_result_get(index: i32) -> i32:
 
 @export("__tetra_task_join_typed_2")
 func rt_task_join_typed_2(handle: i32, error: i32) -> task.i32:
-    var status: i32 = error
-    if status == 0:
-        status = rt_task_join_i32(handle, error)
-    if status != 0:
-        return task.i32(value: status, error: 1)
+    if error != 0:
+        return task.i32(value: error, error: 1)
+    var _status: i32 = rt_task_join_i32(handle, error)
     return task.i32(value: task_result_slot_value(0), error: 0)
 
 @export("__tetra_task_join_typed_3")
 func rt_task_join_typed_3(handle: i32, slot1: i32, error: i32) -> task_join_typed_3:
     var _unused: i32 = slot1
-    var status: i32 = error
-    if status == 0:
-        status = rt_task_join_i32(handle, error)
-    if status != 0:
-        return task_join_typed_3(r0: 0, r1: status, r2: 1)
-    return task_join_typed_3(r0: task_result_slot_value(0), r1: task_result_slot_value(1), r2: 0)
+    if error != 0:
+        return task_join_typed_3(r0: 0, r1: error, r2: 1)
+    var _status: i32 = rt_task_join_i32(handle, error)
+    return task_join_typed_3(r0: task_result_slot_value(0), r1: task_result_slot_value(1), r2: task_result_slot_value(2))
 
 @export("__tetra_task_join_typed_4")
 func rt_task_join_typed_4(handle: i32, slot1: i32, slot2: i32, error: i32) -> task_join_typed_4:
     var _unused1: i32 = slot1
     var _unused2: i32 = slot2
-    var status: i32 = error
-    if status == 0:
-        status = rt_task_join_i32(handle, error)
-    if status != 0:
-        return task_join_typed_4(r0: 0, r1: 0, r2: status, r3: 1)
-    return task_join_typed_4(r0: task_result_slot_value(0), r1: task_result_slot_value(1), r2: task_result_slot_value(2), r3: 0)
+    if error != 0:
+        return task_join_typed_4(r0: 0, r1: 0, r2: error, r3: 1)
+    var _status: i32 = rt_task_join_i32(handle, error)
+    return task_join_typed_4(r0: task_result_slot_value(0), r1: task_result_slot_value(1), r2: task_result_slot_value(2), r3: task_result_slot_value(3))
 
 func staged_typed_join_status(handle: i32, error: i32, slots: i32) -> i32:
     var status: i32 = error

@@ -1,0 +1,136 @@
+{
+  "schema": "tetra.surface.browser-canvas-trace.v1",
+  "wasm_path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/text-input-smoke-wasm/surface-wasm32-web-release-text-input-artifacts/surface-release-text-input.wasm",
+  "canvas": {
+    "opened": true,
+    "width": 480,
+    "height": 320,
+    "readback": true
+  },
+  "browser_events": [
+    {
+      "order": 1,
+      "native_type": "pointerup",
+      "kind": 5,
+      "x": 48,
+      "y": 96,
+      "key": 0,
+      "width": 480,
+      "height": 320,
+      "text_len": 0
+    },
+    {
+      "order": 2,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 480,
+      "height": 320,
+      "text_len": 2
+    },
+    {
+      "order": 3,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 37,
+      "width": 480,
+      "height": 320,
+      "text_len": 0
+    },
+    {
+      "order": 4,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 8,
+      "width": 480,
+      "height": 320,
+      "text_len": 0
+    },
+    {
+      "order": 5,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 46,
+      "width": 480,
+      "height": 320,
+      "text_len": 0
+    },
+    {
+      "order": 6,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 480,
+      "height": 320,
+      "text_len": 1
+    },
+    {
+      "order": 7,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 480,
+      "height": 320,
+      "text_len": 0
+    },
+    {
+      "order": 8,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 32,
+      "width": 480,
+      "height": 320,
+      "text_len": 0
+    },
+    {
+      "order": 9,
+      "native_type": "resize",
+      "kind": 2,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 400,
+      "height": 240,
+      "text_len": 0
+    }
+  ],
+  "frames": [
+    {
+      "order": 1,
+      "width": 480,
+      "height": 320,
+      "stride": 1920,
+      "pixels_len": 614400,
+      "source_checksum": "423231997b13d9f862e0c1473cb831184e0457bae98a02f43c72ec706e8bb3a0",
+      "canvas_checksum": "423231997b13d9f862e0c1473cb831184e0457bae98a02f43c72ec706e8bb3a0",
+      "checksum": "423231997b13d9f862e0c1473cb831184e0457bae98a02f43c72ec706e8bb3a0",
+      "presented": true
+    },
+    {
+      "order": 5,
+      "width": 480,
+      "height": 320,
+      "stride": 1920,
+      "pixels_len": 614400,
+      "source_checksum": "446d045e4521ef4a7afe3e09c7798c69dc8d14cf863ec141009fcdcdc2098e1c",
+      "canvas_checksum": "446d045e4521ef4a7afe3e09c7798c69dc8d14cf863ec141009fcdcdc2098e1c",
+      "checksum": "446d045e4521ef4a7afe3e09c7798c69dc8d14cf863ec141009fcdcdc2098e1c",
+      "presented": true
+    }
+  ],
+  "app_exit_code": 1
+}

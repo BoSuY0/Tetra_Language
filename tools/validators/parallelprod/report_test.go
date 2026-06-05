@@ -65,6 +65,23 @@ func TestValidateReportRejectsMissingStableParallelDiagnosticsAudit(t *testing.T
 	}
 }
 
+func TestValidateReportRejectsMissingSchedulerPrototypeBenchmarks(t *testing.T) {
+	raw := strings.Replace(validParallelProductionReport(), `  "benchmarks": [
+    {"name":"actor ping-pong fanout scheduler prototype","kind":"scheduler","metric":"max_queue_depth","unit":"work_items","baseline_value":4,"measured_value":2,"improvement_ratio":2.0,"evidence":"compiler/internal/parallelrt two-core work stealing model ran actor ping-pong fanout comparison","ran":true,"pass":true},
+    {"name":"zero-copy region message scheduler prototype","kind":"transfer","metric":"bytes_copied","unit":"bytes","baseline_value":4096,"measured_value":0,"improvement_ratio":4096.0,"evidence":"compiler/internal/parallelrt owned-region transfer report emitted zero_copy_move with bytes_copied=0","ran":true,"pass":true}
+  ],
+`, "", 1)
+	err := ValidateReport([]byte(raw))
+	if err == nil {
+		t.Fatalf("expected missing scheduler prototype benchmarks to fail")
+	}
+	for _, want := range []string{"actor ping-pong fanout scheduler prototype", "zero-copy region message scheduler prototype"} {
+		if !strings.Contains(strings.ToLower(err.Error()), want) {
+			t.Fatalf("error missing %q:\n%v", want, err)
+		}
+	}
+}
+
 func TestValidateReportRejectsMissingSafeUnsafeForbiddenBoundaryCoverageCase(t *testing.T) {
 	raw := strings.Replace(validParallelProductionReport(), `    {"name":"safe unsafe forbidden boundary coverage","kind":"positive","ran":true,"pass":true},
 `, "", 1)
@@ -117,6 +134,7 @@ func TestValidateReportRejectsMissingCompletionAudit(t *testing.T) {
     {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, cancellation storm, and timeouts stress cases are required","result":"pass"},
     {"requirement":"safe/unsafe/forbidden parallelism documentation","artifact":"docs/spec/actors.md; docs/user/async_actors_guide.md; docs/spec/runtime_abi.md; compiler/tests/semantics/async_test.go; compiler/tests/safety/effects_test.go","evidence":"documentation defines supported actor/task runtime, transfer boundaries, and unsupported guarantees; safe unsafe forbidden boundary coverage runs compiler tests for allowed immutable task targets, missing runtime/actors effects, unsafe-only operations, and forbidden mutable actor/task targets","result":"pass"},
     {"requirement":"stable parallel diagnostics","artifact":"compiler/task_runtime_test.go; compiler/actors_test.go; compiler/tests/ownership/actor_task_ownership_test.go; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"negative parallel cases require stable expected_error evidence for cancellation, deadline, backpressure, invalid handle, double join, use-after-close, transfer, and shared mutable rejection diagnostics","result":"pass"},
+    {"requirement":"per-core scheduler prototype and zero-copy transfer benchmarks","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt model covers single-core compatibility, two-core work stealing, bounded typed mailboxes, actor ping-pong fanout comparison, and zero_copy_move owned-region message transfer with bytes_copied=0","result":"pass"},
     {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh","evidence":"parallel production gate must run producer, validator, and artifact hash validation","result":"pass"}
   ]`, "", 1)
 	err := ValidateReport([]byte(raw))
@@ -139,7 +157,12 @@ func validParallelProductionReport() string {
   "processes": [
     {"name":"tetra build","kind":"build","path":"/tmp/tetra","ran":true,"pass":true,"exit_code":0},
     {"name":"parallel smoke app","kind":"app","path":"/tmp/parallel-smoke","ran":true,"pass":true,"exit_code":0},
-    {"name":"parallel stress","kind":"stress","path":"/tmp/parallel-stress","ran":true,"pass":true,"exit_code":0}
+    {"name":"parallel stress","kind":"stress","path":"/tmp/parallel-stress","ran":true,"pass":true,"exit_code":0},
+    {"name":"parallel scheduler prototype","kind":"benchmark","path":"compiler/internal/parallelrt","ran":true,"pass":true,"exit_code":0}
+  ],
+  "benchmarks": [
+    {"name":"actor ping-pong fanout scheduler prototype","kind":"scheduler","metric":"max_queue_depth","unit":"work_items","baseline_value":4,"measured_value":2,"improvement_ratio":2.0,"evidence":"compiler/internal/parallelrt two-core work stealing model ran actor ping-pong fanout comparison","ran":true,"pass":true},
+    {"name":"zero-copy region message scheduler prototype","kind":"transfer","metric":"bytes_copied","unit":"bytes","baseline_value":4096,"measured_value":0,"improvement_ratio":4096.0,"evidence":"compiler/internal/parallelrt owned-region transfer report emitted zero_copy_move with bytes_copied=0","ran":true,"pass":true}
   ],
   "contracts": [
     {"name":"production task scheduler","status":"pass","evidence":"scheduler fairness and lifecycle cases ran on linux-x64"},
@@ -182,6 +205,7 @@ func validParallelProductionReport() string {
     {"requirement":"stress evidence for tasks, actor messages, cancellation storms, and timeouts","artifact":"tools/cmd/parallel-production-smoke","evidence":"many tasks stress, many actor messages stress, cancellation storm, and timeouts stress cases are required","result":"pass"},
     {"requirement":"safe/unsafe/forbidden parallelism documentation","artifact":"docs/spec/actors.md; docs/user/async_actors_guide.md; docs/spec/runtime_abi.md; compiler/tests/semantics/async_test.go; compiler/tests/safety/effects_test.go","evidence":"documentation defines supported actor/task runtime, transfer boundaries, and unsupported guarantees; safe unsafe forbidden boundary coverage runs compiler tests for allowed immutable task targets, missing runtime/actors effects, unsafe-only operations, and forbidden mutable actor/task targets","result":"pass"},
     {"requirement":"stable parallel diagnostics","artifact":"compiler/task_runtime_test.go; compiler/actors_test.go; compiler/tests/ownership/actor_task_ownership_test.go; cli/cmd/tetra/check_diagnostics_resource_actor_test.go","evidence":"negative parallel cases require stable expected_error evidence for cancellation, deadline, backpressure, invalid handle, double join, use-after-close, transfer, and shared mutable rejection diagnostics","result":"pass"},
+    {"requirement":"per-core scheduler prototype and zero-copy transfer benchmarks","artifact":"compiler/internal/parallelrt; tools/cmd/parallel-production-smoke","evidence":"parallelrt model covers single-core compatibility, two-core work stealing, bounded typed mailboxes, actor ping-pong fanout comparison, and zero_copy_move owned-region message transfer with bytes_copied=0","result":"pass"},
     {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh","evidence":"parallel production gate must run producer, validator, and artifact hash validation","result":"pass"}
   ]
 }`

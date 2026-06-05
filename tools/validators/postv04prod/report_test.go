@@ -176,12 +176,16 @@ func validMemoryReport() memoryprod.Report {
 			{Name: "memory smoke app", Kind: "app", Path: "/tmp/memory-smoke", Ran: true, Pass: true, ExitCode: &exitZero},
 			{Name: "memory stress", Kind: "stress", Path: "tools/cmd/memory-production-smoke", Ran: true, Pass: true, ExitCode: &exitZero},
 		},
+		Benchmarks: []memoryprod.BenchmarkReport{
+			{Name: "small heap allocation syscall reduction", Kind: "allocator", Metric: "estimated_os_syscalls", Unit: "syscalls", BaselineValue: 64, MeasuredValue: 1, ImprovementRatio: 64, Evidence: "allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill", Ran: true, Pass: true},
+		},
 		Contracts: []memoryprod.ContractReport{
 			{Name: "allocator runtime model", Status: "pass", Evidence: "allocator lifecycle returns deterministic handles and failure status"},
 			{Name: "allocator failure semantics", Status: "pass", Evidence: "linux-x64 allocation failure exits deterministically"},
 			{Name: "ownership escape model", Status: "pass", Evidence: "heap, slices, structs, and closures preserve borrow/consume diagnostics"},
 			{Name: "unsafe cap.mem raw memory rules", Status: "pass", Evidence: "raw memory helpers require unsafe and explicit cap.mem"},
 			{Name: "runtime bounds diagnostics", Status: "pass", Evidence: "out-of-bounds memory access reports deterministic runtime diagnostic"},
+			{Name: "raw pointer bounds metadata", Status: "pass", Evidence: "allocation_base_metadata, derived_allocation_offset, checked_external_unknown, and external_unknown raw-slice policy"},
 			{Name: "actor task transfer rules", Status: "pass", Evidence: "memory-bearing values cannot cross actor/task boundaries without checked transfer"},
 		},
 		Cases: []memoryprod.CaseReport{
@@ -195,6 +199,9 @@ func validMemoryReport() memoryprod.Report {
 			{Name: "raw ptr_add allocation upper bound", Kind: "negative", Ran: true, Pass: true, ExpectedError: "allocation upper bound"},
 			{Name: "raw allocation-base i32 access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "i32 access width exceeds allocation"},
 			{Name: "raw allocation-base ptr access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "ptr access width exceeds allocation"},
+			{Name: "raw slice negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative raw slice length"},
+			{Name: "raw slice i32 length byte overflow", Kind: "negative", Ran: true, Pass: true, ExpectedError: "raw slice length byte overflow"},
+			{Name: "raw pointer bounds metadata report", Kind: "positive", Ran: true, Pass: true},
 			{Name: "memcpy/memset negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative helper length"},
 			{Name: "reject use-after-free", Kind: "negative", Ran: true, Pass: true, ExpectedError: "use-after-free"},
 			{Name: "reject double-free", Kind: "negative", Ran: true, Pass: true, ExpectedError: "double-free"},
@@ -215,7 +222,9 @@ func validMemoryReport() memoryprod.Report {
 			{Requirement: "heap, slices, structs, and closures memory coverage", Artifact: "docs/spec/ownership_v1.md; compiler/tests/ownership; compiler/tests/semantics/closures_semantic_clauses_test.go", Evidence: "heap closure handle coverage, callable heap escape rejection, slice struct borrow escape coverage, and function-typed slice aggregate borrow escape coverage cases ran", Result: "pass"},
 			{Requirement: "unsafe/cap.mem/raw memory/memcpy/memset rules", Artifact: "docs/spec/unsafe.md; lib/core/memory.tetra", Evidence: "cap.mem unsafe boundary plus memcpy/memset capability path and negative length cases require unsafe cap.mem", Result: "pass"},
 			{Requirement: "runtime bounds checks and diagnostics", Artifact: "docs/spec/runtime_abi.md", Evidence: "bounds and raw ptr_add diagnostics are required cases", Result: "pass"},
+			{Requirement: "raw pointer bounds metadata", Artifact: "compiler/internal/runtimeabi/raw_pointer_bounds.go; compiler/internal/plir/plir.go; compiler/internal/allocplan/plan.go; tools/cmd/memory-production-smoke", Evidence: "core.alloc_bytes allocation reports include allocation_base_metadata and external_unknown raw-slice policy; PLIR records derived_allocation_offset and checked_external_unknown raw pointer paths", Result: "pass"},
 			{Requirement: "stress/fuzz evidence", Artifact: "tools/cmd/memory-production-smoke", Evidence: "allocator stress and deterministic memcpy/memset fuzz cases ran", Result: "pass"},
+			{Requirement: "measured memory benchmark improvement", Artifact: "tools/cmd/memory-production-smoke; compiler allocation report schema v2", Evidence: "small heap allocation syscall reduction benchmark compares estimated mmap-per-allocation baseline against 64KiB chunk refill calls", Result: "pass"},
 			{Requirement: "use-after-free, double-free, borrow escape, and aliasing safety", Artifact: "compiler/tests/safety; compiler/tests/ownership", Evidence: "required cases reject unsafe memory behavior", Result: "pass"},
 			{Requirement: "actor/task transfer safety", Artifact: "compiler/tests/ownership", Evidence: "actor/task transfer safety case is required", Result: "pass"},
 			{Requirement: "real memory examples", Artifact: "examples/core_memory_smoke.tetra; examples/ownership_smoke.tetra; examples/flow_unsafe_cap_mem_smoke.tetra", Evidence: "checked-in memory examples build and run", Result: "pass"},
@@ -238,6 +247,12 @@ func validParallelReport() parallelprod.Report {
 			{Name: "tetra build", Kind: "build", Path: "/tmp/tetra", Ran: true, Pass: true, ExitCode: &exitZero},
 			{Name: "parallel smoke app", Kind: "app", Path: "/tmp/parallel-smoke", Ran: true, Pass: true, ExitCode: &exitZero},
 			{Name: "parallel stress", Kind: "stress", Path: "/tmp/parallel-stress", Ran: true, Pass: true, ExitCode: &exitZero},
+			{Name: "parallel scheduler prototype tests", Kind: "benchmark", Path: "go test ./compiler/internal/parallelrt", Ran: true, Pass: true, ExitCode: &exitZero},
+			{Name: "parallel scheduler prototype evidence", Kind: "benchmark", Path: "go run ./compiler/cmd/parallelrt-evidence", Ran: true, Pass: true, ExitCode: &exitZero},
+		},
+		Benchmarks: []parallelprod.BenchmarkReport{
+			{Name: "actor ping-pong fanout scheduler prototype", Kind: "scheduler", Metric: "max_queue_depth", Unit: "work_items", BaselineValue: 4, MeasuredValue: 2, ImprovementRatio: 2, Evidence: "compiler/internal/parallelrt two-core work stealing model ran actor ping-pong fanout comparison", Ran: true, Pass: true},
+			{Name: "zero-copy region message scheduler prototype", Kind: "transfer", Metric: "bytes_copied", Unit: "bytes", BaselineValue: 4096, MeasuredValue: 0, ImprovementRatio: 4096, Evidence: "compiler/internal/parallelrt owned-region transfer report emitted zero_copy_move with bytes_copied=0", Ran: true, Pass: true},
 		},
 		Contracts: []parallelprod.ContractReport{
 			{Name: "production task scheduler", Status: "pass", Evidence: "scheduler fairness and lifecycle cases ran"},
@@ -280,6 +295,7 @@ func validParallelReport() parallelprod.Report {
 			{Requirement: "stress evidence for tasks, actor messages, cancellation storms, and timeouts", Artifact: "tools/cmd/parallel-production-smoke", Evidence: "required stress cases ran", Result: "pass"},
 			{Requirement: "safe/unsafe/forbidden parallelism documentation", Artifact: "docs/spec/actors.md; docs/user/async_actors_guide.md; docs/spec/runtime_abi.md; compiler/tests/semantics/async_test.go; compiler/tests/safety/effects_test.go", Evidence: "safe unsafe forbidden boundary coverage case runs compiler tests and docs define boundaries", Result: "pass"},
 			{Requirement: "stable parallel diagnostics", Artifact: "compiler/task_runtime_test.go; compiler/actors_test.go; compiler/tests/ownership/actor_task_ownership_test.go; cli/cmd/tetra/check_diagnostics_resource_actor_test.go", Evidence: "negative parallel cases require stable expected_error evidence for cancellation deadline backpressure invalid handle double join use-after-close transfer and shared mutable rejection", Result: "pass"},
+			{Requirement: "per-core scheduler prototype and zero-copy transfer benchmarks", Artifact: "compiler/internal/parallelrt; tools/cmd/parallel-production-smoke", Evidence: "parallelrt model covers single-core compatibility two-core work stealing bounded typed mailboxes actor ping-pong fanout comparison and zero_copy_move owned-region message transfer with bytes_copied=0", Result: "pass"},
 			{Requirement: "release-gate entrypoint", Artifact: "scripts/release/post_v0_4/parallel-production-linux-x64-smoke.sh", Evidence: "parallel gate writes and validates production evidence", Result: "pass"},
 		},
 	}

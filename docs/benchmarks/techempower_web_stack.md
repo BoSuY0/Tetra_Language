@@ -7,16 +7,49 @@ runtime codebase. It is not an official upstream TechEmpower submission yet.
 The upstream FrameworkBenchmarks repository was archived on March 24, 2026, so
 official publication mechanics may require a fork or successor process.
 
+P19.2 also has a separate source-first dry-run gate:
+`reports/production-http-json-v1/benchmarks/http-json-source-first-report.json`
+under scope `p19.2_http_json_source_first`. That artifact checks Tetra source
+coverage for HTTP plaintext and HTTP JSON rows before the broader P20 matrix.
+It does not replace this local runtime/DB evidence and does not imply an
+official TechEmpower publication, full production web stack, or measured
+performance claim.
+
+P19.3 adds a separate PostgreSQL source-first dry-run gate:
+`reports/production-postgres-v1/benchmarks/postgres-source-first-report.json`
+under scope `p19.3_postgres_source_first`. That artifact checks Tetra source
+coverage for DB single query, DB multiple queries, DB updates, and DB fortunes
+rows before the broader P20 matrix. It is not measured database throughput, a
+production database benchmark, a C++/Rust parity claim, or an official
+TechEmpower result.
+
+P19.3 closure links that source-first gate to checked local SCRAM/PostgreSQL
+reports that the repo validator accepts without `--allow-skip-db`:
+`docs/benchmarks/techempower_scram_single_query_local_report.json`,
+`docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`, and
+`docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`. This is
+honest local runtime/DB measurement evidence only; broader performance claims
+remain owned by P20.
+
 ## Runtime Pieces
 
 - `compiler/internal/netrt`: Linux TCP sockets and epoll-backed event polling.
-- `compiler/internal/httprt`: HTTP/1.1 parser, static and parameterized
-  router, middleware wrappers, request body limits, and response writer.
+- `compiler/internal/httprt`: HTTP/1.1 parser, allocation-free request-head
+  view parser for caller-owned buffers, borrowed header views, static and
+  parameterized router, middleware wrappers, request body limits, and response
+  writer.
 - `compiler/internal/jsonrt`: byte-buffer JSON serializers and generic
-  deterministic JSON value parse/write helpers.
+  deterministic JSON value parse/write helpers, plus a borrowed JSON view
+  parser that keeps unescaped strings as input slices and copies escaped
+  strings into request-region storage when provided.
 - `compiler/internal/htmlrt`: Fortunes HTML escaping and rendering.
 - `compiler/internal/pgrt`: PostgreSQL wire protocol client, prepared statement
-  execution, TCP dial path, connection pool, and pool stats.
+  execution, binary int4 Bind helpers, borrowed DataRow cell decode, TCP dial
+  path, connection pool, and pool stats.
+- `compiler/internal/stdlibrt`: checked region-aware storage/provenance model
+  for Vec, StringBuilder, HashMap, ByteBuffer, and ArenaBuffer planning used by
+  P7 runtime evidence. This is not a promoted generic Tetra-source collection
+  API.
 - `lib/core/postgres.tetra`: executable Tetra-source PostgreSQL startup,
   Simple Query, Parse/Bind/Describe/Execute/Sync,
   RowDescription/DataRow/CommandComplete/ReadyForQuery, Terminate, and endian
@@ -201,6 +234,12 @@ Current local evidence:
   `docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`
 - DB-backed SCRAM-SHA-256 run notes:
   `docs/benchmarks/techempower_scram_single_query_local_2026-05-21.md`
+- P19.3 PostgreSQL source-first dry-run gate:
+  `reports/production-postgres-v1/benchmarks/postgres-source-first-report.json`
+- P19.3 PostgreSQL live local benchmark honesty closure:
+  `docs/benchmarks/techempower_scram_single_query_local_report.json`,
+  `docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`,
+  and `docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`
 - full DB-backed local attempt log:
   `docs/benchmarks/techempower_full_local_attempt_2026-05-20.md`
 

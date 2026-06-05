@@ -4,10 +4,13 @@ package compiler
 type FeatureStatus string
 
 const (
-	FeatureStatusCurrent      FeatureStatus = "current"
-	FeatureStatusExperimental FeatureStatus = "experimental"
-	FeatureStatusPlanned      FeatureStatus = "planned"
-	FeatureStatusPostV1       FeatureStatus = "post-v1"
+	FeatureStatusCurrent             FeatureStatus = "current"
+	FeatureStatusExperimental        FeatureStatus = "experimental"
+	FeatureStatusReleaseCandidate    FeatureStatus = "release_candidate"
+	FeatureStatusUnsupported         FeatureStatus = "unsupported"
+	FeatureStatusLegacyCompatibility FeatureStatus = "legacy_compatibility"
+	FeatureStatusPlanned             FeatureStatus = "planned"
+	FeatureStatusPostV1              FeatureStatus = "post-v1"
 )
 
 // FeatureInfo is a machine-readable release-truth registry entry.
@@ -41,8 +44,8 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Native target builds",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.2.0",
-			Scope:     "linux-x64 build/run plus macos-x64 and windows-x64 build-only release coverage",
-			Stability: "supported target metadata is validated by release checks",
+			Scope:     "linux-x64 build/run plus macos-x64, windows-x64, linux-x86, and linux-x32 build-only release coverage with pointer, rawptr, nullable_ptr, ref, c_int, c_uint, and the complete ILP32 native/libc scalar FFI object evidence set, x86/x32 allocator success/failure and island/free executable ABI smoke evidence, current x86/x32 core.net runtime ABI evidence, and explicit x86/x32 no-host-fallback, bounded two-spawn x86/x32 self-host scheduler evidence, function-pointer FFI diagnostics, remaining source target-layout scalar diagnostics, Surface, distributed actors, and actor-fanout diagnostics",
+			Stability: "supported target metadata is validated by release checks; linux-x64 keeps pointer plus c_int/c_uint @export object regression smokes, linux-x86 and linux-x32 now build canonical ptr/rawptr/nullable_ptr/ref plus c_int/c_uint plus the complete ILP32 native/libc scalar @export object smoke set and target-specific allocator success/failure plus island/free executable ABI smokes, and both build-only targets remain unpromoted until their remaining FFI/runtime/stdlib runner gates pass",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/cli_contracts.md"},
 		},
 		{
@@ -68,9 +71,92 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Static monomorphized generics MVP",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.2.0",
-			Scope:     "generic functions with inferred value arguments are statically monomorphized across modules; no runtime generic values or dynamic dispatch",
-			Stability: "supported static MVP; explicit type arguments, generic structs, higher-ranked generics, full protocol-bound generic dispatch, and specialization optimization remain future/post-v1",
+			Scope:     "generic functions with inferred value arguments are statically monomorphized across modules; tiny generic identity/wrapper calls may disappear through the internal small-pure inliner after monomorphization; no runtime generic values or dynamic dispatch",
+			Stability: "supported static MVP; explicit type arguments, generic structs, higher-ranked generics, full protocol-bound generic dispatch, and broad specialization optimization remain future/post-v1",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
+		},
+		{
+			ID:        "language.layout-abi-policy",
+			Name:      "Struct layout and ABI representation policy",
+			Status:    FeatureStatusCurrent,
+			Since:     "v0.4.0",
+			Scope:     "default structs carry Tetra representation metadata and do not promise C layout; repr(C) struct declarations parse and check into ABI-locked metadata; public ABI/exported FFI aggregate boundaries require explicit repr(C)",
+			Stability: "current P21.0 default layout freedom v1 metadata/report contract with .layout.json schema_version 2, policy p21.0_default_layout_freedom_v1, decision rows compiler_owned_default, abi_locked_repr_c, exported_ffi_explicit_repr_c, and validator rejection for fake layout freedoms; field_reordering, padding_removal, hot_cold_splitting, scalar_replacement, and aos_to_soa freedoms are explicitly unavailable for repr(C), while the compiler-owned default layout freedom is report evidence only and no field reordering, packing, hot/cold splitting, scalar replacement, AoS-to-SoA transform, performance change, runtime behavior change, or public ABI layout without repr(C) is claimed",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/design/truthful_intent_architecture.md", "docs/design/explainable_one_build.md", "docs/audits/default-layout-freedom-v1.md"},
+		},
+		{
+			ID:        "compiler.abi-verification",
+			Name:      "ABI verification v1",
+			Status:    FeatureStatusCurrent,
+			Since:     "v0.4.0",
+			Scope:     "P21.1 ABI verification v1 report schema tetra.abi.verification.v1 with scope p21.1_abi_verification covers linux-x64 SysV, linux-x86 i386 SysV, linux-x32 x32 SysV, macos-x64 SysV, windows-x64 Win64, wasm32-wasi, and wasm32-web target rows; task coverage includes abi_test_corpus, struct_enum_slice_string_return_validation, call_boundary_validation, and ffi_repr_c_tests; native rows reuse x86/x32/x64 classifier, aggregate, object, and FFI repr(C) diagnostics; wasm rows validate compiler-owned i32 slot ABI metadata and backend IRCall arg/return slot matching",
+			Stability: "current evidence/report contract only; no runtime execution claim for build-only or wasm targets, no C ABI claim for default structs, no native C aggregate ABI claim for wasm targets, no performance claim, and no safe-program semantics change",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/design/truthful_intent_architecture.md", "docs/design/explainable_one_build.md", "docs/audits/abi-verification-v1.md"},
+		},
+		{
+			ID:        "compiler.feature-surface-audit",
+			Name:      "Full feature surface audit v1",
+			Status:    FeatureStatusCurrent,
+			Since:     "v0.4.0",
+			Scope:     "P22.0 full feature surface audit report schema tetra.language.feature_surface_audit.v1 with scope p22.0_full_feature_surface_audit covers first-class callables, closures, protocols/trait objects, runtime generics, advanced enums/pattern matching, async typed errors, structured concurrency, modules/packages, macros/metaprogramming, UI/surface, and Eco/capsules; rows copy current FeatureRegistry statuses and preserve keep-current-bounded, keep-static-only, keep-post-v1, unsupported, or experimental-gate decisions without promoting a feature unless same-branch evidence exists",
+			Stability: "current evidence/report contract only; no full v1 language guarantee, runtime generic values, trait objects, runtime protocol values, macro/metaprogramming system, full structured concurrency, cross-platform production UI runtime, distributed EcoNet, proof-carrying capsules, performance claim, runtime behavior change, or safe-program semantics change is claimed",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/design/truthful_intent_architecture.md", "docs/design/explainable_one_build.md", "docs/audits/full-feature-surface-audit-v1.md"},
+		},
+		{
+			ID:        "compiler.first-class-callables-v1",
+			Name:      "First-class callables v1 evidence",
+			Status:    FeatureStatusCurrent,
+			Since:     "v0.4.0",
+			Scope:     "P22.1 first-class callables v1 report schema tetra.language.first_class_callables.v1 with scope p22.1_first_class_callables_v1 covers the bounded fnptr fast path, fat callable handle, capture safety classifier, mutable capture escape diagnostics, resource/thread escape diagnostics, fixed ABI width, cross-module interface metadata, and storage/callback paths; witnesses parse, check, and lower a one-capture 9-slot fnptr value without heap environment allocation plus a nine-capture fixed 4-slot handle value with IRAllocBytes, nine IRMemWritePtrOffset writes, nine IRMemReadPtrOffset reads, and call ArgSlots 10 RetSlots 1; generated .t4i metadata preserves ReturnFunctionHandleValue, heap escape kind, capture count, target identity, and ReturnSlots = 4",
+			Stability: "current evidence/report contract only for the existing safe by-value callable model; no variable-width callable ABI, exploding return slots, mutable by-reference capture support, pointer/resource capture support, thread-boundary callable transfer, runtime generic callable polymorphism, dynamic callable dispatch, unsafe lifetime relaxation, performance claim, runtime behavior change, or safe-program semantics change is claimed",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/design/truthful_intent_architecture.md", "docs/design/explainable_one_build.md", "docs/audits/first-class-callables-v1.md", "docs/release/v0_4_0_callable_evidence_map.md"},
+		},
+		{
+			ID:        "compiler.protocol-trait-object-decision",
+			Name:      "Protocol / trait object decision v1",
+			Status:    FeatureStatusCurrent,
+			Since:     "v0.4.0",
+			Scope:     "P22.2 protocol / trait object decision report schema tetra.language.protocol_trait_object_decision.v1 with scope p22.2_protocol_trait_object_decision records decision keep_static_conformance_only; rows cover static conformance fast path, static protocol-bound generics, runtime existential decision, explicit dynamic-dispatch gate, specialization static abstraction, witness-table boundary, trait-object boundary, and registry/docs alignment; witnesses parse, check, and lower a static protocol impl direct Vec2.draw IRCall, a protocol-bound generic concrete id__T_Vec2 direct call, runtime protocol value rejection with unknown type 'Drawable', generic-bound requirement-call rejection, and P17/P21 known-direct specialization evidence",
+			Stability: "current evidence/report decision only; runtime protocol values, trait objects, witness tables, dynamic dispatch, conformance-table lookup, runtime existential ABI, broad protocol specialization, performance, runtime behavior change, and safe-program semantics change are not promoted or claimed",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/design/truthful_intent_architecture.md", "docs/design/explainable_one_build.md", "docs/audits/protocol-trait-object-decision-v1.md", "docs/audits/inlining-specialization-v1.md", "docs/audits/specialization-machine-code-v1.md"},
+		},
+		{
+			ID:        "compiler.verified-track",
+			Name:      "Long-term verified track evidence",
+			Status:    FeatureStatusCurrent,
+			Since:     "v0.4.0",
+			Scope:     "internal P11/P16/P17/P18/P19 verified track: differential scalar-i32 stable IR interpreter compares source interpreter, stack backend, register backend, and optimized backend results; backend differential matrix v1 compares supported source, Stack IR, optimized Stack IR, SSA, Machine IR, and native execution lanes for scalar, slice-sum, branch/loop, and call-loop rows; optimizer pass contract v1 requires registered pass names, input/output verifier evidence, proof preservation or invalidation rules, translation validation hooks, stable report rows, negative-test markers, and validation metadata with sha256 before/after hashes, function set, proof facts, semantic checks, and differential samples; optimizer core coverage v1 records a bounded evidence-backed P17.1 closure with narrow safe const-denominator div_i32/mod_i32 constant folding plus same-local comparison algebraic simplification, narrow SCCP constant-condition, known-local and stored safe unary neg_i32 plus safe constant-expression facts including safe const-denominator div_i32/mod_i32, constant unary neg_i32 and binary-expression branch folding including safe const-denominator div_i32/mod_i32 with unary min-int and denominator 0 and -1 rejected, immediate and forward-terminated single-predecessor label propagation plus folded zero-branch target propagation for labels with one incoming edge and no fallthrough predecessor, folded nonzero-branch fallthrough propagation through immediate labels with no explicit incoming branch/jump edges, dynamic load-local zero-target and nonzero-fallthrough path facts, dynamic zero-comparison eq/ne zero/nonzero path facts, fallthrough-predecessor rejection, explicit-incoming fallthrough-label rejection, and fallthrough pruning, narrow Stack IR adjacent and stack-neutral separated single-assignment mem2reg temp promotion including bounded comparison-expression, safe const unary neg_i32, safe known-local unary neg_i32, safe const add_i32/sub_i32/mul_i32 arithmetic, safe known-local add_i32/sub_i32/mul_i32 arithmetic, safe const-denominator div_i32/mod_i32 producer temps, and safe known-local div_i32/mod_i32 producer temps with unary min-int, arithmetic overflow, source-local mutation, and denominator 0 and -1 rejected, bounded DCE for simple dead local stores, non-trapping comparison-expression stores, safe known-local unary neg_i32 stores, safe known-local add_i32/sub_i32/mul_i32 stores, safe const-denominator div_i32/mod_i32 stores, and safe known-local div_i32/mod_i32 stores with unary min-int, arithmetic overflow, and denominator 0 and -1 rejected, a narrow exact/commutative/mirrored-comparison local-load, local-load/constant, unary local neg_i32, safe known-local unary neg_i32 value, safe known-local add_i32/sub_i32/mul_i32 value, safe known-local cmp_*_i32 value, safe known-local div_i32/mod_i32 value, and safe const-denominator div_i32/mod_i32 CSE/GVN slice in basic-scalar including commutative add/mul/eq/ne and mirrored lt/gt/le/ge operand canonicalization, narrow proof-tagged LICM pure invariant comparison, add/sub/mul arithmetic, known-local add_i32/sub_i32/mul_i32 left-or-right operand hoisting, known-local cmp_*_i32 left-or-right operand hoisting, safe const-denominator div_i32/mod_i32 hoisting, and safe known-local div_i32/mod_i32 denominator hoisting, and bounded hot-loop shape evidence for scalar sum, scalar constant-stride sum, scalar sum-of-squares, scalar product reduction bounded to product *= index + 1, scalar branchy max reduction, scalar affine sum with compile-time scale and bias 1..127, scalar countdown, proof-tagged slice sum, proof-tagged slice constant-stride sum, and call-loop machine IR rows; inlining specialization coverage v1 records P17.2 target rows with narrow monomorphized generic identity/wrapper, small-pure inline-small-pure, payload enum known-case match and proven-some optional match sccp-constant-branch evidence, statically checked protocol/conformance direct-call inline-small-pure evidence, statically resolved extension-call inline-small-pure evidence, inlined/not_inlined report reasons, the same 8-instruction body cap, translation validation, constant_stack_store tag tracking, known direct Stack IR function symbol boundaries, and explicit non-claims for protocol-bound requirement calls, witness tables, trait objects, runtime protocol values, dynamic dispatch, and conformance-table lookup; vectorization coverage v1 records P17.3 initial target rows with proof-tagged sum []i32 candidate recognition, range-proof evidence, noalias-not-required read-only reduction evidence, safe unaligned i32x4 vector backend lowering through vector-i32x4-slice-sum-plan, linux-x64 native SIMD lowering for proof-tagged step=1 sum []i32, scalar tail handling, scalar-i32-slice-sum fallback, translation/differential validation against stack fallback, proof-tagged copy []u8 vector backend lowering through vector-u8x16-copy-plan, noalias required source/dest disjoint owned-copy-result evidence, safe unaligned u8x16 load/store, scalar-u8-copy fallback, linux-x64 native SIMD lowering for proof-tagged copy []u8, copy []u8 translation/differential validation against stack fallback, proof-tagged simple map over []i32 guarded vector backend lowering through vector-i32x4-map-add-const-plan, single mutable slice in-place noalias-not-required evidence, safe unaligned i32x4 map load/store, scalar-i32-map fallback, linux-x64 native SIMD lowering for proof-tagged in-place add-constant-1 map []i32, map []i32 translation/differential validation against stack fallback, proof-tagged memset/memcpy helper evidence through vector-u8x16-memset-zero-plan, single mutable slice zero-fill noalias-not-required evidence, safe unaligned u8x16 zero-store, scalar-u8-memset-zero fallback, linux-x64 native SIMD zero-fill lowering for proof-tagged memset_zero_u8, memset_zero_u8 translation/differential validation against stack fallback, memcpy helper via copy []u8 evidence, and explicit no broad SIMD auto-vectorization, checked/no-proof copy, overlapping copy, checked/no-proof map, broader map-shape vectorization, arbitrary non-zero memset, overlapping memcpy, checked/no-proof helper, libc/runtime helper lowering, or performance claim; PGO/LTO/target-cpu evidence v1 records tetra.optimizer.profile.v1 canonical JSON profile collection format with duplicate and negative counter rejection, internal Options.ProfileInput optimizer profile input API, profile_input_policy pass-contract metadata, profile digest validation metadata, translation validation for profile-input foundation runs, profile-guided rewrite policy rejection, profile parsing is evidence-only, target-cpu feature detection foundation with portable baseline target-feature model, guarded codegen contract, no target-specific rewrite, LTO/incremental module summary foundation with tetra.incremental.module_summary.v1 dependency hash contract and non-consumer boundary, no LTO optimizer or incremental speedup claim, final safe-semantics closure validator rejects fake semantic-changing coverage, profile-guided rewrite policy, target-specific optimization evidence, and LTO/codegen/linker consumers, and no PGO, LTO, target-cpu, or profile flag changes safe-program semantics; actor runtime production-boundary audit v1 records tetra.runtime.actor.production_boundary.v1 rows for current actor runtime limits, scheduler prototype features, production runtime acceptance, and full claim blockers, with fake full production actor runtime claim rejection and explicit non-claims for production multi-threaded actor scheduling, non-Linux-x64 distributed actor runtime targets, message-pool exhaustion/reclamation, full cancellation and structured concurrency, full race-safety proof, and production broker deployment evidence; async I/O reactor v1 records tetra.runtime.io_reactor.v1 rows for Linux epoll v1, io_uring future boundary, kqueue macOS boundary, IOCP Windows boundary, WASI/web adapter boundary, nonblocking accept/read/write, readiness polling, task wakeups from I/O readiness, timer integration, cancellation, backpressure, reactor report rows, HTTP smoke, DB smoke, stress evidence, fake full production web-stack rejection, fake cross-platform reactor parity rejection, fake io_uring rejection, fake runtime-behavior-change rejection, and clear production boundary per platform; region-aware stdlib v1 records tetra.stdlib.region_aware.v1 rows for byte-oriented StringBuilder, VecBytes, fixed-capacity HashMapBytes, ByteBuffer, RingBuffer, borrowed JSON/HTTP views, PostgreSQL protocol helper reports, copy-only-when-needed reports, hidden-heap rejection, and fake production web/db/result claim rejection; no full production web stack, cross-platform reactor parity, io_uring support, runtime behavior change, official TechEmpower result, production HTTP/PostgreSQL stack promotion, broad generic collection API, or public stdlib mode is claimed; self-hosting gate requires register backend, optimizer, allocator, and stdlib evidence before a self-hosting claim; formal core spec covers values, provenance, borrow/copy, bounds proofs, allocation intent, raw pointer bounds metadata, and check-elimination validity",
+			Stability: "current internal evidence only; not a public backend selector, source interpreter mode, release optimization mode, full self-hosting claim, or full formal proof of the language",
+			Docs: []string{
+				"docs/spec/current_supported_surface.md",
+				"docs/design/explainable_one_build.md",
+				"docs/design/formal_core_semantics.md",
+				"docs/design/truthful_intent_architecture.md",
+				"docs/audits/master-plan-final-20260602.md",
+				"docs/audits/master-plan-final-20260602-artifact-map.md",
+				"docs/audits/truthful-performance-core-baseline.md",
+				"docs/audits/safe-borrow-returns-v1.md",
+				"docs/audits/noalias-mutable-borrow-v1.md",
+				"docs/audits/lifetime-module-boundaries-v1.md",
+				"docs/audits/implicit-region-lowering-readiness-v1.md",
+				"docs/audits/request-task-region-v1.md",
+				"docs/audits/thread-per-core-allocator-v1.md",
+				"docs/audits/raw-pointer-bounds-metadata-v1.md",
+				"docs/audits/backend-coverage-audit-v1.md",
+				"docs/audits/value-ssa-ir-v1.md",
+				"docs/audits/register-backend-coverage-expansion-v1.md",
+				"docs/audits/backend-differential-validation-v1.md",
+				"docs/audits/optimizer-pass-contract-v1.md",
+				"docs/audits/optimizer-core-coverage-v1.md",
+				"docs/audits/inlining-specialization-v1.md",
+				"docs/audits/vectorization-v1.md",
+				"docs/audits/pgo-lto-target-cpu-v1.md",
+				"docs/audits/actor-runtime-production-boundary-v1.md",
+				"docs/audits/typed-actor-ownership-transfer-v1.md",
+				"docs/audits/per-core-scheduler-v1.md",
+				"docs/audits/async-io-reactor-v1.md",
+				"docs/audits/region-aware-stdlib-v1.md",
+			},
 		},
 		{
 			ID:        "language.protocol-conformance-mvp",
@@ -122,8 +208,8 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Effects and uses checker MVP",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.3.0",
-			Scope:     "stable uses effect names and groups with transitive call propagation across resolved direct, generic, protocol, and supported callable paths; missing uses declarations are diagnostics",
-			Stability: "supported static MVP; no effect inference or proof-level effect system guarantee is claimed",
+			Scope:     "stable uses effect names and groups with transitive call propagation across resolved direct, generic, protocol, and supported callable paths; missing uses declarations are diagnostics; PLIR exposes checker-enforced optimizer facts for pure/no-alloc/no-mem-write/no-actor-send/no-unknown-escape cases",
+			Stability: "supported static MVP; no effect inference or proof-level effect system guarantee is claimed, and optimizer facts are emitted only from checked declared effects",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/spec/capabilities.md"},
 		},
 		{
@@ -158,9 +244,9 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Production safety core",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.4.0",
-			Scope:     "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates",
-			Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees",
-			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md"},
+			Scope:     "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, pointer/MMIO/memory capability gates, Memory Production Core v1 report evidence through compiler-owned facts rather than report-reconstructed truth, a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims",
+			Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, runtime-wide guarantees, and arbitrary unsafe external pointer safety",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/spec/unsafe.md", "docs/spec/memory_report_schema_v1.md", "docs/design/memory_production_core_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-baseline.md", "docs/audits/memory-production-core-v1-gap-map.md", "docs/audits/memory-production-core-v1-supported-surface.md", "docs/audits/memory-target-capability-matrix.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md"},
 		},
 		{
 			ID:        "language.globals-properties-capsule-mvp",
@@ -176,9 +262,18 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Native-first slice MVP",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.2.0",
-			Scope:     "[]u16 and []bool helpers including make_* and island compile-compatible fallback paths",
+			Scope:     "[]u8/[]u16/[]i32/[]bool helpers including make_* and island_make_* allocation-length contracts, island compile-compatible fallback paths, checked slice window/prefix/suffix safe view constructors, proof-tagged for-loop and supported while-loop bounds-check removal through PLIR CFG/dominance/range facts, explicit borrow/copy/copy_into methods, and checked String byte window/prefix/suffix/borrow/copy/copy_into methods with provenance-aware PLIR facts, allocation/proof/bounds report evidence, and actor-boundary copy diagnostics",
 			Stability: "supported MVP with documented layout/runtime constraints",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/stdlib.md"},
+		},
+		{
+			ID:        "language.safe-view-lifetime-contracts-v1",
+			Name:      "Safe View Lifetime Contracts v1",
+			Status:    FeatureStatusCurrent,
+			Since:     "v0.4.0",
+			Scope:     "borrowed return signatures for supported slice/String byte views, cross-module borrowed return preservation, single-source borrowed return validation, recursive hidden-borrow escape checks for structs/enums/optionals/generic wrappers, actor and typed-task copy-required boundaries, and PLIR/proof/alloc evidence for borrow/copy/borrowed-return facts",
+			Stability: "current conservative lifetime contract for safe view surfaces; named lifetimes, generic lifetime parameters, arbitrary borrowed aggregate returns, full Unicode String lifetime semantics, Rust-like borrow checking, and production FFI lifetime contracts remain outside this claim",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/design/truthful_safe_values.md", "docs/design/provenance_lifetime_ir.md", "docs/design/truthful_intent_architecture.md", "docs/user/examples_index.md"},
 		},
 		{
 			ID:        "language.ownership-markers-mvp",
@@ -239,9 +334,9 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Core standard library current profile",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.2.0",
-			Scope:     "release-covered lib.core helper modules with a capability-gated linux-x64 filesystem exists slice, executable Linux TCP socket client/server I/O helpers with recv/send, SO_REUSEPORT, TCP_NODELAY, nonblocking accept convenience, and epoll add/mod/delete plus wait-one readiness flag capture and predicates, stable crypto interface helpers, stable networking endpoint policy helpers, executable HTTP/1.1 String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers, and executable JSON byte-buffer response helpers",
-			Stability: "current import paths and smoke coverage; filesystem exists is host-backed on linux-x64, net socket open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close plus SO_REUSEPORT, TCP_NODELAY, SOCK_NONBLOCK/SOCK_CLOEXEC accept helpers, and epoll create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one/wait-one-into helpers with EPOLLIN/EPOLLOUT/EPOLLERR/EPOLLHUP predicates are host-backed on linux-x64, crypto exposes deterministic interface helpers, networking exposes deterministic endpoint policy helpers, HTTP helpers classify TechEmpower request lines from String text or caller-owned byte buffers, locate CRLFCRLF request-head boundaries for pipelined buffers, and write compact response payloads into caller-owned buffers, and JSON helpers write compact response bodies into caller-owned buffers",
-			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/stdlib.md", "docs/user/standard_library_guide.md"},
+			Scope:     "release-covered lib.core helper modules with a capability-gated linux-x64 filesystem exists slice plus filesystem+scheduler composition and scheduler-restriction regression smokes, x86 and x32 no-runtime stdout/string-literal executable smokes, x86 and x32 stderr fd runtime smokes through core.net_write(2), x86 and x32 allocator success/failure executable smokes for core.alloc_bytes plus raw store/load and checked invalid-size/mmap-error exit lowering, x86 and x32 island/free executable smokes for scoped island allocation/free and debug free guard lowering, x86 and x32 filesystem+scheduler self-host composition smokes, x86 and x32 bounded two-spawn actors/task/task-group self-host smokes, x86 and x32 typed-task self-host smokes, x86 and x32 staged typed-task self-host smokes, x86 and x32 typed task-group self-host smokes, and pure fs_exists linux-x86/linux-x32 smokes, executable Linux TCP socket client/server I/O helpers with recv/send, SO_REUSEPORT, TCP_NODELAY, nonblocking accept convenience, and epoll add/mod/delete plus wait-one readiness flag capture and predicates, stable crypto interface helpers, stable networking endpoint policy helpers, executable HTTP/1.1 String and byte-buffer request-line routing, request-head framing, and response byte-buffer helpers, executable JSON byte-buffer response helpers, and internal P7/P19 runtime evidence for region-aware collection/buffer storage planning, P19 byte-oriented StringBuilder/VecBytes/HashMapBytes/RingBuffer helpers, borrowed JSON parsing, borrowed HTTP request-head parsing, and PostgreSQL borrowed/binary row helpers",
+			Stability: "current import paths and smoke coverage; filesystem exists is host-backed on linux-x64 including filesystem+scheduler composition and scheduler-restriction regression smokes, x86 and x32 no-runtime stdout/string-literal executables plus core.net_write fd=2 stderr runtime executables, core.alloc_bytes allocator success/failure executable smokes, and scoped island/free executable smokes are covered by ABI smokes, composable with the x86 and x32 self-host scheduler slices, x86 and x32 two-spawn actors/task/task-group flows are covered by self-host runtime smokes, x86 and x32 typed-task handles are covered by self-host runtime smokes with staged typed-task coverage, x86 and x32 typed task-group composition are covered by self-host runtime smokes, and pure fs_exists linux-x86/linux-x32 smokes remain covered; full x86/x32 allocator/free/panic parity remains unpromoted. net socket open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close plus SO_REUSEPORT, TCP_NODELAY, SOCK_NONBLOCK/SOCK_CLOEXEC accept helpers, and epoll create/add-read/add-read-write/mod-read/mod-read-write/delete/wait-one/wait-one-into helpers with EPOLLIN/EPOLLOUT/EPOLLERR/EPOLLHUP predicates are host-backed on linux-x64, crypto exposes deterministic interface helpers, networking exposes deterministic endpoint policy helpers, HTTP helpers classify TechEmpower request lines from String text or caller-owned byte buffers, locate CRLFCRLF request-head boundaries for pipelined buffers, and write compact response payloads into caller-owned buffers, JSON helpers write compact response bodies into caller-owned buffers, and P7/P19 internal runtime helpers provide checked storage/provenance/copy evidence without promoting broad generic collection APIs, production web/db stacks, or official TechEmpower claims",
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/stdlib.md", "docs/user/standard_library_guide.md", "docs/audits/region-aware-stdlib-v1.md"},
 		},
 		{
 			ID:        "stdlib.experimental-mirrors",
@@ -275,9 +370,129 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "UI metadata v1 surface",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.4.0",
-			Scope:     "production UI metadata contract for checked view/state declarations, deterministic tetra.ui.v1 JSON, web command-dispatch preview artifacts, style metadata preview attributes, accessibility metadata preview attributes, and native shell command-dispatch text plus JSON trace sidecars with deterministic widget-tree artifacts",
-			Stability: "current metadata plus wasm32-web command dispatch and native shell command dispatch/widget-tree traces for lowered scalar state operations; style and accessibility metadata are preview attributes only, while executable Linux-x64 native runtime evidence is tracked by ui.native-runtime",
+			Scope:     "legacy metadata compatibility surface preserving the production UI metadata contract for checked view/state declarations, deterministic tetra.ui.v1 JSON, web command-dispatch preview artifacts, style metadata preview attributes, accessibility metadata preview attributes, and native shell command-dispatch text plus JSON trace sidecars with deterministic widget-tree artifacts",
+			Stability: "current legacy metadata compatibility path for existing apps, including wasm32-web command dispatch and native shell command dispatch/widget-tree traces for lowered scalar state operations; it is not the new Tetra Surface runtime, not the pure-Tetra component model, and not a basis for new Surface host claims; style and accessibility metadata are preview attributes only, while executable Linux-x64 native runtime evidence is tracked by ui.native-runtime",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/spec/v1_feature_status.md", "docs/user/wasm_ui_guide.md"},
+		},
+		{
+			ID:        "ui.surface-core",
+			Name:      "Tetra Surface core",
+			Status:    FeatureStatusCurrent,
+			Since:     "surface-v1",
+			Scope:     "surface-v1-linux-web current release scope: pure-Tetra UI, tiny Surface Host ABI, software RGBA framebuffer presentation, owned/copy-safe event and text buffers, and release evidence for headless, linux-x64 real-window, and wasm32-web browser-canvas targets",
+			Stability: "current only for the bounded Surface v1 linux/web release scope; macOS, Windows, wasm32-wasi UI, GPU rendering, platform widgets, DOM/user-JS app logic, dynamic trait-object widgets, witness-table component dispatch, and rich text editor claims remain unsupported or future work",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md", "docs/release/surface_v1_release_notes.md", "docs/release/surface_v1_release_audit.md"},
+		},
+		{
+			ID:        "ui.surface-headless",
+			Name:      "Headless Tetra Surface runtime",
+			Status:    FeatureStatusCurrent,
+			Since:     "surface-v1",
+			Scope:     "release-test target for deterministic Surface runtime, text/input, toolkit, accessibility, artifact-hash, and validator evidence under surface-v1-linux-web",
+			Stability: "current as a release evidence target, not as an end-user platform claim; reports are validated by strict Surface v1 release validators and artifact hashes",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		},
+		{
+			ID:        "ui.surface-linux-x64",
+			Name:      "Linux-x64 Tetra Surface host",
+			Status:    FeatureStatusCurrent,
+			Since:     "surface-v1",
+			Scope:     "current linux-x64-release-window-v1 Surface target using Wayland shm RGBA real-window evidence, native event pump, text input, clipboard, IME/composition trace, toolkit, and accessibility bridge evidence",
+			Stability: "current only for the proven linux-x64 real-window release path; no GTK, Qt, platform widget, metadata sidecar playback, macOS, or Windows production claim is implied",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		},
+		{
+			ID:        "ui.surface-web-wasm",
+			Name:      "WASM web Tetra Surface",
+			Status:    FeatureStatusCurrent,
+			Since:     "surface-v1",
+			Scope:     "current wasm32-web-browser-canvas-release-v1 Surface target with compiler-owned browser boot, browser canvas RGBA presentation/readback, browser input, clipboard, composition, accessibility snapshot, and accessibility mirror evidence",
+			Stability: "current only for pure-Tetra apps running through the tiny Surface Host ABI; DOM UI, React, user JavaScript app logic, metadata-only UI sidecars, Node-only evidence, and arbitrary browser widget claims are rejected by validators",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		},
+		{
+			ID:        "ui.surface-component-model",
+			Name:      "Tetra Surface component model",
+			Status:    FeatureStatusCurrent,
+			Since:     "surface-v1",
+			Scope:     "component-tree-api release subset where ordinary Tetra structs use `lib.core.component`, helper-owned parent/child links, stable ids, layout helpers, hit testing, focus routing, root-to-leaf dispatch paths, and no manual app-side tree bookkeeping",
+			Stability: "current for the static release subset only; dynamic trait-object child lists, witness-table component dispatch, arbitrary reactive frameworks, and platform-native component trees remain future work",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		},
+		{
+			ID:        "ui.surface-toolkit-v1",
+			Name:      "Tetra Surface toolkit v1",
+			Status:    FeatureStatusCurrent,
+			Since:     "surface-v1",
+			Scope:     "production-widgets-v1 release subset in `lib.core.widgets`: Text, Label, StatusText, Button, TextBox, Checkbox, Row, Column, Panel, Stack, Scroll, and Spacer over the ComponentTree helper API",
+			Stability: "current for the release widget subset with owned/copy-safe state and no magical widgets, platform widgets, DOM UI, user JS, or demo-local widget structs; broader widget libraries remain post-release work",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/release/surface_v1_release_notes.md"},
+		},
+		{
+			ID:        "ui.surface-text-input-v1",
+			Name:      "Tetra Surface text/input v1",
+			Status:    FeatureStatusCurrent,
+			Since:     "surface-v1",
+			Scope:     "production-text-input-v1 baseline covering UTF-8 byte storage, caret, selection, copy/paste clipboard transfer, clipboard read/write, IME/composition trace, focused TextBox routing, and host-boundary copy semantics",
+			Stability: "current for the bounded Surface v1 text/input baseline; rich text, IDE-grade editing, arbitrary native text controls, and full Unicode editor semantics remain unsupported in this release",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/release/surface_v1_release_notes.md"},
+		},
+		{
+			ID:        "ui.surface-accessibility-v1",
+			Name:      "Tetra Surface accessibility v1",
+			Status:    FeatureStatusCurrent,
+			Since:     "surface-v1",
+			Scope:     "platform-bridge-v1 accessibility for supported targets: metadata tree exported through the Linux accessibility bridge/probe path and wasm32-web browser accessibility snapshot/mirror",
+			Stability: "current for supported targets only; metadata-only reports, DOM/ARIA claims without compiler-owned mirror evidence, screen-reader claims, macOS/Windows accessibility, and full AT-SPI claims remain unsupported without separate proof",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/release/surface_v1_release_notes.md"},
+		},
+		{
+			ID:        "ui.surface-minimal-toolkit",
+			Name:      "Tetra Surface minimal widget toolkit",
+			Status:    FeatureStatusExperimental,
+			Scope:     "historical minimal-widgets-v1 evidence absorbed by ui.surface-toolkit-v1; retained for backward report references and regression evidence",
+			Stability: "absorbed by ui.surface-toolkit-v1 and not a public current release API; reports remain experimental historical evidence and must not claim production toolkit support",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
+		},
+		{
+			ID:        "ui.surface-toolkit-reuse-v1",
+			Name:      "Tetra Surface toolkit reuse v1",
+			Status:    FeatureStatusExperimental,
+			Scope:     "historical toolkit-reuse-v1 multi-form evidence absorbed by ui.surface-toolkit-v1; retained for backward report references and regression evidence",
+			Stability: "absorbed by ui.surface-toolkit-v1 and not a public current release API; reports remain experimental historical evidence and must not claim production toolkit support",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
+		},
+		{
+			ID:        "ui.surface-accessibility-metadata-tree-v1",
+			Name:      "Tetra Surface accessibility metadata tree v1",
+			Status:    FeatureStatusExperimental,
+			Scope:     "internal layer under ui.surface-accessibility-v1; retained as historical metadata-tree evidence for roles, labels, values, states, bounds, relationships, focus order, reading order, actions, snapshots, and status updates",
+			Stability: "internal layer under ui.surface-accessibility-v1 and not a public production accessibility claim by itself; metadata-only evidence must not claim platform accessibility, DOM/ARIA, screen-reader, or full AT-SPI support",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
+		},
+		{
+			ID:        "ui.surface-macos-x64",
+			Name:      "macOS Surface host",
+			Status:    FeatureStatusUnsupported,
+			Scope:     "unsupported for Surface v1; no production target evidence exists for macOS real-window Surface",
+			Stability: "no production target evidence in surface-v1-linux-web and no current macOS Surface support claim",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
+		},
+		{
+			ID:        "ui.surface-windows-x64",
+			Name:      "Windows Surface host",
+			Status:    FeatureStatusUnsupported,
+			Scope:     "unsupported for Surface v1; no production target evidence exists for Windows real-window Surface",
+			Stability: "no production target evidence in surface-v1-linux-web and no current Windows Surface support claim",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
+		},
+		{
+			ID:        "ui.surface-wasm32-wasi",
+			Name:      "WASI Surface UI runtime",
+			Status:    FeatureStatusUnsupported,
+			Scope:     "unsupported for Surface v1; wasm32-wasi has no Surface UI runtime production target evidence",
+			Stability: "no production target evidence in surface-v1-linux-web and no current wasm32-wasi Surface UI support claim",
+			Docs:      []string{"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
 		},
 		{
 			ID:        "wasm.runtime-execution",
@@ -345,6 +560,61 @@ func FeatureRegistry() []FeatureInfo {
 	copy(out, features)
 	for i := range out {
 		out[i].Docs = append([]string(nil), features[i].Docs...)
+		if out[i].ID == "compiler.verified-track" {
+			out[i].Scope += "; P17.3 simple map over []i32 executable evidence is limited to proof-tagged in-place add-constant-1 linux-x64 native SIMD through vector-i32x4-map-add-const-plan, single mutable slice in-place noalias-not-required evidence, safe unaligned i32x4 map load/store, scalar-i32-map fallback, and stack-fallback translation/differential validation; P17.3 memset/memcpy helper executable evidence is limited to proof-tagged zero-fill memset_zero_u8 through vector-u8x16-memset-zero-plan plus memcpy helper via copy []u8 evidence; no checked/no-proof map, broader map-shape vectorization, arbitrary non-zero memset, overlapping memcpy, checked/no-proof helper, libc/runtime helper lowering, or performance claim is made"
+			out[i].Scope += "; typed actor ownership transfer v1 records tetra.actors.ownership_transfer.v1 rows for borrowed-view copy boundaries, owned-region move, sender use-after-move diagnostics, receiver ownership evidence, explicit copy fallback, unsafe-send contract model evidence, semantics transfer checker, PLIR moved facts with FactMoved and OpActorSend for direct core.send_typed ownership transfers, runtime mailbox representation, actor-transfer reports, stress diagnostics, fake distributed zero-copy rejection, and fake runtime-behavior-change rejection; no distributed pointer or region zero-copy, safe typed actor raw pointer payload, actor scheduler promotion, or production actor runtime claim is made"
+			out[i].Scope += "; per-core scheduler v1 records tetra.parallel.per_core_scheduler.v1 rows for per-core queues, work stealing, bounded typed mailboxes, backpressure, timers sleep/wake, structured task groups, cancellation checkpoints, actor ping-pong, fanout/fanin, task group cancel, backpressure overflow, mailbox fairness with FIFO receive, stress evidence, race detector where applicable, fake full production actor-runtime rejection, fake runtime-behavior-change rejection, and fake all-target race-detector rejection; no non-Linux distributed actor runtime target, full production actor runtime, full race-safety proof, scheduler performance claim, public runtime mode, or safe-semantics flag change is claimed"
+			out[i].Scope += "; stable generic collections v1 records tetra.stdlib.generic_collections.v1 rows for stable Tetra-source Vec<T> and HashMap<K,V> caller-owned slice views, generic value representation through genericTypeName and mangleGenericName, generic-struct parameter inference through bindGenericNamedTypeArgs, monomorphized vec_from_slice<T> and hash_map_from_slices<K,V> operations, common hash_map_get_i32_i32_or and hash_map_get_u8_i32_or specializations, allocation-plan report linkage through core.make_* caller allocations, and a checked truth-bench-harness dry-run artifact for scope p19.1_generic_collections with hash table Tetra/C++/Rust equivalents, report path reports/stable-generic-collections-v1/benchmarks/generic-collections-hash-table-report.json, matching algorithm_id/input metadata, and Tetra proof/allocation/bounds/performance report artifacts; no allocator-backed production Vec<T>/HashMap<K,V> runtime, generic hashing/equality protocol, C++/Rust parity, broad production stdlib, hidden runtime allocator, measured speed comparison, or official benchmark result is claimed"
+			out[i].Scope += "; production HTTP/JSON stack v1 foundation records tetra.stdlib.http_json.production_stack.v1 rows for HTTP/1.1 request-head parsing, pipelined request heads, headers/body/keep-alive metadata, zero-heap request-view evidence, JSON parse/stringify, response building, internal per-server UTC-second Date cache helper evidence through HTTPDateCache and FormatWithReport, Linux writev/sendfile helper evidence through netrt.Writev and netrt.Sendfile, and a checked truth-bench-harness dry-run artifact for scope p19.2_http_json_source_first with Tetra-only HTTP plaintext and HTTP JSON rows, report path reports/production-http-json-v1/benchmarks/http-json-source-first-report.json, matching algorithm_id/input metadata, and Tetra proof/allocation/bounds/P19.2 coverage artifacts; webrt.flush scatter/gather integration, HTTP static-file sendfile path, and non-Linux writev/sendfile parity remain documented boundaries, and no full production web stack, official TechEmpower result, production PostgreSQL stack, P20 performance matrix, C++/Rust parity, measured speed comparison, source-level cached-date API, cross-worker Date cache, zero-copy production file-serving, or runtime behavior change is claimed"
+			out[i].Scope += "; production PostgreSQL driver/pool v1 closure records tetra.stdlib.postgresql.production_driver.v1 rows for startup/SCRAM, prepared statements, binary int4 helpers, pooling/backpressure, borrowed DataRow decode, local DB single query, DB multiple queries, DB updates, DB fortunes endpoint workloads, a checked truth-bench-harness dry-run artifact for scope p19.3_postgres_source_first with Tetra-only DB rows, report path reports/production-postgres-v1/benchmarks/postgres-source-first-report.json, matching algorithm_id/input metadata, and Tetra proof/allocation/bounds/P19.3 coverage artifacts, plus live local SCRAM benchmark honesty evidence through validate-techempower-report on docs/benchmarks/techempower_scram_single_query_local_report.json, docs/benchmarks/techempower_scram_single_query_matrix_local_report.json, and docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json; no official TechEmpower result, production database benchmark, P20 performance matrix, C++/Rust parity, external production database deployment, full source-level PostgreSQL driver API, measured speed comparison, or runtime behavior change is claimed"
+			out[i].Scope += "; benchmark matrix hardening v1 records the p20.0_benchmark_matrix truth-bench-harness contract with 68 checked dry-run rows for 17 master-plan categories across Tetra, C clang -O3, C++ clang++ -O3, and Rust rustc -C opt-level=3, including matching algorithm_id/input metadata, raw output artifacts on every row, Tetra proof/allocation/bounds/performance artifacts on every Tetra row, report path reports/benchmark-matrix-hardening-v1/benchmarks/p20-matrix-hardening-report.json, and row target CPU consistency with host target CPU; no measured speed comparison, C++/Rust parity, official benchmark result, official TechEmpower result, production database benchmark, P20.1 blocker completeness, P20.2 claim-tier promotion, throughput advantage, latency advantage, startup-time advantage, binary-size advantage, or compile-time advantage is claimed"
+			out[i].Scope += "; performance blocker reports v1 records compiler .perf.json schema_version 3 for P20.1 with matrix scope p20.0_benchmark_matrix, report path reports/benchmark-matrix-hardening-v1/benchmarks/artifacts/p20-matrix-hardening.perf.json, ValidatePerformanceBlockerReport, the exact blocker reasons left bounds check: missing dominance, heap allocation: escapes through return, heap allocation: unknown call, not vectorized: no noalias proof, not inlined: code-size budget, register spill: live range pressure, stack fallback: unsupported aggregate return, and actor copy: borrowed data crosses boundary, plus 17 P20.0 Tetra benchmark explanation rows from integer_loops_tetra through compile_time_tetra; no measured speed comparison, C++/Rust parity, official benchmark result, official TechEmpower result, P20.2 claim-tier promotion, optimizer behavior change, runtime behavior change, blocker removal, throughput advantage, or latency advantage is claimed"
+			out[i].Scope += "; claim tiers v1 records tetra.performance.claim_tiers.v1 scope p20.2_claim_tiers with exact Tier 0 local smoke only, Tier 1 local benchmark evidence, Tier 2 reproducible cross-machine benchmark, Tier 3 independent reproduced benchmark, and Tier 4 official upstream benchmark submission policy rows, checked artifact reports/claim-tiers-v1/claim-tier-report.json, current P20.0/P20.1 public claim p20_current_local_smoke_only at tier0_local_smoke_only, required evidence classes local_smoke, local_benchmark, cross_machine_reproduction, independent_reproduction, and official_upstream_submission, and validator rejection for fake local benchmark evidence, cross-machine benchmark, independent reproduced benchmark, official upstream benchmark submission, official TechEmpower, measured speed, throughput advantage, latency advantage, and C++/Rust parity wording unless explicit non-claims or matching tier evidence exist; current P20.0/P20.1 evidence remains Tier 0 only"
+			out[i].Scope += "; specialization machine-code evidence v1 records tetra.optimizer.specialization_machine_code.v1 scope p21.2_specialization_v1_v2 rows for generics, protocol/static conformance, extension methods, enum match known cases, optionals, and collections; BuildP21SpecializationMachineCodeWitness uses inline-small-pure plus machine.ScalarIntFunctionFromStackIR to prove a known direct helper call is present before optimization, absent from optimized Stack IR, and absent as OpCall from verified scalar Machine IR, with translation validation; rows connect P17.2 monomorphized generic identity/wrapper, statically checked protocol impl direct calls, statically resolved extension method direct calls, SCCP known enum discriminator branch folding, proven-some optional presence branch folding, and P19.1 caller-owned Vec<T>/HashMap<K,V> monomorphized helper evidence; validator rejects placeholder evidence, missing target rows, fake broad specialization, fake dynamic dispatch, fake runtime generic values, fake allocator-backed generic collections, fake layout/ABI freedom, fake performance, and fake safe-semantics changes"
+			out[i].Scope += "; translation validation v2 records tetra.translation.validation.v2 scope p23.0_translation_validation_v2 rows for registered optimizer pass coverage, symbolic scalar equivalence, supported i32 slice memory equivalence, bounds proof preservation, allocation plan preservation, and machine-checkable sha256 before/after optimization metadata; witnesses run opt.NewManager over opt.RegisteredPasses, validation.ValidateTranslation scalar and proof cases, differential backend matrix loop/call/slice samples, validation.ValidateAllocationLowering, and BuildOptimizationValidationMetadata; validator rejects missing rows/witnesses, placeholders, incomplete registered-pass coverage, missing scalar/memory/loop/call/proof/allocation/hash evidence, fake full formal proof, fake exhaustive optimizer completeness, fake broad memory or loop proof claims, fake performance, fake runtime behavior change, and fake safe-semantics changes"
+			out[i].Scope += "; fuzz/property/differential expansion v1 records tetra.fuzz.property.differential.v1 scope p23.1_fuzz_property_differential rows for parser/checker generated programs, PLIR/lowering verifier pipeline, backend differential matrix expansion, native backend boundary, runtime allocator properties, actor transfer stress boundary, fuzz nightly summary gate, and reducer failure artifacts; witnesses run compiler.Parse, compiler.Check, BuildPLIR, Lower, VerifyIRProgram, differential.CheckBackendMatrix with deterministic randomized samples, host-supported Linux x64 native backend lane or explicit unavailable boundary, runtimeabi.AlignRegionBytes valid/invalid allocator properties, actorsafety.TypedActorOwnershipTransferCoverage stress diagnostics and PLIR moved facts, fuzz-nightly/validate-fuzz-summary artifact contract, and reduced_to_single_sample mismatch reproducer; validator rejects missing rows/witnesses, placeholders, missing generated parser/checker cases, missing PLIR/lowering verifier cases, missing backend randomized samples, missing reducer evidence, missing native-host sample or explicit non-host boundary, missing runtime allocator property evidence, missing actor-transfer stress diagnostics, missing fuzz summary artifacts or nightly boundary, fake full program correctness, fake exhaustive fuzzing, fake full native differential, fake performance, fake runtime behavior change, and fake safe-semantics changes"
+			out[i].Scope += "; formal core v1 records tetra.formal_core.v1 scope p23.2_formal_core_v1 rows for values, borrows and owned/copy, provenance and regions, bounds proof id semantics, allocation length contract, allocation intent lowering, raw pointer bounds metadata, and check-elimination validity; witnesses run formalcore.ValidateSpec, differential.CheckBackendMatrix, compiler.Parse, compiler.Check, BuildPLIR, plir.VerifyProgram, validation.CheckBoundsProofsWithPLIR, allocplan.FromPLIR, validation.ValidateAllocationLowering, runtimeabi.NewRawAllocationBounds, runtimeabi.DeriveRawPointerBounds, and runtimeabi.RawSliceBoundsFromParts; validator rejects missing rows/witnesses, placeholders, missing formal spec validation, missing value samples, missing borrow/copy or provenance/regions facts, missing bounds proof id or check-elimination evidence, missing allocation length contract evidence, missing allocation-intent lowering evidence, missing raw pointer bounds metadata evidence, fake full formal proof, fake broad language proof, fake unsafe policy change, fake runtime behavior change, fake safe-semantics changes, and fake performance"
+			out[i].Scope += "; self-hosting gate v1 records tetra.self_hosting.gate.v1 scope p23.3_self_hosting_gate rows for self-host subset definition, small compiler component compile boundary, Go compiler output vs Tetra-compiled output comparison boundary, register backend stability, optimizer validation maturity, allocator/runtime stability, stdlib sufficiency, deterministic bootstrap chain, cross-platform bootstrap story, and no self-hosting claim; witnesses run selfhostgate.Evaluate, differential.CheckBackendMatrix, BuildP23TranslationValidationV2, runtimeabi.RuntimeAllocationContracts, runtimeabi.RuntimeRegionAllocatorConfig, runtimeabi.RuntimePerCoreSmallHeapABI, and stdlibrt.RegionAwareStdlibCoverage; current report requires SelfHostingClaimed=false and GateDecision.Allowed=false, records missing small compiler component, Go-vs-Tetra output comparison, deterministic bootstrap chain, and cross-platform bootstrap story blockers, and validator rejects missing rows/witnesses, placeholders, weak compiler subset/backend/optimizer/allocator/runtime/stdlib evidence, fake self-hosting claim, fake small compiler component, fake output comparison, fake deterministic bootstrap, fake cross-platform bootstrap, fake runtime behavior change, fake safe-semantics changes, and fake performance"
+			out[i].Scope += "; security review gate v1 records tetra.security.review_gate.v1 scope p24.0_security_review_gate rows for unsafe API surface, capability surface, memory allocator, network runtime, actor runtime, DB protocol, package/Eco system, build scripts, supply chain, and required artifact set; artifacts are docs/audits/security-review.md, docs/audits/threat-model.md, docs/audits/unsafe-surface-map.md, and docs/audits/capability-surface-map.md; witnesses run runtimeabi.RuntimeAllocationContracts, runtimeabi.RuntimeRawPointerBoundsABI, netrt.IOReactorCoverage, actorsrt.ActorRuntimeProductionBoundaryAudit, pgrt.ProductionPostgresCoverage, Eco validator path checks, release security-review script checks, and artifact presence checks; validator rejects missing rows/witnesses, weak artifacts, fake security certification, fake external penetration test, fake CVE-free status, fake release security signoff, fake runtime behavior change, fake safe-semantics changes, and fake performance"
+			out[i].Scope += "; runtime hardening v1 records tetra.runtime.hardening.v1 scope p24.1_runtime_hardening rows for deterministic traps, OOM policy, stack overflow guard boundary, integer overflow semantics audit, allocator corruption detection instrumentation, region double-free/use-after-free instrumentation, actor mailbox overflow policy, and network parser limits; witnesses run runtimeabi.RuntimeAllocationContracts, runtimeabi.RuntimeRegionAllocatorConfig, runtimeabi.RuntimePerCoreSmallHeapABI, runtimeabi.NewPerCoreSmallHeapAllocator, parallelrt.NewTypedMailbox, actorsrt.ActorRuntimeProductionBoundaryAudit, httprt.ParseRequest, httprt.ParseRequestView, pgrt.ReadFrame, backend trap/stack-depth file checks, and optimizer overflow-semantics file checks; validator rejects missing rows/witnesses, placeholders, missing runtime-hardening artifacts, fake full runtime-hardening proof, fake full stack-overflow protection, fake OOM recovery, fake full allocator-corruption detection, fake production actor-mailbox promotion, fake runtime behavior change, fake safe-semantics changes, and fake performance"
+			out[i].Scope += "; compatibility/stability v1 records tetra.compatibility.stability.v1 scope p24.2_compatibility_stability rows for stable diagnostic codes, versioned report schemas, manifest compatibility checks, breaking-change migration guide, and deprecation policy; witnesses read DiagnosticCodeRegistry, validate-diagnostic, P21-P24 schema constants, validate-manifest, docs/generated/manifest.json, docs/spec/api_diff_policy.md, docs/release/breaking-change-migration-guide.md, docs/release/deprecation_policy.md, docs/release/v1_0_x_maintenance_policy.md, and docs/spec/stdlib_naming_versioning.md; validator rejects missing rows/witnesses, placeholders, missing compatibility-stability artifacts, fake full backward compatibility, fake frozen diagnostic messages, fake automatic migration, fake manifest/runtime ABI stability, fake breaking change without migration guide, fake removal without deprecation, fake runtime behavior change, fake safe-semantics changes, and fake performance"
+			out[i].Docs = append(out[i].Docs, "docs/audits/typed-actor-ownership-transfer-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/per-core-scheduler-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/stable-generic-collections-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/production-http-json-stack-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/production-postgres-driver-pool-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/benchmark-matrix-hardening-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/performance-blocker-reports-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/claim-tiers-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/specialization-machine-code-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/translation-validation-v2.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/fuzz-property-differential-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/formal-core-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/self-hosting-gate-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/security-review.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/threat-model.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/unsafe-surface-map.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/capability-surface-map.md")
+			out[i].Docs = append(out[i].Docs, "docs/plans/2026-06-03-p24.0-security-review-gate-design.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/runtime-hardening-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/plans/2026-06-03-p24.1-runtime-hardening-design.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/compatibility-stability-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/plans/2026-06-03-p24.2-compatibility-stability-design.md")
+			out[i].Docs = append(out[i].Docs, "docs/release/breaking-change-migration-guide.md")
+			out[i].Docs = append(out[i].Docs, "docs/release/deprecation_policy.md")
+			out[i].Docs = append(out[i].Docs, "docs/benchmarks/truth_benchmark_harness.md")
+		}
+		if out[i].ID == "stdlib.core-current" {
+			out[i].Scope += "; stable generic collection source views expose lib.core.collections.Vec<T> and HashMap<K,V> over caller-owned slices, generic vec_from_slice<T>/vec_len<T>/vec_get_or<T>/hash_map_from_slices<K,V>/hash_map_len<K,V> helpers, and common hash_map_get_i32_i32_or plus hash_map_get_u8_i32_or lookup specializations"
+			out[i].Scope += "; P19.2 HTTP/JSON source-first evidence covers lib.core.http request-head framing, pipelined local buffers, plaintext/JSON response byte-buffer helpers, lib.core.json message-object writers, internal borrowed HTTP/JSON request-region coverage, internal per-server UTC-second Date cache evidence, and Linux netrt.Writev/netrt.Sendfile helper evidence through tetra.stdlib.http_json.production_stack.v1"
+			out[i].Scope += "; P19.3 PostgreSQL source-first and local SCRAM evidence covers lib.core.postgres source rows for DB single query, DB multiple queries, DB updates, and DB fortunes plus internal runtime startup/SCRAM, prepared statements, binary int4 helpers, pooling/backpressure, borrowed DataRow decode, and checked local SCRAM benchmark reports through tetra.stdlib.postgresql.production_driver.v1, p19.3_postgres_source_first, and validate-techempower-report"
+			out[i].Stability += "; generic collection views are source-level and caller-owned, with no hidden allocator, resizing, generic hashing/equality protocol, production runtime map/vector claim, C++/Rust parity, or official benchmark result"
+			out[i].Stability += "; HTTP/JSON P19.2 evidence is source-first and local dry-run only, with no production HTTP server promotion, source-level cached-date API, cross-worker Date cache, webrt.flush scatter/gather integration, HTTP static-file sendfile path, zero-copy production file-serving, P20 performance matrix, C++/Rust parity, or official TechEmpower result"
+			out[i].Stability += "; PostgreSQL P19.3 evidence is source-first plus checked local SCRAM evidence only, with no full source-level PostgreSQL driver API, external production database deployment, production database benchmark, P20 performance matrix, C++/Rust parity, official TechEmpower result, measured speed comparison, or runtime behavior change"
+			out[i].Docs = append(out[i].Docs, "docs/audits/stable-generic-collections-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/production-http-json-stack-v1.md")
+			out[i].Docs = append(out[i].Docs, "docs/audits/production-postgres-driver-pool-v1.md")
+		}
 	}
 	return out
 }

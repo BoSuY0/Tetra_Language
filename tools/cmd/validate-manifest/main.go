@@ -37,30 +37,47 @@ type formatManifest struct {
 }
 
 type targetManifest struct {
-	Triple                  string `json:"triple"`
-	Status                  string `json:"status,omitempty"`
-	OS                      string `json:"os"`
-	Arch                    string `json:"arch"`
-	ABI                     string `json:"abi"`
-	DataModel               string `json:"data_model,omitempty"`
-	Format                  string `json:"format"`
-	ExeExt                  string `json:"exe_ext"`
-	CollectImports          bool   `json:"collect_imports"`
-	RunMode                 string `json:"run_mode,omitempty"`
-	UIRuntimeContract       string `json:"ui_runtime_contract,omitempty"`
-	UIRuntimeStatus         string `json:"ui_runtime_status,omitempty"`
-	UIRuntimeEvidence       string `json:"ui_runtime_evidence,omitempty"`
-	PointerWidthBits        int    `json:"pointer_width_bits,omitempty"`
-	RegisterWidthBits       int    `json:"register_width_bits,omitempty"`
-	NativeIntWidthBits      int    `json:"native_int_width_bits,omitempty"`
-	Endian                  string `json:"endian,omitempty"`
-	StackAlignmentBytes     int    `json:"stack_alignment_bytes,omitempty"`
-	MaxAtomicWidthBits      int    `json:"max_atomic_width_bits,omitempty"`
-	AtomicWidthBits         []int  `json:"atomic_width_bits,omitempty"`
-	AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits,omitempty"`
-	UnsupportedReason       string `json:"unsupported_reason,omitempty"`
-	SupportsDebugInfo       bool   `json:"supports_debug_info,omitempty"`
-	SupportsReleaseOptimize bool   `json:"supports_release_optimize,omitempty"`
+	Triple                   string   `json:"triple"`
+	Status                   string   `json:"status,omitempty"`
+	OS                       string   `json:"os"`
+	Arch                     string   `json:"arch"`
+	ABI                      string   `json:"abi"`
+	DataModel                string   `json:"data_model,omitempty"`
+	Format                   string   `json:"format"`
+	ExeExt                   string   `json:"exe_ext"`
+	CollectImports           bool     `json:"collect_imports"`
+	RunMode                  string   `json:"run_mode,omitempty"`
+	UIRuntimeContract        string   `json:"ui_runtime_contract,omitempty"`
+	UIRuntimeStatus          string   `json:"ui_runtime_status,omitempty"`
+	UIRuntimeEvidence        string   `json:"ui_runtime_evidence,omitempty"`
+	PointerWidthBits         int      `json:"pointer_width_bits,omitempty"`
+	RegisterWidthBits        int      `json:"register_width_bits,omitempty"`
+	NativeIntWidthBits       int      `json:"native_int_width_bits,omitempty"`
+	Endian                   string   `json:"endian,omitempty"`
+	StackAlignmentBytes      int      `json:"stack_alignment_bytes,omitempty"`
+	MaxAtomicWidthBits       int      `json:"max_atomic_width_bits,omitempty"`
+	AtomicWidthBits          []int    `json:"atomic_width_bits,omitempty"`
+	AtomicPointerWidthBits   int      `json:"atomic_pointer_width_bits,omitempty"`
+	UnsupportedReason        string   `json:"unsupported_reason,omitempty"`
+	RuntimeStatus            string   `json:"runtime_status,omitempty"`
+	StdlibStatus             string   `json:"stdlib_status,omitempty"`
+	FFIStatus                string   `json:"ffi_status,omitempty"`
+	MemoryBuild              string   `json:"memory_build,omitempty"`
+	MemoryLower              string   `json:"memory_lower,omitempty"`
+	MemoryRun                string   `json:"memory_run,omitempty"`
+	MemoryRawDiagnostics     string   `json:"memory_raw_diagnostics,omitempty"`
+	MemoryRegionLowering     string   `json:"memory_region_lowering,omitempty"`
+	MemoryAlignmentSemantics string   `json:"memory_alignment_semantics,omitempty"`
+	MemoryClaimLevel         string   `json:"memory_claim_level,omitempty"`
+	RunnerProbeCommand       string   `json:"runner_probe_command,omitempty"`
+	ReleaseGate              string   `json:"release_gate,omitempty"`
+	EvidenceArtifacts        []string `json:"evidence_artifacts,omitempty"`
+	SyscallInstruction       string   `json:"syscall_instruction,omitempty"`
+	SyscallNumbering         string   `json:"syscall_numbering,omitempty"`
+	SyscallArgRegisters      []string `json:"syscall_arg_registers,omitempty"`
+	SyscallErrorRange        string   `json:"syscall_error_range,omitempty"`
+	SupportsDebugInfo        bool     `json:"supports_debug_info,omitempty"`
+	SupportsReleaseOptimize  bool     `json:"supports_release_optimize,omitempty"`
 }
 
 type builtinManifest struct {
@@ -84,6 +101,7 @@ type runtimeABIManifest struct {
 	TimeRequiredSymbols       []string `json:"time_required_symbols,omitempty"`
 	FilesystemRequiredSymbols []string `json:"filesystem_required_symbols,omitempty"`
 	NetRequiredSymbols        []string `json:"net_required_symbols,omitempty"`
+	SurfaceRequiredSymbols    []string `json:"surface_required_symbols,omitempty"`
 	ActorsProgramGlueSymbols  []string `json:"actors_program_glue_symbols"`
 }
 
@@ -360,8 +378,93 @@ func validateTarget(target targetManifest) error {
 		if target.UnsupportedReason != "" && target.UnsupportedReason != tgt.UnsupportedReason {
 			return fmt.Errorf("target %s unsupported_reason = %q, want %q", target.Triple, target.UnsupportedReason, tgt.UnsupportedReason)
 		}
+		if target.RuntimeStatus != "" && target.RuntimeStatus != tgt.RuntimeStatus {
+			return fmt.Errorf("target %s runtime_status = %s, want %s", target.Triple, target.RuntimeStatus, tgt.RuntimeStatus)
+		}
+		if target.StdlibStatus != "" && target.StdlibStatus != tgt.StdlibStatus {
+			return fmt.Errorf("target %s stdlib_status = %s, want %s", target.Triple, target.StdlibStatus, tgt.StdlibStatus)
+		}
+		if target.FFIStatus != "" && target.FFIStatus != tgt.FFIStatus {
+			return fmt.Errorf("target %s ffi_status = %s, want %s", target.Triple, target.FFIStatus, tgt.FFIStatus)
+		}
+		if target.RunnerProbeCommand != "" && target.RunnerProbeCommand != tgt.RunnerProbeCommand {
+			return fmt.Errorf("target %s runner_probe_command = %q, want %q", target.Triple, target.RunnerProbeCommand, tgt.RunnerProbeCommand)
+		}
+		if target.ReleaseGate != "" && target.ReleaseGate != tgt.ReleaseGate {
+			return fmt.Errorf("target %s release_gate = %q, want %q", target.Triple, target.ReleaseGate, tgt.ReleaseGate)
+		}
+		if len(target.EvidenceArtifacts) > 0 && !sameStringSequence(target.EvidenceArtifacts, tgt.EvidenceArtifacts) {
+			return fmt.Errorf("target %s evidence_artifacts = %s, want %s", target.Triple, strings.Join(target.EvidenceArtifacts, ", "), strings.Join(tgt.EvidenceArtifacts, ", "))
+		}
+		if err := validateTargetMemoryCapabilities(target, tgt); err != nil {
+			return err
+		}
+		if target.SyscallInstruction != "" && target.SyscallInstruction != tgt.SyscallInstruction {
+			return fmt.Errorf("target %s syscall_instruction = %q, want %q", target.Triple, target.SyscallInstruction, tgt.SyscallInstruction)
+		}
+		if target.SyscallNumbering != "" && target.SyscallNumbering != tgt.SyscallNumbering {
+			return fmt.Errorf("target %s syscall_numbering = %q, want %q", target.Triple, target.SyscallNumbering, tgt.SyscallNumbering)
+		}
+		if len(target.SyscallArgRegisters) > 0 && !sameStringSequence(target.SyscallArgRegisters, tgt.SyscallArgRegisters) {
+			return fmt.Errorf("target %s syscall_arg_registers = %s, want %s", target.Triple, strings.Join(target.SyscallArgRegisters, ", "), strings.Join(tgt.SyscallArgRegisters, ", "))
+		}
+		if target.SyscallErrorRange != "" && target.SyscallErrorRange != tgt.SyscallErrorRange {
+			return fmt.Errorf("target %s syscall_error_range = %q, want %q", target.Triple, target.SyscallErrorRange, tgt.SyscallErrorRange)
+		}
 	}
 	return nil
+}
+
+func validateTargetMemoryCapabilities(target targetManifest, tgt ctarget.Target) error {
+	if !targetHasMemoryCapabilityFields(target) && target.Status == "" {
+		return nil
+	}
+	if tgt.Status == ctarget.StatusBuildOnly && (target.MemoryRun == "yes" || target.MemoryClaimLevel == "production/host_runtime") {
+		return fmt.Errorf("target %s runtime memory claim requires target runtime evidence, but target is build-only", target.Triple)
+	}
+	if target.MemoryRawDiagnostics == "yes" && target.Triple != "linux-x64" {
+		return fmt.Errorf("target %s raw diagnostics claim requires raw diagnostics evidence", target.Triple)
+	}
+	if (target.MemoryRegionLowering == "yes" || target.MemoryRegionLowering == "yes/partial" || target.MemoryRegionLowering == "partial") &&
+		(target.Triple == "linux-x64" || target.Triple == "linux-x86" || target.Triple == "linux-x32") &&
+		!containsString(target.EvidenceArtifacts, target.Triple+"-abi.json") {
+		return fmt.Errorf("target %s region lowering claim requires lowered artifact evidence", target.Triple)
+	}
+	if target.MemoryAlignmentSemantics == "yes" && (target.ABI == "" || target.DataModel == "") {
+		return fmt.Errorf("target %s alignment claim requires target-specific ABI evidence", target.Triple)
+	}
+	if target.MemoryBuild != tgt.MemoryBuild {
+		return fmt.Errorf("target %s memory_build = %s, want %s", target.Triple, target.MemoryBuild, tgt.MemoryBuild)
+	}
+	if target.MemoryLower != tgt.MemoryLower {
+		return fmt.Errorf("target %s memory_lower = %s, want %s", target.Triple, target.MemoryLower, tgt.MemoryLower)
+	}
+	if target.MemoryRun != tgt.MemoryRun {
+		return fmt.Errorf("target %s memory_run = %s, want %s", target.Triple, target.MemoryRun, tgt.MemoryRun)
+	}
+	if target.MemoryRawDiagnostics != tgt.MemoryRawDiagnostics {
+		return fmt.Errorf("target %s memory_raw_diagnostics = %s, want %s", target.Triple, target.MemoryRawDiagnostics, tgt.MemoryRawDiagnostics)
+	}
+	if target.MemoryRegionLowering != tgt.MemoryRegionLowering {
+		return fmt.Errorf("target %s memory_region_lowering = %s, want %s", target.Triple, target.MemoryRegionLowering, tgt.MemoryRegionLowering)
+	}
+	if target.MemoryAlignmentSemantics != tgt.MemoryAlignmentSemantics {
+		return fmt.Errorf("target %s memory_alignment_semantics = %s, want %s", target.Triple, target.MemoryAlignmentSemantics, tgt.MemoryAlignmentSemantics)
+	}
+	if target.MemoryClaimLevel != tgt.MemoryClaimLevel {
+		return fmt.Errorf("target %s memory_claim_level = %s, want %s", target.Triple, target.MemoryClaimLevel, tgt.MemoryClaimLevel)
+	}
+	return nil
+}
+
+func targetHasMemoryCapabilityFields(target targetManifest) bool {
+	return target.MemoryBuild != "" ||
+		target.MemoryLower != "" ||
+		target.MemoryRun != "" ||
+		target.MemoryRawDiagnostics != "" ||
+		target.MemoryRegionLowering != "" ||
+		target.MemoryAlignmentSemantics != "" ||
+		target.MemoryClaimLevel != ""
 }
 
 func sameInts(a []int, b []int) bool {
@@ -403,7 +506,15 @@ func validateFeatures(features []featureManifest) error {
 	if len(features) == 0 {
 		return fmt.Errorf("features must not be empty")
 	}
-	allowedStatus := map[string]bool{"current": true, "experimental": true, "planned": true, "post-v1": true}
+	allowedStatus := map[string]bool{
+		"current":              true,
+		"experimental":         true,
+		"release_candidate":    true,
+		"unsupported":          true,
+		"legacy_compatibility": true,
+		"planned":              true,
+		"post-v1":              true,
+	}
 	requiredStatus := map[string]bool{"current": false, "planned": false, "post-v1": false}
 	requiredIDs := map[string]string{
 		"cli.core":                                "current",
@@ -531,6 +642,9 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"unsafe boundaries",
 			"actor/task transfer safety",
 			"pointer/MMIO/memory capability gates",
+			"memory cost model",
+			"memory fuzz oracle",
+			"memory production final audit",
 			"explicit diagnostics",
 		},
 		"language.enum-payload-match": {
@@ -555,7 +669,7 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 		"language.resource-lifetime-mvp":          {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
 		"actors.task-transfer-safety":             {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
 		"language.lifetime-ssa":                   {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"},
-		"safety.production-core":                  {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md"},
+		"safety.production-core":                  {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"},
 		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
 		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
 	}
@@ -645,6 +759,24 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 	requiredFilesystemSymbols := []string{
 		"__tetra_fs_exists",
 	}
+	requiredSurfaceSymbols := []string{
+		"__tetra_surface_open",
+		"__tetra_surface_close",
+		"__tetra_surface_poll_event_kind",
+		"__tetra_surface_poll_event_x",
+		"__tetra_surface_poll_event_y",
+		"__tetra_surface_poll_event_button",
+		"__tetra_surface_poll_event_into",
+		"__tetra_surface_poll_event_text_len",
+		"__tetra_surface_poll_event_text_into",
+		"__tetra_surface_clipboard_write_text",
+		"__tetra_surface_clipboard_read_text_into",
+		"__tetra_surface_poll_composition_into",
+		"__tetra_surface_begin_frame",
+		"__tetra_surface_present_rgba",
+		"__tetra_surface_now_ms",
+		"__tetra_surface_request_redraw",
+	}
 	requiredActorStateSymbols := []string{
 		"__tetra_actor_state_load",
 		"__tetra_actor_state_store",
@@ -690,6 +822,12 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 	if !sameStringSet(abi.FilesystemRequiredSymbols, requiredFilesystemSymbols) {
 		return fmt.Errorf("filesystem_required_symbols got %s want %s", strings.Join(sortedStrings(abi.FilesystemRequiredSymbols), ", "), strings.Join(sortedStrings(requiredFilesystemSymbols), ", "))
 	}
+	if len(abi.SurfaceRequiredSymbols) == 0 {
+		return fmt.Errorf("surface_required_symbols must not be empty")
+	}
+	if !sameStringSet(abi.SurfaceRequiredSymbols, requiredSurfaceSymbols) {
+		return fmt.Errorf("surface_required_symbols got %s want %s", strings.Join(sortedStrings(abi.SurfaceRequiredSymbols), ", "), strings.Join(sortedStrings(requiredSurfaceSymbols), ", "))
+	}
 	if len(abi.ActorStateRequiredSymbols) == 0 {
 		return fmt.Errorf("actor_state_required_symbols must not be empty")
 	}
@@ -728,6 +866,8 @@ func validateRuntimeABI(abi runtimeABIManifest, targets map[string]bool) error {
 	allSymbols = append(allSymbols, abi.TypedTaskRequiredSymbols...)
 	allSymbols = append(allSymbols, abi.TimeRequiredSymbols...)
 	allSymbols = append(allSymbols, abi.FilesystemRequiredSymbols...)
+	allSymbols = append(allSymbols, abi.NetRequiredSymbols...)
+	allSymbols = append(allSymbols, abi.SurfaceRequiredSymbols...)
 	allSymbols = append(allSymbols, abi.ActorsProgramGlueSymbols...)
 	for _, symbol := range allSymbols {
 		if symbol == "" {

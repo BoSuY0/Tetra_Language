@@ -1,0 +1,201 @@
+{
+  "schema": "tetra.surface.text-input.v1",
+  "target": "headless",
+  "source": "examples/surface_release_text_input.tetra",
+  "level": "production-text-input-v1",
+  "experimental": false,
+  "production_claim": true,
+  "storage": "owned-utf8-byte-buffer",
+  "utf8_validation": true,
+  "caret": true,
+  "selection": true,
+  "backspace": true,
+  "delete": true,
+  "home_end": true,
+  "arrow_left_right": true,
+  "composition_events": true,
+  "composition_commit": true,
+  "composition_cancel": true,
+  "clipboard_read": true,
+  "clipboard_write": true,
+  "clipboard_host_abi": true,
+  "clipboard_owned_copy": true,
+  "composition_trace": {
+    "start": true,
+    "update": true,
+    "commit": true,
+    "cancel": true
+  },
+  "borrowed_view_storage": false,
+  "safe_view_lifetime_checked": true,
+  "processes": [
+    {
+      "name": "tetra build",
+      "kind": "build",
+      "path": "tetra build --target linux-x64 /home/tetra/Desktop/Projects/Tetra_Language/examples/surface_release_text_input.tetra -o /home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/text-input-smoke/surface-headless-release-text-input-artifacts/surface-release-text-input",
+      "ran": true,
+      "pass": true,
+      "exit_code": 0
+    },
+    {
+      "name": "surface component app",
+      "kind": "app",
+      "path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/text-input-smoke/surface-headless-release-text-input-artifacts/surface-release-text-input",
+      "ran": true,
+      "pass": true,
+      "exit_code": 1,
+      "expected_exit_code": 1
+    },
+    {
+      "name": "surface headless runtime",
+      "kind": "runtime",
+      "path": "/tmp/go-build983378754/b001/exe/surface-runtime-smoke",
+      "ran": true,
+      "pass": true,
+      "exit_code": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "component-app",
+      "path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/text-input-smoke/surface-headless-release-text-input-artifacts/surface-release-text-input",
+      "sha256": "sha256:6d95f85036453fa2196caefcc3e8de3dd2af472ffd0dff1859157d5bbce4d41d",
+      "size": 69726
+    },
+    {
+      "kind": "runner-trace",
+      "path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/text-input-smoke/surface-headless-release-text-input-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:cbd00826b80a2ebcdbac13b059e45bbf2f3f761ad22d3d66a1b699ececeaf933",
+      "size": 13022
+    }
+  ],
+  "artifact_scan": {
+    "root": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/text-input-smoke/surface-headless-release-text-input-artifacts",
+    "files_checked": 2,
+    "forbidden_paths": [],
+    "pass": true
+  },
+  "cases": [
+    {
+      "name": "host-provided pointer event dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "host event buffer poll_event",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "pre/post event frame sequence",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "component hierarchy dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "component text input scalar dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "host text payload buffer",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "component focus dispatch",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "component accessibility metadata",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "no legacy UI sidecar artifacts",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input ASCII insertion",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input UTF-8 insertion",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input caret home end arrows",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input selection replacement",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input backspace delete",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input clipboard owned copy transfer",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input composition start update",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input composition commit",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input composition cancel",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "release text input safe view lifetime checked",
+      "kind": "positive",
+      "ran": true,
+      "pass": true
+    },
+    {
+      "name": "reject legacy UI evidence",
+      "kind": "negative",
+      "ran": true,
+      "pass": true,
+      "expected_error": "legacy UI evidence rejected"
+    }
+  ]
+}

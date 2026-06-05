@@ -45,7 +45,8 @@ generated docs run.
 | Test status helpers | `import lib.core.testing as testing` | `examples/core_testing_smoke.tetra` | none |
 | Slice summation helpers (`sum_i32`, `weighted_sum_i32`, `sum_u8`) | `import lib.core.slices as slices` | `examples/core_slices_smoke.tetra` | `mem` |
 | ASCII length, ASCII sum, and empty checks (`ascii_len`, `ascii_sum`, `is_empty`) | `import lib.core.strings as strings` | `examples/core_strings_smoke.tetra` | none |
-| Collection scans over `[]i32` | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
+| Caller-owned UTF-8 text buffer helpers | `import lib.core.text as text` | `examples/core_text_smoke.tetra` | none |
+| Generic collection views and `[]i32` scans | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
 | Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core_serialization_smoke.tetra` | `mem` |
 | Filesystem path helpers and host-backed `exists` | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | `io` |
 | Linux TCP socket client/server I/O helpers | `import lib.core.net as net` | `examples/core_net_smoke.tetra` | `io, mem` |
@@ -57,6 +58,12 @@ generated docs run.
 | Synchronization status helpers | `import lib.core.sync as sync` | `examples/core_sync_smoke.tetra` | none |
 | Time duration/status helpers | `import lib.core.time as time` | `examples/core_time_smoke.tetra` | none |
 | Crypto interface helpers | `import lib.core.crypto as crypto` | `examples/core_crypto_smoke.tetra` | `mem` |
+| Planned Tetra Surface host/frame/event wrappers | `import lib.core.surface as surface` | `examples/core_surface_smoke.tetra` | `surface`, `alloc`, `mem` |
+| Planned Tetra Surface software draw helpers | `import lib.core.draw as draw` | `examples/core_draw_smoke.tetra` | `mem` |
+| Stable Surface v1 widget style and theme helpers | `import lib.core.style as style` | `examples/core_style_smoke.tetra` | none |
+| Planned Tetra Surface static component helpers | `import lib.core.component as component` | `examples/core_component_smoke.tetra` | none |
+| Experimental Tetra Surface accessibility metadata helpers | `import lib.core.accessibility as accessibility` | `examples/core_accessibility_smoke.tetra` | none |
+| Experimental Tetra Surface minimal widget helpers | `import lib.core.widgets as widgets` | `examples/core_widgets_smoke.tetra` | none |
 
 Call-shape reminders used by generated docs and smoke examples:
 `slices.sum_i32(values)`, `slices.weighted_sum_i32(values)`,
@@ -65,6 +72,11 @@ Call-shape reminders used by generated docs and smoke examples:
 `collections.len_i32(values)`, `collections.contains_i32(values, needle)`,
 `collections.count_i32(values, needle)`, and
 `collections.first_or_i32(values, fallback)`,
+`collections.vec_from_slice(values)`, `collections.vec_len(vec)`,
+`collections.vec_get_or(vec, index, fallback)`,
+`collections.hash_map_from_slices(keys, values)`,
+`collections.hash_map_len(map)`, and the specialized
+`collections.hash_map_get_i32_i32_or(map, key, fallback)`,
 `json.write_message_object(buffer, message)`, and
 `json.write_json_string(buffer, value)`,
 `http.write_plaintext_response(buffer, server, date, keep_alive)`, and
@@ -106,6 +118,14 @@ the `_at` helpers for each request window.
 `lib.core.filesystem` now has a capability-gated linux-x64 `exists` slice plus
 pure path-shape helpers. `lib.core.crypto` is a stable crypto interface-helper
 surface. `lib.core.networking` is a stable endpoint policy-helper surface.
+`lib.core.surface`, `lib.core.draw`, `lib.core.style`,
+`lib.core.component`, and `lib.core.widgets` are experimental Tetra Surface modules for the pure-Tetra UI
+direction. The current evidence covers headless
+frame/event/checksum reports and Linux-x64 starter Host ABI open/present/close
+probe reports plus Linux-x64 real-window Wayland shm evidence for
+`examples/surface_window_counter.tetra`; browser runtime, full IME/String text
+editing, production widget toolkit support, and accessibility Surface support
+remain unpromoted.
 `lib.core.net` is a stable linux-x64 TCP socket client/server I/O slice for
 open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close, `SO_REUSEPORT`,
 `TCP_NODELAY`, plus epoll
@@ -135,6 +155,15 @@ the signed i16 protocol range, and RowDescription/DataRow count readers return
 sentinels for high-bit signed i16 count fields. PostgreSQL C-string length and
 writer helpers return sentinels for embedded NUL bytes in startup, query,
 statement, or portal fields instead of truncating the wire payload.
+P19.3 additionally records bounded internal driver/pool evidence through
+`tetra.stdlib.postgresql.production_driver.v1` and a checked
+`p19.3_postgres_source_first` dry-run gate for DB single query, multiple
+queries, updates, and fortunes source rows. The closure links that source gate
+to checked local SCRAM/PostgreSQL reports accepted by
+`validate-techempower-report`. This does not promote a full source-level
+PostgreSQL driver API, measured speed comparison, official TechEmpower result,
+production database benchmark, external production database deployment,
+C++/Rust parity, or P20 performance matrix.
 `lib.core.json` is a stable executable byte-buffer helper surface for compact
 JSON response bodies. The runtime package used by backend services also has a
 generic deterministic JSON value parser/writer for objects, arrays, strings,
@@ -226,9 +255,42 @@ or broad host permission grants.
 
 ## Collections Helper Contract
 
-`lib.core.collections` currently documents and implements only `[]i32` helper
-scans. Do not infer `[]u16`, `[]bool`, generic collection helpers, sorting,
-mutation, allocation, or iterator APIs from this module.
+`lib.core.collections` exposes a narrow stable generic collection-view surface
+plus the older `[]i32` helper scans. `collections.Vec<T>` wraps a caller-owned
+`[]T`, and `collections.HashMap<K,V>` wraps caller-owned parallel key/value
+slices. These views do not allocate storage internally, resize, sort, mutate
+the underlying slices, provide iterator objects, or implement generic hashing
+and equality protocols.
+
+P7 adds an internal runtime/storage-planning model for region-aware `Vec`,
+`StringBuilder`, `HashMap`, `ByteBuffer`, and `ArenaBuffer` evidence, but that
+model lives under `compiler/internal/stdlibrt`. It is used to verify storage
+reports and safe-view provenance for the web/runtime stack; it is not the
+allocator-backed runtime for the source-level `lib.core.collections` generic
+views.
+
+The P19.1 benchmark gate has a checked dry-run truth-bench-harness artifact
+for `p19.1_generic_collections`: a hash-table-equivalent Tetra/C++/Rust source
+shape with matching algorithm/input metadata and Tetra proof/allocation/bounds
+and performance report paths. It is not a runtime measurement, C++/Rust parity
+claim, or official benchmark result.
+
+- `collections.vec_from_slice(values)` creates a generic `Vec<T>` view over a
+  caller-owned slice and records the logical length by scanning it.
+- `collections.vec_len(vec)` returns the logical length captured by
+  `vec_from_slice`.
+- `collections.vec_first_or(vec, fallback)` returns the first item when present,
+  otherwise `fallback`.
+- `collections.vec_get_or(vec, index, fallback)` scans to `index` and returns
+  `fallback` for negative or missing indexes.
+- `collections.hash_map_from_slices(keys, values)` creates a generic
+  `HashMap<K,V>` view over caller-owned parallel slices.
+- `collections.hash_map_len(map)` returns the captured key count.
+- `collections.hash_map_first_value_or(map, fallback)` returns the first value
+  when present, otherwise `fallback`.
+- `collections.hash_map_get_i32_i32_or(map, key, fallback)` and
+  `collections.hash_map_get_u8_i32_or(map, key, fallback)` are the current
+  concrete lookup specializations.
 
 - `collections.len_i32(values)` counts the number of `i32` elements by scanning
   the slice and returns that count.
@@ -239,7 +301,7 @@ mutation, allocation, or iterator APIs from this module.
 - `collections.first_or_i32(values, fallback)` returns the first element when
   the slice is non-empty, otherwise `fallback`.
 
-All four helpers require `uses mem` because they scan a slice supplied by the
+The scan helpers require `uses mem` because they scan slices supplied by the
 caller. They do not allocate, mutate the slice, or validate ownership beyond
 the current slice/effect checks.
 
@@ -334,8 +396,10 @@ configuration defaults:
   by `/`. Leading, trailing, and repeated slash characters do not add empty
   segments.
 - `filesystem.exists(path, io_cap)` checks host existence on linux-x64 through
-  the runtime ABI. Embedded NUL bytes are rejected instead of truncating to a
-  host prefix. Unsupported native targets report a filesystem runtime
+  the runtime ABI, and has pure `fs_exists`-only linux-x86/linux-x32 smokes.
+  Embedded NUL bytes are rejected instead of truncating to a host prefix.
+  linux-x86/linux-x32 programs that mix filesystem calls with scheduler runtime
+  surfaces, and other unsupported native targets, report a filesystem runtime
   diagnostic; WASM targets reject the filesystem runtime builtin.
 
 | Path | `has_leading_slash` | `ends_with_slash` | `is_root` | `slash_count` | `directory_depth` |
@@ -583,9 +647,12 @@ mkdir -p reports
 ./tetra doc \
   lib/core \
   lib/experimental \
+  examples/core_accessibility_smoke.tetra \
   examples/core_async_smoke.tetra \
   examples/core_capability_smoke.tetra \
   examples/core_collections_smoke.tetra \
+  examples/core_component_smoke.tetra \
+  examples/core_widgets_smoke.tetra \
   examples/core_crypto_smoke.tetra \
   examples/core_filesystem_smoke.tetra \
   examples/core_http_smoke.tetra \

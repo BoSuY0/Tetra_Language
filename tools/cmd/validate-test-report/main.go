@@ -33,6 +33,7 @@ type testReportEnvelope struct {
 	Total      int             `json:"total"`
 	Passed     int             `json:"passed"`
 	Failed     int             `json:"failed"`
+	Target     string          `json:"target,omitempty"`
 	DurationMS int64           `json:"duration_ms"`
 	FilesRaw   json.RawMessage `json:"files"`
 	ResultsRaw json.RawMessage `json:"results"`

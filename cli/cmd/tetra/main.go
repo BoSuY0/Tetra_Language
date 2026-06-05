@@ -27,6 +27,8 @@ var execNativeProgram = execProgram
 var linuxX86HostSupport = canRunLinuxX86OnHost
 var linuxX32HostSupport = canRunLinuxX32OnHost
 
+var linuxX86ProbeOnce sync.Once
+var linuxX86ProbeResult bool
 var linuxX32ProbeOnce sync.Once
 var linuxX32ProbeResult bool
 
@@ -126,6 +128,12 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 	interfaceOnly := fs.Bool("interface-only", false, "type-check interface/API graph without emitting executable code")
 	islandsDebug := fs.Bool("islands-debug", false, "enable islands debug runtime checks")
 	emit := fs.String("emit", "exe", "emit mode: exe, object, or library")
+	explain := fs.Bool("explain", false, "write explain, proof, bounds, allocation, backend, layout, and perf reports")
+	emitPLIR := fs.Bool("emit-plir", false, "write PLIR JSON and text reports")
+	emitProof := fs.Bool("emit-proof", false, "write proof report")
+	emitAllocReport := fs.Bool("emit-alloc-report", false, "write allocation report")
+	emitBoundsReport := fs.Bool("emit-bounds-report", false, "write bounds-check report")
+	emitMemoryReport := fs.Bool("emit-memory-report", false, "write schema-versioned memory fact report")
 	runtimeMode := fs.String("runtime", "auto", "actors runtime: auto, selfhost, or builtin")
 	runtimeObject := fs.String("runtime-object", "", "actors runtime object override")
 	jobs := fs.Int("jobs", 1, "parallel module build jobs")
@@ -196,6 +204,7 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 			writeDiagnostic(stderr, *diagnostics, err)
 			return 2
 		}
+		applyBuildReportOptions(&opt, *explain, *emitPLIR, *emitProof, *emitAllocReport, *emitBoundsReport, *emitMemoryReport)
 		opt.ProjectRoot = worldOpt.Root
 		opt.SourceRoots = worldOpt.SourceRoots
 		opt.DependencyRoots = worldOpt.DependencyRoots
@@ -257,6 +266,7 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 		writeDiagnostic(stderr, *diagnostics, err)
 		return 2
 	}
+	applyBuildReportOptions(&opt, *explain, *emitPLIR, *emitProof, *emitAllocReport, *emitBoundsReport, *emitMemoryReport)
 	opt.ProjectRoot = worldOpt.Root
 	opt.SourceRoots = worldOpt.SourceRoots
 	opt.DependencyRoots = worldOpt.DependencyRoots
@@ -271,6 +281,15 @@ func runBuild(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "Built: %s\n", output)
 	}
 	return 0
+}
+
+func applyBuildReportOptions(opt *compiler.BuildOptions, explain bool, emitPLIR bool, emitProof bool, emitAllocReport bool, emitBoundsReport bool, emitMemoryReport bool) {
+	opt.Explain = explain
+	opt.EmitPLIR = emitPLIR
+	opt.EmitProof = emitProof
+	opt.EmitAllocReport = emitAllocReport
+	opt.EmitBoundsReport = emitBoundsReport
+	opt.EmitMemoryReport = emitMemoryReport
 }
 
 func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -318,12 +337,12 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer) int {
 	isWASI := tgt.Triple == "wasm32-wasi"
 	isWeb := tgt.Triple == "wasm32-web"
 	if ctarget.IsBuildOnlyTarget(tgt.Triple) && !isWASI && !canRunBuildOnlyNativeTargetOnHost(tgt) {
-		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run target %s: %s", tgt.Triple, buildOnlyNativeRunUnsupportedReason(tgt)))
+		writeTargetRuntimeDiagnostic(stderr, *diagnostics, fmt.Sprintf("cannot run target %s: %s", tgt.Triple, buildOnlyNativeRunUnsupportedReason(tgt)))
 		return 2
 	}
 	if !isWASI && !isWeb {
 		if !canRunNativeExecutableTargetOnHost(tgt) {
-			writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run target %s on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH))
+			writeTargetRuntimeDiagnostic(stderr, *diagnostics, fmt.Sprintf("cannot run target %s on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH))
 			return 2
 		}
 	}
@@ -485,7 +504,13 @@ func canRunNativeExecutableTargetOnHost(tgt ctarget.Target) bool {
 }
 
 func canRunLinuxX86OnHost() bool {
-	return runtime.GOOS == "linux" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "386")
+	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "386") {
+		return false
+	}
+	linuxX86ProbeOnce.Do(func() {
+		linuxX86ProbeResult = probeLinuxX86Execution()
+	})
+	return linuxX86ProbeResult
 }
 
 func canRunLinuxX32OnHost() bool {
@@ -496,6 +521,23 @@ func canRunLinuxX32OnHost() bool {
 		linuxX32ProbeResult = probeLinuxX32Execution()
 	})
 	return linuxX32ProbeResult
+}
+
+func probeLinuxX86Execution() bool {
+	dir, err := os.MkdirTemp("", "tetra-x86-probe-*")
+	if err != nil {
+		return false
+	}
+	defer os.RemoveAll(dir)
+	srcPath := filepath.Join(dir, "probe.tetra")
+	outPath := filepath.Join(dir, "probe")
+	if err := os.WriteFile(srcPath, []byte("func main() -> Int:\n    return 0\n"), 0o644); err != nil {
+		return false
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "x86", compiler.BuildOptions{Jobs: 1}); err != nil {
+		return false
+	}
+	return execProgram(outPath, io.Discard, io.Discard) == 0
 }
 
 func probeLinuxX32Execution() bool {
@@ -516,11 +558,16 @@ func probeLinuxX32Execution() bool {
 }
 
 func buildOnlyNativeRunUnsupportedReason(tgt ctarget.Target) string {
+	probe := strings.TrimSpace(tgt.RunnerProbeCommand)
+	if probe == "" {
+		probe = "tetra test --diagnostics=json --target " + strings.TrimPrefix(tgt.Triple, "linux-") + " --format=json <runner-smoke.tetra>"
+	}
+	host := runtime.GOOS + "/" + runtime.GOARCH
 	switch tgt.Triple {
 	case "linux-x86":
-		return "host does not support Linux i386 execution; no host fallback is allowed"
+		return fmt.Sprintf("host %s does not support Linux i386 execution; no host fallback is allowed; probe command: %s", host, probe)
 	case "linux-x32":
-		return "host does not support Linux x32 ABI execution; no host fallback is allowed"
+		return fmt.Sprintf("host %s does not support Linux x32 ABI execution; no host fallback is allowed; probe command: %s", host, probe)
 	default:
 		if tgt.UnsupportedReason != "" {
 			return tgt.UnsupportedReason
@@ -718,7 +765,11 @@ func execWebProgram(path string, stdout io.Writer, stderr io.Writer) (int, error
 }
 
 func execWebProgramWithRunner(path string, runner webRuntimeRunner, stdout io.Writer, stderr io.Writer) (int, error) {
-	cmd := exec.Command(runner.Path, runner.Helper, path)
+	args := []string{runner.Helper, path}
+	if runner.Name == "node-web" {
+		args = append([]string{"--no-warnings"}, args...)
+	}
+	cmd := exec.Command(runner.Path, args...)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
@@ -879,6 +930,18 @@ func writeDiagnosticWithHint(w io.Writer, mode string, message string, hint stri
 			Message:  message,
 			Severity: "error",
 			Hint:     hint,
+		})
+		return
+	}
+	fmt.Fprintln(w, message)
+}
+
+func writeTargetRuntimeDiagnostic(w io.Writer, mode string, message string) {
+	if mode == "json" {
+		writeDiagnosticObject(w, compiler.Diagnostic{
+			Code:     compiler.DiagnosticCodeTargetRuntime,
+			Message:  message,
+			Severity: "error",
 		})
 		return
 	}

@@ -2118,6 +2118,7 @@ func (l *lowerer) lowerFunctionTypedParamCall(e *frontend.CallExpr, local semant
 			return 0, err
 		}
 	}
+	l.invalidateWhileRangeProofsForInoutArgs(e.Args, local.FunctionParamOwnership)
 	abiRetSlots := expectedRetSlots + inoutWritebackSlotCount(writebacks)
 	if local.FunctionHandleValue {
 		return l.lowerCallableHandleLocalCall(e, local, targets, total, argScratch, expectedRetSlots, abiRetSlots, writebacks)
@@ -2288,6 +2289,7 @@ func (l *lowerer) lowerStoredFunctionCall(e *frontend.CallExpr, fieldInfo semant
 			return 0, err
 		}
 	}
+	l.invalidateWhileRangeProofsForInoutArgs(e.Args, fieldInfo.FunctionParamOwnership)
 	abiReturnSlots := expectedReturnSlots + inoutWritebackSlotCount(writebacks)
 	for _, target := range targets {
 		sig, ok := l.funcs[target]

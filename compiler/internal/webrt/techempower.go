@@ -144,7 +144,15 @@ func fetchWorld(ctx context.Context, pool *pgrt.Pool, id int) (jsonrt.World, err
 }
 
 func queryWorld(ctx context.Context, conn *pgrt.Conn, id int) (jsonrt.World, error) {
-	result, err := conn.PreparedQuery(ctx, "world_by_id", "SELECT id, randomNumber FROM World WHERE id=$1", []uint32{pgrt.Int4OID}, [][]byte{[]byte(strconv.Itoa(id))})
+	result, err := conn.PreparedQueryFormat(
+		ctx,
+		"world_by_id",
+		"SELECT id, randomNumber FROM World WHERE id=$1",
+		[]uint32{pgrt.Int4OID},
+		[]int16{pgrt.BinaryFormat},
+		[][]byte{pgrt.AppendInt4Binary(nil, id)},
+		nil,
+	)
 	if err != nil {
 		return jsonrt.World{}, err
 	}
@@ -152,11 +160,11 @@ func queryWorld(ctx context.Context, conn *pgrt.Conn, id int) (jsonrt.World, err
 		return jsonrt.World{}, pgrt.ErrUnexpectedMessage
 	}
 	row := result.Rows[0]
-	worldID, err := strconv.Atoi(row.String(0))
+	worldID, err := decodeWorldInt4(result.Columns, row, 0)
 	if err != nil {
 		return jsonrt.World{}, err
 	}
-	randomNumber, err := strconv.Atoi(row.String(1))
+	randomNumber, err := decodeWorldInt4(result.Columns, row, 1)
 	if err != nil {
 		return jsonrt.World{}, err
 	}
@@ -164,8 +172,27 @@ func queryWorld(ctx context.Context, conn *pgrt.Conn, id int) (jsonrt.World, err
 }
 
 func updateWorld(ctx context.Context, conn *pgrt.Conn, world jsonrt.World) error {
-	_, err := conn.PreparedQuery(ctx, "update_world_random", "UPDATE World SET randomNumber=$1 WHERE id=$2", []uint32{pgrt.Int4OID, pgrt.Int4OID}, [][]byte{[]byte(strconv.Itoa(world.RandomNumber)), []byte(strconv.Itoa(world.ID))})
+	_, err := conn.PreparedQueryFormat(
+		ctx,
+		"update_world_random",
+		"UPDATE World SET randomNumber=$1 WHERE id=$2",
+		[]uint32{pgrt.Int4OID, pgrt.Int4OID},
+		[]int16{pgrt.BinaryFormat},
+		[][]byte{pgrt.AppendInt4Binary(nil, world.RandomNumber), pgrt.AppendInt4Binary(nil, world.ID)},
+		nil,
+	)
 	return err
+}
+
+func decodeWorldInt4(columns []pgrt.Column, row pgrt.Row, index int) (int, error) {
+	if index < 0 || index >= len(row) {
+		return 0, pgrt.ErrUnexpectedMessage
+	}
+	format := pgrt.TextFormat
+	if index < len(columns) {
+		format = columns[index].Format
+	}
+	return pgrt.DecodeInt4(row[index], format)
 }
 
 func fetchFortunes(ctx context.Context, pool *pgrt.Pool) ([]htmlrt.Fortune, error) {

@@ -1,0 +1,54 @@
+{
+  "title": "Memory Ideal Vertical Slice v2",
+  "slug": "memory-ideal-vertical-slice-v2",
+  "created_at": "2026-06-04T11:01:31+00:00",
+  "status": "in_progress",
+  "approval": {
+    "required": false,
+    "granted": true,
+    "notes": "Local non-destructive implementation and verification only."
+  },
+  "packets": [
+    {
+      "id": "P0-discovery",
+      "status": "accepted",
+      "result": ".workflow/memory-ideal-vertical-slice-v2/results/P0-discovery.md"
+    },
+    {
+      "id": "P1-memoryfacts-model",
+      "status": "accepted",
+      "result": ".workflow/memory-ideal-vertical-slice-v2/results/P1-memoryfacts-model.md"
+    },
+    {
+      "id": "P2-semantics",
+      "status": "accepted",
+      "result": ".workflow/memory-ideal-vertical-slice-v2/results/P2-semantics.md"
+    },
+    {
+      "id": "P3-docs-audit-manifest",
+      "status": "accepted",
+      "result": ".workflow/memory-ideal-vertical-slice-v2/results/P3-docs-audit-manifest.md"
+    },
+    {
+      "id": "P4-verification",
+      "status": "in_progress",
+      "result": null
+    }
+  ],
+  "verification": {
+    "status": "in_progress",
+    "checks": [
+      "go test ./compiler/internal/memoryfacts -count=1",
+      "go test ./compiler/internal/memorymodel -count=1",
+      "go test ./compiler/tests/semantics -run 'MemoryIdealV2|Callback|FunctionTyped|Borrow|Inout|Alias' -count=1",
+      "go test ./tools/cmd/validate-memory-report ./tools/cmd/validate-memory-correlation -count=1",
+      "go run ./tools/cmd/validate-memory-correlation --file docs/audits/memory-ideal-vslice-v2-correlation.md",
+      "go test ./compiler/... ./cli/... ./tools/... -count=1",
+      "bash scripts/ci/test.sh",
+      "go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json",
+      "go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+      "git diff --check",
+      "graphify update ."
+    ]
+  }
+}

@@ -31,6 +31,30 @@ func TestValidateWASMImportsAcceptsTargetAllowlists(t *testing.T) {
 			},
 		},
 		{
+			name:   "web surface host",
+			target: "wasm32-web",
+			imports: []wasmImport{
+				{Module: "tetra_web_v1", Name: "console_log"},
+				{Module: "tetra_web_v1", Name: "panic"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_open"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_close"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_event_kind"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_event_x"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_event_y"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_event_button"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_event_into"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_event_text_len"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_event_text_into"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_clipboard_write_text"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_clipboard_read_text_into"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_composition_into"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_begin_frame"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_present_rgba"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_now_ms"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_request_redraw"},
+			},
+		},
+		{
 			name:    "no imports",
 			target:  "wasm32-web",
 			imports: nil,
@@ -88,6 +112,15 @@ func TestValidateWASMImportsRejectsExtraImports(t *testing.T) {
 				{Module: "tetra_web_v1", Name: "fetch"},
 			},
 			want: "disallowed import tetra_web_v1.fetch",
+		},
+		{
+			name:   "web rejects extra surface host function",
+			target: "wasm32-web",
+			imports: []wasmImport{
+				{Module: "tetra_web_v1", Name: "console_log"},
+				{Module: "tetra_surface_host_v1", Name: "__tetra_surface_fake"},
+			},
+			want: "disallowed import tetra_surface_host_v1.__tetra_surface_fake",
 		},
 	}
 

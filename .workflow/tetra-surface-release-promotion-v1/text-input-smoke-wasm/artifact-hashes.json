@@ -1,0 +1,28 @@
+{
+  "schema": "tetra.release-artifact-hashes.v1alpha1",
+  "root": ".",
+  "artifacts": [
+    {
+      "path": "surface-wasm32-web-release-text-input-artifacts/surface-release-text-input.mjs",
+      "sha256": "sha256:5f9ff0cd0667dd6f8eb65c33806cfd9be17dfd3d1a0ec4f638d77bbd035fffad",
+      "size": 6566
+    },
+    {
+      "path": "surface-wasm32-web-release-text-input-artifacts/surface-release-text-input.wasm",
+      "sha256": "sha256:7a82257c88ac7e3261ac747485cf3f3825d9f638504f59a60fb5f7c391b6e48b",
+      "size": 17193
+    },
+    {
+      "path": "surface-wasm32-web-release-text-input-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:0719e320e99a968f43b6321e46d4784846cd62aed3377bc433e6e96c53f26cf1",
+      "size": 2943,
+      "schema": "tetra.surface.browser-canvas-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-release-text-input.json",
+      "sha256": "sha256:44a3f5a9afa0100a1165fc4ac3fbdf3636a5f6f3982e9e230d7058e3ab80dbf1",
+      "size": 6851,
+      "schema": "tetra.surface.text-input.v1"
+    }
+  ]
+}

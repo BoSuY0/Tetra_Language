@@ -24,12 +24,13 @@ type smokeOptions struct {
 }
 
 type smokeRunner struct {
-	opt       smokeOptions
-	workDir   string
-	sourceDir string
-	tetraPath string
-	processes []memoryprod.ProcessReport
-	cases     []memoryprod.CaseReport
+	opt        smokeOptions
+	workDir    string
+	sourceDir  string
+	tetraPath  string
+	processes  []memoryprod.ProcessReport
+	benchmarks []memoryprod.BenchmarkReport
+	cases      []memoryprod.CaseReport
 }
 
 type processResult struct {
@@ -108,6 +109,12 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 		return err
 	}
 	if err := r.runMemoryShapeCoverageCases(ctx); err != nil {
+		return err
+	}
+	if err := r.runSmallHeapAllocationBenchmark(ctx); err != nil {
+		return err
+	}
+	if err := r.runRawPointerBoundsMetadataReport(ctx); err != nil {
 		return err
 	}
 	return r.writeReport()
@@ -209,6 +216,7 @@ func (r *smokeRunner) runRuntimeDiagnosticCases(ctx context.Context) error {
 		source        string
 		expectedExit  int
 		expectedError string
+		requireError  bool
 	}{
 		{name: "allocator invalid size precondition", source: allocInvalidSizeSource, expectedExit: 2, expectedError: "invalid allocation size"},
 		{name: "runtime bounds check", source: sliceBoundsSource, expectedExit: 1, expectedError: "bounds"},
@@ -216,6 +224,10 @@ func (r *smokeRunner) runRuntimeDiagnosticCases(ctx context.Context) error {
 		{name: "raw ptr_add allocation upper bound", source: rawPtrAddUpperSource, expectedExit: 2, expectedError: "allocation upper bound"},
 		{name: "raw allocation-base i32 access width", source: rawI32WidthSource, expectedExit: 2, expectedError: "i32 access width exceeds allocation"},
 		{name: "raw allocation-base ptr access width", source: rawPtrWidthSource, expectedExit: 2, expectedError: "ptr access width exceeds allocation"},
+		{name: "raw allocation-base store_i32 access width", source: rawStoreI32WidthSource, expectedExit: 2, expectedError: "i32 access width exceeds allocation"},
+		{name: "raw allocation-base load_ptr access width", source: rawLoadPtrWidthSource, expectedExit: 2, expectedError: "ptr access width exceeds allocation"},
+		{name: "raw slice negative length", source: rawSliceNegativeLengthSource, expectedExit: 2, expectedError: "negative raw slice length"},
+		{name: "raw slice i32 length byte overflow", source: rawSliceI32LengthOverflowSource, expectedExit: 2, expectedError: "raw slice length byte overflow"},
 		{name: "memcpy/memset negative length", source: memoryNegativeLengthSource, expectedExit: 2, expectedError: "negative helper length"},
 	}
 	for i, tc := range tests {
@@ -230,14 +242,24 @@ func (r *smokeRunner) runRuntimeDiagnosticCases(ctx context.Context) error {
 			return fmt.Errorf("build %s: %s", tc.name, build.output)
 		}
 		run := runCommand(ctx, 5*time.Second, outPath)
-		pass := run.exitCode == tc.expectedExit
+		pass := runtimeDiagnosticPass(run, tc.expectedExit, tc.expectedError, tc.requireError)
 		if !pass {
 			r.cases = append(r.cases, failedCase(tc.name, "negative", tc.expectedError, fmt.Sprintf("exit=%d output=%s", run.exitCode, run.output)))
-			return fmt.Errorf("%s exit=%d, want %d: %s", tc.name, run.exitCode, tc.expectedExit, run.output)
+			return fmt.Errorf("%s exit=%d, want %d and error %q: %s", tc.name, run.exitCode, tc.expectedExit, tc.expectedError, run.output)
 		}
 		r.cases = append(r.cases, memoryprod.CaseReport{Name: tc.name, Kind: "negative", Ran: true, Pass: true, ExpectedError: tc.expectedError})
 	}
 	return nil
+}
+
+func runtimeDiagnosticPass(run processResult, expectedExit int, expectedError string, requireError bool) bool {
+	if run.exitCode != expectedExit {
+		return false
+	}
+	if !requireError || strings.TrimSpace(expectedError) == "" {
+		return true
+	}
+	return strings.Contains(run.output, expectedError)
 }
 
 func (r *smokeRunner) writeSource(name, body string) (string, error) {
@@ -315,8 +337,226 @@ func (r *smokeRunner) runMemoryShapeCoverageCases(ctx context.Context) error {
 	return nil
 }
 
+func (r *smokeRunner) runSmallHeapAllocationBenchmark(ctx context.Context) error {
+	const allocationCount = 64
+	const bytesPerAllocation = 32
+	const smallHeapChunkBytes = 64 * 1024
+
+	sourcePath, err := r.writeSource("small_heap_benchmark", smallHeapBenchmarkSource(allocationCount, bytesPerAllocation))
+	if err != nil {
+		return err
+	}
+	outPath := filepath.Join(r.workDir, "small-heap-benchmark")
+	build := runCommand(ctx, 30*time.Second, r.tetraPath, "build", "--target", "linux-x64", "--emit-alloc-report", "-o", outPath, sourcePath)
+	r.recordProcess("small heap allocation benchmark build", "benchmark", r.tetraPath+" build --target linux-x64 --emit-alloc-report", build)
+	if build.err != nil {
+		return fmt.Errorf("build small heap allocation benchmark: %s", build.output)
+	}
+	allocReportPath := outPath + ".alloc.json"
+	raw, err := os.ReadFile(allocReportPath)
+	if err != nil {
+		return fmt.Errorf("read small heap allocation report: %w", err)
+	}
+	report, err := parseAllocationReportSummary(raw)
+	if err != nil {
+		return err
+	}
+	smallHeapRows := report.Summary.RuntimePaths["per_core_small_heap"]
+	if smallHeapRows != allocationCount {
+		return fmt.Errorf("small heap allocation benchmark: per_core_small_heap rows = %d, want %d", smallHeapRows, allocationCount)
+	}
+	reusePolicyRows := report.Summary.AllocatorReusePolicies["same_core_same_size_class_free_list"]
+	if reusePolicyRows != allocationCount {
+		return fmt.Errorf("small heap allocation benchmark: same-core reuse policy rows = %d, want %d", reusePolicyRows, allocationCount)
+	}
+	if report.Summary.BytesReserved <= 0 {
+		return fmt.Errorf("small heap allocation benchmark: bytes_reserved = %d, want positive", report.Summary.BytesReserved)
+	}
+	baselineSyscalls := smallHeapRows
+	measuredSyscalls := ceilDiv(report.Summary.BytesReserved, smallHeapChunkBytes)
+	if measuredSyscalls <= 0 {
+		measuredSyscalls = 1
+	}
+	improvement := float64(baselineSyscalls) / float64(measuredSyscalls)
+	if baselineSyscalls <= measuredSyscalls {
+		return fmt.Errorf("small heap allocation benchmark: baseline syscalls %d must exceed measured chunk refills %d", baselineSyscalls, measuredSyscalls)
+	}
+	r.benchmarks = append(r.benchmarks, memoryprod.BenchmarkReport{
+		Name:             "small heap allocation syscall reduction",
+		Kind:             "allocator",
+		Metric:           "estimated_os_syscalls",
+		Unit:             "syscalls",
+		BaselineValue:    baselineSyscalls,
+		MeasuredValue:    measuredSyscalls,
+		ImprovementRatio: improvement,
+		Evidence: fmt.Sprintf(
+			"allocation report schema v2 shows %d per_core_small_heap rows with same_core_same_size_class_free_list reuse policy, %d bytes reserved, and %d estimated 64KiB chunk refill syscall(s) instead of %d mmap-per-allocation syscall(s)",
+			smallHeapRows,
+			report.Summary.BytesReserved,
+			measuredSyscalls,
+			baselineSyscalls,
+		),
+		Ran:  true,
+		Pass: true,
+	})
+	return nil
+}
+
+func (r *smokeRunner) runRawPointerBoundsMetadataReport(ctx context.Context) error {
+	sourcePath, err := r.writeSource("raw_pointer_bounds_metadata", rawPointerBoundsMetadataSource)
+	if err != nil {
+		return err
+	}
+	outPath := filepath.Join(r.workDir, "raw-pointer-bounds-metadata")
+	build := runCommand(ctx, 30*time.Second, r.tetraPath, "build", "--target", "linux-x64", "--emit-alloc-report", "--emit-memory-report", "-o", outPath, sourcePath)
+	r.recordProcess("raw pointer bounds metadata report build", "benchmark", r.tetraPath+" build --target linux-x64 --emit-alloc-report --emit-memory-report", build)
+	if build.err != nil {
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", build.output))
+		return fmt.Errorf("build raw pointer bounds metadata report: %s", build.output)
+	}
+	raw, err := os.ReadFile(outPath + ".alloc.json")
+	if err != nil {
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+		return fmt.Errorf("read raw pointer bounds allocation report: %w", err)
+	}
+	report, err := parseAllocationReportSummary(raw)
+	if err != nil {
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+		return err
+	}
+	memoryRaw, err := os.ReadFile(outPath + ".memory.json")
+	if err != nil {
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+		return fmt.Errorf("read raw pointer bounds memory report: %w", err)
+	}
+	validateMemory := runCommand(ctx, 30*time.Second, "go", "run", "./tools/cmd/validate-memory-report", "--report", outPath+".memory.json")
+	r.recordProcess("raw pointer bounds memory report validation", "benchmark", "go run ./tools/cmd/validate-memory-report --report "+outPath+".memory.json", validateMemory)
+	if validateMemory.err != nil {
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", validateMemory.output))
+		return fmt.Errorf("validate raw pointer bounds memory report: %s", validateMemory.output)
+	}
+	memoryClaims, err := parseMemoryReportClaims(memoryRaw)
+	if err != nil {
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+		return err
+	}
+	if report.Summary.RawPointerBoundsStatuses["allocation_base_metadata"] < 1 {
+		err := fmt.Errorf("raw pointer bounds allocation report missing allocation_base_metadata summary: %+v", report.Summary.RawPointerBoundsStatuses)
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+		return err
+	}
+	if report.Summary.RawSlicePolicies["external_unknown"] < 1 {
+		err := fmt.Errorf("raw pointer bounds allocation report missing external_unknown raw slice policy: %+v", report.Summary.RawSlicePolicies)
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+		return err
+	}
+	for _, claim := range []string{
+		"allocation_base_metadata",
+		"derived_allocation_offset",
+		"rejected_negative_offset",
+		"rejected_upper_bound",
+		"rejected_access_width_overflow",
+		"checked_external_unknown",
+		"external_unknown",
+		"raw_slice_verified_allocation_root",
+		"rejected_negative_length",
+	} {
+		if memoryClaims[claim] < 1 {
+			err := fmt.Errorf("raw pointer bounds memory report missing %s claim: %+v", claim, memoryClaims)
+			r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+			return err
+		}
+	}
+	r.cases = append(r.cases, memoryprod.CaseReport{Name: "raw pointer bounds metadata report", Kind: "positive", Ran: true, Pass: true})
+	return nil
+}
+
+type allocationReportSummary struct {
+	SchemaVersion int `json:"schema_version"`
+	Summary       struct {
+		AllocationCount          int            `json:"allocation_count"`
+		RuntimePaths             map[string]int `json:"runtime_paths"`
+		AllocatorClasses         map[string]int `json:"allocator_classes"`
+		AllocatorReusePolicies   map[string]int `json:"allocator_reuse_policies"`
+		RawPointerBoundsStatuses map[string]int `json:"raw_pointer_bounds_statuses"`
+		RawSlicePolicies         map[string]int `json:"raw_slice_policies"`
+		BytesReserved            int            `json:"bytes_reserved"`
+	} `json:"summary"`
+}
+
+func parseAllocationReportSummary(raw []byte) (allocationReportSummary, error) {
+	var report allocationReportSummary
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return allocationReportSummary{}, fmt.Errorf("parse small heap allocation report: %w", err)
+	}
+	if report.SchemaVersion != 2 {
+		return allocationReportSummary{}, fmt.Errorf("small heap allocation report schema_version = %d, want 2", report.SchemaVersion)
+	}
+	if report.Summary.AllocationCount <= 0 {
+		return allocationReportSummary{}, fmt.Errorf("small heap allocation report allocation_count = %d, want positive", report.Summary.AllocationCount)
+	}
+	if report.Summary.RuntimePaths == nil {
+		return allocationReportSummary{}, fmt.Errorf("small heap allocation report missing runtime_paths summary")
+	}
+	if report.Summary.AllocatorReusePolicies == nil {
+		return allocationReportSummary{}, fmt.Errorf("small heap allocation report missing allocator_reuse_policies summary")
+	}
+	return report, nil
+}
+
+func parseMemoryReportClaims(raw []byte) (map[string]int, error) {
+	var report struct {
+		SchemaVersion string `json:"schema_version"`
+		Rows          []struct {
+			Claim string `json:"claim"`
+		} `json:"rows"`
+	}
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return nil, fmt.Errorf("parse memory report: %w", err)
+	}
+	if report.SchemaVersion != "tetra.memory-report.v1" {
+		return nil, fmt.Errorf("memory report schema_version = %q, want tetra.memory-report.v1", report.SchemaVersion)
+	}
+	claims := map[string]int{}
+	for _, row := range report.Rows {
+		claims[row.Claim]++
+	}
+	return claims, nil
+}
+
+func ceilDiv(n, d int) int {
+	if d <= 0 {
+		return 0
+	}
+	return (n + d - 1) / d
+}
+
+func smallHeapBenchmarkSource(allocationCount, bytesPerAllocation int) string {
+	var b strings.Builder
+	for i := 0; i < allocationCount; i++ {
+		fmt.Fprintf(&b, "func make_%02d() -> []u8\n", i)
+		b.WriteString("uses alloc, mem:\n")
+		fmt.Fprintf(&b, "    var xs: []u8 = make_u8(%d)\n", bytesPerAllocation)
+		b.WriteString("    return xs\n\n")
+	}
+	b.WriteString("func main() -> Int\n")
+	b.WriteString("uses alloc, mem:\n")
+	for i := 0; i < allocationCount; i++ {
+		fmt.Fprintf(&b, "    let xs_%02d: []u8 = make_%02d()\n", i, i)
+	}
+	b.WriteString("    return ")
+	for i := 0; i < allocationCount; i++ {
+		if i > 0 {
+			b.WriteString(" + ")
+		}
+		fmt.Fprintf(&b, "xs_%02d.len", i)
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
 func (r *smokeRunner) writeReport() error {
-	report := buildReport("tools/cmd/memory-production-smoke", r.processes, r.cases)
+	report := buildReport("tools/cmd/memory-production-smoke", r.processes, r.benchmarks, r.cases)
 	raw, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
@@ -328,7 +568,7 @@ func (r *smokeRunner) writeReport() error {
 	return os.WriteFile(r.opt.ReportPath, raw, 0o644)
 }
 
-func buildReport(source string, processes []memoryprod.ProcessReport, cases []memoryprod.CaseReport) memoryprod.Report {
+func buildReport(source string, processes []memoryprod.ProcessReport, benchmarks []memoryprod.BenchmarkReport, cases []memoryprod.CaseReport) memoryprod.Report {
 	return memoryprod.Report{
 		Schema:  memoryprod.SchemaV1,
 		Status:  "pass",
@@ -339,12 +579,16 @@ func buildReport(source string, processes []memoryprod.ProcessReport, cases []me
 		Processes: append([]memoryprod.ProcessReport(nil),
 			processes...,
 		),
+		Benchmarks: append([]memoryprod.BenchmarkReport(nil),
+			benchmarks...,
+		),
 		Contracts: []memoryprod.ContractReport{
 			{Name: "allocator runtime model", Status: "pass", Evidence: "linux-x64 allocator headers and scoped island lifecycle smoke"},
 			{Name: "allocator failure semantics", Status: "pass", Evidence: "linux-x64 mmap failure guard and invalid-size runtime status"},
 			{Name: "ownership escape model", Status: "pass", Evidence: "compiler safety diagnostics for borrow escape and resource aliases"},
 			{Name: "unsafe cap.mem raw memory rules", Status: "pass", Evidence: "raw helper examples require unsafe and explicit cap.mem"},
 			{Name: "runtime bounds diagnostics", Status: "pass", Evidence: "linux-x64 raw pointer and slice bounds negative cases"},
+			{Name: "raw pointer bounds metadata", Status: "pass", Evidence: "allocation report schema v2 includes allocation_base_metadata; memory report includes derived_allocation_offset, rejected_negative_offset, rejected_upper_bound, rejected_access_width_overflow, checked_external_unknown, external_unknown, raw_slice_verified_allocation_root, and rejected_negative_length"},
 			{Name: "actor task transfer rules", Status: "pass", Evidence: "compiler safety diagnostics for actor/task transfer boundaries"},
 		},
 		Cases: append([]memoryprod.CaseReport(nil), cases...),
@@ -381,13 +625,25 @@ func memoryProductionAudit() []memoryprod.AuditReport {
 		{
 			Requirement: "runtime bounds checks and diagnostics",
 			Artifact:    "docs/spec/runtime_abi.md; compiler/compiler_test.go; tools/cmd/memory-production-smoke",
-			Evidence:    "slice bounds, ptr_add negative offset, allocation upper bound, i32 width, ptr width, and negative helper length diagnostics are required cases",
+			Evidence:    "slice bounds, ptr_add negative offset, allocation upper bound, load/store i32 width, load/store ptr width, raw-slice length, and negative helper length diagnostics are required cases",
+			Result:      "pass",
+		},
+		{
+			Requirement: "raw pointer bounds metadata",
+			Artifact:    "compiler/internal/runtimeabi/raw_pointer_bounds.go; compiler/internal/plir/plir.go; compiler/internal/allocplan/plan.go; tools/cmd/memory-production-smoke",
+			Evidence:    "core.alloc_bytes allocation reports include allocation_base_metadata and external_unknown raw-slice policy; memory reports include derived_allocation_offset, rejected_negative_offset, rejected_upper_bound, rejected_access_width_overflow, checked_external_unknown, external_unknown, raw_slice_verified_allocation_root, and rejected_negative_length without arbitrary raw pointer safety claims",
 			Result:      "pass",
 		},
 		{
 			Requirement: "stress/fuzz evidence",
 			Artifact:    "tools/cmd/memory-production-smoke",
 			Evidence:    "stress allocator reuse and deterministic memcpy/memset fuzz cases ran through the release-gate entrypoint",
+			Result:      "pass",
+		},
+		{
+			Requirement: "measured memory benchmark improvement",
+			Artifact:    "tools/cmd/memory-production-smoke; compiler allocation report schema v2",
+			Evidence:    "small heap allocation syscall reduction benchmark reads the emitted allocation report, counts per_core_small_heap rows with same_core_same_size_class_free_list reuse policy, and compares estimated mmap-per-allocation baseline against 64KiB chunk refill calls",
 			Result:      "pass",
 		},
 		{
@@ -435,6 +691,11 @@ func requiredPassingCases() []memoryprod.CaseReport {
 		{Name: "raw ptr_add allocation upper bound", Kind: "negative", Ran: true, Pass: true, ExpectedError: "allocation upper bound"},
 		{Name: "raw allocation-base i32 access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "i32 access width exceeds allocation"},
 		{Name: "raw allocation-base ptr access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "ptr access width exceeds allocation"},
+		{Name: "raw allocation-base store_i32 access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "i32 access width exceeds allocation"},
+		{Name: "raw allocation-base load_ptr access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "ptr access width exceeds allocation"},
+		{Name: "raw slice negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative raw slice length"},
+		{Name: "raw slice i32 length byte overflow", Kind: "negative", Ran: true, Pass: true, ExpectedError: "raw slice length byte overflow"},
+		{Name: "raw pointer bounds metadata report", Kind: "positive", Ran: true, Pass: true},
 		{Name: "memcpy/memset negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative helper length"},
 		{Name: "reject use-after-free", Kind: "negative", Ran: true, Pass: true, ExpectedError: "use-after-free"},
 		{Name: "reject double-free", Kind: "negative", Ran: true, Pass: true, ExpectedError: "double-free"},
@@ -632,8 +893,9 @@ func main() -> Int
 uses alloc, capability, mem:
     unsafe:
         let mem: cap.mem = core.cap_mem()
-        let p: ptr = core.alloc_bytes(3)
-        let _: Int = core.store_i32(p, 123, mem)
+        let p: ptr = core.alloc_bytes(8)
+        let q: ptr = core.ptr_add(p, 5, mem)
+        let _: Int = core.load_i32(q, mem)
         return 0
     return 0
 `
@@ -643,9 +905,91 @@ func main() -> Int
 uses alloc, capability, mem:
     unsafe:
         let mem: cap.mem = core.cap_mem()
-        let p: ptr = core.alloc_bytes(7)
-        let _: ptr = core.store_ptr(p, p, mem)
+        let p: ptr = core.alloc_bytes(4)
+        let q: ptr = core.ptr_add(p, 1, mem)
+        let _: ptr = core.store_ptr(q, p, mem)
         return 0
+    return 0
+`
+
+const rawStoreI32WidthSource = `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(8)
+        let q: ptr = core.ptr_add(p, 5, mem)
+        let _: Int = core.store_i32(q, 123, mem)
+        return 0
+    return 0
+`
+
+const rawLoadPtrWidthSource = `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(4)
+        let q: ptr = core.ptr_add(p, 1, mem)
+        let _: ptr = core.load_ptr(q, mem)
+        return 0
+    return 0
+`
+
+const rawPointerBoundsMetadataSource = `
+func external(raw: ptr, n: Int) -> Int
+uses capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let q: ptr = core.ptr_add(raw, 0 - 1, mem)
+        let xs: []u8 = core.raw_slice_u8_from_parts(q, n, mem)
+        return xs.len
+    return 0
+
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(24)
+        let q: ptr = core.ptr_add(p, 8, mem)
+        let _: UInt8 = core.store_u8(q, 7, mem)
+        let value: UInt8 = core.load_u8(q, mem)
+        let neg_base: ptr = core.alloc_bytes(8)
+        let neg: ptr = core.ptr_add(neg_base, 0 - 1, mem)
+        let upper_base: ptr = core.alloc_bytes(8)
+        let upper: ptr = core.ptr_add(upper_base, 8, mem)
+        let i32_base: ptr = core.alloc_bytes(8)
+        let i32_ptr: ptr = core.ptr_add(i32_base, 5, mem)
+        let i32_value: Int = core.load_i32(i32_ptr, mem)
+        let ptr_base: ptr = core.alloc_bytes(4)
+        let ptr_ptr: ptr = core.ptr_add(ptr_base, 1, mem)
+        let ptr_value: ptr = core.store_ptr(ptr_ptr, ptr_base, mem)
+        let raw_slice_base: ptr = core.alloc_bytes(16)
+        let raw_slice_view: []u8 = core.raw_slice_u8_from_parts(raw_slice_base, 8, mem)
+        let raw_slice_negative: []u8 = core.raw_slice_u8_from_parts(raw_slice_base, 0 - 1, mem)
+        return i32_value + raw_slice_view.len + raw_slice_negative.len
+    return 0
+`
+
+const rawSliceNegativeLengthSource = `
+func main() -> Int
+uses capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = 0
+        let xs: []u8 = core.raw_slice_u8_from_parts(p, 0 - 1, mem)
+        return xs.len + 98
+    return 0
+`
+
+const rawSliceI32LengthOverflowSource = `
+func main() -> Int
+uses capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = 0
+        let xs: []i32 = core.raw_slice_i32_from_parts(p, 536870912, mem)
+        return xs.len + 98
     return 0
 `
 

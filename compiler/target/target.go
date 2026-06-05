@@ -349,26 +349,57 @@ type AtomicLayout struct {
 }
 
 type Target struct {
-	Triple                  string
-	Status                  Status
-	OS                      OS
-	Arch                    Arch
-	ABI                     ABI
-	DataModel               DataModel
-	Format                  Format
-	ExeExt                  string
-	CollectImports          bool
-	RunMode                 RunMode
-	RunRunner               string
-	PointerWidthBits        int
-	RegisterWidthBits       int
-	NativeIntWidthBits      int
-	Endian                  Endian
-	StackAlignmentBytes     int
-	MaxAtomicWidthBits      int
-	UnsupportedReason       string
-	SupportsDebugInfo       bool
-	SupportsReleaseOptimize bool
+	Triple                   string
+	Status                   Status
+	OS                       OS
+	Arch                     Arch
+	ABI                      ABI
+	DataModel                DataModel
+	Format                   Format
+	ExeExt                   string
+	CollectImports           bool
+	RunMode                  RunMode
+	RunRunner                string
+	PointerWidthBits         int
+	RegisterWidthBits        int
+	NativeIntWidthBits       int
+	Endian                   Endian
+	StackAlignmentBytes      int
+	MaxAtomicWidthBits       int
+	UnsupportedReason        string
+	RuntimeStatus            string
+	StdlibStatus             string
+	FFIStatus                string
+	MemoryBuild              string
+	MemoryLower              string
+	MemoryRun                string
+	MemoryRawDiagnostics     string
+	MemoryRegionLowering     string
+	MemoryAlignmentSemantics string
+	MemoryClaimLevel         string
+	RunnerProbeCommand       string
+	ReleaseGate              string
+	EvidenceArtifacts        []string
+	SyscallInstruction       string
+	SyscallNumbering         string
+	SyscallArgRegisters      []string
+	SyscallErrorRange        string
+	SupportsDebugInfo        bool
+	SupportsReleaseOptimize  bool
+}
+
+const linuxNativeReleaseGate = "scripts/release/post_v0_4/linux-native-targets-smoke.sh"
+
+func linuxNativeEvidenceArtifacts(stem string) []string {
+	return []string{
+		"targets.json",
+		stem + "-abi.json",
+		stem + "-atomic-stress.json",
+		stem + "-fuzz.json",
+		stem + "-runner.json",
+		"linux-native-targets-brutal.json",
+		"artifact-hashes.json",
+	}
 }
 
 func All() []Target {
@@ -458,153 +489,232 @@ func Parse(triple string) (Target, error) {
 	switch canonical {
 	case "linux-x86":
 		return Target{
-			Triple:                  "linux-x86",
-			Status:                  StatusBuildOnly,
-			OS:                      OSLinux,
-			Arch:                    ArchX86,
-			ABI:                     ABI386SysV,
-			DataModel:               DataModelILP32,
-			Format:                  FormatELF,
-			ExeExt:                  "",
-			CollectImports:          false,
-			RunMode:                 RunModeHostProbed,
-			PointerWidthBits:        32,
-			RegisterWidthBits:       32,
-			NativeIntWidthBits:      32,
-			Endian:                  EndianLittle,
-			StackAlignmentBytes:     16,
-			MaxAtomicWidthBits:      32,
-			UnsupportedReason:       "full linux-x86 runtime/stdlib/FFI support is not implemented yet; no-runtime executable build/link, i386-compatible Linux run/test execution, stdout write/string literal data, stack-argument, scalar global, symbol-backed callback, heap-backed slice allocation/indexing, raw ptr_add/load/store, MMIO read/write, scoped island bump allocation/free plus debug double-free guard/page-protect object codegen, ELF/linker primitives, i386 SysV ABI classifier, explicit filesystem/networking stdlib plus time/task/actors target-runtime boundary diagnostics, x86 pointer/native-libc/function-pointer @export diagnostics, source native scalar diagnostics, pointer-only atomic ABI-width object check, source-level atomic diagnostics, and full 8/16/32-bit atomic/fuzz object checks are available",
-			SupportsDebugInfo:       false,
-			SupportsReleaseOptimize: false,
+			Triple:                   "linux-x86",
+			Status:                   StatusBuildOnly,
+			OS:                       OSLinux,
+			Arch:                     ArchX86,
+			ABI:                      ABI386SysV,
+			DataModel:                DataModelILP32,
+			Format:                   FormatELF,
+			ExeExt:                   "",
+			CollectImports:           false,
+			RunMode:                  RunModeHostProbed,
+			PointerWidthBits:         32,
+			RegisterWidthBits:        32,
+			NativeIntWidthBits:       32,
+			Endian:                   EndianLittle,
+			StackAlignmentBytes:      16,
+			MaxAtomicWidthBits:       32,
+			UnsupportedReason:        "full linux-x86 runtime/stdlib/FFI support is not implemented yet; no-runtime executable build/link, i386-compatible Linux run/test execution, stdout write/string literal data, stack-argument, scalar global, symbol-backed callback, heap-backed slice allocation/indexing, raw ptr_add/load/store, raw pointer-slot base/offset load/store executable smokes, MMIO read/write, scoped island bump allocation/free plus debug double-free guard/page-protect object codegen, ELF/linker primitives, i386 SysV ABI classifier, self-host logical time runtime smoke, fs_exists filesystem runtime plus filesystem/scheduler composition smoke, bounded two-spawn self-host actors/task/task-group runtime smokes, single-spawn typed-task/staged typed-task/typed task-group plus actor-state runtime smoke, i386 ctx_switch object smoke, current core.net networking runtime smokes, Surface, distributed actors, and actor fanout above 2 runtime boundary diagnostics, x86 canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes, x86 function-pointer @export diagnostics, remaining source target-layout scalar diagnostics, pointer-only atomic ABI-width object check, source-level atomic diagnostics, and full 8/16/32-bit atomic/fuzz object checks are available",
+			RuntimeStatus:            "partial_build_only",
+			StdlibStatus:             "partial_build_only",
+			FFIStatus:                "ilp32_scalar_object_smokes_partial",
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "no/host-dependent",
+			MemoryRawDiagnostics:     "partial",
+			MemoryRegionLowering:     "partial",
+			MemoryAlignmentSemantics: "partial",
+			MemoryClaimLevel:         "build_lower_only",
+			RunnerProbeCommand:       "tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>",
+			ReleaseGate:              linuxNativeReleaseGate,
+			EvidenceArtifacts:        linuxNativeEvidenceArtifacts("linux-x86"),
+			SyscallInstruction:       "int 0x80",
+			SyscallNumbering:         "i386",
+			SyscallArgRegisters:      []string{"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp"},
+			SyscallErrorRange:        "-4095..-1",
+			SupportsDebugInfo:        false,
+			SupportsReleaseOptimize:  false,
 		}, nil
 	case "linux-x64":
 		return Target{
-			Triple:                  "linux-x64",
-			Status:                  StatusSupported,
-			OS:                      OSLinux,
-			Arch:                    ArchX64,
-			ABI:                     ABISysV,
-			DataModel:               DataModelLP64,
-			Format:                  FormatELF,
-			ExeExt:                  "",
-			CollectImports:          false,
-			RunMode:                 RunModeHostNative,
-			PointerWidthBits:        64,
-			RegisterWidthBits:       64,
-			NativeIntWidthBits:      64,
-			Endian:                  EndianLittle,
-			StackAlignmentBytes:     16,
-			MaxAtomicWidthBits:      64,
-			SupportsDebugInfo:       true,
-			SupportsReleaseOptimize: true,
+			Triple:                   "linux-x64",
+			Status:                   StatusSupported,
+			OS:                       OSLinux,
+			Arch:                     ArchX64,
+			ABI:                      ABISysV,
+			DataModel:                DataModelLP64,
+			Format:                   FormatELF,
+			ExeExt:                   "",
+			CollectImports:           false,
+			RunMode:                  RunModeHostNative,
+			PointerWidthBits:         64,
+			RegisterWidthBits:        64,
+			NativeIntWidthBits:       64,
+			Endian:                   EndianLittle,
+			StackAlignmentBytes:      16,
+			MaxAtomicWidthBits:       64,
+			RuntimeStatus:            "production",
+			StdlibStatus:             "production",
+			FFIStatus:                "scalar_object_smokes_partial",
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "yes",
+			MemoryRawDiagnostics:     "yes",
+			MemoryRegionLowering:     "yes/partial",
+			MemoryAlignmentSemantics: "yes",
+			MemoryClaimLevel:         "production/host_runtime",
+			RunnerProbeCommand:       "tetra test --target x64 --format=json <runner-smoke.tetra>",
+			ReleaseGate:              linuxNativeReleaseGate,
+			EvidenceArtifacts:        linuxNativeEvidenceArtifacts("linux-x64"),
+			SyscallInstruction:       "syscall",
+			SyscallNumbering:         "x86_64",
+			SyscallArgRegisters:      []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"},
+			SyscallErrorRange:        "-4095..-1",
+			SupportsDebugInfo:        true,
+			SupportsReleaseOptimize:  true,
 		}, nil
 	case "linux-x32":
 		return Target{
-			Triple:                  "linux-x32",
-			Status:                  StatusBuildOnly,
-			OS:                      OSLinux,
-			Arch:                    ArchX64,
-			ABI:                     ABIX32SysV,
-			DataModel:               DataModelX32,
-			Format:                  FormatELF,
-			ExeExt:                  "",
-			CollectImports:          false,
-			RunMode:                 RunModeHostProbed,
-			PointerWidthBits:        32,
-			RegisterWidthBits:       64,
-			NativeIntWidthBits:      32,
-			Endian:                  EndianLittle,
-			StackAlignmentBytes:     16,
-			MaxAtomicWidthBits:      64,
-			UnsupportedReason:       "full linux-x32 runtime/stdlib/FFI support is not implemented yet; executable build/link, object codegen, ELF/linker primitives, no-runtime programs, raw ptr_add/load/store, pointer load/store, MMIO read/write, scoped island bump allocation/free, self-host runtime builds, compiler-owned target suites, x32 SysV ABI classifier, explicit filesystem/networking stdlib plus x32 multi-spawn actors/task, task-group, and typed-task runtime boundary diagnostics, scalar i32 @export object smoke, x32 pointer/native-libc/function-pointer @export diagnostics, source native scalar diagnostics, x32 syscall numbers, pointer-only atomic ABI-width object check, dword pointer atomics, and host-probed source run/test execution are available when the Linux kernel supports the x32 ABI",
-			SupportsDebugInfo:       false,
-			SupportsReleaseOptimize: false,
+			Triple:                   "linux-x32",
+			Status:                   StatusBuildOnly,
+			OS:                       OSLinux,
+			Arch:                     ArchX64,
+			ABI:                      ABIX32SysV,
+			DataModel:                DataModelX32,
+			Format:                   FormatELF,
+			ExeExt:                   "",
+			CollectImports:           false,
+			RunMode:                  RunModeHostProbed,
+			PointerWidthBits:         32,
+			RegisterWidthBits:        64,
+			NativeIntWidthBits:       32,
+			Endian:                   EndianLittle,
+			StackAlignmentBytes:      16,
+			MaxAtomicWidthBits:       64,
+			UnsupportedReason:        "full linux-x32 runtime/stdlib/FFI support is not implemented yet; executable build/link, object codegen, ELF/linker primitives, no-runtime programs with stdout write/string literal data, raw ptr_add/load/store, pointer load/store, raw pointer-slot base/offset executable smokes, MMIO read/write, scoped island bump allocation/free, self-host runtime builds for time, bounded two-spawn actors/task/task-group, single-spawn typed-task/staged typed-task/typed task-group, actor-state, and filesystem/scheduler composition smokes, x32 ctx_switch object smoke, compiler-owned target suites, x32 SysV ABI classifier, fs_exists-only filesystem runtime smoke, current x32 core.net networking runtime smokes, Surface, distributed actors, and x32 actor fanout above 2 runtime boundary diagnostics, scalar i32 plus canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes, x32 function-pointer @export diagnostics, remaining source target-layout scalar diagnostics, x32 syscall numbers, pointer-only atomic ABI-width object check, dword pointer atomics, and host-probed source run/test execution are available when the Linux kernel supports the x32 ABI",
+			RuntimeStatus:            "partial_build_only",
+			StdlibStatus:             "partial_build_only",
+			FFIStatus:                "ilp32_scalar_object_smokes_partial",
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "no/host-dependent",
+			MemoryRawDiagnostics:     "partial",
+			MemoryRegionLowering:     "partial",
+			MemoryAlignmentSemantics: "special",
+			MemoryClaimLevel:         "build_lower_only",
+			RunnerProbeCommand:       "tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
+			ReleaseGate:              linuxNativeReleaseGate,
+			EvidenceArtifacts:        linuxNativeEvidenceArtifacts("linux-x32"),
+			SyscallInstruction:       "syscall",
+			SyscallNumbering:         "x32_syscall_bit",
+			SyscallArgRegisters:      []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"},
+			SyscallErrorRange:        "-4095..-1",
+			SupportsDebugInfo:        false,
+			SupportsReleaseOptimize:  false,
 		}, nil
 	case "windows-x64":
 		return Target{
-			Triple:                  "windows-x64",
-			Status:                  StatusSupported,
-			OS:                      OSWindows,
-			Arch:                    ArchX64,
-			ABI:                     ABIWin64,
-			DataModel:               DataModelLLP64,
-			Format:                  FormatPE,
-			ExeExt:                  ".exe",
-			CollectImports:          true,
-			RunMode:                 RunModeHostNative,
-			PointerWidthBits:        64,
-			RegisterWidthBits:       64,
-			NativeIntWidthBits:      64,
-			Endian:                  EndianLittle,
-			StackAlignmentBytes:     16,
-			MaxAtomicWidthBits:      64,
-			SupportsDebugInfo:       true,
-			SupportsReleaseOptimize: true,
+			Triple:                   "windows-x64",
+			Status:                   StatusSupported,
+			OS:                       OSWindows,
+			Arch:                     ArchX64,
+			ABI:                      ABIWin64,
+			DataModel:                DataModelLLP64,
+			Format:                   FormatPE,
+			ExeExt:                   ".exe",
+			CollectImports:           true,
+			RunMode:                  RunModeHostNative,
+			PointerWidthBits:         64,
+			RegisterWidthBits:        64,
+			NativeIntWidthBits:       64,
+			Endian:                   EndianLittle,
+			StackAlignmentBytes:      16,
+			MaxAtomicWidthBits:       64,
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "host-required",
+			MemoryRawDiagnostics:     "host-required",
+			MemoryRegionLowering:     "host-required",
+			MemoryAlignmentSemantics: "host-required",
+			MemoryClaimLevel:         "build_lower_only unless run",
+			SupportsDebugInfo:        true,
+			SupportsReleaseOptimize:  true,
 		}, nil
 	case "macos-x64":
 		return Target{
-			Triple:                  "macos-x64",
-			Status:                  StatusSupported,
-			OS:                      OSMacOS,
-			Arch:                    ArchX64,
-			ABI:                     ABISysV,
-			DataModel:               DataModelLP64,
-			Format:                  FormatMachO,
-			ExeExt:                  "",
-			CollectImports:          false,
-			RunMode:                 RunModeHostNative,
-			PointerWidthBits:        64,
-			RegisterWidthBits:       64,
-			NativeIntWidthBits:      64,
-			Endian:                  EndianLittle,
-			StackAlignmentBytes:     16,
-			MaxAtomicWidthBits:      64,
-			SupportsDebugInfo:       true,
-			SupportsReleaseOptimize: true,
+			Triple:                   "macos-x64",
+			Status:                   StatusSupported,
+			OS:                       OSMacOS,
+			Arch:                     ArchX64,
+			ABI:                      ABISysV,
+			DataModel:                DataModelLP64,
+			Format:                   FormatMachO,
+			ExeExt:                   "",
+			CollectImports:           false,
+			RunMode:                  RunModeHostNative,
+			PointerWidthBits:         64,
+			RegisterWidthBits:        64,
+			NativeIntWidthBits:       64,
+			Endian:                   EndianLittle,
+			StackAlignmentBytes:      16,
+			MaxAtomicWidthBits:       64,
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "host-required",
+			MemoryRawDiagnostics:     "host-required",
+			MemoryRegionLowering:     "host-required",
+			MemoryAlignmentSemantics: "host-required",
+			MemoryClaimLevel:         "build_lower_only unless run",
+			SupportsDebugInfo:        true,
+			SupportsReleaseOptimize:  true,
 		}, nil
 	case "wasm32-wasi":
 		return Target{
-			Triple:                  "wasm32-wasi",
-			Status:                  StatusSupported,
-			OS:                      OSWASI,
-			Arch:                    ArchWASM32,
-			ABI:                     ABIWASI,
-			DataModel:               DataModelILP32,
-			Format:                  FormatWASM,
-			ExeExt:                  ".wasm",
-			CollectImports:          false,
-			RunMode:                 RunModeWASIRunner,
-			RunRunner:               "wasmtime",
-			PointerWidthBits:        32,
-			RegisterWidthBits:       32,
-			NativeIntWidthBits:      32,
-			Endian:                  EndianLittle,
-			StackAlignmentBytes:     16,
-			MaxAtomicWidthBits:      64,
-			SupportsDebugInfo:       false,
-			SupportsReleaseOptimize: true,
+			Triple:                   "wasm32-wasi",
+			Status:                   StatusSupported,
+			OS:                       OSWASI,
+			Arch:                     ArchWASM32,
+			ABI:                      ABIWASI,
+			DataModel:                DataModelILP32,
+			Format:                   FormatWASM,
+			ExeExt:                   ".wasm",
+			CollectImports:           false,
+			RunMode:                  RunModeWASIRunner,
+			RunRunner:                "wasmtime",
+			PointerWidthBits:         32,
+			RegisterWidthBits:        32,
+			NativeIntWidthBits:       32,
+			Endian:                   EndianLittle,
+			StackAlignmentBytes:      16,
+			MaxAtomicWidthBits:       64,
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "runner-smoke if available",
+			MemoryRawDiagnostics:     "safe-only",
+			MemoryRegionLowering:     "limited",
+			MemoryAlignmentSemantics: "wasm rules",
+			MemoryClaimLevel:         "artifact/runtime tiered",
+			SupportsDebugInfo:        false,
+			SupportsReleaseOptimize:  true,
 		}, nil
 	case "wasm32-web":
 		return Target{
-			Triple:                  "wasm32-web",
-			Status:                  StatusSupported,
-			OS:                      OSWeb,
-			Arch:                    ArchWASM32,
-			ABI:                     ABIWeb,
-			DataModel:               DataModelILP32,
-			Format:                  FormatWASM,
-			ExeExt:                  ".wasm",
-			CollectImports:          false,
-			RunMode:                 RunModeWebRunner,
-			PointerWidthBits:        32,
-			RegisterWidthBits:       32,
-			NativeIntWidthBits:      32,
-			Endian:                  EndianLittle,
-			StackAlignmentBytes:     16,
-			MaxAtomicWidthBits:      64,
-			SupportsDebugInfo:       false,
-			SupportsReleaseOptimize: true,
+			Triple:                   "wasm32-web",
+			Status:                   StatusSupported,
+			OS:                       OSWeb,
+			Arch:                     ArchWASM32,
+			ABI:                      ABIWeb,
+			DataModel:                DataModelILP32,
+			Format:                   FormatWASM,
+			ExeExt:                   ".wasm",
+			CollectImports:           false,
+			RunMode:                  RunModeWebRunner,
+			PointerWidthBits:         32,
+			RegisterWidthBits:        32,
+			NativeIntWidthBits:       32,
+			Endian:                   EndianLittle,
+			StackAlignmentBytes:      16,
+			MaxAtomicWidthBits:       64,
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "browser-smoke if available",
+			MemoryRawDiagnostics:     "safe-only",
+			MemoryRegionLowering:     "limited",
+			MemoryAlignmentSemantics: "wasm rules",
+			MemoryClaimLevel:         "artifact/runtime tiered",
+			SupportsDebugInfo:        false,
+			SupportsReleaseOptimize:  true,
 		}, nil
 	default:
 		return Target{}, UnsupportedTargetError{Triple: rawTriple}

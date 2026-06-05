@@ -1,0 +1,180 @@
+{
+  "schema": "tetra.surface.browser-canvas-trace.v1",
+  "wasm_path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/baseline-reports/surface-experimental/surface-wasm32-web-browser-canvas-minimal-toolkit-artifacts/surface-toolkit-form.wasm",
+  "canvas": {
+    "opened": true,
+    "width": 400,
+    "height": 240,
+    "readback": true
+  },
+  "browser_events": [
+    {
+      "order": 1,
+      "native_type": "pointerup",
+      "kind": 5,
+      "x": 40,
+      "y": 72,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 2,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "text_len": 2
+    },
+    {
+      "order": 3,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 37,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 4,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 8,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 5,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 46,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 6,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "text_len": 1
+    },
+    {
+      "order": 7,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 8,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 32,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 9,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 10,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "text_len": 1
+    },
+    {
+      "order": 11,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 13,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 12,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 13,
+      "native_type": "resize",
+      "kind": 2,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 400,
+      "height": 240,
+      "text_len": 0
+    }
+  ],
+  "frames": [
+    {
+      "order": 1,
+      "width": 320,
+      "height": 200,
+      "stride": 1280,
+      "pixels_len": 256000,
+      "source_checksum": "e37d6149aa14938e5354620add818ec974f9c4121c724dbf2f1cbdc12442a42a",
+      "canvas_checksum": "e37d6149aa14938e5354620add818ec974f9c4121c724dbf2f1cbdc12442a42a",
+      "checksum": "e37d6149aa14938e5354620add818ec974f9c4121c724dbf2f1cbdc12442a42a",
+      "presented": true
+    },
+    {
+      "order": 5,
+      "width": 400,
+      "height": 240,
+      "stride": 1600,
+      "pixels_len": 384000,
+      "source_checksum": "b55f62535f3eca27f7bf8574519b4fcd8fbff5407a797f97692f6c1e23ebd02a",
+      "canvas_checksum": "b55f62535f3eca27f7bf8574519b4fcd8fbff5407a797f97692f6c1e23ebd02a",
+      "checksum": "b55f62535f3eca27f7bf8574519b4fcd8fbff5407a797f97692f6c1e23ebd02a",
+      "presented": true
+    }
+  ],
+  "app_exit_code": 1
+}

@@ -144,6 +144,48 @@ Decision: approved for ` + version + ` release
 	}
 }
 
+func TestSecurityReviewSignoffValidatorAcceptsConcreteSmokeReportPaths(t *testing.T) {
+	dir := t.TempDir()
+	signoff := filepath.Join(dir, "security-review.md")
+	head := currentGitHead(t)
+	version := currentReleaseVersion(t)
+	raw := `# ` + version + ` Security Review Signoff
+
+Reviewer: Release Reviewer <security@example.invalid>
+Reviewed commit: ` + head + `
+Report directory: /tmp/tetra-v1-rc-security
+Decision: approved for ` + version + ` release
+
+## Evidence Commands
+
+- ` + "`go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`: pass" + `
+- ` + "`go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1`: pass" + `
+- ` + "`go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1`: pass" + `
+- ` + "`go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1`: pass" + `
+- ` + "`bash scripts/release/v1_0/wasi-smoke.sh --report reports/v1_0/wasi-smoke.json`: pass" + `
+- ` + "`bash scripts/release/v1_0/web-smoke.sh --report reports/v1_0/web-ui-smoke.json`: pass" + `
+
+## Artifact Hashes
+
+- release_gate_summary.json: sha256:1111111111111111111111111111111111111111111111111111111111111111
+- security-review.md: sha256:2222222222222222222222222222222222222222222222222222222222222222
+
+## Residual Risks
+
+- None beyond the documented beta/post-v1 Eco trust surfaces.
+`
+	if err := os.WriteFile(signoff, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command("bash", "scripts/release/v1_0/security-review.sh", "--signoff", signoff)
+	cmd.Dir = repoRoot(t)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("security review signoff with concrete smoke report paths should validate: %v\n%s", err, out)
+	}
+}
+
 func TestSecurityReviewSignoffValidatorRejectsTemplatePlaceholders(t *testing.T) {
 	dir := t.TempDir()
 	signoff := filepath.Join(dir, "security-review.md")

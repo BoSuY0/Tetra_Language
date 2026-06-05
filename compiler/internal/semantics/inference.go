@@ -102,6 +102,16 @@ func inferExprTypeForDecl(
 			}
 			return enumType, nil
 		}
+		if rewritten, err := rewriteSliceViewMethodCall(e, locals, globals, types); rewritten || err != nil {
+			if err != nil {
+				return "", err
+			}
+			sig, ok := funcs[e.Name]
+			if !ok {
+				return "", fmt.Errorf("unknown function '%s'", e.Name)
+			}
+			return sig.ReturnType, nil
+		}
 		if builtin, ok := ResolveBuiltinAlias(e.Name); ok && builtin == "core.recv_typed" {
 			if len(e.TypeArgs) != 1 {
 				return "", fmt.Errorf("recv_typed expects one explicit type argument")

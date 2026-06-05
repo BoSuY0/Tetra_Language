@@ -26,30 +26,47 @@ func TestTargetsCommandText(t *testing.T) {
 
 func TestTargetsCommandJSON(t *testing.T) {
 	type targetMeta struct {
-		Triple                  string `json:"triple"`
-		Status                  string `json:"status"`
-		OS                      string `json:"os"`
-		Arch                    string `json:"arch"`
-		ABI                     string `json:"abi"`
-		DataModel               string `json:"data_model"`
-		Format                  string `json:"format"`
-		ExeExt                  string `json:"exe_ext"`
-		BuildOnly               bool   `json:"build_only"`
-		RunMode                 string `json:"run_mode"`
-		RunRunner               string `json:"run_runner,omitempty"`
-		RunSupported            bool   `json:"run_supported"`
-		RunUnsupportedReason    string `json:"run_unsupported_reason"`
-		PointerWidthBits        int    `json:"pointer_width_bits"`
-		RegisterWidthBits       int    `json:"register_width_bits"`
-		NativeIntWidthBits      int    `json:"native_int_width_bits"`
-		Endian                  string `json:"endian"`
-		StackAlignmentBytes     int    `json:"stack_alignment_bytes"`
-		MaxAtomicWidthBits      int    `json:"max_atomic_width_bits"`
-		AtomicWidthBits         []int  `json:"atomic_width_bits"`
-		AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits"`
-		UnsupportedReason       string `json:"unsupported_reason"`
-		SupportsDebugInfo       bool   `json:"supports_debug_info"`
-		SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
+		Triple                   string   `json:"triple"`
+		Status                   string   `json:"status"`
+		OS                       string   `json:"os"`
+		Arch                     string   `json:"arch"`
+		ABI                      string   `json:"abi"`
+		DataModel                string   `json:"data_model"`
+		Format                   string   `json:"format"`
+		ExeExt                   string   `json:"exe_ext"`
+		BuildOnly                bool     `json:"build_only"`
+		RunMode                  string   `json:"run_mode"`
+		RunRunner                string   `json:"run_runner,omitempty"`
+		RunSupported             bool     `json:"run_supported"`
+		RunUnsupportedReason     string   `json:"run_unsupported_reason"`
+		PointerWidthBits         int      `json:"pointer_width_bits"`
+		RegisterWidthBits        int      `json:"register_width_bits"`
+		NativeIntWidthBits       int      `json:"native_int_width_bits"`
+		Endian                   string   `json:"endian"`
+		StackAlignmentBytes      int      `json:"stack_alignment_bytes"`
+		MaxAtomicWidthBits       int      `json:"max_atomic_width_bits"`
+		AtomicWidthBits          []int    `json:"atomic_width_bits"`
+		AtomicPointerWidthBits   int      `json:"atomic_pointer_width_bits"`
+		UnsupportedReason        string   `json:"unsupported_reason"`
+		RuntimeStatus            string   `json:"runtime_status"`
+		StdlibStatus             string   `json:"stdlib_status"`
+		FFIStatus                string   `json:"ffi_status"`
+		MemoryBuild              string   `json:"memory_build"`
+		MemoryLower              string   `json:"memory_lower"`
+		MemoryRun                string   `json:"memory_run"`
+		MemoryRawDiagnostics     string   `json:"memory_raw_diagnostics"`
+		MemoryRegionLowering     string   `json:"memory_region_lowering"`
+		MemoryAlignmentSemantics string   `json:"memory_alignment_semantics"`
+		MemoryClaimLevel         string   `json:"memory_claim_level"`
+		RunnerProbeCommand       string   `json:"runner_probe_command"`
+		ReleaseGate              string   `json:"release_gate"`
+		EvidenceArtifacts        []string `json:"evidence_artifacts"`
+		SyscallInstruction       string   `json:"syscall_instruction"`
+		SyscallNumbering         string   `json:"syscall_numbering"`
+		SyscallArgRegisters      []string `json:"syscall_arg_registers"`
+		SyscallErrorRange        string   `json:"syscall_error_range"`
+		SupportsDebugInfo        bool     `json:"supports_debug_info"`
+		SupportsReleaseOptimize  bool     `json:"supports_release_optimize"`
 	}
 	var report struct {
 		Supported []string     `json:"supported"`
@@ -84,6 +101,12 @@ func TestTargetsCommandJSON(t *testing.T) {
 	}
 	if got := byTriple["linux-x64"]; got.Status != "supported" || got.OS != "linux" || got.Arch != "x64" || got.ABI != "sysv" || got.DataModel != "lp64" || got.Format != "elf" || got.PointerWidthBits != 64 || got.RegisterWidthBits != 64 || got.NativeIntWidthBits != 64 || got.AtomicPointerWidthBits != 64 || !reflect.DeepEqual(got.AtomicWidthBits, []int{8, 16, 32, 64}) || got.Endian != "little" || got.BuildOnly || !got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 		t.Fatalf("linux-x64 metadata = %#v", got)
+	} else if got.RuntimeStatus != "production" || got.StdlibStatus != "production" || got.FFIStatus != "scalar_object_smokes_partial" || got.RunnerProbeCommand == "" || got.ReleaseGate != "scripts/release/post_v0_4/linux-native-targets-smoke.sh" || !hasString(got.EvidenceArtifacts, "linux-x64-runner.json") {
+		t.Fatalf("linux-x64 promotion metadata = %#v", got)
+	} else if got.MemoryBuild != "yes" || got.MemoryLower != "yes" || got.MemoryRun != "yes" || got.MemoryRawDiagnostics != "yes" || got.MemoryRegionLowering != "yes/partial" || got.MemoryAlignmentSemantics != "yes" || got.MemoryClaimLevel != "production/host_runtime" {
+		t.Fatalf("linux-x64 memory capability metadata = %#v", got)
+	} else if got.SyscallInstruction != "syscall" || got.SyscallNumbering != "x86_64" || !reflect.DeepEqual(got.SyscallArgRegisters, []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"}) || got.SyscallErrorRange != "-4095..-1" {
+		t.Fatalf("linux-x64 syscall metadata = %#v", got)
 	}
 	if got := byTriple["windows-x64"]; got.Status != "supported" || got.OS != "windows" || got.ABI != "win64" || got.DataModel != "llp64" || got.Format != "pe" || got.ExeExt != ".exe" || got.PointerWidthBits != 64 || got.RegisterWidthBits != 64 || !got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 		t.Fatalf("windows-x64 metadata = %#v", got)
@@ -91,11 +114,26 @@ func TestTargetsCommandJSON(t *testing.T) {
 	if got := byTriple["linux-x86"]; got.Status != "build_only" || got.OS != "linux" || got.Arch != "x86" || got.ABI != "i386-sysv" || got.DataModel != "ilp32" || got.PointerWidthBits != 32 || got.RegisterWidthBits != 32 || got.NativeIntWidthBits != 32 || got.AtomicPointerWidthBits != 32 || got.MaxAtomicWidthBits != 32 || !reflect.DeepEqual(got.AtomicWidthBits, []int{8, 16, 32}) || got.RunMode != "host_probed" || !got.BuildOnly || !strings.Contains(got.UnsupportedReason, "not implemented yet") || !strings.Contains(got.UnsupportedReason, "executable build/link") || !strings.Contains(got.UnsupportedReason, "run/test execution") || !strings.Contains(got.UnsupportedReason, "stdout write/string literal data") || !strings.Contains(got.UnsupportedReason, "stack-argument") || !strings.Contains(got.UnsupportedReason, "scalar global") || !strings.Contains(got.UnsupportedReason, "symbol-backed callback") || !strings.Contains(got.UnsupportedReason, "heap-backed slice allocation/indexing") || !strings.Contains(got.UnsupportedReason, "raw ptr_add/load/store") || !strings.Contains(got.UnsupportedReason, "MMIO read/write") || !strings.Contains(got.UnsupportedReason, "scoped island bump allocation/free") || !strings.Contains(got.UnsupportedReason, "debug double-free guard/page-protect") {
 		t.Fatalf("linux-x86 metadata = %#v", got)
 	} else {
+		if got.RuntimeStatus != "partial_build_only" || got.StdlibStatus != "partial_build_only" || got.FFIStatus != "ilp32_scalar_object_smokes_partial" || !strings.Contains(got.RunnerProbeCommand, "--target x86") || got.ReleaseGate != "scripts/release/post_v0_4/linux-native-targets-smoke.sh" || !hasString(got.EvidenceArtifacts, "linux-x86-runner.json") {
+			t.Fatalf("linux-x86 promotion metadata = %#v", got)
+		}
+		if got.MemoryBuild != "yes" || got.MemoryLower != "yes" || got.MemoryRun != "no/host-dependent" || got.MemoryRawDiagnostics != "partial" || got.MemoryRegionLowering != "partial" || got.MemoryAlignmentSemantics != "partial" || got.MemoryClaimLevel != "build_lower_only" {
+			t.Fatalf("linux-x86 memory capability metadata = %#v", got)
+		}
+		if got.SyscallInstruction != "int 0x80" || got.SyscallNumbering != "i386" || !reflect.DeepEqual(got.SyscallArgRegisters, []string{"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp"}) || got.SyscallErrorRange != "-4095..-1" {
+			t.Fatalf("linux-x86 syscall metadata = %#v", got)
+		}
 		requireUnsupportedReasonContains(t, "linux-x86", got.UnsupportedReason, []string{
 			"i386 SysV ABI classifier",
-			"explicit filesystem/networking stdlib plus time/task/actors target-runtime boundary diagnostics",
-			"x86 pointer/native-libc/function-pointer @export diagnostics",
-			"source native scalar diagnostics",
+			"self-host logical time runtime smoke",
+			"fs_exists filesystem runtime plus filesystem/scheduler composition smoke",
+			"bounded two-spawn self-host actors/task/task-group runtime smokes",
+			"single-spawn typed-task/staged typed-task/typed task-group plus actor-state runtime smoke",
+			"i386 ctx_switch object smoke",
+			"current core.net networking runtime smokes, Surface, distributed actors, and actor fanout above 2 runtime boundary diagnostics",
+			"x86 canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes",
+			"x86 function-pointer @export diagnostics",
+			"remaining source target-layout scalar diagnostics",
 			"pointer-only atomic ABI-width object check",
 			"source-level atomic diagnostics",
 		})
@@ -103,22 +141,36 @@ func TestTargetsCommandJSON(t *testing.T) {
 			if got.RunUnsupportedReason != "" {
 				t.Fatalf("linux-x86 supported host-probed metadata = %#v", got)
 			}
-		} else if !strings.Contains(got.RunUnsupportedReason, "host does not support Linux i386 execution") || !strings.Contains(got.RunUnsupportedReason, "no host fallback") {
+		} else if !strings.Contains(got.RunUnsupportedReason, "does not support Linux i386 execution") || !strings.Contains(got.RunUnsupportedReason, "no host fallback") {
 			t.Fatalf("linux-x86 unsupported host-probed metadata = %#v", got)
 		}
 	}
 	if got := byTriple["linux-x32"]; got.Status != "build_only" || got.OS != "linux" || got.Arch != "x64" || got.ABI != "x32-sysv" || got.DataModel != "x32" || got.PointerWidthBits != 32 || got.RegisterWidthBits != 64 || got.NativeIntWidthBits != 32 || got.AtomicPointerWidthBits != 32 || !reflect.DeepEqual(got.AtomicWidthBits, []int{8, 16, 32, 64}) || got.RunMode != "host_probed" || !got.BuildOnly || !strings.Contains(got.UnsupportedReason, "full linux-x32 runtime/stdlib/FFI support is not implemented yet") || !strings.Contains(got.UnsupportedReason, "executable build/link") || !strings.Contains(got.UnsupportedReason, "object codegen") || !strings.Contains(got.UnsupportedReason, "self-host runtime builds") || !strings.Contains(got.UnsupportedReason, "compiler-owned target suites") || !strings.Contains(got.UnsupportedReason, "host-probed source run/test execution") || !strings.Contains(got.UnsupportedReason, "Linux kernel supports the x32 ABI") {
 		t.Fatalf("linux-x32 metadata = %#v", got)
 	} else {
+		if got.RuntimeStatus != "partial_build_only" || got.StdlibStatus != "partial_build_only" || got.FFIStatus != "ilp32_scalar_object_smokes_partial" || !strings.Contains(got.RunnerProbeCommand, "--target x32") || got.ReleaseGate != "scripts/release/post_v0_4/linux-native-targets-smoke.sh" || !hasString(got.EvidenceArtifacts, "linux-x32-runner.json") {
+			t.Fatalf("linux-x32 promotion metadata = %#v", got)
+		}
+		if got.MemoryBuild != "yes" || got.MemoryLower != "yes" || got.MemoryRun != "no/host-dependent" || got.MemoryRawDiagnostics != "partial" || got.MemoryRegionLowering != "partial" || got.MemoryAlignmentSemantics != "special" || got.MemoryClaimLevel != "build_lower_only" {
+			t.Fatalf("linux-x32 memory capability metadata = %#v", got)
+		}
+		if got.SyscallInstruction != "syscall" || got.SyscallNumbering != "x32_syscall_bit" || !reflect.DeepEqual(got.SyscallArgRegisters, []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"}) || got.SyscallErrorRange != "-4095..-1" {
+			t.Fatalf("linux-x32 syscall metadata = %#v", got)
+		}
 		requireUnsupportedReasonContains(t, "linux-x32", got.UnsupportedReason, []string{
 			"x32 SysV ABI classifier",
+			"stdout write/string literal data",
 			"raw ptr_add/load/store",
 			"pointer load/store",
 			"MMIO read/write",
 			"scoped island bump allocation/free",
-			"explicit filesystem/networking stdlib plus x32 multi-spawn actors/task, task-group, and typed-task runtime boundary diagnostics",
-			"x32 pointer/native-libc/function-pointer @export diagnostics",
-			"source native scalar diagnostics",
+			"self-host runtime builds for time, bounded two-spawn actors/task/task-group, single-spawn typed-task/staged typed-task/typed task-group, actor-state, and filesystem/scheduler composition smokes",
+			"x32 ctx_switch object smoke",
+			"fs_exists-only filesystem runtime smoke",
+			"current x32 core.net networking runtime smokes, Surface, distributed actors, and x32 actor fanout above 2 runtime boundary diagnostics",
+			"scalar i32 plus canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes",
+			"x32 function-pointer @export diagnostics",
+			"remaining source target-layout scalar diagnostics",
 			"pointer-only atomic ABI-width object check",
 			"dword pointer atomics",
 			"x32 syscall numbers",
@@ -135,6 +187,13 @@ func TestTargetsCommandJSON(t *testing.T) {
 		got := byTriple[triple]
 		if got.Status != "supported" || got.Arch != "wasm32" || got.DataModel != "ilp32" || got.PointerWidthBits != 32 || got.Format != "wasm" || got.ExeExt != ".wasm" || got.BuildOnly || got.SupportsDebugInfo || !got.SupportsReleaseOptimize {
 			t.Fatalf("%s metadata = %#v", triple, got)
+		}
+		wantRun := "runner-smoke if available"
+		if triple == "wasm32-web" {
+			wantRun = "browser-smoke if available"
+		}
+		if got.MemoryBuild != "yes" || got.MemoryLower != "yes" || got.MemoryRun != wantRun || got.MemoryRawDiagnostics != "safe-only" || got.MemoryRegionLowering != "limited" || got.MemoryAlignmentSemantics != "wasm rules" || got.MemoryClaimLevel != "artifact/runtime tiered" {
+			t.Fatalf("%s memory capability metadata = %#v", triple, got)
 		}
 	}
 	if got := byTriple["wasm32-wasi"]; got.RunMode != "wasi_runner" {
@@ -218,6 +277,15 @@ func requireUnsupportedReasonContains(t *testing.T, triple string, reason string
 			t.Fatalf("%s unsupported_reason missing %q: %q", triple, want, reason)
 		}
 	}
+}
+
+func hasString(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestTargetsCommandRejectsUnsupportedFormat(t *testing.T) {

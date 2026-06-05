@@ -91,6 +91,7 @@ type FuncDecl struct {
 	TypeParams      []string
 	TypeParamBounds []TypeParamBound
 	ReturnType      TypeRef
+	ReturnOwnership string
 	Throws          TypeRef
 	HasThrows       bool
 	Params          []ParamDecl
@@ -149,23 +150,30 @@ const (
 )
 
 type TypeRef struct {
-	At             Position
-	Kind           TypeRefKind
-	Name           string
-	TypeArgs       []TypeRef
-	Elem           *TypeRef
-	Len            int
-	Params         []TypeRef
-	ParamOwnership []string
-	Return         *TypeRef
-	Throws         *TypeRef
-	Uses           []string
+	At              Position
+	Kind            TypeRefKind
+	Name            string
+	TypeArgs        []TypeRef
+	Elem            *TypeRef
+	Len             int
+	Params          []TypeRef
+	ParamOwnership  []string
+	Return          *TypeRef
+	ReturnOwnership string
+	Throws          *TypeRef
+	Uses            []string
 }
+
+const (
+	StructReprDefault = "tetra"
+	StructReprC       = "C"
+)
 
 type StructDecl struct {
 	At         Position
 	Name       string
 	TypeParams []string
+	Repr       string
 	Public     bool
 	Fields     []FieldDecl
 }
@@ -272,15 +280,16 @@ type ImplDecl struct {
 }
 
 type FuncSigDecl struct {
-	At         Position
-	Name       string
-	TypeParams []string
-	Async      bool
-	ReturnType TypeRef
-	Throws     TypeRef
-	HasThrows  bool
-	Params     []ParamDecl
-	Uses       []string
+	At              Position
+	Name            string
+	TypeParams      []string
+	Async           bool
+	ReturnType      TypeRef
+	ReturnOwnership string
+	Throws          TypeRef
+	HasThrows       bool
+	Params          []ParamDecl
+	Uses            []string
 }
 
 type PrintStmt struct {

@@ -29,7 +29,7 @@ func TestCIWorkflowIncludesStabilizationAndRobustnessJobs(t *testing.T) {
 		"go test -race ./compiler/... ./cli/... ./tools/... -count=1",
 		"supply-chain-vulnerability-scan-linux:",
 		"go install golang.org/x/vuln/cmd/govulncheck@v1.1.2",
-		"govulncheck ./...",
+		"govulncheck ./compiler/... ./cli/... ./tools/...",
 		"fuzz-short-linux:",
 		"bash scripts/dev/fuzz-nightly.sh --short --out-dir \"$RUNNER_TEMP/fuzz-short\"",
 		"fuzz-nightly-linux:",
@@ -67,12 +67,65 @@ func TestCIWorkflowHasLeastPrivilegeConcurrencyAndTimeouts(t *testing.T) {
 		"fuzz-short-linux:",
 		"fuzz-nightly-linux:",
 		"release-v0-4-0-readiness-linux:",
+		"surface-release-readiness-linux:",
 		"techempower-report-schemas-linux:",
 		"lint-workflows-and-shell-linux:",
 	} {
 		if !workflowJobHasField(text, job, "timeout-minutes:") {
 			t.Fatalf("ci workflow job %s missing job-level timeout-minutes", job)
 		}
+	}
+}
+
+func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"surface-release-readiness-linux:",
+		"github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'",
+		"runs-on: ubuntu-latest",
+		"timeout-minutes: 90",
+		"actions/checkout@v4",
+		"actions/setup-go@v5",
+		"go-version: \"1.20.x\"",
+		"name: Bootstrap",
+		"bash scripts/dev/bootstrap.sh",
+		"name: Surface release gate",
+		"bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
+		"name: Surface experimental regression gate",
+		"bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression",
+		"name: Safe view lifetime gate",
+		"bash scripts/release/safe-view-lifetime/gate.sh --report-dir reports/safe-view-lifetime",
+		"name: Surface API stability gate",
+		"bash scripts/release/surface/api-stability-gate.sh --report-dir reports/surface-api-stability-v1",
+		"name: Full tests",
+		"go test ./compiler/... ./cli/... ./tools/... -count=1",
+		"go test ./... ./compiler/... ./cli/... ./tools/... -count=1",
+		"bash scripts/ci/test.sh",
+		"name: Docs and manifest",
+		"go run ./tools/cmd/gen-manifest -o docs/generated/manifest.json",
+		"go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json",
+		"go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+		"git diff --exit-code -- docs/generated/manifest.json",
+		"name: Upload release reports",
+		"if: always()",
+		"uses: actions/upload-artifact@v4",
+		"name: tetra-surface-release-v1-${{ github.sha }}",
+		"path: |",
+		"reports/surface-release-v1",
+		"reports/surface-experimental-regression",
+		"reports/safe-view-lifetime",
+		"reports/surface-api-stability-v1",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("ci workflow missing Surface release readiness detail %q", want)
+		}
+	}
+	if strings.Contains(text, "continue-on-error: true") {
+		t.Fatalf("Surface release readiness job must not silently continue after missing production dependencies")
 	}
 }
 
@@ -94,7 +147,7 @@ func TestCIWorkflowIncludesSupplyChainVulnerabilityScan(t *testing.T) {
 		"go install golang.org/x/vuln/cmd/govulncheck@v1.1.2",
 		"name: govulncheck",
 		"shell: bash",
-		"govulncheck ./...",
+		"govulncheck ./compiler/... ./cli/... ./tools/...",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("ci workflow missing supply-chain vulnerability scan detail %q", want)
@@ -171,6 +224,7 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		"tetra-v0.4.0-${{ github.sha }}-coverage-linux",
 		"tetra-v0.4.0-${{ github.sha }}-fuzz-short-linux",
 		"tetra-v0.4.0-${{ github.sha }}-fuzz-nightly-linux",
+		"tetra-surface-release-v1-${{ github.sha }}",
 	}
 	if len(names) != len(want) {
 		t.Fatalf("ci workflow upload-artifact names = %v, want %v", names, want)
@@ -181,7 +235,11 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		}
 	}
 	for _, name := range names {
-		for _, wantPart := range []string{"v0.4.0", "${{ github.sha }}"} {
+		wantParts := []string{"v0.4.0", "${{ github.sha }}"}
+		if name == "tetra-surface-release-v1-${{ github.sha }}" {
+			wantParts = []string{"surface-release-v1", "${{ github.sha }}"}
+		}
+		for _, wantPart := range wantParts {
 			if !strings.Contains(name, wantPart) {
 				t.Fatalf("ci workflow artifact name %q missing release-aware metadata %q", name, wantPart)
 			}

@@ -54,6 +54,24 @@ func TestValidateFeaturesReportAcceptsExpectedShape(t *testing.T) {
 	}
 }
 
+func TestValidateFeaturesReportAcceptsSurfaceReleaseStatusVocabulary(t *testing.T) {
+	raw := []byte(`{
+  "schema": "tetra.features.v1",
+  "version": "surface-v1",
+  "features": [
+    {"id":"cli.core","name":"Core CLI workflows","status":"current","since":"v0.2.0","scope":"local workflows","stability":"supported","docs":["docs/spec/cli_contracts.md"]},
+    {"id":"ui.surface-core","name":"Tetra Surface core","status":"release_candidate","scope":"surface-v1-linux-web","stability":"release gate candidate","docs":["docs/spec/surface_v1.md"]},
+    {"id":"ui.surface-macos-x64","name":"macOS Surface host","status":"unsupported","scope":"not in Surface v1","stability":"no release evidence","docs":["docs/spec/surface_v1.md"]},
+    {"id":"ui.metadata-v1","name":"UI metadata v1 surface","status":"legacy_compatibility","scope":"legacy metadata compatibility","stability":"compatibility bridge","docs":["docs/spec/ui_v1.md"]},
+    {"id":"language.full-v1-guarantees","name":"Full v1.0 language guarantees","status":"planned","scope":"complete release contract","stability":"planned","docs":["docs/spec/v1_scope.md"]},
+    {"id":"eco.distributed-network","name":"Distributed EcoNet","status":"post-v1","scope":"distributed publishing","stability":"deferred","docs":["docs/release/post_v1_promotion_checklist.md"]}
+  ]
+}`)
+	if err := validateFeaturesReport(raw); err != nil {
+		t.Fatalf("validate release status vocabulary: %v", err)
+	}
+}
+
 func TestValidateFeaturesReportRejectsUnknownFields(t *testing.T) {
 	raw := []byte(`{"schema":"tetra.features.v1","version":"v0.3.0","features":[],"extra":true}`)
 	if err := validateFeaturesReport(raw); err == nil || !strings.Contains(err.Error(), "unknown field") {

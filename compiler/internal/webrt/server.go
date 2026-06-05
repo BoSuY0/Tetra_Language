@@ -20,12 +20,14 @@ type Config struct {
 	ServerName   string
 	MaxBodyBytes int
 	DateFunc     func() string
+	NowFunc      func() time.Time
 }
 
 type Server struct {
 	Config
-	Router httprt.Router
-	mu     sync.Mutex
+	Router    httprt.Router
+	mu        sync.Mutex
+	dateCache HTTPDateCache
 
 	listener netrt.TCPListener
 	poller   *netrt.Poller
@@ -269,7 +271,11 @@ func (s *Server) date() string {
 	if s.DateFunc != nil {
 		return s.DateFunc()
 	}
-	return time.Now().UTC().Format(httpDateLayout)
+	now := time.Now
+	if s.NowFunc != nil {
+		now = s.NowFunc
+	}
+	return s.dateCache.Format(now())
 }
 
 func (s *Server) flush(conn *connState) error {

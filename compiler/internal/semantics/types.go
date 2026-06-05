@@ -24,18 +24,21 @@ type CheckedProgram struct {
 }
 
 type CheckedFunc struct {
-	Name        string
-	Module      string
-	Decl        *frontend.FuncDecl
-	Imports     map[string]string
-	Locals      map[string]LocalInfo
-	ActorState  map[string]ActorStateField
-	LocalSlots  int
-	ParamSlots  int
-	ReturnType  string
-	ThrowsType  string
-	Async       bool
-	ReturnSlots int
+	Name                  string
+	Module                string
+	Decl                  *frontend.FuncDecl
+	Imports               map[string]string
+	Locals                map[string]LocalInfo
+	ActorState            map[string]ActorStateField
+	LocalSlots            int
+	ParamSlots            int
+	ReturnType            string
+	ReturnOwnership       string
+	ThrowsType            string
+	Async                 bool
+	ReturnSlots           int
+	Effects               []string
+	TouchesMutableGlobals bool
 }
 
 type ActorStateField struct {
@@ -71,11 +74,13 @@ type LocalInfo struct {
 	FunctionParamTypes            []string
 	FunctionParamOwnership        []string
 	FunctionReturnType            string
+	FunctionReturnOwnership       string
 	FunctionThrowsType            string
 	FunctionEffects               []string
 	FunctionFields                map[string]FunctionFieldInfo
 	EnumPayloadFunctions          map[string]FunctionFieldInfo
 	EnumPayloadFields             map[string]FunctionFieldInfo
+	SurfaceFramePixelsSource      string
 }
 
 type FunctionFieldInfo struct {
@@ -91,6 +96,7 @@ type FunctionFieldInfo struct {
 	FunctionParamTypes            []string
 	FunctionParamOwnership        []string
 	FunctionReturnType            string
+	FunctionReturnOwnership       string
 	FunctionThrowsType            string
 	FunctionEffects               []string
 }
@@ -111,23 +117,24 @@ const (
 )
 
 type GlobalInfo struct {
-	DataIndex              int
-	TypeName               string
-	Mutable                bool
-	Const                  bool
-	Public                 bool
-	FunctionValue          string
-	FunctionTypeValue      bool
-	FunctionParamTypes     []string
-	FunctionParamOwnership []string
-	FunctionReturnType     string
-	FunctionThrowsType     string
-	FunctionEffects        []string
-	FunctionEscapeKind     CallableEscapeKind
-	FunctionHandleValue    bool
-	HasStringLiteralInit   bool
-	StringLiteralInit      []byte
-	ArrayBackings          []GlobalArrayBackingInfo
+	DataIndex               int
+	TypeName                string
+	Mutable                 bool
+	Const                   bool
+	Public                  bool
+	FunctionValue           string
+	FunctionTypeValue       bool
+	FunctionParamTypes      []string
+	FunctionParamOwnership  []string
+	FunctionReturnType      string
+	FunctionReturnOwnership string
+	FunctionThrowsType      string
+	FunctionEffects         []string
+	FunctionEscapeKind      CallableEscapeKind
+	FunctionHandleValue     bool
+	HasStringLiteralInit    bool
+	StringLiteralInit       []byte
+	ArrayBackings           []GlobalArrayBackingInfo
 }
 
 type GlobalArrayBackingInfo struct {
@@ -150,15 +157,18 @@ type FuncSig struct {
 	ParamFunctionParams                 [][]string
 	ParamFunctionOwnership              [][]string
 	ParamFunctionReturns                []string
+	ParamFunctionReturnOwnership        []string
 	ParamFunctionThrows                 []string
 	ParamFunctionEffects                [][]string
 	ParamOwnership                      []string
 	ParamSlots                          int
 	ReturnType                          string
+	ReturnOwnership                     string
 	ReturnFunctionType                  bool
 	ReturnFunctionParams                []string
 	ReturnFunctionParamOwnership        []string
 	ReturnFunctionReturn                string
+	ReturnFunctionReturnOwnership       string
 	ReturnFunctionThrows                string
 	ReturnFunctionEffects               []string
 	ReturnFunctionSymbol                string
@@ -244,23 +254,26 @@ const (
 const MaxActorStateSlots = 8
 
 type FieldInfo struct {
-	Name                   string
-	TypeName               string
-	Offset                 int
-	SlotCount              int
-	FunctionTypeValue      bool
-	FunctionTypeRef        frontend.TypeRef
-	FunctionParamTypes     []string
-	FunctionParamOwnership []string
-	FunctionReturnType     string
-	FunctionThrowsType     string
-	FunctionEffects        []string
+	Name                    string
+	TypeName                string
+	Offset                  int
+	SlotCount               int
+	UserAssignable          bool
+	FunctionTypeValue       bool
+	FunctionTypeRef         frontend.TypeRef
+	FunctionParamTypes      []string
+	FunctionParamOwnership  []string
+	FunctionReturnType      string
+	FunctionReturnOwnership string
+	FunctionThrowsType      string
+	FunctionEffects         []string
 }
 
 type TypeInfo struct {
 	Name      string
 	Kind      TypeKind
 	Public    bool
+	Repr      string
 	Fields    []FieldInfo
 	FieldMap  map[string]FieldInfo
 	SlotCount int
@@ -271,18 +284,19 @@ type TypeInfo struct {
 }
 
 type EnumCaseInfo struct {
-	Name                   string
-	Ordinal                int32
-	PayloadTypes           []string
-	PayloadSlots           []int
-	PayloadFunctionTypes   []bool
-	PayloadFunctionRefs    []frontend.TypeRef
-	PayloadFunctionParams  [][]string
-	PayloadFunctionOwns    [][]string
-	PayloadFunctionReturns []string
-	PayloadFunctionThrows  []string
-	PayloadFunctionEffects [][]string
-	SlotCount              int
+	Name                      string
+	Ordinal                   int32
+	PayloadTypes              []string
+	PayloadSlots              []int
+	PayloadFunctionTypes      []bool
+	PayloadFunctionRefs       []frontend.TypeRef
+	PayloadFunctionParams     [][]string
+	PayloadFunctionOwns       [][]string
+	PayloadFunctionReturns    []string
+	PayloadFunctionReturnOwns []string
+	PayloadFunctionThrows     []string
+	PayloadFunctionEffects    [][]string
+	SlotCount                 int
 }
 
 func makeSliceTypeInfo(name, elem string) *TypeInfo {
@@ -336,10 +350,11 @@ func makeStructTypeInfo(name string, fields []FieldInfo) *TypeInfo {
 			slotCount = 1
 		}
 		resolved := FieldInfo{
-			Name:      field.Name,
-			TypeName:  field.TypeName,
-			Offset:    offset,
-			SlotCount: slotCount,
+			Name:           field.Name,
+			TypeName:       field.TypeName,
+			Offset:         offset,
+			SlotCount:      slotCount,
+			UserAssignable: true,
 		}
 		offset += slotCount
 		structFields = append(structFields, resolved)
@@ -349,6 +364,7 @@ func makeStructTypeInfo(name string, fields []FieldInfo) *TypeInfo {
 		Name:      name,
 		Kind:      TypeStruct,
 		Public:    true,
+		Repr:      frontend.StructReprDefault,
 		Fields:    structFields,
 		FieldMap:  fieldMap,
 		SlotCount: offset,
@@ -361,6 +377,8 @@ func baseTypes() map[string]*TypeInfo {
 		"i64":           {Name: "i64", Kind: TypeI64, SlotCount: 1, Public: true},
 		"u8":            {Name: "u8", Kind: TypeU8, SlotCount: 1, Public: true},
 		"u16":           {Name: "u16", Kind: TypeU8, SlotCount: 1, Public: true},
+		"c_int":         {Name: "c_int", Kind: TypeI32, SlotCount: 1, Public: true},
+		"c_uint":        {Name: "c_uint", Kind: TypeI32, SlotCount: 1, Public: true},
 		"bool":          {Name: "bool", Kind: TypeBool, SlotCount: 1, Public: true},
 		"ptr":           {Name: "ptr", Kind: TypePtr, SlotCount: 1, Public: true},
 		"fnptr":         {Name: "fnptr", Kind: TypePtr, SlotCount: FnPtrSlotCount, Public: true},
@@ -396,7 +414,52 @@ func baseTypes() map[string]*TypeInfo {
 		{Name: "tag", TypeName: "i32"},
 		{Name: "error", TypeName: "task.error"},
 	})
+	for _, name := range []string{
+		"task.i32",
+		"task.result_i32",
+		"actor.msg",
+		"actor.recv_result_i32",
+		"actor.recv_msg_result",
+	} {
+		types[name].Repr = frontend.StructReprC
+	}
 	return types
+}
+
+func addILP32NativeScalarTypes(types map[string]*TypeInfo) {
+	for _, name := range []string{
+		"usize",
+		"isize",
+		"size_t",
+		"ssize_t",
+		"native_int",
+		"native_uint",
+		"c_long",
+		"c_ulong",
+	} {
+		types[name] = &TypeInfo{Name: name, Kind: TypeI32, SlotCount: 1, Public: true}
+	}
+	types["rawptr"] = &TypeInfo{Name: "rawptr", Kind: TypePtr, SlotCount: 1, Public: true}
+	types["nullable_ptr"] = &TypeInfo{Name: "nullable_ptr", Kind: TypePtr, SlotCount: 1, Public: true}
+	types["ref"] = &TypeInfo{Name: "ref", Kind: TypePtr, SlotCount: 1, Public: true}
+}
+
+func IsILP32NativeScalarType(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong":
+		return true
+	default:
+		return false
+	}
+}
+
+func IsILP32UnsignedNativeScalarType(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "usize", "size_t", "native_uint", "c_ulong":
+		return true
+	default:
+		return false
+	}
 }
 
 func TypedTaskHandleTypeName(errorType string, types map[string]*TypeInfo) string {
@@ -508,7 +571,7 @@ func targetLayoutOnlyScalarError(name string) error {
 
 func isTargetLayoutOnlyScalar(name string) bool {
 	switch strings.TrimSpace(name) {
-	case "i8", "i16", "u32", "u64", "uint", "c_int", "c_uint",
+	case "i8", "i16", "u32", "u64", "uint",
 		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint",
 		"c_long", "c_ulong", "f32", "f64", "ref", "nullable_ptr", "rawptr":
 		return true
@@ -553,10 +616,19 @@ func typesCompatibleWithNullPtr(expected, actual string, expr frontend.Expr) boo
 		_, ok := expr.(*frontend.ClosureExpr)
 		return ok
 	}
-	if expected == "ptr" && actual == "i32" && isNullPtrLiteral(expr) {
+	if isNullablePointerScalarType(expected) && actual == "i32" && isNullPtrLiteral(expr) {
 		return true
 	}
 	return false
+}
+
+func isNullablePointerScalarType(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "ptr", "rawptr", "nullable_ptr":
+		return true
+	default:
+		return false
+	}
 }
 
 func smallIntLiteralFits(expected, actual string, expr frontend.Expr) bool {
@@ -571,7 +643,7 @@ func smallIntLiteralFits(expected, actual string, expr frontend.Expr) bool {
 		}
 		rangeType = elem
 	}
-	if rangeType != "u8" && rangeType != "u16" {
+	if rangeType != "u8" && rangeType != "u16" && rangeType != "c_uint" && !IsILP32UnsignedNativeScalarType(rangeType) {
 		return true
 	}
 	v, ok, overflow := evalConstI32(expr)
@@ -586,6 +658,10 @@ func smallIntLiteralFits(expected, actual string, expr frontend.Expr) bool {
 		return v >= 0 && v <= 255
 	case "u16":
 		return v >= 0 && v <= 65535
+	case "c_uint":
+		return v >= 0
+	case "usize", "size_t", "native_uint", "c_ulong":
+		return v >= 0
 	default:
 		return true
 	}
@@ -664,7 +740,7 @@ func checkedConstI32(v int64) (int64, bool, bool) {
 }
 
 func isInt32Like(name string) bool {
-	return name == "i32" || name == "u8" || name == "u16" || name == "task.error"
+	return name == "i32" || name == "u8" || name == "u16" || name == "c_int" || name == "c_uint" || name == "task.error" || IsILP32NativeScalarType(name)
 }
 
 func isConditionType(name string) bool {
@@ -673,7 +749,8 @@ func isConditionType(name string) bool {
 
 func isReservedTypeName(name string) bool {
 	switch name {
-	case "i32", "i64", "Int64", "u8", "u16", "bool", "Bool", "ptr", "fnptr", "str", "String",
+	case "i32", "i64", "Int64", "u8", "u16", "c_int", "c_uint", "bool", "Bool", "ptr", "fnptr", "rawptr", "nullable_ptr", "ref", "str", "String",
+		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong",
 		"actor", "actor.msg", "actor.recv_result_i32", "actor.recv_msg_result",
 		"task.error", "task.group", "task.i32", "task.result_i32",
 		"island", "cap.io", "cap.mem", "consent.token", "secret.i32":
@@ -751,14 +828,15 @@ func isSupportedCollectionElemType(info *TypeInfo) bool {
 		return false
 	}
 	switch info.Name {
-	case "i32", "u8", "u16", "bool":
+	case "i32", "u8", "u16", "c_int", "c_uint", "bool",
+		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong":
 		return true
 	}
 	return info.Kind == TypeStruct && info.Name != "secret.i32" && info.SlotCount == 1
 }
 
 func isSupportedActorStateScalarType(name string) bool {
-	return name == "i32" || name == "bool" || name == "u8" || name == "u16" || name == "task.error"
+	return name == "i32" || name == "bool" || name == "u8" || name == "u16" || name == "c_int" || name == "c_uint" || name == "task.error" || IsILP32NativeScalarType(name)
 }
 
 func funcSigActorTaskTransferSafe(sig FuncSig, types map[string]*TypeInfo) bool {
@@ -788,6 +866,9 @@ func funcSigActorTaskTransferUnsafeReason(sig FuncSig, types map[string]*TypeInf
 }
 
 func typeActorTaskSendable(typeName string, types map[string]*TypeInfo, seen map[string]bool) bool {
+	if _, ok := surfaceActorTaskBoundaryValueType(typeName, types); ok {
+		return false
+	}
 	if seen[typeName] {
 		return true
 	}
@@ -823,6 +904,9 @@ func typeActorTaskSendable(typeName string, types map[string]*TypeInfo, seen map
 }
 
 func typeActorTaskSendabilityUnsafeReason(typeName string, types map[string]*TypeInfo, seen map[string]bool) string {
+	if surfaceType, ok := surfaceActorTaskBoundaryValueType(typeName, types); ok {
+		return fmt.Sprintf("surface value '%s' cannot cross actor/task boundary", surfaceType)
+	}
 	if seen[typeName] {
 		return ""
 	}

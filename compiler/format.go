@@ -487,7 +487,11 @@ func (p *sourcePrinter) structDecl(st *frontend.StructDecl) {
 	if len(st.TypeParams) > 0 {
 		typeParams = "<" + strings.Join(st.TypeParams, ", ") + ">"
 	}
-	p.line(0, publicPrefix(st.Public)+"struct "+st.Name+typeParams+":")
+	reprPrefix := ""
+	if st.Repr == frontend.StructReprC {
+		reprPrefix = "repr(C) "
+	}
+	p.line(0, publicPrefix(st.Public)+reprPrefix+"struct "+st.Name+typeParams+":")
 	for _, f := range st.Fields {
 		p.line(1, f.Name+": "+formatTypeRef(f.Type))
 	}

@@ -43,6 +43,34 @@ func TestBuildCommandJSONDiagnosticsForOptionValidation(t *testing.T) {
 	}
 }
 
+func TestBuildCommandExplainFlagsWriteReports(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	outPath := filepath.Join(dir, "app")
+	src := `func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = make_i32(1)
+    xs[0] = 7
+    for x in xs:
+        return x
+    return 0
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := runCLI([]string{"build", "--target", "linux-x64", "--explain", "--emit-plir", "--emit-proof", "--emit-bounds-report", "--emit-alloc-report", "-o", outPath, srcPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, suffix := range []string{".plir.txt", ".proof.json", ".bounds.json", ".alloc.json", ".explain.txt"} {
+		if _, err := os.Stat(outPath + suffix); err != nil {
+			t.Fatalf("missing report %s: %v", outPath+suffix, err)
+		}
+	}
+}
+
 func TestBuildCommandWASMTargetWritesWasmModule(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "main.tetra")

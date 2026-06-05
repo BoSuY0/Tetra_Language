@@ -952,6 +952,19 @@ uses alloc, islands, mem:
 `, "cannot use freed resource 'isl'")
 }
 
+func TestIslandFinalizationRejectsIslandMakeAfterFree(t *testing.T) {
+	testkit.RequireFileCheckErrorContains(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        free(isl)
+        let xs: []u8 = core.island_make_u8(isl, 1)
+    }
+    return 0
+`, "cannot use freed resource 'isl'")
+}
+
 func TestIslandFinalizationReportsMaybeFreedAfterMerge(t *testing.T) {
 	testkit.RequireFileCheckErrorContains(t, `
 func main() -> Int

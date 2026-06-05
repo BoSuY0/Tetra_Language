@@ -1,0 +1,153 @@
+// Experimental Surface accessibility metadata helpers.
+// This is a pure metadata tree layer over lib.core.component; it does not
+// integrate with platform accessibility hosts, DOM/ARIA, or screen readers.
+// Effects: none
+// ```tetra doctest
+// func accessibility_doctest() -> Int:
+//     return lib.core.accessibility.validate_settings_counts(12, 4, 2, 2, 2, 1)
+// ```
+module lib.core.accessibility
+
+import lib.core.surface as surface
+import lib.core.component as component
+
+struct NodeMetadata:
+    role: Int
+    label_for: Int
+    labelled_by: Int
+    value_kind: Int
+    value_len: Int
+    focus_index: Int
+    reading_index: Int
+    actions: Int
+
+struct Snapshot:
+    generation: Int
+    focused_component_id: Int
+    focused_accessibility_node_id: Int
+    name_value_len: Int
+    email_value_len: Int
+    status_value: Int
+    bounds_checksum: Int
+    metadata_checksum: Int
+    frame_checksum: Int
+
+func tree_schema_version() -> Int:
+    return 1
+
+func level_metadata_tree_v1() -> Int:
+    return 1
+
+func role_root() -> Int:
+    return 1
+
+func role_panel() -> Int:
+    return 2
+
+func role_column() -> Int:
+    return 3
+
+func role_text() -> Int:
+    return 4
+
+func role_label() -> Int:
+    return 5
+
+func role_textbox() -> Int:
+    return 6
+
+func role_row() -> Int:
+    return 7
+
+func role_button() -> Int:
+    return 8
+
+func role_status() -> Int:
+    return 9
+
+func value_empty() -> Int:
+    return 0
+
+func value_name() -> Int:
+    return 1
+
+func value_email() -> Int:
+    return 2
+
+func value_saved() -> Int:
+    return 3
+
+func value_reset() -> Int:
+    return 4
+
+func action_focus() -> Int:
+    return 1
+
+func action_edit() -> Int:
+    return 2
+
+func action_press() -> Int:
+    return 4
+
+func action_save() -> Int:
+    return 8
+
+func action_reset() -> Int:
+    return 16
+
+func node_metadata(role: Int, label_for: Int, labelled_by: Int, value_kind: Int, value_len: Int, focus_index: Int, reading_index: Int, actions: Int) -> NodeMetadata:
+    return NodeMetadata(role: role, label_for: label_for, labelled_by: labelled_by, value_kind: value_kind, value_len: value_len, focus_index: focus_index, reading_index: reading_index, actions: actions)
+
+func textbox_metadata(labelled_by: Int, value_kind: Int, value_len: Int, focus_index: Int, reading_index: Int) -> NodeMetadata:
+    return node_metadata(role_textbox(), component.focus_none(), labelled_by, value_kind, value_len, focus_index, reading_index, action_focus() + action_edit())
+
+func button_metadata(value_kind: Int, focus_index: Int, reading_index: Int, semantic_action: Int) -> NodeMetadata:
+    return node_metadata(role_button(), component.focus_none(), component.focus_none(), value_kind, 0, focus_index, reading_index, action_focus() + action_press() + semantic_action)
+
+func label_metadata(label_for: Int, value_kind: Int, reading_index: Int) -> NodeMetadata:
+    return node_metadata(role_label(), label_for, component.focus_none(), value_kind, 0, component.focus_none(), reading_index, 0)
+
+func status_metadata(value_kind: Int, reading_index: Int) -> NodeMetadata:
+    return node_metadata(role_status(), component.focus_none(), component.focus_none(), value_kind, 0, component.focus_none(), reading_index, 0)
+
+func snapshot(generation: Int, focused_component_id: Int, name_value_len: Int, email_value_len: Int, status_value: Int, bounds_checksum: Int, metadata_checksum: Int, frame_checksum: Int) -> Snapshot:
+    return Snapshot(generation: generation, focused_component_id: focused_component_id, focused_accessibility_node_id: focused_component_id, name_value_len: name_value_len, email_value_len: email_value_len, status_value: status_value, bounds_checksum: bounds_checksum, metadata_checksum: metadata_checksum, frame_checksum: frame_checksum)
+
+func settings_node_count() -> Int:
+    return 12
+
+func settings_focusable_count() -> Int:
+    return 4
+
+func settings_label_count() -> Int:
+    return 2
+
+func settings_textbox_count() -> Int:
+    return 2
+
+func settings_button_count() -> Int:
+    return 2
+
+func settings_status_count() -> Int:
+    return 1
+
+func validate_settings_counts(node_count: Int, focusable_count: Int, label_count: Int, textbox_count: Int, button_count: Int, status_count: Int) -> Int:
+    if node_count != settings_node_count():
+        return 1
+    if focusable_count != settings_focusable_count():
+        return 2
+    if label_count != settings_label_count():
+        return 3
+    if textbox_count != settings_textbox_count():
+        return 4
+    if button_count != settings_button_count():
+        return 5
+    if status_count != settings_status_count():
+        return 6
+    return 0
+
+func bounds_seed(rect: surface.Rect) -> Int:
+    return rect.x * 31 + rect.y * 37 + rect.w * 41 + rect.h * 43
+
+func metadata_seed(node: borrow NodeMetadata) -> Int:
+    return node.role * 3 + node.label_for * 5 + node.labelled_by * 7 + node.value_kind * 11 + node.value_len * 13 + node.focus_index * 17 + node.reading_index * 19 + node.actions * 23

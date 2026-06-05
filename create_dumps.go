@@ -77,25 +77,22 @@ func wantsHelp(args []string) bool {
 }
 
 func printUsage() {
-	fmt.Fprint(os.Stdout, `Usage: go run ./create_dumps.go [dump-project flags...]
+	fmt.Fprint(os.Stdout, `Usage: go run ./create_dumps.go [--out dumps/project_dump.md]
 
-Creates project dump artifacts under ./dumps/ while preserving gitignore filtering.
+Creates whole-project dump artifacts under ./dumps/ while preserving gitignore filtering.
 Each dump artifact is Markdown and is capped at 10 MiB per .md file.
 Before creating a new dump, existing top-level files under ./dumps/ are removed.
+The full project is always included; do not pass --all, --only, or other dump-mode flags.
 
-Common examples:
+Examples:
   go run ./create_dumps.go
-  go run ./create_dumps.go --all
-  go run ./create_dumps.go --only compiler --out compiler_dump.txt
+  go run ./create_dumps.go --out tetra_language_dump.md
 
 Output rules:
   --out may be a file name or a path inside dumps/.
   Plain file names are written as dumps/<name>.md.
   Larger dumps are split as dumps/<name>_part_001.md, dumps/<name>_part_002.md, ...
   .gitignore is always applied, including tracked files that match ignore rules.
-
-Disabled here:
-  --root, --no-git, --include-ignored, --include-dumps, --include-dotenv, --file-list
 `)
 }
 
@@ -113,25 +110,14 @@ func gitRoot() (string, error) {
 }
 
 func sanitizeArgs(root, dumpDir string, args []string) ([]string, string, error) {
-	forward := make([]string, 0, len(args))
+	forward := []string{"--all"}
 	outputPath := ""
-	hasNoSummary := false
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		name, value, inline := splitFlagValue(arg)
 
 		switch name {
-		case "--include-dumps", "-include-dumps",
-			"--include-dotenv", "-include-dotenv",
-			"--include-ignored", "-include-ignored",
-			"--file-list", "-file-list",
-			"--no-git", "-no-git",
-			"--root", "-root":
-			return nil, "", fmt.Errorf("%s is disabled here so dumps stay gitignore-filtered for this project", name)
-		case "--no-summary", "-no-summary":
-			hasNoSummary = true
-			forward = append(forward, arg)
 		case "--out", "-out":
 			if inline {
 				out, err := normalizeOutputPath(root, dumpDir, value)
@@ -153,18 +139,16 @@ func sanitizeArgs(root, dumpDir string, args []string) ([]string, string, error)
 			outputPath = out
 			i++
 			continue
+		default:
+			return nil, "", fmt.Errorf("%s is not accepted: create_dumps always dumps the whole project with gitignore filtering", name)
 		}
-
-		forward = append(forward, arg)
 	}
 
 	if outputPath == "" {
 		outputPath = defaultOutputPath(root, dumpDir)
 		forward = append(forward, "--out", outputPath)
 	}
-	if !hasNoSummary {
-		forward = append(forward, "--no-summary")
-	}
+	forward = append(forward, "--no-summary")
 	return forward, outputPath, nil
 }
 

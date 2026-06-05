@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	regionNone       = -1
-	regionUnknown    = -2
-	regionParamStart = -3
+	regionNone                = -1
+	regionUnknown             = -2
+	regionParamStart          = -3
+	regionExplicitBorrowStart = -1000000
 )
 
 type branchScopeInfo struct {
@@ -92,62 +93,64 @@ func (s *scopeInfo) exitScope() {
 }
 
 type regionState struct {
-	localScopes           map[string]int
-	localScopeSets        map[string]map[int]struct{}
-	islandScopes          map[string]int
-	ifScopes              map[*frontend.IfStmt]branchScopeInfo
-	ifLetScopes           map[*frontend.IfLetStmt]branchScopeInfo
-	whileScopes           map[*frontend.WhileStmt]int
-	forScopes             map[*frontend.ForRangeStmt]int
-	matchCaseScopes       map[*frontend.MatchStmt][]int
-	matchExprScopes       map[*frontend.MatchExpr][]int
-	catchExprScopes       map[*frontend.CatchExpr][]int
-	unsafeScopes          map[*frontend.UnsafeStmt]int
-	deferScopes           map[*frontend.DeferStmt]int
-	islandNameByID        map[int]string
-	regionVars            map[string]int
-	exprRegionTrees       map[frontend.Expr]map[string]int
-	paramRegionIndex      map[int]int
-	resourceParamIndex    map[int]int
-	resourceParamPath     map[int]string
-	borrowedParamRegion   map[int]string
-	paramNames            []string
-	unknownVars           map[string]bool
-	unknownConflicts      map[string]regionConflict
-	reachable             bool
-	consumedVars          map[string]frontend.Position
-	maybeConsumedVars     map[string]ownershipJoinConflict
-	ownershipAliases      map[string]string
-	borrowedPtrAliases    map[string]string
-	consumedResources     map[int]frontend.Position
-	resourceVars          map[string]int
-	unknownResources      map[int]bool
-	finalizedResources    map[int]resourceFinalization
-	nextResourceID        int
-	deferCaptureFrames    []map[string]frontend.Position
-	activeScopes          []int
-	activeIndex           map[int]int
-	unsafeDepth           int
-	loopDepth             int
-	loopFlowFrames        []loopFlowFrame
-	throwType             string
-	allowThrowDepth       int
-	allowThrowCall        *frontend.CallExpr
-	allowCatchDepth       int
-	allowCatchCall        *frontend.CallExpr
-	async                 bool
-	allowAwaitDepth       int
-	allowAwaitCall        *frontend.CallExpr
-	returnRegion          int
-	returnRegionSet       bool
-	returnRegionSummary   ReturnRegionSummary
-	returnResourceParam   int
-	returnResourcePath    string
-	returnResourceSummary ReturnResourceSummary
-	returnResourceSet     bool
-	returnResourceUnknown bool
-	throwResourceSummary  ReturnResourceSummary
-	actorStateFields      map[string]ActorStateField
+	localScopes            map[string]int
+	localScopeSets         map[string]map[int]struct{}
+	islandScopes           map[string]int
+	ifScopes               map[*frontend.IfStmt]branchScopeInfo
+	ifLetScopes            map[*frontend.IfLetStmt]branchScopeInfo
+	whileScopes            map[*frontend.WhileStmt]int
+	forScopes              map[*frontend.ForRangeStmt]int
+	matchCaseScopes        map[*frontend.MatchStmt][]int
+	matchExprScopes        map[*frontend.MatchExpr][]int
+	catchExprScopes        map[*frontend.CatchExpr][]int
+	unsafeScopes           map[*frontend.UnsafeStmt]int
+	deferScopes            map[*frontend.DeferStmt]int
+	islandNameByID         map[int]string
+	regionVars             map[string]int
+	exprRegionTrees        map[frontend.Expr]map[string]int
+	paramRegionIndex       map[int]int
+	resourceParamIndex     map[int]int
+	resourceParamPath      map[int]string
+	borrowedParamRegion    map[int]string
+	nextExplicitBorrow     int
+	paramNames             []string
+	unknownVars            map[string]bool
+	unknownConflicts       map[string]regionConflict
+	reachable              bool
+	consumedVars           map[string]frontend.Position
+	maybeConsumedVars      map[string]ownershipJoinConflict
+	ownershipAliases       map[string]string
+	borrowedPtrAliases     map[string]string
+	ownedRegionSliceOwners map[string]string
+	consumedResources      map[int]frontend.Position
+	resourceVars           map[string]int
+	unknownResources       map[int]bool
+	finalizedResources     map[int]resourceFinalization
+	nextResourceID         int
+	deferCaptureFrames     []map[string]frontend.Position
+	activeScopes           []int
+	activeIndex            map[int]int
+	unsafeDepth            int
+	loopDepth              int
+	loopFlowFrames         []loopFlowFrame
+	throwType              string
+	allowThrowDepth        int
+	allowThrowCall         *frontend.CallExpr
+	allowCatchDepth        int
+	allowCatchCall         *frontend.CallExpr
+	async                  bool
+	allowAwaitDepth        int
+	allowAwaitCall         *frontend.CallExpr
+	returnRegion           int
+	returnRegionSet        bool
+	returnRegionSummary    ReturnRegionSummary
+	returnResourceParam    int
+	returnResourcePath     string
+	returnResourceSummary  ReturnResourceSummary
+	returnResourceSet      bool
+	returnResourceUnknown  bool
+	throwResourceSummary   ReturnResourceSummary
+	actorStateFields       map[string]ActorStateField
 }
 
 func newRegionState(scopes *scopeInfo) *regionState {
@@ -182,38 +185,40 @@ func newRegionState(scopes *scopeInfo) *regionState {
 		islandNameByID[id] = name
 	}
 	return &regionState{
-		localScopes:         localScopes,
-		localScopeSets:      localScopeSets,
-		islandScopes:        islandScopes,
-		ifScopes:            ifScopes,
-		ifLetScopes:         ifLetScopes,
-		whileScopes:         whileScopes,
-		forScopes:           forScopes,
-		matchCaseScopes:     matchCaseScopes,
-		matchExprScopes:     matchExprScopes,
-		catchExprScopes:     catchExprScopes,
-		unsafeScopes:        unsafeScopes,
-		deferScopes:         deferScopes,
-		islandNameByID:      islandNameByID,
-		regionVars:          make(map[string]int),
-		exprRegionTrees:     make(map[frontend.Expr]map[string]int),
-		paramRegionIndex:    make(map[int]int),
-		resourceParamIndex:  make(map[int]int),
-		resourceParamPath:   make(map[int]string),
-		borrowedParamRegion: make(map[int]string),
-		unknownConflicts:    make(map[string]regionConflict),
-		unknownVars:         make(map[string]bool),
-		reachable:           true,
-		consumedVars:        make(map[string]frontend.Position),
-		maybeConsumedVars:   make(map[string]ownershipJoinConflict),
-		ownershipAliases:    make(map[string]string),
-		borrowedPtrAliases:  make(map[string]string),
-		consumedResources:   make(map[int]frontend.Position),
-		resourceVars:        make(map[string]int),
-		unknownResources:    make(map[int]bool),
-		finalizedResources:  make(map[int]resourceFinalization),
-		nextResourceID:      1,
-		activeIndex:         make(map[int]int),
+		localScopes:            localScopes,
+		localScopeSets:         localScopeSets,
+		islandScopes:           islandScopes,
+		ifScopes:               ifScopes,
+		ifLetScopes:            ifLetScopes,
+		whileScopes:            whileScopes,
+		forScopes:              forScopes,
+		matchCaseScopes:        matchCaseScopes,
+		matchExprScopes:        matchExprScopes,
+		catchExprScopes:        catchExprScopes,
+		unsafeScopes:           unsafeScopes,
+		deferScopes:            deferScopes,
+		islandNameByID:         islandNameByID,
+		regionVars:             make(map[string]int),
+		exprRegionTrees:        make(map[frontend.Expr]map[string]int),
+		paramRegionIndex:       make(map[int]int),
+		resourceParamIndex:     make(map[int]int),
+		resourceParamPath:      make(map[int]string),
+		borrowedParamRegion:    make(map[int]string),
+		nextExplicitBorrow:     regionExplicitBorrowStart,
+		unknownConflicts:       make(map[string]regionConflict),
+		unknownVars:            make(map[string]bool),
+		reachable:              true,
+		consumedVars:           make(map[string]frontend.Position),
+		maybeConsumedVars:      make(map[string]ownershipJoinConflict),
+		ownershipAliases:       make(map[string]string),
+		borrowedPtrAliases:     make(map[string]string),
+		ownedRegionSliceOwners: make(map[string]string),
+		consumedResources:      make(map[int]frontend.Position),
+		resourceVars:           make(map[string]int),
+		unknownResources:       make(map[int]bool),
+		finalizedResources:     make(map[int]resourceFinalization),
+		nextResourceID:         1,
+		activeIndex:            make(map[int]int),
 	}
 }
 
@@ -328,6 +333,45 @@ func (s *regionState) clearBorrowedPtrAliasTree(name string) {
 			delete(s.borrowedPtrAliases, path)
 		}
 	}
+}
+
+func (s *regionState) bindOwnedRegionSliceOwner(name string, owner string) {
+	if s == nil || name == "" {
+		return
+	}
+	if owner == "" || owner == name {
+		s.clearOwnedRegionSliceOwnerTree(name)
+		return
+	}
+	s.ownedRegionSliceOwners[name] = owner
+}
+
+func (s *regionState) clearOwnedRegionSliceOwnerTree(name string) {
+	if s == nil || name == "" {
+		return
+	}
+	for path := range s.ownedRegionSliceOwners {
+		if path == name || ownershipPathPrefix(name, path) {
+			delete(s.ownedRegionSliceOwners, path)
+		}
+	}
+}
+
+func (s *regionState) ownedRegionSliceOwner(path string) (string, bool) {
+	if s == nil || path == "" {
+		return "", false
+	}
+	for probe := path; probe != ""; probe = ownershipPathParent(probe) {
+		owner, ok := s.ownedRegionSliceOwners[probe]
+		if !ok || owner == "" {
+			continue
+		}
+		if probe == path {
+			return owner, true
+		}
+		return owner + path[len(probe):], true
+	}
+	return "", false
 }
 
 func (s *regionState) borrowedPtrAliasOwner(name string) (string, bool) {
@@ -749,7 +793,7 @@ func (s *regionState) consumedAt(name string) (frontend.Position, bool) {
 
 func isResourceHandleType(typeName string) bool {
 	switch typeName {
-	case "actor", "island", "task.group", "task.i32":
+	case "actor", "island", "task.group", "task.i32", surfaceSurfaceTypeName:
 		return true
 	default:
 		return strings.HasPrefix(typeName, "task.i32.throws.")
@@ -761,6 +805,9 @@ func typeContainsResourceHandle(typeName string, types map[string]*TypeInfo) boo
 }
 
 func typeContainsResourceHandleVisiting(typeName string, types map[string]*TypeInfo, visiting map[string]bool) bool {
+	if typeName == surfaceFrameTypeName {
+		return false
+	}
 	if isResourceHandleType(typeName) {
 		return true
 	}
@@ -819,6 +866,7 @@ func (s *regionState) clearRegionTree(prefix string) {
 	delete(s.regionVars, prefix)
 	delete(s.unknownVars, prefix)
 	delete(s.unknownConflicts, prefix)
+	s.clearOwnedRegionSliceOwnerTree(prefix)
 	prefixDot := prefix + "."
 	for name := range s.regionVars {
 		if strings.HasPrefix(name, prefixDot) {
@@ -1339,6 +1387,22 @@ func (s *regionState) borrowedParamOwner(regionID int) (string, bool) {
 	}
 	name, ok := s.borrowedParamRegion[regionID]
 	return name, ok
+}
+
+func (s *regionState) bindExplicitBorrow(owner string) int {
+	if s == nil {
+		return regionNone
+	}
+	if owner == "" {
+		owner = "<borrow>"
+	}
+	if s.nextExplicitBorrow >= regionNone {
+		s.nextExplicitBorrow = regionExplicitBorrowStart
+	}
+	id := s.nextExplicitBorrow
+	s.nextExplicitBorrow--
+	s.borrowedParamRegion[id] = owner
+	return id
 }
 
 func formatRegionID(state *regionState, regionID int) string {

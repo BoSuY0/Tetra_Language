@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"tetra_language/compiler/internal/backend/x64"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/testkit"
 	ctarget "tetra_language/compiler/target"
@@ -131,6 +132,42 @@ func TestNativeCodegenOptionsInheritTargetWidths(t *testing.T) {
 		}
 		if !got.IslandsDebug || !got.DebugInfo || !got.ReleaseOptimize {
 			t.Fatalf("%s codegen flags not preserved: %#v", tc.target, got)
+		}
+	}
+}
+
+func TestNativeCodegenOptionsUsePortableTargetFeatureBaseline(t *testing.T) {
+	for _, tc := range []struct {
+		target      string
+		wantFeature bool
+	}{
+		{"linux-x64", true},
+		{"windows-x64", true},
+		{"macos-x64", true},
+		{"x32", true},
+		{"x86", false},
+	} {
+		tgt, err := ctarget.Parse(tc.target)
+		if err != nil {
+			t.Fatalf("parse %s: %v", tc.target, err)
+		}
+		opt := nativeCodegenOptionsForTarget(tgt, BuildOptions{ReleaseOptimize: true})
+		evidence, err := opt.TargetFeatureEvidence()
+		if err != nil {
+			t.Fatalf("%s TargetFeatureEvidence: %v", tc.target, err)
+		}
+		if evidence.Source != string(x64.TargetFeatureSourcePortableBaseline) || !evidence.PortableBaselineFallback {
+			t.Fatalf("%s target feature source = %#v, want portable baseline", tc.target, evidence)
+		}
+		hasSSE2 := containsString(evidence.Features, string(x64.TargetFeatureSSE2))
+		if hasSSE2 != tc.wantFeature {
+			t.Fatalf("%s sse2 baseline = %v, want %v; evidence=%#v", tc.target, hasSSE2, tc.wantFeature, evidence)
+		}
+		if evidence.ChangesSafeSemantics || evidence.EnablesTargetSpecificOptimization {
+			t.Fatalf("%s target feature evidence changed semantics or enabled tuning: %#v", tc.target, evidence)
+		}
+		if opt.TargetFeatures.Source != "" || len(opt.TargetFeatures.Features) != 0 {
+			t.Fatalf("%s native codegen options should not get explicit target features from BuildOptions: %#v", tc.target, opt.TargetFeatures)
 		}
 	}
 }

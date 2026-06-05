@@ -197,11 +197,17 @@ func canonicalBuiltinType(name string) (string, bool) {
 		return "u8", true
 	case "u16", "UInt16":
 		return "u16", true
+	case "c_int":
+		return "c_int", true
+	case "c_uint":
+		return "c_uint", true
+	case "usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong":
+		return name, true
 	case "str", "String":
 		return "str", true
 	case "bool", "Bool":
 		return "bool", true
-	case "ptr", "island", "cap.io", "cap.mem", "actor", "consent.token", "secret.i32":
+	case "ptr", "rawptr", "nullable_ptr", "ref", "island", "cap.io", "cap.mem", "actor", "consent.token", "secret.i32":
 		return name, true
 	case "ConsentToken":
 		return "consent.token", true
@@ -444,6 +450,9 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, global
 		if _, err := ensureTypeInfo(baseType, types); err != nil {
 			return assignTargetInfo{}, "", err
 		}
+		if err := rejectCollectionInternalAssignment(baseType, fields, types, pos); err != nil {
+			return assignTargetInfo{}, "", err
+		}
 		baseType, _, _, err := resolveFieldChain(baseType, baseOffset, fields, types, pos)
 		if err != nil {
 			return assignTargetInfo{}, "", err
@@ -471,11 +480,11 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, global
 			if _, err := ensureTypeInfo(globalInfo.TypeName, types); err != nil {
 				return assignTargetInfo{}, "", err
 			}
-			targetType, _, offset, err := resolveFieldChain(globalInfo.TypeName, globalInfo.DataIndex, fields, types, pos)
-			if err != nil {
+			if err := rejectCollectionInternalAssignment(globalInfo.TypeName, fields, types, pos); err != nil {
 				return assignTargetInfo{}, "", err
 			}
-			if err := rejectCollectionInternalAssignment(globalInfo.TypeName, fields, types, pos); err != nil {
+			targetType, _, offset, err := resolveFieldChain(globalInfo.TypeName, globalInfo.DataIndex, fields, types, pos)
+			if err != nil {
 				return assignTargetInfo{}, "", err
 			}
 			return assignTargetInfo{Name: baseName, Mutable: globalInfo.Mutable, Const: globalInfo.Const, TypeName: targetType, Offset: offset, Global: true}, targetType, nil
@@ -483,6 +492,9 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, global
 		return assignTargetInfo{}, "", fmt.Errorf("%s: unknown identifier '%s'", frontend.FormatPos(pos), baseName)
 	}
 	if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
+		return assignTargetInfo{}, "", err
+	}
+	if err := rejectCollectionInternalAssignment(info.TypeName, fields, types, pos); err != nil {
 		return assignTargetInfo{}, "", err
 	}
 	if info.ActorField {
@@ -502,9 +514,6 @@ func resolveAssignTarget(expr frontend.Expr, locals map[string]LocalInfo, global
 	if err != nil {
 		return assignTargetInfo{}, "", err
 	}
-	if err := rejectCollectionInternalAssignment(info.TypeName, fields, types, pos); err != nil {
-		return assignTargetInfo{}, "", err
-	}
 	return assignTargetInfo{Name: baseName, Mutable: info.Mutable, Const: info.Const, TypeName: targetType, Offset: offset}, targetType, nil
 }
 
@@ -515,20 +524,69 @@ func rejectCollectionInternalAssignment(typeName string, fields []string, types 
 		if !ok {
 			return fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(pos), current)
 		}
-		if info.Kind == TypeArray && (field == "ptr" || field == "len") {
-			return fmt.Errorf("%s: cannot assign to fixed-array internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
-		}
-		if info.Kind == TypeSlice && (field == "ptr" || field == "len") {
-			return fmt.Errorf("%s: cannot assign to slice internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
-		}
-		if info.Kind == TypeStr && (field == "ptr" || field == "len") {
-			return fmt.Errorf("%s: cannot assign to string internals ('ptr'/'len')", frontend.FormatPos(pos))
+		if err := rejectRepresentationMetadataAssignment(info, field, pos); err != nil {
+			return err
 		}
 		fieldInfo, ok := info.FieldMap[field]
 		if !ok {
 			return fmt.Errorf("%s: unknown field '%s'", frontend.FormatPos(pos), field)
 		}
 		current = fieldInfo.TypeName
+	}
+	return nil
+}
+
+func rejectRepresentationMetadataIndexBaseAssignment(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, types map[string]*TypeInfo) error {
+	baseName, fields, pos, ok := splitFieldPath(expr)
+	if !ok || len(fields) == 0 {
+		return nil
+	}
+	if info, ok := locals[baseName]; ok {
+		if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
+			return err
+		}
+		return rejectCollectionInternalAssignment(info.TypeName, fields, types, pos)
+	}
+	if info, ok := globals[baseName]; ok {
+		if _, err := ensureTypeInfo(info.TypeName, types); err != nil {
+			return err
+		}
+		return rejectCollectionInternalAssignment(info.TypeName, fields, types, pos)
+	}
+	return nil
+}
+
+func rejectRepresentationMetadataExprAssignment(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, types map[string]*TypeInfo) error {
+	switch e := expr.(type) {
+	case *frontend.FieldAccessExpr:
+		if err := rejectRepresentationMetadataIndexBaseAssignment(e, locals, globals, types); err != nil {
+			return err
+		}
+		return rejectRepresentationMetadataExprAssignment(e.Base, locals, globals, types)
+	case *frontend.IndexExpr:
+		return rejectRepresentationMetadataExprAssignment(e.Base, locals, globals, types)
+	default:
+		return nil
+	}
+}
+
+func rejectRepresentationMetadataAssignment(info *TypeInfo, field string, pos frontend.Position) error {
+	if info == nil {
+		return nil
+	}
+	fieldInfo, fieldKnown := info.FieldMap[field]
+	if fieldKnown && fieldInfo.UserAssignable {
+		return nil
+	}
+	if fieldKnown || isReservedRepresentationMetadataField(field) {
+		switch info.Kind {
+		case TypeArray:
+			return fmt.Errorf("%s: cannot assign to fixed-array internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
+		case TypeSlice:
+			return fmt.Errorf("%s: cannot assign to slice internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
+		case TypeStr:
+			return fmt.Errorf("%s: cannot assign to string internals ('ptr'/'len')", frontend.FormatPos(pos))
+		}
 	}
 	return nil
 }

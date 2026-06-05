@@ -8,6 +8,7 @@ import (
 	"tetra_language/compiler/internal/backend/x64"
 	"tetra_language/compiler/internal/format/tobj"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/runtimeabi"
 )
 
 func CodegenObjectLinuxX86(funcs []ir.IRFunc) (*tobj.Object, error) {
@@ -82,15 +83,19 @@ func (e *emitter) pushEax()            { e.emit(0x50) }
 func (e *emitter) pushEcx()            { e.emit(0x51) }
 func (e *emitter) pushEdx()            { e.emit(0x52) }
 func (e *emitter) pushEbx()            { e.emit(0x53) }
+func (e *emitter) pushEsi()            { e.emit(0x56) }
+func (e *emitter) pushEdi()            { e.emit(0x57) }
 func (e *emitter) popEax()             { e.emit(0x58) }
 func (e *emitter) popEcx()             { e.emit(0x59) }
 func (e *emitter) popEdx()             { e.emit(0x5A) }
 func (e *emitter) popEbx()             { e.emit(0x5B) }
 func (e *emitter) popEbp()             { e.emit(0x5D) }
+func (e *emitter) popEsi()             { e.emit(0x5E) }
 func (e *emitter) popEdi()             { e.emit(0x5F) }
 func (e *emitter) cdq()                { e.emit(0x99) }
 func (e *emitter) int80()              { e.emit(0xCD, 0x80) }
 func (e *emitter) mfenceCompat()       { e.emit(0xF0, 0x83, 0x0C, 0x24, 0x00) }
+func (e *emitter) xorEaxEax()          { e.emit(0x31, 0xC0) }
 func (e *emitter) movEaxEcx()          { e.emit(0x89, 0xC8) }
 func (e *emitter) movEcxEax()          { e.emit(0x89, 0xC1) }
 func (e *emitter) movEdxEax()          { e.emit(0x89, 0xC2) }
@@ -105,6 +110,7 @@ func (e *emitter) addEaxEdx()          { e.emit(0x01, 0xD0) }
 func (e *emitter) addEdxEax()          { e.emit(0x01, 0xC2) }
 func (e *emitter) addEdiEcx()          { e.emit(0x01, 0xCF) }
 func (e *emitter) subEaxEcx()          { e.emit(0x29, 0xC8) }
+func (e *emitter) subEcxEdx()          { e.emit(0x29, 0xD1) }
 func (e *emitter) subEaxEdi()          { e.emit(0x29, 0xF8) }
 func (e *emitter) imulEaxEcx()         { e.emit(0x0F, 0xAF, 0xC1) }
 func (e *emitter) idivEcx()            { e.emit(0xF7, 0xF9) }
@@ -112,8 +118,10 @@ func (e *emitter) negEax()             { e.emit(0xF7, 0xD8) }
 func (e *emitter) negEcx()             { e.emit(0xF7, 0xD9) }
 func (e *emitter) cmpEaxEcx()          { e.emit(0x39, 0xC8) }
 func (e *emitter) cmpEdxEcx()          { e.emit(0x39, 0xCA) }
+func (e *emitter) cmpEbxEcx()          { e.emit(0x39, 0xCB) }
 func (e *emitter) cmpEdiEbx()          { e.emit(0x39, 0xDF) }
 func (e *emitter) testEaxEax()         { e.emit(0x85, 0xC0) }
+func (e *emitter) testEcxEcx()         { e.emit(0x85, 0xC9) }
 func (e *emitter) xorEbxEbx()          { e.emit(0x31, 0xDB) }
 func (e *emitter) xorEbpEbp()          { e.emit(0x31, 0xED) }
 func (e *emitter) movzxEaxAl()         { e.emit(0x0F, 0xB6, 0xC0) }
@@ -128,7 +136,9 @@ func (e *emitter) movzxEaxWordEaxPtr() { e.emit(0x0F, 0xB7, 0x00) }
 func (e *emitter) movzxEaxWordEdiPtr() { e.emit(0x0F, 0xB7, 0x07) }
 func (e *emitter) movMemEaxPtrEcx()    { e.emit(0x89, 0x08) }
 func (e *emitter) movMemEaxPtrEbx()    { e.emit(0x89, 0x18) }
+func (e *emitter) movMemEaxPtrEsp()    { e.emit(0x89, 0x20) }
 func (e *emitter) movMemEaxPtrEdi()    { e.emit(0x89, 0x38) }
+func (e *emitter) movEspFromEcxPtr()   { e.emit(0x8B, 0x21) }
 func (e *emitter) movMem8EaxPtrBl()    { e.emit(0x88, 0x18) }
 func (e *emitter) movMem16EaxPtrBx()   { e.emit(0x66, 0x89, 0x18) }
 func (e *emitter) xchgMem32EdiEcx()    { e.emit(0x87, 0x0F) }
@@ -302,8 +312,18 @@ func (e *emitter) cmpEcxImm8(v byte) {
 	e.emit(0x83, 0xF9, v)
 }
 
+func (e *emitter) cmpEcxImm32(v uint32) {
+	e.emit(0x81, 0xF9)
+	e.imm32(v)
+}
+
 func (e *emitter) cmpEdxImm8(v byte) {
 	e.emit(0x83, 0xFA, v)
+}
+
+func (e *emitter) cmpEbxImm32(v uint32) {
+	e.emit(0x81, 0xFB)
+	e.imm32(v)
 }
 
 func (e *emitter) cmpEaxImm32(v uint32) {
@@ -335,6 +355,16 @@ func (e *emitter) jaeRel32() int {
 
 func (e *emitter) jaRel32() int {
 	e.emit(0x0F, 0x87, 0, 0, 0, 0)
+	return len(e.buf) - 4
+}
+
+func (e *emitter) jlRel32() int {
+	e.emit(0x0F, 0x8C, 0, 0, 0, 0)
+	return len(e.buf) - 4
+}
+
+func (e *emitter) jgRel32() int {
+	e.emit(0x0F, 0x8F, 0, 0, 0, 0)
 	return len(e.buf) - 4
 }
 
@@ -555,6 +585,13 @@ func emitFunc(e *emitter, fn ir.IRFunc, callPatches *[]callPatch, dataPatches *[
 			if dataBlobs == nil {
 				return fmt.Errorf("x86 backend: missing data blobs for string literal in function '%s'", fn.Name)
 			}
+			if len(instr.Str) == 0 {
+				e.movEaxImm32(0)
+				e.pushEax()
+				e.pushEax()
+				push(2)
+				continue
+			}
 			at := e.movEaxImm32Patch()
 			*dataPatches = append(*dataPatches, dataPatch{at: at, dataIndex: len(*dataBlobs)})
 			*dataBlobs = append(*dataBlobs, instr.Str)
@@ -707,6 +744,14 @@ func emitFunc(e *emitter, fn ir.IRFunc, callPatches *[]callPatch, dataPatches *[
 			if err := emitMakeSlice(e, instr.Kind, pop, push); err != nil {
 				return err
 			}
+		case ir.IRRawSliceFromParts:
+			if err := emitRawSliceFromParts(e, pop, push); err != nil {
+				return err
+			}
+		case ir.IRSliceWindow, ir.IRSlicePrefix, ir.IRSliceSuffix:
+			if err := emitSliceView(e, instr.Kind, byte(instr.Imm), pop, push); err != nil {
+				return err
+			}
 		case ir.IRIslandNew:
 			if err := emitIslandNew(e, pop, push, opt); err != nil {
 				return err
@@ -719,7 +764,8 @@ func emitFunc(e *emitter, fn ir.IRFunc, callPatches *[]callPatch, dataPatches *[
 			if err := emitIslandFree(e, pop, opt); err != nil {
 				return err
 			}
-		case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
+		case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
+			ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 			if err := emitIndexLoad(e, instr.Kind, pop, push); err != nil {
 				return err
 			}
@@ -757,6 +803,10 @@ func emitFunc(e *emitter, fn ir.IRFunc, callPatches *[]callPatch, dataPatches *[
 			}
 		case ir.IRMmioWriteI32:
 			if err := emitMMIOWriteI32(e, pop, push); err != nil {
+				return err
+			}
+		case ir.IRCtxSwitch:
+			if err := emitCtxSwitch(e, pop, push); err != nil {
 				return err
 			}
 		case ir.IRAtomicFenceSeqCst:
@@ -924,7 +974,7 @@ func emitCall(e *emitter, fn ir.IRFunc, instr ir.IRInstr, pop func(int) error, p
 	if instr.ArgSlots < 0 || instr.RetSlots < 0 {
 		return fmt.Errorf("x86 backend: call %q has negative ABI slots args=%d rets=%d in function '%s'", instr.Name, instr.ArgSlots, instr.RetSlots, fn.Name)
 	}
-	if instr.RetSlots > 3 {
+	if instr.RetSlots > 4 {
 		return fmt.Errorf("x86 backend: unsupported call return slots %d in function '%s' call %q", instr.RetSlots, fn.Name, instr.Name)
 	}
 	if err := pop(instr.ArgSlots); err != nil {
@@ -959,6 +1009,12 @@ func emitCall(e *emitter, fn ir.IRFunc, instr ir.IRInstr, pop func(int) error, p
 		e.pushEdx()
 		e.pushEcx()
 		push(3)
+	case 4:
+		e.pushEax()
+		e.pushEdx()
+		e.pushEcx()
+		e.pushEbx()
+		push(4)
 	}
 	return nil
 }
@@ -975,6 +1031,11 @@ func emitReturn(e *emitter, fn ir.IRFunc, pop func(int) error) error {
 		e.popEdx()
 		e.popEax()
 	case 3:
+		e.popEcx()
+		e.popEdx()
+		e.popEax()
+	case 4:
+		e.popEbx()
 		e.popEcx()
 		e.popEdx()
 		e.popEax()
@@ -1026,6 +1087,40 @@ func emitWrite(e *emitter, pop func(int) error) error {
 	return nil
 }
 
+func emitCtxSwitch(e *emitter, pop func(int) error, push func(int)) error {
+	if err := pop(3); err != nil {
+		return err
+	}
+	e.popEdx() // cap.mem, currently a permission token only.
+	e.popEcx() // to_rsp_slot
+	e.popEax() // from_rsp_slot
+
+	callAt := e.callRel32()
+	e.xorEaxEax()
+	e.pushEax()
+	push(1)
+	jmpAt := e.jmpRel32()
+
+	switchOff := len(e.buf)
+	if err := e.patchRel32(callAt, switchOff); err != nil {
+		return err
+	}
+	e.pushEbx()
+	e.pushEbp()
+	e.pushEsi()
+	e.pushEdi()
+	e.movMemEaxPtrEsp()
+	e.movEspFromEcxPtr()
+	e.popEdi()
+	e.popEsi()
+	e.popEbp()
+	e.popEbx()
+	e.ret()
+
+	contOff := len(e.buf)
+	return e.patchRel32(jmpAt, contOff)
+}
+
 func emitAllocBytes(e *emitter, pop func(int) error, push func(int)) error {
 	if err := pop(1); err != nil {
 		return err
@@ -1056,8 +1151,15 @@ func emitMakeSlice(e *emitter, kind ir.IRInstrKind, pop func(int) error, push fu
 		return err
 	}
 	e.popEcx()
+	e.testEcxEcx()
+	negativeAt := e.jlRel32()
 	e.cmpEcxImm8(0)
 	emptyAt := e.jzRel32()
+	overflowAt := -1
+	if max, ok := x86MakeSliceMaxElements(kind); ok {
+		e.cmpEcxImm32(uint32(max))
+		overflowAt = e.jgRel32()
+	}
 	e.pushEcx()
 	switch kind {
 	case ir.IRMakeSliceI32:
@@ -1085,10 +1187,99 @@ func emitMakeSlice(e *emitter, kind ir.IRInstrKind, pop func(int) error, push fu
 	if err := e.patchRel32(emptyAt, emptyOff); err != nil {
 		return err
 	}
+	if err := e.patchRel32(negativeAt, failOff); err != nil {
+		return err
+	}
+	if overflowAt >= 0 {
+		if err := e.patchRel32(overflowAt, failOff); err != nil {
+			return err
+		}
+	}
 	if err := e.patchRel32(failAt, failOff); err != nil {
 		return err
 	}
 	return e.patchRel32(doneAt, doneOff)
+}
+
+func emitRawSliceFromParts(e *emitter, pop func(int) error, push func(int)) error {
+	if err := pop(3); err != nil {
+		return err
+	}
+	e.popEdx()
+	e.popEcx()
+	e.popEax()
+	e.pushEax()
+	e.pushEcx()
+	push(2)
+	return nil
+}
+
+func emitSliceView(e *emitter, kind ir.IRInstrKind, shift byte, pop func(int) error, push func(int)) error {
+	failPatches := []int{}
+	switch kind {
+	case ir.IRSliceWindow:
+		if err := pop(4); err != nil {
+			return err
+		}
+		e.popEbx()
+		e.popEdx()
+		e.popEcx()
+		e.popEax()
+		e.cmpEdxImm8(0)
+		failPatches = append(failPatches, e.jlRel32())
+		e.cmpEbxImm32(0)
+		failPatches = append(failPatches, e.jlRel32())
+		e.cmpEdxEcx()
+		failPatches = append(failPatches, e.jgRel32())
+		e.subEcxEdx()
+		e.cmpEbxEcx()
+		failPatches = append(failPatches, e.jgRel32())
+		if shift > 0 {
+			e.shlEdxImm8(shift)
+		}
+		e.addEaxEdx()
+		e.pushEax()
+		e.pushEbx()
+		push(2)
+		return patchExitBranches(e, failPatches, 1)
+	case ir.IRSlicePrefix:
+		if err := pop(3); err != nil {
+			return err
+		}
+		e.popEbx()
+		e.popEcx()
+		e.popEax()
+		e.cmpEbxImm32(0)
+		failPatches = append(failPatches, e.jlRel32())
+		e.cmpEbxEcx()
+		failPatches = append(failPatches, e.jgRel32())
+		e.pushEax()
+		e.pushEbx()
+		push(2)
+		return patchExitBranches(e, failPatches, 1)
+	case ir.IRSliceSuffix:
+		if err := pop(3); err != nil {
+			return err
+		}
+		e.popEdx()
+		e.popEcx()
+		e.popEax()
+		e.cmpEdxImm8(0)
+		failPatches = append(failPatches, e.jlRel32())
+		e.cmpEdxEcx()
+		failPatches = append(failPatches, e.jgRel32())
+		e.subEcxEdx()
+		if shift > 0 {
+			e.shlEdxImm8(shift)
+		}
+		e.addEaxEdx()
+		e.pushEax()
+		e.pushEcx()
+		push(2)
+		return patchExitBranches(e, failPatches, 1)
+	default:
+		return fmt.Errorf("x86 backend: unsupported slice view kind %v", kind)
+	}
 }
 
 func emitIslandNew(e *emitter, pop func(int) error, push func(int), opt x64.CodegenOptions) error {
@@ -1096,9 +1287,14 @@ func emitIslandNew(e *emitter, pop func(int) error, push func(int), opt x64.Code
 		return err
 	}
 	e.popEcx()
-	headerSize := int32(16)
-	if opt.IslandsDebug {
-		headerSize = x64.IslandsDebugPageSize
+	cfg := runtimeabi.RuntimeRegionAllocatorConfig(opt.IslandsDebug)
+	headerSize := cfg.HeaderBytes
+	e.testEcxEcx()
+	negativeAt := e.jlRel32()
+	e.cmpEcxImm32(uint32(cfg.MaxPayloadBytes))
+	overflowAt := e.jgRel32()
+	if opt.IslandsDebug && headerSize != x64.IslandsDebugPageSize {
+		return fmt.Errorf("internal error: island debug header size mismatch")
 	}
 	e.addEcxImm32(headerSize)
 	e.pushEcx()
@@ -1111,7 +1307,7 @@ func emitIslandNew(e *emitter, pop func(int) error, push func(int), opt x64.Code
 	e.movMemEaxDispImm32(12, 0)
 	e.pushEax()
 	push(1)
-	return patchExitBranch(e, failAt, 2)
+	return patchExitBranches(e, []int{negativeAt, overflowAt, failAt}, 2)
 }
 
 func emitIslandMakeSlice(e *emitter, kind ir.IRInstrKind, pop func(int) error, push func(int)) error {
@@ -1120,6 +1316,15 @@ func emitIslandMakeSlice(e *emitter, kind ir.IRInstrKind, pop func(int) error, p
 	}
 	e.popEcx()
 	e.popEax()
+	e.testEcxEcx()
+	negativeAt := e.jlRel32()
+	e.cmpEcxImm8(0)
+	emptyAt := e.jzRel32()
+	overflowAt := -1
+	if max, ok := x86MakeSliceMaxElements(kind); ok {
+		e.cmpEcxImm32(uint32(max))
+		overflowAt = e.jgRel32()
+	}
 	e.pushEcx()
 	switch kind {
 	case ir.IRIslandMakeSliceI32:
@@ -1134,6 +1339,8 @@ func emitIslandMakeSlice(e *emitter, kind ir.IRInstrKind, pop func(int) error, p
 	e.movEbxFromEaxDisp(4)
 	e.movEdiEdx()
 	e.addEdiEcx()
+	e.addEdiImm8(byte(runtimeabi.RegionAllocatorAlignmentBytes - 1))
+	e.andEdiImm32(-runtimeabi.RegionAllocatorAlignmentBytes)
 	e.cmpEdiEbx()
 	failAt := e.jaRel32()
 	e.movMemEaxPtrEdi()
@@ -1142,7 +1349,42 @@ func emitIslandMakeSlice(e *emitter, kind ir.IRInstrKind, pop func(int) error, p
 	e.pushEdx()
 	e.pushEcx()
 	push(2)
-	return patchExitBranch(e, failAt, 1)
+	doneAt := e.jmpRel32()
+	lengthFailOff := len(e.buf)
+	emitExit(e, 2)
+	capacityFailOff := len(e.buf)
+	emitExit(e, 1)
+	emptyOff := len(e.buf)
+	e.movEaxImm32(0)
+	e.pushEax()
+	e.pushEcx()
+	doneOff := len(e.buf)
+	if err := e.patchRel32(negativeAt, lengthFailOff); err != nil {
+		return err
+	}
+	if overflowAt >= 0 {
+		if err := e.patchRel32(overflowAt, lengthFailOff); err != nil {
+			return err
+		}
+	}
+	if err := e.patchRel32(emptyAt, emptyOff); err != nil {
+		return err
+	}
+	if err := e.patchRel32(failAt, capacityFailOff); err != nil {
+		return err
+	}
+	return e.patchRel32(doneAt, doneOff)
+}
+
+func x86MakeSliceMaxElements(kind ir.IRInstrKind) (int32, bool) {
+	switch kind {
+	case ir.IRMakeSliceU16, ir.IRIslandMakeSliceU16:
+		return 2147483647 / 2, true
+	case ir.IRMakeSliceI32, ir.IRIslandMakeSliceI32:
+		return 2147483647 / 4, true
+	default:
+		return 0, false
+	}
 }
 
 func emitIslandFree(e *emitter, pop func(int) error, opt x64.CodegenOptions) error {
@@ -1181,23 +1423,30 @@ func emitIndexLoad(e *emitter, kind ir.IRInstrKind, pop func(int) error, push fu
 	e.popEdx()
 	e.popEcx()
 	e.popEax()
-	e.cmpEdxEcx()
-	failAt := e.jaeRel32()
+	checked := kind == ir.IRIndexLoadI32 || kind == ir.IRIndexLoadU8 || kind == ir.IRIndexLoadU16
+	failAt := 0
+	if checked {
+		e.cmpEdxEcx()
+		failAt = e.jaeRel32()
+	}
 	scaleIndex(e, kind)
 	e.addEaxEdx()
 	switch kind {
-	case ir.IRIndexLoadI32:
+	case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 		e.movEaxFromEaxPtr()
-	case ir.IRIndexLoadU16:
+	case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 		e.movzxEaxWordEaxPtr()
-	case ir.IRIndexLoadU8:
+	case ir.IRIndexLoadU8, ir.IRIndexLoadU8Unchecked:
 		e.movzxEaxByteEaxPtr()
 	default:
 		return fmt.Errorf("x86 backend: unsupported index load kind %v", kind)
 	}
 	e.pushEax()
 	push(1)
-	return patchExitBranch(e, failAt, 1)
+	if checked {
+		return patchExitBranch(e, failAt, 1)
+	}
+	return nil
 }
 
 func emitIndexStore(e *emitter, kind ir.IRInstrKind, pop func(int) error) error {
@@ -1227,9 +1476,9 @@ func emitIndexStore(e *emitter, kind ir.IRInstrKind, pop func(int) error) error 
 
 func scaleIndex(e *emitter, kind ir.IRInstrKind) {
 	switch kind {
-	case ir.IRIndexLoadI32, ir.IRIndexStoreI32:
+	case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked, ir.IRIndexStoreI32:
 		e.shlEdxImm8(2)
-	case ir.IRIndexLoadU16, ir.IRIndexStoreU16:
+	case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked, ir.IRIndexStoreU16:
 		e.shlEdxImm8(1)
 	}
 }
@@ -1258,6 +1507,19 @@ func patchExitBranch(e *emitter, failAt int, code int32) error {
 	doneOff := len(e.buf)
 	if err := e.patchRel32(failAt, failOff); err != nil {
 		return err
+	}
+	return e.patchRel32(doneAt, doneOff)
+}
+
+func patchExitBranches(e *emitter, failAts []int, code int32) error {
+	doneAt := e.jmpRel32()
+	failOff := len(e.buf)
+	emitExit(e, code)
+	doneOff := len(e.buf)
+	for _, failAt := range failAts {
+		if err := e.patchRel32(failAt, failOff); err != nil {
+			return err
+		}
 	}
 	return e.patchRel32(doneAt, doneOff)
 }

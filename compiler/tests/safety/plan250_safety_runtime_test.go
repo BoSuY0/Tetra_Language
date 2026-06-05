@@ -112,7 +112,7 @@ func TestPlan250SafetySendabilityAcrossModuleBoundaries(t *testing.T) {
 		wantErr []string
 	}{
 		{
-			name: "reject string payload",
+			name: "reject uncopied string payload",
 			files: map[string]string{
 				"lib/messages.tetra": `module lib.messages
 
@@ -131,7 +131,7 @@ uses actors:
     return core.send_typed(peer, Msg.text("remote"))
 `,
 			},
-			wantErr: []string{"typed actor message payload must be value-only", "str"},
+			wantErr: []string{"cannot cross actor boundary without copy", "<borrow>"},
 		},
 		{
 			name: "reject actor handle payload",
@@ -1544,7 +1544,7 @@ func main() -> Int:
 
 func TestPlan250RuntimeRejectsAggregateConsentTokensInExportedSignatures(t *testing.T) {
 	testkit.RequireFileCheckErrorContains(t, `
-struct ConsentBox:
+repr(C) struct ConsentBox:
     token: consent.token
 
 @export("ffi_boxed_consent")
@@ -1556,7 +1556,7 @@ func main() -> Int:
 `, "exported function 'boxed_consent' cannot expose forgeable consent token 'consent.token' through parameter 'box' type 'ConsentBox'")
 
 	testkit.RequireFileCheckErrorContains(t, `
-struct ConsentBox:
+repr(C) struct ConsentBox:
     token: consent.token
 
 @export("ffi_make_consent_box")

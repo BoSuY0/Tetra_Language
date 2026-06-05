@@ -12,16 +12,17 @@ import (
 const SchemaV1 = "tetra.parallel.production.v1"
 
 type Report struct {
-	Schema    string           `json:"schema"`
-	Status    string           `json:"status"`
-	Target    string           `json:"target"`
-	Host      string           `json:"host"`
-	Runtime   string           `json:"runtime"`
-	Source    string           `json:"source"`
-	Processes []ProcessReport  `json:"processes"`
-	Contracts []ContractReport `json:"contracts"`
-	Cases     []CaseReport     `json:"cases"`
-	Audit     []AuditReport    `json:"audit"`
+	Schema     string            `json:"schema"`
+	Status     string            `json:"status"`
+	Target     string            `json:"target"`
+	Host       string            `json:"host"`
+	Runtime    string            `json:"runtime"`
+	Source     string            `json:"source"`
+	Processes  []ProcessReport   `json:"processes"`
+	Benchmarks []BenchmarkReport `json:"benchmarks"`
+	Contracts  []ContractReport  `json:"contracts"`
+	Cases      []CaseReport      `json:"cases"`
+	Audit      []AuditReport     `json:"audit"`
 }
 
 type ProcessReport struct {
@@ -37,6 +38,19 @@ type ContractReport struct {
 	Name     string `json:"name"`
 	Status   string `json:"status"`
 	Evidence string `json:"evidence"`
+}
+
+type BenchmarkReport struct {
+	Name             string  `json:"name"`
+	Kind             string  `json:"kind"`
+	Metric           string  `json:"metric"`
+	Unit             string  `json:"unit"`
+	BaselineValue    int     `json:"baseline_value"`
+	MeasuredValue    int     `json:"measured_value"`
+	ImprovementRatio float64 `json:"improvement_ratio"`
+	Evidence         string  `json:"evidence"`
+	Ran              bool    `json:"ran"`
+	Pass             bool    `json:"pass"`
 }
 
 type CaseReport struct {
@@ -82,6 +96,7 @@ func ValidateReport(raw []byte) error {
 		issues = append(issues, "source is required")
 	}
 	issues = append(issues, validateProcesses(report.Processes)...)
+	issues = append(issues, validateBenchmarks(report.Benchmarks)...)
 	issues = append(issues, validateContracts(report.Contracts)...)
 	issues = append(issues, validateCases(report.Cases)...)
 	issues = append(issues, validateAudit(report.Audit)...)
@@ -138,8 +153,9 @@ func validateProcesses(processes []ProcessReport) []string {
 			seenApp = true
 		case "stress":
 			seenStress = true
+		case "benchmark":
 		default:
-			issues = append(issues, fmt.Sprintf("process %s kind is %q, want build, app, or stress", p.Name, p.Kind))
+			issues = append(issues, fmt.Sprintf("process %s kind is %q, want build, app, stress, or benchmark", p.Name, p.Kind))
 		}
 		if strings.TrimSpace(p.Path) == "" {
 			issues = append(issues, fmt.Sprintf("process %s path is required", p.Name))
@@ -164,6 +180,77 @@ func validateProcesses(processes []ProcessReport) []string {
 	}
 	if !seenStress {
 		issues = append(issues, "process evidence missing parallel stress process")
+	}
+	return issues
+}
+
+func validateBenchmarks(benchmarks []BenchmarkReport) []string {
+	required := map[string]string{
+		"actor ping-pong fanout scheduler prototype":   "scheduler",
+		"zero-copy region message scheduler prototype": "transfer",
+	}
+	var issues []string
+	if len(benchmarks) == 0 {
+		issues = append(issues, "benchmark evidence is required")
+	}
+	seen := map[string]bool{}
+	for _, b := range benchmarks {
+		name := strings.TrimSpace(b.Name)
+		if name == "" {
+			issues = append(issues, "benchmark name is required")
+			continue
+		}
+		if seen[name] {
+			issues = append(issues, fmt.Sprintf("duplicate benchmark %s", name))
+		}
+		seen[name] = true
+		if wantKind, ok := required[name]; ok {
+			required[name] = ""
+			if b.Kind != wantKind {
+				issues = append(issues, fmt.Sprintf("benchmark %s kind is %q, want %s", name, b.Kind, wantKind))
+			}
+		} else if b.Kind != "scheduler" && b.Kind != "transfer" {
+			issues = append(issues, fmt.Sprintf("benchmark %s kind is %q, want scheduler or transfer", name, b.Kind))
+		}
+		if strings.TrimSpace(b.Metric) == "" {
+			issues = append(issues, fmt.Sprintf("benchmark %s metric is required", name))
+		}
+		if strings.TrimSpace(b.Unit) == "" {
+			issues = append(issues, fmt.Sprintf("benchmark %s unit is required", name))
+		}
+		if !b.Ran {
+			issues = append(issues, fmt.Sprintf("benchmark %s did not run", name))
+		}
+		if !b.Pass {
+			issues = append(issues, fmt.Sprintf("benchmark %s did not pass", name))
+		}
+		if b.BaselineValue <= 0 {
+			issues = append(issues, fmt.Sprintf("benchmark %s baseline_value = %d, want positive", name, b.BaselineValue))
+		}
+		if b.MeasuredValue < 0 {
+			issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want non-negative", name, b.MeasuredValue))
+		}
+		if b.BaselineValue > 0 && b.MeasuredValue >= b.BaselineValue {
+			issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want less than baseline_value %d", name, b.MeasuredValue, b.BaselineValue))
+		}
+		if b.ImprovementRatio <= 1 {
+			issues = append(issues, fmt.Sprintf("benchmark %s improvement_ratio = %.3f, want > 1", name, b.ImprovementRatio))
+		}
+		evidence := strings.TrimSpace(b.Evidence)
+		if evidence == "" {
+			issues = append(issues, fmt.Sprintf("benchmark %s evidence is required", name))
+		}
+		if name == "actor ping-pong fanout scheduler prototype" && !strings.Contains(strings.ToLower(evidence), "work stealing") {
+			issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention work stealing", name))
+		}
+		if name == "zero-copy region message scheduler prototype" && !strings.Contains(evidence, "zero_copy_move") {
+			issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention zero_copy_move", name))
+		}
+	}
+	for name, wantKind := range required {
+		if wantKind != "" {
+			issues = append(issues, fmt.Sprintf("missing required benchmark %q", name))
+		}
 	}
 	return issues
 }
@@ -290,6 +377,7 @@ func validateAudit(audit []AuditReport) []string {
 		"stress evidence for tasks, actor messages, cancellation storms, and timeouts": false,
 		"safe/unsafe/forbidden parallelism documentation":                              false,
 		"stable parallel diagnostics":                                                  false,
+		"per-core scheduler prototype and zero-copy transfer benchmarks":               false,
 		"release-gate entrypoint":                                                      false,
 	}
 	var issues []string

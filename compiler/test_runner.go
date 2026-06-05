@@ -40,6 +40,7 @@ type TestRunnerReport struct {
 	Total      int                    `json:"total"`
 	Passed     int                    `json:"passed"`
 	Failed     int                    `json:"failed"`
+	Target     string                 `json:"target,omitempty"`
 	DurationMS int64                  `json:"duration_ms"`
 	Files      []TestRunnerFileReport `json:"files"`
 	Results    []TestRunnerResult     `json:"results"`
@@ -170,6 +171,12 @@ func NewTestRunnerReport(results []TestRunnerResult) TestRunnerReport {
 	for _, filename := range filenames {
 		report.Files = append(report.Files, *byFile[filename])
 	}
+	return report
+}
+
+func NewTestRunnerReportForTarget(results []TestRunnerResult, target string) TestRunnerReport {
+	report := NewTestRunnerReport(results)
+	report.Target = strings.TrimSpace(target)
 	return report
 }
 

@@ -7,10 +7,18 @@ import (
 	"strings"
 
 	"tetra_language/compiler/actorwire"
+	"tetra_language/compiler/internal/allocplan"
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/plir"
+	"tetra_language/compiler/internal/rangeproof"
 	"tetra_language/compiler/internal/semantics"
 )
+
+type Options struct {
+	StackAllocationLowering    bool
+	FunctionTempRegionLowering bool
+}
 
 type runtimePolicy struct {
 	hasBudget    bool
@@ -73,11 +81,26 @@ var budgetChargeTable = []budgetCharge{
 	{kind: ir.IRMakeSliceU8, cost: 1},
 	{kind: ir.IRMakeSliceU16, cost: 1},
 	{kind: ir.IRMakeSliceI32, cost: 1},
+	{kind: ir.IRStackSliceU8, cost: 1},
+	{kind: ir.IRStackSliceU16, cost: 1},
+	{kind: ir.IRStackSliceI32, cost: 1},
+	{kind: ir.IRRegionEnter, cost: 1},
+	{kind: ir.IRRegionMakeSliceU8, cost: 1},
+	{kind: ir.IRRegionMakeSliceU16, cost: 1},
+	{kind: ir.IRRegionMakeSliceI32, cost: 1},
+	{kind: ir.IRRegionReset, cost: 1},
+	{kind: ir.IRRawSliceFromParts, cost: 1},
+	{kind: ir.IRSliceWindow, cost: 1},
+	{kind: ir.IRSlicePrefix, cost: 1},
+	{kind: ir.IRSliceSuffix, cost: 1},
 	{kind: ir.IRIndexLoadI32, cost: 1},
+	{kind: ir.IRIndexLoadI32Unchecked, cost: 1},
 	{kind: ir.IRIndexStoreI32, cost: 1},
 	{kind: ir.IRIndexLoadU8, cost: 1},
+	{kind: ir.IRIndexLoadU8Unchecked, cost: 1},
 	{kind: ir.IRIndexStoreU8, cost: 1},
 	{kind: ir.IRIndexLoadU16, cost: 1},
+	{kind: ir.IRIndexLoadU16Unchecked, cost: 1},
 	{kind: ir.IRIndexStoreU16, cost: 1},
 	{kind: ir.IRIslandNew, cost: 1},
 	{kind: ir.IRIslandMakeSliceU8, cost: 1},
@@ -172,19 +195,35 @@ func budgetChargedInstr(kind ir.IRInstrKind) bool {
 }
 
 func Lower(checked *semantics.CheckedProgram) (*ir.IRProgram, error) {
+	return LowerWithOptions(checked, Options{})
+}
+
+func LowerWithOptions(checked *semantics.CheckedProgram, opt Options) (*ir.IRProgram, error) {
 	if checked == nil {
 		return nil, fmt.Errorf("missing checked program")
 	}
 	if len(checked.Funcs) == 0 {
 		return nil, fmt.Errorf("expected at least one function")
 	}
+	plirProg, err := plir.FromCheckedProgram(checked)
+	if err != nil {
+		return nil, err
+	}
+	if err := plir.VerifyProgram(plirProg); err != nil {
+		return nil, err
+	}
+	allocationPlan, err := allocplan.FromPLIRWithOptions(plirProg, allocationPlannerOptions(opt))
+	if err != nil {
+		return nil, err
+	}
+	allocationsByFunction := allocationPlanByFunction(allocationPlan)
 
 	prog := ir.IRProgram{MainIndex: checked.MainIndex, MainName: checked.MainName}
 	wrappers := collectTypedTaskWrappers(checked, "")
 	stagedTargets := collectStagedTypedTaskTargets(wrappers)
 	callableTargets := collectFunctionTypedParamTargets(checked, "")
 	for _, fn := range checked.Funcs {
-		irFunc, err := lowerCheckedFunc(fn, checked.Types, checked.FuncSigs, checked.GlobalsByModule[fn.Module], stagedTargets[fn.Name], callableTargets[fn.Name])
+		irFunc, err := lowerCheckedFuncWithOptions(fn, checked.Types, checked.FuncSigs, checked.GlobalsByModule[fn.Module], stagedTargets[fn.Name], callableTargets[fn.Name], opt, allocationsByFunction[fn.Name])
 		if err != nil {
 			return nil, err
 		}
@@ -210,9 +249,25 @@ func Lower(checked *semantics.CheckedProgram) (*ir.IRProgram, error) {
 }
 
 func LowerModule(checked *semantics.CheckedProgram, module string) ([]ir.IRFunc, error) {
+	return LowerModuleWithOptions(checked, module, Options{})
+}
+
+func LowerModuleWithOptions(checked *semantics.CheckedProgram, module string, opt Options) ([]ir.IRFunc, error) {
 	if checked == nil {
 		return nil, fmt.Errorf("missing checked program")
 	}
+	plirProg, err := plir.FromCheckedProgram(checked)
+	if err != nil {
+		return nil, err
+	}
+	if err := plir.VerifyProgram(plirProg); err != nil {
+		return nil, err
+	}
+	allocationPlan, err := allocplan.FromPLIRWithOptions(plirProg, allocationPlannerOptions(opt))
+	if err != nil {
+		return nil, err
+	}
+	allocationsByFunction := allocationPlanByFunction(allocationPlan)
 	var out []ir.IRFunc
 	wrappers := collectTypedTaskWrappers(checked, module)
 	stagedTargets := collectStagedTypedTaskTargets(wrappers)
@@ -221,7 +276,7 @@ func LowerModule(checked *semantics.CheckedProgram, module string) ([]ir.IRFunc,
 		if fn.Module != module {
 			continue
 		}
-		irFunc, err := lowerCheckedFunc(fn, checked.Types, checked.FuncSigs, checked.GlobalsByModule[fn.Module], stagedTargets[fn.Name], callableTargets[fn.Name])
+		irFunc, err := lowerCheckedFuncWithOptions(fn, checked.Types, checked.FuncSigs, checked.GlobalsByModule[fn.Module], stagedTargets[fn.Name], callableTargets[fn.Name], opt, allocationsByFunction[fn.Name])
 		if err != nil {
 			return nil, err
 		}
@@ -241,6 +296,29 @@ func LowerModule(checked *semantics.CheckedProgram, module string) ([]ir.IRFunc,
 		out = append(out, irFunc)
 	}
 	return out, nil
+}
+
+func allocationPlanByFunction(plan *allocplan.Plan) map[string]map[string]allocplan.Allocation {
+	out := map[string]map[string]allocplan.Allocation{}
+	if plan == nil {
+		return out
+	}
+	for _, fn := range plan.Functions {
+		row := map[string]allocplan.Allocation{}
+		for _, alloc := range fn.Allocations {
+			row[alloc.ID] = alloc
+		}
+		out[fn.Name] = row
+	}
+	return out
+}
+
+func allocationPlannerOptions(opt Options) allocplan.Options {
+	return allocplan.Options{
+		EnableStackLowering:  opt.StackAllocationLowering,
+		EnableRegionPlanning: opt.FunctionTempRegionLowering,
+		EnableRegionLowering: opt.FunctionTempRegionLowering,
+	}
 }
 
 func LowerModules(checked *semantics.CheckedProgram) (map[string][]ir.IRFunc, error) {
@@ -275,6 +353,10 @@ func LowerModules(checked *semantics.CheckedProgram) (map[string][]ir.IRFunc, er
 }
 
 func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.TypeInfo, funcs map[string]semantics.FuncSig, globals map[string]semantics.GlobalInfo, stagedTarget typedTaskStagedTarget, callableParamTargets map[string][]string) (ir.IRFunc, error) {
+	return lowerCheckedFuncWithOptions(fn, types, funcs, globals, stagedTarget, callableParamTargets, Options{}, nil)
+}
+
+func lowerCheckedFuncWithOptions(fn semantics.CheckedFunc, types map[string]*semantics.TypeInfo, funcs map[string]semantics.FuncSig, globals map[string]semantics.GlobalInfo, stagedTarget typedTaskStagedTarget, callableParamTargets map[string][]string, opt Options, allocationPlan map[string]allocplan.Allocation) (ir.IRFunc, error) {
 	throwSuccessSlots := 0
 	throwErrorSlots := 0
 	throwCompact := false
@@ -311,31 +393,40 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 	}
 	abiReturnSlots := effectiveReturnSlots + inoutReturnSlotCount(inoutReturnLocals)
 	l := &lowerer{
-		locals:               fn.Locals,
-		actorState:           fn.ActorState,
-		globals:              globals,
-		types:                types,
-		funcs:                funcs,
-		imports:              fn.Imports,
-		module:               fn.Module,
-		localSlots:           localSlots,
-		returnType:           fn.ReturnType,
-		throwsType:           fn.ThrowsType,
-		returnSlots:          effectiveReturnSlots,
-		abiReturnSlots:       abiReturnSlots,
-		inoutReturnLocals:    inoutReturnLocals,
-		throwSuccessSlots:    throwSuccessSlots,
-		throwErrorSlots:      throwErrorSlots,
-		throwCompact:         throwCompact,
-		throwScratchBase:     throwScratchBase,
-		policyFailLabel:      -1,
-		budgetEnabled:        policy.hasBudget,
-		budgetLocal:          budgetLocal,
-		discardLocal:         -1,
-		budgetScratchBase:    -1,
-		stagedTaskTarget:     stagedTarget,
-		callableParamTargets: callableParamTargets,
-		rawPtrOffsetLocals:   map[int]rawPtrOffsetLocal{},
+		locals:                     fn.Locals,
+		actorState:                 fn.ActorState,
+		globals:                    globals,
+		types:                      types,
+		funcs:                      funcs,
+		imports:                    fn.Imports,
+		module:                     fn.Module,
+		localSlots:                 localSlots,
+		returnType:                 fn.ReturnType,
+		throwsType:                 fn.ThrowsType,
+		returnSlots:                effectiveReturnSlots,
+		abiReturnSlots:             abiReturnSlots,
+		inoutReturnLocals:          inoutReturnLocals,
+		throwSuccessSlots:          throwSuccessSlots,
+		throwErrorSlots:            throwErrorSlots,
+		throwCompact:               throwCompact,
+		throwScratchBase:           throwScratchBase,
+		policyFailLabel:            -1,
+		budgetEnabled:              policy.hasBudget,
+		budgetLocal:                budgetLocal,
+		discardLocal:               -1,
+		budgetScratchBase:          -1,
+		stagedTaskTarget:           stagedTarget,
+		callableParamTargets:       callableParamTargets,
+		allocationPlan:             allocationPlan,
+		stackAllocationLowering:    opt.StackAllocationLowering,
+		functionTempRegionLowering: opt.FunctionTempRegionLowering,
+		scalarSlices:               map[string]scalarSliceLocal{},
+		rawPtrOffsetLocals:         map[int]rawPtrOffsetLocal{},
+		zeroLocals:                 map[string]bool{},
+		constIntLocals:             map[string]int64{},
+		lenBoundLocals:             map[string]string{},
+		externalSliceLocals:        map[string]bool{},
+		invalidSliceLocals:         map[string]bool{},
 	}
 	if policy.hasBudget || policy.consentParam != "" {
 		l.policyFailLabel = l.newLabel()
@@ -389,39 +480,63 @@ func lowerCheckedFunc(fn semantics.CheckedFunc, types map[string]*semantics.Type
 // bookkeeping used to preserve local invariants while lowering; VerifyFunc is
 // still the final target-neutral check before codegen sees the function.
 type lowerer struct {
-	instrs               []ir.IRInstr
-	locals               map[string]semantics.LocalInfo
-	actorState           map[string]semantics.ActorStateField
-	globals              map[string]semantics.GlobalInfo
-	types                map[string]*semantics.TypeInfo
-	funcs                map[string]semantics.FuncSig
-	imports              map[string]string
-	module               string
-	localSlots           int
-	returnType           string
-	throwsType           string
-	returnSlots          int
-	abiReturnSlots       int
-	inoutReturnLocals    []inoutReturnLocal
-	throwSuccessSlots    int
-	throwErrorSlots      int
-	throwCompact         bool
-	throwScratchBase     int
-	policyFailLabel      int
-	budgetEnabled        bool
-	budgetLocal          int
-	discardLocal         int
-	budgetScratchBase    int
-	budgetScratchSlots   int
-	stagedTaskTarget     typedTaskStagedTarget
-	callableParamTargets map[string][]string
-	rawPtrOffsetLocals   map[int]rawPtrOffsetLocal
-	preparedStringFields map[string]bool
-	stackHeight          int
-	nextLabel            int
-	cleanupIslands       []int
-	deferFrames          []deferFrame
-	loopStack            []loopLabels
+	instrs                     []ir.IRInstr
+	locals                     map[string]semantics.LocalInfo
+	actorState                 map[string]semantics.ActorStateField
+	globals                    map[string]semantics.GlobalInfo
+	types                      map[string]*semantics.TypeInfo
+	funcs                      map[string]semantics.FuncSig
+	imports                    map[string]string
+	module                     string
+	localSlots                 int
+	returnType                 string
+	throwsType                 string
+	returnSlots                int
+	abiReturnSlots             int
+	inoutReturnLocals          []inoutReturnLocal
+	throwSuccessSlots          int
+	throwErrorSlots            int
+	throwCompact               bool
+	throwScratchBase           int
+	policyFailLabel            int
+	budgetEnabled              bool
+	budgetLocal                int
+	discardLocal               int
+	budgetScratchBase          int
+	budgetScratchSlots         int
+	stagedTaskTarget           typedTaskStagedTarget
+	callableParamTargets       map[string][]string
+	allocationPlan             map[string]allocplan.Allocation
+	stackAllocationLowering    bool
+	functionTempRegionLowering bool
+	functionTempRegionEntered  bool
+	scalarSlices               map[string]scalarSliceLocal
+	rawPtrOffsetLocals         map[int]rawPtrOffsetLocal
+	preparedStringFields       map[string]bool
+	zeroLocals                 map[string]bool
+	constIntLocals             map[string]int64
+	lenBoundLocals             map[string]string
+	externalSliceLocals        map[string]bool
+	invalidSliceLocals         map[string]bool
+	whileRangeProofs           []whileRangeProof
+	stackHeight                int
+	nextLabel                  int
+	cleanupIslands             []int
+	deferFrames                []deferFrame
+	loopStack                  []loopLabels
+}
+
+type scalarSliceLocal struct {
+	elemType    string
+	length      int64
+	elementBase int
+}
+
+type whileRangeProof struct {
+	indexName string
+	baseName  string
+	proofID   string
+	active    bool
 }
 
 type rawPtrOffsetLocal struct {
@@ -1128,6 +1243,7 @@ func (l *lowerer) lowerTypedTaskJoin(call *frontend.CallExpr, pos frontend.Posit
 			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
 		}
 		l.emitCleanup(pos)
+		l.emitFunctionTempRegionReset(pos)
 		l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: pos})
 		l.emitZeroSlots(handleInfo.SlotCount-1, pos)
 		l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: okLabel, Pos: pos})
@@ -1165,6 +1281,7 @@ func (l *lowerer) lowerTypedTaskJoin(call *frontend.CallExpr, pos frontend.Posit
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
 	}
 	l.emitCleanup(pos)
+	l.emitFunctionTempRegionReset(pos)
 	l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: pos})
 	l.emitZeroSlots(handleInfo.SlotCount-1, pos)
 	l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: okLabel, Pos: pos})
@@ -1356,10 +1473,10 @@ func (l *lowerer) emitConvertedValueFromScratch(srcType, dstType string, base in
 
 func isThrowIntLike(typeName string) bool {
 	switch typeName {
-	case "i32", "u8", "task.error":
+	case "i32", "u8", "c_int", "c_uint", "task.error":
 		return true
 	default:
-		return false
+		return semantics.IsILP32NativeScalarType(typeName)
 	}
 }
 
@@ -1595,6 +1712,7 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 				return err
 			}
 			l.emitCleanup(s.At)
+			l.emitFunctionTempRegionReset(s.At)
 			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: s.At})
 			l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: s.At})
 			return nil
@@ -1644,6 +1762,7 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		if l.throwsType == "" {
 			l.emitInoutReturnSlots(s.At)
 		}
+		l.emitFunctionTempRegionReset(s.At)
 		l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: s.At})
 	case *frontend.ThrowStmt:
 		if l.stagedTaskTarget.SlotCount > 4 {
@@ -1668,6 +1787,7 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 				return err
 			}
 			l.emitCleanup(s.At)
+			l.emitFunctionTempRegionReset(s.At)
 			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: s.At})
 			l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: s.At})
 			return nil
@@ -1690,6 +1810,7 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			return err
 		}
 		l.emitCleanup(s.At)
+		l.emitFunctionTempRegionReset(s.At)
 		l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: s.At})
 	case *frontend.DeferStmt:
 		if len(l.deferFrames) == 0 {
@@ -1803,10 +1924,47 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			}
 		}
 		if slots == 0 {
+			var lowered bool
 			var err error
-			slots, err = l.lowerExprAs(s.Value, info.TypeName)
+			lowered, slots, err = l.lowerUnusedCopyLet(s.Name, info, s.Value, s.At)
 			if err != nil {
 				return err
+			}
+			if !lowered {
+				lowered, slots, err = l.lowerScalarReplacementLet(s.Name, info, s.Value, s.At)
+				if err != nil {
+					return err
+				}
+				if !lowered {
+					lowered, slots, err = l.lowerFunctionTempRegionCopyLet(s.Name, info, s.Value, s.At)
+					if err != nil {
+						return err
+					}
+					if !lowered {
+						lowered, slots, err = l.lowerExplicitIslandAllocationLet(s.Name, info, s.Value, s.At)
+						if err != nil {
+							return err
+						}
+						if !lowered {
+							lowered, slots, err = l.lowerStackCopyLet(s.Name, info, s.Value, s.At)
+							if err != nil {
+								return err
+							}
+							if !lowered {
+								lowered, slots, err = l.lowerStackAllocationLet(s.Name, info, s.Value, s.At)
+								if err != nil {
+									return err
+								}
+								if !lowered {
+									slots, err = l.lowerExprAs(s.Value, info.TypeName)
+									if err != nil {
+										return err
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 		if slots != info.SlotCount {
@@ -1815,6 +1973,7 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 		for i := info.SlotCount - 1; i >= 0; i-- {
 			l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: info.Base + i, Pos: s.At})
 		}
+		l.rememberRangeMetadataForLocal(s.Name, s.Value)
 		if info.SlotCount == 1 {
 			l.rememberRawPtrOffsetAlias(info.Base, s.Value)
 		}
@@ -1835,6 +1994,9 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			}
 		}
 		if idx, ok := s.Target.(*frontend.IndexExpr); ok {
+			if lowered, err := l.lowerScalarIndexStore(idx, s.Value, s.At); lowered || err != nil {
+				return err
+			}
 			elemType, err := l.indexElemType(idx.Base)
 			if err != nil {
 				return err
@@ -1953,12 +2115,20 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 				}
 			}
 		}
+		if !target.Global {
+			if id, ok := s.Target.(*frontend.IdentExpr); ok {
+				delete(l.scalarSlices, id.Name)
+				l.rememberRangeMetadataForLocal(id.Name, s.Value)
+				l.invalidateWhileRangeProofForLocal(id.Name)
+			}
+		}
 	case *frontend.IfStmt:
 		elseLabel := l.newLabel()
 		endLabel := -1
 		if len(s.Else) > 0 {
 			endLabel = l.newLabel()
 		}
+		proof, hasProof := l.ifRangeProof(s)
 		slots, err := l.lowerExpr(s.Cond)
 		if err != nil {
 			return err
@@ -1967,19 +2137,34 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			return fmt.Errorf("%s: condition must be i32", frontend.FormatPos(s.At))
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: elseLabel, Pos: s.At})
+		branchState := l.snapshotRangeMetadata()
+		if hasProof {
+			l.pushWhileRangeProof(proof)
+		}
 		if err := l.lowerBlock(s.Then, s.At); err != nil {
+			if hasProof {
+				l.popWhileRangeProof()
+			}
 			return err
 		}
+		if hasProof {
+			l.popWhileRangeProof()
+		}
+		thenState := l.snapshotRangeMetadata()
+		elseState := branchState
 		if len(s.Else) > 0 {
 			l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: endLabel, Pos: s.At})
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: elseLabel, Pos: s.At})
 		if len(s.Else) > 0 {
+			l.restoreRangeMetadata(branchState)
 			if err := l.lowerBlock(s.Else, s.At); err != nil {
 				return err
 			}
+			elseState = l.snapshotRangeMetadata()
 			l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: endLabel, Pos: s.At})
 		}
+		l.mergeRangeMetadata(thenState, elseState)
 	case *frontend.IfLetStmt:
 		valueInfo, ok := l.locals[s.ValueLocal]
 		if !ok {
@@ -2037,6 +2222,7 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 	case *frontend.WhileStmt:
 		startLabel := l.newLabel()
 		endLabel := l.newLabel()
+		proof, hasProof := l.whileRangeProof(s)
 		l.pushLoop(startLabel, endLabel)
 		l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: startLabel, Pos: s.At})
 		slots, err := l.lowerExpr(s.Cond)
@@ -2049,9 +2235,19 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			return fmt.Errorf("%s: condition must be i32", frontend.FormatPos(s.At))
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: endLabel, Pos: s.At})
+		if hasProof {
+			l.pushWhileRangeProof(proof)
+		}
 		if err := l.lowerBlock(s.Body, s.At); err != nil {
+			if hasProof {
+				l.popWhileRangeProof()
+			}
 			l.popLoop()
 			return err
+		}
+		if hasProof {
+			l.popWhileRangeProof()
+			l.zeroLocals[proof.indexName] = false
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: startLabel, Pos: s.At})
 		l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: endLabel, Pos: s.At})
@@ -2104,7 +2300,11 @@ func (l *lowerer) lowerStmtPrepared(stmt frontend.Stmt) error {
 			if !ok {
 				return lowerUnsupportedError(s.At, "unsupported for collection element type '%s'", loopInfo.TypeName)
 			}
-			l.emit(ir.IRInstr{Kind: loadKind, Pos: s.At})
+			if l.collectionIterableProofAllowed(s.Iterable) {
+				l.emit(ir.IRInstr{Kind: uncheckedIndexLoadKind(loadKind), ProofID: forCollectionBoundsProofID(s), Pos: s.At})
+			} else {
+				l.emit(ir.IRInstr{Kind: loadKind, Pos: s.At})
+			}
 			if loopInfo.SlotCount != 1 {
 				return fmt.Errorf("%s: for collection element slot mismatch", frontend.FormatPos(s.At))
 			}
@@ -2312,6 +2512,450 @@ func (l *lowerer) allocScratchSlots(slots int) int {
 	base := l.localSlots
 	l.localSlots += slots
 	return base
+}
+
+func (l *lowerer) lowerUnusedCopyLet(name string, info semantics.LocalInfo, expr frontend.Expr, pos frontend.Position) (bool, int, error) {
+	if !l.stackAllocationLowering || info.SlotCount != 2 {
+		return false, 0, nil
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false, 0, nil
+	}
+	call = lowerCallExprWithBuiltinAlias(call)
+	if len(call.Args) != 1 {
+		return false, 0, nil
+	}
+	if _, ok := freshCopyBuiltinElement(call.Name); !ok {
+		return false, 0, nil
+	}
+	alloc, ok := l.allocationPlan[name]
+	if !ok || alloc.ActualLoweringStorage != allocplan.StorageEliminated || alloc.LoweringStatus != "eliminated_unused_copy" {
+		return false, 0, nil
+	}
+	sourceSlots, err := l.lowerExpr(call.Args[0])
+	if err != nil {
+		return false, 0, err
+	}
+	if sourceSlots != 2 {
+		return false, 0, fmt.Errorf("%s: %s expects one view source argument", frontend.FormatPos(pos), call.Name)
+	}
+	srcLen := l.allocScratchSlots(1)
+	srcPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcPtr, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+	return true, 2, nil
+}
+
+func (l *lowerer) lowerScalarReplacementLet(name string, info semantics.LocalInfo, expr frontend.Expr, pos frontend.Position) (bool, int, error) {
+	if !l.stackAllocationLowering || info.SlotCount != 2 {
+		return false, 0, nil
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false, 0, nil
+	}
+	call = lowerCallExprWithBuiltinAlias(call)
+	if len(call.Args) != 1 {
+		return false, 0, nil
+	}
+	elem, isMake := stackAllocationElementByBuiltin(call.Name)
+	if !isMake {
+		var ok bool
+		elem, ok = freshCopyBuiltinElement(call.Name)
+		if !ok {
+			return false, 0, nil
+		}
+	}
+	isCopy := !isMake
+	alloc, ok := l.allocationPlan[name]
+	if !ok || alloc.ActualLoweringStorage != allocplan.StorageEliminated || alloc.LoweringStatus != "scalar_replacement" {
+		return false, 0, nil
+	}
+	if alloc.ElementSize <= 0 || alloc.ByteSize <= 0 || alloc.ByteSize%alloc.ElementSize != 0 {
+		return false, 0, nil
+	}
+	length := int64(alloc.ByteSize / alloc.ElementSize)
+	if isMake {
+		var known bool
+		length, known = evalConstInt64ForAllocation(call.Args[0])
+		if !known {
+			return false, 0, nil
+		}
+	}
+	if length <= 0 || length > int64(alloc.ByteSize) {
+		return false, 0, nil
+	}
+	if alloc.ElementSize <= 0 || int(length)*alloc.ElementSize != alloc.ByteSize {
+		return false, 0, nil
+	}
+	loadKind, ok := lowerIndexLoadKind(elem, l.types)
+	if !ok {
+		return false, 0, nil
+	}
+	srcPtr, srcLen := -1, -1
+	if isCopy {
+		sourceSlots, err := l.lowerExpr(call.Args[0])
+		if err != nil {
+			return false, 0, err
+		}
+		if sourceSlots != 2 {
+			return false, 0, fmt.Errorf("%s: %s expects one view source argument", frontend.FormatPos(pos), call.Name)
+		}
+		srcLen = l.allocScratchSlots(1)
+		srcPtr = l.allocScratchSlots(1)
+		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcLen, Pos: pos})
+		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcPtr, Pos: pos})
+	}
+	elementBase := l.allocScratchSlots(int(length))
+	for i := int64(0); i < length; i++ {
+		if isCopy {
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcPtr, Pos: pos})
+			l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(i), Pos: pos})
+			l.emit(ir.IRInstr{Kind: loadKind, Pos: pos})
+		} else {
+			l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+		}
+		l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: elementBase + int(i), Pos: pos})
+	}
+	l.scalarSlices[name] = scalarSliceLocal{
+		elemType:    elem,
+		length:      length,
+		elementBase: elementBase,
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: int32(length), Pos: pos})
+	return true, 2, nil
+}
+
+func (l *lowerer) lowerScalarIndexStore(index *frontend.IndexExpr, value frontend.Expr, pos frontend.Position) (bool, error) {
+	meta, indexValue, ok, err := l.scalarSliceIndex(index)
+	if err != nil || !ok {
+		return ok, err
+	}
+	slots, err := l.lowerExprAs(value, meta.elemType)
+	if err != nil {
+		return true, err
+	}
+	if slots != 1 {
+		return true, fmt.Errorf("%s: scalar-replaced slice store expects single-slot element", frontend.FormatPos(pos))
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: meta.elementBase + int(indexValue), Pos: pos})
+	return true, nil
+}
+
+func (l *lowerer) lowerScalarIndexLoad(index *frontend.IndexExpr) (bool, int, error) {
+	meta, indexValue, ok, err := l.scalarSliceIndex(index)
+	if err != nil || !ok {
+		return ok, 0, err
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: meta.elementBase + int(indexValue), Pos: index.At})
+	return true, 1, nil
+}
+
+func (l *lowerer) scalarSliceIndex(index *frontend.IndexExpr) (scalarSliceLocal, int64, bool, error) {
+	if index == nil {
+		return scalarSliceLocal{}, 0, false, nil
+	}
+	base, ok := index.Base.(*frontend.IdentExpr)
+	if !ok || base == nil {
+		return scalarSliceLocal{}, 0, false, nil
+	}
+	meta, ok := l.scalarSlices[base.Name]
+	if !ok {
+		return scalarSliceLocal{}, 0, false, nil
+	}
+	indexValue, known := evalConstInt64ForAllocation(index.Index)
+	if !known {
+		return scalarSliceLocal{}, 0, true, fmt.Errorf("%s: scalar-replaced slice '%s' has non-constant index after allocation planning", frontend.FormatPos(index.At), base.Name)
+	}
+	if indexValue < 0 || indexValue >= meta.length {
+		return scalarSliceLocal{}, 0, true, fmt.Errorf("%s: scalar-replaced slice '%s' has out-of-range constant index %d", frontend.FormatPos(index.At), base.Name, indexValue)
+	}
+	return meta, indexValue, true, nil
+}
+
+func (l *lowerer) lowerFunctionTempRegionCopyLet(name string, info semantics.LocalInfo, expr frontend.Expr, pos frontend.Position) (bool, int, error) {
+	if !l.functionTempRegionLowering || info.SlotCount != 2 {
+		return false, 0, nil
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false, 0, nil
+	}
+	call = lowerCallExprWithBuiltinAlias(call)
+	if len(call.Args) != 1 {
+		return false, 0, nil
+	}
+	elem, ok := copyBuiltinElement(call.Name)
+	if !ok {
+		return false, 0, nil
+	}
+	alloc, ok := l.allocationPlan[name]
+	if !ok || alloc.ActualLoweringStorage != allocplan.StorageFunctionTempRegion {
+		return false, 0, nil
+	}
+	_, loadKind, storeKind, ok := copyElementIRKinds(elem, l.types)
+	if !ok {
+		return false, 0, nil
+	}
+	regionKind, ok := regionSliceKindByElement(elem)
+	if !ok {
+		return false, 0, nil
+	}
+	sourceSlots, err := l.lowerExpr(call.Args[0])
+	if err != nil {
+		return false, 0, err
+	}
+	if sourceSlots != 2 {
+		return false, 0, fmt.Errorf("%s: %s expects one view source argument", frontend.FormatPos(pos), call.Name)
+	}
+	srcLen := l.allocScratchSlots(1)
+	srcPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcPtr, Pos: pos})
+
+	l.ensureFunctionTempRegion(pos)
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: regionKind, Name: name, Pos: pos})
+	dstLen := l.allocScratchSlots(1)
+	dstPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstPtr, Pos: pos})
+
+	l.emitCopyLoop(srcPtr, srcLen, dstPtr, dstLen, loadKind, storeKind, copyLoopBoundsProofID(call.Name, call.At), pos)
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstPtr, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstLen, Pos: pos})
+	return true, 2, nil
+}
+
+func (l *lowerer) lowerExplicitIslandAllocationLet(name string, info semantics.LocalInfo, expr frontend.Expr, pos frontend.Position) (bool, int, error) {
+	if info.SlotCount != 2 {
+		return false, 0, nil
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false, 0, nil
+	}
+	call = lowerCallExprWithBuiltinAlias(call)
+	if len(call.Args) != 2 {
+		return false, 0, nil
+	}
+	kind, ok := islandSliceKindByBuiltin(call.Name)
+	if !ok {
+		return false, 0, nil
+	}
+	alloc, ok := l.allocationPlan[name]
+	if !ok || alloc.ActualLoweringStorage != allocplan.StorageExplicitIsland {
+		return false, 0, nil
+	}
+	islandSlots, err := l.lowerExpr(call.Args[0])
+	if err != nil {
+		return false, 0, err
+	}
+	if islandSlots != 1 {
+		return false, 0, fmt.Errorf("%s: %s expects island handle argument", frontend.FormatPos(pos), call.Name)
+	}
+	lengthSlots, err := l.lowerExpr(call.Args[1])
+	if err != nil {
+		return false, 0, err
+	}
+	if lengthSlots != 1 {
+		return false, 0, fmt.Errorf("%s: %s expects length argument", frontend.FormatPos(pos), call.Name)
+	}
+	l.emit(ir.IRInstr{Kind: kind, Name: name, Pos: pos})
+	return true, 2, nil
+}
+
+func (l *lowerer) ensureFunctionTempRegion(pos frontend.Position) {
+	if l.functionTempRegionEntered {
+		return
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRRegionEnter, Pos: pos})
+	l.functionTempRegionEntered = true
+}
+
+func (l *lowerer) emitFunctionTempRegionReset(pos frontend.Position) {
+	if !l.functionTempRegionEntered {
+		return
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRRegionReset, Pos: pos})
+}
+
+func (l *lowerer) lowerStackCopyLet(name string, info semantics.LocalInfo, expr frontend.Expr, pos frontend.Position) (bool, int, error) {
+	if !l.stackAllocationLowering || info.SlotCount != 2 {
+		return false, 0, nil
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false, 0, nil
+	}
+	call = lowerCallExprWithBuiltinAlias(call)
+	if len(call.Args) != 1 {
+		return false, 0, nil
+	}
+	elem, ok := copyBuiltinElement(call.Name)
+	if !ok {
+		return false, 0, nil
+	}
+	alloc, ok := l.allocationPlan[name]
+	if !ok || alloc.ActualLoweringStorage != allocplan.StorageStack || alloc.ByteSize <= 0 || alloc.ElementSize <= 0 {
+		return false, 0, nil
+	}
+	_, loadKind, storeKind, ok := copyElementIRKinds(elem, l.types)
+	if !ok {
+		return false, 0, nil
+	}
+	stackKind, ok := stackSliceKindByElement(elem)
+	if !ok {
+		return false, 0, nil
+	}
+	sourceSlots, err := l.lowerExpr(call.Args[0])
+	if err != nil {
+		return false, 0, err
+	}
+	if sourceSlots != 2 {
+		return false, 0, fmt.Errorf("%s: %s expects one view source argument", frontend.FormatPos(pos), call.Name)
+	}
+	srcLen := l.allocScratchSlots(1)
+	srcPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcPtr, Pos: pos})
+
+	backingSlots := (alloc.ByteSize + 7) / 8
+	backingBase := l.allocScratchSlots(backingSlots)
+	logicalLen := alloc.ByteSize / alloc.ElementSize
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: stackKind, Local: backingBase, ArgSlots: backingSlots, Imm: int32(logicalLen), Name: name, Pos: pos})
+	dstLen := l.allocScratchSlots(1)
+	dstPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstPtr, Pos: pos})
+
+	l.emitCopyLoop(srcPtr, srcLen, dstPtr, dstLen, loadKind, storeKind, copyLoopBoundsProofID(name, pos), pos)
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstPtr, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstLen, Pos: pos})
+	return true, 2, nil
+}
+
+func (l *lowerer) lowerStackAllocationLet(name string, info semantics.LocalInfo, expr frontend.Expr, pos frontend.Position) (bool, int, error) {
+	if !l.stackAllocationLowering || info.SlotCount != 2 {
+		return false, 0, nil
+	}
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false, 0, nil
+	}
+	call = lowerCallExprWithBuiltinAlias(call)
+	if len(call.Args) != 1 {
+		return false, 0, nil
+	}
+	alloc, ok := l.allocationPlan[name]
+	if !ok {
+		return false, 0, nil
+	}
+	if alloc.ActualLoweringStorage != allocplan.StorageStack && alloc.ActualLoweringStorage != allocplan.StorageEliminated {
+		return false, 0, nil
+	}
+	length, known := evalConstInt64ForAllocation(call.Args[0])
+	if !known {
+		return false, 0, nil
+	}
+	kind, ok := stackSliceKindByBuiltin(call.Name)
+	if !ok {
+		return false, 0, nil
+	}
+	lengthSlots, err := l.lowerExpr(call.Args[0])
+	if err != nil {
+		return false, 0, err
+	}
+	if lengthSlots != 1 {
+		return false, 0, fmt.Errorf("%s: allocation length must be i32", frontend.FormatPos(pos))
+	}
+	if alloc.ActualLoweringStorage == allocplan.StorageEliminated {
+		if length != 0 {
+			return false, 0, fmt.Errorf("%s: eliminated allocation %q has non-zero length %d", frontend.FormatPos(pos), name, length)
+		}
+		l.emit(ir.IRInstr{Kind: kind, Local: -1, ArgSlots: 0, Imm: 0, Name: name, Pos: pos})
+		return true, 2, nil
+	}
+	if length <= 0 || alloc.ByteSize <= 0 {
+		return false, 0, nil
+	}
+	backingSlots := (alloc.ByteSize + 7) / 8
+	backingBase := l.allocScratchSlots(backingSlots)
+	l.emit(ir.IRInstr{Kind: kind, Local: backingBase, ArgSlots: backingSlots, Imm: int32(length), Name: name, Pos: pos})
+	return true, 2, nil
+}
+
+func stackSliceKindByBuiltin(name string) (ir.IRInstrKind, bool) {
+	switch name {
+	case "core.make_u8":
+		return ir.IRStackSliceU8, true
+	case "core.make_u16":
+		return ir.IRStackSliceU16, true
+	case "core.make_i32", "core.make_bool":
+		return ir.IRStackSliceI32, true
+	default:
+		return 0, false
+	}
+}
+
+func stackAllocationElementByBuiltin(name string) (string, bool) {
+	switch name {
+	case "core.make_u8":
+		return "u8", true
+	case "core.make_u16":
+		return "u16", true
+	case "core.make_i32":
+		return "i32", true
+	case "core.make_bool":
+		return "bool", true
+	default:
+		return "", false
+	}
+}
+
+func stackSliceKindByElement(elem string) (ir.IRInstrKind, bool) {
+	switch elem {
+	case "u8":
+		return ir.IRStackSliceU8, true
+	case "u16":
+		return ir.IRStackSliceU16, true
+	case "i32", "bool":
+		return ir.IRStackSliceI32, true
+	default:
+		return 0, false
+	}
+}
+
+func regionSliceKindByElement(elem string) (ir.IRInstrKind, bool) {
+	switch elem {
+	case "u8":
+		return ir.IRRegionMakeSliceU8, true
+	case "u16":
+		return ir.IRRegionMakeSliceU16, true
+	case "i32", "bool":
+		return ir.IRRegionMakeSliceI32, true
+	default:
+		return 0, false
+	}
+}
+
+func islandSliceKindByBuiltin(name string) (ir.IRInstrKind, bool) {
+	switch name {
+	case "core.island_make_u8":
+		return ir.IRIslandMakeSliceU8, true
+	case "core.island_make_u16":
+		return ir.IRIslandMakeSliceU16, true
+	case "core.island_make_i32", "core.island_make_bool":
+		return ir.IRIslandMakeSliceI32, true
+	default:
+		return 0, false
+	}
 }
 
 func (l *lowerer) lowerMatchExpr(e *frontend.MatchExpr) (int, error) {
@@ -2910,6 +3554,22 @@ func (l *lowerer) lowerRawOffsetAddress(expr frontend.Expr, pos frontend.Positio
 	return true, nil
 }
 
+func (l *lowerer) lowerSurfaceRuntimeCall(e *frontend.CallExpr, runtimeName string, expectedArgSlots int) (int, error) {
+	total := 0
+	for _, arg := range e.Args {
+		slots, err := l.lowerExpr(arg)
+		if err != nil {
+			return 0, err
+		}
+		total += slots
+	}
+	if total != expectedArgSlots {
+		return 0, fmt.Errorf("%s: %s lowered %d argument slots, want %d", frontend.FormatPos(e.At), e.Name, total, expectedArgSlots)
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRCall, Name: runtimeName, ArgSlots: total, RetSlots: 1, Pos: e.At})
+	return 1, nil
+}
+
 func (l *lowerer) lowerRawOffsetCall(e *frontend.CallExpr) (int, bool, error) {
 	switch e.Name {
 	case "core.load_i32", "core.load_u8", "core.load_ptr":
@@ -3100,6 +3760,9 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		}
 		return target.SlotCount, nil
 	case *frontend.IndexExpr:
+		if lowered, slots, err := l.lowerScalarIndexLoad(e); lowered || err != nil {
+			return slots, err
+		}
 		elemType, err := l.indexElemType(e.Base)
 		if err != nil {
 			return 0, err
@@ -3122,7 +3785,11 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		if !ok {
 			return 0, lowerUnsupportedError(e.At, "unsupported index element type '%s'", elemType)
 		}
-		l.emit(ir.IRInstr{Kind: loadKind, Pos: e.At})
+		if proofID, ok := l.activeWhileProofForIndex(e); ok {
+			l.emit(ir.IRInstr{Kind: uncheckedIndexLoadKind(loadKind), ProofID: proofID, Pos: e.At})
+		} else {
+			l.emit(ir.IRInstr{Kind: loadKind, Pos: e.At})
+		}
 		return 1, nil
 	case *frontend.StructLitExpr:
 		return l.lowerStructLiteralExpr(e, nil)
@@ -3232,6 +3899,7 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 		}
 		l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: e.At})
 		l.emitCleanup(e.At)
+		l.emitFunctionTempRegionReset(e.At)
 		l.emit(ir.IRInstr{Kind: ir.IRReturn, Pos: e.At})
 
 		// The x64 emitter tracks stack depth linearly. This unreachable padding
@@ -3297,6 +3965,38 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			return slots, err
 		}
 		switch e.Name {
+		case "core.surface_open":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_open", 4)
+		case "core.surface_close":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_close", 1)
+		case "core.surface_poll_event_kind":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_poll_event_kind", 1)
+		case "core.surface_poll_event_x":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_poll_event_x", 1)
+		case "core.surface_poll_event_y":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_poll_event_y", 1)
+		case "core.surface_poll_event_button":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_poll_event_button", 1)
+		case "core.surface_poll_event_into":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_poll_event_into", 3)
+		case "core.surface_poll_event_text_len":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_poll_event_text_len", 1)
+		case "core.surface_poll_event_text_into":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_poll_event_text_into", 3)
+		case "core.surface_clipboard_write_text":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_clipboard_write_text", 3)
+		case "core.surface_clipboard_read_text_into":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_clipboard_read_text_into", 3)
+		case "core.surface_poll_composition_into":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_poll_composition_into", 3)
+		case "core.surface_begin_frame":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_begin_frame", 1)
+		case "core.surface_present_rgba":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_present_rgba", 6)
+		case "core.surface_now_ms":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_now_ms", 0)
+		case "core.surface_request_redraw":
+			return l.lowerSurfaceRuntimeCall(e, "__tetra_surface_request_redraw", 1)
 		case "core.spawn":
 			if len(e.Args) != 1 {
 				return 0, fmt.Errorf("%s: spawn expects 1 argument", frontend.FormatPos(e.At))
@@ -3693,6 +4393,9 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			}
 			total += slots
 		}
+		if hasCallSig {
+			l.invalidateWhileRangeProofsForInoutArgs(e.Args, callSig.ParamOwnership)
+		}
 		switch e.Name {
 		case "core.cap_io":
 			if total != 0 {
@@ -3735,6 +4438,51 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 				return 0, fmt.Errorf("%s: make_bool expects 1 argument", frontend.FormatPos(e.At))
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRMakeSliceI32, Pos: e.At})
+			return 2, nil
+		case "core.raw_slice_u8_from_parts", "core.raw_slice_u16_from_parts", "core.raw_slice_i32_from_parts", "core.raw_slice_bool_from_parts":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: %s expects ptr, length, and cap.mem arguments", frontend.FormatPos(e.At), e.Name)
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRRawSliceFromParts, Imm: rawSliceElementShift(e.Name), Pos: e.At})
+			return 2, nil
+		case "core.slice_borrow_u8", "core.slice_borrow_u16", "core.slice_borrow_i32", "core.slice_borrow_bool", "core.string_borrow":
+			if total != 2 {
+				return 0, fmt.Errorf("%s: %s expects one view source argument", frontend.FormatPos(e.At), e.Name)
+			}
+			return 2, nil
+		case "core.slice_copy_u8", "core.slice_copy_u16", "core.slice_copy_i32", "core.slice_copy_bool", "core.string_copy":
+			return l.lowerCopyBuiltinFromStack(e.Name, total, e.At)
+		case "core.slice_copy_into_u8", "core.slice_copy_into_u16", "core.slice_copy_into_i32", "core.slice_copy_into_bool", "core.string_copy_into":
+			return l.lowerCopyIntoBuiltinFromStack(e.Name, total, e.At)
+		case "core.slice_window_u8", "core.slice_window_u16", "core.slice_window_i32", "core.slice_window_bool", "core.string_window":
+			if total != 4 {
+				return 0, fmt.Errorf("%s: %s expects view source, start, and count arguments", frontend.FormatPos(e.At), e.Name)
+			}
+			shift, ok := sliceViewElementShift(e.Name)
+			if !ok {
+				return 0, lowerUnsupportedError(e.At, "unsupported view window builtin '%s'", e.Name)
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRSliceWindow, Imm: shift, Pos: e.At})
+			return 2, nil
+		case "core.slice_prefix_u8", "core.slice_prefix_u16", "core.slice_prefix_i32", "core.slice_prefix_bool", "core.string_prefix":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: %s expects view source and count arguments", frontend.FormatPos(e.At), e.Name)
+			}
+			shift, ok := sliceViewElementShift(e.Name)
+			if !ok {
+				return 0, lowerUnsupportedError(e.At, "unsupported view prefix builtin '%s'", e.Name)
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRSlicePrefix, Imm: shift, Pos: e.At})
+			return 2, nil
+		case "core.slice_suffix_u8", "core.slice_suffix_u16", "core.slice_suffix_i32", "core.slice_suffix_bool", "core.string_suffix":
+			if total != 3 {
+				return 0, fmt.Errorf("%s: %s expects view source and start argument", frontend.FormatPos(e.At), e.Name)
+			}
+			shift, ok := sliceViewElementShift(e.Name)
+			if !ok {
+				return 0, lowerUnsupportedError(e.At, "unsupported view suffix builtin '%s'", e.Name)
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRSliceSuffix, Imm: shift, Pos: e.At})
 			return 2, nil
 		case "core.island_new":
 			if total != 1 {
@@ -4410,10 +5158,10 @@ func (l *lowerer) lowerTypedTaskPublicHandle(expr frontend.Expr) (int, error) {
 
 func lowerInt32LikeType(typeName string) bool {
 	switch typeName {
-	case "i32", "u8", "u16", "task.error":
+	case "i32", "u8", "u16", "c_int", "c_uint", "task.error":
 		return true
 	default:
-		return false
+		return semantics.IsILP32NativeScalarType(typeName)
 	}
 }
 
@@ -4470,7 +5218,8 @@ func globalArrayBackingByteLen(elemType string, n int, types map[string]*semanti
 		return n
 	case "u16":
 		return n * 2
-	case "i32", "bool":
+	case "i32", "c_int", "c_uint", "bool",
+		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong":
 		return n * 4
 	}
 	if info, ok := types[elemType]; ok && info.Kind == semantics.TypeStruct && info.SlotCount == 1 {
@@ -4642,7 +5391,8 @@ func (l *lowerer) indexElemType(base frontend.Expr) (string, error) {
 
 func lowerIndexLoadKind(elemType string, types map[string]*semantics.TypeInfo) (ir.IRInstrKind, bool) {
 	switch elemType {
-	case "i32":
+	case "i32", "c_int", "c_uint",
+		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong":
 		return ir.IRIndexLoadI32, true
 	case "bool":
 		return ir.IRIndexLoadI32, true
@@ -4661,9 +5411,968 @@ func lowerIndexLoadKind(elemType string, types map[string]*semantics.TypeInfo) (
 	return 0, false
 }
 
+func uncheckedIndexLoadKind(kind ir.IRInstrKind) ir.IRInstrKind {
+	switch kind {
+	case ir.IRIndexLoadI32:
+		return ir.IRIndexLoadI32Unchecked
+	case ir.IRIndexLoadU8:
+		return ir.IRIndexLoadU8Unchecked
+	case ir.IRIndexLoadU16:
+		return ir.IRIndexLoadU16Unchecked
+	default:
+		return kind
+	}
+}
+
+func sliceViewElementShift(name string) (int32, bool) {
+	if strings.HasPrefix(name, "core.string_") {
+		return 0, true
+	}
+	parts := strings.Split(name, "_")
+	if len(parts) == 0 {
+		return 0, false
+	}
+	switch parts[len(parts)-1] {
+	case "u8":
+		return 0, true
+	case "u16":
+		return 1, true
+	case "i32", "bool":
+		return 2, true
+	default:
+		return 0, false
+	}
+}
+
+func (l *lowerer) lowerCopyBuiltinFromStack(name string, total int, pos frontend.Position) (int, error) {
+	if total != 2 {
+		return 0, fmt.Errorf("%s: %s expects one view source argument", frontend.FormatPos(pos), name)
+	}
+	elem, ok := copyBuiltinElement(name)
+	if !ok {
+		return 0, lowerUnsupportedError(pos, "unsupported copy builtin '%s'", name)
+	}
+	makeKind, loadKind, storeKind, ok := copyElementIRKinds(elem, l.types)
+	if !ok {
+		return 0, lowerUnsupportedError(pos, "unsupported copy element type '%s'", elem)
+	}
+	srcLen := l.allocScratchSlots(1)
+	srcPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcPtr, Pos: pos})
+
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: makeKind, Pos: pos})
+	dstLen := l.allocScratchSlots(1)
+	dstPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstPtr, Pos: pos})
+
+	l.emitCopyLoop(srcPtr, srcLen, dstPtr, dstLen, loadKind, storeKind, copyLoopBoundsProofID(name, pos), pos)
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstPtr, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstLen, Pos: pos})
+	return 2, nil
+}
+
+func (l *lowerer) lowerCopyIntoBuiltinFromStack(name string, total int, pos frontend.Position) (int, error) {
+	if total != 4 {
+		return 0, fmt.Errorf("%s: %s expects source and destination view arguments", frontend.FormatPos(pos), name)
+	}
+	elem, ok := copyBuiltinElement(name)
+	if !ok {
+		return 0, lowerUnsupportedError(pos, "unsupported copy_into builtin '%s'", name)
+	}
+	_, loadKind, storeKind, ok := copyElementIRKinds(elem, l.types)
+	if !ok {
+		return 0, lowerUnsupportedError(pos, "unsupported copy_into element type '%s'", elem)
+	}
+	shift, ok := copyElementShift(elem)
+	if !ok {
+		return 0, lowerUnsupportedError(pos, "unsupported copy_into element shift for '%s'", elem)
+	}
+	dstLen := l.allocScratchSlots(1)
+	dstPtr := l.allocScratchSlots(1)
+	srcLen := l.allocScratchSlots(1)
+	srcPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: dstPtr, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: srcPtr, Pos: pos})
+
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstPtr, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRSlicePrefix, Imm: shift, Pos: pos})
+	checkedDstLen := l.allocScratchSlots(1)
+	checkedDstPtr := l.allocScratchSlots(1)
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: checkedDstLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: checkedDstPtr, Pos: pos})
+
+	l.emitCopyLoop(srcPtr, srcLen, checkedDstPtr, checkedDstLen, loadKind, storeKind, copyLoopBoundsProofID(name, pos), pos)
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
+	return 1, nil
+}
+
+func (l *lowerer) emitCopyLoop(srcPtr, srcLen, dstPtr, dstLen int, loadKind, storeKind ir.IRInstrKind, proofID string, pos frontend.Position) {
+	index := l.allocScratchSlots(1)
+	value := l.allocScratchSlots(1)
+	startLabel := l.newLabel()
+	endLabel := l.newLabel()
+
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 0, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: index, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: startLabel, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: index, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRCmpLtI32, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRJmpIfZero, Label: endLabel, Pos: pos})
+
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcPtr, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: srcLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: index, Pos: pos})
+	if proofID != "" {
+		l.emit(ir.IRInstr{Kind: uncheckedIndexLoadKind(loadKind), ProofID: proofID, Pos: pos})
+	} else {
+		l.emit(ir.IRInstr{Kind: loadKind, Pos: pos})
+	}
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: value, Pos: pos})
+
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstPtr, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: dstLen, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: index, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: value, Pos: pos})
+	l.emit(ir.IRInstr{Kind: storeKind, Pos: pos})
+
+	l.emit(ir.IRInstr{Kind: ir.IRLoadLocal, Local: index, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRConstI32, Imm: 1, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRAddI32, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRStoreLocal, Local: index, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRJmp, Label: startLabel, Pos: pos})
+	l.emit(ir.IRInstr{Kind: ir.IRLabel, Label: endLabel, Pos: pos})
+}
+
+func copyBuiltinElement(name string) (string, bool) {
+	if name == "core.string_copy" || name == "core.string_copy_into" {
+		return "u8", true
+	}
+	for _, prefix := range []string{"core.slice_copy_into_", "core.slice_copy_"} {
+		if strings.HasPrefix(name, prefix) {
+			elem := strings.TrimPrefix(name, prefix)
+			switch elem {
+			case "u8", "u16", "i32", "bool":
+				return elem, true
+			}
+		}
+	}
+	return "", false
+}
+
+func freshCopyBuiltinElement(name string) (string, bool) {
+	if name == "core.string_copy_into" || strings.HasPrefix(name, "core.slice_copy_into_") {
+		return "", false
+	}
+	return copyBuiltinElement(name)
+}
+
+func copyElementIRKinds(elem string, types map[string]*semantics.TypeInfo) (ir.IRInstrKind, ir.IRInstrKind, ir.IRInstrKind, bool) {
+	makeKind := ir.IRMakeSliceI32
+	switch elem {
+	case "u8":
+		makeKind = ir.IRMakeSliceU8
+	case "u16":
+		makeKind = ir.IRMakeSliceU16
+	case "i32", "bool":
+		makeKind = ir.IRMakeSliceI32
+	default:
+		return 0, 0, 0, false
+	}
+	loadKind, ok := lowerIndexLoadKind(elem, types)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	storeKind, ok := lowerIndexStoreKind(elem, types)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	return makeKind, loadKind, storeKind, true
+}
+
+func copyElementShift(elem string) (int32, bool) {
+	switch elem {
+	case "u8":
+		return 0, true
+	case "u16":
+		return 1, true
+	case "i32", "bool":
+		return 2, true
+	default:
+		return 0, false
+	}
+}
+
+func staticInvalidCollectionIterable(expr frontend.Expr) bool {
+	return staticInvalidAllocationIterable(expr) || staticInvalidStringViewIterable(expr)
+}
+
+func staticInvalidAllocationIterable(expr frontend.Expr) bool {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false
+	}
+	name := call.Name
+	elemSize, ok := allocationElementSizeByBuiltin(name)
+	if !ok {
+		if target, aliasOK := semantics.ResolveBuiltinAlias(name); aliasOK {
+			name = target
+			elemSize, ok = allocationElementSizeByBuiltin(name)
+		}
+	}
+	if !ok {
+		return false
+	}
+	lengthArgIndex := 0
+	if strings.HasPrefix(name, "core.island_make_") {
+		lengthArgIndex = 1
+	}
+	if lengthArgIndex >= len(call.Args) {
+		return false
+	}
+	length, known := evalConstInt64ForAllocation(call.Args[lengthArgIndex])
+	if !known {
+		return false
+	}
+	if length < 0 {
+		return true
+	}
+	return elemSize > 0 && length*int64(elemSize) > 2147483647
+}
+
+func staticInvalidStringViewIterable(expr frontend.Expr) bool {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false
+	}
+	name := call.Name
+	if target, aliasOK := semantics.ResolveBuiltinAlias(name); aliasOK {
+		name = target
+	}
+	if !strings.HasPrefix(name, "core.string_") {
+		return false
+	}
+	sourceLen, knownLen := staticStringByteLen(callArg(call, 0))
+	if !knownLen {
+		return false
+	}
+	switch name {
+	case "core.string_window":
+		if len(call.Args) != 3 {
+			return false
+		}
+		start, startKnown := evalConstInt64ForAllocation(call.Args[1])
+		count, countKnown := evalConstInt64ForAllocation(call.Args[2])
+		if !startKnown || !countKnown {
+			return false
+		}
+		return start < 0 || count < 0 || start > sourceLen || count > sourceLen-start
+	case "core.string_prefix":
+		if len(call.Args) != 2 {
+			return false
+		}
+		count, known := evalConstInt64ForAllocation(call.Args[1])
+		if !known {
+			return false
+		}
+		return count < 0 || count > sourceLen
+	case "core.string_suffix":
+		if len(call.Args) != 2 {
+			return false
+		}
+		start, known := evalConstInt64ForAllocation(call.Args[1])
+		if !known {
+			return false
+		}
+		return start < 0 || start > sourceLen
+	default:
+		return false
+	}
+}
+
+func callArg(call *frontend.CallExpr, index int) frontend.Expr {
+	if call == nil || index < 0 || index >= len(call.Args) {
+		return nil
+	}
+	return call.Args[index]
+}
+
+func staticStringByteLen(expr frontend.Expr) (int64, bool) {
+	lit, ok := expr.(*frontend.StringLitExpr)
+	if !ok || lit == nil {
+		return 0, false
+	}
+	return int64(len(lit.Value)), true
+}
+
+func allocationElementSizeByBuiltin(name string) (int, bool) {
+	switch name {
+	case "core.make_u8", "core.island_make_u8":
+		return 1, true
+	case "core.make_u16", "core.island_make_u16":
+		return 2, true
+	case "core.make_i32", "core.island_make_i32", "core.make_bool", "core.island_make_bool":
+		return 4, true
+	default:
+		return 0, false
+	}
+}
+
+func evalConstInt64ForAllocation(expr frontend.Expr) (int64, bool) {
+	switch e := expr.(type) {
+	case nil:
+		return 0, false
+	case *frontend.NumberExpr:
+		return int64(e.Value), true
+	case *frontend.UnaryExpr:
+		v, ok := evalConstInt64ForAllocation(e.X)
+		if !ok {
+			return 0, false
+		}
+		if e.Op == frontend.TokenMinus {
+			return -v, true
+		}
+		return 0, false
+	case *frontend.BinaryExpr:
+		left, ok := evalConstInt64ForAllocation(e.Left)
+		if !ok {
+			return 0, false
+		}
+		right, ok := evalConstInt64ForAllocation(e.Right)
+		if !ok {
+			return 0, false
+		}
+		switch e.Op {
+		case frontend.TokenPlus:
+			return left + right, true
+		case frontend.TokenMinus:
+			return left - right, true
+		case frontend.TokenStar:
+			return left * right, true
+		case frontend.TokenSlash:
+			if right == 0 {
+				return 0, false
+			}
+			return left / right, true
+		case frontend.TokenPercent:
+			if right == 0 {
+				return 0, false
+			}
+			return left % right, true
+		default:
+			return 0, false
+		}
+	default:
+		return 0, false
+	}
+}
+
+func (l *lowerer) whileRangeProof(stmt *frontend.WhileStmt) (whileRangeProof, bool) {
+	indexName, baseName, ok := l.whileRangeCondition(stmt.Cond)
+	if !ok {
+		return whileRangeProof{}, false
+	}
+	if !l.zeroLocals[indexName] {
+		return whileRangeProof{}, false
+	}
+	if !l.whileBodyHasUnitIncrement(stmt.Body, indexName) {
+		return whileRangeProof{}, false
+	}
+	if l.externalSliceLocals[baseName] || l.invalidSliceLocals[baseName] {
+		return whileRangeProof{}, false
+	}
+	return whileRangeProof{
+		indexName: indexName,
+		baseName:  baseName,
+		proofID:   whileBoundsProofID(indexName, baseName, stmt.At),
+		active:    true,
+	}, true
+}
+
+func (l *lowerer) ifRangeProof(stmt *frontend.IfStmt) (whileRangeProof, bool) {
+	indexName, baseName, ok := branchRangeCondition(stmt.Cond)
+	if !ok {
+		indexName, baseName, ok = whileRangeCondition(stmt.Cond)
+		if !ok || !l.zeroLocals[indexName] {
+			return whileRangeProof{}, false
+		}
+	}
+	if l.externalSliceLocals[baseName] || l.invalidSliceLocals[baseName] {
+		return whileRangeProof{}, false
+	}
+	return whileRangeProof{
+		indexName: indexName,
+		baseName:  baseName,
+		proofID:   ifBoundsProofID(indexName, baseName, stmt.At),
+		active:    true,
+	}, true
+}
+
+func (l *lowerer) pushWhileRangeProof(proof whileRangeProof) {
+	l.whileRangeProofs = append(l.whileRangeProofs, proof)
+}
+
+func (l *lowerer) popWhileRangeProof() {
+	l.whileRangeProofs = l.whileRangeProofs[:len(l.whileRangeProofs)-1]
+}
+
+func (l *lowerer) invalidateWhileRangeProofForLocal(name string) {
+	for i := range l.whileRangeProofs {
+		if lowerProofPathMatchesMutation(l.whileRangeProofs[i].indexName, name) || lowerProofPathMatchesMutation(l.whileRangeProofs[i].baseName, name) {
+			l.whileRangeProofs[i].active = false
+		}
+	}
+}
+
+func (l *lowerer) invalidateWhileRangeProofsForInoutArgs(args []frontend.Expr, ownership []string) {
+	if len(args) == 0 || len(ownership) == 0 {
+		return
+	}
+	for i, owner := range ownership {
+		if owner != "inout" {
+			continue
+		}
+		if i >= len(args) {
+			break
+		}
+		path := simpleExprPath(args[i])
+		if path == "" {
+			continue
+		}
+		l.invalidateWhileRangeProofForLocal(path)
+	}
+}
+
+func lowerProofPathMatchesMutation(proofPath string, mutatedPath string) bool {
+	if proofPath == "" || mutatedPath == "" {
+		return false
+	}
+	return proofPath == mutatedPath || strings.HasPrefix(proofPath, mutatedPath+".")
+}
+
+func (l *lowerer) activeWhileProofForIndex(index *frontend.IndexExpr) (string, bool) {
+	baseName := simpleExprPath(index.Base)
+	indexName := simpleExprPath(index.Index)
+	if baseName == "" || indexName == "" {
+		return "", false
+	}
+	for i := len(l.whileRangeProofs) - 1; i >= 0; i-- {
+		proof := l.whileRangeProofs[i]
+		if proof.active && proof.baseName == baseName && proof.indexName == indexName {
+			return proof.proofID, true
+		}
+	}
+	return "", false
+}
+
+func (l *lowerer) rememberRangeMetadataForLocal(name string, expr frontend.Expr) {
+	if value, ok := l.proofConstIntValue(expr); ok {
+		l.zeroLocals[name] = value == 0
+		l.constIntLocals[name] = value
+	} else {
+		l.zeroLocals[name] = isZeroLiteral(expr)
+		delete(l.constIntLocals, name)
+	}
+	if base := lenFieldBaseName(expr); base != "" {
+		l.lenBoundLocals[name] = base
+	} else {
+		delete(l.lenBoundLocals, name)
+	}
+	l.externalSliceLocals[name] = l.exprHasExternalSliceProvenance(expr)
+	l.invalidSliceLocals[name] = l.exprIsInvalidSliceView(expr)
+}
+
+type rangeMetadataState struct {
+	zero     map[string]bool
+	constInt map[string]int64
+	lenBound map[string]string
+	external map[string]bool
+	invalid  map[string]bool
+}
+
+func (l *lowerer) snapshotRangeMetadata() rangeMetadataState {
+	return rangeMetadataState{
+		zero:     cloneLowerBoolMap(l.zeroLocals),
+		constInt: cloneLowerInt64Map(l.constIntLocals),
+		lenBound: cloneLowerStringMap(l.lenBoundLocals),
+		external: cloneLowerBoolMap(l.externalSliceLocals),
+		invalid:  cloneLowerBoolMap(l.invalidSliceLocals),
+	}
+}
+
+func (l *lowerer) restoreRangeMetadata(state rangeMetadataState) {
+	l.zeroLocals = cloneLowerBoolMap(state.zero)
+	l.constIntLocals = cloneLowerInt64Map(state.constInt)
+	l.lenBoundLocals = cloneLowerStringMap(state.lenBound)
+	l.externalSliceLocals = cloneLowerBoolMap(state.external)
+	l.invalidSliceLocals = cloneLowerBoolMap(state.invalid)
+}
+
+func (l *lowerer) mergeRangeMetadata(thenState rangeMetadataState, elseState rangeMetadataState) {
+	keys := map[string]bool{}
+	for key := range thenState.zero {
+		keys[key] = true
+	}
+	for key := range elseState.zero {
+		keys[key] = true
+	}
+	for key := range thenState.constInt {
+		keys[key] = true
+	}
+	for key := range elseState.constInt {
+		keys[key] = true
+	}
+	for key := range thenState.lenBound {
+		keys[key] = true
+	}
+	for key := range elseState.lenBound {
+		keys[key] = true
+	}
+	for key := range thenState.external {
+		keys[key] = true
+	}
+	for key := range elseState.external {
+		keys[key] = true
+	}
+	for key := range thenState.invalid {
+		keys[key] = true
+	}
+	for key := range elseState.invalid {
+		keys[key] = true
+	}
+	for key := range keys {
+		l.zeroLocals[key] = thenState.zero[key] && elseState.zero[key]
+		if thenValue, thenOK := thenState.constInt[key]; thenOK {
+			if elseValue, elseOK := elseState.constInt[key]; elseOK && thenValue == elseValue {
+				l.constIntLocals[key] = thenValue
+			} else {
+				delete(l.constIntLocals, key)
+			}
+		} else {
+			delete(l.constIntLocals, key)
+		}
+		if thenValue, thenOK := thenState.lenBound[key]; thenOK {
+			if elseValue, elseOK := elseState.lenBound[key]; elseOK && thenValue == elseValue {
+				l.lenBoundLocals[key] = thenValue
+			} else {
+				delete(l.lenBoundLocals, key)
+			}
+		} else {
+			delete(l.lenBoundLocals, key)
+		}
+		l.externalSliceLocals[key] = thenState.external[key] || elseState.external[key]
+		l.invalidSliceLocals[key] = thenState.invalid[key] || elseState.invalid[key]
+	}
+}
+
+func cloneLowerBoolMap(in map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneLowerInt64Map(in map[string]int64) map[string]int64 {
+	out := make(map[string]int64, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneLowerStringMap(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func (l *lowerer) whileRangeCondition(cond frontend.Expr) (string, string, bool) {
+	indexName, baseName, _, ok := l.rangeFromCondition(cond)
+	return indexName, baseName, ok
+}
+
+func (l *lowerer) rangeFromCondition(cond frontend.Expr) (string, string, rangeproof.Range, bool) {
+	bin, ok := cond.(*frontend.BinaryExpr)
+	if !ok || bin == nil {
+		return "", "", rangeproof.Range{}, false
+	}
+	left, ok := bin.Left.(*frontend.IdentExpr)
+	if !ok || left == nil {
+		return "", "", rangeproof.Range{}, false
+	}
+	switch bin.Op {
+	case frontend.TokenLess, frontend.TokenBangEq:
+		base := l.lenBoundBaseName(bin.Right)
+		if base == "" {
+			return "", "", rangeproof.Range{}, false
+		}
+		return left.Name, base, rangeproof.LessThanLen(left.Name, base), true
+	case frontend.TokenLessEq:
+		base := lenMinusOneBaseName(bin.Right)
+		if base == "" {
+			return "", "", rangeproof.Range{}, false
+		}
+		return left.Name, base, rangeproof.LessEqualLenMinusOne(left.Name, base), true
+	default:
+		return "", "", rangeproof.Range{}, false
+	}
+}
+
+func staticRangeFromCondition(cond frontend.Expr) (string, string, rangeproof.Range, bool) {
+	bin, ok := cond.(*frontend.BinaryExpr)
+	if !ok || bin == nil {
+		return "", "", rangeproof.Range{}, false
+	}
+	left, ok := bin.Left.(*frontend.IdentExpr)
+	if !ok || left == nil {
+		return "", "", rangeproof.Range{}, false
+	}
+	switch bin.Op {
+	case frontend.TokenLess, frontend.TokenBangEq:
+		base := lenFieldBaseName(bin.Right)
+		if base == "" {
+			return "", "", rangeproof.Range{}, false
+		}
+		return left.Name, base, rangeproof.LessThanLen(left.Name, base), true
+	case frontend.TokenLessEq:
+		base := lenMinusOneBaseName(bin.Right)
+		if base == "" {
+			return "", "", rangeproof.Range{}, false
+		}
+		return left.Name, base, rangeproof.LessEqualLenMinusOne(left.Name, base), true
+	default:
+		return "", "", rangeproof.Range{}, false
+	}
+}
+
+func staticRangeCondition(cond frontend.Expr) (string, string, bool) {
+	indexName, baseName, _, ok := staticRangeFromCondition(cond)
+	return indexName, baseName, ok
+}
+
+func whileRangeCondition(cond frontend.Expr) (string, string, bool) {
+	return staticRangeCondition(cond)
+}
+
+func staticWhileRangeCondition(cond frontend.Expr) (string, string, bool) {
+	return staticRangeCondition(cond)
+}
+
+func branchRangeCondition(cond frontend.Expr) (string, string, bool) {
+	bin, ok := cond.(*frontend.BinaryExpr)
+	if !ok || bin == nil || bin.Op != frontend.TokenAmpAmp {
+		return "", "", false
+	}
+	if indexName, baseName, ok := branchRangeConditionParts(bin.Left, bin.Right); ok {
+		return indexName, baseName, true
+	}
+	return branchRangeConditionParts(bin.Right, bin.Left)
+}
+
+func (l *lowerer) lenBoundBaseName(expr frontend.Expr) string {
+	if base := lenFieldBaseName(expr); base != "" {
+		return base
+	}
+	id, ok := expr.(*frontend.IdentExpr)
+	if !ok || id == nil {
+		return ""
+	}
+	return l.lenBoundLocals[id.Name]
+}
+
+func branchRangeConditionParts(lower frontend.Expr, upper frontend.Expr) (string, string, bool) {
+	lowerIndex, ok := nonNegativeGuardIndex(lower)
+	if !ok {
+		return "", "", false
+	}
+	upperIndex, baseName, ok := whileRangeCondition(upper)
+	if !ok || upperIndex != lowerIndex {
+		return "", "", false
+	}
+	return upperIndex, baseName, true
+}
+
+func nonNegativeGuardIndex(expr frontend.Expr) (string, bool) {
+	bin, ok := expr.(*frontend.BinaryExpr)
+	if !ok || bin == nil {
+		return "", false
+	}
+	if left, ok := bin.Left.(*frontend.IdentExpr); ok && left != nil && bin.Op == frontend.TokenGreaterEq && isZeroNumber(bin.Right) {
+		return left.Name, true
+	}
+	if right, ok := bin.Right.(*frontend.IdentExpr); ok && right != nil && bin.Op == frontend.TokenLessEq && isZeroNumber(bin.Left) {
+		return right.Name, true
+	}
+	return "", false
+}
+
+func isZeroNumber(expr frontend.Expr) bool {
+	num, ok := expr.(*frontend.NumberExpr)
+	return ok && num != nil && num.Value == 0
+}
+
+func lenFieldBaseName(expr frontend.Expr) string {
+	field, ok := expr.(*frontend.FieldAccessExpr)
+	if !ok || field == nil || field.Field != "len" {
+		return ""
+	}
+	return simpleExprPath(field.Base)
+}
+
+func lenMinusOneBaseName(expr frontend.Expr) string {
+	bin, ok := expr.(*frontend.BinaryExpr)
+	if !ok || bin == nil || bin.Op != frontend.TokenMinus {
+		return ""
+	}
+	right, ok := bin.Right.(*frontend.NumberExpr)
+	if !ok || right == nil || right.Value != 1 {
+		return ""
+	}
+	return lenFieldBaseName(bin.Left)
+}
+
+func (l *lowerer) whileBodyHasUnitIncrement(stmts []frontend.Stmt, indexName string) bool {
+	for _, stmt := range stmts {
+		assign, ok := stmt.(*frontend.AssignStmt)
+		if !ok || assign == nil {
+			continue
+		}
+		target, ok := assign.Target.(*frontend.IdentExpr)
+		if !ok || target.Name != indexName {
+			continue
+		}
+		if l.isUnitIncrementExpr(assign.Value, indexName) {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *lowerer) isUnitIncrementExpr(expr frontend.Expr, indexName string) bool {
+	bin, ok := expr.(*frontend.BinaryExpr)
+	if !ok || bin == nil || bin.Op != frontend.TokenPlus {
+		return false
+	}
+	if left, ok := bin.Left.(*frontend.IdentExpr); ok && left.Name == indexName {
+		return l.isUnitStepExpr(bin.Right)
+	}
+	if right, ok := bin.Right.(*frontend.IdentExpr); ok && right.Name == indexName {
+		return l.isUnitStepExpr(bin.Left)
+	}
+	return false
+}
+
+func (l *lowerer) isUnitStepExpr(expr frontend.Expr) bool {
+	if num, ok := expr.(*frontend.NumberExpr); ok && num != nil {
+		return num.Value == 1
+	}
+	id, ok := expr.(*frontend.IdentExpr)
+	if !ok || id == nil {
+		return false
+	}
+	info, ok := l.locals[id.Name]
+	if !ok || info.Mutable {
+		return false
+	}
+	value, ok := l.constIntLocals[id.Name]
+	return ok && value == 1
+}
+
+func (l *lowerer) proofConstIntValue(expr frontend.Expr) (int64, bool) {
+	if value, ok := evalConstInt64ForAllocation(expr); ok {
+		return value, true
+	}
+	id, ok := expr.(*frontend.IdentExpr)
+	if !ok || id == nil {
+		return 0, false
+	}
+	info, ok := l.locals[id.Name]
+	if !ok || info.Mutable {
+		return 0, false
+	}
+	value, ok := l.constIntLocals[id.Name]
+	return value, ok
+}
+
+func isZeroLiteral(expr frontend.Expr) bool {
+	num, ok := expr.(*frontend.NumberExpr)
+	return ok && num != nil && num.Value == 0
+}
+
+func (l *lowerer) collectionIterableProofAllowed(expr frontend.Expr) bool {
+	if expr == nil {
+		return false
+	}
+	return !l.exprHasExternalSliceProvenance(expr) && !l.exprIsInvalidSliceView(expr)
+}
+
+func isRawSliceConstructor(expr frontend.Expr) bool {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false
+	}
+	name := call.Name
+	if target, ok := semantics.ResolveBuiltinAlias(name); ok {
+		name = target
+	}
+	switch name {
+	case "core.raw_slice_u8_from_parts", "core.raw_slice_u16_from_parts", "core.raw_slice_i32_from_parts", "core.raw_slice_bool_from_parts":
+		return true
+	default:
+		return false
+	}
+}
+
+func rawSliceElementShift(name string) int32 {
+	switch name {
+	case "core.raw_slice_u16_from_parts":
+		return 1
+	case "core.raw_slice_i32_from_parts", "core.raw_slice_bool_from_parts":
+		return 2
+	default:
+		return 0
+	}
+}
+
+func (l *lowerer) exprHasExternalSliceProvenance(expr frontend.Expr) bool {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		return l.externalSliceLocals[e.Name]
+	case *frontend.CallExpr:
+		name := e.Name
+		if target, ok := semantics.ResolveBuiltinAlias(name); ok {
+			name = target
+		}
+		if isRawSliceConstructor(&frontend.CallExpr{Name: name}) {
+			return true
+		}
+		if isSliceCopyBuiltinName(name) {
+			return false
+		}
+		if isBorrowOrViewBuiltinName(name) {
+			return len(e.Args) == 0 || l.exprHasExternalSliceProvenance(e.Args[0])
+		}
+	}
+	return false
+}
+
+func (l *lowerer) exprIsInvalidSliceView(expr frontend.Expr) bool {
+	if staticInvalidCollectionIterable(expr) {
+		return true
+	}
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		return l.invalidSliceLocals[e.Name]
+	case *frontend.CallExpr:
+		name := e.Name
+		if target, ok := semantics.ResolveBuiltinAlias(name); ok {
+			name = target
+		}
+		if isSliceCopyBuiltinName(name) {
+			return false
+		}
+		if isBorrowOrViewBuiltinName(name) {
+			return len(e.Args) > 0 && l.exprIsInvalidSliceView(e.Args[0])
+		}
+	}
+	return false
+}
+
+func isSliceCopyBuiltinName(name string) bool {
+	return name == "core.string_copy" ||
+		name == "core.string_copy_into" ||
+		strings.HasPrefix(name, "core.slice_copy_")
+}
+
+func isBorrowOrViewBuiltinName(name string) bool {
+	return name == "core.string_borrow" ||
+		name == "core.string_window" ||
+		name == "core.string_prefix" ||
+		name == "core.string_suffix" ||
+		strings.HasPrefix(name, "core.slice_borrow_") ||
+		strings.HasPrefix(name, "core.slice_window_") ||
+		strings.HasPrefix(name, "core.slice_prefix_") ||
+		strings.HasPrefix(name, "core.slice_suffix_")
+}
+
+func simpleExprPath(expr frontend.Expr) string {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		return e.Name
+	case *frontend.FieldAccessExpr:
+		base := simpleExprPath(e.Base)
+		if base == "" {
+			return e.Field
+		}
+		return base + "." + e.Field
+	default:
+		return ""
+	}
+}
+
+func whileBoundsProofID(indexName string, baseName string, pos frontend.Position) string {
+	return rangeBoundsProofID("while", indexName, baseName, pos)
+}
+
+func ifBoundsProofID(indexName string, baseName string, pos frontend.Position) string {
+	return rangeBoundsProofID("if", indexName, baseName, pos)
+}
+
+func rangeBoundsProofID(kind string, indexName string, baseName string, pos frontend.Position) string {
+	baseName = strings.NewReplacer(".", "_", " ", "_").Replace(baseName)
+	if baseName == "" {
+		baseName = "value"
+	}
+	return fmt.Sprintf("proof:%s:%s:%s:%d:%d", kind, indexName, baseName, pos.Line, pos.Col)
+}
+
+func copyLoopBoundsProofID(name string, pos frontend.Position) string {
+	name = strings.NewReplacer(".", "_", " ", "_").Replace(name)
+	if name == "" {
+		name = "copy"
+	}
+	return fmt.Sprintf("proof:copy-loop:%s:%d:%d", name, pos.Line, pos.Col)
+}
+
+func forCollectionBoundsProofID(stmt *frontend.ForRangeStmt) string {
+	kind := "for-collection"
+	if isViewCollectionIterable(stmt.Iterable) {
+		kind = "for-collection-view"
+	}
+	return fmt.Sprintf("proof:%s:%s:%d:%d", kind, stmt.Name, stmt.At.Line, stmt.At.Col)
+}
+
+func isViewCollectionIterable(expr frontend.Expr) bool {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false
+	}
+	name := call.Name
+	if target, ok := semantics.ResolveBuiltinAlias(name); ok {
+		name = target
+	}
+	return strings.HasPrefix(name, "core.slice_window_") ||
+		strings.HasPrefix(name, "core.slice_prefix_") ||
+		strings.HasPrefix(name, "core.slice_suffix_") ||
+		name == "core.string_window" ||
+		name == "core.string_prefix" ||
+		name == "core.string_suffix"
+}
+
 func lowerIndexStoreKind(elemType string, types map[string]*semantics.TypeInfo) (ir.IRInstrKind, bool) {
 	switch elemType {
-	case "i32":
+	case "i32", "c_int", "c_uint",
+		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong":
 		return ir.IRIndexStoreI32, true
 	case "bool":
 		return ir.IRIndexStoreI32, true

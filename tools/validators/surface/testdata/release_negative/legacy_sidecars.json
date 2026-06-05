@@ -1,0 +1,5 @@
+{
+  "validator": "browser-release",
+  "mutation": "legacy_sidecars",
+  "expected_error": ".ui.json"
+}

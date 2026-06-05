@@ -14,6 +14,7 @@ import (
 	"tetra_language/compiler/internal/linker"
 	"tetra_language/compiler/internal/lower"
 	"tetra_language/compiler/internal/module"
+	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/semantics"
 )
 
@@ -22,6 +23,7 @@ type FileAST = frontend.FileAST
 type CheckedProgram = semantics.CheckedProgram
 type IRProgram = ir.IRProgram
 type IRFunc = ir.IRFunc
+type PLIRProgram = plir.Program
 type UILoweredBundle = lower.UILoweredBundle
 
 type Object = tobj.Object
@@ -81,6 +83,21 @@ func CheckWorldOpt(world *World, opt CheckOptions) (*CheckedProgram, error) {
 
 func Lower(checked *CheckedProgram) (*IRProgram, error) {
 	return lower.Lower(checked)
+}
+
+func BuildPLIR(checked *CheckedProgram) (*PLIRProgram, error) {
+	prog, err := plir.FromCheckedProgram(checked)
+	if err != nil {
+		return nil, err
+	}
+	if err := plir.VerifyProgram(prog); err != nil {
+		return nil, err
+	}
+	return prog, nil
+}
+
+func FormatPLIR(prog *PLIRProgram) string {
+	return plir.FormatText(prog)
 }
 
 func LowerModule(checked *CheckedProgram, module string) ([]IRFunc, error) {

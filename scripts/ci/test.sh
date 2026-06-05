@@ -23,9 +23,9 @@ Usage: bash scripts/ci/test.sh [--frontend-focused]
 
 Runs the canonical Go test suite:
 - gofmt -l formatting gate for tracked and untracked Go files
-- go test ./compiler/...
-- go test ./cli/...
-- go test ./tools/...
+- go test ./compiler/... -count=1
+- go test ./cli/... -count=1
+- go test ./tools/... -count=1
 
 Focused targets:
 - --frontend-focused:
@@ -82,9 +82,9 @@ fi
 
 case "$mode" in
   canonical)
-    go test ./compiler/...
-    go test ./cli/...
-    go test ./tools/...
+    go test ./compiler/... -count=1
+    go test ./cli/... -count=1
+    go test ./tools/... -count=1
     ;;
   frontend-focused)
     go test ./compiler/internal/frontend ./compiler -run 'Lex|Parser|Flow|Diagnostic|Stabilization' -count=1

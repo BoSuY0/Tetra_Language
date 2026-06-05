@@ -112,6 +112,15 @@ Add failing tests before the next implementation slice:
 
 - Target metadata now exposes atomic fixed widths, pointer-sized atomic width,
   alignment checks, and load/store/fetch/fence memory-order validation.
+- Linux native target metadata also exposes promotion-gate fields
+  (`runtime_status`, `stdlib_status`, `ffi_status`, `runner_probe_command`,
+  `release_gate`, and `evidence_artifacts`) so x86/x32 partial build-only
+  runtime/stdlib/FFI evidence is machine-checkable and cannot be mistaken for
+  production support.
+- The same metadata now exposes the canonical Linux syscall pack so x64,
+  x86, and x32 cannot silently share a syscall instruction or numbering model:
+  x64 uses x86_64 `syscall`, x86 uses i386 `int 0x80`, and x32 uses x86_64
+  registers with x32 syscall-bit numbering.
 - The x64 ABI package now has a target-driven classifier for SysV AMD64,
   Microsoft x64, and x32 SysV. x32 uses AMD64 registers while preserving 32-bit
   pointer/usize slot facts and zero/sign extension metadata for narrower
@@ -200,6 +209,17 @@ Add failing tests before the next implementation slice:
   does not promote full x86 stdlib/runtime/FFI: ownership/freeing, libc bridge,
   volatile/MMIO hardening, aggregate/float ABI, and production allocator policy
   remain separate work.
+- The x86/x32 ABI suites now promote that existing raw-memory lowering evidence
+  into release-gated executable smoke names: each target builds a
+  `core.alloc_bytes` program that checks allocation-header bounds for
+  `store_i32`/`load_i32`, `core.ptr_add`, and byte `store_u8`/`load_u8`, while
+  preserving the target syscall bridge requirements. This is still build-only
+  ABI evidence, not full runtime allocator/free/panic parity.
+- The x86/x32 ABI suites also require raw pointer-slot executable smokes for
+  allocation-base and direct `core.ptr_add(base, offset, mem)`
+  `core.store_ptr`/`core.load_ptr` over 4-byte pointer slots, so ILP32 and x32
+  pointer memory cannot silently widen to LP64 while the targets remain
+  build-only/host-probed.
 - The x86 backend now supports no-runtime stdout output and string literal data:
   `IRStrLit` appends the literal to the TOBJ data section, materializes its
   ELF32 absolute data address through `RelocDataAbs32`, pushes the usual
@@ -439,20 +459,23 @@ Add failing tests before the next implementation slice:
   matrix.
 - Non-runtime `@export` functions on native targets now reject struct/aggregate
   parameter and return signatures before lowering/codegen with an explicit
-  aggregate C ABI diagnostic. Linux x86 and x32 also reject pointer/native-int
-  and function-pointer `@export` parameters and returns until their 32-bit
-  pointer C ABI boundaries have verified wrappers; this includes pointer-like spellings
-  (`ptr`, `ref`, `nullable_ptr`, `rawptr`, `fnptr`, `fn(...) -> ...`) and
-  native/libc spellings (`usize`, `isize`, `size_t`, `ssize_t`, `native_int`,
-  `native_uint`, `c_long`, `c_ulong`) instead of silently using an internal
-  slot/callable ABI as if it were a verified C ABI. This keeps FFI honest while
-  runtime `__rt`/`__tetra_*` exports continue to use the compiler-owned internal
-  slot ABI for self-host runtime objects.
-- The x86/x64/x32 ABI suites now also prove source-level native/libc scalar
-  spellings such as `usize`, `size_t`, `native_int`, and `c_long` do not fall
-  through to a vague `unknown type` error and do not silently compile before
-  native-int/codegen support exists. They must emit the explicit
-  target-layout-scalar diagnostic and avoid writing output objects.
+  aggregate C ABI diagnostic. Linux x86 and x32 build canonical `ptr`,
+  `rawptr`, `nullable_ptr`, and `ref` object smokes, including a nullable
+  null-return smoke and a non-nullable `ref` null-return type diagnostic, while
+  still rejecting unverified function-pointer `@export` parameters and returns
+  until those C ABI wrappers are verified; this avoids
+  silently using an internal slot/callable ABI as if it were a verified C ABI.
+  Wider/float target-layout scalar spellings remain covered by the explicit
+  native-scalar diagnostic below. This keeps FFI honest while runtime
+  `__rt`/`__tetra_*` exports continue to use the compiler-owned internal slot
+  ABI for self-host runtime objects.
+- The x86/x32 ABI suites now also prove source-level ILP32 native/libc scalar
+  spellings `usize`, `isize`, `size_t`, `ssize_t`, `native_int`,
+  `native_uint`, `c_long`, and `c_ulong` lower as 1-slot 32-bit `@export`
+  object wrappers with target-specific symbol metadata.
+  Linux x64 still rejects those source-level native/libc aliases, and x86/x32
+  still reject wider/float target-layout spellings with the explicit
+  target-layout-scalar diagnostic and no output object.
 - The x86 and x32 ABI/default target suites now include compiler-owned
   stdlib/runtime boundary diagnostics: small `core.fs_exists` and
   `core.net_socket_tcp4` programs must fail on those targets with `TETRA3003`,
@@ -465,11 +488,11 @@ Add failing tests before the next implementation slice:
   This keeps currently unsupported stdlib/runtime bridges explicit instead of
   becoming host fallback.
 - `tetra test --all-targets` now runs the x86, Linux x64, macOS x64,
-  Windows x64, and x32 ABI matrix and currently passes 42/42 checks.
+  Windows x64, and x32 ABI matrix and currently passes 102/102 checks.
   `tetra test --all-targets --brutal` now runs a real aggregate harness
   instead of a blanket unsupported diagnostic: ABI checks, atomic stress
   checks, and fuzz checks execute for real across that matrix and currently
-  report 82/82 passing checks. The macOS x64 and Windows x64 ABI cells now
+  report 142/142 passing checks. The macOS x64 and Windows x64 ABI cells now
   include real object smoke checks: macOS verifies SysV-style object data
   relocations without Windows IAT imports, while Windows verifies Win64
   `kernel32` IAT relocations. Combined per-target suite flags and per-target
@@ -493,8 +516,9 @@ Add failing tests before the next implementation slice:
   in `unsupported_reason` instead of only listing older no-runtime slices. The
   canonical metadata and CLI JSON both require the i386/x32 ABI classifiers,
   explicit filesystem/networking stdlib plus target-runtime boundary diagnostics,
-  x86/x32 pointer/native-libc/function-pointer `@export` diagnostics,
-  source native scalar diagnostics,
+  x86/x32 `rawptr`/`nullable_ptr`/`ref` plus ILP32 native/libc scalar `@export` object smokes,
+  function-pointer `@export` diagnostics, and remaining source
+  target-layout scalar diagnostics,
   pointer-only atomic ABI-width object checks, x32 dword pointer atomics, x32
   syscall numbering, and source-level atomic diagnostics to remain visible
   while full runtime/stdlib/FFI support stays explicitly blocked.

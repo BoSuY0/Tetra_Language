@@ -104,6 +104,9 @@ func checkExprWithEffects(
 		if info, ok := locals[e.Name]; ok && info.ActorField {
 			return info.TypeName, regionNone, nil
 		}
+		if err := analysis.checkSurfaceFramePixelsUsable(e.Name, e.At); err != nil {
+			return "", regionNone, err
+		}
 		if err := state.checkNotConsumed(e.Name, e.At); err != nil {
 			return "", regionNone, err
 		}
@@ -1059,6 +1062,11 @@ func checkCallExprWithEffects(
 	analysis *functionAnalysisState,
 ) (string, int, error) {
 	callerSig, hasCallerSig := currentCallerSignature(effects, funcs)
+	if rewritten, err := rewriteSliceViewMethodCall(e, locals, globals, types); rewritten || err != nil {
+		if err != nil {
+			return "", regionNone, err
+		}
+	}
 	resolved := ""
 	isBuiltin := false
 	preserveDynamicCallName := false
@@ -1110,11 +1118,13 @@ func checkCallExprWithEffects(
 		consumeArgRefs := make([]ownershipArgRef, 0, len(e.Args))
 		borrowArgs := make([]ownershipArgRef, 0, len(e.Args))
 		inoutArgs := make([]ownershipArgRef, 0, len(e.Args))
+		argRegions := make([]int, len(e.Args))
 		for i, arg := range e.Args {
 			argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
 			if err != nil {
 				return "", regionNone, err
 			}
+			argRegions[i] = argRegion
 			if !typesCompatibleWithNullPtr(fieldInfo.FunctionParamTypes[i], argType, arg) {
 				return "", regionNone, fmt.Errorf("%s: type mismatch for function-typed struct field call '%s' arg %d", frontend.FormatPos(arg.Pos()), e.Name, i+1)
 			}
@@ -1243,7 +1253,7 @@ func checkCallExprWithEffects(
 		if err := validateFunctionTypedThrowCall(fieldInfo.FunctionThrowsType, e, state); err != nil {
 			return "", regionNone, err
 		}
-		return fieldInfo.FunctionReturnType, regionNone, nil
+		return fieldInfo.FunctionReturnType, functionTypedBorrowReturnRegion(fieldInfo.FunctionReturnOwnership, fieldInfo.FunctionParamOwnership, argRegions, state), nil
 	} else if local, ok := locals[e.Name]; ok {
 		if analysis != nil && local.FunctionTouchesMutableGlobals {
 			analysis.touchesMutableGlobals = true
@@ -1290,11 +1300,13 @@ func checkCallExprWithEffects(
 			consumeArgRefs := make([]ownershipArgRef, 0, len(e.Args))
 			borrowArgs := make([]ownershipArgRef, 0, len(e.Args))
 			inoutArgs := make([]ownershipArgRef, 0, len(e.Args))
+			argRegions := make([]int, len(e.Args))
 			for i, arg := range e.Args {
 				argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
 				if err != nil {
 					return "", regionNone, err
 				}
+				argRegions[i] = argRegion
 				if !typesCompatibleWithNullPtr(local.FunctionParamTypes[i], argType, arg) {
 					return "", regionNone, fmt.Errorf("%s: type mismatch for %s arg %d", frontend.FormatPos(arg.Pos()), valueCallPhrase, i+1)
 				}
@@ -1462,7 +1474,7 @@ func checkCallExprWithEffects(
 			if err := validateFunctionTypedThrowCall(local.FunctionThrowsType, e, state); err != nil {
 				return "", regionNone, err
 			}
-			return local.FunctionReturnType, regionNone, nil
+			return local.FunctionReturnType, functionTypedBorrowReturnRegion(local.FunctionReturnOwnership, local.FunctionParamOwnership, argRegions, state), nil
 		}
 		if local.GenericFunctionValue {
 			return "", regionNone, unsupportedGenericClosureDirectCallError(e.At, e.Name)
@@ -1884,6 +1896,35 @@ func checkCallExprWithEffects(
 		}
 		markConsumedResourceValue(name, consumeArgTypes[i], types, state, e.Args[i].Pos())
 	}
+	if handleArg, ok := surfaceHostABIHandleArgIndex(resolved); ok && handleArg < len(e.Args) {
+		if owner, ok := surfaceHandleOwnerPathExprWithAnalysis(e.Args[handleArg], locals, globals, types, analysis); ok {
+			if err := state.checkNotConsumed(owner, e.Args[handleArg].Pos()); err != nil {
+				return "", regionNone, err
+			}
+		}
+	}
+	if resolved == "core.surface_close" && len(e.Args) > 0 {
+		if owner, ok := surfaceHandleOwnerPathExprWithAnalysis(e.Args[0], locals, globals, types, analysis); ok {
+			markConsumedResourceValue(owner, surfaceSurfaceTypeName, types, state, e.Args[0].Pos())
+		}
+	}
+	if resolved == "core.surface_present_rgba" && len(e.Args) > 1 {
+		if frameName, ok := surfaceFramePixelsSourceExpr(e.Args[1], locals, globals, types, analysis); ok && frameName != "" {
+			if err := checkSurfacePresentFrameOwnerPath(frameName, analysis, state, e.Args[1].Pos()); err != nil {
+				return "", regionNone, err
+			}
+			analysis.markSurfaceFramePresented(frameName, e.Args[1].Pos())
+			markConsumedResourceValue(frameName, surfaceFrameTypeName, types, state, e.Args[1].Pos())
+		}
+	}
+	if isSurfacePresentCallName(resolved) && len(e.Args) > 0 {
+		if err := checkSurfacePresentFrameOwner(e.Args[0], analysis, state, e.Args[0].Pos()); err != nil {
+			return "", regionNone, err
+		}
+		if frameName, ok := surfacePresentedFrameArg(e.Args[0]); ok {
+			analysis.markSurfaceFramePresented(frameName, e.Args[0].Pos())
+		}
+	}
 	markCallFinalizedResources(resolved, e, funcs, module, imports, state)
 	if isTryCall {
 		if err := recordTryCallThrowResourceSummary(e, sig, funcs, types, module, imports, state); err != nil {
@@ -2092,6 +2133,16 @@ func checkCallExprWithEffects(
 		e.Name = resolved
 	}
 	regionID := regionNone
+	if isExplicitBorrowBuiltin(resolved) && len(e.Args) == 1 {
+		owner := borrowOwnerNameFromExpr(e.Args[0])
+		if len(argRegions) > 0 {
+			if _, borrowed := state.borrowedParamOwner(argRegions[0]); borrowed {
+				return sig.ReturnType, argRegions[0], nil
+			}
+		}
+		regionID = state.bindExplicitBorrow(owner)
+		return sig.ReturnType, regionID, nil
+	}
 	if len(sig.ReturnRegionSummary) > 0 {
 		tree := make(map[string]int, len(sig.ReturnRegionSummary))
 		for leaf, paramIndex := range sig.ReturnRegionSummary {
@@ -2118,6 +2169,89 @@ func checkCallExprWithEffects(
 		}
 	}
 	return sig.ReturnType, regionID, nil
+}
+
+func functionTypedBorrowReturnRegion(returnOwnership string, paramOwnership []string, argRegions []int, state *regionState) int {
+	if returnOwnership != "borrow" {
+		return regionNone
+	}
+	regionID := regionNone
+	seen := false
+	for i, ownership := range paramOwnership {
+		if ownership != "borrow" || i >= len(argRegions) {
+			continue
+		}
+		argRegion := argRegions[i]
+		if argRegion == regionNone {
+			continue
+		}
+		if argRegion == regionUnknown {
+			return state.bindExplicitBorrow("<borrow>")
+		}
+		if _, borrowed := borrowedOwnerForRegion(argRegion, state); !borrowed {
+			continue
+		}
+		if !seen {
+			regionID = argRegion
+			seen = true
+			continue
+		}
+		if regionID != argRegion {
+			return state.bindExplicitBorrow("<borrow>")
+		}
+	}
+	return regionID
+}
+
+func isExplicitBorrowBuiltin(name string) bool {
+	if target, ok := ResolveBuiltinAlias(name); ok {
+		name = target
+	}
+	if name == "core.string_borrow" {
+		return true
+	}
+	return strings.HasPrefix(name, "core.slice_borrow_")
+}
+
+func isExplicitCopyBuiltin(name string) bool {
+	if target, ok := ResolveBuiltinAlias(name); ok {
+		name = target
+	}
+	if name == "core.string_copy" {
+		return true
+	}
+	return strings.HasPrefix(name, "core.slice_copy_") && !strings.HasPrefix(name, "core.slice_copy_into_")
+}
+
+func borrowOwnerNameFromExpr(expr frontend.Expr) string {
+	if expr == nil {
+		return "<borrow>"
+	}
+	if path, ok := resourcePathForExpr(expr); ok && path != "" {
+		return path
+	}
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		return e.Name
+	case *frontend.FieldAccessExpr:
+		return borrowOwnerNameFromExpr(e.Base)
+	case *frontend.IndexExpr:
+		return borrowOwnerNameFromExpr(e.Base)
+	case *frontend.CallExpr:
+		name := e.Name
+		if target, ok := ResolveBuiltinAlias(name); ok {
+			name = target
+		}
+		if isExplicitBorrowBuiltin(name) || isExplicitCopyBuiltin(name) {
+			if len(e.Args) > 0 {
+				return borrowOwnerNameFromExpr(e.Args[0])
+			}
+		}
+		if _, _, ok := sliceViewElemFromBuiltin(name); ok && len(e.Args) > 0 {
+			return borrowOwnerNameFromExpr(e.Args[0])
+		}
+	}
+	return "<borrow>"
 }
 
 func validateFunctionTypedValueCallLabels(e *frontend.CallExpr, kind, name string) error {
@@ -2721,6 +2855,10 @@ func validateCallbackSignature(
 	}
 	wantParams := calleeSig.ParamFunctionParams[paramIndex]
 	wantReturn := calleeSig.ParamFunctionReturns[paramIndex]
+	wantReturnOwnership := ""
+	if paramIndex < len(calleeSig.ParamFunctionReturnOwnership) {
+		wantReturnOwnership = calleeSig.ParamFunctionReturnOwnership[paramIndex]
+	}
 	wantThrows := callbackExpectedThrowsType(calleeSig, paramIndex)
 	wantEffects := []string(nil)
 	if paramIndex < len(calleeSig.ParamFunctionEffects) {
@@ -2743,6 +2881,9 @@ func validateCallbackSignature(
 	}
 	if wantReturn != "" && wantReturn != callbackSig.ReturnType {
 		return fmt.Errorf("%s: callback function symbol '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), rawName, wantReturn, callbackSig.ReturnType)
+	}
+	if wantReturnOwnership != callbackSig.ReturnOwnership {
+		return fmt.Errorf("%s: callback function symbol '%s' return ownership mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), rawName, ownershipDisplay(wantReturnOwnership), ownershipDisplay(callbackSig.ReturnOwnership))
 	}
 	if wantThrows != callbackSig.ThrowsType {
 		return fmt.Errorf("%s: callback function symbol '%s' throws type mismatch: expected '%s', got '%s'", frontend.FormatPos(pos), rawName, wantThrows, callbackSig.ThrowsType)
@@ -2827,6 +2968,15 @@ func checkTypedActorBuiltin(
 		}
 		if err := validateTypedActorMessageType(msgType, types, map[string]bool{}); err != nil {
 			return "", regionNone, fmt.Errorf("%s: %v", frontend.FormatPos(e.Args[1].Pos()), err)
+		}
+		transferOwners := actorTransferOwnerPayloads(e.Args[1], msgType, types, module, imports)
+		if err := validateActorBoundaryPayloadExpr(e.Args[1], msgType, types, module, imports, state, transferOwners); err != nil {
+			return "", regionNone, err
+		}
+		if err := checkBorrowedEscape(e.Args[1], locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+			return ownershipDiagnosticf(e.Args[1].Pos(), "cannot send borrowed view across actor boundary; use .copy() (borrowed value derived from '%s' cannot cross actor boundary without copy)", borrowedName)
+		}); err != nil {
+			return "", regionNone, err
 		}
 		if err := consumeTypedActorTransferPayloads(e.Args[1], msgType, locals, types, module, imports, state); err != nil {
 			return "", regionNone, err
@@ -3072,9 +3222,15 @@ func borrowedOwnerForRegion(regionID int, state *regionState) (string, bool) {
 }
 
 func borrowedOwnerFromExpr(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState) (string, bool, error) {
+	if explicitCopyResultExpr(expr) {
+		return "", false, nil
+	}
 	tname, regionID, err := checkExprWithEffects(expr, locals, globals, funcs, types, module, imports, state, effects, analysis)
 	if err != nil {
 		return "", false, err
+	}
+	if explicitCopyResultExpr(expr) {
+		return "", false, nil
 	}
 	borrowedName, borrowed := borrowedOwnerForRegion(regionID, state)
 	if borrowed {
@@ -3106,6 +3262,24 @@ func borrowedOwnerFromExpr(expr frontend.Expr, locals map[string]LocalInfo, glob
 		}
 	}
 	return borrowedName, borrowed, nil
+}
+
+func explicitCopyResultExpr(expr frontend.Expr) bool {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok {
+		return false
+	}
+	if method, ok := syntheticViewMethodName(call.Name); ok {
+		return method == "copy"
+	}
+	if _, method, ok := sliceViewMethodParts(call.Name); ok {
+		return method == "copy"
+	}
+	name := call.Name
+	if target, ok := ResolveBuiltinAlias(name); ok {
+		name = target
+	}
+	return isExplicitCopyBuiltin(name)
 }
 
 func checkBorrowedEscape(expr frontend.Expr, locals map[string]LocalInfo, globals map[string]GlobalInfo, funcs map[string]FuncSig, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, effects *effectContext, analysis *functionAnalysisState, format func(string) error) error {
@@ -3161,6 +3335,11 @@ func checkBorrowedEscape(expr frontend.Expr, locals map[string]LocalInfo, global
 		}
 	}
 	if fieldAccess, ok := expr.(*frontend.FieldAccessExpr); ok {
+		if _, _, enumCase, err := resolveEnumCaseExpr(fieldAccess, locals, globals, types, module, imports); err != nil {
+			return err
+		} else if enumCase {
+			return nil
+		}
 		if err := checkBorrowedEscape(fieldAccess.Base, locals, globals, funcs, types, module, imports, state, effects, analysis, format); err != nil {
 			return err
 		}
@@ -3412,6 +3591,9 @@ func validateTypedActorMessageType(typeName string, types map[string]*TypeInfo, 
 	if !ok {
 		return fmt.Errorf("unknown type '%s'", typeName)
 	}
+	if surfaceType, ok := surfaceActorTaskBoundaryValueType(typeName, types); ok {
+		return fmt.Errorf("surface value '%s' cannot cross actor/task boundary", surfaceType)
+	}
 	switch info.Kind {
 	case TypeI32, TypeU8, TypeBool, TypeIsland:
 		return nil
@@ -3453,10 +3635,8 @@ func validateTypedActorMessageType(typeName string, types map[string]*TypeInfo, 
 		return typedActorUnsupportedTransferTypeError("capability handle", typeName)
 	case TypePtr:
 		return typedActorUnsupportedTransferTypeError("pointer handle", typeName)
-	case TypeStr:
-		return typedActorUnsupportedTransferTypeError("string view", typeName)
-	case TypeSlice:
-		return typedActorUnsupportedTransferTypeError("slice view", typeName)
+	case TypeStr, TypeSlice:
+		return nil
 	case TypeArray:
 		return typedActorUnsupportedTransferTypeError("array view", typeName)
 	case TypeOptional:
@@ -3464,6 +3644,115 @@ func validateTypedActorMessageType(typeName string, types map[string]*TypeInfo, 
 	default:
 		return typedActorUnsupportedTransferTypeError("non-value type", typeName)
 	}
+}
+
+func validateActorBoundaryPayloadExpr(expr frontend.Expr, typeName string, types map[string]*TypeInfo, module string, imports map[string]string, state *regionState, transferOwners map[string]bool) error {
+	info, ok := types[typeName]
+	if !ok {
+		return fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(expr.Pos()), typeName)
+	}
+	switch info.Kind {
+	case TypeStr, TypeSlice:
+		if isExplicitCopyExpr(expr) {
+			return nil
+		}
+		if info.Kind == TypeSlice {
+			if owner := ownedRegionSliceOwnerForExpr(expr, state); owner != "" && transferOwners[owner] {
+				return nil
+			}
+		}
+		return ownershipDiagnosticf(expr.Pos(), "cannot send borrowed view across actor boundary; use .copy() (borrowed value derived from '%s' cannot cross actor boundary without copy)", borrowOwnerNameFromExpr(expr))
+	case TypeStruct:
+		for _, field := range structFieldExprs(expr, info) {
+			if kind, _, directView := borrowedReturnDirectViewLabels(field.typeName, types); directView && !isExplicitCopyExpr(field.value) {
+				return ownershipDiagnosticf(expr.Pos(), "aggregate '%s' contains borrowed %s field '%s' that cannot cross actor boundary", displayTypeName(typeName, module), kind, field.name)
+			}
+			if err := validateActorBoundaryPayloadExpr(field.value, field.typeName, types, module, imports, state, transferOwners); err != nil {
+				return err
+			}
+		}
+	case TypeEnum:
+		if call, ok := expr.(*frontend.CallExpr); ok {
+			_, caseInfo, found, err := resolveEnumCaseConstructorCall(call, types, module, imports)
+			if err != nil {
+				return err
+			}
+			if found {
+				for i, arg := range call.Args {
+					if i >= len(caseInfo.PayloadTypes) {
+						break
+					}
+					if err := validateActorBoundaryPayloadExpr(arg, caseInfo.PayloadTypes[i], types, module, imports, state, transferOwners); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	case TypeOptional:
+		if call, ok := expr.(*frontend.CallExpr); ok {
+			for _, arg := range call.Args {
+				if err := validateActorBoundaryPayloadExpr(arg, info.ElemType, types, module, imports, state, transferOwners); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func actorTransferOwnerPayloads(expr frontend.Expr, typeName string, types map[string]*TypeInfo, module string, imports map[string]string) map[string]bool {
+	owners := make(map[string]bool)
+	collectActorTransferOwnerPayloads(expr, typeName, types, module, imports, owners)
+	return owners
+}
+
+func collectActorTransferOwnerPayloads(expr frontend.Expr, typeName string, types map[string]*TypeInfo, module string, imports map[string]string, owners map[string]bool) {
+	if expr == nil {
+		return
+	}
+	info, ok := types[typeName]
+	if !ok {
+		return
+	}
+	switch info.Kind {
+	case TypeIsland:
+		if path, ok := resourcePathForExpr(expr); ok && path != "" {
+			owners[path] = true
+		}
+	case TypeStruct:
+		for _, field := range structFieldExprs(expr, info) {
+			collectActorTransferOwnerPayloads(field.value, field.typeName, types, module, imports, owners)
+		}
+	case TypeEnum:
+		call, ok := expr.(*frontend.CallExpr)
+		if !ok {
+			return
+		}
+		_, caseInfo, found, err := resolveEnumCaseConstructorCall(call, types, module, imports)
+		if err != nil || !found {
+			return
+		}
+		for i, arg := range call.Args {
+			if i >= len(caseInfo.PayloadTypes) {
+				break
+			}
+			collectActorTransferOwnerPayloads(arg, caseInfo.PayloadTypes[i], types, module, imports, owners)
+		}
+	case TypeOptional:
+		if call, ok := expr.(*frontend.CallExpr); ok {
+			for _, arg := range call.Args {
+				collectActorTransferOwnerPayloads(arg, info.ElemType, types, module, imports, owners)
+			}
+		}
+	}
+}
+
+func isExplicitCopyExpr(expr frontend.Expr) bool {
+	call, ok := expr.(*frontend.CallExpr)
+	if !ok || call == nil {
+		return false
+	}
+	return isExplicitCopyBuiltin(call.Name)
 }
 
 func typedActorUnsupportedTransferTypeError(category string, typeName string) error {
@@ -3563,12 +3852,12 @@ func consumeTypedActorTransferPayloads(
 	imports map[string]string,
 	state *regionState,
 ) error {
-	if !typedActorTypeContainsIsland(typeName, types, map[string]bool{}) {
-		return nil
-	}
 	info, ok := types[typeName]
 	if !ok {
 		return fmt.Errorf("%s: unknown type '%s'", frontend.FormatPos(expr.Pos()), typeName)
+	}
+	if !typedActorTypeContainsIsland(typeName, types, map[string]bool{}) && info.Kind != TypeSlice {
+		return nil
 	}
 	switch info.Kind {
 	case TypeIsland:
@@ -3583,6 +3872,21 @@ func consumeTypedActorTransferPayloads(
 			return ownershipDiagnosticf(id.At, "island transfer payload '%s' must be a local value", id.Name)
 		}
 		markConsumedResourceValue(id.Name, typeName, types, state, id.At)
+		return nil
+	case TypeSlice:
+		if ownedRegionSliceOwnerForExpr(expr, state) == "" || isExplicitCopyExpr(expr) {
+			return nil
+		}
+		if path, ok := resourcePathForExpr(expr); ok && path != "" {
+			state.markConsumed(path, expr.Pos())
+			return nil
+		}
+		if id, ok := expr.(*frontend.IdentExpr); ok {
+			if _, exists := locals[id.Name]; !exists {
+				return nil
+			}
+			state.markConsumed(id.Name, id.At)
+		}
 		return nil
 	case TypeStruct:
 		if lit, ok := expr.(*frontend.StructLitExpr); ok {

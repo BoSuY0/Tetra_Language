@@ -20,33 +20,50 @@ type targetsReport struct {
 }
 
 type targetReportEntry struct {
-	Triple                  string `json:"triple"`
-	Status                  string `json:"status"`
-	OS                      string `json:"os"`
-	Arch                    string `json:"arch"`
-	ABI                     string `json:"abi"`
-	DataModel               string `json:"data_model"`
-	Format                  string `json:"format"`
-	ExeExt                  string `json:"exe_ext"`
-	BuildOnly               bool   `json:"build_only"`
-	RunMode                 string `json:"run_mode"`
-	RunRunner               string `json:"run_runner,omitempty"`
-	RunSupported            bool   `json:"run_supported"`
-	RunUnsupportedReason    string `json:"run_unsupported_reason,omitempty"`
-	UIRuntimeContract       string `json:"ui_runtime_contract,omitempty"`
-	UIRuntimeStatus         string `json:"ui_runtime_status"`
-	UIRuntimeEvidence       string `json:"ui_runtime_evidence,omitempty"`
-	PointerWidthBits        int    `json:"pointer_width_bits"`
-	RegisterWidthBits       int    `json:"register_width_bits"`
-	NativeIntWidthBits      int    `json:"native_int_width_bits"`
-	Endian                  string `json:"endian"`
-	StackAlignmentBytes     int    `json:"stack_alignment_bytes"`
-	MaxAtomicWidthBits      int    `json:"max_atomic_width_bits"`
-	AtomicWidthBits         []int  `json:"atomic_width_bits"`
-	AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits"`
-	UnsupportedReason       string `json:"unsupported_reason,omitempty"`
-	SupportsDebugInfo       bool   `json:"supports_debug_info"`
-	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
+	Triple                   string   `json:"triple"`
+	Status                   string   `json:"status"`
+	OS                       string   `json:"os"`
+	Arch                     string   `json:"arch"`
+	ABI                      string   `json:"abi"`
+	DataModel                string   `json:"data_model"`
+	Format                   string   `json:"format"`
+	ExeExt                   string   `json:"exe_ext"`
+	BuildOnly                bool     `json:"build_only"`
+	RunMode                  string   `json:"run_mode"`
+	RunRunner                string   `json:"run_runner,omitempty"`
+	RunSupported             bool     `json:"run_supported"`
+	RunUnsupportedReason     string   `json:"run_unsupported_reason,omitempty"`
+	UIRuntimeContract        string   `json:"ui_runtime_contract,omitempty"`
+	UIRuntimeStatus          string   `json:"ui_runtime_status"`
+	UIRuntimeEvidence        string   `json:"ui_runtime_evidence,omitempty"`
+	PointerWidthBits         int      `json:"pointer_width_bits"`
+	RegisterWidthBits        int      `json:"register_width_bits"`
+	NativeIntWidthBits       int      `json:"native_int_width_bits"`
+	Endian                   string   `json:"endian"`
+	StackAlignmentBytes      int      `json:"stack_alignment_bytes"`
+	MaxAtomicWidthBits       int      `json:"max_atomic_width_bits"`
+	AtomicWidthBits          []int    `json:"atomic_width_bits"`
+	AtomicPointerWidthBits   int      `json:"atomic_pointer_width_bits"`
+	UnsupportedReason        string   `json:"unsupported_reason,omitempty"`
+	RuntimeStatus            string   `json:"runtime_status,omitempty"`
+	StdlibStatus             string   `json:"stdlib_status,omitempty"`
+	FFIStatus                string   `json:"ffi_status,omitempty"`
+	MemoryBuild              string   `json:"memory_build"`
+	MemoryLower              string   `json:"memory_lower"`
+	MemoryRun                string   `json:"memory_run"`
+	MemoryRawDiagnostics     string   `json:"memory_raw_diagnostics"`
+	MemoryRegionLowering     string   `json:"memory_region_lowering"`
+	MemoryAlignmentSemantics string   `json:"memory_alignment_semantics"`
+	MemoryClaimLevel         string   `json:"memory_claim_level"`
+	RunnerProbeCommand       string   `json:"runner_probe_command,omitempty"`
+	ReleaseGate              string   `json:"release_gate,omitempty"`
+	EvidenceArtifacts        []string `json:"evidence_artifacts,omitempty"`
+	SyscallInstruction       string   `json:"syscall_instruction,omitempty"`
+	SyscallNumbering         string   `json:"syscall_numbering,omitempty"`
+	SyscallArgRegisters      []string `json:"syscall_arg_registers,omitempty"`
+	SyscallErrorRange        string   `json:"syscall_error_range,omitempty"`
+	SupportsDebugInfo        bool     `json:"supports_debug_info"`
+	SupportsReleaseOptimize  bool     `json:"supports_release_optimize"`
 }
 
 type formatsReport struct {
@@ -209,33 +226,50 @@ func buildTargetReportEntries() []targetReportEntry {
 		buildOnly := ctarget.IsBuildOnlyTarget(tgt.Triple)
 		runSupported, runRunner, runUnsupportedReason := targetRunSupport(tgt, host, hostOK)
 		out = append(out, targetReportEntry{
-			Triple:                  tgt.Triple,
-			Status:                  tgt.Status.String(),
-			OS:                      tgt.OS.String(),
-			Arch:                    tgt.Arch.String(),
-			ABI:                     tgt.ABI.String(),
-			DataModel:               tgt.DataModel.String(),
-			Format:                  tgt.Format.String(),
-			ExeExt:                  tgt.ExeExt,
-			BuildOnly:               buildOnly,
-			RunMode:                 tgt.RunMode.String(),
-			RunRunner:               runRunner,
-			RunSupported:            runSupported,
-			RunUnsupportedReason:    runUnsupportedReason,
-			UIRuntimeContract:       ctarget.UIRuntimeContract(tgt.Triple),
-			UIRuntimeStatus:         ctarget.UIRuntimeStatus(tgt.Triple),
-			UIRuntimeEvidence:       ctarget.UIRuntimeEvidence(tgt.Triple),
-			PointerWidthBits:        tgt.PointerWidthBits,
-			RegisterWidthBits:       tgt.RegisterWidthBits,
-			NativeIntWidthBits:      tgt.NativeIntWidthBits,
-			Endian:                  tgt.Endian.String(),
-			StackAlignmentBytes:     tgt.StackAlignmentBytes,
-			MaxAtomicWidthBits:      tgt.MaxAtomicWidthBits,
-			AtomicWidthBits:         tgt.AtomicWidthBits(),
-			AtomicPointerWidthBits:  atomicPointerWidthBits(tgt),
-			UnsupportedReason:       tgt.UnsupportedReason,
-			SupportsDebugInfo:       tgt.SupportsDebugInfo,
-			SupportsReleaseOptimize: tgt.SupportsReleaseOptimize,
+			Triple:                   tgt.Triple,
+			Status:                   tgt.Status.String(),
+			OS:                       tgt.OS.String(),
+			Arch:                     tgt.Arch.String(),
+			ABI:                      tgt.ABI.String(),
+			DataModel:                tgt.DataModel.String(),
+			Format:                   tgt.Format.String(),
+			ExeExt:                   tgt.ExeExt,
+			BuildOnly:                buildOnly,
+			RunMode:                  tgt.RunMode.String(),
+			RunRunner:                runRunner,
+			RunSupported:             runSupported,
+			RunUnsupportedReason:     runUnsupportedReason,
+			UIRuntimeContract:        ctarget.UIRuntimeContract(tgt.Triple),
+			UIRuntimeStatus:          ctarget.UIRuntimeStatus(tgt.Triple),
+			UIRuntimeEvidence:        ctarget.UIRuntimeEvidence(tgt.Triple),
+			PointerWidthBits:         tgt.PointerWidthBits,
+			RegisterWidthBits:        tgt.RegisterWidthBits,
+			NativeIntWidthBits:       tgt.NativeIntWidthBits,
+			Endian:                   tgt.Endian.String(),
+			StackAlignmentBytes:      tgt.StackAlignmentBytes,
+			MaxAtomicWidthBits:       tgt.MaxAtomicWidthBits,
+			AtomicWidthBits:          tgt.AtomicWidthBits(),
+			AtomicPointerWidthBits:   atomicPointerWidthBits(tgt),
+			UnsupportedReason:        tgt.UnsupportedReason,
+			RuntimeStatus:            tgt.RuntimeStatus,
+			StdlibStatus:             tgt.StdlibStatus,
+			FFIStatus:                tgt.FFIStatus,
+			MemoryBuild:              tgt.MemoryBuild,
+			MemoryLower:              tgt.MemoryLower,
+			MemoryRun:                tgt.MemoryRun,
+			MemoryRawDiagnostics:     tgt.MemoryRawDiagnostics,
+			MemoryRegionLowering:     tgt.MemoryRegionLowering,
+			MemoryAlignmentSemantics: tgt.MemoryAlignmentSemantics,
+			MemoryClaimLevel:         tgt.MemoryClaimLevel,
+			RunnerProbeCommand:       tgt.RunnerProbeCommand,
+			ReleaseGate:              tgt.ReleaseGate,
+			EvidenceArtifacts:        append([]string(nil), tgt.EvidenceArtifacts...),
+			SyscallInstruction:       tgt.SyscallInstruction,
+			SyscallNumbering:         tgt.SyscallNumbering,
+			SyscallArgRegisters:      append([]string(nil), tgt.SyscallArgRegisters...),
+			SyscallErrorRange:        tgt.SyscallErrorRange,
+			SupportsDebugInfo:        tgt.SupportsDebugInfo,
+			SupportsReleaseOptimize:  tgt.SupportsReleaseOptimize,
 		})
 	}
 	return out

@@ -3,6 +3,7 @@ package linux_x86
 import (
 	"bytes"
 	"encoding/binary"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -152,6 +153,101 @@ func TestCodegenObjectLinuxX86EmitsThreeSlotInternalReturn(t *testing.T) {
 			t.Fatalf("three-slot return code missing % x in:\n% x", want, obj.Code)
 		}
 	}
+}
+
+func TestCodegenObjectLinuxX86EmitsFourSlotInternalReturn(t *testing.T) {
+	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{
+		{
+			Name:        "callee",
+			ReturnSlots: 4,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRConstI32, Imm: 2},
+				{Kind: ir.IRConstI32, Imm: 3},
+				{Kind: ir.IRConstI32, Imm: 4},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "main",
+			ReturnSlots: 4,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRCall, Name: "callee", ArgSlots: 0, RetSlots: 4},
+				{Kind: ir.IRReturn},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("codegen four-slot return object: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0x5B, 0x59, 0x5A, 0x58, 0xC9, 0xC3}, // pop ebx; pop ecx; pop edx; pop eax; leave; ret
+		{0x50, 0x52, 0x51, 0x53},             // push eax; push edx; push ecx; push ebx
+	} {
+		if !bytes.Contains(obj.Code, want) {
+			t.Fatalf("four-slot return code missing % x in:\n% x", want, obj.Code)
+		}
+	}
+}
+
+func TestCodegenObjectLinuxX86EmitsCtxSwitchI386Stub(t *testing.T) {
+	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
+		Name:        "main",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRConstI32, Imm: 3},
+			{Kind: ir.IRCtxSwitch},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("codegen ctx_switch object: %v", err)
+	}
+
+	want := []byte{
+		0x53,       // push ebx
+		0x55,       // push ebp
+		0x56,       // push esi
+		0x57,       // push edi
+		0x89, 0x20, // mov [eax], esp
+		0x8B, 0x21, // mov esp, [ecx]
+		0x5F, // pop edi
+		0x5E, // pop esi
+		0x5D, // pop ebp
+		0x5B, // pop ebx
+		0xC3, // ret
+	}
+	target := findCtxSwitchI386InternalTarget(t, obj.Code)
+	if target+len(want) > len(obj.Code) {
+		t.Fatalf("ctx_switch target slice out of bounds: target=%d want=%d len=%d", target, len(want), len(obj.Code))
+	}
+	if got := obj.Code[target : target+len(want)]; !bytes.Equal(got, want) {
+		t.Fatalf("ctx_switch i386 internal stub mismatch\n got=% x\nwant=% x", got, want)
+	}
+	if !bytes.Contains(obj.Code, []byte{0x31, 0xC0, 0x50}) {
+		t.Fatalf("ctx_switch continuation did not push zero return status: % x", obj.Code)
+	}
+}
+
+func findCtxSwitchI386InternalTarget(t *testing.T, code []byte) int {
+	t.Helper()
+	for i := 0; i+5 <= len(code); i++ {
+		if code[i] != 0xE8 {
+			continue
+		}
+		disp := int32(binary.LittleEndian.Uint32(code[i+1 : i+5]))
+		target := i + 5 + int(disp)
+		if target < 0 || target+4 > len(code) {
+			continue
+		}
+		if bytes.Equal(code[target:target+4], []byte{0x53, 0x55, 0x56, 0x57}) {
+			return target
+		}
+	}
+	t.Fatalf("ctx_switch i386 internal call target not found in % x", code)
+	return 0
 }
 
 func TestCodegenObjectLinuxX86EmitsCallerCleanedStackArguments(t *testing.T) {
@@ -488,6 +584,94 @@ func TestCodegenObjectLinuxX86MakeSliceZeroLengthBypassesMmap(t *testing.T) {
 	}
 }
 
+func TestCodegenObjectLinuxX86MakeSliceLengthContractGuardsBeforeMmap(t *testing.T) {
+	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
+		Name:        "make_i32_guarded",
+		ReturnSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 536870912},
+			{Kind: ir.IRMakeSliceI32},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("codegen guarded slice object: %v", err)
+	}
+	negativeGuard := []byte{0x85, 0xC9, 0x0F, 0x8C}
+	overflowGuard := []byte{0x81, 0xF9, 0xFF, 0xFF, 0xFF, 0x1F, 0x0F, 0x8F}
+	mmap := []byte{0xB8, 0xC0, 0x00, 0x00, 0x00, 0xCD, 0x80}
+	negativeAt := bytes.Index(obj.Code, negativeGuard)
+	overflowAt := bytes.Index(obj.Code, overflowGuard)
+	mmapAt := bytes.Index(obj.Code, mmap)
+	if negativeAt < 0 {
+		t.Fatalf("x86 make_slice missing negative guard:\n% x", obj.Code)
+	}
+	if overflowAt < 0 {
+		t.Fatalf("x86 make_slice missing overflow guard:\n% x", obj.Code)
+	}
+	if mmapAt < 0 {
+		t.Fatalf("x86 make_slice missing mmap2 path:\n% x", obj.Code)
+	}
+	if negativeAt > mmapAt || overflowAt > mmapAt {
+		t.Fatalf("x86 make_slice guards must precede mmap: neg=%d overflow=%d mmap=%d\n% x", negativeAt, overflowAt, mmapAt, obj.Code)
+	}
+}
+
+func TestCodegenObjectLinuxX86RawSliceFromPartsBuildsScopedView(t *testing.T) {
+	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
+		Name:        "raw_slice_from_parts_view",
+		ReturnSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRCapMem},
+			{Kind: ir.IRRawSliceFromParts},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("codegen raw slice object: %v", err)
+	}
+	viewProjection := []byte{0x5A, 0x59, 0x58, 0x50, 0x51} // pop cap,len,ptr; push ptr,len
+	if !bytes.Contains(obj.Code, viewProjection) {
+		t.Fatalf("x86 raw_slice_from_parts missing scoped view projection % x in:\n% x", viewProjection, obj.Code)
+	}
+}
+
+func TestCodegenObjectLinuxX86IslandMakeSliceLengthContractGuardsBeforeMetadataAccess(t *testing.T) {
+	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
+		Name:        "island_make_i32_guarded",
+		ReturnSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 4096},
+			{Kind: ir.IRConstI32, Imm: 536870912},
+			{Kind: ir.IRIslandMakeSliceI32},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("codegen guarded island slice object: %v", err)
+	}
+	negativeGuard := []byte{0x85, 0xC9, 0x0F, 0x8C}
+	overflowGuard := []byte{0x81, 0xF9, 0xFF, 0xFF, 0xFF, 0x1F, 0x0F, 0x8F}
+	metadataRead := []byte{0x8B, 0x10}
+	negativeAt := bytes.Index(obj.Code, negativeGuard)
+	overflowAt := bytes.Index(obj.Code, overflowGuard)
+	metadataAt := bytes.Index(obj.Code, metadataRead)
+	if negativeAt < 0 {
+		t.Fatalf("x86 island_make_slice missing negative guard:\n% x", obj.Code)
+	}
+	if overflowAt < 0 {
+		t.Fatalf("x86 island_make_slice missing overflow guard:\n% x", obj.Code)
+	}
+	if metadataAt < 0 {
+		t.Fatalf("x86 island_make_slice missing metadata read:\n% x", obj.Code)
+	}
+	if negativeAt > metadataAt || overflowAt > metadataAt {
+		t.Fatalf("x86 island_make_slice guards must precede metadata read: neg=%d overflow=%d metadata=%d\n% x", negativeAt, overflowAt, metadataAt, obj.Code)
+	}
+}
+
 func TestCodegenObjectLinuxX86EmitsRawMemoryOps(t *testing.T) {
 	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
 		Name:        "main",
@@ -559,6 +743,40 @@ func TestCodegenObjectLinuxX86EmitsPtrAddAndOffsetRawMemoryOps(t *testing.T) {
 	}
 }
 
+func TestCodegenObjectLinuxX86EmptyStringLiteralHasNoDataReloc(t *testing.T) {
+	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
+		Name:        "main",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRStrLit, Str: nil},
+			{Kind: ir.IRWrite},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("CodegenObjectLinuxX86 empty string: %v", err)
+	}
+	if len(obj.Data) != 0 {
+		t.Fatalf("data = %q, want empty data section", string(obj.Data))
+	}
+	if hasRelocKind(obj.Relocs, tobj.RelocDataAbs32) {
+		t.Fatalf("empty string emitted data relocation into empty data section: %#v", obj.Relocs)
+	}
+	if err := tobj.WriteObject(filepath.Join(t.TempDir(), "empty-string.tobj"), obj); err != nil {
+		t.Fatalf("WriteObject empty-string object: %v", err)
+	}
+}
+
+func hasRelocKind(relocs []tobj.Reloc, kind tobj.RelocKind) bool {
+	for _, reloc := range relocs {
+		if reloc.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
 func TestCodegenObjectLinuxX86EmitsStringLiteralAndWrite(t *testing.T) {
 	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
 		Name:        "main",
@@ -627,18 +845,53 @@ func TestCodegenObjectLinuxX86EmitsIslandAllocationAndFree(t *testing.T) {
 		t.Fatalf("codegen island object: %v", err)
 	}
 	for _, want := range [][]byte{
-		{0x81, 0xC1, 0x10, 0x00, 0x00, 0x00},                         // add ecx,16 header bytes
-		{0xB8, 0xC0, 0x00, 0x00, 0x00, 0xCD, 0x80},                   // mmap2
-		{0xC7, 0x00, 0x10, 0x00, 0x00, 0x00},                         // [island+0] next offset
-		{0x89, 0x48, 0x04, 0x89, 0x48, 0x08},                         // [island+4]/[island+8] capacity/map length
-		{0x8B, 0x10, 0x8B, 0x58, 0x04},                               // load next/capacity
-		{0x01, 0xCF, 0x39, 0xDF, 0x0F, 0x87},                         // next+bytes > capacity overflow
-		{0x89, 0x38},                                                 // commit new bump offset
+		{0x81, 0xC1, 0x10, 0x00, 0x00, 0x00},       // add ecx,16 header bytes
+		{0xB8, 0xC0, 0x00, 0x00, 0x00, 0xCD, 0x80}, // mmap2
+		{0xC7, 0x00, 0x10, 0x00, 0x00, 0x00},       // [island+0] next offset
+		{0x89, 0x48, 0x04, 0x89, 0x48, 0x08},       // [island+4]/[island+8] capacity/map length
+		{0x8B, 0x10, 0x8B, 0x58, 0x04},             // load next/capacity
+		{0x01, 0xCF, 0x83, 0xC7, 0x0F, 0x81, 0xE7, 0xF0, 0xFF, 0xFF, 0xFF, 0x39, 0xDF, 0x0F, 0x87}, // aligned next+bytes > capacity overflow
+		{0x89, 0x38}, // commit new bump offset
 		{0x8B, 0x4B, 0x08, 0xB8, 0x5B, 0x00, 0x00, 0x00, 0xCD, 0x80}, // munmap
 	} {
 		if !bytes.Contains(obj.Code, want) {
 			t.Fatalf("island code missing % x in:\n% x", want, obj.Code)
 		}
+	}
+}
+
+func TestCodegenObjectLinuxX86IslandNewLengthGuardsBeforeMmap(t *testing.T) {
+	obj, err := CodegenObjectLinuxX86([]ir.IRFunc{{
+		Name:        "main",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: -1},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("codegen island guard object: %v", err)
+	}
+	negativeGuard := []byte{0x85, 0xC9, 0x0F, 0x8C}
+	overflowGuard := []byte{0x81, 0xF9, 0xEF, 0xFF, 0xFF, 0x7F, 0x0F, 0x8F}
+	mmap := []byte{0xB8, 0xC0, 0x00, 0x00, 0x00, 0xCD, 0x80}
+	negativeAt := bytes.Index(obj.Code, negativeGuard)
+	overflowAt := bytes.Index(obj.Code, overflowGuard)
+	mmapAt := bytes.Index(obj.Code, mmap)
+	if negativeAt < 0 {
+		t.Fatalf("x86 island_new missing negative guard:\n% x", obj.Code)
+	}
+	if overflowAt < 0 {
+		t.Fatalf("x86 island_new missing overflow guard:\n% x", obj.Code)
+	}
+	if mmapAt < 0 {
+		t.Fatalf("x86 island_new missing mmap2 path:\n% x", obj.Code)
+	}
+	if negativeAt > mmapAt || overflowAt > mmapAt {
+		t.Fatalf("x86 island_new guards must precede mmap: neg=%d overflow=%d mmap=%d\n% x", negativeAt, overflowAt, mmapAt, obj.Code)
 	}
 }
 

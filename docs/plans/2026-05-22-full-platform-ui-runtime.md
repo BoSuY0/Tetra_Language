@@ -14,7 +14,7 @@
 
 2. **Full-platform smoke scripts and gate**
    - **Files:** add `scripts/release/full_platform/windows-ui-runtime-smoke.sh`, `macos-ui-runtime-smoke.sh`, `ui-runtime-gate.sh`, and README.
-   - **Approach:** accept externally produced target-host evidence with validation, write explicit blocked reports on non-target hosts without claiming production, and make the gate run baseline, Linux, Windows, macOS, Web, cross-platform validation, docs/manifest checks, and artifact hashes.
+   - **Approach:** accept externally produced target-host evidence with validation, write explicit blocked reports on non-target hosts without claiming production, and make the gate run baseline, Linux, Windows, macOS, Web, cross-platform validation, docs and manifest checks, and artifact hashes.
    - **Verification:** script structure tests plus direct non-host smoke run should fail with a blocked report.
    - **Done when:** missing/blocked Windows/macOS evidence stops the gate.
 
@@ -22,7 +22,7 @@
    - **Files:** update `compiler/target/target.go`, `cli/cmd/tetra/metadata.go`, `compiler/manifest.go`, validators, `compiler/features.go`, `docs/spec/current_supported_surface.md`, `docs/spec/ui_v1.md`, `docs/spec/runtime_abi.md`, `docs/user/wasm_ui_guide.md`, and regenerated `docs/generated/manifest.json`.
    - **Approach:** expose truthful UI runtime status per target: Linux and Web have current runtime evidence paths; Windows/macOS require target-host evidence before production; WASI/build-only targets do not provide UI runtime dispatch.
    - **Verification:** `go run ./tools/cmd/gen-manifest`, `verify-docs`, `validate-manifest`, `validate-targets`.
-   - **Done when:** docs/features/targets do not imply Windows/macOS production from build-only or remote-blocked evidence.
+   - **Done when:** docs feature/target descriptions do not imply Windows/macOS production from build-only or remote-blocked evidence.
 
 4. **Web UI runtime marker hardening**
    - **Files:** update `scripts/release/v1_0/web-smoke.sh` and `tools/cmd/validate-web-ui-smoke`.

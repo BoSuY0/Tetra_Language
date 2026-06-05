@@ -25,6 +25,7 @@ func nativeSmokeListForTest(omit string) []byte {
 		{"core_async_smoke", "examples/core_async_smoke.tetra", "native", 42},
 		{"core_capability_smoke", "examples/core_capability_smoke.tetra", "native", 42},
 		{"core_collections_smoke", "examples/core_collections_smoke.tetra", "native", 42},
+		{"core_component_smoke", "examples/core_component_smoke.tetra", "native", 42},
 		{"core_crypto_smoke", "examples/core_crypto_smoke.tetra", "native", 42},
 		{"core_filesystem_smoke", "examples/core_filesystem_smoke.tetra", "native", 42},
 		{"core_io_smoke", "examples/core_io_smoke.tetra", "native", 42},
@@ -37,6 +38,12 @@ func nativeSmokeListForTest(omit string) []byte {
 		{"core_sync_smoke", "examples/core_sync_smoke.tetra", "native", 42},
 		{"core_testing_smoke", "examples/core_testing_smoke.tetra", "native", 42},
 		{"core_time_smoke", "examples/core_time_smoke.tetra", "native", 42},
+		{"surface_counter", "examples/surface_counter.tetra", "native", 1},
+		{"surface_text_input", "examples/surface_text_input.tetra", "native", 42},
+		{"surface_migration_ui_web_smoke", "examples/surface_migration_ui_web_smoke.tetra", "native", 2},
+		{"surface_migration_ui_native_shell_smoke", "examples/surface_migration_ui_native_shell_smoke.tetra", "native", 11},
+		{"surface_migration_dogfood_web_ui", "examples/surface_migration_dogfood_web_ui.tetra", "native", 3},
+		{"surface_migration_tetra_control_center", "examples/surface_migration_tetra_control_center.tetra", "native", 5},
 	}
 	for i := 1; len(cases) < 40; i++ {
 		name := fmt.Sprintf("filler_case_%02d", i)
@@ -82,7 +89,7 @@ func TestValidateSmokeListAcceptsWASMBuildOnlyProfile(t *testing.T) {
   "target": "wasm32-web",
   "build_only": true,
   "run_supported": false,
-  "total": 13,
+  "total": 15,
   "islands_debug": false,
   "cases": [
     {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
@@ -90,6 +97,8 @@ func TestValidateSmokeListAcceptsWASMBuildOnlyProfile(t *testing.T) {
     {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"core_slices_smoke","src_path":"examples/core_slices_smoke.tetra","target_group":"wasm","expected_exit":42},
     {"name":"wasm_globals_smoke","src_path":"examples/wasm_globals_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"surface_counter","src_path":"examples/surface_counter.tetra","target_group":"wasm","expected_exit":1},
+    {"name":"surface_text_input","src_path":"examples/surface_text_input.tetra","target_group":"wasm","expected_exit":42},
     {"name":"wasm_multi_return_2_smoke","src_path":"examples/wasm_multi_return_2_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"wasm_multi_return_3_smoke","src_path":"examples/wasm_multi_return_3_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"wasm_multi_return_4_smoke","src_path":"examples/wasm_multi_return_4_smoke.tetra","target_group":"wasm","expected_exit":0},
@@ -110,7 +119,7 @@ func TestValidateSmokeListRejectsUnknownFields(t *testing.T) {
   "target": "wasm32-web",
   "build_only": true,
   "run_supported": false,
-  "total": 13,
+  "total": 14,
   "islands_debug": false,
   "cases": [
     {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
@@ -128,7 +137,7 @@ func TestValidateSmokeListRejectsUnknownFields(t *testing.T) {
   "target": "wasm32-web",
   "build_only": true,
   "run_supported": false,
-  "total": 13,
+  "total": 14,
   "islands_debug": false,
   "cases": [
     {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0,"extra":true},
@@ -158,6 +167,61 @@ func TestValidateSmokeListRejectsMissingCoreStdlibCase(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "core_crypto_smoke") {
 		t.Fatalf("missing core stdlib error = %v", err)
+	}
+}
+
+func TestValidateSmokeListRejectsMissingNativeSurfaceCounter(t *testing.T) {
+	raw := nativeSmokeListForTest("surface_counter")
+	err := validateSmokeList(raw)
+	if err == nil {
+		t.Fatalf("expected missing native Surface counter case failure")
+	}
+	if !strings.Contains(err.Error(), "surface_counter") {
+		t.Fatalf("missing native Surface counter error = %v", err)
+	}
+}
+
+func TestValidateSmokeListRejectsMissingNativeSurfaceTextInput(t *testing.T) {
+	raw := nativeSmokeListForTest("surface_text_input")
+	err := validateSmokeList(raw)
+	if err == nil {
+		t.Fatalf("expected missing native Surface text input case failure")
+	}
+	if !strings.Contains(err.Error(), "surface_text_input") {
+		t.Fatalf("missing native Surface text input error = %v", err)
+	}
+}
+
+func TestValidateSmokeListRejectsMissingWASMSurfaceTextInput(t *testing.T) {
+	raw := []byte(`{
+  "target": "wasm32-web",
+  "build_only": true,
+  "run_supported": false,
+  "total": 14,
+  "islands_debug": false,
+  "cases": [
+    {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"effects_io_smoke","src_path":"examples/effects_io_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"core_slices_smoke","src_path":"examples/core_slices_smoke.tetra","target_group":"wasm","expected_exit":42},
+    {"name":"wasm_globals_smoke","src_path":"examples/wasm_globals_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"surface_counter","src_path":"examples/surface_counter.tetra","target_group":"wasm","expected_exit":1},
+    {"name":"wasm_multi_return_2_smoke","src_path":"examples/wasm_multi_return_2_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"wasm_multi_return_3_smoke","src_path":"examples/wasm_multi_return_3_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"wasm_multi_return_4_smoke","src_path":"examples/wasm_multi_return_4_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"dogfood_wasi","src_path":"examples/projects/dogfood_wasi/src/main.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"dogfood_web_ui","src_path":"examples/projects/dogfood_web_ui/src/main.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"time_sleep_smoke","src_path":"examples/time_sleep_smoke.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
+    {"name":"task_smoke","src_path":"examples/task_smoke.tetra","target_group":"wasm","expected_exit":42,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"},
+    {"name":"actors_pingpong","src_path":"examples/actors_pingpong.tetra","target_group":"wasm","expected_exit":0,"unsupported":true,"expected_diagnostic":"runtime not supported on wasm32"}
+  ]
+}`)
+	err := validateSmokeList(raw)
+	if err == nil {
+		t.Fatalf("expected missing wasm Surface text input case failure")
+	}
+	if !strings.Contains(err.Error(), "surface_text_input") {
+		t.Fatalf("missing wasm Surface text input error = %v", err)
 	}
 }
 
@@ -383,7 +447,7 @@ func TestValidateSmokeListRejectsUnassignedExampleWhenRootProvided(t *testing.T)
 	raw := []byte(`{
   "target": "wasm32-web",
   "build_only": true,
-  "total": 13,
+  "total": 15,
   "islands_debug": false,
   "cases": [
     {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
@@ -391,6 +455,8 @@ func TestValidateSmokeListRejectsUnassignedExampleWhenRootProvided(t *testing.T)
     {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"core_slices_smoke","src_path":"examples/core_slices_smoke.tetra","target_group":"wasm","expected_exit":42},
     {"name":"wasm_globals_smoke","src_path":"examples/wasm_globals_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"surface_counter","src_path":"examples/surface_counter.tetra","target_group":"wasm","expected_exit":1},
+    {"name":"surface_text_input","src_path":"examples/surface_text_input.tetra","target_group":"wasm","expected_exit":42},
     {"name":"wasm_multi_return_2_smoke","src_path":"examples/wasm_multi_return_2_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"wasm_multi_return_3_smoke","src_path":"examples/wasm_multi_return_3_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"wasm_multi_return_4_smoke","src_path":"examples/wasm_multi_return_4_smoke.tetra","target_group":"wasm","expected_exit":0},
@@ -419,7 +485,7 @@ func TestValidateSmokeListAcceptsDocumentedExampleExclusion(t *testing.T) {
 	raw := []byte(`{
   "target": "wasm32-web",
   "build_only": true,
-  "total": 13,
+  "total": 15,
   "islands_debug": false,
   "cases": [
     {"name":"legacy_hello","src_path":"examples/hello.tetra","target_group":"wasm","expected_exit":0},
@@ -427,6 +493,8 @@ func TestValidateSmokeListAcceptsDocumentedExampleExclusion(t *testing.T) {
     {"name":"ui_web_smoke","src_path":"examples/ui_web_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"core_slices_smoke","src_path":"examples/core_slices_smoke.tetra","target_group":"wasm","expected_exit":42},
     {"name":"wasm_globals_smoke","src_path":"examples/wasm_globals_smoke.tetra","target_group":"wasm","expected_exit":0},
+    {"name":"surface_counter","src_path":"examples/surface_counter.tetra","target_group":"wasm","expected_exit":1},
+    {"name":"surface_text_input","src_path":"examples/surface_text_input.tetra","target_group":"wasm","expected_exit":42},
     {"name":"wasm_multi_return_2_smoke","src_path":"examples/wasm_multi_return_2_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"wasm_multi_return_3_smoke","src_path":"examples/wasm_multi_return_3_smoke.tetra","target_group":"wasm","expected_exit":0},
     {"name":"wasm_multi_return_4_smoke","src_path":"examples/wasm_multi_return_4_smoke.tetra","target_group":"wasm","expected_exit":0},

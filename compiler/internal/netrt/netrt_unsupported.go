@@ -38,6 +38,14 @@ func Send(fd int, buf []byte) (int, error) {
 	return 0, ErrUnsupported
 }
 
+func Writev(fd int, chunks [][]byte) (int, error) {
+	return 0, ErrUnsupported
+}
+
+func Sendfile(outFD int, inFD int, offset *int64, count int) (int, error) {
+	return 0, ErrUnsupported
+}
+
 func Close(fd int) error {
 	return ErrUnsupported
 }

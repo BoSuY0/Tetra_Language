@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"tetra_language/compiler/internal/actorsrt"
+	"tetra_language/compiler/internal/allocplan"
 	"tetra_language/compiler/internal/backend/linux_x32"
 	"tetra_language/compiler/internal/backend/linux_x64"
 	"tetra_language/compiler/internal/backend/linux_x86"
@@ -27,8 +28,10 @@ import (
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/lower"
+	"tetra_language/compiler/internal/plir"
 	"tetra_language/compiler/internal/runtimeabi"
 	"tetra_language/compiler/internal/semantics"
+	"tetra_language/compiler/internal/validation"
 	"tetra_language/compiler/internal/version"
 	ctarget "tetra_language/compiler/target"
 )
@@ -59,6 +62,12 @@ type BuildOptions struct {
 	IslandsDebug      bool
 	DebugInfo         bool
 	ReleaseOptimize   bool
+	Explain           bool
+	EmitPLIR          bool
+	EmitProof         bool
+	EmitAllocReport   bool
+	EmitBoundsReport  bool
+	EmitMemoryReport  bool
 	Emit              EmitMode
 	Runtime           RuntimeMode
 	RuntimeObjectPath string
@@ -143,6 +152,9 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 	if err := validateTargetExportedFFIABI(build.checked, native.triple); err != nil {
 		return nil, err
 	}
+	if err := validateNativeRuntimeBeforeCodegen(build.checked, native.triple); err != nil {
+		return nil, err
+	}
 	linkedObjects, err := prepareLinkedObjects(build.world, build.checked, opt.LinkObjectPaths, native.triple)
 	if err != nil {
 		return nil, err
@@ -164,6 +176,9 @@ func BuildFileWithStatsOpt(inputPath, outputPath, target string, opt BuildOption
 		return nil, err
 	}
 	if err := emitUIArtifacts(outputPath, native.triple, build.checked); err != nil {
+		return nil, err
+	}
+	if err := emitExplainReports(outputPath, native.triple, build.checked, opt); err != nil {
 		return nil, err
 	}
 
@@ -364,11 +379,18 @@ func loadCheckedBuildWorld(inputPath string, opt BuildOptions, requireMain bool,
 	if err := validateTargetExportedFFIAST(world, target); err != nil {
 		return checkedBuildWorld{}, err
 	}
-	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: requireMain})
+	checked, err := semantics.CheckWorldOpt(world, semanticsCheckOptionsForTarget(requireMain, target))
 	if err != nil {
 		return checkedBuildWorld{}, err
 	}
 	return checkedBuildWorld{world: world, checked: checked}, nil
+}
+
+func semanticsCheckOptionsForTarget(requireMain bool, target string) semantics.CheckOptions {
+	return semantics.CheckOptions{
+		RequireMain:              requireMain,
+		EnableILP32NativeScalars: target == "linux-x86" || target == "linux-x32",
+	}
 }
 
 func prepareLinkedObjects(world *World, checked *semantics.CheckedProgram, paths []string, target string) ([]linkedObject, error) {
@@ -414,6 +436,13 @@ func planNativeModuleBuild(world *World, checked *semantics.CheckedProgram, targ
 	}
 
 	buildTag := buildTagFromOptions(opt, linkedObjects)
+	if targetSupportsStackAllocationLowering(target) {
+		if buildTag == "" {
+			buildTag = "alloc-stack-v1"
+		} else {
+			buildTag += "+alloc-stack-v1"
+		}
+	}
 	objectsByModule := make(map[string]*Object, len(modules))
 	var toCompile []moduleBuildJob
 
@@ -464,6 +493,20 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 		sortBuildStats(stats)
 		return nil
 	}
+	var allocationPlan *allocplan.Plan
+	if targetSupportsStackAllocationLowering(native.triple) {
+		plirProg, err := plir.FromCheckedProgram(checked)
+		if err != nil {
+			return err
+		}
+		if err := plir.VerifyProgram(plirProg); err != nil {
+			return err
+		}
+		allocationPlan, err = allocplan.FromPLIRWithOptions(plirProg, allocationPlanOptionsForTarget(native.triple))
+		if err != nil {
+			return err
+		}
+	}
 	jobs := opt.Jobs
 	if jobs <= 0 {
 		jobs = runtime.NumCPU()
@@ -504,7 +547,7 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 			if getErr() != nil {
 				continue
 			}
-			funcs, err := LowerModule(checked, job.module)
+			funcs, err := lower.LowerModuleWithOptions(checked, job.module, lowerOptionsForTarget(native.triple))
 			if err != nil {
 				setErr(err)
 				continue
@@ -512,6 +555,12 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 			if err := validateTargetAtomicIR(funcs, native.target); err != nil {
 				setErr(err)
 				continue
+			}
+			if allocationPlan != nil {
+				if err := validation.ValidateAllocationLowering(allocationPlanForIRFuncs(allocationPlan, funcs), &ir.IRProgram{Funcs: funcs}); err != nil {
+					setErr(err)
+					continue
+				}
 			}
 			mu.Lock()
 			stats.LoweredModules = append(stats.LoweredModules, job.module)
@@ -598,190 +647,305 @@ func linkNativeExecutable(outputPath string, native nativeBuildTarget, opt Build
 	typedTasksUsed, typedTaskMaxSlots := collectTypedTaskRuntimeUsage(checked)
 	timeRuntimeUsed, timeRuntimePos := collectTimeRuntimeUsagePosition(checked)
 	filesystemRuntimeUsed, filesystemRuntimePos := collectFilesystemRuntimeUsagePosition(checked)
-	netRuntimeUsed, netRuntimePos := collectNetRuntimeUsagePosition(checked)
+	netRuntimeUsage := collectNetRuntimeUsageProfile(checked)
+	netRuntimeUsed := netRuntimeUsage.used
+	surfaceRuntimeUsed, surfaceRuntimePos := collectSurfaceRuntimeUsagePosition(checked)
 	distributedActorsUsed, distributedActorsPos := collectDistributedActorRuntimeUsagePosition(checked)
-	if filesystemRuntimeUsed && native.triple != "linux-x64" {
+	runtimeCaps := nativeRuntimeCapabilitiesForTarget(native.triple)
+	timeOnlyRuntime := runtimeCaps.timeOnlyWithoutScheduler && opt.RuntimeObjectPath == "" && timeRuntimeUsed &&
+		!actorRuntimeUsed && !actorStateUsed && !tasksUsed && !taskGroupsUsed && !typedTasksUsed &&
+		!filesystemRuntimeUsed && !netRuntimeUsed && !surfaceRuntimeUsed && !distributedActorsUsed
+	linuxMinimalRuntime := (native.triple == "linux-x86" || native.triple == "linux-x32") && opt.RuntimeObjectPath == "" &&
+		(filesystemRuntimeUsed || netRuntimeUsed) && targetSupportsNetRuntimeUsage(native.triple, netRuntimeUsage) &&
+		!actorsUsed && !actorRuntimeUsed && !actorStateUsed && !tasksUsed && !taskGroupsUsed && !typedTasksUsed &&
+		!timeRuntimeUsed && !surfaceRuntimeUsed && !distributedActorsUsed
+	if netRuntimeUsed {
+		if pos, unsupported := unsupportedNetRuntimeUsagePosition(native.triple, netRuntimeUsage); unsupported {
+			return targetRuntimeDiagnostic(pos, native.triple, "networking")
+		}
+	}
+	if filesystemRuntimeUsed && !runtimeCaps.filesystem {
 		return targetRuntimeDiagnostic(filesystemRuntimePos, native.triple, "filesystem")
 	}
-	if netRuntimeUsed && native.triple != "linux-x64" {
-		return targetRuntimeDiagnostic(netRuntimePos, native.triple, "networking")
+	if surfaceRuntimeUsed && !runtimeCaps.surface {
+		return targetRuntimeDiagnostic(surfaceRuntimePos, native.triple, "surface")
 	}
-	if distributedActorsUsed && native.triple != "linux-x64" {
+	if distributedActorsUsed && !runtimeCaps.distributedActors {
 		return targetRuntimeDiagnostic(distributedActorsPos, native.triple, "distributed actors")
 	}
-	if timeRuntimeUsed && native.triple == "linux-x86" {
+	if timeRuntimeUsed && !runtimeCaps.time && !timeOnlyRuntime {
 		return targetRuntimeDiagnostic(timeRuntimePos, native.triple, "time")
 	}
-	if tasksUsed && native.triple == "linux-x86" {
+	if tasksUsed && !runtimeCaps.tasks {
 		return targetRuntimeDiagnostic(tasksPos, native.triple, "task")
 	}
-	if actorRuntimeUsed && native.triple == "linux-x86" {
+	if actorRuntimeUsed && !runtimeCaps.actors {
 		return targetRuntimeDiagnostic(actorRuntimePos, native.triple, "actors")
 	}
-	if actorStateUsed && native.triple == "linux-x86" {
+	if actorStateUsed && !runtimeCaps.actorState {
 		return targetRuntimeDiagnostic(actorStatePos, native.triple, "actors")
 	}
-	if actorSpawnCount > 1 && native.triple == "linux-x32" {
-		return targetRuntimeDiagnostic(actorRuntimePos, native.triple, "multi-spawn actors")
+	if runtimeCaps.actors && runtimeCaps.maxActorSpawns != unlimitedActorSpawns && actorSpawnCount > runtimeCaps.maxActorSpawns {
+		return targetRuntimeDiagnostic(actorRuntimePos, native.triple, fmt.Sprintf("actor fanout above %d", runtimeCaps.maxActorSpawns))
 	}
-	if taskGroupsUsed && native.triple == "linux-x32" {
+	if taskGroupsUsed && !runtimeCaps.taskGroups {
 		return targetRuntimeDiagnostic(tasksPos, native.triple, "task group")
 	}
-	if typedTasksUsed && native.triple == "linux-x32" {
+	if typedTasksUsed && !runtimeCaps.typedTasks {
 		return targetRuntimeDiagnostic(tasksPos, native.triple, "typed task")
 	}
-	runtimeUsed := actorsUsed || actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed || filesystemRuntimeUsed || netRuntimeUsed || distributedActorsUsed
+	if typedTasksUsed && runtimeCaps.maxTypedTaskSlots > 0 && typedTaskMaxSlots > runtimeCaps.maxTypedTaskSlots {
+		return targetRuntimeDiagnostic(tasksPos, native.triple, "staged typed task")
+	}
+	runtimeUsed := actorsUsed || actorStateUsed || tasksUsed || taskGroupsUsed || typedTasksUsed || timeRuntimeUsed || filesystemRuntimeUsed || netRuntimeUsed || surfaceRuntimeUsed || distributedActorsUsed
 	if runtimeUsed && len(actorEntries) == 0 {
 		actorEntries = []string{checked.MainName}
 	}
 	mainName := checked.MainName
 	if opt.RuntimeObjectPath != "" && !runtimeUsed {
-		return fmt.Errorf("runtime object override requires runtime usage (no actor/task/time/filesystem/networking/distributed actor builtins found)")
+		return fmt.Errorf("runtime object override requires runtime usage (no actor/task/time/filesystem/networking/surface/distributed actor builtins found)")
 	}
 	if runtimeUsed {
-		usage := runtimeUsageProfile{
-			actorStateUsed:        actorStateUsed,
-			tasksUsed:             tasksUsed,
-			taskGroupsUsed:        taskGroupsUsed,
-			typedTasksUsed:        typedTasksUsed,
-			typedTaskMaxSlots:     typedTaskMaxSlots,
-			timeRuntimeUsed:       timeRuntimeUsed,
-			filesystemUsed:        filesystemRuntimeUsed,
-			netUsed:               netRuntimeUsed,
-			distributedActorsUsed: distributedActorsUsed,
-			actorSpawnCount:       actorSpawnCount,
-		}
-		runtimeMode, err := selectRuntimeMode(opt.Runtime, usage)
-		if err != nil {
-			return err
-		}
-		runtimeMode, err = runtimeModeForNativeTarget(native.triple, opt.Runtime, runtimeMode, usage)
-		if err != nil {
-			return err
-		}
-		if native.triple == "linux-x32" && opt.RuntimeObjectPath == "" && runtimeMode == RuntimeBuiltin {
-			return fmt.Errorf("builtin runtime is not supported on target linux-x32; use runtime=selfhost for supported self-host runtime builds or remove runtime builtins")
-		}
-		var rt *Object
-		needsDispatchGlue := true
-		needsMainEntryIDGlue := true
-		if opt.RuntimeObjectPath != "" {
-			rt, err = ReadObject(opt.RuntimeObjectPath)
-			if err != nil {
-				return fmt.Errorf("read runtime object: %w", err)
-			}
-			if rt.Target == "" {
-				return fmt.Errorf("runtime object has no target: %s", opt.RuntimeObjectPath)
-			}
-			if rt.Target != native.triple {
-				return fmt.Errorf("runtime object target mismatch: got=%s want=%s", rt.Target, native.triple)
-			}
-		} else {
-			switch runtimeMode {
-			case RuntimeSelfHost:
-				rt, err = buildEmbeddedSelfHostActorsRuntimeObject(native.triple, native.codegen)
-			case RuntimeBuiltin:
-				if native.backend.actorRuntime == nil {
-					return fmt.Errorf("actors runtime is not supported on target %s", native.triple)
-				}
-				rt, err = native.backend.actorRuntime(actorEntries)
-			}
+		runtimeObjectHandled := false
+		if timeOnlyRuntime {
+			rt, err := buildEmbeddedSelfHostTimeRuntimeObject(native.triple, native.codegen)
 			if err != nil {
 				return err
 			}
 			annotateRuntimeObjectSignatures(rt)
-		}
-		if err := validateActorRuntimeObject(rt); err != nil {
-			return err
-		}
-		if actorStateUsed {
-			if err := validateActorStateRuntimeObject(rt); err != nil {
-				return err
-			}
-		}
-		if tasksUsed {
-			if err := validateTaskRuntimeObject(rt); err != nil {
-				return err
-			}
-		}
-		if taskGroupsUsed {
-			if err := validateTaskGroupRuntimeObject(rt); err != nil {
-				return err
-			}
-		}
-		if typedTasksUsed {
-			if err := validateTypedTaskRuntimeObject(rt, typedTaskMaxSlots); err != nil {
-				return err
-			}
-		}
-		if timeRuntimeUsed {
 			if err := validateTimeRuntimeObject(rt); err != nil {
 				return err
 			}
+			rt.Target = native.triple
+			rt.Module = "__selfhosttime"
+			objects = append(objects, rt)
+			runtimeObjectHandled = true
 		}
-		if filesystemRuntimeUsed {
-			if err := validateFilesystemRuntimeObject(rt); err != nil {
-				return err
+		if linuxMinimalRuntime {
+			var rt *Object
+			switch native.triple {
+			case "linux-x86":
+				if filesystemRuntimeUsed {
+					rt = buildLinuxX86FilesystemRuntimeObject()
+				} else {
+					rt = buildLinuxX86BasicNetRuntimeObject()
+				}
+				if filesystemRuntimeUsed && netRuntimeUsed {
+					if err := appendLinuxX86BasicNetRuntimeObject(rt); err != nil {
+						return err
+					}
+				}
+			case "linux-x32":
+				if filesystemRuntimeUsed {
+					rt = buildLinuxX32FilesystemRuntimeObject()
+				} else {
+					rt = buildLinuxX32BasicNetRuntimeObject()
+				}
+				if filesystemRuntimeUsed && netRuntimeUsed {
+					if err := appendLinuxX32BasicNetRuntimeObject(rt); err != nil {
+						return err
+					}
+				}
 			}
-		}
-		if netRuntimeUsed {
-			if err := validateNetRuntimeObject(rt); err != nil {
-				return err
+			annotateRuntimeObjectSignatures(rt)
+			if filesystemRuntimeUsed {
+				if err := validateFilesystemRuntimeObject(rt); err != nil {
+					return err
+				}
 			}
-		}
-		if distributedActorsUsed {
-			if err := validateDistributedActorRuntimeObject(rt); err != nil {
-				return err
-			}
-		}
-
-		for _, sym := range rt.Symbols {
-			if sym.Name == "__tetra_actor_dispatch" {
-				needsDispatchGlue = false
-			}
-			if sym.Name == "__tetra_actor_main_entry_id" {
-				needsMainEntryIDGlue = false
-			}
-		}
-
-		if needsDispatchGlue || needsMainEntryIDGlue {
-			var glueFuncs []IRFunc
-			if needsDispatchGlue {
-				dispatchFn, err := buildActorDispatchFunc(actorEntries, checked)
+			if netRuntimeUsed {
+				if runtimeCaps.networking {
+					err = validateNetRuntimeObject(rt)
+				} else {
+					err = validateNetRuntimeObjectForUsage(rt, netRuntimeUsage)
+				}
 				if err != nil {
 					return err
 				}
-				glueFuncs = append(glueFuncs, dispatchFn)
 			}
-			if needsMainEntryIDGlue {
-				mainIDFn, err := buildActorMainEntryIDFunc(actorEntries[0])
-				if err != nil {
-					return err
+			rt.Target = native.triple
+			if filesystemRuntimeUsed && netRuntimeUsed {
+				if native.triple == "linux-x86" {
+					rt.Module = "__linux_x86_minrt"
+				} else {
+					rt.Module = "__linux_x32_minrt"
 				}
-				glueFuncs = append(glueFuncs, mainIDFn)
 			}
-			if err := verifyIRFuncs(glueFuncs); err != nil {
-				return fmt.Errorf("generated actor glue verifier: %w", err)
+			objects = append(objects, rt)
+			runtimeObjectHandled = true
+		}
+		if !runtimeObjectHandled {
+			usage := runtimeUsageProfile{
+				actorStateUsed:        actorStateUsed,
+				tasksUsed:             tasksUsed,
+				taskGroupsUsed:        taskGroupsUsed,
+				typedTasksUsed:        typedTasksUsed,
+				typedTaskMaxSlots:     typedTaskMaxSlots,
+				timeRuntimeUsed:       timeRuntimeUsed,
+				filesystemUsed:        filesystemRuntimeUsed,
+				netUsed:               netRuntimeUsed,
+				netRuntimeSymbols:     netRuntimeUsage.requiredSymbols(),
+				surfaceUsed:           surfaceRuntimeUsed,
+				distributedActorsUsed: distributedActorsUsed,
+				actorSpawnCount:       actorSpawnCount,
 			}
-			glueObj, err := native.codegen(glueFuncs, nil)
+			runtimeMode, err := selectRuntimeModeForNativeTarget(native.triple, opt.Runtime, usage)
 			if err != nil {
 				return err
 			}
-			glueObj.Target = native.triple
-			glueObj.Module = "__actorsglue"
-			objects = append(objects, glueObj)
+			if native.triple == "linux-x32" && opt.RuntimeObjectPath == "" && runtimeMode == RuntimeBuiltin {
+				return fmt.Errorf("builtin runtime is not supported on target linux-x32; use runtime=selfhost for supported self-host runtime builds or remove runtime builtins")
+			}
+			var rt *Object
+			needsDispatchGlue := true
+			needsMainEntryIDGlue := true
+			if opt.RuntimeObjectPath != "" {
+				rt, err = ReadObject(opt.RuntimeObjectPath)
+				if err != nil {
+					return fmt.Errorf("read runtime object: %w", err)
+				}
+				if rt.Target == "" {
+					return fmt.Errorf("runtime object has no target: %s", opt.RuntimeObjectPath)
+				}
+				if rt.Target != native.triple {
+					return fmt.Errorf("runtime object target mismatch: got=%s want=%s", rt.Target, native.triple)
+				}
+			} else {
+				switch runtimeMode {
+				case RuntimeSelfHost:
+					rt, err = buildEmbeddedSelfHostActorsRuntimeObject(native.triple, native.codegen)
+				case RuntimeBuiltin:
+					if native.backend.actorRuntime == nil {
+						return fmt.Errorf("actors runtime is not supported on target %s", native.triple)
+					}
+					rt, err = native.backend.actorRuntime(actorEntries)
+				}
+				if err != nil {
+					return err
+				}
+				annotateRuntimeObjectSignatures(rt)
+				if native.triple == "linux-x86" && filesystemRuntimeUsed {
+					if err := appendLinuxX86FilesystemRuntimeObject(rt); err != nil {
+						return err
+					}
+				}
+				if native.triple == "linux-x32" && filesystemRuntimeUsed {
+					if err := appendLinuxX32FilesystemRuntimeObject(rt); err != nil {
+						return err
+					}
+				}
+				if native.triple == "linux-x86" && netRuntimeUsed {
+					if err := appendLinuxX86BasicNetRuntimeObject(rt); err != nil {
+						return err
+					}
+				}
+				if native.triple == "linux-x32" && netRuntimeUsed {
+					if err := appendLinuxX32BasicNetRuntimeObject(rt); err != nil {
+						return err
+					}
+				}
+			}
+			if err := validateActorRuntimeObject(rt); err != nil {
+				return err
+			}
+			if actorStateUsed {
+				if err := validateActorStateRuntimeObject(rt); err != nil {
+					return err
+				}
+			}
+			if tasksUsed {
+				if err := validateTaskRuntimeObject(rt); err != nil {
+					return err
+				}
+			}
+			if taskGroupsUsed {
+				if err := validateTaskGroupRuntimeObject(rt); err != nil {
+					return err
+				}
+			}
+			if typedTasksUsed {
+				if err := validateTypedTaskRuntimeObject(rt, typedTaskMaxSlots); err != nil {
+					return err
+				}
+			}
+			if timeRuntimeUsed {
+				if err := validateTimeRuntimeObject(rt); err != nil {
+					return err
+				}
+			}
+			if filesystemRuntimeUsed {
+				if err := validateFilesystemRuntimeObject(rt); err != nil {
+					return err
+				}
+			}
+			if netRuntimeUsed {
+				if runtimeCaps.networking {
+					if err := validateNetRuntimeObject(rt); err != nil {
+						return err
+					}
+				} else if err := validateNetRuntimeObjectForUsage(rt, netRuntimeUsage); err != nil {
+					return err
+				}
+			}
+			if surfaceRuntimeUsed {
+				if err := validateSurfaceRuntimeObject(rt); err != nil {
+					return err
+				}
+			}
+			if distributedActorsUsed {
+				if err := validateDistributedActorRuntimeObject(rt); err != nil {
+					return err
+				}
+			}
+
+			for _, sym := range rt.Symbols {
+				if sym.Name == "__tetra_actor_dispatch" {
+					needsDispatchGlue = false
+				}
+				if sym.Name == "__tetra_actor_main_entry_id" {
+					needsMainEntryIDGlue = false
+				}
+			}
+
+			if needsDispatchGlue || needsMainEntryIDGlue {
+				var glueFuncs []IRFunc
+				if needsDispatchGlue {
+					dispatchFn, err := buildActorDispatchFunc(actorEntries, checked)
+					if err != nil {
+						return err
+					}
+					glueFuncs = append(glueFuncs, dispatchFn)
+				}
+				if needsMainEntryIDGlue {
+					mainIDFn, err := buildActorMainEntryIDFunc(actorEntries[0])
+					if err != nil {
+						return err
+					}
+					glueFuncs = append(glueFuncs, mainIDFn)
+				}
+				if err := verifyIRFuncs(glueFuncs); err != nil {
+					return fmt.Errorf("generated actor glue verifier: %w", err)
+				}
+				glueObj, err := native.codegen(glueFuncs, nil)
+				if err != nil {
+					return err
+				}
+				glueObj.Target = native.triple
+				glueObj.Module = "__actorsglue"
+				objects = append(objects, glueObj)
+			}
+			rt.Target = native.triple
+			switch {
+			case opt.RuntimeObjectPath != "":
+				rt.Module = "__runtime"
+			case runtimeMode == RuntimeBuiltin:
+				rt.Module = "__actorsrt"
+			default:
+				rt.Module = "__selfhostrt"
+			}
+			objects = append(objects, rt)
+			mainName = "__tetra_entry"
 		}
-		rt.Target = native.triple
-		switch {
-		case opt.RuntimeObjectPath != "":
-			rt.Module = "__runtime"
-		case runtimeMode == RuntimeBuiltin:
-			rt.Module = "__actorsrt"
-		default:
-			rt.Module = "__selfhostrt"
-		}
-		objects = append(objects, rt)
-		mainName = "__tetra_entry"
 	}
 
 	for _, linked := range linkedObjects {
@@ -803,19 +967,129 @@ type runtimeUsageProfile struct {
 	timeRuntimeUsed       bool
 	filesystemUsed        bool
 	netUsed               bool
+	netRuntimeSymbols     []string
+	surfaceUsed           bool
 	distributedActorsUsed bool
 	actorSpawnCount       int
+}
+
+const unlimitedActorSpawns = -1
+
+type nativeRuntimeCapabilities struct {
+	actors                   bool
+	actorState               bool
+	tasks                    bool
+	taskGroups               bool
+	typedTasks               bool
+	time                     bool
+	timeOnlyWithoutScheduler bool
+	filesystem               bool
+	networking               bool
+	surface                  bool
+	distributedActors        bool
+	maxActorSpawns           int
+	maxTypedTaskSlots        int
+	builtinRuntime           bool
+	selfHostActorsRuntime    bool
+	selfHostTimeRuntime      bool
+}
+
+func nativeRuntimeCapabilitiesForTarget(target string) nativeRuntimeCapabilities {
+	switch target {
+	case "linux-x64":
+		return nativeRuntimeCapabilities{
+			actors:                true,
+			actorState:            true,
+			tasks:                 true,
+			taskGroups:            true,
+			typedTasks:            true,
+			time:                  true,
+			filesystem:            true,
+			networking:            true,
+			surface:               true,
+			distributedActors:     true,
+			maxActorSpawns:        unlimitedActorSpawns,
+			maxTypedTaskSlots:     8,
+			builtinRuntime:        true,
+			selfHostActorsRuntime: true,
+		}
+	case "linux-x32":
+		return nativeRuntimeCapabilities{
+			actors:                true,
+			actorState:            true,
+			tasks:                 true,
+			taskGroups:            true,
+			typedTasks:            true,
+			time:                  true,
+			filesystem:            true,
+			networking:            true,
+			maxActorSpawns:        2,
+			maxTypedTaskSlots:     8,
+			selfHostActorsRuntime: true,
+		}
+	case "linux-x86":
+		return nativeRuntimeCapabilities{
+			actors:                   true,
+			actorState:               true,
+			tasks:                    true,
+			taskGroups:               true,
+			typedTasks:               true,
+			time:                     true,
+			timeOnlyWithoutScheduler: true,
+			filesystem:               true,
+			networking:               true,
+			maxActorSpawns:           2,
+			maxTypedTaskSlots:        8,
+			selfHostActorsRuntime:    true,
+			selfHostTimeRuntime:      true,
+		}
+	case "macos-x64", "windows-x64":
+		return nativeRuntimeCapabilities{
+			actors:                true,
+			actorState:            true,
+			tasks:                 true,
+			taskGroups:            true,
+			typedTasks:            true,
+			time:                  true,
+			maxActorSpawns:        unlimitedActorSpawns,
+			maxTypedTaskSlots:     8,
+			builtinRuntime:        true,
+			selfHostActorsRuntime: true,
+		}
+	default:
+		return nativeRuntimeCapabilities{maxActorSpawns: 0}
+	}
+}
+
+func allocationPlanForIRFuncs(plan *allocplan.Plan, funcs []IRFunc) *allocplan.Plan {
+	if plan == nil {
+		return nil
+	}
+	names := map[string]bool{}
+	for _, fn := range funcs {
+		names[fn.Name] = true
+	}
+	out := &allocplan.Plan{Totals: plan.Totals}
+	for _, fn := range plan.Functions {
+		if names[fn.Name] {
+			out.Functions = append(out.Functions, fn)
+		}
+	}
+	return out
 }
 
 func selectRuntimeMode(requested RuntimeMode, usage runtimeUsageProfile) (RuntimeMode, error) {
 	switch requested {
 	case RuntimeAuto:
 		// Default to self-host runtime when its ABI can express the program surface.
-		if usage.actorStateUsed || usage.tasksUsed || usage.taskGroupsUsed || usage.typedTasksUsed || usage.timeRuntimeUsed || usage.filesystemUsed || usage.netUsed || usage.distributedActorsUsed || usage.typedTaskMaxSlots > 4 || usage.actorSpawnCount > 1 {
+		if usage.actorStateUsed || usage.tasksUsed || usage.taskGroupsUsed || usage.typedTasksUsed || usage.timeRuntimeUsed || usage.filesystemUsed || usage.netUsed || usage.surfaceUsed || usage.distributedActorsUsed || usage.typedTaskMaxSlots > 4 || usage.actorSpawnCount > 1 {
 			return RuntimeBuiltin, nil
 		}
 		return RuntimeSelfHost, nil
 	case RuntimeSelfHost:
+		if usage.surfaceUsed {
+			return 0, fmt.Errorf("self-host runtime does not support Tetra Surface; use runtime=auto or runtime=builtin")
+		}
 		if usage.distributedActorsUsed {
 			return 0, fmt.Errorf("self-host runtime does not support distributed actors; use runtime=auto or runtime=builtin")
 		}
@@ -837,13 +1111,55 @@ func selectRuntimeMode(requested RuntimeMode, usage runtimeUsageProfile) (Runtim
 }
 
 func runtimeModeForNativeTarget(target string, requested RuntimeMode, selected RuntimeMode, usage runtimeUsageProfile) (RuntimeMode, error) {
-	if target != "linux-x32" || requested != RuntimeAuto || selected != RuntimeBuiltin {
+	caps := nativeRuntimeCapabilitiesForTarget(target)
+	if !caps.selfHostActorsRuntime || caps.builtinRuntime || requested != RuntimeAuto || selected != RuntimeBuiltin {
 		return selected, nil
 	}
-	if _, err := selectRuntimeMode(RuntimeSelfHost, usage); err != nil {
-		return selected, nil
+	if selfHostRuntimeSupportsNativeUsage(target, usage) {
+		return RuntimeSelfHost, nil
 	}
-	return RuntimeSelfHost, nil
+	return selected, nil
+}
+
+func selectRuntimeModeForNativeTarget(target string, requested RuntimeMode, usage runtimeUsageProfile) (RuntimeMode, error) {
+	selected, err := selectRuntimeMode(requested, usage)
+	if err != nil {
+		if requested == RuntimeSelfHost && selfHostRuntimeSupportsNativeUsage(target, usage) {
+			return RuntimeSelfHost, nil
+		}
+		return 0, err
+	}
+	return runtimeModeForNativeTarget(target, requested, selected, usage)
+}
+
+func selfHostRuntimeSupportsNativeUsage(target string, usage runtimeUsageProfile) bool {
+	if usage.surfaceUsed || usage.distributedActorsUsed {
+		return false
+	}
+	if usage.netUsed && !targetSupportsNetRuntimeSymbols(target, usage.netRuntimeSymbols) {
+		return false
+	}
+	switch target {
+	case "linux-x32":
+		if usage.actorSpawnCount > 2 {
+			return false
+		}
+		return !usage.typedTasksUsed || usage.typedTaskMaxSlots <= 8
+	case "linux-x86":
+		if usage.actorSpawnCount > 2 {
+			return false
+		}
+		return !usage.typedTasksUsed || usage.typedTaskMaxSlots <= 8
+	default:
+		if usage.actorSpawnCount > 1 {
+			return false
+		}
+		if usage.typedTasksUsed {
+			return false
+		}
+		_, err := selectRuntimeMode(RuntimeSelfHost, usage)
+		return err == nil
+	}
 }
 
 func requiredActorRuntimeSymbols() []string {
@@ -880,6 +1196,55 @@ func requiredFilesystemRuntimeSymbols() []string {
 
 func requiredNetRuntimeSymbols() []string {
 	return runtimeabi.RequiredNetSymbols()
+}
+
+func targetSupportsNetRuntimeUsage(target string, usage netRuntimeUsageProfile) bool {
+	return targetSupportsNetRuntimeSymbols(target, usage.requiredSymbols())
+}
+
+func targetSupportsNetRuntimeSymbols(target string, symbols []string) bool {
+	if len(symbols) == 0 {
+		return true
+	}
+	supported := supportedNetRuntimeSymbolsForTarget(target)
+	if len(supported) == 0 {
+		return false
+	}
+	for _, symbol := range symbols {
+		if _, ok := supported[symbol]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func unsupportedNetRuntimeUsagePosition(target string, usage netRuntimeUsageProfile) (frontend.Position, bool) {
+	supported := supportedNetRuntimeSymbolsForTarget(target)
+	for _, symbol := range usage.requiredSymbols() {
+		if _, ok := supported[symbol]; ok {
+			continue
+		}
+		if pos, ok := usage.symbolPositions[symbol]; ok {
+			return pos, true
+		}
+		return usage.firstPos, true
+	}
+	return frontend.Position{}, false
+}
+
+func supportedNetRuntimeSymbolsForTarget(target string) map[string]struct{} {
+	if nativeRuntimeCapabilitiesForTarget(target).networking {
+		symbols := make(map[string]struct{}, len(requiredNetRuntimeSymbols()))
+		for _, symbol := range requiredNetRuntimeSymbols() {
+			symbols[symbol] = struct{}{}
+		}
+		return symbols
+	}
+	return nil
+}
+
+func requiredSurfaceRuntimeSymbols() []string {
+	return runtimeabi.RequiredSurfaceSymbols()
 }
 
 type runtimeObjectSlotSignature struct {
@@ -968,6 +1333,14 @@ func validateNetRuntimeObject(rt *Object) error {
 	return validateRuntimeObjectSymbols(rt, "missing networking runtime object", requiredNetRuntimeSymbols())
 }
 
+func validateNetRuntimeObjectForUsage(rt *Object, usage netRuntimeUsageProfile) error {
+	return validateRuntimeObjectSymbols(rt, "missing networking runtime object", usage.requiredSymbols())
+}
+
+func validateSurfaceRuntimeObject(rt *Object) error {
+	return validateRuntimeObjectSymbols(rt, "missing surface runtime object", requiredSurfaceRuntimeSymbols())
+}
+
 func validateTypedTaskRuntimeObject(rt *Object, maxSlots int) error {
 	return validateRuntimeObjectSymbols(rt, "missing typed task runtime object", requiredTypedTaskRuntimeSymbols(maxSlots))
 }
@@ -991,7 +1364,7 @@ func buildObjectFileWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 	if err := validateTargetExportedFFIAST(world, tgt.Triple); err != nil {
 		return nil, err
 	}
-	checked, err := semantics.CheckWorldOpt(world, semantics.CheckOptions{RequireMain: requireMain})
+	checked, err := semantics.CheckWorldOpt(world, semanticsCheckOptionsForTarget(requireMain, tgt.Triple))
 	if err != nil {
 		return nil, translateTargetExportedFFISemanticError(err, tgt.Triple)
 	}
@@ -1262,7 +1635,7 @@ func rejectUnsupportedWASMRuntimeBuiltins(funcs []IRFunc, target string) error {
 			if instr.Kind != ir.IRCall {
 				continue
 			}
-			runtimeName, ok := wasmRuntimeNameForBuiltin(instr.Name)
+			runtimeName, ok := wasmRuntimeNameForBuiltin(instr.Name, target)
 			if !ok {
 				continue
 			}
@@ -1272,7 +1645,7 @@ func rejectUnsupportedWASMRuntimeBuiltins(funcs []IRFunc, target string) error {
 	return nil
 }
 
-func wasmRuntimeNameForBuiltin(name string) (string, bool) {
+func wasmRuntimeNameForBuiltin(name string, target string) (string, bool) {
 	switch {
 	case strings.HasPrefix(name, "__tetra_actor_"):
 		return "actors", true
@@ -1282,6 +1655,11 @@ func wasmRuntimeNameForBuiltin(name string) (string, bool) {
 		return "filesystem", true
 	case strings.HasPrefix(name, "__tetra_net_"):
 		return "networking", true
+	case strings.HasPrefix(name, "__tetra_surface_"):
+		if target == "wasm32-web" {
+			return "", false
+		}
+		return "surface", true
 	case strings.HasPrefix(name, "__tetra_time_"), name == "__tetra_sleep_ms", name == "__tetra_sleep_until_ms", name == "__tetra_deadline_ms", name == "__tetra_timer_ready_ms":
 		return "time", true
 	default:
@@ -1768,6 +2146,7 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, int
 				}
 			case "core.task_spawn_group_i32":
 				used = true
+				spawnCount++
 				if len(e.Args) == 2 {
 					if lit, ok := e.Args[1].(*frontend.StringLitExpr); ok {
 						name := string(lit.Value)
@@ -1778,6 +2157,7 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, int
 				}
 			case "core.task_spawn_i32_typed":
 				used = true
+				spawnCount++
 				if len(e.TypeArgs) == 1 && e.TypeArgs[0].Name != "" && len(e.Args) == 1 {
 					if lit, ok := e.Args[0].(*frontend.StringLitExpr); ok {
 						name := string(lit.Value)
@@ -1788,6 +2168,7 @@ func collectActorEntries(checked *semantics.CheckedProgram) (bool, []string, int
 				}
 			case "core.task_spawn_group_i32_typed":
 				used = true
+				spawnCount++
 				if len(e.TypeArgs) == 1 && e.TypeArgs[0].Name != "" && len(e.Args) == 2 {
 					if lit, ok := e.Args[1].(*frontend.StringLitExpr); ok {
 						name := string(lit.Value)
@@ -2667,6 +3048,22 @@ func collectTypedTaskRuntimeUsage(checked *semantics.CheckedProgram) (bool, int)
 	return used, maxSlots
 }
 
+func validateNativeRuntimeBeforeCodegen(checked *semantics.CheckedProgram, target string) error {
+	if checked == nil || target != "linux-x86" {
+		return nil
+	}
+	typedTasksUsed, typedTaskMaxSlots := collectTypedTaskRuntimeUsage(checked)
+	if !typedTasksUsed {
+		return nil
+	}
+	_, tasksPos := collectTaskRuntimeUsagePosition(checked)
+	caps := nativeRuntimeCapabilitiesForTarget(target)
+	if caps.maxTypedTaskSlots > 0 && typedTaskMaxSlots > caps.maxTypedTaskSlots {
+		return targetRuntimeDiagnostic(tasksPos, target, "staged typed task")
+	}
+	return nil
+}
+
 func collectDistributedActorRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
 	if checked == nil {
 		return false, frontend.Position{}
@@ -3132,11 +3529,238 @@ func collectFilesystemRuntimeUsagePosition(checked *semantics.CheckedProgram) (b
 }
 
 func collectNetRuntimeUsage(checked *semantics.CheckedProgram) bool {
-	used, _ := collectNetRuntimeUsagePosition(checked)
-	return used
+	return collectNetRuntimeUsageProfile(checked).used
 }
 
 func collectNetRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
+	usage := collectNetRuntimeUsageProfile(checked)
+	return usage.used, usage.firstPos
+}
+
+type netRuntimeUsageProfile struct {
+	used            bool
+	firstPos        frontend.Position
+	symbolPositions map[string]frontend.Position
+}
+
+func (u netRuntimeUsageProfile) requiredSymbols() []string {
+	if !u.used {
+		return nil
+	}
+	out := make([]string, 0, len(u.symbolPositions))
+	for _, symbol := range requiredNetRuntimeSymbols() {
+		if _, ok := u.symbolPositions[symbol]; ok {
+			out = append(out, symbol)
+		}
+	}
+	return out
+}
+
+func collectNetRuntimeUsageProfile(checked *semantics.CheckedProgram) netRuntimeUsageProfile {
+	if checked == nil {
+		return netRuntimeUsageProfile{}
+	}
+	usage := netRuntimeUsageProfile{symbolPositions: map[string]frontend.Position{}}
+	var walkExpr func(frontend.Expr)
+	var walkStmt func(frontend.Stmt)
+
+	walkExpr = func(expr frontend.Expr) {
+		switch e := expr.(type) {
+		case *frontend.CallExpr:
+			name := e.Name
+			if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
+				name = builtin
+			}
+			if symbol, ok := netRuntimeSymbolForBuiltin(name); ok {
+				usage.used = true
+				if usage.firstPos.Line == 0 && usage.firstPos.Col == 0 {
+					usage.firstPos = e.At
+				}
+				if _, exists := usage.symbolPositions[symbol]; !exists {
+					usage.symbolPositions[symbol] = e.At
+				}
+			}
+			for _, arg := range e.Args {
+				walkExpr(arg)
+			}
+		case *frontend.StructLitExpr:
+			for _, field := range e.Fields {
+				walkExpr(field.Value)
+			}
+		case *frontend.FieldAccessExpr:
+			walkExpr(e.Base)
+		case *frontend.IndexExpr:
+			walkExpr(e.Base)
+			walkExpr(e.Index)
+		case *frontend.BinaryExpr:
+			walkExpr(e.Left)
+			walkExpr(e.Right)
+		case *frontend.UnaryExpr:
+			walkExpr(e.X)
+		case *frontend.TryExpr:
+			walkExpr(e.X)
+		case *frontend.CatchExpr:
+			walkExpr(e.Call)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		case *frontend.MatchExpr:
+			walkExpr(e.Value)
+			for _, c := range e.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				walkExpr(c.Guard)
+				walkExpr(c.Value)
+			}
+		}
+	}
+
+	walkStmt = func(stmt frontend.Stmt) {
+		switch s := stmt.(type) {
+		case *frontend.PrintStmt:
+			walkExpr(s.Value)
+		case *frontend.ReturnStmt:
+			walkExpr(s.Value)
+		case *frontend.ThrowStmt:
+			walkExpr(s.Value)
+		case *frontend.DeferStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.LetStmt:
+			walkExpr(s.Value)
+		case *frontend.AssignStmt:
+			walkExpr(s.Target)
+			walkExpr(s.Value)
+		case *frontend.IfStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.IfLetStmt:
+			walkExpr(s.Value)
+			if s.Pattern != nil {
+				walkExpr(s.Pattern)
+			}
+			for _, inner := range s.Then {
+				walkStmt(inner)
+			}
+			for _, inner := range s.Else {
+				walkStmt(inner)
+			}
+		case *frontend.WhileStmt:
+			walkExpr(s.Cond)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.ForRangeStmt:
+			if s.Iterable != nil {
+				walkExpr(s.Iterable)
+			} else {
+				walkExpr(s.Start)
+				walkExpr(s.End)
+			}
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.MatchStmt:
+			walkExpr(s.Value)
+			for _, c := range s.Cases {
+				if !c.Default {
+					walkExpr(c.Pattern)
+				}
+				for _, inner := range c.Body {
+					walkStmt(inner)
+				}
+			}
+		case *frontend.FreeStmt:
+			walkExpr(s.Value)
+		case *frontend.UnsafeStmt:
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		case *frontend.IslandStmt:
+			walkExpr(s.Size)
+			for _, inner := range s.Body {
+				walkStmt(inner)
+			}
+		}
+	}
+
+	for _, fn := range checked.Funcs {
+		if fn.Decl == nil {
+			continue
+		}
+		for _, stmt := range fn.Decl.Body {
+			walkStmt(stmt)
+		}
+	}
+	return usage
+}
+
+func netRuntimeSymbolForBuiltin(name string) (string, bool) {
+	switch name {
+	case "core.net_socket_tcp4":
+		return "__tetra_net_socket_tcp4", true
+	case "core.net_bind_tcp4_loopback":
+		return "__tetra_net_bind_tcp4_loopback", true
+	case "core.net_connect_tcp4_loopback":
+		return "__tetra_net_connect_tcp4_loopback", true
+	case "core.net_listen":
+		return "__tetra_net_listen", true
+	case "core.net_accept4":
+		return "__tetra_net_accept4", true
+	case "core.net_read":
+		return "__tetra_net_read", true
+	case "core.net_recv":
+		return "__tetra_net_recv", true
+	case "core.net_write":
+		return "__tetra_net_write", true
+	case "core.net_send":
+		return "__tetra_net_send", true
+	case "core.net_epoll_create":
+		return "__tetra_net_epoll_create", true
+	case "core.net_epoll_ctl_add_read":
+		return "__tetra_net_epoll_ctl_add_read", true
+	case "core.net_epoll_ctl_add_read_write":
+		return "__tetra_net_epoll_ctl_add_read_write", true
+	case "core.net_epoll_ctl_mod_read":
+		return "__tetra_net_epoll_ctl_mod_read", true
+	case "core.net_epoll_ctl_mod_read_write":
+		return "__tetra_net_epoll_ctl_mod_read_write", true
+	case "core.net_epoll_ctl_delete":
+		return "__tetra_net_epoll_ctl_delete", true
+	case "core.net_epoll_wait_one":
+		return "__tetra_net_epoll_wait_one", true
+	case "core.net_epoll_wait_one_into":
+		return "__tetra_net_epoll_wait_one_into", true
+	case "core.net_set_nonblocking":
+		return "__tetra_net_set_nonblocking", true
+	case "core.net_set_reuseport":
+		return "__tetra_net_set_reuseport", true
+	case "core.net_set_tcp_nodelay":
+		return "__tetra_net_set_tcp_nodelay", true
+	case "core.net_close":
+		return "__tetra_net_close", true
+	default:
+		return "", false
+	}
+}
+
+func collectSurfaceRuntimeUsage(checked *semantics.CheckedProgram) bool {
+	used, _ := collectSurfaceRuntimeUsagePosition(checked)
+	return used
+}
+
+func collectSurfaceRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, frontend.Position) {
 	if checked == nil {
 		return false, frontend.Position{}
 	}
@@ -3153,13 +3777,10 @@ func collectNetRuntimeUsagePosition(checked *semantics.CheckedProgram) (bool, fr
 				name = builtin
 			}
 			switch name {
-			case "core.net_socket_tcp4", "core.net_bind_tcp4_loopback", "core.net_connect_tcp4_loopback", "core.net_listen", "core.net_accept4",
-				"core.net_read", "core.net_recv", "core.net_write", "core.net_send", "core.net_epoll_create", "core.net_epoll_ctl_add_read",
-				"core.net_epoll_ctl_add_read_write", "core.net_epoll_ctl_mod_read",
-				"core.net_epoll_ctl_mod_read_write", "core.net_epoll_ctl_delete",
-				"core.net_epoll_wait_one", "core.net_epoll_wait_one_into",
-				"core.net_set_nonblocking", "core.net_set_reuseport",
-				"core.net_set_tcp_nodelay", "core.net_close":
+			case "core.surface_open", "core.surface_close", "core.surface_poll_event_kind", "core.surface_poll_event_x",
+				"core.surface_poll_event_y", "core.surface_poll_event_button", "core.surface_poll_event_into", "core.surface_poll_event_text_len", "core.surface_poll_event_text_into",
+				"core.surface_clipboard_write_text", "core.surface_clipboard_read_text_into", "core.surface_poll_composition_into", "core.surface_begin_frame",
+				"core.surface_present_rgba", "core.surface_now_ms", "core.surface_request_redraw":
 				used = true
 				if pos.Line == 0 && pos.Col == 0 {
 					pos = e.At

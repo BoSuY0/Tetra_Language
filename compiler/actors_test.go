@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -286,7 +287,7 @@ func TestActorMessagePoolBudgetAtDocumentedCapacityBuildAndRun(t *testing.T) {
 	}
 
 	src := `
-val MESSAGE_POOL_SAFE_MESSAGES: i32 = 1170
+val MESSAGE_POOL_SAFE_MESSAGES: i32 = 744
 
 func main() -> Int
 uses actors:
@@ -327,7 +328,7 @@ func TestActorRuntimeCapacityLimitsDocumented(t *testing.T) {
 		"`maxActors = 128`",
 		"127 child actors",
 		"64 KiB",
-		"1170",
+		"744",
 		"single-slot messages",
 		"8 state slots",
 		"rejects programs that require more than 8 actor-state slots before lowering",
@@ -803,7 +804,7 @@ func worker() -> Int:
 	if err == nil {
 		t.Fatalf("expected typed actor payload diagnostic")
 	}
-	if !strings.Contains(err.Error(), "typed actor message payload must be value-only") {
+	if !strings.Contains(err.Error(), "cannot send borrowed view across actor boundary; use .copy()") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -929,6 +930,207 @@ func worker() -> Int:
 	}
 	if !strings.Contains(err.Error(), "cannot use consumed value 'isl'") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestActorsTypedMessagesOwnedRegionSliceMoveBuildAndRun(t *testing.T) {
+	tgt, ok := target.Host()
+	if !ok {
+		t.Skipf("unsupported host: %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `
+enum MoveMsg:
+    case region(island, []i32)
+
+enum Reply:
+    case value(Int)
+
+func main() -> Int
+uses actors, alloc, islands, mem:
+    unsafe:
+        var region: island = core.island_new(128)
+        var xs: []i32 = core.island_make_i32(region, 2)
+        xs[0] = 20
+        xs[1] = 22
+        let _sent: Int = core.send_typed(core.self(), MoveMsg.region(region, xs))
+        let msg: MoveMsg = core.recv_typed<MoveMsg>()
+        match msg:
+        case MoveMsg.region(moved_region, moved_xs):
+            let sum: Int = moved_xs[0] + moved_xs[1]
+            free(moved_region)
+            return sum
+    return 0
+`
+	stdout, exitCode := buildAndRunWithOptions(t, src, BuildOptions{Runtime: RuntimeBuiltin})
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code = %d, want 42", exitCode)
+	}
+	_ = tgt
+}
+
+func TestActorsTypedMessagesOwnedRegionSliceMoveConsumesSenderSlice(t *testing.T) {
+	src := []byte(`
+enum MoveMsg:
+    case region(island, []i32)
+
+func main() -> Int
+uses actors, alloc, islands, mem:
+    unsafe:
+        var region: island = core.island_new(128)
+        var xs: []i32 = core.island_make_i32(region, 2)
+        let _sent: Int = core.send_typed(core.self(), MoveMsg.region(region, xs))
+        return xs[0]
+
+func worker() -> Int:
+    return 0
+`)
+	prog, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	_, err = Check(prog)
+	if err == nil {
+		t.Fatalf("expected region-backed slice move consume diagnostic")
+	}
+	if !strings.Contains(err.Error(), "cannot use consumed value 'xs'") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestActorsTypedMessagesOwnedRegionSliceMoveExplainReport(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "actor_region_slice_move.tetra")
+	outPath := filepath.Join(tmp, "actor_region_slice_move")
+	if err := os.WriteFile(srcPath, []byte(`
+enum MoveMsg:
+    case region(island, []i32)
+
+func main() -> Int
+uses actors, alloc, islands, mem:
+    unsafe:
+        var region: island = core.island_new(128)
+        var xs: []i32 = core.island_make_i32(region, 2)
+        return core.send_typed(core.self(), MoveMsg.region(region, xs))
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", BuildOptions{
+		Runtime: RuntimeBuiltin,
+		Explain: true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+	raw, err := os.ReadFile(outPath + ".actor-transfer.json")
+	if err != nil {
+		t.Fatalf("read actor transfer report: %v", err)
+	}
+	for _, want := range []string{
+		`"kind": "actor_transfer"`,
+		`"transfer_mode": "zero_copy_move"`,
+		`"runtime_path": "actor_mailbox_zero_copy_region_slot"`,
+		`"payload_type": "[]i32"`,
+		`"owner": "region"`,
+		`"bytes_copied": 0`,
+		`"zero_copy": true`,
+	} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("actor transfer report missing %s:\n%s", want, raw)
+		}
+	}
+	var report struct {
+		Sends []struct {
+			PayloadType                string `json:"payload_type"`
+			TransferMode               string `json:"transfer_mode"`
+			RuntimePath                string `json:"runtime_path"`
+			ClaimLevel                 string `json:"claim_level"`
+			ProductionRuntimeValidated bool   `json:"production_runtime_validated"`
+		} `json:"sends"`
+	}
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("decode actor transfer report: %v\n%s", err, raw)
+	}
+	var sawZeroCopyMove bool
+	for _, row := range report.Sends {
+		if row.TransferMode != "zero_copy_move" {
+			continue
+		}
+		sawZeroCopyMove = true
+		if row.PayloadType != "[]i32" || row.RuntimePath != "actor_mailbox_zero_copy_region_slot" {
+			t.Fatalf("zero-copy row = %+v, want owned region-backed slice runtime path", row)
+		}
+		if row.ClaimLevel != "evidence_only" {
+			t.Fatalf("zero-copy row claim_level = %q, want evidence_only: %+v", row.ClaimLevel, row)
+		}
+		if row.ProductionRuntimeValidated {
+			t.Fatalf("zero-copy row must not claim production runtime validation: %+v", row)
+		}
+	}
+	if !sawZeroCopyMove {
+		t.Fatalf("actor transfer report missing zero_copy_move row: %+v", report.Sends)
+	}
+}
+
+func TestActorsTypedMailboxExplainReportIncludesMetadataAndCopyMove(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "typed_mailbox_report.tetra")
+	outPath := filepath.Join(tmp, "typed_mailbox_report")
+	if err := os.WriteFile(srcPath, []byte(`
+enum Telemetry:
+    case inc(Int, Bool)
+    case move(island)
+
+func main() -> Int
+uses actors, alloc, islands, mem:
+    unsafe:
+        var region: island = core.island_new(32)
+        let _copy: Int = core.send_typed(core.self(), Telemetry.inc(7, true))
+        return core.send_typed(core.self(), Telemetry.move(region))
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", BuildOptions{
+		Runtime: RuntimeBuiltin,
+		Explain: true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+	raw, err := os.ReadFile(outPath + ".actor-transfer.json")
+	if err != nil {
+		t.Fatalf("read actor transfer report: %v", err)
+	}
+	for _, want := range []string{
+		`"mailboxes"`,
+		`"message_schema": "Telemetry"`,
+		`"capacity": 744`,
+		`"backpressure": "blocking_recv_yield"`,
+		`"transfer_mode": "copy"`,
+		`"ownership": "copy"`,
+		`"runtime_path": "actor_mailbox_value_slot"`,
+		`"payload_type": "i32"`,
+		`"payload_type": "bool"`,
+		`"transfer_mode": "move"`,
+		`"ownership": "owned_region"`,
+		`"runtime_path": "actor_mailbox_resource_slot"`,
+		`"owner": "region"`,
+	} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("typed mailbox report missing %s:\n%s", want, raw)
+		}
 	}
 }
 
@@ -1255,121 +1457,215 @@ func TestActorsPingPongBuildsSelfHostRuntimeForX32(t *testing.T) {
 	}
 }
 
-func TestX32MultiSpawnActorRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
+func TestX32MultiSpawnActorRuntimeBuildsSelfHostRuntime(t *testing.T) {
 	tmp := t.TempDir()
 	srcPath := filepath.Join(tmp, "actors_x32_multi_spawn.tetra")
 	outPath := filepath.Join(tmp, "actors-x32-multi-spawn")
 	if err := os.WriteFile(srcPath, []byte(`
 func slow() -> Int
-uses actors:
-    return 1
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(10)
+    let _sent: Int = core.send(core.sender(), 1)
+    return 0
 
 func fast() -> Int
-uses actors:
-    return 2
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    let _sent: Int = core.send(core.sender(), 2)
+    return 0
 
 func main() -> Int
 uses actors, runtime:
     let _slow: actor = core.spawn("slow")
     let _fast: actor = core.spawn("fast")
+    let first: Int = core.recv()
+    if first != 2:
+        return 10 + first
+    let second: Int = core.recv()
+    if second != 1:
+        return 20 + second
+    if core.time_now_ms() != 10:
+        return 40 + core.time_now_ms()
     return 0
 `), 0o644); err != nil {
 		t.Fatalf("write source: %v", err)
 	}
 
-	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1})
-	if err == nil {
-		t.Fatalf("expected x32 multi-spawn actors runtime support diagnostic")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x32 two-spawn actor self-host runtime: %v", err)
 	}
-	diag := DiagnosticFromError(err)
-	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
-		t.Fatalf("diagnostic identity = %#v", diag)
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x32 executable: %v", err)
 	}
-	if diag.Message != "multi-spawn actors runtime not supported on linux-x32" {
-		t.Fatalf("message = %q, want x32 multi-spawn actors runtime diagnostic", diag.Message)
+	if len(data) < 20 || string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x32 executable missing ELF magic or too small: len=%d", len(data))
 	}
-	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
-		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	if data[4] != 1 {
+		t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
 	}
-	if _, statErr := os.Stat(outPath); statErr == nil {
-		t.Fatalf("x32 multi-spawn actors runtime rejection wrote executable %s", outPath)
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+		t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 0 {
+		t.Fatalf("x32 two-spawn actor runtime exit=%d stdout=%q, want 0", code, stdout)
 	}
 }
 
-func TestX86ActorsRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
+func TestX86SingleActorRuntimeBuildsAndRunsWhenHostSupportsI386(t *testing.T) {
 	tmp := t.TempDir()
 	srcPath := filepath.Join(tmp, "actors_x86.tetra")
 	outPath := filepath.Join(tmp, "actors-x86")
 	if err := os.WriteFile(srcPath, []byte(`
 func worker() -> Int
 uses actors:
-    return core.recv()
+    let value: Int = core.recv()
+    if value == 41:
+        let _sent: Int = core.send(core.sender(), 42)
+        return 0
+    return 1
 
 func main() -> Int
 uses actors:
     let peer: actor = core.spawn("worker")
     let _sent: Int = core.send(peer, 41)
-    return core.recv()
+    let reply: Int = core.recv()
+    if reply == 42:
+        return 0
+    return reply
 `), 0o644); err != nil {
 		t.Fatalf("write source: %v", err)
 	}
 
-	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1})
-	if err == nil {
-		t.Fatalf("expected x86 actors runtime support diagnostic")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x86 single-actor auto self-host runtime: %v", err)
 	}
-	diag := DiagnosticFromError(err)
-	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
-		t.Fatalf("diagnostic identity = %#v", diag)
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x86 executable: %v", err)
 	}
-	if diag.Message != "actors runtime not supported on linux-x86" {
-		t.Fatalf("message = %q, want x86 actors runtime diagnostic", diag.Message)
+	if len(data) < 20 {
+		t.Fatalf("x86 executable too small: %d bytes", len(data))
 	}
-	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
-		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	if string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x86 executable missing ELF magic: % x", data[:4])
 	}
-	if _, statErr := os.Stat(outPath); statErr == nil {
-		t.Fatalf("x86 actors runtime rejection wrote executable %s", outPath)
+	if data[4] != 1 {
+		t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+		t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 0 {
+		t.Fatalf("x86 single-actor runtime exit=%d stdout=%q, want 0", code, stdout)
 	}
 }
 
-func TestX86ActorStateRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
+func TestX86MultiSpawnActorsRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "actors_multi_spawn_x86.tetra")
+	outPath := filepath.Join(tmp, "actors-multi-spawn-x86")
+	if err := os.WriteFile(srcPath, []byte(`
+func slow() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(10)
+    let _sent: Int = core.send(core.sender(), 1)
+    return 0
+
+func fast() -> Int
+uses actors, runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    let _sent: Int = core.send(core.sender(), 2)
+    return 0
+
+func main() -> Int
+uses actors, runtime:
+    let _slow: actor = core.spawn("slow")
+    let _fast: actor = core.spawn("fast")
+    let first: Int = core.recv()
+    if first != 2:
+        return 10 + first
+    let second: Int = core.recv()
+    if second != 1:
+        return 20 + second
+    if core.time_now_ms() != 10:
+        return 40 + core.time_now_ms()
+    return 0
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x86 two-spawn actor self-host runtime: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x86 executable: %v", err)
+	}
+	if len(data) < 20 || string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x86 executable missing ELF magic or too small: len=%d", len(data))
+	}
+	if data[4] != 1 {
+		t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+		t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 0 {
+		t.Fatalf("x86 two-spawn actor runtime exit=%d stdout=%q, want 0", code, stdout)
+	}
+}
+
+func TestX86ActorStateRuntimeBuildsAndRunsWhenHostSupportsI386(t *testing.T) {
 	tmp := t.TempDir()
 	srcPath := filepath.Join(tmp, "actor_state_x86.tetra")
 	outPath := filepath.Join(tmp, "actor-state-x86")
 	if err := os.WriteFile(srcPath, []byte(`
 actor Counter:
     var count: Int = 0
+    const enabled: Bool = true
     func run() -> Int
     uses actors:
-        count = count + 1
-        return count
+        let delta: Int = core.recv()
+        if enabled:
+            count = count + delta + 1
+        let _sent: Int = core.send(core.sender(), count)
+        return 0
 
-func main() -> Int:
-    return 0
+func main() -> Int
+uses actors:
+    let peer: actor = core.spawn("Counter.run")
+    let _sent: Int = core.send(peer, 41)
+    return core.recv()
 `), 0o644); err != nil {
 		t.Fatalf("write source: %v", err)
 	}
 
-	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1})
-	if err == nil {
-		t.Fatalf("expected x86 actor state runtime support diagnostic")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x86 actor-state auto self-host runtime: %v", err)
 	}
-	diag := DiagnosticFromError(err)
-	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
-		t.Fatalf("diagnostic identity = %#v", diag)
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x86 executable: %v", err)
 	}
-	if diag.File != srcPath || diag.Line == 0 {
-		t.Fatalf("diagnostic position = %s:%d, want actor method source position in %s", diag.File, diag.Line, srcPath)
+	if len(data) < 20 {
+		t.Fatalf("x86 executable too small: %d bytes", len(data))
 	}
-	if diag.Message != "actors runtime not supported on linux-x86" {
-		t.Fatalf("message = %q, want x86 actor state runtime diagnostic", diag.Message)
+	if string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x86 executable missing ELF magic: % x", data[:4])
 	}
-	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
-		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	if data[4] != 1 {
+		t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
 	}
-	if _, statErr := os.Stat(outPath); statErr == nil {
-		t.Fatalf("x86 actor state runtime rejection wrote executable %s", outPath)
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+		t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 42 {
+		t.Fatalf("x86 actor-state runtime exit=%d stdout=%q, want 42", code, stdout)
 	}
 }
 
@@ -1379,8 +1675,10 @@ func TestCanonicalSelfHostRuntimeSources(t *testing.T) {
 		wantModule string
 	}{
 		{filepath.Join("..", "__rt", "actors_sysv.tetra"), "__rt.actors_sysv"},
+		{filepath.Join("..", "__rt", "actors_i386.tetra"), "__rt.actors_i386"},
 		{filepath.Join("..", "__rt", "actors_win64.tetra"), "__rt.actors_win64"},
 		{filepath.Join("selfhostrt", "actors_sysv.tetra"), "__rt.actors_sysv"},
+		{filepath.Join("selfhostrt", "actors_i386.tetra"), "__rt.actors_i386"},
 		{filepath.Join("selfhostrt", "actors_win64.tetra"), "__rt.actors_win64"},
 	}
 

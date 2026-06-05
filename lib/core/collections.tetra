@@ -10,6 +10,58 @@
 // ```
 module lib.core.collections
 
+struct Vec<T>:
+    items: []T
+    logical_len: Int
+
+struct HashMap<K, V>:
+    keys: []K
+    values: []V
+    logical_len: Int
+
+func vec_from_slice<T>(items: []T) -> Vec<T>
+uses mem:
+    var count: Int = 0
+    for item in items:
+        count = count + 1
+    return Vec<T>(items: items, logical_len: count)
+
+func vec_len<T>(vec: Vec<T>) -> Int:
+    return vec.logical_len
+
+func vec_first_or<T>(vec: Vec<T>, fallback: T) -> T
+uses mem:
+    for item in vec.items:
+        return item
+    return fallback
+
+func vec_get_or<T>(vec: Vec<T>, index: Int, fallback: T) -> T
+uses mem:
+    if index < 0:
+        return fallback
+    var pos: Int = 0
+    for item in vec.items:
+        if pos == index:
+            return item
+        pos = pos + 1
+    return fallback
+
+func hash_map_from_slices<K, V>(keys: []K, values: []V) -> HashMap<K, V>
+uses mem:
+    var count: Int = 0
+    for key in keys:
+        count = count + 1
+    return HashMap<K, V>(keys: keys, values: values, logical_len: count)
+
+func hash_map_len<K, V>(map: HashMap<K, V>) -> Int:
+    return map.logical_len
+
+func hash_map_first_value_or<K, V>(map: HashMap<K, V>, fallback: V) -> V
+uses mem:
+    for value in map.values:
+        return value
+    return fallback
+
 func len_i32(values: []i32) -> Int
 uses mem:
     var count: Int = 0
@@ -36,4 +88,28 @@ func first_or_i32(values: []i32, fallback: Int) -> Int
 uses mem:
     for value in values:
         return value
+    return fallback
+
+func hash_map_get_i32_i32_or(map: HashMap<Int, Int>, key: Int, fallback: Int) -> Int
+uses mem:
+    var index: Int = 0
+    let value_count: Int = len_i32(map.values)
+    for item_key in map.keys:
+        if index >= value_count:
+            return fallback
+        if item_key == key:
+            return map.values[index]
+        index = index + 1
+    return fallback
+
+func hash_map_get_u8_i32_or(map: HashMap<UInt8, Int>, key: UInt8, fallback: Int) -> Int
+uses mem:
+    var index: Int = 0
+    let value_count: Int = len_i32(map.values)
+    for item_key in map.keys:
+        if index >= value_count:
+            return fallback
+        if item_key == key:
+            return map.values[index]
+        index = index + 1
     return fallback

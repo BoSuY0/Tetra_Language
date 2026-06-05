@@ -23,6 +23,9 @@ func classifyCallableEscape(
 	if err != nil {
 		return "", false, err
 	}
+	if capture, surfaceType, ok := surfaceEphemeralCallableCapture(captures, types); ok {
+		return "", false, lifetimeDiagnosticf(capture.At, "surface value '%s' cannot escape via function capture; keep Surface Frame/Event/DrawContext values local to the active Surface turn", surfaceType)
+	}
 	if slots <= FnPtrEnvSlotCount && boundary != callableBoundaryThread {
 		return CallableEscapeLocalSnapshot, false, nil
 	}
@@ -46,4 +49,13 @@ func classifyCallableEscape(
 		}
 	}
 	return escapeKind, true, nil
+}
+
+func surfaceEphemeralCallableCapture(captures []frontend.ClosureCapture, types map[string]*TypeInfo) (frontend.ClosureCapture, string, bool) {
+	for _, capture := range captures {
+		if surfaceType, ok := surfaceEphemeralValueType(capture.Type.Name, types); ok {
+			return capture, surfaceType, true
+		}
+	}
+	return frontend.ClosureCapture{}, "", false
 }

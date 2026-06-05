@@ -326,11 +326,11 @@ func (db *fakeWorldDB) serve(conn net.Conn) error {
 				if len(values) != 2 {
 					return errors.New("update_world_random expects two params")
 				}
-				randomNumber, err := strconv.Atoi(string(values[0]))
+				randomNumber, err := decodeFakeInt4Param(values[0])
 				if err != nil {
 					return err
 				}
-				id, err := strconv.Atoi(string(values[1]))
+				id, err := decodeFakeInt4Param(values[1])
 				if err != nil {
 					return err
 				}
@@ -356,7 +356,7 @@ func (db *fakeWorldDB) serve(conn net.Conn) error {
 			if len(values) != 1 {
 				return errors.New("world_by_id expects one param")
 			}
-			id, err := strconv.Atoi(string(values[0]))
+			id, err := decodeFakeInt4Param(values[0])
 			if err != nil {
 				return err
 			}
@@ -451,6 +451,13 @@ func queryWorldID(query string) int {
 		return 1
 	}
 	return id
+}
+
+func decodeFakeInt4Param(value []byte) (int, error) {
+	if len(value) == 4 {
+		return pgrt.DecodeInt4(value, pgrt.BinaryFormat)
+	}
+	return pgrt.DecodeInt4(value, pgrt.TextFormat)
 }
 
 func readStartupMessage(r io.Reader) ([]byte, error) {

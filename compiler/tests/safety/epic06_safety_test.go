@@ -415,7 +415,7 @@ func forward(buf: borrow []u8) -> []u8:
 func main() -> Int:
     return 0
 `,
-			want: "borrowed local 'buf' cannot escape via return",
+			want: "borrowed slice return requires '-> borrow []u8' or '.copy()'",
 		},
 		{
 			name: "borrowed island slice cannot escape through inout assignment",

@@ -424,6 +424,17 @@ func writeInterfaceHashOnlySurface(b *bytes.Buffer, file *frontend.FileAST, expl
 			fmt.Fprintf(b, "// view %s accessibility %s: %s\n", view.Name, item.Name, formatLSPTypeRef(item.Type))
 		}
 	}
+	for _, fn := range file.Funcs {
+		if fn.Synthetic || fn.ExtensionOf != "" || !interfaceDeclPublic(file, fn.Public) {
+			continue
+		}
+		source, ok := interfaceBorrowedReturnExpr(fn)
+		if !ok {
+			continue
+		}
+		writeHeader()
+		fmt.Fprintf(b, "// func %s lifetime return=borrow source=%s provenance=param lifetime=call\n", formatLSPFuncDetail(fn), source)
+	}
 	if wroteHeader {
 		b.WriteByte('\n')
 	}
@@ -577,6 +588,9 @@ func interfaceReturnExpr(fn *frontend.FuncDecl) string {
 			return expr
 		}
 		return interfaceFunctionClosureLiteral(fn.ReturnType, "        ")
+	}
+	if expr, ok := interfaceBorrowedReturnExpr(fn); ok {
+		return expr
 	}
 	if expr, ok := interfaceAggregateReturnExpr(fn); ok {
 		return expr
@@ -811,6 +825,111 @@ func interfaceOptionalAggregateReturnFromStmts(stmts []frontend.Stmt, aliases, o
 	return "", false
 }
 
+func interfaceBorrowedReturnExpr(fn *frontend.FuncDecl) (string, bool) {
+	if fn == nil || fn.ReturnOwnership != "borrow" {
+		return "", false
+	}
+	params := map[string]bool{}
+	paramOrder := []string{}
+	returnType := formatLSPTypeRef(fn.ReturnType)
+	for _, param := range fn.Params {
+		if param.Ownership == "borrow" {
+			params[param.Name] = true
+			if formatLSPTypeRef(param.Type) == returnType {
+				paramOrder = append(paramOrder, param.Name)
+			}
+		}
+	}
+	if len(params) == 0 {
+		return "", false
+	}
+	for _, stmt := range fn.Body {
+		ret, ok := stmt.(*frontend.ReturnStmt)
+		if !ok {
+			continue
+		}
+		if source, ok := interfaceBorrowedSourceParamExpr(ret.Value, params); ok {
+			return source, true
+		}
+	}
+	if len(paramOrder) == 1 {
+		return paramOrder[0], true
+	}
+	return "", false
+}
+
+func interfaceBorrowedSourceParamExpr(expr frontend.Expr, params map[string]bool) (string, bool) {
+	switch e := expr.(type) {
+	case *frontend.IdentExpr:
+		if params[e.Name] {
+			return e.Name, true
+		}
+	case *frontend.FieldAccessExpr:
+		return interfaceBorrowedSourceParamExpr(e.Base, params)
+	case *frontend.CallExpr:
+		method, ok := interfaceBorrowedViewMethod(e.Name)
+		if ok && len(e.Args) > 0 {
+			switch method {
+			case "borrow", "window", "prefix", "suffix":
+				return interfaceBorrowedSourceParamExpr(e.Args[0], params)
+			}
+		}
+		return interfaceBorrowedSourceParamMethodCall(e.Name, params)
+	}
+	return "", false
+}
+
+func interfaceBorrowedSourceParamMethodCall(name string, params map[string]bool) (string, bool) {
+	idx := strings.LastIndex(name, ".")
+	if idx < 0 {
+		return "", false
+	}
+	receiver := name[:idx]
+	method := name[idx+1:]
+	switch method {
+	case "borrow", "window", "prefix", "suffix":
+	default:
+		return "", false
+	}
+	root := receiver
+	if dot := strings.Index(root, "."); dot >= 0 {
+		root = root[:dot]
+	}
+	if params[root] {
+		return root, true
+	}
+	return "", false
+}
+
+func interfaceBorrowedViewMethod(name string) (string, bool) {
+	if strings.HasPrefix(name, "__method.") {
+		method := strings.TrimPrefix(name, "__method.")
+		switch method {
+		case "borrow", "window", "prefix", "suffix":
+			return method, true
+		}
+	}
+	if name == "core.string_borrow" {
+		return "borrow", true
+	}
+	if strings.HasPrefix(name, "core.slice_borrow_") {
+		return "borrow", true
+	}
+	if name == "core.string_window" || name == "core.string_prefix" || name == "core.string_suffix" {
+		return strings.TrimPrefix(name, "core.string_"), true
+	}
+	if strings.HasPrefix(name, "core.slice_window_") {
+		return "window", true
+	}
+	if strings.HasPrefix(name, "core.slice_prefix_") {
+		return "prefix", true
+	}
+	if strings.HasPrefix(name, "core.slice_suffix_") {
+		return "suffix", true
+	}
+	return "", false
+}
+
 func interfaceOptionalAggregateMatchReturnExpr(match *frontend.MatchStmt, aliases, optionalAggregates map[string]string, params map[string]bool, returnType string) (string, bool) {
 	if match == nil || len(match.Cases) == 0 {
 		return "", false
@@ -969,7 +1088,18 @@ func interfaceFunctionBody(fn *frontend.FuncDecl) string {
 	if expr, ok := interfaceThrowExpr(fn); ok {
 		return "    throw " + expr
 	}
+	if body, ok := interfaceBorrowedReturnBody(fn); ok {
+		return body
+	}
 	return "    return " + interfaceReturnExpr(fn)
+}
+
+func interfaceBorrowedReturnBody(fn *frontend.FuncDecl) (string, bool) {
+	source, ok := interfaceBorrowedReturnExpr(fn)
+	if !ok {
+		return "", false
+	}
+	return fmt.Sprintf("    // tetra-interface-lifetime: return=borrow source=%s provenance=param lifetime=call\n    return %s", source, source), true
 }
 
 type interfaceCaptureStub struct {

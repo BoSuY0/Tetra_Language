@@ -1,0 +1,579 @@
+{
+  "schema": "tetra.release-artifact-hashes.v1alpha1",
+  "root": ".",
+  "artifacts": [
+    {
+      "path": "surface-headless-accessibility-metadata-artifacts/surface-accessibility-settings",
+      "sha256": "sha256:e7f7e0f4272905eeeb639d7576b7127e4e2986de8f9c9795ada7a2db68db5b2d",
+      "size": 159790
+    },
+    {
+      "path": "surface-headless-accessibility-metadata-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:e5dada070d1162a71d15e3bf697ce5321980941941dc9e98b19eb32d78e32909",
+      "size": 52674,
+      "schema": "tetra.surface.headless-runner-trace.v1"
+    },
+    {
+      "path": "surface-headless-accessibility-metadata.json",
+      "sha256": "sha256:fb840d9d28d65e1efe87db5e9cb24b85f5ac2d7e621d9bbe8968a0b48d465316",
+      "size": 55287,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-headless-artifacts/surface-counter",
+      "sha256": "sha256:19e16bb4861fcc9ee860aa4fbc7c683d431a485bf69edc6e1b18de161dff849d",
+      "size": 90132
+    },
+    {
+      "path": "surface-headless-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:e02dac565295ed9bc9516e86b17fa54f36ce8d0361eeb57bf9380603bdd5a540",
+      "size": 5712,
+      "schema": "tetra.surface.headless-runner-trace.v1"
+    },
+    {
+      "path": "surface-headless-component-tree-api-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:b59f9f4a003c8a625a7b340710355903354978f943de0949dacde1bfb2bcaa6e",
+      "size": 23107,
+      "schema": "tetra.surface.headless-runner-trace.v1"
+    },
+    {
+      "path": "surface-headless-component-tree-api-artifacts/surface-tree-app",
+      "sha256": "sha256:6b070e34874a6ab3c65048aee663da11c0df2caa5326c61f5bfab85d5fe3f6cc",
+      "size": 147498
+    },
+    {
+      "path": "surface-headless-component-tree-api.json",
+      "sha256": "sha256:b763b021699d0a9128f6e51e0a8eae8c276cf13991d1f2f1f0ec467fed0d1c5d",
+      "size": 25644,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-headless-component-tree-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:b59f9f4a003c8a625a7b340710355903354978f943de0949dacde1bfb2bcaa6e",
+      "size": 23107,
+      "schema": "tetra.surface.headless-runner-trace.v1"
+    },
+    {
+      "path": "surface-headless-component-tree-artifacts/surface-tree-app",
+      "sha256": "sha256:6b070e34874a6ab3c65048aee663da11c0df2caa5326c61f5bfab85d5fe3f6cc",
+      "size": 147498
+    },
+    {
+      "path": "surface-headless-component-tree.json",
+      "sha256": "sha256:fad01f1bf525e3cd3f7b74ed3d9c9c7c21dd4dfdc438c479ffe0352d262038c4",
+      "size": 25624,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-headless-minimal-toolkit-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:3d6a64f14044f61e023ca4b2be93f3fcc16221d083cd1d7f2d160f0b5d665e5c",
+      "size": 32547,
+      "schema": "tetra.surface.headless-runner-trace.v1"
+    },
+    {
+      "path": "surface-headless-minimal-toolkit-artifacts/surface-toolkit-form",
+      "sha256": "sha256:4bc06085eaec86ce5501de2c1c6063f915534931594de3ca31b0f01805ec867e",
+      "size": 200747
+    },
+    {
+      "path": "surface-headless-minimal-toolkit.json",
+      "sha256": "sha256:d298e5bf6f023acb5b1f08f22d7c8b5d8eb2722ee0bda9408aefcdfea79ea8be",
+      "size": 35085,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-headless-text-focus-input-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:ebd7d9aa935121c05c37ed844cd326533668cc5eaa32f740eafdfadcacff13ac",
+      "size": 13015,
+      "schema": "tetra.surface.headless-runner-trace.v1"
+    },
+    {
+      "path": "surface-headless-text-focus-input-artifacts/surface-textbox-app",
+      "sha256": "sha256:9df18156a48fbd8a9dfa1d0bb6211635446314c9be2280c3cfe53c53e4bd7195",
+      "size": 110633
+    },
+    {
+      "path": "surface-headless-text-focus-input.json",
+      "sha256": "sha256:9d1fd66aa64f6e70ee5df33fc5316ab72316ab31add1a3bb4716b58fcee1bf86",
+      "size": 15554,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-headless-toolkit-reuse-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:60729fd6928f9b59f0d9ea00e69c29bac6b086d8d4a99d202b68b92233157858",
+      "size": 35763,
+      "schema": "tetra.surface.headless-runner-trace.v1"
+    },
+    {
+      "path": "surface-headless-toolkit-reuse-artifacts/surface-toolkit-settings",
+      "sha256": "sha256:fce0a1574b35e7a6013281e8b293b3b74987ccacaa35a24ed297978638e51400",
+      "size": 225320
+    },
+    {
+      "path": "surface-headless-toolkit-reuse.json",
+      "sha256": "sha256:ea1dd5b92a6c90a1f1d7642c93d484206812e898c4d84503093a8fa89fd0f4e9",
+      "size": 38307,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-headless.json",
+      "sha256": "sha256:2d3d37284d8d6f005b80058c78a6d61bb539cf1a5924171348eb3a6cc5b12614",
+      "size": 8035,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-linux-x64-artifacts/.tetra_cache/linux-x64/_root/65a36a9b14acd2dc751513c8623e665d1d9def2fbe714599072572c7bda74add.tobj",
+      "sha256": "sha256:771d211fed542fdb16c1bf48142ed202242d36ffc69f047ca499b9c317b530d1",
+      "size": 2036
+    },
+    {
+      "path": "surface-linux-x64-artifacts/.tetra_cache/linux-x64/_root/c5a56368ef83d40ceecf1885dab6626e3bebaf007d28613085fba525ae2b97d0.tobj",
+      "sha256": "sha256:79ee3d07b77021528c8aee9fac23e9630448b9fd2a3c3504f41dddadd6d546cd",
+      "size": 5178
+    },
+    {
+      "path": "surface-linux-x64-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-artifacts/surface-counter",
+      "sha256": "sha256:19e16bb4861fcc9ee860aa4fbc7c683d431a485bf69edc6e1b18de161dff849d",
+      "size": 90132
+    },
+    {
+      "path": "surface-linux-x64-artifacts/surface-counter-present-probe",
+      "sha256": "sha256:267c1754ab91f138728f1555f66b820ff6cbebba919eb361fa5d979e493f1930",
+      "size": 90148
+    },
+    {
+      "path": "surface-linux-x64-artifacts/surface-event-sequence-probe",
+      "sha256": "sha256:54315f319019be5845b6eb6ac33f1c11bc64efa17c5e4b37f376ab196228fa29",
+      "size": 20516
+    },
+    {
+      "path": "surface-linux-x64-artifacts/surface-event-sequence-probe.tetra",
+      "sha256": "sha256:a93a4035e288bf6ea98152866f7327f7e36784ae41c943122b538fdec2e898fb",
+      "size": 1100
+    },
+    {
+      "path": "surface-linux-x64-artifacts/surface-host-probe",
+      "sha256": "sha256:f569aca36bf2baecbff5ad23ddfaf4f34c83c93cb3d58d48c41e27560cdd958d",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-artifacts/surface-presented-frame-probe",
+      "sha256": "sha256:17c0b5c06d9d930e8d5bfdb2e58e977f46973a1cd5029632477dfa6ca44f1f27",
+      "size": 20517
+    },
+    {
+      "path": "surface-linux-x64-artifacts/surface-presented-frame-probe.tetra",
+      "sha256": "sha256:d7dc8415125964f434b3734768190c03ae1292039abaf3feb2594314cd88a3ce",
+      "size": 691
+    },
+    {
+      "path": "surface-linux-x64-real-window-accessibility-metadata-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-real-window-accessibility-metadata-artifacts/surface-accessibility-metadata-real-window-frame.rgba",
+      "sha256": "sha256:333694f208c873229299d85038586c35991a757c5c3f54cf7b6f2246a8beaf11",
+      "size": 614400
+    },
+    {
+      "path": "surface-linux-x64-real-window-accessibility-metadata-artifacts/surface-accessibility-settings",
+      "sha256": "sha256:e7f7e0f4272905eeeb639d7576b7127e4e2986de8f9c9795ada7a2db68db5b2d",
+      "size": 159790
+    },
+    {
+      "path": "surface-linux-x64-real-window-accessibility-metadata-artifacts/surface-host-probe",
+      "sha256": "sha256:f569aca36bf2baecbff5ad23ddfaf4f34c83c93cb3d58d48c41e27560cdd958d",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-real-window-accessibility-metadata-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-real-window-accessibility-metadata.json",
+      "sha256": "sha256:1033047af4d9ac169bfb811c63be2e50176b7db972fa6d0e25dfc616d83b7276",
+      "size": 57190,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-linux-x64-real-window-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-real-window-artifacts/surface-counter",
+      "sha256": "sha256:3dd228aa785bc3eda1c6e6daf51dcfc25e764cadee26fc1ce2cf038f335aa0b7",
+      "size": 94238
+    },
+    {
+      "path": "surface-linux-x64-real-window-artifacts/surface-host-probe",
+      "sha256": "sha256:f569aca36bf2baecbff5ad23ddfaf4f34c83c93cb3d58d48c41e27560cdd958d",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-real-window-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-real-window-artifacts/surface-real-window-frame.rgba",
+      "sha256": "sha256:030eb4d0dc6d6edeea2dd0618d219b93cbace14e291a6dff8071d512121b448d",
+      "size": 384000
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-api-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-api-artifacts/surface-component-tree-real-window-frame.rgba",
+      "sha256": "sha256:0e4c669f63c557d06fbb0abaccbb01fbc0be1eb67d96e208d93c9338a3aa3b91",
+      "size": 384000
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-api-artifacts/surface-host-probe",
+      "sha256": "sha256:f569aca36bf2baecbff5ad23ddfaf4f34c83c93cb3d58d48c41e27560cdd958d",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-api-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-api-artifacts/surface-tree-app",
+      "sha256": "sha256:6b070e34874a6ab3c65048aee663da11c0df2caa5326c61f5bfab85d5fe3f6cc",
+      "size": 147498
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-api.json",
+      "sha256": "sha256:b9b5b0b32e5d897664911f8989e03c7a144bd3614cd2469dea0577e043c3be38",
+      "size": 27527,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-artifacts/surface-component-tree-real-window-frame.rgba",
+      "sha256": "sha256:0e4c669f63c557d06fbb0abaccbb01fbc0be1eb67d96e208d93c9338a3aa3b91",
+      "size": 384000
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-artifacts/surface-host-probe",
+      "sha256": "sha256:f569aca36bf2baecbff5ad23ddfaf4f34c83c93cb3d58d48c41e27560cdd958d",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree-artifacts/surface-tree-app",
+      "sha256": "sha256:6b070e34874a6ab3c65048aee663da11c0df2caa5326c61f5bfab85d5fe3f6cc",
+      "size": 147498
+    },
+    {
+      "path": "surface-linux-x64-real-window-component-tree.json",
+      "sha256": "sha256:cf70b52bd5145f1c566c26b01b4aa0d1d75f81bcc668f82f978181b2f0b9817d",
+      "size": 27495,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-linux-x64-real-window-minimal-toolkit-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-real-window-minimal-toolkit-artifacts/surface-host-probe",
+      "sha256": "sha256:f569aca36bf2baecbff5ad23ddfaf4f34c83c93cb3d58d48c41e27560cdd958d",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-real-window-minimal-toolkit-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-real-window-minimal-toolkit-artifacts/surface-minimal-toolkit-real-window-frame.rgba",
+      "sha256": "sha256:b55f62535f3eca27f7bf8574519b4fcd8fbff5407a797f97692f6c1e23ebd02a",
+      "size": 384000
+    },
+    {
+      "path": "surface-linux-x64-real-window-minimal-toolkit-artifacts/surface-toolkit-form",
+      "sha256": "sha256:4bc06085eaec86ce5501de2c1c6063f915534931594de3ca31b0f01805ec867e",
+      "size": 200747
+    },
+    {
+      "path": "surface-linux-x64-real-window-minimal-toolkit.json",
+      "sha256": "sha256:a51c07e40dae18607c268eabba9829c4eb8d62e44be485a6ce43ec7bd774a89d",
+      "size": 36960,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-linux-x64-real-window-text-focus-input-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-real-window-text-focus-input-artifacts/surface-host-probe",
+      "sha256": "sha256:f569aca36bf2baecbff5ad23ddfaf4f34c83c93cb3d58d48c41e27560cdd958d",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-real-window-text-focus-input-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-real-window-text-focus-input-artifacts/surface-text-focus-input-real-window-frame.rgba",
+      "sha256": "sha256:98323a1076b8a8a01a018ab57a02c492e8a3d91dd9af4fb428d975c010c6379b",
+      "size": 384000
+    },
+    {
+      "path": "surface-linux-x64-real-window-text-focus-input-artifacts/surface-textbox-app",
+      "sha256": "sha256:9df18156a48fbd8a9dfa1d0bb6211635446314c9be2280c3cfe53c53e4bd7195",
+      "size": 110633
+    },
+    {
+      "path": "surface-linux-x64-real-window-text-focus-input.json",
+      "sha256": "sha256:b5e248323c30e24a3cb9e03c4f0bd4e987409640387c09721394d96c1a13850b",
+      "size": 17433,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-linux-x64-real-window-toolkit-reuse-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-real-window-toolkit-reuse-artifacts/surface-host-probe",
+      "sha256": "sha256:f569aca36bf2baecbff5ad23ddfaf4f34c83c93cb3d58d48c41e27560cdd958d",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-real-window-toolkit-reuse-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-real-window-toolkit-reuse-artifacts/surface-toolkit-reuse-real-window-frame.rgba",
+      "sha256": "sha256:4e9de371f89abc1a88486c9ba76dbc6aa4e64e97db8bfbcf1ac39d12929a5f70",
+      "size": 614400
+    },
+    {
+      "path": "surface-linux-x64-real-window-toolkit-reuse-artifacts/surface-toolkit-settings",
+      "sha256": "sha256:fce0a1574b35e7a6013281e8b293b3b74987ccacaa35a24ed297978638e51400",
+      "size": 225320
+    },
+    {
+      "path": "surface-linux-x64-real-window-toolkit-reuse.json",
+      "sha256": "sha256:54b2070842f92e6219ad10cea864eb1bb3bb8e2208ea1af312c212844392868f",
+      "size": 40174,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-linux-x64-real-window.json",
+      "sha256": "sha256:ff435bc923616188fede04b34dedd5a8f6a50d3b0f7be651e10922d91321519f",
+      "size": 11666,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-linux-x64.json",
+      "sha256": "sha256:c7e48cafc21097218e2482aa55288da59f5067013695f0a26b69fc1ffa24cfdf",
+      "size": 11179,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-wasm32-web-artifacts/surface-counter.mjs",
+      "sha256": "sha256:e992ac7da1f14ecc8cd2e14d32a3de5ad793320bb3c4204f76acf2478c19191a",
+      "size": 4931
+    },
+    {
+      "path": "surface-wasm32-web-artifacts/surface-counter.wasm",
+      "sha256": "sha256:f11116d2d13af16076905f7576459bb184bd6ae9dd066787916b9ccb5a302a11",
+      "size": 22005
+    },
+    {
+      "path": "surface-wasm32-web-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:34874a437199aa2a323aba8442d7b681181449ce6619de3fafa5eb5db3ed4887",
+      "size": 679,
+      "schema": "tetra.surface.web-runner-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-accessibility-metadata-artifacts/surface-accessibility-settings.mjs",
+      "sha256": "sha256:c6d085a7744de82136aa78a44c2d5dd28e8d434f4b5ab60c8d69d75c2ed42574",
+      "size": 4946
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-accessibility-metadata-artifacts/surface-accessibility-settings.wasm",
+      "sha256": "sha256:4f4e3993d13ea698fda070edd4372d197b77801ec9193cd7224bc3800678b7c4",
+      "size": 32803
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-accessibility-metadata-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:f8a6528da3386a0dcbc4fe8220a56b1f097ec54944bbc22ca13be02359118757",
+      "size": 3168,
+      "schema": "tetra.surface.browser-canvas-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-accessibility-metadata.json",
+      "sha256": "sha256:35f40cf5ceeeafcbf8489908e03e562255a4fe09e25921926d9a865ae1fe721b",
+      "size": 56922,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-artifacts/surface-browser-counter.mjs",
+      "sha256": "sha256:9eb8e74c048f6199508dbf287f44d01122c6907349a4c20066cffefdbec9dc8a",
+      "size": 4939
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-artifacts/surface-browser-counter.wasm",
+      "sha256": "sha256:78204e77708102a911b75526feaef594bde521fd2018ea59384ba993f41bd4e5",
+      "size": 23137
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:eab4e223a7be11e34d7e7b7b6155121654d7150b006de9190cc3981b90594743",
+      "size": 2021,
+      "schema": "tetra.surface.browser-canvas-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-component-tree-api-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:f277f9551fa0f6e7390244914426389ec95890c9d9d8366dc4077df702971f10",
+      "size": 2787,
+      "schema": "tetra.surface.browser-canvas-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-component-tree-api-artifacts/surface-tree-app.mjs",
+      "sha256": "sha256:e5d8dc323232dbefb17fab605285bd1a901c89f1f8d2b1b4e07381a2ce7a0a57",
+      "size": 4932
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-component-tree-api-artifacts/surface-tree-app.wasm",
+      "sha256": "sha256:0e0d8170a3b223d674e848f23f6f03fccfe3ef6094be5f8281da0d78992cdd49",
+      "size": 32507
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-component-tree-api.json",
+      "sha256": "sha256:46c3b25040a127032c0a1e40c366b9a4dc07c3a9f0459fb1b0cf37b4c8dd4e2b",
+      "size": 27839,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-component-tree-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:632660dcace0494acf690847a4154c58dad3ce3476b9574122f4459bf2889e03",
+      "size": 2783,
+      "schema": "tetra.surface.browser-canvas-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-component-tree-artifacts/surface-tree-app.mjs",
+      "sha256": "sha256:e5d8dc323232dbefb17fab605285bd1a901c89f1f8d2b1b4e07381a2ce7a0a57",
+      "size": 4932
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-component-tree-artifacts/surface-tree-app.wasm",
+      "sha256": "sha256:0e0d8170a3b223d674e848f23f6f03fccfe3ef6094be5f8281da0d78992cdd49",
+      "size": 32507
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-component-tree.json",
+      "sha256": "sha256:3b37a9e536873c5185468ac5f1a3ff843a0ddb75374b0e9356abd89d1dfd486f",
+      "size": 27811,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-minimal-toolkit-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:76417687dd6edf2f51e0dc827fd8ff05df2dcd1245afd4f5afac1cfad0e7b285",
+      "size": 3714,
+      "schema": "tetra.surface.browser-canvas-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-minimal-toolkit-artifacts/surface-toolkit-form.mjs",
+      "sha256": "sha256:bcee94a6fdeded005d01932d0a0cb13a10d88a4ff4c9efeb65a5e9e538bf727c",
+      "size": 4936
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-minimal-toolkit-artifacts/surface-toolkit-form.wasm",
+      "sha256": "sha256:4dae08e96454a6dbe32a9bca475226c3910d9b9abb0ece02e67d96961a0af424",
+      "size": 40941
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-minimal-toolkit.json",
+      "sha256": "sha256:9189b65e06a9334ee4fa27314e61665d9f8e8515486f94476972bc1d59cc06e5",
+      "size": 36876,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-text-focus-input-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:b71be00b9c8c5cce03c2e0075076b00eae3ad47bb27f947a14f0eaff5fa73339",
+      "size": 2965,
+      "schema": "tetra.surface.browser-canvas-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-text-focus-input-artifacts/surface-textbox-app.mjs",
+      "sha256": "sha256:5476b8f9dd952952c3fb5b354de3713b2f5ed0c28290336e862880a7e708a169",
+      "size": 4935
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-text-focus-input-artifacts/surface-textbox-app.wasm",
+      "sha256": "sha256:28f1fc70de31ba57931c745f0f50ff2872fdb5ba01b188ac46ff97a4498134a1",
+      "size": 28112
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-text-focus-input.json",
+      "sha256": "sha256:20a86dd4f0ff94c0726a1a023db048ee8a1b74e6b56b7015c3f5f9795de0000c",
+      "size": 17755,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-toolkit-reuse-artifacts/surface-runner-trace.json",
+      "sha256": "sha256:a79af4b10ef21d61a22df9c3ebcb00fc694ab5f9b169963c7fa66e7b646da070",
+      "size": 3152,
+      "schema": "tetra.surface.browser-canvas-trace.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-toolkit-reuse-artifacts/surface-toolkit-settings.mjs",
+      "sha256": "sha256:27ff20b8df3fbdd579de53929a44186d21b87d7c2abd2742cc5b8d6550e3bc40",
+      "size": 4940
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-toolkit-reuse-artifacts/surface-toolkit-settings.wasm",
+      "sha256": "sha256:5c4056006ef4f597ad323c2d73729f758ecaad6805a6ee846bf54ff572dcfda9",
+      "size": 45910
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas-toolkit-reuse.json",
+      "sha256": "sha256:0c3ebeadc1f555b12cd0d5fb7d1c7dfc96ffde380f29f91053e33bb732b330b5",
+      "size": 39894,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-wasm32-web-browser-canvas.json",
+      "sha256": "sha256:ec829dd703306e58d5ae2f55269ef3cf8122f24016b8c296611a240ae9b0f3ff",
+      "size": 11268,
+      "schema": "tetra.surface.runtime.v1"
+    },
+    {
+      "path": "surface-wasm32-web.json",
+      "sha256": "sha256:c2a6b26a163b54d561a932159675d5732ae648a7e9697e2da37b2768c3c74624",
+      "size": 9619,
+      "schema": "tetra.surface.runtime.v1"
+    }
+  ]
+}

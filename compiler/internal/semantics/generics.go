@@ -1808,6 +1808,13 @@ func bindGenericType(param frontend.TypeRef, actual string, typeParams []string,
 		return nil
 	}
 	switch param.Kind {
+	case frontend.TypeRefNamed:
+		if len(param.TypeArgs) == 0 {
+			return nil
+		}
+		if matched, err := bindGenericNamedTypeArgs(param, actual, typeParams, subst); err != nil || matched {
+			return err
+		}
 	case frontend.TypeRefFunction:
 		actualParams, actualReturn, ok := parseGenericFunctionTypeName(actual)
 		if !ok {
@@ -1849,6 +1856,65 @@ func bindGenericType(param frontend.TypeRef, actual string, typeParams []string,
 		}
 	}
 	return nil
+}
+
+func bindGenericNamedTypeArgs(param frontend.TypeRef, actual string, typeParams []string, subst map[string]string) (bool, error) {
+	paramBase := lastNameSegment(param.Name)
+	actualBase := lastNameSegment(actual)
+	prefix := paramBase + "__"
+	if paramBase == "" || !strings.HasPrefix(actualBase, prefix) {
+		return false, nil
+	}
+	rest := strings.TrimPrefix(actualBase, prefix)
+	for i, arg := range param.TypeArgs {
+		argName := genericNamedTypeArgSegmentName(arg)
+		if argName == "" {
+			return false, nil
+		}
+		marker := argName + "_"
+		if !strings.HasPrefix(rest, marker) {
+			return false, nil
+		}
+		rest = strings.TrimPrefix(rest, marker)
+		var encoded string
+		if i+1 < len(param.TypeArgs) {
+			nextArgName := genericNamedTypeArgSegmentName(param.TypeArgs[i+1])
+			if nextArgName == "" {
+				return false, nil
+			}
+			nextMarker := "__" + nextArgName + "_"
+			idx := strings.Index(rest, nextMarker)
+			if idx < 0 {
+				return false, nil
+			}
+			encoded = rest[:idx]
+			rest = rest[idx+len("__"):]
+		} else {
+			encoded = rest
+			rest = ""
+		}
+		concrete, err := unsanitizeGenericType(encoded)
+		if err != nil {
+			return true, err
+		}
+		if canonical, ok := canonicalBuiltinType(concrete); ok {
+			concrete = canonical
+		}
+		if err := bindGenericType(arg, concrete, typeParams, subst); err != nil {
+			return true, err
+		}
+	}
+	if rest != "" {
+		return false, nil
+	}
+	return true, nil
+}
+
+func genericNamedTypeArgSegmentName(ref frontend.TypeRef) string {
+	if ref.Kind == frontend.TypeRefNamed && ref.Name != "" {
+		return ref.Name
+	}
+	return genericTypeName(ref)
 }
 
 func arrayElemName(name string, wantLen int) (string, bool) {
@@ -2198,6 +2264,36 @@ func sanitizeGenericType(tname string) string {
 		b.WriteString("_")
 	}
 	return b.String()
+}
+
+func unsanitizeGenericType(tname string) (string, error) {
+	var b strings.Builder
+	for i := 0; i < len(tname); {
+		if tname[i] != '_' {
+			b.WriteByte(tname[i])
+			i++
+			continue
+		}
+		if i+1 < len(tname) && tname[i+1] == '_' {
+			b.WriteByte('_')
+			i += 2
+			continue
+		}
+		j := i + 1
+		for j < len(tname) && tname[j] != '_' {
+			j++
+		}
+		if j >= len(tname) {
+			return "", fmt.Errorf("malformed sanitized generic type %q", tname)
+		}
+		code, err := strconv.ParseInt(tname[i+1:j], 16, 32)
+		if err != nil {
+			return "", fmt.Errorf("malformed sanitized generic type %q", tname)
+		}
+		b.WriteRune(rune(code))
+		i = j + 1
+	}
+	return b.String(), nil
 }
 
 func genericTypeName(ref frontend.TypeRef) string {

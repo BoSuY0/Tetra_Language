@@ -23,6 +23,18 @@ Coverage:
 - Eco capsule parser fuzzing in `cli/cmd/tetra`
 - bounded actor/task stress examples in `compiler`
 
+Memory Production Core v1 has a narrower oracle-backed Tier 1 smoke:
+
+```sh
+GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-mpc15-short go run ./tools/cmd/memory-fuzz-short --tier=1 --report-dir reports/memory-fuzz-short/mpc15
+go run ./tools/cmd/validate-memory-fuzz-oracle --report reports/memory-fuzz-short/mpc15/memory-fuzz-oracle.json
+```
+
+That report uses `tetra.memory-fuzz.oracle.v1` and classifies checker reject
+expected, runtime trap expected, compiled output equals interpreter/reference
+expected, compiler crash is bug, miscompile is bug, unsafe_unknown optimized as
+safe is bug, and report validation failure is bug.
+
 ## Nightly Fuzz Commands
 
 Run the one-command wrapper for agent and CI reproducibility:

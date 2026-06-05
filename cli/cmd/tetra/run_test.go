@@ -20,7 +20,7 @@ import (
 func TestRunCommandJSONDiagnosticsForHostTargetMismatch(t *testing.T) {
 	target := nonHostTarget(t)
 	diag := runCLIJSONDiagnostic(t, []string{"run", "--diagnostics=json", "--target", target}, 2)
-	if diag.Code != "TETRA0001" || diag.Severity != "error" || !strings.Contains(diag.Message, "cannot run target "+target) {
+	if diag.Code != compiler.DiagnosticCodeTargetRuntime || diag.Severity != "error" || !strings.Contains(diag.Message, "cannot run target "+target) {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 }
@@ -54,7 +54,15 @@ func TestRunCommandJSONDiagnosticsForLinuxX32HostUnsupported(t *testing.T) {
 		t.Fatal(err)
 	}
 	diag := runCLIJSONDiagnostic(t, []string{"run", "--diagnostics=json", "--target", "x32", srcPath}, 2)
-	for _, want := range []string{"cannot run target linux-x32", "host does not support Linux x32 ABI execution", "no host fallback"} {
+	if diag.Code != compiler.DiagnosticCodeTargetRuntime || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v, want code %s severity error", diag, compiler.DiagnosticCodeTargetRuntime)
+	}
+	for _, want := range []string{
+		"cannot run target linux-x32",
+		"host " + runtime.GOOS + "/" + runtime.GOARCH + " does not support Linux x32 ABI execution",
+		"no host fallback",
+		"probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
+	} {
 		if !strings.Contains(diag.Message, want) {
 			t.Fatalf("diagnostic missing %q: %#v", want, diag)
 		}
@@ -112,6 +120,42 @@ printf '<html><body><pre id="result">exit:7</pre></body></html>\n'
 	}
 	if exit != 7 {
 		t.Fatalf("exit = %d, want 7", exit)
+	}
+}
+
+func TestExecWebProgramWithNodeRunnerRunsSurfaceHostImports(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skipf("node unavailable: %v", err)
+	}
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		t.Skipf("repo root unavailable: %v", err)
+	}
+
+	tmp := t.TempDir()
+	wasmPath := filepath.Join(tmp, "surface-counter.wasm")
+	if _, err := compiler.BuildFileWithStatsOpt(filepath.Join(repoRoot, "examples", "surface_counter.tetra"), wasmPath, "wasm32-web", compiler.BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build surface counter wasm32-web: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exit, err := execWebProgramWithRunner(wasmPath, webRuntimeRunner{
+		Name:   "node-web",
+		Path:   node,
+		Helper: filepath.Join(repoRoot, "scripts", "tools", "web_run_module.mjs"),
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("exec web program: %v", err)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	if exit != 1 {
+		t.Fatalf("exit = %d, want Surface counter result 1", exit)
 	}
 }
 
@@ -551,6 +595,9 @@ func requireLinuxX86Execution(t *testing.T) {
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "386") {
 		t.Skipf("linux-x86 execution requires a Linux i386-compatible host, got %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
+	if !canRunLinuxX86OnHost() {
+		t.Skipf("Linux kernel cannot execute generated i386 ELF on this host")
+	}
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "probe.tetra")
 	outPath := filepath.Join(dir, "probe")
@@ -564,6 +611,9 @@ func requireLinuxX86Execution(t *testing.T) {
 	code := execProgram(outPath, &bytes.Buffer{}, &stderr)
 	if code == 7 {
 		return
+	}
+	if code == -1 && strings.TrimSpace(stderr.String()) == "" {
+		t.Skipf("Linux kernel rejected generated i386 ELF with signal-like exit %d", code)
 	}
 	if strings.Contains(stderr.String(), "exec format error") || strings.Contains(stderr.String(), "no such file or directory") {
 		t.Skipf("Linux kernel cannot execute generated i386 ELF on this host: exit=%d stderr=%q", code, stderr.String())

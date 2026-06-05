@@ -69,3 +69,39 @@ func TestEnsureTypeInfoRejectsTargetLayoutOnlyNativeIntegers(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureTypeInfoAcceptsILP32NativeIntegerAliasesWhenEnabled(t *testing.T) {
+	types := baseTypes()
+	addILP32NativeScalarTypes(types)
+	for _, name := range []string{"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint", "c_long", "c_ulong"} {
+		t.Run(name, func(t *testing.T) {
+			info, err := ensureTypeInfo(name, types)
+			if err != nil {
+				t.Fatalf("ensureTypeInfo(%q): %v", name, err)
+			}
+			if info.Kind != TypeI32 || info.SlotCount != 1 || !info.Public {
+				t.Fatalf("type info = %#v, want public 1-slot TypeI32 alias", info)
+			}
+		})
+	}
+}
+
+func TestEnsureTypeInfoAcceptsILP32PointerAliasesWhenEnabled(t *testing.T) {
+	for _, name := range []string{"rawptr", "nullable_ptr", "ref"} {
+		t.Run(name, func(t *testing.T) {
+			types := baseTypes()
+			if _, err := ensureTypeInfo(name, types); err == nil {
+				t.Fatalf("ensureTypeInfo(%s) succeeded before ILP32 target scalar enablement", name)
+			}
+
+			addILP32NativeScalarTypes(types)
+			info, err := ensureTypeInfo(name, types)
+			if err != nil {
+				t.Fatalf("ensureTypeInfo(%s): %v", name, err)
+			}
+			if info.Kind != TypePtr || info.SlotCount != 1 || !info.Public {
+				t.Fatalf("type info = %#v, want public 1-slot TypePtr alias", info)
+			}
+		})
+	}
+}

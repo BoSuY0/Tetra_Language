@@ -223,7 +223,9 @@ record_artifact_pair() {
 }
 
 artifacts_json="$tmp_dir/artifacts.jsonl"
+native_targets_json="$tmp_dir/native-targets.jsonl"
 : >"$artifacts_json"
+: >"$native_targets_json"
 all_match="true"
 legacy_native_json=""
 legacy_wasm_json=""
@@ -246,6 +248,11 @@ for target in "${targets[@]}"; do
 
   record_artifact_pair "$target" "$out_a" "$out_b" "false"
   artifact_json="$last_artifact_json"
+  case "$target" in
+    linux-*|macos-*|windows-*)
+      printf '%s\n' "$artifact_json" >>"$native_targets_json"
+      ;;
+  esac
   if [[ "$target" == "linux-x64" ]]; then
     legacy_native_json="$artifact_json"
   fi
@@ -287,6 +294,9 @@ done
     fi
     printf '    "%s"%s\n' "$(json_escape "${targets[$i]}")" "$sep"
   done
+  echo '  ],'
+  echo '  "native_targets": ['
+  awk 'NR > 1 { printf ",\n" } { printf "    %s", $0 } END { if (NR > 0) printf "\n" }' "$native_targets_json"
   echo '  ],'
   printf '  "native": %s,\n' "$legacy_native_json"
   printf '  "wasm": %s,\n' "$legacy_wasm_json"

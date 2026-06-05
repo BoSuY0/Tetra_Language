@@ -525,6 +525,29 @@ func TestVerifyFuncRejectsMissingNamedOperands(t *testing.T) {
 	}
 }
 
+func TestVerifyFuncRejectsInvalidRawSliceElementShift(t *testing.T) {
+	for _, shift := range []int32{-1, 3} {
+		fn := ir.IRFunc{
+			Name:        "bad_raw_slice_shift",
+			ReturnSlots: 2,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 0},
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRCapMem},
+				{Kind: ir.IRRawSliceFromParts, Imm: shift},
+				{Kind: ir.IRReturn},
+			},
+		}
+		err := VerifyFunc(fn)
+		if err == nil {
+			t.Fatalf("shift %d: expected verifier error", shift)
+		}
+		if !strings.Contains(err.Error(), "raw slice element-size shift") {
+			t.Fatalf("shift %d: error = %v, want raw slice element-size shift", shift, err)
+		}
+	}
+}
+
 func TestVerifyFuncAcceptsPolicyGuardShape(t *testing.T) {
 	fn := ir.IRFunc{
 		Name:        "guarded",
@@ -738,11 +761,26 @@ func TestBudgetChargeModelIsExplicit(t *testing.T) {
 		ir.IRMakeSliceU8:              1,
 		ir.IRMakeSliceU16:             1,
 		ir.IRMakeSliceI32:             1,
+		ir.IRStackSliceU8:             1,
+		ir.IRStackSliceU16:            1,
+		ir.IRStackSliceI32:            1,
+		ir.IRRegionEnter:              1,
+		ir.IRRegionMakeSliceU8:        1,
+		ir.IRRegionMakeSliceU16:       1,
+		ir.IRRegionMakeSliceI32:       1,
+		ir.IRRegionReset:              1,
+		ir.IRRawSliceFromParts:        1,
+		ir.IRSliceWindow:              1,
+		ir.IRSlicePrefix:              1,
+		ir.IRSliceSuffix:              1,
 		ir.IRIndexLoadI32:             1,
+		ir.IRIndexLoadI32Unchecked:    1,
 		ir.IRIndexStoreI32:            1,
 		ir.IRIndexLoadU8:              1,
+		ir.IRIndexLoadU8Unchecked:     1,
 		ir.IRIndexStoreU8:             1,
 		ir.IRIndexLoadU16:             1,
+		ir.IRIndexLoadU16Unchecked:    1,
 		ir.IRIndexStoreU16:            1,
 		ir.IRIslandNew:                1,
 		ir.IRIslandMakeSliceU8:        1,

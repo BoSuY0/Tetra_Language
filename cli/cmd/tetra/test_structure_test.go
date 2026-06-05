@@ -320,6 +320,10 @@ func TestCLITestsAreSplitByCommandSurface(t *testing.T) {
 			"TestCheckCommandJSONDiagnosticsForCrossModuleLifetimeBorrowNestedSliceEnumPayloadEscapeCodes",
 			"TestCheckCommandJSONDiagnosticsForLifetimeBorrowSliceEnumEscapeCodes",
 			"TestCheckCommandJSONDiagnosticsForCrossModuleLifetimeBorrowSliceEnumEscapeCodes",
+			"TestCheckCommandJSONDiagnosticsForSafeViewBorrowedOwnedReturnCode",
+			"TestCheckCommandJSONDiagnosticsForSafeViewActorBoundaryCode",
+			"TestCheckCommandJSONDiagnosticsForSafeViewTaskBoundaryCode",
+			"TestCheckCommandJSONDiagnosticsForSafeViewAggregateHiddenBorrowCode",
 		},
 		"check_diagnostics_lifetime_global_assignment_test.go": {
 			"TestCheckCommandJSONDiagnosticsForBorrowedPtrOptionalGlobalAssignmentCode",

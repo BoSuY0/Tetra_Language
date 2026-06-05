@@ -147,9 +147,7 @@ func targetExportedFFIRequiresPointerBoundaryGate(target, typeName string) bool 
 	}
 	normalized := strings.TrimSpace(typeName)
 	switch normalized {
-	case "ptr", "fnptr", "ref", "nullable_ptr", "rawptr",
-		"usize", "isize", "size_t", "ssize_t", "native_int", "native_uint",
-		"c_long", "c_ulong":
+	case "fnptr":
 		return true
 	default:
 		return strings.HasPrefix(normalized, "fn(")

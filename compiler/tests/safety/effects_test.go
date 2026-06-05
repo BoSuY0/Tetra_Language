@@ -143,6 +143,21 @@ func main() -> Int:
 `)
 }
 
+func TestEffectsRequireUsesSurfaceForSurfaceOpen(t *testing.T) {
+	requireCheckErrorContains(t, `
+func main() -> Int:
+  return core.surface_open("Bad", 100, 100)
+`, "uses effect 'surface'")
+}
+
+func TestEffectsAllowUsesSurfaceForSurfaceOpen(t *testing.T) {
+	requireCheckOK(t, `
+func main() -> Int
+uses surface:
+  return core.surface_open("OK", 100, 100)
+`)
+}
+
 func TestEffectsAliasesAndUnsafeRemainSeparate(t *testing.T) {
 	requireCheckOK(t, `
 func main() -> Int
@@ -357,7 +372,20 @@ uses effects.cap.mem, effects.memory:
     let _: Int = core.store_i32(p, 7, mem)
     return core.load_i32(p, mem)
   return 0
-`)
+	`)
+}
+
+func TestRawSliceFromPartsRequiresCapsuleMemPermission(t *testing.T) {
+	requireFileCheckErrorContains(t, `
+func main() -> Int
+uses effects.cap.mem, effects.memory:
+  unsafe:
+    let mem: cap.mem = core.cap_mem()
+    let p: ptr = core.alloc_bytes(8)
+    let xs: []u16 = core.raw_slice_u16_from_parts(p, 2, mem)
+    return xs.len
+  return 0
+`, "capsule permission 'capsule.mem'")
 }
 
 func TestCapsulePermissionVocabularyDoesNotAliasCoreEffects(t *testing.T) {
@@ -1552,10 +1580,11 @@ func TestPrivacySecretTaintBeyondFunctionSignatures(t *testing.T) {
 			name: "exported function cannot return unsealed secret-tainted local",
 			src: `
 @export("leak_plain")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   return raw
 `,
@@ -1564,14 +1593,15 @@ consent(token):
 		{
 			name: "secret-tainted field taints plain struct container",
 			src: `
-struct PlainBox:
+repr(C) struct PlainBox:
   value: Int
 
 @export("leak_box")
-func leak_box(token: consent.token, value: secret.i32) -> PlainBox
+func leak_box(seed: Int) -> PlainBox
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let box: PlainBox = PlainBox(value: raw)
   return box
@@ -1603,10 +1633,11 @@ consent(token):
   return core.secret_unseal_i32(value, token)
 
 @export("leak_via_helper")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   return reveal(token, value)
 `,
 			wantErr: "secret-tainted value cannot be returned from @export function 'leak'",
@@ -1618,10 +1649,11 @@ func id(x: Int) -> Int:
   return x
 
 @export("leak_via_id")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   return id(raw)
 `,
@@ -1637,10 +1669,11 @@ func id2(x: Int) -> Int:
   return id1(x)
 
 @export("leak_via_chain")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   return id2(raw)
 `,
@@ -1653,10 +1686,11 @@ enum LeakErr:
   case raw(Int)
 
 @export("leak_throw")
-func leak(token: consent.token, value: secret.i32) -> Int throws LeakErr
+func leak(seed: Int) -> Int throws LeakErr
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   throw LeakErr.raw(raw)
 `,
@@ -1682,10 +1716,11 @@ consent(token):
 			name: "secret-tainted if condition cannot select exported return",
 			src: `
 @export("leak_branch")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   if raw == 1:
     return 42
@@ -1716,10 +1751,11 @@ consent(token):
 			name: "secret-tainted match expression cannot select exported return",
 			src: `
 @export("leak_match_expr")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let out: Int = match raw:
   case 1:
@@ -1734,10 +1770,11 @@ consent(token):
 			name: "secret-tainted while condition cannot select exported return",
 			src: `
 @export("leak_while")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   var count: Int = raw
   var out: Int = 7
@@ -1752,10 +1789,11 @@ consent(token):
 			name: "secret-tainted value cannot be sent through actor mailbox",
 			src: `
 @export("leak_actor_mailbox")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses actors, privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let self_actor: actor = core.self()
   let _sent: Int = core.send(self_actor, raw)
@@ -1771,10 +1809,11 @@ enum LeakMsg:
   case empty
 
 @export("leak_typed_actor_mailbox")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses actors, privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let self_actor: actor = core.self()
   let _sent: Int = core.send_typed(self_actor, LeakMsg.raw(raw))
@@ -1791,10 +1830,11 @@ consent(token):
 			name: "secret-tainted tagged payload cannot be sent through actor mailbox",
 			src: `
 @export("leak_tagged_actor_mailbox")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses actors, privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let self_actor: actor = core.self()
   let _sent: Int = core.send_msg(self_actor, raw, 99)
@@ -1807,10 +1847,11 @@ consent(token):
 			name: "secret-tainted value cannot be stored through raw memory",
 			src: `
 @export("leak_raw_memory")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses alloc, capability, mem, privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   unsafe:
     let mem: cap.mem = core.cap_mem()
@@ -1824,10 +1865,11 @@ consent(token):
 			name: "secret-tainted sleep duration cannot affect runtime time",
 			src: `
 @export("leak_sleep_time")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy, runtime
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let _slept: Int = core.sleep_ms(raw)
   return core.time_now_ms()
@@ -1838,10 +1880,11 @@ consent(token):
 			name: "secret-tainted value cannot be written through mmio",
 			src: `
 @export("leak_mmio")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses alloc, capability, io, mem, mmio, privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   unsafe:
     let io_cap: cap.io = core.cap_io()
@@ -1855,10 +1898,11 @@ consent(token):
 			name: "secret-tainted closure capture cannot be returned from export",
 			src: `
 @export("leak_closure_capture")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let f: fn() -> Int = fn() -> Int:
     return raw
@@ -1869,17 +1913,18 @@ consent(token):
 		{
 			name: "secret-tainted value cannot be laundered into struct via helper",
 			src: `
-struct PlainBox:
+repr(C) struct PlainBox:
   value: Int
 
 func id(x: Int) -> Int:
   return x
 
 @export("leak_box_via_id")
-func leak(token: consent.token, value: secret.i32) -> PlainBox
+func leak(seed: Int) -> PlainBox
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let box: PlainBox = PlainBox(value: id(raw))
   return box
@@ -1896,10 +1941,11 @@ func stash(x: Int) -> Int:
   return 0
 
 @export("leak_via_side_effect")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   let dropped: Int = stash(raw)
   return 0
@@ -1916,10 +1962,11 @@ func stash(x: Int) -> Int:
   return 0
 
 @export("leak_via_side_effect_stmt")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   stash(raw)
   return 0
@@ -1940,10 +1987,11 @@ func apply(cb: fn(Int) -> Int, x: Int) -> Int:
   return 0
 
 @export("leak_via_callback")
-func leak(token: consent.token, value: secret.i32) -> Int
+func leak(seed: Int) -> Int
 uses privacy
-privacy
-consent(token):
+privacy:
+  let token: consent.token = core.consent_token()
+  let value: secret.i32 = core.secret_seal_i32(seed, token)
   let raw: Int = core.secret_unseal_i32(value, token)
   apply(stash, raw)
   return 0

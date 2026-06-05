@@ -966,7 +966,16 @@ func readinessNativeUIRuntimeJSON() []byte {
 func chdirReadinessEvidenceRoot(t *testing.T, paths ...string) {
 	t.Helper()
 	root := t.TempDir()
-	t.Chdir(root)
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("chdir test evidence root: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
 	for _, path := range paths {
 		writeReadinessEvidenceFile(t, path, defaultReadinessEvidenceContent(path))
 	}

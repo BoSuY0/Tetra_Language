@@ -63,6 +63,76 @@ func TestCodegenObjectLinuxX32DefaultsToILP32PointerOps(t *testing.T) {
 	assertNotContainsBytes(t, "x32 ptr read 64-bit load", obj.Code, forbidLoad64.Buf)
 }
 
+func TestCodegenObjectLinuxX32RawSliceFromPartsBuildsScopedView(t *testing.T) {
+	obj, err := CodegenObjectLinuxX32([]ir.IRFunc{{
+		Name:        "__test_raw_slice_x32",
+		ReturnSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRCapMem},
+			{Kind: ir.IRRawSliceFromParts, Imm: 2},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("CodegenObjectLinuxX32 raw_slice_from_parts: %v", err)
+	}
+	assertContainsBytes(t, "x32 raw slice signed length guard", obj.Code, []byte{0x85, 0xC9, 0x0F, 0x8C})
+	assertContainsBytes(t, "x32 raw slice i32 byte-overflow guard", obj.Code, []byte{0x48, 0x81, 0xF9, 0xFF, 0xFF, 0xFF, 0x1F, 0x0F, 0x8F})
+}
+
+func TestCodegenObjectLinuxX32EmitsCtxSwitchSysVStub(t *testing.T) {
+	obj, err := CodegenObjectLinuxX32([]ir.IRFunc{{
+		Name:        "__test_ctx_switch_x32",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRConstI32, Imm: 3},
+			{Kind: ir.IRCtxSwitch},
+			{Kind: ir.IRReturn},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("CodegenObjectLinuxX32 ctx_switch: %v", err)
+	}
+
+	want := expectedCtxSwitchSysVStub()
+	if !bytes.Contains(obj.Code, want) {
+		t.Fatalf("x32 ctx_switch missing SysV x86_64 stub\nwant=% x\ncode=% x", want, obj.Code)
+	}
+	shadow := &x64.Emitter{}
+	shadow.SubRspImm32(32)
+	if bytes.Contains(obj.Code, shadow.Buf) {
+		t.Fatalf("x32 ctx_switch unexpectedly emitted Win64 shadow-space adjustment: % x", obj.Code)
+	}
+	if !bytes.Contains(obj.Code, []byte{0x31, 0xC0, 0x50}) {
+		t.Fatalf("x32 ctx_switch continuation did not push zero return status: % x", obj.Code)
+	}
+}
+
+func expectedCtxSwitchSysVStub() []byte {
+	e := &x64.Emitter{}
+	e.PushRbx()
+	e.PushRbp()
+	e.PushR12()
+	e.PushR13()
+	e.PushR14()
+	e.PushR15()
+	e.MovMem64RdiDispRsp(0)
+	e.MovRdiRsi()
+	e.MovRspFromRdiDisp(0)
+	e.PopR15()
+	e.PopR14()
+	e.PopR13()
+	e.PopR12()
+	e.PopRbp()
+	e.PopRbx()
+	e.Ret()
+	return e.Buf
+}
+
 func writeHelloMainFunc() ir.IRFunc {
 	return ir.IRFunc{
 		Name:        "main",

@@ -40,7 +40,7 @@ Use this checklist before labeling a build or branch as v0.5 Integrated Alpha.
 - [x] `tetra eco verify --target ... --lock ...` validates a local multi-capsule
       dependency graph and writes provenance JSON.
 - [x] `tetra eco vault add/list/verify` stores and verifies local Todex records.
-- [x] v0.5 MVP examples/tests cover ownership markers, typed errors, async
+- [x] v0.5 MVP examples and tests cover ownership markers, typed errors, async
       syntax, extensions, protocol declarations, generic signatures, local
       Capsule/Todex graphing, generated docs, and LSP diagnostics.
 - [x] Build-only smoke passes for `linux-x64`, `macos-x64`, and `windows-x64`;

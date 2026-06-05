@@ -1,0 +1,136 @@
+{
+  "schema": "tetra.surface.browser-canvas-trace.v1",
+  "wasm_path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/baseline-reports/surface-experimental/surface-wasm32-web-browser-canvas-text-focus-input-artifacts/surface-textbox-app.wasm",
+  "canvas": {
+    "opened": true,
+    "width": 400,
+    "height": 240,
+    "readback": true
+  },
+  "browser_events": [
+    {
+      "order": 1,
+      "native_type": "pointerup",
+      "kind": 5,
+      "x": 48,
+      "y": 96,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 2,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "text_len": 2
+    },
+    {
+      "order": 3,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 37,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 4,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 8,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 5,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 46,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 6,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 200,
+      "text_len": 1
+    },
+    {
+      "order": 7,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 8,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 32,
+      "width": 320,
+      "height": 200,
+      "text_len": 0
+    },
+    {
+      "order": 9,
+      "native_type": "resize",
+      "kind": 2,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 400,
+      "height": 240,
+      "text_len": 0
+    }
+  ],
+  "frames": [
+    {
+      "order": 1,
+      "width": 320,
+      "height": 200,
+      "stride": 1280,
+      "pixels_len": 256000,
+      "source_checksum": "164c8bd6c840e3044c89dd67bb57f94a3feb733abc3828739048a45ef821c58d",
+      "canvas_checksum": "164c8bd6c840e3044c89dd67bb57f94a3feb733abc3828739048a45ef821c58d",
+      "checksum": "164c8bd6c840e3044c89dd67bb57f94a3feb733abc3828739048a45ef821c58d",
+      "presented": true
+    },
+    {
+      "order": 5,
+      "width": 400,
+      "height": 240,
+      "stride": 1600,
+      "pixels_len": 384000,
+      "source_checksum": "98323a1076b8a8a01a018ab57a02c492e8a3d91dd9af4fb428d975c010c6379b",
+      "canvas_checksum": "98323a1076b8a8a01a018ab57a02c492e8a3d91dd9af4fb428d975c010c6379b",
+      "checksum": "98323a1076b8a8a01a018ab57a02c492e8a3d91dd9af4fb428d975c010c6379b",
+      "presented": true
+    }
+  ],
+  "app_exit_code": 1
+}

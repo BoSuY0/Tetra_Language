@@ -170,19 +170,29 @@ require_line '^## Evidence Commands$' 'Evidence Commands section'
 require_line '^## Artifact Hashes$' 'Artifact Hashes section'
 require_line '^## Residual Risks$' 'Residual Risks section'
 
-for command in \
-  'go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json' \
-  "go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1" \
-  "go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1" \
-  "go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1" \
-  'bash scripts/release/v1_0/wasi-smoke.sh --report <path>' \
-  'bash scripts/release/v1_0/web-smoke.sh --report <path>'
-do
+require_passing_evidence_command() {
+  local command="$1"
   if [[ "$text" != *"\`$command\`: pass"* ]]; then
     echo "security_review: missing passing evidence command: $command" >&2
     exit 1
   fi
-done
+}
+
+require_passing_evidence_regex() {
+  local pattern="$1"
+  local description="$2"
+  if ! grep -Eq -- "$pattern" "$signoff_path"; then
+    echo "security_review: missing passing evidence command: $description" >&2
+    exit 1
+  fi
+}
+
+require_passing_evidence_command 'go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json'
+require_passing_evidence_command "go test ./compiler/... -run 'Unsafe|Capability|Effect|MMIO|Mem' -count=1"
+require_passing_evidence_command "go test ./compiler/... -run 'Privacy|Consent|Budget|Effect' -count=1"
+require_passing_evidence_command "go test ./cli/... ./tools/... -run 'Eco|Permission|Capsule|Trust' -count=1"
+require_passing_evidence_regex '^- `bash scripts/release/v1_0/wasi-smoke\.sh --report ([^`<>[:space:]]+|<path>)`: pass$' 'bash scripts/release/v1_0/wasi-smoke.sh --report PATH'
+require_passing_evidence_regex '^- `bash scripts/release/v1_0/web-smoke\.sh --report ([^`<>[:space:]]+|<path>)`: pass$' 'bash scripts/release/v1_0/web-smoke.sh --report PATH'
 
 artifact_hash_lines="$(awk '
   /^## Artifact Hashes$/ { in_hashes=1; next }

@@ -238,6 +238,9 @@ func TestCanonicalTestScriptUsageDocumentsFrontendFocusedTarget(t *testing.T) {
 	for _, want := range []string{
 		"Usage: bash scripts/ci/test.sh [--frontend-focused]",
 		"--frontend-focused",
+		"go test ./compiler/... -count=1",
+		"go test ./cli/... -count=1",
+		"go test ./tools/... -count=1",
 		"go test ./compiler/internal/frontend ./compiler -run",
 		"go test ./compiler/internal/backend/wasm32_web",
 	} {
@@ -402,7 +405,7 @@ func Test_examples_index_has_rows_for_every_core_smoke(t *testing.T) {
 			t.Fatalf("examples index core smoke row for %s has invalid target group %q", rel, row.target)
 		}
 		expected := strings.ToLower(row.expected)
-		if !strings.Contains(expected, "exits ") && !strings.Contains(expected, "build-only") {
+		if !strings.Contains(expected, "exits ") && !strings.Contains(expected, "build-only") && !strings.Contains(expected, "check-only") {
 			t.Fatalf("examples index core smoke row for %s missing expected behavior: %q", rel, row.expected)
 		}
 	}

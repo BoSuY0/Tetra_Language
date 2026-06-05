@@ -89,6 +89,7 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 		"core_async_smoke":         "examples/core_async_smoke.tetra",
 		"core_capability_smoke":    "examples/core_capability_smoke.tetra",
 		"core_collections_smoke":   "examples/core_collections_smoke.tetra",
+		"core_component_smoke":     "examples/core_component_smoke.tetra",
 		"core_crypto_smoke":        "examples/core_crypto_smoke.tetra",
 		"core_filesystem_smoke":    "examples/core_filesystem_smoke.tetra",
 		"core_io_smoke":            "examples/core_io_smoke.tetra",
@@ -101,6 +102,15 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 		"core_sync_smoke":          "examples/core_sync_smoke.tetra",
 		"core_testing_smoke":       "examples/core_testing_smoke.tetra",
 		"core_time_smoke":          "examples/core_time_smoke.tetra",
+	}
+	requiredSurfaceMigrations := map[string]struct {
+		src          string
+		expectedExit int
+	}{
+		"surface_migration_ui_web_smoke":          {src: "examples/surface_migration_ui_web_smoke.tetra", expectedExit: 2},
+		"surface_migration_ui_native_shell_smoke": {src: "examples/surface_migration_ui_native_shell_smoke.tetra", expectedExit: 11},
+		"surface_migration_dogfood_web_ui":        {src: "examples/surface_migration_dogfood_web_ui.tetra", expectedExit: 3},
+		"surface_migration_tetra_control_center":  {src: "examples/surface_migration_tetra_control_center.tetra", expectedExit: 5},
 	}
 	for _, c := range report.Cases {
 		if c.Name == "flow_hello" && c.SrcPath == "examples/flow_hello.tetra" && c.TargetGroup == "native" && c.ExpectedExit == 0 {
@@ -115,6 +125,9 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 		if wantSrc, ok := requiredCoreStdlib[c.Name]; ok && c.SrcPath == wantSrc && c.TargetGroup == "native" && c.ExpectedExit == 42 {
 			delete(requiredCoreStdlib, c.Name)
 		}
+		if want, ok := requiredSurfaceMigrations[c.Name]; ok && c.SrcPath == want.src && c.TargetGroup == "native" && c.ExpectedExit == want.expectedExit {
+			delete(requiredSurfaceMigrations, c.Name)
+		}
 	}
 	if !sawFlowHello {
 		t.Fatalf("smoke list missing flow_hello: %#v", report.Cases)
@@ -128,6 +141,9 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	if len(requiredCoreStdlib) != 0 {
 		t.Fatalf("smoke list missing core stdlib cases: %#v", requiredCoreStdlib)
 	}
+	if len(requiredSurfaceMigrations) != 0 {
+		t.Fatalf("smoke list missing Surface migration cases: %#v", requiredSurfaceMigrations)
+	}
 	for _, exclusion := range report.ExcludedExamples {
 		if exclusion.SrcPath == "examples/projects/hello_t4/src/main.t4" && strings.Contains(exclusion.Reason, report.Target) {
 			sawHelloT4Exclusion = true
@@ -136,6 +152,42 @@ func TestSmokeCommandListsCasesAsJSON(t *testing.T) {
 	if !sawHelloT4Exclusion {
 		t.Fatalf("smoke list missing T4 example exclusion for hello_t4: %#v", report.ExcludedExamples)
 	}
+}
+
+func TestSmokeCommandListsNativeSurfaceCounter(t *testing.T) {
+	var report smokeListReport
+	runCLIJSONStdout(t, []string{"smoke", "--list", "--target", "linux-x64", "--format=json"}, 0, &report)
+	if report.Target != "linux-x64" || report.BuildOnly {
+		t.Fatalf("native smoke list metadata = %#v", report)
+	}
+	for _, c := range report.Cases {
+		if c.Name != "surface_counter" {
+			continue
+		}
+		if c.SrcPath != "examples/surface_counter.tetra" || c.TargetGroup != "native" || c.ExpectedExit != 1 || c.Unsupported || c.ExpectedDiagnostic != "" || c.DebugOnly {
+			t.Fatalf("surface_counter smoke list case = %#v", c)
+		}
+		return
+	}
+	t.Fatalf("native smoke list missing surface_counter: %#v", report.Cases)
+}
+
+func TestSmokeCommandListsNativeSurfaceTextInput(t *testing.T) {
+	var report smokeListReport
+	runCLIJSONStdout(t, []string{"smoke", "--list", "--target", "linux-x64", "--format=json"}, 0, &report)
+	if report.Target != "linux-x64" || report.BuildOnly {
+		t.Fatalf("native smoke list metadata = %#v", report)
+	}
+	for _, c := range report.Cases {
+		if c.Name != "surface_text_input" {
+			continue
+		}
+		if c.SrcPath != "examples/surface_text_input.tetra" || c.TargetGroup != "native" || c.ExpectedExit != 42 || c.Unsupported || c.ExpectedDiagnostic != "" || c.DebugOnly {
+			t.Fatalf("surface_text_input smoke list case = %#v", c)
+		}
+		return
+	}
+	t.Fatalf("native smoke list missing surface_text_input: %#v", report.Cases)
 }
 
 func TestSmokeCommandKeepsInvalidDoubleFreeOutOfDebugList(t *testing.T) {
@@ -179,6 +231,9 @@ func TestSmokeCommandListsWASMRuntimeTargets(t *testing.T) {
 			required["wasm_multi_return_2_smoke"] = "examples/wasm_multi_return_2_smoke.tetra"
 			required["wasm_multi_return_3_smoke"] = "examples/wasm_multi_return_3_smoke.tetra"
 			required["wasm_multi_return_4_smoke"] = "examples/wasm_multi_return_4_smoke.tetra"
+		} else {
+			required["surface_counter"] = "examples/surface_counter.tetra"
+			required["surface_text_input"] = "examples/surface_text_input.tetra"
 		}
 		unsupported := map[string]string{
 			"time_sleep_smoke": "runtime not supported on wasm32",
@@ -386,8 +441,10 @@ func TestSmokeCommandWASMTargetGroupsIncludeDogfoodWebUI(t *testing.T) {
 	var report smokeListReport
 	runCLIJSONStdout(t, []string{"smoke", "--list", "--target", "wasm32-web", "--format=json"}, 0, &report)
 	required := map[string]string{
-		"ui_web_smoke":   "examples/ui_web_smoke.tetra",
-		"dogfood_web_ui": "examples/projects/dogfood_web_ui/src/main.tetra",
+		"ui_web_smoke":       "examples/ui_web_smoke.tetra",
+		"surface_counter":    "examples/surface_counter.tetra",
+		"surface_text_input": "examples/surface_text_input.tetra",
+		"dogfood_web_ui":     "examples/projects/dogfood_web_ui/src/main.tetra",
 	}
 	for _, c := range report.Cases {
 		if wantPath, ok := required[c.Name]; ok {

@@ -1,0 +1,174 @@
+// Planned Tetra Surface core types and host ABI wrappers.
+// Effects: surface, alloc, mem
+// ```tetra doctest
+// func surface_doctest() -> Int:
+//     let size: lib.core.surface.Size = lib.core.surface.Size(w: 320, h: 200)
+//     return size.w + size.h
+// ```
+module lib.core.surface
+
+struct Size:
+    w: Int
+    h: Int
+
+struct Point:
+    x: Int
+    y: Int
+
+struct Rect:
+    x: Int
+    y: Int
+    w: Int
+    h: Int
+
+struct Color:
+    r: u8
+    g: u8
+    b: u8
+    a: u8
+
+struct Surface:
+    handle: Int
+    width: Int
+    height: Int
+
+struct Frame:
+    surface: Surface
+    width: Int
+    height: Int
+    stride: Int
+    pixels: []u8
+
+struct Event:
+    kind: Int
+    x: Int
+    y: Int
+    button: Int
+    key: Int
+    width: Int
+    height: Int
+    timestamp_ms: Int
+    text_len: Int
+
+struct CompositionTrace:
+    start: Bool
+    update: Bool
+    commit: Bool
+    cancel: Bool
+
+func event_none() -> Int:
+    return 0
+
+func event_close() -> Int:
+    return 1
+
+func event_resize() -> Int:
+    return 2
+
+func event_mouse_move() -> Int:
+    return 3
+
+func event_mouse_down() -> Int:
+    return 4
+
+func event_mouse_up() -> Int:
+    return 5
+
+func event_key_down() -> Int:
+    return 6
+
+func event_key_up() -> Int:
+    return 7
+
+func event_text_input() -> Int:
+    return 8
+
+func event_frame() -> Int:
+    return 9
+
+func event_composition_start() -> Int:
+    return 10
+
+func event_composition_update() -> Int:
+    return 11
+
+func event_composition_commit() -> Int:
+    return 12
+
+func event_composition_cancel() -> Int:
+    return 13
+
+func open(title: String, width: Int, height: Int) -> Surface
+uses surface:
+    let handle: Int = core.surface_open(title, width, height)
+    return Surface(handle: handle, width: width, height: height)
+
+func close(surface: consume Surface) -> Int
+uses surface:
+    return core.surface_close(surface.handle)
+
+func poll_event(surface: borrow Surface) -> Event
+uses alloc, mem, surface:
+    var event_slots: []i32 = core.make_i32(9)
+    let copied: Int = core.surface_poll_event_into(surface.handle, event_slots)
+    if copied >= 9:
+        return Event(kind: event_slots[0], x: event_slots[1], y: event_slots[2], button: event_slots[3], key: event_slots[4], width: event_slots[5], height: event_slots[6], timestamp_ms: event_slots[7], text_len: event_slots[8])
+    if copied >= 5:
+        return Event(kind: event_slots[0], x: event_slots[1], y: event_slots[2], button: event_slots[3], key: 0, width: surface.width, height: surface.height, timestamp_ms: core.surface_now_ms(), text_len: event_slots[4])
+    let kind: Int = core.surface_poll_event_kind(surface.handle)
+    let x: Int = core.surface_poll_event_x(surface.handle)
+    let y: Int = core.surface_poll_event_y(surface.handle)
+    let button: Int = core.surface_poll_event_button(surface.handle)
+    let text_len: Int = core.surface_poll_event_text_len(surface.handle)
+    return Event(kind: kind, x: x, y: y, button: button, key: 0, width: surface.width, height: surface.height, timestamp_ms: core.surface_now_ms(), text_len: text_len)
+
+func poll_event_into(surface: borrow Surface, out: []i32) -> Int
+uses mem, surface:
+    return core.surface_poll_event_into(surface.handle, out)
+
+func poll_event_text_len(surface: borrow Surface) -> Int
+uses surface:
+    return core.surface_poll_event_text_len(surface.handle)
+
+func poll_event_text_into(surface: borrow Surface, out: []u8) -> Int
+uses mem, surface:
+    return core.surface_poll_event_text_into(surface.handle, out)
+
+func clipboard_write_text(surface: borrow Surface, src: []u8) -> Int
+uses mem, surface:
+    return core.surface_clipboard_write_text(surface.handle, src)
+
+func clipboard_read_text_into(surface: borrow Surface, out: []u8) -> Int
+uses mem, surface:
+    return core.surface_clipboard_read_text_into(surface.handle, out)
+
+func poll_composition_into(surface: borrow Surface, out: []i32) -> Int
+uses mem, surface:
+    return core.surface_poll_composition_into(surface.handle, out)
+
+func poll_composition(surface: borrow Surface) -> CompositionTrace
+uses alloc, mem, surface:
+    var slots: []i32 = core.make_i32(4)
+    let copied: Int = poll_composition_into(surface, slots)
+    if copied >= 4:
+        return CompositionTrace(start: slots[0] != 0, update: slots[1] != 0, commit: slots[2] != 0, cancel: slots[3] != 0)
+    return CompositionTrace(start: false, update: false, commit: false, cancel: false)
+
+func begin_frame(surface: borrow Surface) -> Frame
+uses alloc, mem, surface:
+    let _: Int = core.surface_begin_frame(surface.handle)
+    let stride: Int = surface.width * 4
+    let pixels: []u8 = core.make_u8(stride * surface.height)
+    return Frame(surface: surface, width: surface.width, height: surface.height, stride: stride, pixels: pixels)
+
+func present(frame: consume Frame) -> Int
+uses mem, surface:
+    return core.surface_present_rgba(frame.surface.handle, frame.pixels, frame.width, frame.height, frame.stride)
+
+func now_ms() -> Int
+uses surface:
+    return core.surface_now_ms()
+
+func request_redraw(surface: borrow Surface) -> Int
+uses surface:
+    return core.surface_request_redraw(surface.handle)

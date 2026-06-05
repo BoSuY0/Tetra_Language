@@ -197,7 +197,7 @@ func discoverExamples(examplesRoot string) ([]string, error) {
 
 func requiredCasesForReport(report smokeListReport) map[string]bool {
 	if report.BuildOnly || report.Target == "wasm32-wasi" || report.Target == "wasm32-web" {
-		return map[string]bool{
+		required := map[string]bool{
 			"legacy_hello":              false,
 			"effects_io_smoke":          false,
 			"ui_web_smoke":              false,
@@ -212,29 +212,41 @@ func requiredCasesForReport(report smokeListReport) map[string]bool {
 			"task_smoke":                false,
 			"actors_pingpong":           false,
 		}
+		if report.Target == "wasm32-web" {
+			required["surface_counter"] = false
+			required["surface_text_input"] = false
+		}
+		return required
 	}
 	return map[string]bool{
-		"flow_hello":               false,
-		"actors_pingpong":          false,
-		"enum_match_smoke":         false,
-		"effects_io_smoke":         false,
-		"typed_errors_smoke":       false,
-		"protocol_impl_smoke":      false,
-		"for_collection_smoke":     false,
-		"core_async_smoke":         false,
-		"core_capability_smoke":    false,
-		"core_collections_smoke":   false,
-		"core_crypto_smoke":        false,
-		"core_filesystem_smoke":    false,
-		"core_io_smoke":            false,
-		"core_math_smoke":          false,
-		"core_memory_smoke":        false,
-		"core_networking_smoke":    false,
-		"core_serialization_smoke": false,
-		"core_slices_smoke":        false,
-		"core_strings_smoke":       false,
-		"core_sync_smoke":          false,
-		"core_testing_smoke":       false,
-		"core_time_smoke":          false,
+		"flow_hello":                              false,
+		"actors_pingpong":                         false,
+		"enum_match_smoke":                        false,
+		"effects_io_smoke":                        false,
+		"typed_errors_smoke":                      false,
+		"protocol_impl_smoke":                     false,
+		"for_collection_smoke":                    false,
+		"core_async_smoke":                        false,
+		"core_capability_smoke":                   false,
+		"core_collections_smoke":                  false,
+		"core_component_smoke":                    false,
+		"core_crypto_smoke":                       false,
+		"core_filesystem_smoke":                   false,
+		"core_io_smoke":                           false,
+		"core_math_smoke":                         false,
+		"core_memory_smoke":                       false,
+		"core_networking_smoke":                   false,
+		"core_serialization_smoke":                false,
+		"core_slices_smoke":                       false,
+		"core_strings_smoke":                      false,
+		"core_sync_smoke":                         false,
+		"core_testing_smoke":                      false,
+		"core_time_smoke":                         false,
+		"surface_counter":                         false,
+		"surface_text_input":                      false,
+		"surface_migration_ui_web_smoke":          false,
+		"surface_migration_ui_native_shell_smoke": false,
+		"surface_migration_dogfood_web_ui":        false,
+		"surface_migration_tetra_control_center":  false,
 	}
 }

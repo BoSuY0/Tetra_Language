@@ -144,7 +144,7 @@ func main() -> Int:
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	assertCLIJSONLifetimeDiagnostic(t, srcPath, "borrowed local 'maybe' cannot escape via global assignment to 'leaked'")
+	assertCLIJSONLifetimeDiagnostic(t, srcPath, "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot be stored in global")
 }
 
 func TestCheckCommandJSONDiagnosticsForBorrowedSliceGlobalAssignmentCode(t *testing.T) {
@@ -194,7 +194,7 @@ import lib.leaks as leaks
 func main() -> Int:
     return 0
 `)
-	assertCLIJSONLifetimeDiagnosticForPath(t, srcPath, libPath, "borrowed local 'maybe' cannot escape via global assignment to 'leaked'")
+	assertCLIJSONLifetimeDiagnosticForPath(t, srcPath, libPath, "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot be stored in global")
 }
 
 func TestCheckCommandJSONDiagnosticsForCrossModuleBorrowedSliceGlobalAssignmentCode(t *testing.T) {

@@ -81,10 +81,13 @@ func validateFeatures(features []featureEntry) error {
 		return fmt.Errorf("features must not be empty")
 	}
 	allowedStatus := map[string]bool{
-		"current":      true,
-		"experimental": true,
-		"planned":      true,
-		"post-v1":      true,
+		"current":              true,
+		"experimental":         true,
+		"release_candidate":    true,
+		"unsupported":          true,
+		"legacy_compatibility": true,
+		"planned":              true,
+		"post-v1":              true,
 	}
 	requiredStatuses := []string{"current", "planned", "post-v1"}
 	seenStatus := map[string]bool{}

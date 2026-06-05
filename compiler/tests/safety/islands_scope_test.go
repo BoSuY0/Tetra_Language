@@ -21,6 +21,24 @@ func TestScopedIslandReturnEscape(t *testing.T) {
 	}
 }
 
+func TestScopedIslandBorrowedViewReturnEscape(t *testing.T) {
+	src := "fun make(): []u8 uses alloc, islands, mem {\n  island(16) as isl {\n    var xs: []u8 = core.island_make_u8(isl, 4)\n    return xs.window(0, 1).borrow()\n  }\n  return make_u8(1)\n}\nfun main(): i32 {\n  return 0\n}\n"
+	err := testkit.CheckProgram(src)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "borrowed slice return") {
+		t.Fatalf("expected borrowed return diagnostic, got: %v", err)
+	}
+}
+
+func TestScopedIslandCopyReturnEscapeAllowed(t *testing.T) {
+	src := "fun make(): []u8 uses alloc, islands, mem {\n  island(16) as isl {\n    var xs: []u8 = core.island_make_u8(isl, 4)\n    xs[0] = 7\n    return xs.window(0, 1).copy()\n  }\n  return make_u8(1)\n}\nfun main(): i32 uses alloc, islands, mem {\n  let out: []u8 = make()\n  return out.len\n}\n"
+	if err := testkit.CheckProgram(src); err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+}
+
 func TestScopedIslandOptionalReturnEscape(t *testing.T) {
 	src := "fun make(): []u8? {\n  island(16) as isl {\n    var xs: []u8 = core.island_make_u8(isl, 4)\n    var maybe: []u8? = none\n    maybe = xs\n    return maybe\n  }\n  return none\n}\n"
 	if err := testkit.CheckProgram(src); err == nil {

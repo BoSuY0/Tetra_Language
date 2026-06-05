@@ -1,0 +1,33 @@
+{
+  "title": "Memory Ideal Vertical Slice v1",
+  "slug": "memory-ideal-vertical-slice-v1",
+  "status": "complete",
+  "approval": {
+    "required": false,
+    "granted": true,
+    "notes": "Local non-destructive edits only; ask before destructive or external actions."
+  },
+  "packets": [
+    "P0-discovery",
+    "P1-tests-model",
+    "P2-semantics",
+    "P3-docs-audit",
+    "P4-final-verification"
+  ],
+  "verification": {
+    "status": "passed",
+    "checks": [
+      "focused memoryfacts",
+      "focused memorymodel",
+      "focused semantics",
+      "focused tools",
+      "v0 and v1 correlation",
+      "broad go test",
+      "ci script",
+      "manifest",
+      "verify-docs",
+      "git diff --check",
+      "graphify update"
+    ]
+  }
+}

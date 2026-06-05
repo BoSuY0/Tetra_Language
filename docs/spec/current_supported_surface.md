@@ -72,9 +72,97 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   be reviewed through the resulting diff.
 - Native build/smoke coverage for `linux-x64`, plus build-only coverage for
   `macos-x64` and `windows-x64`.
+- Linux native target-family promotion is tracked by
+  `docs/plans/linux_x86_x64_x32_full_support_plan.md`. The current strict
+  matrix is: `linux-x64` is the supported production Linux baseline;
+  `linux-x86` is build-only/host-probed i386 SysV; `linux-x32` is
+  build-only/host-probed x32 SysV with x86_64 registers and 32-bit
+  pointer/native-int facts. The current stdlib/runtime capability matrix lives
+  in `docs/spec/linux_native_target_stdlib_matrix.md`. `linux-x86` now has a
+  build-verified self-host logical time-runtime smoke for time-only programs,
+  bounded two-spawn actor/task/task-group smokes, single-spawn typed-task/staged typed-task/typed task-group/actor-state smokes, and an x86
+  filesystem+scheduler composition smoke. x86/x32 no-runtime executable ABI
+  smokes cover stdout writes plus string-literal data, and the ABI reports now
+  include `core.net_write(2)` stderr fd runtime smokes and allocator
+  success/failure executable smokes for `core.alloc_bytes` plus raw store/load
+  and checked invalid-size/post-`mmap` error exit lowering, raw memory bounds
+  executable smokes for `ptr_add` plus byte store/load, raw pointer-slot
+  executable smokes for base and direct-`ptr_add` offset `store_ptr`/`load_ptr`,
+  as well as scoped
+  island/free executable smokes in normal and debug modes. `linux-x32` now has ABI-report self-host time/
+  bounded two-spawn actor/task/task-group smokes plus single-spawn typed-task/staged typed-task/typed task-group/actor-state runtime smokes,
+  an x32 filesystem+scheduler composition smoke, plus an x32 `ctx_switch`
+  object smoke, and minimal `fs_exists` filesystem runtime smokes now cover
+  both `linux-x86` and `linux-x32`. Both build-only targets also have
+  networking runtime smokes for the current `core.net` runtime ABI:
+  `core.net_socket_tcp4`, bind/connect/listen/accept4, read/recv/write/send,
+  epoll create/control/wait,
+  `core.net_set_nonblocking`, `core.net_set_reuseport`,
+  `core.net_set_tcp_nodelay`, and `core.net_close`, backed by their own syscall
+  ABI (`socketcall` plus `read`/`write`/`fcntl`/`int 0x80` on i386, x32
+  syscall-bit numbers on x32, including x32-specific `recvfrom`,
+  `setsockopt`, and epoll numbers).
+  The ABI reports build canonical pointer plus `c_int`/`c_uint` `@export` object smokes
+  for x86, x64, and x32; x86/x32 also build canonical `rawptr`,
+  `nullable_ptr`, `ref`, and ILP32 native/libc scalar `@export` object smokes for
+  `usize`, `isize`, `size_t`, `ssize_t`, `native_int`, `native_uint`,
+  `c_long`, and `c_ulong`, while function-pointer FFI
+  spellings and wider/float target-layout scalars still emit target-aware
+  diagnostics with no output artifact. `linux-x64` also has
+  explicit filesystem+scheduler composition, networking runtime, and
+  scheduler-restriction regression smokes so build-only target restrictions
+  cannot leak into the production baseline.
+  Surface, distributed actor, and actor fanout above 2 still fail with
+  target-aware diagnostics on x86/x32; the ABI reports include
+  Surface/distributed no-output evidence instead of counting these as
+  production support. Full x86/x32 allocator/free/panic parity is also still
+  unpromoted; the allocator success/failure, raw memory bounds, raw
+  pointer-slot base/offset, and island/free smokes are target-specific build
+  evidence, not a production memory-runtime claim.
+  `linux-x86` and
+  `linux-x32` must not be described as production targets until runtime,
+  stdlib, FFI, ABI, linker, atomic, smoke, fuzz, brutal, runner, and
+  artifact-hash gates pass through `tools/cmd/validate-linux-native-targets`
+  and the target metadata is updated in the same evidence-backed change.
 - WASM artifact/import preflight for `wasm32-wasi` and `wasm32-web` through
   `smoke --run=false`, with runtime proof coming from the dedicated WASI and
   web runner smoke reports validated by the gate.
+- ABI verification v1 records schema `tetra.abi.verification.v1` with scope
+  `p21.1_abi_verification` for `linux-x64`, `linux-x86`, `linux-x32`,
+  `macos-x64`, `windows-x64`, `wasm32-wasi`, and `wasm32-web`. The report
+  covers the ABI test corpus, struct/enum/slice/String return validation, call
+  boundary validation, and FFI `repr(C)` tests. Native rows reuse the existing
+  x86/x32/x64 classifier, aggregate, object, and FFI diagnostics; wasm rows
+  validate compiler-owned i32 slot ABI metadata and backend call arg/return
+  slot matching. This is evidence/report coverage only: it does not claim
+  runtime execution for build-only or wasm targets, C ABI for default structs,
+  native C aggregate ABI for wasm, performance, or a safe-semantics change.
+- Specialization machine-code evidence v1 records schema
+  `tetra.optimizer.specialization_machine_code.v1` with scope
+  `p21.2_specialization_v1_v2` for generics, protocol/static conformance,
+  extension methods, enum match known cases, optionals, and collections.
+  `BuildP21SpecializationMachineCodeWitness` uses `inline-small-pure` plus
+  `machine.ScalarIntFunctionFromStackIR` to show a known direct helper call is
+  present before optimization, absent from optimized Stack IR, and absent as
+  `OpCall` from verified scalar Machine IR after translation validation. Rows
+  tie this witness to P17.2 generic/protocol/extension/SCCP evidence and P19.1
+  caller-owned collection monomorphization. This is evidence/report coverage
+  only: it does not add a public optimizer mode, runtime behavior change,
+  dynamic dispatch claim, runtime generic values, allocator-backed production
+  collections, layout/ABI freedom, performance, or safe-semantics change.
+- Full feature surface audit v1 records schema
+  `tetra.language.feature_surface_audit.v1` with scope
+  `p22.0_full_feature_surface_audit` for first-class callables, closures,
+  protocols/trait objects, runtime generics, advanced enums/pattern matching,
+  async typed errors, structured concurrency, modules/packages,
+  macros/metaprogramming, UI/surface, and Eco/capsules. Rows copy
+  `FeatureRegistry()` statuses and preserve bounded current, static-only,
+  experimental, unsupported, planned, and post-v1 decisions. This is
+  evidence/report coverage only: it does not claim a full v1 language
+  guarantee, runtime generic values, trait objects, runtime protocol values,
+  a macro/metaprogramming system, full structured concurrency,
+  cross-platform production UI runtime, distributed EcoNet, proof-carrying
+  capsules, performance, runtime behavior change, or safe-semantics change.
 - Local Eco package lifecycle validation for verify, lock generation/validation
   through `--lock` workflows, pack/unpack, vault, stable local publish
   metadata, beta publish metadata, target-aware downloads, and stable/beta
@@ -89,10 +177,40 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   are reported with structured diagnostics.
 - Static monomorphized generic functions: generic functions with inferred value
   arguments are parsed, checked, formatted, documented, and specialized with
-  deterministic names across modules. The current truth boundary excludes
-  runtime generic values, explicit type arguments, generic structs,
-  higher-ranked generics, full protocol-bound generic dispatch, specialization
-  optimization, and any dynamic dispatch claim.
+  deterministic names across modules. After monomorphization, the internal
+  `inline-small-pure` pass may remove tiny generic identity/wrapper calls while
+  preserving ABI, proof, and provenance facts. The current truth boundary
+  excludes runtime generic values, explicit type arguments, generic structs,
+  higher-ranked generics, full protocol-bound generic dispatch, broad
+  specialization optimization, and any dynamic dispatch claim.
+- Struct layout / ABI representation policy: plain `struct Foo` carries the
+  default Tetra representation and does not promise C field order, padding, or
+  ABI layout to user code. `repr(C) struct Foo` parses and checks into
+  ABI-locked metadata. `@export` public ABI aggregate boundaries require
+  explicit `repr(C)` and reject default-layout structs before codegen.
+  `.layout.json` schema version 2 records policy
+  `p21.0_default_layout_freedom_v1`, including `compiler_owned_default`,
+  `abi_locked_repr_c`, and `exported_ffi_explicit_repr_c` decision rows.
+  Internal layout policy may permit field reordering, padding removal, packing,
+  hot/cold splitting, scalar replacement, or AoS-to-SoA transforms for default
+  structs only when later proofs allow them; those freedoms are never available
+  for `repr(C)`, and no transform/performance/runtime change is claimed by the
+  current report.
+- Long-term verified track evidence: internal P11 libraries now provide a
+  scalar-i32 stable-subset differential interpreter that compares source
+  interpreter, stack backend, register backend, and optimized backend results;
+  machine-checkable optimizer validation metadata with sha256 before/after IR
+  hashes; a self-hosting gate that blocks claims until compiler subset,
+  register backend, optimizer, allocator/runtime, stdlib, small compiler
+  component, Go-vs-Tetra output comparison, deterministic bootstrap, and
+  cross-platform bootstrap evidence are all present; and a small formal core
+  spec for values, provenance, borrow/copy, bounds proofs, allocation intent,
+  and check-elimination validity; and a security review gate for unsafe APIs,
+  capabilities, memory allocator, network runtime, actor runtime, DB protocol,
+  package/Eco system, build scripts, supply chain, and required audit
+  artifacts. This is evidence infrastructure, not a public
+  source interpreter mode, backend selector, full self-hosting claim, or full
+  formal proof of Tetra, and not a security certification or release signoff.
 - Static protocol conformance: protocol declarations and `impl Type: Protocol`
   are checked against extension/static methods, including compatible effects,
   async, throws, parameter ownership markers, params, return types, and MVP
@@ -106,6 +224,21 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   cross-module impl conformance with parameter ownership markers, requirement
   signature shape, and visibility diagnostics. This does not introduce calls through generic protocol bounds,
   witness tables, trait objects, runtime protocol values, or dynamic dispatch.
+- P22.2 records the protocol / trait-object decision as an evidence-only
+  report, `tetra.language.protocol_trait_object_decision.v1` /
+  `p22.2_protocol_trait_object_decision`, with decision
+  `keep_static_conformance_only`. The report validates rows for static
+  conformance fast path, static protocol-bound generics, runtime existential
+  decision, explicit dynamic-dispatch gate, specialization static abstraction,
+  witness-table boundary, trait-object boundary, and registry/docs alignment.
+  Its live witnesses parse/check/lower a static protocol impl direct
+  `Vec2.draw` `IRCall`, a protocol-bound concrete `id__T_Vec2` direct call,
+  runtime protocol value rejection with `unknown type 'Drawable'`,
+  generic-bound requirement-call rejection, and P17/P21 known-direct
+  specialization evidence. Runtime protocol values, trait objects, witness
+  tables, dynamic dispatch, conformance-table lookup, runtime existential ABI,
+  broad protocol specialization, performance, runtime behavior changes, and
+  safe-program semantic changes are not promoted or claimed.
 - Enum payload constructors and exhaustive enum match/catch coverage: positional
   enum payload constructors and payload bindings are supported for
   match/catch/if-let, with exhaustive unguarded enum match/catch checks and
@@ -207,18 +340,67 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
 - Effects and `uses` checker MVP: stable effect names and groups are checked,
   function calls propagate callee effects transitively across resolved direct,
   generic, protocol, and supported callable paths, and missing `uses`
-  declarations are diagnostics. This is a static MVP; it does not infer effects
-  or claim proof-level effect-system guarantees.
+  declarations are diagnostics. PLIR exposes only checker-enforced optimization
+  facts (`pure_call`, `no_heap_allocation`, `no_mem_write`, `no_actor_send`,
+  and `no_unknown_escape`) derived from normalized declared effects and mutable
+  global analysis. This is a static MVP; it does not infer effects or claim
+  proof-level effect-system guarantees.
 - Capabilities and unsafe boundary MVP: `cap.io` and `cap.mem` are opaque tokens
   obtained only inside `unsafe` blocks; raw memory/MMIO operations require the
   matching `uses` effects, an `unsafe` boundary, the required capability
-  argument, and capsule permissions for attenuated capability groups. This is
+  argument, and capsule permissions for attenuated capability groups. Raw slice
+  headers can be constructed only by the audited unsafe
+  `core.raw_slice_*_from_parts(ptr, len, cap.mem)` builtin family; those values
+  are treated as external provenance until stronger facts are proven. This is
   compile-time gating with minimal current backend lowering, not a broad
   safe-code capability construction model. On `wasm32-wasi` and `wasm32-web`,
   raw unsafe allocation, capability-token construction, raw memory access,
   MMIO, pointer arithmetic, and context switching are blocked by compile-time
   target diagnostics before WASM backend emission; safe slices and the current
   compile-compatible scoped island path remain available.
+- Safe slice and String byte view constructors: `xs.window(start, count)`,
+  `xs.prefix(count)`, `xs.suffix(start)`, `xs.borrow()`, `xs.copy()`, and
+  `xs.copy_into(dst)` are supported for `[]u8`, `[]u16`, `[]i32`, and `[]bool`;
+  `String` supports the same byte-oriented `window`/`prefix`/`suffix`,
+  `borrow()`, `copy()`, and `copy_into(dst: inout []u8)` surface. Views operate
+  on byte offsets and byte lengths, not Unicode scalars or grapheme clusters.
+  Checked view constructors reject negative inputs and out-of-range windows
+  before constructing the view, derive provenance from the source value,
+  preserve `len_stable` when the source provenance is known, and never make
+  slice or String `ptr`/`len` assignable in safe code. Explicit `borrow()`
+  creates a no-allocation immutable view with `borrowed_imm`, `no_escape`, and
+  preserved `derived_window` PLIR facts. Borrowed return signatures are
+  supported for the same slice view types and for byte-oriented `String` via
+  `-> borrow []u8`, `-> borrow []u16`, `-> borrow []i32`, `-> borrow []bool`,
+  and `-> borrow String`; generated interfaces preserve that return ownership
+  across module boundaries. A borrowed return must come from one safe nonlocal
+  source such as a parameter or compatible borrowed return. Borrowed views
+  cannot escape through owned returns, global storage, actor boundaries, the
+  current typed task transfer surface, closure escape, consume parameters, or
+  hidden struct/enum/optional/generic aggregate payloads unless copied.
+  Explicit `copy()` creates owned storage with new known provenance, and
+  `copy_into` writes into a caller-owned destination after checking the
+  destination length. Bounds reports show proof-tagged check removal for `for`
+  loops over valid views when the loop guard dominates the indexed load;
+  allocation/proof reports distinguish borrowed no-allocation views and
+  borrowed returns from owned copy allocation intent; statically invalid String
+  view constructors do not receive false `index_in_range` facts. This is not a
+  named-lifetime system, generic lifetime parameter model, arbitrary borrowed
+  aggregate return surface, full Unicode String model, or Rust-like borrow
+  checker.
+- Slice constructor allocation-length contract: `core.make_u8`,
+  `core.make_u16`, `core.make_i32`, `core.make_bool`, and the matching
+  `core.island_make_*` constructors treat the argument as a logical element
+  count. `n == 0` returns a valid empty slice (`len == 0`, pointer `0` on the
+  implemented empty fast paths), `n < 0` traps or rejects before allocation,
+  and byte-size overflow traps or rejects before allocation. On island
+  constructors the negative, zero, and byte-size overflow checks run before
+  island metadata access where the native backend implements island storage.
+  PLIR records element type, element size, length expression, and
+  zero/negative/overflow guard status; allocation reports distinguish valid
+  empty, normal, rejected negative, rejected overflow, and runtime-guarded
+  dynamic lengths. These semantics do not depend on `--explain` or report
+  flags.
 - Privacy and consent checker MVP: `uses privacy` requires a `privacy` semantic
   clause, recursive signature detection (parameter/return/throws) unwraps `?`
   and `[]` layers and treats `secret.*` as secret-bearing, such signatures
@@ -488,9 +670,18 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   MMIO, islands, linker/control, and privacy effects are conservative
   diagnostics when present on the worker effect surface. IO and budget remain
   covered by their existing effect and budget-context checkers. For typed actor
-  messages, checked ownership transfer currently applies to `island` payload
-  paths; actor/task handles in typed message payloads remain outside this
-  transfer contract and are rejected by the current value-only payload rule.
+  messages, P6.1 sendability requires small scalars to copy, borrowed
+  `String`/slice views to use explicit `.copy()`, and unknown unsafe provenance
+  to have an audited unsafe send contract. Checked ownership transfer applies
+  to `island` payload paths, and the local typed mailbox now supports a narrow
+  zero-copy move for an island-backed slice when the same payload carries the
+  owning `island`; sender-side use after send is rejected and `--explain`
+  writes actor-transfer evidence. P6.2 actor-transfer evidence includes
+  typed-mailbox `message_schema`, fixed local capacity/backpressure metadata,
+  and per-payload copy/move ownership rows. Actor/task handles in typed message
+  payloads, unknown raw pointers, and distributed pointer/region zero-copy
+  transfer remain outside this transfer contract and are rejected by the
+  current value-only payload rule.
   This is a conservative local MVP; it does not claim distributed actor safety,
   full race-safety proofs, full cancellation semantics, or structured
   concurrency.
@@ -523,6 +714,13 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
 - Non-Linux-x64 distributed actor targets, multi-threaded scheduling, and
   broader structured-concurrency guarantees beyond the documented cooperative
   task group handles remain outside this claim unless separately promoted.
+- P6.3 per-core actor scheduling is represented by a checked prototype model in
+  `compiler/internal/parallelrt` and by required
+  `tetra.parallel.production.v1` benchmark rows. That evidence covers
+  single-core compatibility, two-core work stealing, bounded typed mailboxes,
+  actor ping-pong/fanout comparison, and zero-copy owned-region message
+  transfer; it does not promote the production runtime to a full per-core worker
+  scheduler.
 - A full TechEmpower-compatible web stack is still broader than the current
   stable Tetra source surface: no production HTTP server, full HTTP header/body
   parser, full event-loop abstraction, io_uring path, per-core worker runtime,
@@ -545,6 +743,152 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   `lib.core.networking` policy helpers and still require broader
   `lib.core.net` event-loop/socket-option expansion and `lib.core.postgres`
   driver/pool layers.
+- The internal P7 runtime evidence includes `compiler/internal/stdlibrt`
+  region-aware collection/buffer storage planning, `jsonrt.ParseValueView`
+  borrowed JSON string/byte views with region copies for escaped strings,
+  `httprt.ParseRequestView` allocation-free request-head parsing with borrowed
+  header views, and `pgrt` borrowed DataRow/binary int4 helpers. These are
+  runtime evidence paths for the local web stack. The stable generic collection
+  source surface is limited to caller-owned slice views in
+  `lib.core.collections.Vec<T>` and `HashMap<K,V>` plus narrow common lookup
+  specializations. P19.1 also has a checked truth-bench-harness dry-run
+  `p19.1_generic_collections` hash-table artifact with Tetra/C++/Rust rows,
+  matching algorithm/input metadata, and Tetra proof/allocation/bounds/perf
+  report paths. This does not promote allocator-backed production
+  `Vec<T>`/`HashMap<K,V>` runtimes, generic hashing/equality, measured
+  C++/Rust speed parity, or an official TechEmpower benchmark claim. P21.2
+  specialization machine-code evidence may cite these rows only for
+  caller-owned monomorphized collection helper evidence; it does not promote a
+  broader collection runtime.
+- P19.2 foundation evidence adds `tetra.stdlib.http_json.production_stack.v1`
+  coverage for HTTP/1.1 request-head parsing, pipelined request heads,
+  headers/body/keep-alive metadata, zero-heap request-view evidence,
+  JSON parse/stringify, response building, an internal per-server UTC-second
+  Date cache helper, Linux `netrt.Writev`/`netrt.Sendfile` helper evidence, and
+  a checked
+  `p19.2_http_json_source_first`
+  truth-bench-harness dry-run artifact. That artifact has Tetra-only
+  `HTTP plaintext` and `HTTP JSON` rows and Tetra proof/allocation/bounds/P19.2
+  coverage paths. It is not a full production web-stack promotion, official
+  TechEmpower result, PostgreSQL production-stack claim, P20 performance
+  matrix, C++/Rust parity claim, source-level cached-date API, cross-worker
+  Date cache, `webrt.flush` scatter/gather integration, HTTP static-file
+  sendfile path, zero-copy production file-serving, non-Linux writev/sendfile
+  parity, or measured speed comparison.
+- P19.3 closure evidence adds
+  `tetra.stdlib.postgresql.production_driver.v1` coverage for startup/SCRAM,
+  prepared statements, binary int4 helpers, pooling/backpressure, borrowed
+  DataRow decode, local `/db`, `/queries`, `/updates`, and `/fortunes`
+  endpoint correctness, and a checked `p19.3_postgres_source_first`
+  truth-bench-harness dry-run artifact. That artifact has Tetra-only
+  `DB single query`, `DB multiple queries`, `DB updates`, and `DB fortunes`
+  rows plus Tetra proof/allocation/bounds/P19.3 coverage paths. The closure
+  also requires `validate-techempower-report` to accept the checked local
+  SCRAM semantic report, `/db` matrix report, and
+  `/queries`/`/updates`/`/fortunes` matrix report. It is not a full
+  source-level PostgreSQL driver API, external production database deployment,
+  official TechEmpower result, production database benchmark, P20 performance
+  matrix, C++/Rust parity claim, measured speed comparison, or runtime behavior
+  change.
+- P8 benchmark evidence is tooling-level claim discipline, not a new language
+  semantic mode. `tools/cmd/truth-bench-harness` validates the default full
+  local Tetra/C/C++/Rust benchmark matrix with compiler-version, target-CPU,
+  binary-size, runtime, proof, allocation, and bounds report evidence. It also
+  validates named bounded scopes such as `p19.1_generic_collections` and
+  `p19.2_http_json_source_first` when a slice needs a checked artifact before
+  the full P20 matrix. Compiler `.perf.json` reports list performance blockers,
+  and broad fastest-language, C++/Rust parity, production-web-stack, or
+  official-TechEmpower claims remain forbidden without matching official
+  evidence.
+- P11 verified-track evidence is intentionally internal. The stable scalar-i32
+  subset lives in `compiler/internal/differential`; it interprets stack IR and
+  Machine IR for small scalar/loop cases, compares them with a source
+  interpreter and optimized stack IR, and rejects lane mismatches. The
+  translation-validation metadata builder in `compiler/internal/validation`
+  records machine-checkable hashes and validation counters for optimization
+  passes, while `compiler/internal/selfhostgate` keeps self-hosting blocked
+  until compiler subset, backend, optimizer, allocator/runtime, stdlib,
+  compiler component, output comparison, deterministic bootstrap, and
+  cross-platform bootstrap evidence are present. `compiler/internal/formalcore`
+  validates the small formal-core concept/rule inventory for values,
+  provenance, regions, borrow/copy, bounds proofs, allocation length contracts,
+  allocation intent, raw pointer bounds metadata, and check-elimination
+  validity; it is not a full language formalization.
+- P23.0 translation validation v2 is current as internal evidence:
+  `tetra.translation.validation.v2` records registered optimizer pass coverage,
+  symbolic scalar equivalence, supported i32 slice memory samples, loop and
+  call/inlining differential samples, bounds proof preservation, allocation plan
+  preservation, and sha256 before/after optimization metadata. It is not a full
+  formal proof, exhaustive optimizer completeness claim, broad memory/alias
+  model, broad loop theorem prover, performance claim, runtime behavior change,
+  or safe-program semantics change.
+- P23.1 fuzz/property/differential expansion is current as internal evidence:
+  `tetra.fuzz.property.differential.v1` records generated parser/checker
+  programs, PLIR/lowering verifier cases, backend differential matrix
+  randomized samples, host-supported Linux x64 native differential evidence or
+  an explicit unavailable boundary, runtime allocator properties, actor-transfer
+  stress diagnostics, fuzz nightly summary gate artifacts, and reduced
+  single-sample mismatch reproducers. It is not exhaustive fuzzing, a full
+  program-correctness proof, a full native differential suite for every target,
+  a performance claim, a runtime behavior change, or a safe-program semantics
+  change.
+- P23.2 formal core v1 is current as internal evidence:
+  `tetra.formal_core.v1` records values, borrows and owned/copy, provenance and
+  regions, bounds proof id semantics, allocation length contracts, allocation
+  intent lowering, raw pointer bounds metadata, and check-elimination validity
+  through existing machine checks. It is not a full formal proof, broad language
+  theorem prover, unsafe-policy change, runtime behavior change,
+  safe-program-semantics change, performance claim, public source interpreter,
+  or public backend selector.
+- P23.3 self-hosting gate v1 is current as internal evidence:
+  `tetra.self_hosting.gate.v1` records the self-host subset boundary, current
+  backend/optimizer/allocator/runtime/stdlib evidence, and explicit blockers
+  for small compiler component compile, Go compiler output vs Tetra-compiled
+  output comparison, deterministic bootstrap chain, and cross-platform
+  bootstrap story. The current report requires `SelfHostingClaimed=false` and
+  `GateDecision.Allowed=false`; it is not a self-hosting claim, deterministic
+  bootstrap chain, cross-platform bootstrap story, runtime behavior change,
+  safe-program-semantics change, performance claim, public backend selector, or
+  public source interpreter.
+- P24.0 security review gate v1 is current as internal audit evidence:
+  `tetra.security.review_gate.v1` records unsafe API surface, capability
+  surface, memory allocator, network runtime, actor runtime, DB protocol,
+  package/Eco system, build scripts, supply chain, and the required artifacts
+  `docs/audits/security-review.md`, `docs/audits/threat-model.md`,
+  `docs/audits/unsafe-surface-map.md`, and
+  `docs/audits/capability-surface-map.md`. It reuses existing validators for
+  runtime allocation contracts, raw-pointer bounds metadata, IO reactor
+  coverage, actor production boundaries, PostgreSQL protocol coverage, Eco
+  validator paths, release security-review scripts, and artifact presence. It
+  is not security certification, an external penetration test, CVE-free status,
+  release security signoff, runtime behavior change, safe-program-semantics
+  change, or a performance claim.
+- P24.1 runtime hardening v1 is current as internal audit evidence:
+  `tetra.runtime.hardening.v1` records deterministic traps, OOM policy, the
+  stack overflow guard boundary, integer overflow semantics, allocator
+  corruption instrumentation, region double-free/use-after-free
+  instrumentation, actor mailbox overflow policy, and network parser limits.
+  It reuses current allocation contracts, region/small-heap runtime ABI
+  evidence, typed mailbox overflow evidence, actor production-boundary audit,
+  HTTP/PostgreSQL parser limits, backend trap/stack-depth checks, and optimizer
+  overflow-semantics checks. It is not a full runtime-hardening proof, full
+  stack-overflow protection, OOM recovery guarantee, full allocator-corruption
+  detection proof, production actor-mailbox promotion, runtime behavior change,
+  safe-program-semantics change, or a performance claim.
+- P24.2 compatibility/stability v1 is current as internal audit evidence:
+  `tetra.compatibility.stability.v1` records stable diagnostic codes,
+  versioned report schemas, manifest compatibility checks, a breaking-change
+  migration guide, and a deprecation policy. It reuses
+  `DiagnosticCodeRegistry`, `tools/cmd/validate-diagnostic`, P21-P24 schema
+  constants, `tools/cmd/validate-manifest`, `docs/generated/manifest.json`,
+  `docs/spec/api_diff_policy.md`,
+  `docs/release/breaking-change-migration-guide.md`,
+  `docs/release/deprecation_policy.md`,
+  `docs/release/v1_0_x_maintenance_policy.md`, and
+  `docs/spec/stdlib_naming_versioning.md`. It is not a full backward
+  compatibility guarantee for all future versions, diagnostic-message freeze,
+  automatic migration promise, manifest/runtime ABI stability promise, runtime
+  behavior change, safe-program-semantics change, or a performance claim.
 - Callable Level 1 is current since `v0.4.0`: the production claim covers
   non-capturing, symbol-backed function-typed locals, immutable aliases,
   target-set-backed aliases of function-typed parameters, callback parameters,
@@ -702,6 +1046,23 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   storage, struct fields, and enum payloads use the `fnptr` fast path for
   bounded environments and the 4-slot handle path for larger safe immutable
   by-value environments.
+  P22.1 records this callable model as an evidence-only report,
+  `tetra.language.first_class_callables.v1` /
+  `p22.1_first_class_callables_v1`. The report validates rows for the bounded
+  `fnptr` fast path, the fat callable handle, capture safety classification,
+  mutable-capture diagnostics, resource/thread escape diagnostics, fixed ABI
+  width, cross-module interface metadata, and storage/callback paths. Its live
+  witnesses parse, check, and lower a one-capture 9-slot `fnptr` value without
+  heap environment allocation and a nine-capture fixed 4-slot handle with one
+  `IRAllocBytes`, nine `IRMemWritePtrOffset` writes, nine
+  `IRMemReadPtrOffset` reads, and call arg/ret slots `10/1`; generated `.t4i`
+  metadata is checked for `ReturnFunctionHandleValue`, heap escape kind,
+  capture count, target identity, and `ReturnSlots = 4`. This report does not
+  claim variable-width callable ABI, exploding return slots, mutable
+  by-reference capture support, pointer/resource capture support,
+  thread-boundary callable transfer, runtime generic callable polymorphism,
+  dynamic callable dispatch, unsafe lifetime relaxation, performance, runtime
+  behavior changes, or safe-program semantic changes.
 - Function-typed struct fields support the current safe callable model: local
   struct values may store non-capturing symbol-backed function values, captured
   `fnptr` values with up to eight environment slots, or handle-backed larger
@@ -802,9 +1163,10 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   handle model.
 - Generic structs, explicit type arguments, higher-ranked generics, runtime
   generic values, full protocol-bound generic dispatch, calls through generic
-  requirement bounds, specialization optimization, witness tables, trait objects,
-  runtime protocol values, and protocol dynamic dispatch remain outside the
-  current `v0.4.0` support claim unless separately promoted by a later gate.
+  requirement bounds, broad specialization optimization beyond the small-pure
+  monomorphic inline path, witness tables, trait objects, runtime protocol
+  values, and protocol dynamic dispatch remain outside the current `v0.4.0`
+  support claim unless separately promoted by a later gate.
 - Advanced ADT constructors, nested destructuring patterns, richer enum payload
   algebra, and guard expansion remain future/post-v1 unless separately promoted.
 - Broad formal lifetime proofs, distributed race-safety proofs, and
@@ -819,19 +1181,208 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   concurrency, GTK/Qt/OS UI toolkit backends, broad native UI input/change/focus
   behavior, and platform accessibility integration remain outside the current
   `v0.4.0` support claim.
-- UI metadata v1 (`ui.metadata-v1`) is promoted for the `v0.4.0` metadata
-  contract: checked state/view declarations, deterministic `tetra.ui.v1` JSON,
-  wasm32-web command-dispatch preview sidecars for lowered scalar state
-  operations, and native shell command-dispatch text plus
+- UI metadata v1 (`ui.metadata-v1`) is promoted for the `v0.4.0` legacy metadata
+  compatibility contract: checked state/view declarations, deterministic
+  `tetra.ui.v1` JSON, wasm32-web command-dispatch preview sidecars for lowered
+  scalar state operations, and native shell command-dispatch text plus
   `tetra.ui.native-shell.v1` JSON trace sidecars for lowered scalar state
   operations and deterministic native shell widget-tree artifacts, including
   direct assignment and integer increment/decrement updates, including
   supported `+=`/`-=` compound assignments, with scalar assignment hydration
   and same-state field-copy assignment in command order.
   The web preview mirrors supported style and accessibility metadata into DOM
-  preview attributes, but this is not platform-native widgets, a full
-  styling/layout engine, platform accessibility API integration, or `v1.0.0`
-  readiness without the full release gate.
+  preview attributes, but this legacy metadata compatibility path is not the
+  new Tetra Surface runtime, not platform-native widgets, not a full
+  styling/layout engine, not platform accessibility API integration, and not
+  `v1.0.0` readiness without the full release gate.
+- Tetra Surface v1 is current for the bounded `surface-v1-linux-web` release
+  scope: pure-Tetra UI, tiny Surface Host ABI, headless as a release evidence
+  target, linux-x64 real-window Wayland shm presentation, and wasm32-web
+  browser-canvas presentation. macOS Surface, Windows Surface, and wasm32-wasi
+  Surface UI are unsupported in this release.
+
+  | Feature | Status | Scope |
+  | --- | --- | --- |
+  | Surface core | current | pure-Tetra UI, Host ABI |
+  | Headless Surface | current/test | deterministic evidence target |
+  | Linux-x64 Surface | current | Wayland shm real-window release path |
+  | wasm32-web Surface | current | browser canvas release path |
+  | Surface toolkit v1 | current | Text/Label/Button/TextBox/Checkbox/Row/Column/Panel/Stack/Scroll/Spacer |
+  | Surface text input v1 | current | UTF-8/caret/selection/clipboard/composition baseline |
+  | Surface accessibility v1 | current | metadata plus platform bridge for supported targets |
+  | macOS Surface | unsupported | no production target evidence |
+  | Windows Surface | unsupported | no production target evidence |
+  | wasm32-wasi Surface UI | unsupported | no production UI runtime evidence |
+
+  Historical feature IDs `ui.surface-minimal-toolkit`,
+  `ui.surface-toolkit-reuse-v1`, and
+  `ui.surface-accessibility-metadata-tree-v1` remain experimental evidence
+  layers absorbed by `ui.surface-toolkit-v1` and
+  `ui.surface-accessibility-v1`; they are not separate current release APIs.
+  The component-model slice now includes static component
+  evidence plus experimental component-tree helper API evidence: runtime reports prove
+  ordinary structs with `measure`, `layout`, `draw`, `event`, `focus`,
+  `text_input`, host text payload copy into caller-owned buffers, and
+  accessibility metadata abilities plus a
+  `CounterApp`/`CounterButton` parent-child hierarchy and child-target event
+  dispatch. Reports include component layout bounds and root-to-child
+  `dispatch_path` entries, and the strict validator rejects pointer dispatch
+  evidence that misses the reported target component bounds.
+  `examples/surface_text_input.tetra` adds a pure-Tetra `TextBox` fixture that
+  stores deterministic host text payload bytes in component-owned `[]u8`
+  storage and builds for both Linux-x64 and wasm32-web Surface host paths, but
+  `examples/surface_textbox_app.tetra` now adds the first editable pure-Tetra
+  TextBox layer: click focuses the TextBox, Tab moves focus to a button,
+  keyboard events route only to the focused component, text bytes insert into
+  component-owned storage, caret/backspace/delete mutate the buffer, resize
+  preserves focused state, and redraw changes the RGBA frame.
+  `examples/surface_tree_app.tetra` adds a `ComponentTree`/`TreeNode`
+  milestone with stable node IDs, parent IDs, child positions, layout bounds,
+  draw order, focus order, root-to-leaf click paths for TextBox/Submit/Reset,
+  exact TextBox -> SubmitButton -> ResetButton -> TextBox Tab cycling,
+  TextBox text routing only while focused, keyboard-routed Button actions
+  through focused root-to-leaf paths, reset clear, resize relayout from
+  320x200 to 400x240, and changed frame checksums on
+  headless, linux real-window, and browser-canvas evidence levels. The
+  API-hardening reports add `component_tree_api` schema
+  `tetra.surface.component-tree-api.v1` with
+  `api_level = builder-layout-dispatch-v1`, `manual_bookkeeping:false`,
+  `tree_add_root`/`tree_add_child` builder evidence, `tree_validate`
+  invariant evidence, Column/Row layout helper evidence, helper-routed hit
+  tests, focus helper wrap evidence, and `tree_build_dispatch_path` output.
+  `examples/surface_toolkit_form.tetra` adds the first reusable toolkit
+  layer: ordinary `lib.core.widgets` Text/Button/TextBox/Row/Column/Panel
+  structs and helper functions build a Panel -> Column form with TextBox,
+  Submit/Reset buttons, and StatusText over the same ComponentTree API.
+  Reports add `tetra.surface.toolkit.v1` with
+  `toolkit_level = minimal-widgets-v1`, `module = lib.core.widgets`,
+  `experimental:true`, `production_claim:false`,
+  `uses_component_tree_api:true`, and `manual_bookkeeping:false`, plus
+  widget evidence and headless/linux-real-window/browser-canvas runtime
+  evidence for focus, text editing, button routing, status updates, resize,
+  and changed frame checksums.
+  `examples/surface_toolkit_settings.tetra` proves toolkit reuse across a
+  second app shape using the same `lib.core.widgets` module. Toolkit reuse
+  reports use `toolkit_level = toolkit-reuse-v1` and
+  `reuse_level = multi-form-widget-reuse-v1`, cover both
+  `examples/surface_toolkit_form.tetra` and
+  `examples/surface_toolkit_settings.tetra`, require two independently routed
+  TextBoxes, Save/Reset buttons, StatusText updates, resize relayout from
+  320x240 to 480x320, changed frame checksums, `production_claim:false`,
+  `manual_bookkeeping:false`, `demo_specific_widget_structs:false`, no DOM UI,
+  no user JavaScript app logic, no platform widgets, and no magic compiler
+  widgets across headless, linux real-window, and wasm32-web browser-canvas
+  evidence levels.
+  `examples/surface_accessibility_settings.tetra` adds a metadata-only
+  accessibility tree over `lib.core.accessibility`, `lib.core.widgets`, and
+  the same ComponentTree API. Reports add
+  `tetra.surface.accessibility-tree.v1` with
+  `accessibility_level = metadata-tree-v1`, exact 12-node settings-tree
+  alignment, NameLabel/EmailLabel label relationships, NameTextBox ->
+  EmailTextBox -> SaveButton -> ResetButton focus order, reading order,
+  edit/press/save/reset actions, status updates, snapshots, metadata checksum
+  changes, bounds checksum changes after resize to 480x320, changed frame
+  checksums, `production_claim:false`, `platform_host_integration:false`,
+  `dom_aria_integration:false`, `screen_reader_evidence:false`,
+  `manual_bookkeeping:false`, no DOM UI, no user JavaScript app logic, no
+  platform widgets, no platform accessibility host claim, and no legacy
+  sidecars across headless, linux real-window, and wasm32-web browser-canvas
+  evidence levels.
+  Full dynamic trait-object child lists, full IME/String text editing,
+  clipboard/rich text, platform accessibility integration, screen-reader
+  validation, production widget toolkit claims, production accessibility
+  claims, and witness-table dispatch remain future work. The
+  headless starter gate
+  `scripts/release/surface/surface-headless-smoke.sh` now emits
+  `tetra.surface.runtime.v1` evidence with deterministic pre/post
+  frame/event/checksum data, a positive `host-provided pointer event dispatch`
+  case, a positive `host event buffer poll_event` case, a positive
+  `pre/post event frame sequence` case, a positive `component hierarchy
+  dispatch` case, a positive `component text input scalar dispatch` case, a
+  positive `host text payload buffer` case, a positive
+  `component focus dispatch` case, a positive
+  `component accessibility metadata` case, and a positive `no legacy UI
+  sidecar artifacts` case for
+  `examples/surface_counter.tetra`; the Linux-x64 starter gate
+  `scripts/release/surface/surface-linux-x64-smoke.sh` now builds and runs the
+  counter plus a pure-Tetra host probe requiring kernel-backed
+  open/present/close behavior and a pure-Tetra event-sequence probe requiring
+  pointer, key, then resize records from `surface_poll_event_into` behind the
+  Surface Host ABI, with the same no-legacy-sidecar artifact scan, and records
+  a third frame checksum read back from a pure-Tetra 2x2 app-presented RGBA
+  probe through the kernel memfd.
+  The counter app consumes the starter host-provided pointer event through the
+  Surface Host ABI rather than constructing its own click.
+  The Linux-x64 real-window gate
+  `scripts/release/surface/surface-linux-x64-real-window-smoke.sh` builds and
+  runs `examples/surface_window_counter.tetra`, opens a real Wayland shm
+  Linux window through the smoke probe, presents a 400x240 RGBA frame, records
+  click/key/resize/text/close event evidence, validates
+  `host_evidence.level:"linux-x64-real-window"`, and rejects headless,
+  memfd-only, docs-only, metadata-only, legacy `.ui.*`, DOM/web-only, fake, or
+  stale evidence for that promotion level.
+  The wasm32-web starter gate
+  `scripts/release/surface/surface-wasm32-web-smoke.sh` builds and runs
+  `examples/surface_counter.tetra` through compiler-owned
+  `tetra_surface_host_v1.__tetra_surface_*` imports without user JavaScript or
+  legacy `.ui.json`/`.ui.web.mjs`/`.ui.html` sidecars, validates only that
+  exact Surface host allowlist, and emits a strict
+  `tetra.surface.runtime.v1` report for the compiler-owned Node web runner.
+  The wasm32-web browser canvas/input gate
+  `scripts/release/surface/surface-wasm32-web-browser-canvas-smoke.sh` builds
+  and runs `examples/surface_browser_counter.tetra` in a real Chromium-
+  compatible browser canvas, presents and reads back Tetra-owned RGBA pixels,
+  dispatches pointer/key/resize/text input through the tiny Surface Host ABI,
+  records `host_evidence.level:"wasm32-web-browser-canvas-input"` and
+  `tetra.surface.browser-canvas-trace.v1` source/canvas checksums, and rejects
+  Node-only, DOM-only, user-JS, metadata-only, fake, stale, or legacy sidecar
+  evidence for that level. The TextBox focus/text input gates
+  `scripts/release/surface/surface-headless-text-focus-input-smoke.sh`,
+  `scripts/release/surface/surface-linux-x64-real-window-text-focus-input-smoke.sh`,
+  and
+  `scripts/release/surface/surface-wasm32-web-browser-canvas-text-focus-input-smoke.sh`
+  emit strict `tetra.surface.runtime.v1` reports for the same TextBox app on
+  headless, linux real-window, and browser-canvas evidence levels. The
+  component-tree gates
+  `scripts/release/surface/surface-headless-component-tree-smoke.sh`,
+  `scripts/release/surface/surface-linux-x64-real-window-component-tree-smoke.sh`,
+  and
+  `scripts/release/surface/surface-wasm32-web-browser-canvas-component-tree-smoke.sh`
+  emit strict reports for `examples/surface_tree_app.tetra`; the
+  component-tree API gates
+  `scripts/release/surface/surface-headless-component-tree-api-smoke.sh`,
+  `scripts/release/surface/surface-linux-x64-real-window-component-tree-api-smoke.sh`,
+  and
+  `scripts/release/surface/surface-wasm32-web-browser-canvas-component-tree-api-smoke.sh`
+  add helper API evidence for the same source. The minimal toolkit gates
+  `scripts/release/surface/surface-headless-minimal-toolkit-smoke.sh`,
+  `scripts/release/surface/surface-linux-x64-real-window-minimal-toolkit-smoke.sh`,
+  and
+  `scripts/release/surface/surface-wasm32-web-browser-canvas-minimal-toolkit-smoke.sh`
+  emit strict reports for `examples/surface_toolkit_form.tetra`. The toolkit
+  reuse gates
+  `scripts/release/surface/surface-headless-toolkit-reuse-smoke.sh`,
+  `scripts/release/surface/surface-linux-x64-real-window-toolkit-reuse-smoke.sh`,
+  and
+  `scripts/release/surface/surface-wasm32-web-browser-canvas-toolkit-reuse-smoke.sh`
+  emit strict reports for `examples/surface_toolkit_settings.tetra`.
+  The accessibility metadata gates
+  `scripts/release/surface/surface-headless-accessibility-metadata-smoke.sh`,
+  `scripts/release/surface/surface-linux-x64-real-window-accessibility-metadata-smoke.sh`,
+  and
+  `scripts/release/surface/surface-wasm32-web-browser-canvas-accessibility-metadata-smoke.sh`
+  emit strict reports for `examples/surface_accessibility_settings.tetra`.
+  The validator rejects
+  missing/fake tree evidence, missing/fake API evidence, manual bookkeeping,
+  paths that skip parent containers, TextBox mutation while a Button is
+  focused, missing/fake toolkit evidence, production toolkit claims, resize
+  claims without changed bounds, unchanged frame checksums, missing/fake
+  accessibility tree evidence, fake platform accessibility host claims,
+  unsupported DOM/ARIA or screen-reader claims, Node-only browser evidence,
+  DOM/user-JS, platform-widget claims, and legacy sidecars. Surface apps must
+  not require user JavaScript, generated HTML/DOM UI, React, Qt, GTK, WinUI,
+  Cocoa, or platform widget code as the user-facing model. The only platform
+  boundary is the tiny Surface Host ABI described in `docs/spec/surface_v1.md`.
 - UI native runtime (`ui.native-runtime`) is promoted only for the Linux-x64
   production slice. The release gate runs
   `bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh`, which builds the
@@ -867,9 +1418,28 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
 - Build-only Linux x86/x32 target metadata uses `run_mode: "host_probed"`:
   `run_supported` is true only when the current host can execute that exact
   ABI (`i386` compatibility for x86, Linux x32 ABI support for x32), and
-  false results must carry an explicit no-host-fallback
-  `run_unsupported_reason`. Their broader runtime/stdlib/FFI limitations remain
-  in `unsupported_reason`.
+  false results must carry an explicit `run_unsupported_reason` with the host
+  identity, `runner_probe_command`, and no-host-fallback reason. Their broader
+  runtime/stdlib/FFI limitations remain
+  in `unsupported_reason`. Linux native target metadata also records explicit
+  promotion-gate fields: `runtime_status`, `stdlib_status`, `ffi_status`,
+  `runner_probe_command`, `release_gate`, and `evidence_artifacts`. The current
+  x86/x32 values are `partial_build_only` for runtime/stdlib and
+  `ilp32_scalar_object_smokes_partial` for FFI, while `linux-x64` remains the
+  `production` runtime/stdlib baseline with partial scalar-object FFI evidence.
+  Passing Linux native runner reports contain target-scoped arithmetic,
+  allocator/raw-memory, filesystem, stderr fd, time, network socket open/close,
+  network options, and task-join smoke results;
+  unsupported x86/x32 runner environments use the diagnostic path instead.
+  The same metadata records the canonical Linux syscall pack:
+  `linux-x64` uses `syscall` with x86_64 numbering, `linux-x86` uses
+  `int 0x80` with i386 numbering and `eax,ebx,ecx,edx,esi,edi,ebp`, and
+  `linux-x32` uses `syscall` with x32 syscall-bit numbering and x86_64
+  argument registers.
+  `linux-x32` must keep `arch: "x64"`,
+  `abi: "x32-sysv"`, `data_model: "x32"`, 32-bit pointer/native-int widths,
+  and 64-bit register width; `linux-x86` must keep `arch: "x86"`,
+  `abi: "i386-sysv"`, and 32-bit pointer/native-int/register widths.
 - Any feature labeled `planned`, `beta`, `deferred-post-v1`, or
   `blocked-by-prerequisite` in release docs must not be marketed as stable.
 

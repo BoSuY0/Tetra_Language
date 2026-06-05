@@ -493,6 +493,9 @@ exit 0
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "bin", "python3"), []byte(`#!/bin/sh
+if [ "${1:-}" = "-m" ] && [ "${2:-}" = "http.server" ]; then
+  echo "Serving HTTP on 127.0.0.1 port 8765 (http://127.0.0.1:8765/) ..." >&2
+fi
 sleep 60
 `), 0o755); err != nil {
 		t.Fatal(err)

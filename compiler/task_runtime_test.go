@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -157,6 +158,178 @@ func TestRuntimeModeForLinuxX32AutoUsesSelfHostWhenSupported(t *testing.T) {
 	}
 	if got != RuntimeBuiltin {
 		t.Fatalf("x64 auto runtime mode = %v, want existing builtin preference", got)
+	}
+
+	usage = runtimeUsageProfile{typedTasksUsed: true, typedTaskMaxSlots: 4, actorSpawnCount: 1}
+	got, err = runtimeModeForNativeTarget("linux-x32", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x32 typed task runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x32 typed task auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x32", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x32 explicit self-host typed task selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x32 explicit self-host typed task runtime mode = %v, want self-host", got)
+	}
+
+	usage = runtimeUsageProfile{typedTasksUsed: true, typedTaskMaxSlots: 4, actorSpawnCount: 2}
+	got, err = runtimeModeForNativeTarget("linux-x32", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x32 multi-spawn typed task runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x32 multi-spawn typed task auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x32", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x32 explicit self-host multi-spawn typed task selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x32 explicit self-host multi-spawn typed task runtime mode = %v, want self-host", got)
+	}
+
+	usage = runtimeUsageProfile{taskGroupsUsed: true, actorSpawnCount: 1}
+	got, err = runtimeModeForNativeTarget("linux-x32", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x32 task-group runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x32 task-group auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x32", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x32 explicit self-host task-group selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x32 explicit self-host task-group runtime mode = %v, want self-host", got)
+	}
+
+	usage = runtimeUsageProfile{taskGroupsUsed: true, typedTasksUsed: true, typedTaskMaxSlots: 4, actorSpawnCount: 1}
+	got, err = runtimeModeForNativeTarget("linux-x32", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x32 typed task-group runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x32 typed task-group auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x32", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x32 explicit self-host typed task-group selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x32 explicit self-host typed task-group runtime mode = %v, want self-host", got)
+	}
+}
+
+func TestTargetSpecificSelfHostMultiSpawnOverrideStaysLinuxILP32Only(t *testing.T) {
+	usage := runtimeUsageProfile{actorSpawnCount: 2}
+	for _, target := range []string{"linux-x64", "macos-x64", "windows-x64"} {
+		if got, err := selectRuntimeModeForNativeTarget(target, RuntimeSelfHost, usage); err == nil || !strings.Contains(err.Error(), "self-host runtime supports at most one spawned actor") {
+			t.Fatalf("%s explicit self-host two-spawn selection = mode %v err %v, want generic one-spawn diagnostic", target, got, err)
+		}
+	}
+}
+
+func TestRuntimeModeForLinuxX86AutoUsesSelfHostWhenSupported(t *testing.T) {
+	usage := runtimeUsageProfile{taskGroupsUsed: true, actorSpawnCount: 1}
+	got, err := runtimeModeForNativeTarget("linux-x86", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x86 task-group runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 task-group auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x86", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x86 explicit self-host task-group selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 explicit self-host task-group runtime mode = %v, want self-host", got)
+	}
+
+	usage = runtimeUsageProfile{typedTasksUsed: true, typedTaskMaxSlots: 4, actorSpawnCount: 1}
+	got, err = runtimeModeForNativeTarget("linux-x86", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x86 typed task runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 typed task auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x86", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x86 explicit self-host typed task selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 explicit self-host typed task runtime mode = %v, want self-host", got)
+	}
+
+	usage = runtimeUsageProfile{typedTasksUsed: true, typedTaskMaxSlots: 8, actorSpawnCount: 1}
+	got, err = runtimeModeForNativeTarget("linux-x86", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x86 staged typed task runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 staged typed task auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x86", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x86 explicit self-host staged typed task selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 explicit self-host staged typed task runtime mode = %v, want self-host", got)
+	}
+
+	usage = runtimeUsageProfile{taskGroupsUsed: true, actorSpawnCount: 2}
+	got, err = runtimeModeForNativeTarget("linux-x86", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x86 multi-spawn task-group runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 multi-spawn task-group auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x86", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x86 explicit self-host multi-spawn task-group selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 explicit self-host multi-spawn task-group runtime mode = %v, want self-host", got)
+	}
+
+	usage = runtimeUsageProfile{taskGroupsUsed: true, typedTasksUsed: true, typedTaskMaxSlots: 4, actorSpawnCount: 1}
+	got, err = runtimeModeForNativeTarget("linux-x86", RuntimeAuto, RuntimeBuiltin, usage)
+	if err != nil {
+		t.Fatalf("x86 typed task-group runtimeModeForNativeTarget: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 typed task-group auto runtime mode = %v, want self-host", got)
+	}
+	got, err = selectRuntimeModeForNativeTarget("linux-x86", RuntimeSelfHost, usage)
+	if err != nil {
+		t.Fatalf("x86 explicit self-host typed task-group selection: %v", err)
+	}
+	if got != RuntimeSelfHost {
+		t.Fatalf("x86 explicit self-host typed task-group runtime mode = %v, want self-host", got)
+	}
+}
+
+func TestNativeRuntimeCapabilityTableDocumentsCurrentLinuxFamily(t *testing.T) {
+	x64 := nativeRuntimeCapabilitiesForTarget("linux-x64")
+	if !x64.actors || !x64.actorState || !x64.tasks || !x64.taskGroups || !x64.typedTasks || !x64.time || !x64.filesystem || !x64.networking || !x64.surface || !x64.distributedActors || x64.maxActorSpawns != unlimitedActorSpawns || !x64.builtinRuntime || !x64.selfHostActorsRuntime {
+		t.Fatalf("linux-x64 runtime capabilities = %#v", x64)
+	}
+
+	x32 := nativeRuntimeCapabilitiesForTarget("linux-x32")
+	if !x32.actors || !x32.actorState || !x32.tasks || !x32.taskGroups || !x32.typedTasks || !x32.time || !x32.filesystem || !x32.networking || x32.surface || x32.distributedActors || x32.maxActorSpawns != 2 || x32.maxTypedTaskSlots != 8 || x32.builtinRuntime || !x32.selfHostActorsRuntime {
+		t.Fatalf("linux-x32 runtime capabilities = %#v", x32)
+	}
+
+	x86 := nativeRuntimeCapabilitiesForTarget("linux-x86")
+	if !x86.actors || !x86.actorState || !x86.tasks || !x86.taskGroups || !x86.typedTasks || !x86.time || !x86.timeOnlyWithoutScheduler || !x86.filesystem || !x86.networking || x86.surface || x86.distributedActors || x86.maxActorSpawns != 2 || x86.maxTypedTaskSlots != 8 || x86.builtinRuntime || !x86.selfHostActorsRuntime || !x86.selfHostTimeRuntime {
+		t.Fatalf("linux-x86 runtime capabilities = %#v", x86)
 	}
 }
 
@@ -332,6 +505,7 @@ func TestRuntimeObjectSignatureUsesSharedRuntimeABI(t *testing.T) {
 	names = append(names, requiredTypedTaskRuntimeSymbols(8)...)
 	names = append(names, requiredTimeRuntimeSymbols()...)
 	names = append(names, requiredFilesystemRuntimeSymbols()...)
+	names = append(names, requiredSurfaceRuntimeSymbols()...)
 
 	for _, name := range names {
 		objectSig, ok := runtimeObjectSignature(name)
@@ -480,7 +654,7 @@ uses runtime:
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	used, entries, _, err := collectActorEntries(checked)
+	used, entries, spawnCount, err := collectActorEntries(checked)
 	if err != nil {
 		t.Fatalf("collectActorEntries: %v", err)
 	}
@@ -492,6 +666,9 @@ uses runtime:
 	}
 	if !hasPrefix(entries, "__tetra_task_typed_") {
 		t.Fatalf("typed task wrapper entry missing: %#v", entries)
+	}
+	if spawnCount != 1 {
+		t.Fatalf("typed task spawn count = %d, want 1", spawnCount)
 	}
 
 	irProg, err := Lower(checked)
@@ -1041,39 +1218,47 @@ uses runtime:
 	}
 }
 
-func TestX86TimeRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
+func TestX86TimeRuntimeBuildsAndRunsWhenHostSupportsI386(t *testing.T) {
 	tmp := t.TempDir()
 	srcPath := filepath.Join(tmp, "time_x86.tetra")
 	outPath := filepath.Join(tmp, "time-x86")
 	if err := os.WriteFile(srcPath, []byte(`
 func main() -> Int
 uses runtime:
-    let _sleep: Int = core.sleep_ms(1)
-    return 0
+    let _sleep: Int = core.sleep_ms(5)
+    let _until: Int = core.sleep_until(core.deadline_ms(2))
+    return core.time_now_ms()
 `), 0o644); err != nil {
 		t.Fatalf("write source: %v", err)
 	}
 
 	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1})
-	if err == nil {
-		t.Fatalf("expected x86 time runtime support diagnostic")
+	if err != nil {
+		t.Fatalf("build x86 time runtime: %v", err)
 	}
-	diag := DiagnosticFromError(err)
-	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
-		t.Fatalf("diagnostic identity = %#v", diag)
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x86 executable: %v", err)
 	}
-	if diag.Message != "time runtime not supported on linux-x86" {
-		t.Fatalf("message = %q, want x86 time runtime diagnostic", diag.Message)
+	if len(data) < 20 {
+		t.Fatalf("x86 executable too small: %d bytes", len(data))
 	}
-	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
-		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	if string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x86 executable missing ELF magic: % x", data[:4])
 	}
-	if _, statErr := os.Stat(outPath); statErr == nil {
-		t.Fatalf("x86 time runtime rejection wrote executable %s", outPath)
+	if data[4] != 1 {
+		t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+		t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 7 {
+		t.Fatalf("x86 time runtime exit=%d stdout=%q, want 7", code, stdout)
 	}
 }
 
-func TestX86TaskRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
+func TestX86SingleTaskRuntimeBuildsAndRunsWhenHostSupportsI386(t *testing.T) {
 	tmp := t.TempDir()
 	srcPath := filepath.Join(tmp, "task_x86.tetra")
 	outPath := filepath.Join(tmp, "task-x86")
@@ -1089,61 +1274,652 @@ uses runtime:
 		t.Fatalf("write source: %v", err)
 	}
 
-	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1})
-	if err == nil {
-		t.Fatalf("expected x86 task runtime support diagnostic")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x86 single-task auto self-host runtime: %v", err)
 	}
-	diag := DiagnosticFromError(err)
-	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
-		t.Fatalf("diagnostic identity = %#v", diag)
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x86 executable: %v", err)
 	}
-	if diag.Message != "task runtime not supported on linux-x86" {
-		t.Fatalf("message = %q, want x86 task runtime diagnostic", diag.Message)
+	if len(data) < 20 {
+		t.Fatalf("x86 executable too small: %d bytes", len(data))
 	}
-	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
-		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	if string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x86 executable missing ELF magic: % x", data[:4])
 	}
-	if _, statErr := os.Stat(outPath); statErr == nil {
-		t.Fatalf("x86 task runtime rejection wrote executable %s", outPath)
+	if data[4] != 1 {
+		t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+		t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 41 {
+		t.Fatalf("x86 single-task runtime exit=%d stdout=%q, want 41", code, stdout)
 	}
 }
 
-func TestX32MultiSpawnTaskRuntimeRejectsUnsupportedWithTargetDiagnostic(t *testing.T) {
-	tmp := t.TempDir()
-	srcPath := filepath.Join(tmp, "task_multi_spawn_x32.tetra")
-	outPath := filepath.Join(tmp, "task-multi-spawn-x32")
-	if err := os.WriteFile(srcPath, []byte(`
-func slow() -> Int:
-    return 1
+func TestX86TypedTaskRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	src := `
+enum TaskErr:
+    case boom(Int)
+    case stopped
 
-func fast() -> Int:
-    return 2
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom(23)
 
 func main() -> Int
 uses runtime:
-    let _slow: task.i32 = core.task_spawn_i32("slow")
-    let _fast: task.i32 = core.task_spawn_i32("fast")
-    return 0
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(code):
+        code
+    case TaskErr.stopped:
+        9
+`
+	for _, tc := range []struct {
+		name    string
+		runtime RuntimeMode
+	}{
+		{name: "auto", runtime: RuntimeAuto},
+		{name: "explicit_selfhost", runtime: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			srcPath := filepath.Join(tmp, "typed_task_x86.tetra")
+			outPath := filepath.Join(tmp, "typed-task-x86")
+			if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+				t.Fatalf("write source: %v", err)
+			}
+
+			if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1, Runtime: tc.runtime}); err != nil {
+				t.Fatalf("build x86 typed-task %s self-host runtime: %v", tc.name, err)
+			}
+			data, err := os.ReadFile(outPath)
+			if err != nil {
+				t.Fatalf("read x86 executable: %v", err)
+			}
+			if len(data) < 20 {
+				t.Fatalf("x86 executable too small: %d bytes", len(data))
+			}
+			if string(data[:4]) != "\x7fELF" {
+				t.Fatalf("x86 executable missing ELF magic: % x", data[:4])
+			}
+			if data[4] != 1 {
+				t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+			}
+			if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+				t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+			}
+			stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+			if code != 23 {
+				t.Fatalf("x86 typed-task runtime exit=%d stdout=%q, want 23", code, stdout)
+			}
+		})
+	}
+}
+
+func TestX86StagedTypedTaskRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	src := `
+enum TaskErr:
+    case boom(Int, Int, Int, Int, Int)
+    case stopped
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom(1, 2, 3, 4, 5)
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(a, b, c, d, e):
+        a + b + c + d + e
+    case TaskErr.stopped:
+        99
+`
+	for _, tc := range []struct {
+		name    string
+		runtime RuntimeMode
+	}{
+		{name: "auto", runtime: RuntimeAuto},
+		{name: "explicit_selfhost", runtime: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			srcPath := filepath.Join(tmp, "staged_typed_task_x86.tetra")
+			outPath := filepath.Join(tmp, "staged-typed-task-x86")
+			if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+				t.Fatalf("write source: %v", err)
+			}
+
+			if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1, Runtime: tc.runtime}); err != nil {
+				t.Fatalf("build x86 staged typed-task %s self-host runtime: %v", tc.name, err)
+			}
+			data, err := os.ReadFile(outPath)
+			if err != nil {
+				t.Fatalf("read x86 executable: %v", err)
+			}
+			if len(data) < 20 {
+				t.Fatalf("x86 executable too small: %d bytes", len(data))
+			}
+			if string(data[:4]) != "\x7fELF" {
+				t.Fatalf("x86 executable missing ELF magic: % x", data[:4])
+			}
+			if data[4] != 1 {
+				t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+			}
+			if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+				t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+			}
+			stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+			if code != 15 {
+				t.Fatalf("x86 staged typed-task runtime exit=%d stdout=%q, want 15", code, stdout)
+			}
+		})
+	}
+}
+
+func TestX86SingleTaskGroupRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	src := `
+func worker() -> Int
+uses runtime:
+    let group: task.group = core.task_group_current()
+    let status: Int = core.task_group_status(group)
+    if status != 1:
+        return 60 + status
+    return 7
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let before: Int = core.task_group_status(group)
+    if before != 1:
+        return 30 + before
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let closeError: Int = core.task_group_close(group)
+    if closeError != 0:
+        return 80 + closeError
+    let after: Int = core.task_group_status(group)
+    if after != 3:
+        return 90 + after
+    if result.error != 0:
+        return 100 + result.error
+    return result.value
+`
+	for _, tc := range []struct {
+		name    string
+		runtime RuntimeMode
+	}{
+		{name: "auto", runtime: RuntimeAuto},
+		{name: "explicit_selfhost", runtime: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			srcPath := filepath.Join(tmp, "task_group_x86.tetra")
+			outPath := filepath.Join(tmp, "task-group-x86")
+			if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+				t.Fatalf("write source: %v", err)
+			}
+
+			if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1, Runtime: tc.runtime}); err != nil {
+				t.Fatalf("build x86 task-group %s self-host runtime: %v", tc.name, err)
+			}
+			data, err := os.ReadFile(outPath)
+			if err != nil {
+				t.Fatalf("read x86 executable: %v", err)
+			}
+			if len(data) < 20 {
+				t.Fatalf("x86 executable too small: %d bytes", len(data))
+			}
+			if string(data[:4]) != "\x7fELF" {
+				t.Fatalf("x86 executable missing ELF magic: % x", data[:4])
+			}
+			if data[4] != 1 {
+				t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+			}
+			if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+				t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+			}
+			stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+			if code != 7 {
+				t.Fatalf("x86 task-group runtime exit=%d stdout=%q, want 7", code, stdout)
+			}
+		})
+	}
+}
+
+func TestX86MultiSpawnTaskRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "task_multi_spawn_x86.tetra")
+	outPath := filepath.Join(tmp, "task-multi-spawn-x86")
+	if err := os.WriteFile(srcPath, []byte(`
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return core.time_now_ms()
+
+func fast() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    let slow_task: task.i32 = core.task_spawn_i32("slow")
+    let fast_task: task.i32 = core.task_spawn_i32("fast")
+    let fast_result: task.result_i32 = core.task_join_result_i32(fast_task)
+    if fast_result.error != 0:
+        return 20 + fast_result.error
+    if fast_result.value != 2:
+        return 40 + fast_result.value
+    let slow_value: Int = core.task_join_i32(slow_task)
+    return fast_result.value * 10 + slow_value
 `), 0o644); err != nil {
 		t.Fatalf("write source: %v", err)
 	}
 
-	_, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1})
-	if err == nil {
-		t.Fatalf("expected x32 multi-spawn task runtime support diagnostic")
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x86 two-spawn task self-host runtime: %v", err)
 	}
-	diag := DiagnosticFromError(err)
-	if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
-		t.Fatalf("diagnostic identity = %#v", diag)
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x86 executable: %v", err)
 	}
-	if diag.Message != "multi-spawn actors runtime not supported on linux-x32" {
-		t.Fatalf("message = %q, want x32 multi-spawn runtime diagnostic", diag.Message)
+	if len(data) < 20 || string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x86 executable missing ELF magic or too small: len=%d", len(data))
 	}
-	if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
-		t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+	if data[4] != 1 {
+		t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
 	}
-	if _, statErr := os.Stat(outPath); statErr == nil {
-		t.Fatalf("x32 multi-spawn task runtime rejection wrote executable %s", outPath)
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+		t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 25 {
+		t.Fatalf("x86 two-spawn task runtime exit=%d stdout=%q, want 25", code, stdout)
+	}
+}
+
+func TestX86MultiSpawnTaskGroupRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "task_group_multi_spawn_x86.tetra")
+	outPath := filepath.Join(tmp, "task-group-multi-spawn-x86")
+	if err := os.WriteFile(srcPath, []byte(`
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return core.time_now_ms()
+
+func fast() -> Int
+uses runtime:
+    let group: task.group = core.task_group_current()
+    if core.task_group_status(group) != 1:
+        return 70 + core.task_group_status(group)
+    let _sleep: Int = core.sleep_ms(2)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let slow_task: task.i32 = core.task_spawn_group_i32(group, "slow")
+    let fast_task: task.i32 = core.task_spawn_group_i32(group, "fast")
+    let fast_result: task.result_i32 = core.task_join_result_i32(fast_task)
+    if fast_result.error != 0:
+        return 20 + fast_result.error
+    if fast_result.value != 2:
+        return 40 + fast_result.value
+    let slow_value: Int = core.task_join_i32(slow_task)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    if core.task_group_status(group) != 3:
+        return 100 + core.task_group_status(group)
+    return fast_result.value * 10 + slow_value
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x86 two-spawn task-group self-host runtime: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x86 executable: %v", err)
+	}
+	if len(data) < 20 || string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x86 executable missing ELF magic or too small: len=%d", len(data))
+	}
+	if data[4] != 1 {
+		t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+		t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 25 {
+		t.Fatalf("x86 two-spawn task-group runtime exit=%d stdout=%q, want 25", code, stdout)
+	}
+}
+
+func TestX86TypedTaskGroupRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	src := `
+enum TaskErr:
+    case boom(Int)
+    case stopped
+
+func worker() -> Int throws TaskErr uses runtime:
+    let group: task.group = core.task_group_current()
+    let status: Int = core.task_group_status(group)
+    if status != 1:
+        throw TaskErr.boom(60 + status)
+    throw TaskErr.boom(23)
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let before: Int = core.task_group_status(group)
+    if before != 1:
+        return 30 + before
+    let task = core.task_spawn_group_i32_typed<TaskErr>(group, "worker")
+    let result: Int = catch core.task_join_group_i32_typed<TaskErr>(task):
+    case TaskErr.boom(code):
+        code
+    case TaskErr.stopped:
+        9
+    let closeError: Int = core.task_group_close(group)
+    if closeError != 0:
+        return 80 + closeError
+    let after: Int = core.task_group_status(group)
+    if after != 3:
+        return 90 + after
+    return result
+`
+	for _, tc := range []struct {
+		name    string
+		runtime RuntimeMode
+	}{
+		{name: "auto", runtime: RuntimeAuto},
+		{name: "explicit_selfhost", runtime: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			srcPath := filepath.Join(tmp, "typed_task_group_x86.tetra")
+			outPath := filepath.Join(tmp, "typed-task-group-x86")
+			if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+				t.Fatalf("write source: %v", err)
+			}
+
+			if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x86", BuildOptions{Jobs: 1, Runtime: tc.runtime}); err != nil {
+				t.Fatalf("build x86 typed task-group %s self-host runtime: %v", tc.name, err)
+			}
+			data, err := os.ReadFile(outPath)
+			if err != nil {
+				t.Fatalf("read x86 executable: %v", err)
+			}
+			if len(data) < 20 {
+				t.Fatalf("x86 executable too small: %d bytes", len(data))
+			}
+			if string(data[:4]) != "\x7fELF" {
+				t.Fatalf("x86 executable missing ELF magic: % x", data[:4])
+			}
+			if data[4] != 1 {
+				t.Fatalf("x86 executable must use ELFCLASS32, got %d", data[4])
+			}
+			if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x03 {
+				t.Fatalf("x86 executable machine = %#x, want EM_386", got)
+			}
+			stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+			if code != 23 {
+				t.Fatalf("x86 typed task-group runtime exit=%d stdout=%q, want 23", code, stdout)
+			}
+		})
+	}
+}
+
+func TestX32MultiSpawnTaskRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "task_multi_spawn_x32.tetra")
+	outPath := filepath.Join(tmp, "task-multi-spawn-x32")
+	if err := os.WriteFile(srcPath, []byte(`
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return core.time_now_ms()
+
+func fast() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(2)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    let slow_task: task.i32 = core.task_spawn_i32("slow")
+    let fast_task: task.i32 = core.task_spawn_i32("fast")
+    let fast_result: task.result_i32 = core.task_join_result_i32(fast_task)
+    if fast_result.error != 0:
+        return 20 + fast_result.error
+    if fast_result.value != 2:
+        return 40 + fast_result.value
+    let slow_value: Int = core.task_join_i32(slow_task)
+    return fast_result.value * 10 + slow_value
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x32 two-spawn task self-host runtime: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x32 executable: %v", err)
+	}
+	if len(data) < 20 || string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x32 executable missing ELF magic or too small: len=%d", len(data))
+	}
+	if data[4] != 1 {
+		t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+		t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 25 {
+		t.Fatalf("x32 two-spawn task runtime exit=%d stdout=%q, want 25", code, stdout)
+	}
+}
+
+func TestX32MultiSpawnTypedTaskRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "typed_task_multi_spawn_x32.tetra")
+	outPath := filepath.Join(tmp, "typed-task-multi-spawn-x32")
+	if err := os.WriteFile(srcPath, []byte(`
+enum TaskErr:
+    case boom(Int)
+    case stopped
+
+func slow() -> Int throws TaskErr uses runtime:
+    let _sleep: Int = core.sleep_ms(4)
+    throw TaskErr.boom(11)
+
+func fast() -> Int throws TaskErr uses runtime:
+    let _sleep: Int = core.sleep_ms(1)
+    throw TaskErr.boom(7)
+
+func main() -> Int
+uses runtime:
+    let slow_task = core.task_spawn_i32_typed<TaskErr>("slow")
+    let fast_task = core.task_spawn_i32_typed<TaskErr>("fast")
+    let fast_value: Int = catch core.task_join_i32_typed<TaskErr>(fast_task):
+    case TaskErr.boom(code):
+        code
+    case TaskErr.stopped:
+        90
+    let slow_value: Int = catch core.task_join_i32_typed<TaskErr>(slow_task):
+    case TaskErr.boom(code):
+        code
+    case TaskErr.stopped:
+        91
+    return fast_value * 10 + slow_value
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x32 two-spawn typed-task self-host runtime: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x32 executable: %v", err)
+	}
+	if len(data) < 20 || string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x32 executable missing ELF magic or too small: len=%d", len(data))
+	}
+	if data[4] != 1 {
+		t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+		t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 81 {
+		t.Fatalf("x32 two-spawn typed-task runtime exit=%d stdout=%q, want 81", code, stdout)
+	}
+}
+
+func TestX32MultiSpawnTaskGroupRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	tmp := t.TempDir()
+	srcPath := filepath.Join(tmp, "task_group_multi_spawn_x32.tetra")
+	outPath := filepath.Join(tmp, "task-group-multi-spawn-x32")
+	if err := os.WriteFile(srcPath, []byte(`
+func slow() -> Int
+uses runtime:
+    let _sleep: Int = core.sleep_ms(5)
+    return core.time_now_ms()
+
+func fast() -> Int
+uses runtime:
+    let group: task.group = core.task_group_current()
+    if core.task_group_status(group) != 1:
+        return 70 + core.task_group_status(group)
+    let _sleep: Int = core.sleep_ms(2)
+    return core.time_now_ms()
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let slow_task: task.i32 = core.task_spawn_group_i32(group, "slow")
+    let fast_task: task.i32 = core.task_spawn_group_i32(group, "fast")
+    let fast_result: task.result_i32 = core.task_join_result_i32(fast_task)
+    if fast_result.error != 0:
+        return 20 + fast_result.error
+    if fast_result.value != 2:
+        return 40 + fast_result.value
+    let slow_value: Int = core.task_join_i32(slow_task)
+    let close_error: Int = core.task_group_close(group)
+    if close_error != 0:
+        return 90 + close_error
+    if core.task_group_status(group) != 3:
+        return 100 + core.task_group_status(group)
+    return fast_result.value * 10 + slow_value
+`), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1}); err != nil {
+		t.Fatalf("build x32 two-spawn task-group self-host runtime: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read x32 executable: %v", err)
+	}
+	if len(data) < 20 || string(data[:4]) != "\x7fELF" {
+		t.Fatalf("x32 executable missing ELF magic or too small: len=%d", len(data))
+	}
+	if data[4] != 1 {
+		t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+	}
+	if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+		t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+	}
+	stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+	if code != 25 {
+		t.Fatalf("x32 two-spawn task-group runtime exit=%d stdout=%q, want 25", code, stdout)
+	}
+}
+
+func TestX32TypedTaskGroupRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	src := `
+enum TaskErr:
+    case boom(Int)
+    case stopped
+
+func worker() -> Int throws TaskErr uses runtime:
+    let group: task.group = core.task_group_current()
+    let status: Int = core.task_group_status(group)
+    if status != 1:
+        throw TaskErr.boom(60 + status)
+    throw TaskErr.boom(23)
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let before: Int = core.task_group_status(group)
+    if before != 1:
+        return 30 + before
+    let task = core.task_spawn_group_i32_typed<TaskErr>(group, "worker")
+    let result: Int = catch core.task_join_group_i32_typed<TaskErr>(task):
+    case TaskErr.boom(code):
+        code
+    case TaskErr.stopped:
+        9
+    let closeError: Int = core.task_group_close(group)
+    if closeError != 0:
+        return 80 + closeError
+    let after: Int = core.task_group_status(group)
+    if after != 3:
+        return 90 + after
+    return result
+`
+	for _, tc := range []struct {
+		name    string
+		runtime RuntimeMode
+	}{
+		{name: "auto", runtime: RuntimeAuto},
+		{name: "explicit_selfhost", runtime: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			srcPath := filepath.Join(tmp, "typed_task_group_x32.tetra")
+			outPath := filepath.Join(tmp, "typed-task-group-x32")
+			if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+				t.Fatalf("write source: %v", err)
+			}
+
+			if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1, Runtime: tc.runtime}); err != nil {
+				t.Fatalf("build x32 typed task-group %s self-host runtime: %v", tc.name, err)
+			}
+			data, err := os.ReadFile(outPath)
+			if err != nil {
+				t.Fatalf("read x32 executable: %v", err)
+			}
+			if len(data) < 20 {
+				t.Fatalf("x32 executable too small: %d bytes", len(data))
+			}
+			if string(data[:4]) != "\x7fELF" {
+				t.Fatalf("x32 executable missing ELF magic: % x", data[:4])
+			}
+			if data[4] != 1 {
+				t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+			}
+			if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+				t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+			}
+			stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+			if code != 23 {
+				t.Fatalf("x32 typed task-group runtime exit=%d stdout=%q, want 23", code, stdout)
+			}
+		})
 	}
 }
 
@@ -1185,66 +1961,191 @@ uses runtime:
 	}
 }
 
-func TestX32TaskGroupAndTypedTaskRuntimeRejectUnsupportedWithTargetDiagnostic(t *testing.T) {
-	cases := []struct {
-		name        string
-		src         string
-		wantMessage string
-	}{
-		{
-			name: "task_group",
-			src: `
-func main() -> Int
-uses runtime:
-    let group: task.group = core.task_group_open()
-    return core.task_group_close(group)
-`,
-			wantMessage: "task group runtime not supported on linux-x32",
-		},
-		{
-			name: "typed_task",
-			src: `
+func TestX32TypedTaskRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	src := `
 enum TaskErr:
+    case boom(Int)
     case stopped
 
 func worker() -> Int throws TaskErr:
-    return 42
+    throw TaskErr.boom(23)
 
 func main() -> Int
 uses runtime:
     let task = core.task_spawn_i32_typed<TaskErr>("worker")
     return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(code):
+        code
     case TaskErr.stopped:
-        7
-`,
-			wantMessage: "typed task runtime not supported on linux-x32",
-		},
-	}
-	for _, tc := range cases {
+        9
+`
+	for _, tc := range []struct {
+		name    string
+		runtime RuntimeMode
+	}{
+		{name: "auto", runtime: RuntimeAuto},
+		{name: "explicit_selfhost", runtime: RuntimeSelfHost},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tmp := t.TempDir()
-			srcPath := filepath.Join(tmp, tc.name+"_x32.tetra")
-			outPath := filepath.Join(tmp, tc.name+"-x32")
-			if err := os.WriteFile(srcPath, []byte(tc.src), 0o644); err != nil {
+			srcPath := filepath.Join(tmp, "typed_task_x32.tetra")
+			outPath := filepath.Join(tmp, "typed-task-x32")
+			if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
 				t.Fatalf("write source: %v", err)
 			}
 
-			_, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1})
-			if err == nil {
-				t.Fatalf("expected x32 %s runtime support diagnostic", tc.name)
+			if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1, Runtime: tc.runtime}); err != nil {
+				t.Fatalf("build x32 typed-task %s self-host runtime: %v", tc.name, err)
 			}
-			diag := DiagnosticFromError(err)
-			if diag.Code != DiagnosticCodeTargetRuntime || diag.Severity != "error" {
-				t.Fatalf("diagnostic identity = %#v", diag)
+			data, err := os.ReadFile(outPath)
+			if err != nil {
+				t.Fatalf("read x32 executable: %v", err)
 			}
-			if diag.Message != tc.wantMessage {
-				t.Fatalf("message = %q, want %q", diag.Message, tc.wantMessage)
+			if len(data) < 20 {
+				t.Fatalf("x32 executable too small: %d bytes", len(data))
 			}
-			if !strings.Contains(diag.Hint, "Build this source for linux-x64") {
-				t.Fatalf("hint = %q, want linux-x64 guidance", diag.Hint)
+			if string(data[:4]) != "\x7fELF" {
+				t.Fatalf("x32 executable missing ELF magic: % x", data[:4])
 			}
-			if _, statErr := os.Stat(outPath); statErr == nil {
-				t.Fatalf("x32 %s runtime rejection wrote executable %s", tc.name, outPath)
+			if data[4] != 1 {
+				t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+			}
+			if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+				t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+			}
+			stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+			if code != 23 {
+				t.Fatalf("x32 typed-task runtime exit=%d stdout=%q, want 23", code, stdout)
+			}
+		})
+	}
+}
+
+func TestX32StagedTypedTaskRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	src := `
+enum TaskErr:
+    case boom(Int, Int, Int, Int, Int)
+    case stopped
+
+func worker() -> Int throws TaskErr:
+    throw TaskErr.boom(1, 2, 3, 4, 5)
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return catch core.task_join_i32_typed<TaskErr>(task):
+    case TaskErr.boom(a, b, c, d, e):
+        a + b + c + d + e
+    case TaskErr.stopped:
+        99
+`
+	for _, tc := range []struct {
+		name    string
+		runtime RuntimeMode
+	}{
+		{name: "auto", runtime: RuntimeAuto},
+		{name: "explicit_selfhost", runtime: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			srcPath := filepath.Join(tmp, "staged_typed_task_x32.tetra")
+			outPath := filepath.Join(tmp, "staged-typed-task-x32")
+			if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+				t.Fatalf("write source: %v", err)
+			}
+
+			if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1, Runtime: tc.runtime}); err != nil {
+				t.Fatalf("build x32 staged typed-task %s self-host runtime: %v", tc.name, err)
+			}
+			data, err := os.ReadFile(outPath)
+			if err != nil {
+				t.Fatalf("read x32 executable: %v", err)
+			}
+			if len(data) < 20 {
+				t.Fatalf("x32 executable too small: %d bytes", len(data))
+			}
+			if string(data[:4]) != "\x7fELF" {
+				t.Fatalf("x32 executable missing ELF magic: % x", data[:4])
+			}
+			if data[4] != 1 {
+				t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+			}
+			if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+				t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+			}
+			stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+			if code != 15 {
+				t.Fatalf("x32 staged typed-task runtime exit=%d stdout=%q, want 15", code, stdout)
+			}
+		})
+	}
+}
+
+func TestX32SingleTaskGroupRuntimeBuildsSelfHostRuntime(t *testing.T) {
+	src := `
+func worker() -> Int
+uses runtime:
+    let group: task.group = core.task_group_current()
+    let status: Int = core.task_group_status(group)
+    if status != 1:
+        return 60 + status
+    return 7
+
+func main() -> Int
+uses runtime:
+    let group: task.group = core.task_group_open()
+    let before: Int = core.task_group_status(group)
+    if before != 1:
+        return 30 + before
+    let task: task.i32 = core.task_spawn_group_i32(group, "worker")
+    let result: task.result_i32 = core.task_join_result_i32(task)
+    let closeError: Int = core.task_group_close(group)
+    if closeError != 0:
+        return 80 + closeError
+    let after: Int = core.task_group_status(group)
+    if after != 3:
+        return 90 + after
+    if result.error != 0:
+        return 100 + result.error
+    return result.value
+`
+	for _, tc := range []struct {
+		name    string
+		runtime RuntimeMode
+	}{
+		{name: "auto", runtime: RuntimeAuto},
+		{name: "explicit_selfhost", runtime: RuntimeSelfHost},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			srcPath := filepath.Join(tmp, "task_group_x32.tetra")
+			outPath := filepath.Join(tmp, "task-group-x32")
+			if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+				t.Fatalf("write source: %v", err)
+			}
+
+			if _, err := BuildFileWithStatsOpt(srcPath, outPath, "x32", BuildOptions{Jobs: 1, Runtime: tc.runtime}); err != nil {
+				t.Fatalf("build x32 task-group %s self-host runtime: %v", tc.name, err)
+			}
+			data, err := os.ReadFile(outPath)
+			if err != nil {
+				t.Fatalf("read x32 executable: %v", err)
+			}
+			if len(data) < 20 {
+				t.Fatalf("x32 executable too small: %d bytes", len(data))
+			}
+			if string(data[:4]) != "\x7fELF" {
+				t.Fatalf("x32 executable missing ELF magic: % x", data[:4])
+			}
+			if data[4] != 1 {
+				t.Fatalf("x32 executable must use ELFCLASS32, got %d", data[4])
+			}
+			if got := uint16(data[18]) | uint16(data[19])<<8; got != 0x3e {
+				t.Fatalf("x32 executable machine = %#x, want EM_X86_64", got)
+			}
+			stdout, code := runBinaryOrSkipUnsupportedTarget(t, outPath)
+			if code != 7 {
+				t.Fatalf("x32 task-group runtime exit=%d stdout=%q, want 7", code, stdout)
 			}
 		})
 	}
@@ -2070,6 +2971,33 @@ func buildAndRunWithOptionsTimeout(t *testing.T, src string, opt BuildOptions, t
 		t.Fatalf("run binary: %v", err)
 	}
 	return out.String(), cmd.ProcessState.ExitCode(), false
+}
+
+func runBinaryOrSkipUnsupportedTarget(t *testing.T, path string) (string, int) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			t.Fatalf("target binary timed out after 2s: %s output=%q", path, out.String())
+		}
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok && status.Signaled() && status.Signal() == syscall.SIGSYS {
+				t.Skipf("host kernel rejected target binary %s with SIGSYS; target execution is unsupported in this environment", path)
+			}
+			return out.String(), exitErr.ProcessState.ExitCode()
+		}
+		text := err.Error() + " " + out.String()
+		if strings.Contains(text, "exec format error") || strings.Contains(text, "no such file or directory") {
+			t.Skipf("host cannot execute target binary %s: %v", path, err)
+		}
+		t.Fatalf("run binary: %v", err)
+	}
+	return out.String(), cmd.ProcessState.ExitCode()
 }
 
 func TestTaskCancellationCheckpointUngroupedTaskBuildAndRun(t *testing.T) {

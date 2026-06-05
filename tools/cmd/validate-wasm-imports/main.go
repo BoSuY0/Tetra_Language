@@ -141,8 +141,24 @@ func importPolicy(target string) (map[string]bool, error) {
 		}, nil
 	case "wasm32-web":
 		return map[string]bool{
-			"tetra_web_v1.console_log": true,
-			"tetra_web_v1.panic":       true,
+			"tetra_web_v1.console_log":                                       true,
+			"tetra_web_v1.panic":                                             true,
+			"tetra_surface_host_v1.__tetra_surface_open":                     true,
+			"tetra_surface_host_v1.__tetra_surface_close":                    true,
+			"tetra_surface_host_v1.__tetra_surface_poll_event_kind":          true,
+			"tetra_surface_host_v1.__tetra_surface_poll_event_x":             true,
+			"tetra_surface_host_v1.__tetra_surface_poll_event_y":             true,
+			"tetra_surface_host_v1.__tetra_surface_poll_event_button":        true,
+			"tetra_surface_host_v1.__tetra_surface_poll_event_into":          true,
+			"tetra_surface_host_v1.__tetra_surface_poll_event_text_len":      true,
+			"tetra_surface_host_v1.__tetra_surface_poll_event_text_into":     true,
+			"tetra_surface_host_v1.__tetra_surface_clipboard_write_text":     true,
+			"tetra_surface_host_v1.__tetra_surface_clipboard_read_text_into": true,
+			"tetra_surface_host_v1.__tetra_surface_poll_composition_into":    true,
+			"tetra_surface_host_v1.__tetra_surface_begin_frame":              true,
+			"tetra_surface_host_v1.__tetra_surface_present_rgba":             true,
+			"tetra_surface_host_v1.__tetra_surface_now_ms":                   true,
+			"tetra_surface_host_v1.__tetra_surface_request_redraw":           true,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported target %q", target)

@@ -1,0 +1,37 @@
+{
+  "schema": "tetra.release-artifact-hashes.v1alpha1",
+  "root": ".",
+  "artifacts": [
+    {
+      "path": "surface-linux-x64-release-toolkit-artifacts/.tetra_cache/linux-x64/_root/d378861b6abcbb65afb46752a54ef6573ae7da7458e8b3417b8efc8c96d2f467.tobj",
+      "sha256": "sha256:6891c59347ceefb67c4eb0dd45eba3e5a9f9bcb75bceb1c989703f24f96502dc",
+      "size": 1229
+    },
+    {
+      "path": "surface-linux-x64-release-toolkit-artifacts/surface-host-probe",
+      "sha256": "sha256:e6c1edc35fce02c11a4282d65fedbc98edfad086ef7c2c00fa70467d14d3a6f5",
+      "size": 16405
+    },
+    {
+      "path": "surface-linux-x64-release-toolkit-artifacts/surface-host-probe.tetra",
+      "sha256": "sha256:a7fc610d912ee81bb3b03d956f8ac4e506feb6cc9a7b9e2760246f684879ec8d",
+      "size": 431
+    },
+    {
+      "path": "surface-linux-x64-release-toolkit-artifacts/surface-release-form",
+      "sha256": "sha256:c0dced853c7ec3d24e17be743bc34a4d96d5a2981d4a3a8165f9a097b215483b",
+      "size": 319543
+    },
+    {
+      "path": "surface-linux-x64-release-toolkit-artifacts/surface-release-toolkit-real-window-frame.rgba",
+      "sha256": "sha256:bd624a7189b8647f70ecb492abbf88a811faf4d051aa2c1b37c0eb33477d7210",
+      "size": 940800
+    },
+    {
+      "path": "surface-linux-x64-release-toolkit.json",
+      "sha256": "sha256:553a830a7f2b2a5e8aa60f47071703d9e659763651db6f494e3c330d0e1d1b0a",
+      "size": 54415,
+      "schema": "tetra.surface.runtime.v1"
+    }
+  ]
+}

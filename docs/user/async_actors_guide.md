@@ -103,10 +103,25 @@ state fields declared as `var`/`val`/`const` with scalar types
 `Int`/`Bool`/`UInt8`/`UInt16`/`task.error`. Actor-state initializers must be
 compile-time constants.
 
-Typed actor messages are value-only. Enum payloads may cross module boundaries,
-but the resolved payload must stay within the supported scalar/handle transfer
-surface; reference-shaped payloads such as `String` are rejected with a
-value-only payload diagnostic.
+Typed actor messages follow the P6.1 sendability contract. Enum payloads may
+cross module boundaries, but the resolved payload must stay within the supported
+transfer surface: small scalar values copy, borrowed `String`/slice views must
+use explicit `.copy()`, and an owned slice created from `core.island_make_*` can
+move zero-copy through the local typed mailbox when the same enum payload also
+carries the owning `island`. The sender cannot use the moved island or slice
+after `send_typed`. Raw pointer, actor/task handle, unrelated runtime handle,
+and distributed pointer/region zero-copy payloads remain rejected.
+
+When building with `--explain`, `<output>.actor-transfer.json` records typed
+mailbox metadata (`message_schema`, fixed local capacity, backpressure hook)
+and per-payload copy/move behavior, including scalar copies, island moves,
+explicit view copies, and zero-copy island-backed slice moves.
+
+The P6.3 per-core scheduler work is currently a checked prototype model in
+`compiler/internal/parallelrt`, validated by the parallel production smoke
+report. It covers single-core compatibility, two-core work stealing, bounded
+typed mailboxes, and actor transfer benchmark rows, but it is not a claim that
+the production actor runtime is now a general multi-threaded scheduler.
 
 Distributed actors are supported for the Linux-x64 runtime path. The current
 production surface covers the builtin Linux-x64 runtime with the `actornet`
@@ -116,8 +131,9 @@ failure/status propagation, and compatibility with existing cooperative task
 cancel/join handles.
 
 Non-goals for this release remain non-Linux-x64 distributed actor targets,
-multi-threaded scheduling, full cancellation guarantees, and structured
-concurrency beyond the documented cooperative task group handles. Transport-only
+production multi-threaded scheduling, full cancellation guarantees, and
+structured concurrency beyond the documented cooperative task group handles.
+Transport-only
 `tetra.actors.transport.v1` evidence is still not proof of distributed runtime
 support; executable `tetra.actors.distributed-runtime.v1` smoke evidence is
 required.

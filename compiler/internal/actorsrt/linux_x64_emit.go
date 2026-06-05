@@ -14,8 +14,9 @@ const (
 	msgValueOff  = 12 // u32
 	msgTagOff    = 16 // u32
 	msgCountOff  = 20 // u32
-	msgPayload0  = 24 // u32[8]
-	msgSize      = 56
+	msgPayload0  = 24 // u64[8]
+	msgSize      = 88
+	msgSlotSize  = 8
 )
 
 const (
@@ -24,6 +25,7 @@ const (
 	linuxSysClose        = 3
 	linuxSysFcntl        = 72
 	linuxSysPoll         = 7
+	linuxSysLseek        = 8
 	linuxSysSocket       = 41
 	linuxSysConnect      = 42
 	linuxSysSendto       = 44
@@ -35,6 +37,7 @@ const (
 	linuxSysEpollWait    = 232
 	linuxSysAccept4      = 288
 	linuxSysEpollCreate1 = 291
+	linuxSysMemfdCreate  = 319
 
 	actorWireMagic          = 0x52444154
 	actorWireVersion        = 1
@@ -3004,7 +3007,7 @@ func emitRemoteSendBegin(e *x64.Emitter) {
 func emitSendSlot(e *x64.Emitter) error {
 	// Args: rdi=index, rsi=value.
 	e.MovRaxRdi()
-	e.ShlRaxImm8(2)
+	e.ShlRaxImm8(3)
 	e.AddRaxImm32(msgPayload0)
 	e.MovRdiR15()
 	e.MovRdxRax()
@@ -3019,7 +3022,8 @@ func emitSendSlot(e *x64.Emitter) error {
 	}
 	e.AddRaxRdx()
 	e.MovRdiRax()
-	e.MovMem32RdiDispEsi(0)
+	e.MovRaxRsi()
+	e.MovMem64RdiDispRax(0)
 	e.XorEaxEax()
 	e.Ret()
 	return nil
@@ -3088,7 +3092,7 @@ func emitRemoteSendCommit(e *x64.Emitter) error {
 	e.MovEaxFromRdiDisp(msgTagOff)
 	emitMovMem32RspDispEax(e, actorWireOffsetTag)
 	for slot := 0; slot < 8; slot++ {
-		e.MovEaxFromRdiDisp(msgPayload0 + int32(slot*4))
+		e.MovEaxFromRdiDisp(msgPayload0 + int32(slot*msgSlotSize))
 		emitMovMem32RspDispEax(e, byte(actorWireOffsetValue+slot*4))
 	}
 
@@ -3280,7 +3284,7 @@ func emitActorNetPump(e *x64.Emitter) error {
 	e.MovMem32RdiDispEax(msgValueOff)
 	for slot := 0; slot < 8; slot++ {
 		emitMovEaxRspDisp(e, byte(actorWireOffsetValue+slot*4))
-		e.MovMem32RdiDispEax(msgPayload0 + int32(slot*4))
+		e.MovMem32RdiDispEax(msgPayload0 + int32(slot*msgSlotSize))
 	}
 	emitMovEaxRspDisp(e, 0x4C)
 	e.MovMem32RdiDispEax(msgTagOff)
@@ -3365,6 +3369,255 @@ func emitActorNetPumpNoop(e *x64.Emitter) error {
 	e.XorEaxEax()
 	e.Ret()
 	return nil
+}
+
+func emitSurfaceOpen(e *x64.Emitter) error {
+	// memfd_create("", 0) gives the Surface host an owned kernel handle without
+	// exposing toolkit widgets or filesystem sidecars to Tetra code.
+	e.Emit(0x6A, 0x00) // push 0; empty C string on stack
+	emitMovRdiRsp(e)
+	emitXorEsiEsi(e)
+	e.MovEaxImm32(linuxSysMemfdCreate)
+	e.Syscall()
+	e.AddRspImm32(8)
+	e.Ret()
+	return nil
+}
+
+func emitSurfaceClose(e *x64.Emitter) error {
+	e.MovEaxImm32(linuxSysClose)
+	e.Syscall()
+	e.Ret()
+	return nil
+}
+
+func emitSurfacePresentRGBA(e *x64.Emitter) error {
+	// ABI slots already match Linux write(fd, buf, count):
+	// rdi=surface fd, rsi=pixels ptr, rdx=pixels len.
+	e.PushRsi()
+	e.PushRdx()
+	emitXorEsiEsi(e)
+	e.MovEdxImm32(1)
+	e.MovEaxImm32(linuxSysLseek)
+	e.Syscall()
+	e.PushRax()
+	emitXorEsiEsi(e)
+	e.MovEdxImm32(0)
+	e.MovEaxImm32(linuxSysLseek)
+	e.Syscall()
+	e.PopR8()
+	e.PopRdx()
+	e.PopRsi()
+	e.MovEaxImm32(linuxSysWrite)
+	e.Syscall()
+	e.PushRax()
+	e.PushR8()
+	e.PopRsi()
+	e.MovEdxImm32(0)
+	e.MovEaxImm32(linuxSysLseek)
+	e.Syscall()
+	e.PopRax()
+	e.TestRaxRax()
+	okAt := e.JgeRel32()
+	e.MovEaxImm32(1)
+	e.Ret()
+	okTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, okAt, okTo); err != nil {
+		return err
+	}
+	e.XorEaxEax()
+	e.Ret()
+	return nil
+}
+
+func emitSurfacePollEventInto(e *x64.Emitter) error {
+	e.CmpEdxImm32(9)
+	copyAt := e.JgeRel32()
+	e.XorEaxEax()
+	e.Ret()
+	copyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, copyAt, copyTo); err != nil {
+		return err
+	}
+
+	e.PushRsi()
+	emitXorEsiEsi(e)
+	e.MovEdxImm32(1)
+	e.MovEaxImm32(linuxSysLseek)
+	e.Syscall()
+	e.PopRsi()
+	e.TestRaxRax()
+	cursorOKAt := e.JgeRel32()
+	e.XorEaxEax()
+	cursorOKTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, cursorOKAt, cursorOKTo); err != nil {
+		return err
+	}
+
+	e.PushRsi()
+	e.PushRax()
+	e.AddRaxImm32(1)
+	e.MovRsiRax()
+	e.MovEdxImm32(0)
+	e.MovEaxImm32(linuxSysLseek)
+	e.Syscall()
+	e.PopRax()
+	e.PopRsi()
+
+	e.CmpRaxImm32(0)
+	pointerAt := e.JzRel32()
+	e.CmpRaxImm32(1)
+	keyAt := e.JzRel32()
+	e.CmpRaxImm32(2)
+	resizeAt := e.JzRel32()
+	e.CmpRaxImm32(3)
+	textAt := e.JzRel32()
+	e.CmpRaxImm32(4)
+	closeAt := e.JzRel32()
+	emitSurfaceEventRecord(e, 0, 0, 0, 0, 0, 400, 240, 5, 0)
+	e.MovEaxImm32(9)
+	e.Ret()
+
+	pointerTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, pointerAt, pointerTo); err != nil {
+		return err
+	}
+	emitSurfaceEventRecord(e, 5, 48, 96, 1, 0, 320, 200, 0, 0)
+	e.MovEaxImm32(9)
+	e.Ret()
+
+	keyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, keyAt, keyTo); err != nil {
+		return err
+	}
+	emitSurfaceEventRecord(e, 6, 0, 0, 0, 32, 320, 200, 1, 0)
+	e.MovEaxImm32(9)
+	e.Ret()
+
+	resizeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, resizeAt, resizeTo); err != nil {
+		return err
+	}
+	emitSurfaceEventRecord(e, 2, 0, 0, 0, 0, 400, 240, 2, 0)
+	e.MovEaxImm32(9)
+	e.Ret()
+
+	textTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, textAt, textTo); err != nil {
+		return err
+	}
+	emitSurfaceEventRecord(e, 8, 0, 0, 0, 0, 400, 240, 3, 2)
+	e.MovEaxImm32(9)
+	e.Ret()
+
+	closeTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, closeAt, closeTo); err != nil {
+		return err
+	}
+	emitSurfaceEventRecord(e, 1, 0, 0, 0, 0, 400, 240, 4, 0)
+	e.MovEaxImm32(9)
+	e.Ret()
+	return nil
+}
+
+func emitSurfacePollEventTextInto(e *x64.Emitter) error {
+	e.CmpEdxImm32(2)
+	copyAt := e.JgeRel32()
+	e.XorEaxEax()
+	e.Ret()
+	copyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, copyAt, copyTo); err != nil {
+		return err
+	}
+	e.Emit(0xC6, 0x06, 'O')       // mov byte ptr [rsi], 'O'
+	e.Emit(0xC6, 0x46, 0x01, 'K') // mov byte ptr [rsi+1], 'K'
+	e.MovEaxImm32(2)
+	e.Ret()
+	return nil
+}
+
+func emitSurfaceClipboardWriteText(e *x64.Emitter) error {
+	e.MovEaxEdx()
+	e.Ret()
+	return nil
+}
+
+func emitSurfaceClipboardReadTextInto(e *x64.Emitter) error {
+	e.CmpEdxImm32(3)
+	copyAt := e.JgeRel32()
+	e.XorEaxEax()
+	e.Ret()
+	copyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, copyAt, copyTo); err != nil {
+		return err
+	}
+	e.Emit(0xC6, 0x06, 'T')       // mov byte ptr [rsi], 'T'
+	e.Emit(0xC6, 0x46, 0x01, 'e') // mov byte ptr [rsi+1], 'e'
+	e.Emit(0xC6, 0x46, 0x02, 't') // mov byte ptr [rsi+2], 't'
+	e.MovEaxImm32(3)
+	e.Ret()
+	return nil
+}
+
+func emitSurfacePollCompositionInto(e *x64.Emitter) error {
+	e.CmpEdxImm32(4)
+	copyAt := e.JgeRel32()
+	e.XorEaxEax()
+	e.Ret()
+	copyTo := len(e.Buf)
+	if err := x64.PatchRel32(e.Buf, copyAt, copyTo); err != nil {
+		return err
+	}
+	emitMovMem32RsiDispImm(e, 0, 1)
+	emitMovMem32RsiDispImm(e, 4, 1)
+	emitMovMem32RsiDispImm(e, 8, 1)
+	emitMovMem32RsiDispImm(e, 12, 1)
+	e.MovEaxImm32(4)
+	e.Ret()
+	return nil
+}
+
+func emitMovMem32RsiDispImm(e *x64.Emitter, disp byte, imm uint32) {
+	if disp == 0 {
+		e.Emit(0xC7, 0x06)
+	} else {
+		e.Emit(0xC7, 0x46, disp)
+	}
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], imm)
+	e.Emit(buf[:]...)
+}
+
+func emitSurfaceEventRecord(e *x64.Emitter, kind, x, y, button, key, width, height, timestamp, textLen uint32) {
+	emitMovMem32RsiDispImm(e, 0, kind)
+	emitMovMem32RsiDispImm(e, 4, x)
+	emitMovMem32RsiDispImm(e, 8, y)
+	emitMovMem32RsiDispImm(e, 12, button)
+	emitMovMem32RsiDispImm(e, 16, key)
+	emitMovMem32RsiDispImm(e, 20, width)
+	emitMovMem32RsiDispImm(e, 24, height)
+	emitMovMem32RsiDispImm(e, 28, timestamp)
+	emitMovMem32RsiDispImm(e, 32, textLen)
+}
+
+func emitSurfaceOK(e *x64.Emitter) error {
+	e.XorEaxEax()
+	e.Ret()
+	return nil
+}
+
+func emitSurfaceConst(e *x64.Emitter, value uint32) error {
+	e.MovEaxImm32(value)
+	e.Ret()
+	return nil
+}
+
+func emitMovRdiRsp(e *x64.Emitter) {
+	e.Emit(0x48, 0x89, 0xE7)
+}
+
+func emitXorEsiEsi(e *x64.Emitter) {
+	e.Emit(0x31, 0xF6)
 }
 
 func clearCurrentActorWakeAt(e *x64.Emitter) {
@@ -3728,14 +3981,14 @@ func emitRecvBegin(e *x64.Emitter, callPatches *[]callPatch) error {
 func emitRecvSlot(e *x64.Emitter) error {
 	// Args: rdi=index.
 	e.MovRaxRdi()
-	e.ShlRaxImm8(2)
+	e.ShlRaxImm8(3)
 	e.AddRaxImm32(msgPayload0)
 	e.MovRdiR15()
 	e.MovRdxRax()
 	e.MovRaxFromRdiDisp(schedPendingMsgOff)
 	e.AddRaxRdx()
 	e.MovRdiRax()
-	e.MovEaxFromRdiDisp(0)
+	e.MovRaxFromRdiDisp(0)
 	e.Ret()
 	return nil
 }

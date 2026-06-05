@@ -122,6 +122,31 @@ func TestFormatSourceGenericStructDeclarationRoundTrip(t *testing.T) {
 	}
 }
 
+func TestFormatSourcePreservesReprCStructDeclaration(t *testing.T) {
+	src := []byte(`repr(C) struct Header:
+    tag: c_int
+    ptr: ptr
+`)
+	got, err := compiler.FormatSource(src, "repr_c_struct.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource: %v", err)
+	}
+	want := `repr(C) struct Header:
+    tag: c_int
+    ptr: ptr
+`
+	if string(got) != want {
+		t.Fatalf("formatted source:\n%s\nwant:\n%s", string(got), want)
+	}
+	again, err := compiler.FormatSource(got, "repr_c_struct.tetra")
+	if err != nil {
+		t.Fatalf("FormatSource again: %v", err)
+	}
+	if string(again) != want {
+		t.Fatalf("format not idempotent:\n%s", string(again))
+	}
+}
+
 func TestFormatSourceGenericStructConstructorAndTypeRef(t *testing.T) {
 	src := []byte(`struct Box<T>:
     value: T

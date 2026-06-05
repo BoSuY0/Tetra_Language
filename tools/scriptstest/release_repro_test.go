@@ -192,7 +192,11 @@ esac
 		MatchedCount    int      `json:"matched_count"`
 		MismatchedCount int      `json:"mismatched_count"`
 		Targets         []string `json:"targets"`
-		Artifacts       []struct {
+		NativeTargets   []struct {
+			Target string `json:"target"`
+			Match  bool   `json:"match"`
+		} `json:"native_targets"`
+		Artifacts []struct {
 			Target    string `json:"target"`
 			Extension string `json:"extension"`
 			Match     bool   `json:"match"`
@@ -216,6 +220,21 @@ esac
 	}
 	if proof.TargetCount != 5 || proof.MatchedCount != 10 || proof.MismatchedCount != 0 {
 		t.Fatalf("unexpected match counts: %+v", proof)
+	}
+	if len(proof.NativeTargets) != 3 {
+		t.Fatalf("native_targets = %#v, want linux/macos/windows target-aware entries", proof.NativeTargets)
+	}
+	seenNative := map[string]bool{}
+	for _, artifact := range proof.NativeTargets {
+		if !artifact.Match {
+			t.Fatalf("native target %s did not match", artifact.Target)
+		}
+		seenNative[artifact.Target] = true
+	}
+	for _, target := range []string{"linux-x64", "macos-x64", "windows-x64"} {
+		if !seenNative[target] {
+			t.Fatalf("repro proof missing native target %s in native_targets: %#v", target, proof.NativeTargets)
+		}
 	}
 	seen := map[string]bool{}
 	seenExtensions := map[string]bool{}

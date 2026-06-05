@@ -216,6 +216,17 @@ func (p *parser) parseFile() (*FileAST, error) {
 			continue
 		case TokenIdent:
 			switch p.cur.lit {
+			case "repr":
+				if seenFunc || seenView || seenActor || seenGlobal {
+					return nil, diagnosticErrorf(p.cur.pos, "struct must appear before globals/functions")
+				}
+				seenStruct = true
+				st, err := p.parseReprStructDecl(public)
+				if err != nil {
+					return nil, err
+				}
+				file.Structs = append(file.Structs, st)
+				continue
 			case "state":
 				if seenFunc || seenView || seenActor || seenGlobal {
 					return nil, diagnosticErrorf(p.cur.pos, "state must appear before views/globals/functions")
@@ -473,7 +484,7 @@ func (p *parser) parseFuncSignatureDecl() (FuncSigDecl, error) {
 	default:
 		return FuncSigDecl{}, p.unexpected("-> or :")
 	}
-	retType, err := p.parseTypeRef()
+	retType, returnOwnership, err := p.parseReturnTypeRef()
 	if err != nil {
 		return FuncSigDecl{}, err
 	}
@@ -500,7 +511,7 @@ func (p *parser) parseFuncSignatureDecl() (FuncSigDecl, error) {
 	if err := p.consumeOptionalSemicolon(); err != nil {
 		return FuncSigDecl{}, err
 	}
-	return FuncSigDecl{At: nameTok.pos, Name: nameTok.lit, TypeParams: typeParams, Async: async, ReturnType: retType, Throws: throws, HasThrows: hasThrows, Params: params, Uses: uses}, nil
+	return FuncSigDecl{At: nameTok.pos, Name: nameTok.lit, TypeParams: typeParams, Async: async, ReturnType: retType, ReturnOwnership: returnOwnership, Throws: throws, HasThrows: hasThrows, Params: params, Uses: uses}, nil
 }
 
 func (p *parser) parseExtensionDecl(public bool) (*ExtensionDecl, error) {
@@ -1185,7 +1196,7 @@ func (p *parser) parseFuncDecl(public bool) (*FuncDecl, error) {
 		return nil, p.unexpected("-> or :")
 	}
 
-	retType, err := p.parseTypeRef()
+	retType, returnOwnership, err := p.parseReturnTypeRef()
 	if err != nil {
 		return nil, err
 	}
@@ -1239,6 +1250,7 @@ func (p *parser) parseFuncDecl(public bool) (*FuncDecl, error) {
 		TypeParams:      typeParams,
 		TypeParamBounds: typeParamBounds,
 		ReturnType:      retType,
+		ReturnOwnership: returnOwnership,
 		Throws:          throws,
 		HasThrows:       hasThrows,
 		Params:          params,
@@ -1283,7 +1295,7 @@ func (p *parser) parseClosureDecl(public bool) (*FuncDecl, error) {
 	default:
 		return nil, p.unexpected("-> or :")
 	}
-	retType, err := p.parseTypeRef()
+	retType, returnOwnership, err := p.parseReturnTypeRef()
 	if err != nil {
 		return nil, err
 	}
@@ -1332,6 +1344,7 @@ func (p *parser) parseClosureDecl(public bool) (*FuncDecl, error) {
 		TypeParams:      typeParams,
 		TypeParamBounds: typeParamBounds,
 		ReturnType:      retType,
+		ReturnOwnership: returnOwnership,
 		Throws:          throws,
 		HasThrows:       hasThrows,
 		Params:          params,
@@ -1741,7 +1754,35 @@ func isFunctionLikeCallee(parts []string) bool {
 	return ch == '_' || (ch >= 'a' && ch <= 'z')
 }
 
+func (p *parser) parseReprStructDecl(public bool) (*StructDecl, error) {
+	reprTok := p.cur
+	if reprTok.typ != TokenIdent || reprTok.lit != "repr" {
+		return nil, p.unexpected("repr")
+	}
+	if err := p.next(); err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenLParen); err != nil {
+		return nil, err
+	}
+	nameTok, err := p.expect(TokenIdent)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(TokenRParen); err != nil {
+		return nil, err
+	}
+	if nameTok.lit != StructReprC {
+		return nil, diagnosticErrorf(nameTok.pos, "unsupported struct representation '%s'", nameTok.lit)
+	}
+	return p.parseStructDeclWithRepr(public, StructReprC)
+}
+
 func (p *parser) parseStructDecl(public bool) (*StructDecl, error) {
+	return p.parseStructDeclWithRepr(public, StructReprDefault)
+}
+
+func (p *parser) parseStructDeclWithRepr(public bool, repr string) (*StructDecl, error) {
 	if p.cur.typ != TokenStruct {
 		return nil, p.unexpected("struct")
 	}
@@ -1789,7 +1830,7 @@ func (p *parser) parseStructDecl(public bool) (*StructDecl, error) {
 	if _, err := p.expect(TokenRBrace); err != nil {
 		return nil, err
 	}
-	return &StructDecl{At: nameTok.pos, Name: nameTok.lit, TypeParams: typeParams, Public: public, Fields: fields}, nil
+	return &StructDecl{At: nameTok.pos, Name: nameTok.lit, TypeParams: typeParams, Repr: repr, Public: public, Fields: fields}, nil
 }
 
 func (p *parser) parseEnumDecl(public bool) (*EnumDecl, error) {
@@ -1892,6 +1933,28 @@ func (p *parser) parseTypeRef() (TypeRef, error) {
 		ref = TypeRef{At: at, Kind: TypeRefOptional, Elem: &elem}
 	}
 	return ref, nil
+}
+
+func (p *parser) parseReturnTypeRef() (TypeRef, string, error) {
+	ownership := ""
+	if p.cur.typ == TokenIdent && p.cur.lit == "borrow" {
+		ownershipTok := p.cur
+		ownership = ownershipTok.lit
+		if err := p.next(); err != nil {
+			return TypeRef{}, "", err
+		}
+		if p.cur.typ == TokenIdent && isOwnershipMarker(p.cur.lit) {
+			return TypeRef{}, "", diagnosticErrorf(p.cur.pos, "ownership marker '%s' cannot follow return ownership marker '%s'; use exactly one return ownership marker before the return type", p.cur.lit, ownershipTok.lit)
+		}
+		if !p.startsTypeRef() {
+			return TypeRef{}, "", diagnosticErrorf(ownershipTok.pos, "expected return type after `borrow`")
+		}
+	}
+	ref, err := p.parseTypeRef()
+	if err != nil {
+		return TypeRef{}, "", err
+	}
+	return ref, ownership, nil
 }
 
 func (p *parser) parseTypeRefPrimary() (TypeRef, error) {
@@ -2003,7 +2066,7 @@ func (p *parser) parseFunctionTypeRef() (TypeRef, error) {
 	if _, err := p.expect(TokenArrow); err != nil {
 		return TypeRef{}, err
 	}
-	ret, err := p.parseTypeRef()
+	ret, returnOwnership, err := p.parseReturnTypeRef()
 	if err != nil {
 		return TypeRef{}, err
 	}
@@ -2025,7 +2088,7 @@ func (p *parser) parseFunctionTypeRef() (TypeRef, error) {
 	if len(clauses) > 0 {
 		return TypeRef{}, diagnosticErrorf(clauses[0].At, "semantic clauses are not allowed in function types")
 	}
-	return TypeRef{At: at, Kind: TypeRefFunction, Params: params, ParamOwnership: paramOwnership, Return: &ret, Throws: throws, Uses: uses}, nil
+	return TypeRef{At: at, Kind: TypeRefFunction, Params: params, ParamOwnership: paramOwnership, Return: &ret, ReturnOwnership: returnOwnership, Throws: throws, Uses: uses}, nil
 }
 
 func (p *parser) parseOptionalNamedTypeArgs() ([]TypeRef, error) {
@@ -3552,7 +3615,7 @@ func (p *parser) parseClosureExpr() (Expr, error) {
 	default:
 		return nil, p.unexpected("-> or :")
 	}
-	retType, err := p.parseTypeRef()
+	retType, returnOwnership, err := p.parseReturnTypeRef()
 	if err != nil {
 		return nil, err
 	}
@@ -3600,6 +3663,7 @@ func (p *parser) parseClosureExpr() (Expr, error) {
 		TypeParams:      typeParams,
 		TypeParamBounds: typeParamBounds,
 		ReturnType:      retType,
+		ReturnOwnership: returnOwnership,
 		Throws:          throws,
 		HasThrows:       hasThrows,
 		Params:          params,
@@ -3613,21 +3677,56 @@ func (p *parser) parseClosureExpr() (Expr, error) {
 
 func (p *parser) parsePostfix(base Expr) (Expr, error) {
 	for {
-		if p.cur.typ != TokenLBracket {
-			return base, nil
+		if p.cur.typ == TokenLBracket {
+			at := p.cur.pos
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			index, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			if _, err := p.expect(TokenRBracket); err != nil {
+				return nil, err
+			}
+			base = &IndexExpr{At: at, Base: base, Index: index}
+			continue
 		}
-		at := p.cur.pos
-		if err := p.next(); err != nil {
-			return nil, err
+		if p.cur.typ == TokenDot {
+			at := p.cur.pos
+			if err := p.next(); err != nil {
+				return nil, err
+			}
+			fieldTok, err := p.expectPathPart()
+			if err != nil {
+				return nil, err
+			}
+			typeArgs, hasTypeArgs, err := p.tryParseCallTypeArgs()
+			if err != nil {
+				return nil, err
+			}
+			if p.cur.typ == TokenLParen {
+				if err := p.next(); err != nil {
+					return nil, err
+				}
+				args, labels, err := p.parseCallArgs()
+				if err != nil {
+					return nil, err
+				}
+				args = append([]Expr{base}, args...)
+				if labels != nil {
+					labels = append([]string{""}, labels...)
+				}
+				base = &CallExpr{At: at, Name: "__method." + fieldTok.lit, TypeArgs: typeArgs, Args: args, ArgLabels: labels}
+				continue
+			}
+			if hasTypeArgs {
+				return nil, diagnosticErrorf(at, "generic type arguments require a call or struct literal")
+			}
+			base = &FieldAccessExpr{At: at, Base: base, Field: fieldTok.lit}
+			continue
 		}
-		index, err := p.parseExpr()
-		if err != nil {
-			return nil, err
-		}
-		if _, err := p.expect(TokenRBracket); err != nil {
-			return nil, err
-		}
-		base = &IndexExpr{At: at, Base: base, Index: index}
+		return base, nil
 	}
 }
 

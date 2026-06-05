@@ -54,6 +54,66 @@ docs/generated/manifest.json`. The smoke-list contract is validated separately
 with `validate-smoke-list`, which requires examples to be either active smoke
 cases or explicit `excluded_examples`.
 
+## Builtin Slice Constructor Contract
+
+The builtin slice constructors `core.make_u8`, `core.make_u16`,
+`core.make_i32`, `core.make_bool`, and the matching `core.island_make_*`
+constructors accept a logical element count. A zero count returns a valid empty
+slice, a negative count traps or rejects before allocation, and byte-size
+overflow traps or rejects before allocation. The returned `len` is the logical
+element count. `[]bool` uses the current i32-width representation, so bool
+constructor overflow is checked with element size 4.
+
+This contract is part of safe language semantics. Explanation flags and
+allocation/bounds reports may expose the planner decision and guard status, but
+they do not enable or disable the checks.
+
+## Stable Generic Collection Views
+
+`lib.core.collections` now exposes narrow source-level generic collection views:
+`Vec<T>` wraps a caller-owned `[]T`, and `HashMap<K,V>` wraps caller-owned
+parallel key/value slices. These helpers do not allocate storage internally.
+Callers allocate slices through the existing `core.make_*` or
+`core.island_make_*` constructors, so allocation evidence remains in the
+allocation-plan reports for those constructors. The v1 generic collection
+surface does not claim a production allocator-backed vector/map runtime,
+generic hashing/equality protocols, resizing, collision handling, C++/Rust
+performance parity, or an official benchmark result. The P19.1 benchmark gate
+is covered by a checked dry-run `truth-bench-harness` artifact for scope
+`p19.1_generic_collections`, with hash-table Tetra/C++/Rust rows and Tetra
+proof/allocation/bounds/performance report paths; it records source-equivalent
+shape only, not measured speed.
+
+P19.2 foundation evidence adds a source-first HTTP/JSON gate for
+`lib.core.http` and `lib.core.json`. The checked
+`p19.2_http_json_source_first` dry-run artifact records Tetra-only
+`HTTP plaintext` and `HTTP JSON` rows, with proof/allocation/bounds and
+`tetra.stdlib.http_json.production_stack.v1` coverage artifacts. This covers
+request-head framing, pipelined local buffers, response byte-buffer helpers,
+message-object writers, and internal borrowed HTTP/JSON request-region evidence.
+It also records internal per-server UTC-second Date cache evidence and Linux
+`netrt.Writev`/`netrt.Sendfile` helper evidence through the runtime coverage
+report. It does not promote a production HTTP server, source-level cached-date
+API, cross-worker Date cache, `webrt.flush` scatter/gather integration, HTTP
+static-file sendfile path, zero-copy production file-serving, C++/Rust parity,
+P20 performance matrix, or official TechEmpower result.
+
+P19.3 closure evidence adds a source-first PostgreSQL gate for
+`lib.core.postgres` and the internal runtime driver/pool layer. The checked
+`p19.3_postgres_source_first` dry-run artifact records Tetra-only
+`DB single query`, `DB multiple queries`, `DB updates`, and `DB fortunes` rows,
+with proof/allocation/bounds and
+`tetra.stdlib.postgresql.production_driver.v1` coverage artifacts. This covers
+startup/SCRAM, prepared statements, binary int4 helpers, pooling/backpressure,
+borrowed DataRow decode, and local `/db`, `/queries`, `/updates`, and
+`/fortunes` correctness evidence. The closure also links checked local
+SCRAM/PostgreSQL reports for all six endpoints, the `/db` matrix, and the
+`/queries`/`/updates`/`/fortunes` matrix through
+`tools/cmd/validate-techempower-report`. It does not promote a full
+source-level PostgreSQL driver API, external production database deployment,
+official TechEmpower result, production database benchmark, C++/Rust parity,
+P20 performance matrix, measured speed comparison, or runtime behavior change.
+
 ## Stable Core Function Matrix
 
 This matrix is the function-level `lib.core.*` surface for the current
@@ -69,15 +129,24 @@ runtime, host, or security guarantee.
 | `lib.core.async` | `func select_or(value: Int, fallback: Int) -> Int` | none | stable `v0.3.0` core | Pure fallback helper. |
 | `lib.core.capability` | `func mem() -> cap.mem` | `capability, mem` | stable `v0.3.0` core | Unsafe capability wrapper; callers still need matching effects. |
 | `lib.core.capability` | `func io() -> cap.io` | `capability, io` | stable `v0.3.0` core | Unsafe capability wrapper; callers still need matching effects. |
-| `lib.core.collections` | `func len_i32(values: []i32) -> Int` | `mem` | stable `v0.3.0` core | `[]i32` scan helper only; not a generic collection API. |
-| `lib.core.collections` | `func contains_i32(values: []i32, needle: Int) -> Bool` | `mem` | stable `v0.3.0` core | `[]i32` scan helper only; not a generic collection API. |
-| `lib.core.collections` | `func count_i32(values: []i32, needle: Int) -> Int` | `mem` | stable `v0.3.0` core | `[]i32` scan helper only; not a generic collection API. |
-| `lib.core.collections` | `func first_or_i32(values: []i32, fallback: Int) -> Int` | `mem` | stable `v0.3.0` core | `[]i32` scan helper only; returns fallback for an empty slice. |
+| `lib.core.collections` | `func vec_from_slice<T>(items: []T) -> Vec<T>` | `mem` | stable `v0.4.0` core | Source-level generic view over caller-owned slice storage; no internal allocation. |
+| `lib.core.collections` | `func vec_len<T>(vec: Vec<T>) -> Int` | none | stable `v0.4.0` core | Returns the logical length captured by `vec_from_slice`; not a runtime allocator-backed vector. |
+| `lib.core.collections` | `func vec_first_or<T>(vec: Vec<T>, fallback: T) -> T` | `mem` | stable `v0.4.0` core | Generic first-value helper over caller-owned slice storage; returns fallback for an empty view. |
+| `lib.core.collections` | `func vec_get_or<T>(vec: Vec<T>, index: Int, fallback: T) -> T` | `mem` | stable `v0.4.0` core | Generic indexed scan helper; returns fallback for negative or missing indexes. |
+| `lib.core.collections` | `func hash_map_from_slices<K, V>(keys: []K, values: []V) -> HashMap<K,V>` | `mem` | stable `v0.4.0` core | Source-level generic key/value slice view; caller owns storage and matching key/value lengths. |
+| `lib.core.collections` | `func hash_map_len<K, V>(map: HashMap<K,V>) -> Int` | none | stable `v0.4.0` core | Returns the key-count logical length captured by `hash_map_from_slices`. |
+| `lib.core.collections` | `func hash_map_first_value_or<K, V>(map: HashMap<K,V>, fallback: V) -> V` | `mem` | stable `v0.4.0` core | Generic first-value helper; no key lookup, hashing, resizing, or collision handling is implied. |
+| `lib.core.collections` | `func hash_map_get_i32_i32_or(map: HashMap<Int,Int>, key: Int, fallback: Int) -> Int` | `mem` | stable `v0.4.0` core | Specialized equality lookup for common `Int` keys and `Int` values over caller-owned slices. |
+| `lib.core.collections` | `func hash_map_get_u8_i32_or(map: HashMap<UInt8,Int>, key: UInt8, fallback: Int) -> Int` | `mem` | stable `v0.4.0` core | Specialized equality lookup for common `UInt8` keys and `Int` values over caller-owned slices. |
+| `lib.core.collections` | `func len_i32(values: []i32) -> Int` | `mem` | stable `v0.3.0` core | Legacy `[]i32` scan helper retained alongside generic collection views. |
+| `lib.core.collections` | `func contains_i32(values: []i32, needle: Int) -> Bool` | `mem` | stable `v0.3.0` core | Legacy `[]i32` scan helper retained alongside generic collection views. |
+| `lib.core.collections` | `func count_i32(values: []i32, needle: Int) -> Int` | `mem` | stable `v0.3.0` core | Legacy `[]i32` scan helper retained alongside generic collection views. |
+| `lib.core.collections` | `func first_or_i32(values: []i32, fallback: Int) -> Int` | `mem` | stable `v0.3.0` core | Legacy `[]i32` scan helper; returns fallback for an empty slice. |
 | `lib.core.crypto` | `func interface_strength() -> Int` | none | stable `v0.3.0` core | Stable interface marker for examples and API docs. |
 | `lib.core.crypto` | `func mix_seed(seed: Int, value: Int) -> Int` | none | stable `v0.3.0` core | Deterministic non-negative mixer for reproducible interface tests, saturating the i32 minimum normalization case; no encryption or authentication claim. |
 | `lib.core.crypto` | `func checksum_u8(values: []u8) -> Int` | `mem` | stable `v0.3.0` core | Deterministic byte checksum for examples and API-shape tests. |
 | `lib.core.crypto` | `func constant_time_eq_u8(lhs: []u8, rhs: []u8) -> Bool` | `mem` | stable `v0.3.0` core | Equality helper for byte slices; scans equal-length inputs without early value mismatch exit. |
-| `lib.core.filesystem` | `func exists(path: String, io_cap: cap.io) -> Bool` | `io` | stable `v0.4.0` linux-x64 slice | Host-backed existence check through `__tetra_fs_exists`; requires an explicit `cap.io` token and returns false for missing, embedded-NUL, invalid, too-long, or unsupported paths. |
+| `lib.core.filesystem` | `func exists(path: String, io_cap: cap.io) -> Bool` | `io` | stable `v0.4.0` linux-x64 slice; `fs_exists` linux-x86/linux-x32 smokes plus scheduler composition | Host-backed existence check through `__tetra_fs_exists`; requires an explicit `cap.io` token and returns false for missing, embedded-NUL, invalid, too-long, or unsupported paths. On linux-x86 and linux-x32 this covers pure filesystem existence programs and single-spawn self-host scheduler composition; broader filesystem/syscall parity remains unpromoted. |
 | `lib.core.filesystem` | `func has_leading_slash(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; no host access. |
 | `lib.core.filesystem` | `func ends_with_slash(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; no host access. |
 | `lib.core.filesystem` | `func is_root(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; treats `/` as root. |
@@ -383,6 +452,12 @@ exact length helpers for the JSON response shapes needed by the local
 TechEmpower-compatible stack. It does not open sockets, parse HTTP, allocate
 buffers for callers, or talk to PostgreSQL.
 
+The compiler/runtime also has an internal `compiler/internal/jsonrt`
+`ParseValueView` path for P7 web-stack evidence: unescaped JSON strings borrow
+from the caller-owned input bytes, escaped strings copy into a provided request
+region, and malformed input produces no unsafe facts. That internal API is not
+part of the stable `lib.core.json` Tetra-source surface.
+
 For verifier stability: callers own destination buffer capacity. Writer helpers
 return the next byte index after the encoded JSON payload.
 
@@ -400,6 +475,13 @@ codes, negative Content-Length values, CR/LF header injection, and non-HTAB
 control-byte header values instead of serializing malformed headers. It does
 not open sockets, accept clients, parse full
 HTTP header maps or request bodies, schedule event loops, or talk to PostgreSQL.
+
+The compiler/runtime also has an internal `compiler/internal/httprt`
+`ParseRequestView` path for P7 web-stack evidence. It parses a complete
+request head from a caller-owned byte buffer with caller-provided header
+scratch storage, returns borrowed header views, and reports request storage
+without allocating on the hot path. That internal API is not a new stable
+`lib.core.http` function.
 
 For verifier stability: callers own destination buffer capacity. Writer helpers
 return the next byte index after the encoded HTTP payload.
@@ -431,6 +513,24 @@ only; the full TechEmpower PostgreSQL driver and connection-pool surface
 remains broader runtime/library work on top of `lib.core.net` transport and
 these wire helpers.
 
+The compiler/runtime PostgreSQL client also has P7 internal helpers for binary
+`int4` Bind payloads, borrowed DataRow cell decoding, and text/binary `int4`
+row reads used by the local TechEmpower-compatible runtime path. These helpers
+preserve the stable `lib.core.postgres` boundary: Tetra-source callers still
+own byte-buffer construction, while the higher-level driver/pool remains an
+internal runtime layer.
+
+P19.3 records that higher-level runtime layer through
+`tetra.stdlib.postgresql.production_driver.v1` and a checked
+`p19.3_postgres_source_first` dry-run gate plus checked local SCRAM reports:
+`docs/benchmarks/techempower_scram_single_query_local_report.json`,
+`docs/benchmarks/techempower_scram_single_query_matrix_local_report.json`, and
+`docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json`. The gate
+proves source-first DB endpoint rows and honest local runtime/PostgreSQL
+measurement evidence only; it is not an official TechEmpower result, an
+external production database claim, production database benchmark, measured
+speed comparison, or a source-level full driver API promotion.
+
 ## Generated Docs Rendering Policy
 
 Generated docs render a source unit by declared module path when the file has a
@@ -457,7 +557,7 @@ compatibility.
 | `lib.experimental.async` | `lib.core.async` | Compatibility mirror; source note directs stable callers to `lib.core.async`. |
 | `lib.experimental.collections` | `lib.core.collections` | Compatibility mirror; source note directs stable callers to `lib.core.collections`. |
 | `lib.experimental.crypto` | `lib.core.crypto` | Compatibility mirror for stable crypto interface helpers. |
-| `lib.experimental.filesystem` | `lib.core.filesystem` | Compatibility mirror for filesystem helpers, including the linux-x64 host-backed `exists` slice. |
+| `lib.experimental.filesystem` | `lib.core.filesystem` | Compatibility mirror for filesystem helpers, including the linux-x64 host-backed `exists` slice and the fs-only linux-x86/linux-x32 smokes. |
 | `lib.experimental.io` | `lib.core.io` | Compatibility mirror for capability/MMIO wrappers; callers still need matching effects. |
 | `lib.experimental.math` | `lib.core.math` | Compatibility mirror; explicitly present in `lib/experimental/math.tetra`. |
 | `lib.experimental.memory` | `lib.core.memory` | Compatibility mirror; explicitly present in `lib/experimental/memory.tetra` and still requires `cap.mem`. |
@@ -484,13 +584,20 @@ Public compiler output and generated API docs use canonical builtin names:
 | `UInt8`, `Byte`, `u8` | `u8` | Slice element supported by `[]u8` and string storage. |
 | `UInt16`, `u16` | `u16` | Native-first slice element supported by `[]u16`. |
 | `Bool`, `bool` | `bool` | Boolean literal and condition type. |
-| `String`, `str` | `str` | Two-slot UTF-8 string/slice shape. |
+| `String`, `str` | `str` | Two-slot UTF-8 string/slice shape; `.len` and String view constructors use byte lengths. |
 | `ConsentToken` | `consent.token` | Privacy/consent capability token. |
 | `SecretInt` | `secret.i32` | Privacy-protected integer wrapper. |
 
 Structural types use deterministic field order and slot counts. `str`, `[]u8`,
-`[]u16`, `[]i32`, and `[]bool` are two-slot values (`ptr`, `len`). `T?` adds one presence tag slot
-to the payload slots. Opaque handles such as `ptr`, `island`, `actor`,
+`[]u16`, `[]i32`, and `[]bool` are two-slot values (`ptr`, `len`). Safe code
+may read `String.len` as a byte length but cannot assign `String.ptr` or
+`String.len`; `text.window(start, count)`, `text.prefix(count)`, and
+`text.suffix(start)` return checked byte views of the same string storage.
+`text.borrow()` and `xs.borrow()` return no-allocation immutable borrowed
+views, `text.copy()` and `xs.copy()` return independently owned storage, and
+`copy_into(dst)` copies bytes/elements into a caller-owned destination after a
+checked length guard.
+`T?` adds one presence tag slot to the payload slots. Opaque handles such as `ptr`, `island`, `actor`,
 `cap.io`, `cap.mem`, and `task.*` are not interchangeable even when they occupy
 one slot.
 

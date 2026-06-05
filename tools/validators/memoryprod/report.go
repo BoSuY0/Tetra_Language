@@ -12,16 +12,17 @@ import (
 const SchemaV1 = "tetra.memory.production.v1"
 
 type Report struct {
-	Schema    string           `json:"schema"`
-	Status    string           `json:"status"`
-	Target    string           `json:"target"`
-	Host      string           `json:"host"`
-	Runtime   string           `json:"runtime"`
-	Source    string           `json:"source"`
-	Processes []ProcessReport  `json:"processes"`
-	Contracts []ContractReport `json:"contracts"`
-	Cases     []CaseReport     `json:"cases"`
-	Audit     []AuditReport    `json:"audit"`
+	Schema     string            `json:"schema"`
+	Status     string            `json:"status"`
+	Target     string            `json:"target"`
+	Host       string            `json:"host"`
+	Runtime    string            `json:"runtime"`
+	Source     string            `json:"source"`
+	Processes  []ProcessReport   `json:"processes"`
+	Benchmarks []BenchmarkReport `json:"benchmarks"`
+	Contracts  []ContractReport  `json:"contracts"`
+	Cases      []CaseReport      `json:"cases"`
+	Audit      []AuditReport     `json:"audit"`
 }
 
 type ProcessReport struct {
@@ -37,6 +38,19 @@ type ContractReport struct {
 	Name     string `json:"name"`
 	Status   string `json:"status"`
 	Evidence string `json:"evidence"`
+}
+
+type BenchmarkReport struct {
+	Name             string  `json:"name"`
+	Kind             string  `json:"kind"`
+	Metric           string  `json:"metric"`
+	Unit             string  `json:"unit"`
+	BaselineValue    int     `json:"baseline_value"`
+	MeasuredValue    int     `json:"measured_value"`
+	ImprovementRatio float64 `json:"improvement_ratio"`
+	Evidence         string  `json:"evidence"`
+	Ran              bool    `json:"ran"`
+	Pass             bool    `json:"pass"`
 }
 
 type CaseReport struct {
@@ -82,6 +96,7 @@ func ValidateReport(raw []byte) error {
 		issues = append(issues, "source is required")
 	}
 	issues = append(issues, validateProcesses(report.Processes)...)
+	issues = append(issues, validateBenchmarks(report.Benchmarks)...)
 	issues = append(issues, validateContracts(report.Contracts)...)
 	issues = append(issues, validateCases(report.Cases)...)
 	issues = append(issues, validateAudit(report.Audit)...)
@@ -138,8 +153,9 @@ func validateProcesses(processes []ProcessReport) []string {
 			seenApp = true
 		case "stress":
 			seenStress = true
+		case "benchmark":
 		default:
-			issues = append(issues, fmt.Sprintf("process %s kind is %q, want build, app, or stress", p.Name, p.Kind))
+			issues = append(issues, fmt.Sprintf("process %s kind is %q, want build, app, stress, or benchmark", p.Name, p.Kind))
 		}
 		if strings.TrimSpace(p.Path) == "" {
 			issues = append(issues, fmt.Sprintf("process %s path is required", p.Name))
@@ -168,6 +184,75 @@ func validateProcesses(processes []ProcessReport) []string {
 	return issues
 }
 
+func validateBenchmarks(benchmarks []BenchmarkReport) []string {
+	required := map[string]bool{
+		"small heap allocation syscall reduction": false,
+	}
+	var issues []string
+	if len(benchmarks) == 0 {
+		issues = append(issues, "benchmark evidence is required")
+	}
+	seen := map[string]bool{}
+	for _, b := range benchmarks {
+		name := strings.TrimSpace(b.Name)
+		if name == "" {
+			issues = append(issues, "benchmark name is required")
+			continue
+		}
+		if seen[name] {
+			issues = append(issues, fmt.Sprintf("duplicate benchmark %s", name))
+		}
+		seen[name] = true
+		if _, ok := required[name]; ok {
+			required[name] = true
+		}
+		if b.Kind != "allocator" {
+			issues = append(issues, fmt.Sprintf("benchmark %s kind is %q, want allocator", name, b.Kind))
+		}
+		if strings.TrimSpace(b.Metric) == "" {
+			issues = append(issues, fmt.Sprintf("benchmark %s metric is required", name))
+		}
+		if strings.TrimSpace(b.Unit) == "" {
+			issues = append(issues, fmt.Sprintf("benchmark %s unit is required", name))
+		}
+		if !b.Ran {
+			issues = append(issues, fmt.Sprintf("benchmark %s did not run", name))
+		}
+		if !b.Pass {
+			issues = append(issues, fmt.Sprintf("benchmark %s did not pass", name))
+		}
+		if b.BaselineValue <= 0 {
+			issues = append(issues, fmt.Sprintf("benchmark %s baseline_value = %d, want positive", name, b.BaselineValue))
+		}
+		if b.MeasuredValue <= 0 {
+			issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want positive", name, b.MeasuredValue))
+		}
+		if b.BaselineValue > 0 && b.MeasuredValue > 0 && b.MeasuredValue >= b.BaselineValue {
+			issues = append(issues, fmt.Sprintf("benchmark %s measured_value = %d, want less than baseline_value %d", name, b.MeasuredValue, b.BaselineValue))
+		}
+		if b.ImprovementRatio <= 1 {
+			issues = append(issues, fmt.Sprintf("benchmark %s improvement_ratio = %.3f, want > 1", name, b.ImprovementRatio))
+		}
+		evidence := strings.TrimSpace(b.Evidence)
+		if evidence == "" {
+			issues = append(issues, fmt.Sprintf("benchmark %s evidence is required", name))
+		}
+		if name == "small heap allocation syscall reduction" {
+			for _, marker := range []string{"per_core_small_heap", "same_core_same_size_class_free_list"} {
+				if !strings.Contains(evidence, marker) {
+					issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention %s", name, marker))
+				}
+			}
+		}
+	}
+	for name, ok := range required {
+		if !ok {
+			issues = append(issues, fmt.Sprintf("missing required benchmark %q", name))
+		}
+	}
+	return issues
+}
+
 func validateContracts(contracts []ContractReport) []string {
 	required := map[string]bool{
 		"allocator runtime model":         false,
@@ -175,6 +260,7 @@ func validateContracts(contracts []ContractReport) []string {
 		"ownership escape model":          false,
 		"unsafe cap.mem raw memory rules": false,
 		"runtime bounds diagnostics":      false,
+		"raw pointer bounds metadata":     false,
 		"actor task transfer rules":       false,
 	}
 	var issues []string
@@ -214,6 +300,9 @@ func validateCases(cases []CaseReport) []string {
 		"raw ptr_add allocation upper bound":                    false,
 		"raw allocation-base i32 access width":                  false,
 		"raw allocation-base ptr access width":                  false,
+		"raw slice negative length":                             false,
+		"raw slice i32 length byte overflow":                    false,
+		"raw pointer bounds metadata report":                    false,
 		"memcpy/memset negative length":                         false,
 		"reject use-after-free":                                 false,
 		"reject double-free":                                    false,
@@ -288,7 +377,9 @@ func validateAudit(audit []AuditReport) []string {
 		"heap, slices, structs, and closures memory coverage":             false,
 		"unsafe/cap.mem/raw memory/memcpy/memset rules":                   false,
 		"runtime bounds checks and diagnostics":                           false,
+		"raw pointer bounds metadata":                                     false,
 		"stress/fuzz evidence":                                            false,
+		"measured memory benchmark improvement":                           false,
 		"use-after-free, double-free, borrow escape, and aliasing safety": false,
 		"actor/task transfer safety":                                      false,
 		"real memory examples":                                            false,

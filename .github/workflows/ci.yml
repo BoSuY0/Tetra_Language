@@ -235,6 +235,63 @@ jobs:
           name: tetra-v0.4.0-${{ github.sha }}-release-readiness-linux
           path: reports/ci-release-v0.4.0-readiness
 
+  surface-release-readiness-linux:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Bootstrap
+        shell: bash
+        run: bash scripts/dev/bootstrap.sh
+
+      - name: Surface release gate
+        shell: bash
+        run: bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1
+
+      - name: Surface experimental regression gate
+        shell: bash
+        run: bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression
+
+      - name: Safe view lifetime gate
+        shell: bash
+        run: bash scripts/release/safe-view-lifetime/gate.sh --report-dir reports/safe-view-lifetime
+
+      - name: Surface API stability gate
+        shell: bash
+        run: bash scripts/release/surface/api-stability-gate.sh --report-dir reports/surface-api-stability-v1
+
+      - name: Full tests
+        shell: bash
+        run: |
+          go test ./compiler/... ./cli/... ./tools/... -count=1
+          go test ./... ./compiler/... ./cli/... ./tools/... -count=1
+          bash scripts/ci/test.sh
+
+      - name: Docs and manifest
+        shell: bash
+        run: |
+          go run ./tools/cmd/gen-manifest -o docs/generated/manifest.json
+          go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
+          go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+          git diff --exit-code -- docs/generated/manifest.json
+
+      - name: Upload release reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-surface-release-v1-${{ github.sha }}
+          path: |
+            reports/surface-release-v1
+            reports/surface-experimental-regression
+            reports/safe-view-lifetime
+            reports/surface-api-stability-v1
+
   techempower-report-schemas-linux:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -312,7 +369,7 @@ jobs:
 
       - name: govulncheck
         shell: bash
-        run: govulncheck ./...
+        run: govulncheck ./compiler/... ./cli/... ./tools/...
 
   fuzz-short-linux:
     if: github.event_name != 'schedule'

@@ -1,0 +1,40 @@
+// Self-hosted time-only runtime for ILP32 Linux targets.
+//
+// This is intentionally smaller than the actors runtime: it supports the
+// deterministic logical time builtins for programs that do not use actors,
+// tasks, filesystem, networking, surface, or distributed runtime surfaces.
+module __rt.time_ilp32
+
+var g_time_ms: i32
+
+@export("__tetra_time_now_ms")
+func rt_time_now_ms() -> i32:
+    return g_time_ms
+
+@export("__tetra_sleep_ms")
+func rt_sleep_ms(ms: i32) -> i32:
+    if ms > 0:
+        g_time_ms = g_time_ms + ms
+    return 0
+
+@export("__tetra_sleep_until_ms")
+func rt_sleep_until_ms(deadline: i32) -> i32:
+    var until: i32 = deadline
+    if until < 0:
+        until = 0
+    if until > g_time_ms:
+        g_time_ms = until
+    return 0
+
+@export("__tetra_deadline_ms")
+func rt_deadline_ms(delta: i32) -> i32:
+    if delta > 0:
+        return g_time_ms + delta
+    return g_time_ms
+
+@export("__tetra_timer_ready_ms")
+func rt_timer_ready_ms(deadline: i32) -> bool:
+    var until: i32 = deadline
+    if until < 0:
+        until = 0
+    return g_time_ms >= until

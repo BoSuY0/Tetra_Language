@@ -70,6 +70,9 @@ func validateFunctionTypeLiteralBinding(
 	if wantRet != gotRet {
 		return fmt.Errorf("%s: function-typed local '%s' return type mismatch: expected '%s', got '%s'", frontend.FormatPos(closure.At), name, wantRet, gotRet)
 	}
+	if declared.ReturnOwnership != closure.Decl.ReturnOwnership {
+		return fmt.Errorf("%s: function-typed local '%s' return ownership mismatch: expected '%s', got '%s'", frontend.FormatPos(closure.At), name, ownershipDisplay(declared.ReturnOwnership), ownershipDisplay(closure.Decl.ReturnOwnership))
+	}
 	wantThrows, err := functionTypeRefThrowsType(declared, module, imports)
 	if err != nil {
 		return err
@@ -247,6 +250,7 @@ func validateFunctionTypeStructFieldBinding(
 		FunctionParamTypes:            append([]string(nil), field.FunctionParamTypes...),
 		FunctionParamOwnership:        append([]string(nil), field.FunctionParamOwnership...),
 		FunctionReturnType:            field.FunctionReturnType,
+		FunctionReturnOwnership:       field.FunctionReturnOwnership,
 		FunctionThrowsType:            field.FunctionThrowsType,
 		FunctionEffects:               append([]string(nil), field.FunctionEffects...),
 	}, nil
@@ -263,24 +267,26 @@ func unsupportedFunctionTypedStructFieldInitializerSourceError(pos frontend.Posi
 
 func functionFieldLocalInfo(field FieldInfo) LocalInfo {
 	return LocalInfo{
-		SlotCount:              field.SlotCount,
-		TypeName:               field.TypeName,
-		FunctionTypeValue:      field.FunctionTypeValue,
-		FunctionParamTypes:     append([]string(nil), field.FunctionParamTypes...),
-		FunctionParamOwnership: append([]string(nil), field.FunctionParamOwnership...),
-		FunctionReturnType:     field.FunctionReturnType,
-		FunctionThrowsType:     field.FunctionThrowsType,
-		FunctionEffects:        append([]string(nil), field.FunctionEffects...),
+		SlotCount:               field.SlotCount,
+		TypeName:                field.TypeName,
+		FunctionTypeValue:       field.FunctionTypeValue,
+		FunctionParamTypes:      append([]string(nil), field.FunctionParamTypes...),
+		FunctionParamOwnership:  append([]string(nil), field.FunctionParamOwnership...),
+		FunctionReturnType:      field.FunctionReturnType,
+		FunctionReturnOwnership: field.FunctionReturnOwnership,
+		FunctionThrowsType:      field.FunctionThrowsType,
+		FunctionEffects:         append([]string(nil), field.FunctionEffects...),
 	}
 }
 
 func functionFieldInfoFromField(field FieldInfo) FunctionFieldInfo {
 	return FunctionFieldInfo{
-		FunctionParamTypes:     append([]string(nil), field.FunctionParamTypes...),
-		FunctionParamOwnership: append([]string(nil), field.FunctionParamOwnership...),
-		FunctionReturnType:     field.FunctionReturnType,
-		FunctionThrowsType:     field.FunctionThrowsType,
-		FunctionEffects:        append([]string(nil), field.FunctionEffects...),
+		FunctionParamTypes:      append([]string(nil), field.FunctionParamTypes...),
+		FunctionParamOwnership:  append([]string(nil), field.FunctionParamOwnership...),
+		FunctionReturnType:      field.FunctionReturnType,
+		FunctionReturnOwnership: field.FunctionReturnOwnership,
+		FunctionThrowsType:      field.FunctionThrowsType,
+		FunctionEffects:         append([]string(nil), field.FunctionEffects...),
 	}
 }
 
@@ -458,6 +464,9 @@ func functionParamLocalInfo(sig FuncSig, index int) LocalInfo {
 	if index >= 0 && index < len(sig.ParamFunctionReturns) {
 		info.FunctionReturnType = sig.ParamFunctionReturns[index]
 	}
+	if index >= 0 && index < len(sig.ParamFunctionReturnOwnership) {
+		info.FunctionReturnOwnership = sig.ParamFunctionReturnOwnership[index]
+	}
 	if index >= 0 && index < len(sig.ParamFunctionThrows) {
 		info.FunctionThrowsType = sig.ParamFunctionThrows[index]
 	}
@@ -469,15 +478,16 @@ func functionParamLocalInfo(sig FuncSig, index int) LocalInfo {
 
 func functionReturnLocalInfo(sig FuncSig) LocalInfo {
 	return LocalInfo{
-		SlotCount:              FnPtrSlotCount,
-		TypeName:               "fnptr",
-		FunctionTypeValue:      sig.ReturnFunctionType,
-		FunctionParamName:      sig.ReturnFunctionParamName,
-		FunctionParamTypes:     append([]string(nil), sig.ReturnFunctionParams...),
-		FunctionParamOwnership: append([]string(nil), sig.ReturnFunctionParamOwnership...),
-		FunctionReturnType:     sig.ReturnFunctionReturn,
-		FunctionThrowsType:     sig.ReturnFunctionThrows,
-		FunctionEffects:        append([]string(nil), sig.ReturnFunctionEffects...),
+		SlotCount:               FnPtrSlotCount,
+		TypeName:                "fnptr",
+		FunctionTypeValue:       sig.ReturnFunctionType,
+		FunctionParamName:       sig.ReturnFunctionParamName,
+		FunctionParamTypes:      append([]string(nil), sig.ReturnFunctionParams...),
+		FunctionParamOwnership:  append([]string(nil), sig.ReturnFunctionParamOwnership...),
+		FunctionReturnType:      sig.ReturnFunctionReturn,
+		FunctionReturnOwnership: sig.ReturnFunctionReturnOwnership,
+		FunctionThrowsType:      sig.ReturnFunctionThrows,
+		FunctionEffects:         append([]string(nil), sig.ReturnFunctionEffects...),
 	}
 }
 
@@ -1095,6 +1105,7 @@ func cloneFunctionFieldInfo(info FunctionFieldInfo) FunctionFieldInfo {
 		FunctionParamTypes:            append([]string(nil), info.FunctionParamTypes...),
 		FunctionParamOwnership:        append([]string(nil), info.FunctionParamOwnership...),
 		FunctionReturnType:            info.FunctionReturnType,
+		FunctionReturnOwnership:       info.FunctionReturnOwnership,
 		FunctionThrowsType:            info.FunctionThrowsType,
 		FunctionEffects:               append([]string(nil), info.FunctionEffects...),
 	}
@@ -1125,6 +1136,9 @@ func mergeFunctionFieldInfo(left, right FunctionFieldInfo) FunctionFieldInfo {
 	if out.FunctionReturnType == "" {
 		out.FunctionReturnType = right.FunctionReturnType
 	}
+	if out.FunctionReturnOwnership == "" {
+		out.FunctionReturnOwnership = right.FunctionReturnOwnership
+	}
 	if out.FunctionThrowsType == "" {
 		out.FunctionThrowsType = right.FunctionThrowsType
 	}
@@ -1151,11 +1165,12 @@ func functionFieldInfoHasTargetSet(info FunctionFieldInfo) bool {
 
 func functionFieldInfoSig(info FunctionFieldInfo) FuncSig {
 	return FuncSig{
-		ParamTypes:     append([]string(nil), info.FunctionParamTypes...),
-		ParamOwnership: append([]string(nil), info.FunctionParamOwnership...),
-		ReturnType:     info.FunctionReturnType,
-		ThrowsType:     info.FunctionThrowsType,
-		Effects:        append([]string(nil), info.FunctionEffects...),
+		ParamTypes:      append([]string(nil), info.FunctionParamTypes...),
+		ParamOwnership:  append([]string(nil), info.FunctionParamOwnership...),
+		ReturnType:      info.FunctionReturnType,
+		ReturnOwnership: info.FunctionReturnOwnership,
+		ThrowsType:      info.FunctionThrowsType,
+		Effects:         append([]string(nil), info.FunctionEffects...),
 	}
 }
 
@@ -1176,6 +1191,7 @@ func functionFieldInfoEqual(a, b FunctionFieldInfo) bool {
 	return a.FunctionValue == b.FunctionValue &&
 		a.FunctionParamName == b.FunctionParamName &&
 		a.FunctionReturnType == b.FunctionReturnType &&
+		a.FunctionReturnOwnership == b.FunctionReturnOwnership &&
 		a.FunctionTouchesMutableGlobals == b.FunctionTouchesMutableGlobals &&
 		closureCapturesEqual(a.FunctionCaptures, b.FunctionCaptures) &&
 		closureCapturesEqual(a.FunctionEscapeCaptures, b.FunctionEscapeCaptures) &&
@@ -1238,11 +1254,12 @@ func validateFunctionTypeReturnCallBinding(
 		}
 	}
 	returnedSig := FuncSig{
-		ParamTypes:     append([]string(nil), callSig.ReturnFunctionParams...),
-		ParamOwnership: append([]string(nil), callSig.ReturnFunctionParamOwnership...),
-		ReturnType:     callSig.ReturnFunctionReturn,
-		ThrowsType:     callSig.ReturnFunctionThrows,
-		Effects:        append([]string(nil), callSig.ReturnFunctionEffects...),
+		ParamTypes:      append([]string(nil), callSig.ReturnFunctionParams...),
+		ParamOwnership:  append([]string(nil), callSig.ReturnFunctionParamOwnership...),
+		ReturnType:      callSig.ReturnFunctionReturn,
+		ReturnOwnership: callSig.ReturnFunctionReturnOwnership,
+		ThrowsType:      callSig.ReturnFunctionThrows,
+		Effects:         append([]string(nil), callSig.ReturnFunctionEffects...),
 	}
 	if err := validateFunctionTypeSymbolSignature(name, declared, returnedSig, module, imports, init.At); err != nil {
 		return "", err
@@ -1376,13 +1393,14 @@ func funcSigFromDeclForGlobalInitializer(file *frontend.FileAST, fn *frontend.Fu
 		paramOwnership = append(paramOwnership, param.Ownership)
 	}
 	return FuncSig{
-		Generic:        len(fn.TypeParams) > 0,
-		Public:         declarationIsPublic(file, fn.Public),
-		ParamTypes:     paramTypes,
-		ParamOwnership: paramOwnership,
-		ReturnType:     retName,
-		ThrowsType:     throwsType,
-		Effects:        effects,
+		Generic:         len(fn.TypeParams) > 0,
+		Public:          declarationIsPublic(file, fn.Public),
+		ParamTypes:      paramTypes,
+		ParamOwnership:  paramOwnership,
+		ReturnType:      retName,
+		ReturnOwnership: fn.ReturnOwnership,
+		ThrowsType:      throwsType,
+		Effects:         effects,
 	}, nil
 }
 
@@ -1400,6 +1418,9 @@ func enumPayloadFunctionInfo(caseInfo EnumCaseInfo, index int, functionValue str
 	}
 	if index >= 0 && index < len(caseInfo.PayloadFunctionReturns) {
 		field.FunctionReturnType = caseInfo.PayloadFunctionReturns[index]
+	}
+	if index >= 0 && index < len(caseInfo.PayloadFunctionReturnOwns) {
+		field.FunctionReturnOwnership = caseInfo.PayloadFunctionReturnOwns[index]
 	}
 	if index >= 0 && index < len(caseInfo.PayloadFunctionThrows) {
 		field.FunctionThrowsType = caseInfo.PayloadFunctionThrows[index]
@@ -1584,14 +1605,15 @@ func unsupportedFunctionTypedEnumPayloadInitializerSourceError(pos frontend.Posi
 func enumPayloadLocalInfo(caseInfo EnumCaseInfo, index int) LocalInfo {
 	info := enumPayloadFunctionInfo(caseInfo, index, "")
 	return LocalInfo{
-		SlotCount:              FnPtrSlotCount,
-		TypeName:               "fnptr",
-		FunctionTypeValue:      true,
-		FunctionParamTypes:     append([]string(nil), info.FunctionParamTypes...),
-		FunctionParamOwnership: append([]string(nil), info.FunctionParamOwnership...),
-		FunctionReturnType:     info.FunctionReturnType,
-		FunctionThrowsType:     info.FunctionThrowsType,
-		FunctionEffects:        append([]string(nil), info.FunctionEffects...),
+		SlotCount:               FnPtrSlotCount,
+		TypeName:                "fnptr",
+		FunctionTypeValue:       true,
+		FunctionParamTypes:      append([]string(nil), info.FunctionParamTypes...),
+		FunctionParamOwnership:  append([]string(nil), info.FunctionParamOwnership...),
+		FunctionReturnType:      info.FunctionReturnType,
+		FunctionReturnOwnership: info.FunctionReturnOwnership,
+		FunctionThrowsType:      info.FunctionThrowsType,
+		FunctionEffects:         append([]string(nil), info.FunctionEffects...),
 	}
 }
 
@@ -1875,6 +1897,7 @@ func functionLocalInfoForEnumPayload(caseInfo EnumCaseInfo, index int, value Fun
 		FunctionParamTypes:            append([]string(nil), value.FunctionParamTypes...),
 		FunctionParamOwnership:        append([]string(nil), value.FunctionParamOwnership...),
 		FunctionReturnType:            value.FunctionReturnType,
+		FunctionReturnOwnership:       value.FunctionReturnOwnership,
 		FunctionThrowsType:            value.FunctionThrowsType,
 		FunctionEffects:               append([]string(nil), value.FunctionEffects...),
 	}
@@ -1883,6 +1906,9 @@ func functionLocalInfoForEnumPayload(caseInfo EnumCaseInfo, index int, value Fun
 		info.FunctionParamTypes = append([]string(nil), caseInfo.PayloadFunctionParams[index]...)
 		info.FunctionParamOwnership = append([]string(nil), caseInfo.PayloadFunctionOwns[index]...)
 		info.FunctionReturnType = caseInfo.PayloadFunctionReturns[index]
+		if index < len(caseInfo.PayloadFunctionReturnOwns) {
+			info.FunctionReturnOwnership = caseInfo.PayloadFunctionReturnOwns[index]
+		}
 		if index < len(caseInfo.PayloadFunctionThrows) {
 			info.FunctionThrowsType = caseInfo.PayloadFunctionThrows[index]
 		}

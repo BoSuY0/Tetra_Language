@@ -1,0 +1,25 @@
+// P19.1 generic collections hash-table-equivalent dry-run source.
+module benchmarks.generic_collections.hash_table
+
+import lib.core.collections as collections
+
+func main() -> Int
+uses alloc, mem:
+    let n: Int = 1024
+    var keys: []i32 = core.make_i32(n)
+    var values: []i32 = core.make_i32(n)
+    var i: Int = 0
+    while i < n:
+        keys[i] = i * 2 + 1
+        values[i] = i + 7
+        i = i + 1
+
+    let map: collections.HashMap<Int, Int> = collections.hash_map_from_slices(keys, values)
+    var checksum: Int = 0
+    var q: Int = 0
+    while q < n:
+        let key: Int = q * 2 + 1
+        checksum = checksum + collections.hash_map_get_i32_i32_or(map, key, 0)
+        q = q + 1
+    return checksum
+

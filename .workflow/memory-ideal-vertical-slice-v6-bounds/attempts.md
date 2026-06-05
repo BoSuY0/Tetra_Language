@@ -1,0 +1,9 @@
+# Attempts: Memory Ideal Vertical Slice v6 Bounds
+
+| Time | Attempt | Evidence | Result | Next Adjustment |
+| --- | --- | --- | --- | --- |
+| 2026-06-05 | Goal setup from read-only audit | `get_goal` returned no active goal; `git rev-parse HEAD` returned `5129f2623d9639990076a7d422e56f02b0ed3254`; Graphify MCP and `rg` found existing proof-id substrate | Goal contract ready; implementation not started | Start with RED tests and focused proof/report gates |
+| 2026-06-05 | RED tests for v6 bounds proof slice | `go test ./compiler/internal/memoryfacts`, `go test ./compiler/internal/memorymodel`, and `go test ./tools/cmd/validate-memory-report ./tools/cmd/validate-memory-correlation` with `*-red` caches failed on missing v6 APIs/model symbols/row-set and missing parent validation | Correct RED | Implement smallest v6 bridge/model/validator support |
+| 2026-06-05 | GREEN v6 lower-layer support | `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-memory-v6-bounds-memoryfacts go test ./compiler/internal/memoryfacts -count=1`; `...mini go test ./compiler/internal/memorymodel -count=1`; `...tools go test ./tools/cmd/validate-memory-report ./tools/cmd/validate-memory-correlation -count=1` | Passed | Add docs/audits/schema/manifest and run remaining gates |
+| 2026-06-05 | Focused/docs validation | validation/lower/semantics focused gates, tools including `validate-memory-fuzz-oracle`, v6 correlation doc, v0-v6 correlation regression, `validate-manifest`, and `verify-docs` | Passed | Run broad gates, hygiene, Graphify, and final report |
+| 2026-06-05 | Broad/final verification | `git diff --check`; `go test ./compiler/... ./cli/... ./tools/... -count=1`; `bash scripts/ci/test.sh`; `graphify update .` | Passed; CI printed `OK`, artifact `tetra.release.v0_4_0.go-test-suite.v1`; Graphify rebuilt `21317 nodes`, `66585 edges`, `1180 communities` | Close GOAL completion audit |

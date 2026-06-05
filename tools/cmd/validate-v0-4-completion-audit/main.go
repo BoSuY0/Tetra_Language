@@ -19,6 +19,15 @@ type completionAuditRow struct {
 	Result      string
 }
 
+type releaseEvidenceRow struct {
+	Requirement string
+	Files       string
+	Tests       string
+	Docs        string
+	Evidence    string
+	Status      string
+}
+
 var requiredCompletionAuditRequirements = []string{
 	"Version is marked `v0.4.0`",
 	"Manifest is marked `v0.4.0`",
@@ -82,6 +91,13 @@ func validateCompletionAudit(raw []byte, options completionAuditOptions) error {
 	if err := validateCompletionAuditRows(rows, expectedStatus); err != nil {
 		return err
 	}
+	releaseRows, err := parseReleaseEvidenceRows(text)
+	if err != nil {
+		return err
+	}
+	if err := validateReleaseEvidenceRows(releaseRows, expectedStatus); err != nil {
+		return err
+	}
 	if expectedStatus == "not-achieved" && !hasCompletionAuditSection(text, "Missing Work Summary") {
 		return fmt.Errorf("missing work summary is required for not-achieved audit")
 	}
@@ -136,6 +152,42 @@ func parseCompletionAuditRows(text string) ([]completionAuditRow, error) {
 	return rows, nil
 }
 
+func parseReleaseEvidenceRows(text string) ([]releaseEvidenceRow, error) {
+	section, err := completionAuditSection(text, "Release Evidence Matrix")
+	if err != nil {
+		return nil, err
+	}
+	var rows []releaseEvidenceRow
+	for _, line := range strings.Split(section, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "|") {
+			continue
+		}
+		cells := splitCompletionAuditTableRow(line)
+		if len(cells) != 6 {
+			return nil, fmt.Errorf("release evidence matrix row has %d cells, want 6: %s", len(cells), line)
+		}
+		if strings.EqualFold(cells[0], "Requirement") {
+			continue
+		}
+		if isCompletionAuditSeparatorRow(cells) {
+			continue
+		}
+		rows = append(rows, releaseEvidenceRow{
+			Requirement: cells[0],
+			Files:       cells[1],
+			Tests:       cells[2],
+			Docs:        cells[3],
+			Evidence:    cells[4],
+			Status:      cells[5],
+		})
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("release evidence matrix has no rows")
+	}
+	return rows, nil
+}
+
 func validateCompletionAuditRows(rows []completionAuditRow, expectedStatus string) error {
 	seen := map[string]bool{}
 	nonPassingRows := 0
@@ -175,6 +227,75 @@ func validateCompletionAuditRows(rows []completionAuditRow, expectedStatus strin
 		return fmt.Errorf("not-achieved audit must include at least one non-passing checklist row")
 	}
 	return nil
+}
+
+func validateReleaseEvidenceRows(rows []releaseEvidenceRow, expectedStatus string) error {
+	for _, row := range rows {
+		if row.Requirement == "" {
+			return fmt.Errorf("release evidence matrix row has empty requirement")
+		}
+		if row.Files == "" || row.Tests == "" || row.Docs == "" || row.Evidence == "" {
+			return fmt.Errorf("release evidence row %q has an empty evidence cell", row.Requirement)
+		}
+		if !containsEvidenceKey(row.Files, "implementation") {
+			return fmt.Errorf("release evidence row %q files must include implementation:", row.Requirement)
+		}
+		if !containsEvidenceKey(row.Tests, "positive") {
+			return fmt.Errorf("release evidence row %q tests must include positive:", row.Requirement)
+		}
+		if !containsEvidenceKey(row.Tests, "negative") {
+			return fmt.Errorf("release evidence row %q tests must include negative:", row.Requirement)
+		}
+		if !containsEvidenceKey(row.Docs, "docs") {
+			return fmt.Errorf("release evidence row %q docs must include docs:", row.Requirement)
+		}
+		if !containsEvidenceKey(row.Docs, "manifest") {
+			return fmt.Errorf("release evidence row %q docs must include manifest:", row.Requirement)
+		}
+		if !containsEvidenceKey(row.Evidence, "report") {
+			return fmt.Errorf("release evidence row %q evidence must include report:", row.Requirement)
+		}
+		if !containsEvidenceKey(row.Evidence, "graphify") {
+			return fmt.Errorf("release evidence row %q evidence must include graphify:", row.Requirement)
+		}
+		if !containsEvidenceKey(row.Evidence, "ci") {
+			return fmt.Errorf("release evidence row %q evidence must include ci:", row.Requirement)
+		}
+		classification, err := classifyCompletionAuditResult(row.Status)
+		if err != nil {
+			return fmt.Errorf("release evidence row %q: %w", row.Requirement, err)
+		}
+		if classification == "pass" && releaseEvidenceContainsBlocker(row.Evidence) {
+			return fmt.Errorf("release evidence row %q pass status contains blocker evidence", row.Requirement)
+		}
+		if expectedStatus == "achieved" && classification != "pass" {
+			return fmt.Errorf("achieved audit has non-passing release evidence row %q with status %q", row.Requirement, row.Status)
+		}
+	}
+	return nil
+}
+
+func containsEvidenceKey(cell string, key string) bool {
+	normalized := strings.ToLower(cell)
+	return strings.Contains(normalized, strings.ToLower(key)+":")
+}
+
+func releaseEvidenceContainsBlocker(cell string) bool {
+	normalized := strings.ToLower(cell)
+	for _, token := range []string{
+		"blocked",
+		"dirty worktree",
+		"pending",
+		"missing",
+		"failing",
+		"failed",
+		"stale",
+	} {
+		if strings.Contains(normalized, token) {
+			return true
+		}
+	}
+	return false
 }
 
 func classifyCompletionAuditResult(result string) (string, error) {

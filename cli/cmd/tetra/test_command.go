@@ -23,6 +23,7 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	target := fs.String("target", defaultTarget(), "target triple ("+supportedTargetsHelp+")")
 	diagnostics := fs.String("diagnostics", "text", "diagnostics format: text or json")
 	reportFormat := fs.String("report", "text", "report format: text or json")
+	format := fs.String("format", "", "output format alias for --report: text or json")
 	allTargets := fs.Bool("all-targets", false, "run the required x86/x64/x32 target matrix")
 	brutal := fs.Bool("brutal", false, "run the full brutal target matrix")
 	abiSuite := fs.Bool("abi", false, "run ABI torture tests for the target")
@@ -37,25 +38,29 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 	if !validateDiagnosticsMode(stderr, *diagnostics) {
 		return 2
 	}
-	if *reportFormat != "text" && *reportFormat != "json" {
+	reportFormatValue, ok := resolveTestReportFormat(fs, *reportFormat, *format, *diagnostics, stderr)
+	if !ok {
+		return 2
+	}
+	if reportFormatValue != "text" && reportFormatValue != "json" {
 		writeValidationDiagnostic(stderr, *diagnostics, "unsupported --report format")
 		return 2
 	}
 	if *allTargets || *brutal {
-		return runAllTargetsSuite(*allTargets, *brutal, *diagnostics, *reportFormat, stdout, stderr)
+		return runAllTargetsSuite(*allTargets, *brutal, *diagnostics, reportFormatValue, stdout, stderr)
 	}
 	tgt, ok := parseBuildTargetOrReport(*target, *diagnostics, stderr)
 	if !ok {
 		return 2
 	}
 	if *abiSuite && !*atomicStress && !*fuzzSuite {
-		return runTargetABISuite(*target, *diagnostics, *reportFormat, stdout, stderr)
+		return runTargetABISuite(*target, *diagnostics, reportFormatValue, stdout, stderr)
 	}
 	if *atomicStress && !*abiSuite && !*fuzzSuite {
-		return runTargetAtomicStressSuite(*target, *diagnostics, *reportFormat, stdout, stderr)
+		return runTargetAtomicStressSuite(*target, *diagnostics, reportFormatValue, stdout, stderr)
 	}
 	if *fuzzSuite && !*abiSuite && !*atomicStress {
-		return runTargetFuzzSuite(*target, *diagnostics, *reportFormat, stdout, stderr)
+		return runTargetFuzzSuite(*target, *diagnostics, reportFormatValue, stdout, stderr)
 	}
 	if *abiSuite || *atomicStress || *fuzzSuite {
 		writeDiagnostic(stderr, *diagnostics, unsupportedTargetTestSuiteDiagnostic(tgt.Triple, *abiSuite, *atomicStress, *fuzzSuite))
@@ -89,7 +94,7 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 		if len(paths) == 0 {
 			if explicitTarget && isRequiredTargetSuiteTriple(tgt.Triple) {
-				return runTargetDefaultSuite(tgt, *reportFormat, stdout, stderr)
+				return runTargetDefaultSuite(tgt, reportFormatValue, stdout, stderr)
 			}
 			paths = []string{"."}
 		}
@@ -109,20 +114,20 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 		}
 	}
 	if isWASMTargetTriple(tgt.Triple) {
-		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run tests for target %s: WASM test runner is not part of the current production runtime contract; use smoke/runtime reports for WASM execution evidence", tgt.Triple))
+		writeTargetRuntimeDiagnostic(stderr, *diagnostics, fmt.Sprintf("cannot run tests for target %s: WASM test runner is not part of the current production runtime contract; use smoke/runtime reports for WASM execution evidence", tgt.Triple))
 		return 2
 	}
 	if ctarget.IsBuildOnlyTarget(tgt.Triple) && !canRunBuildOnlyNativeTargetOnHost(tgt) {
 		reason := buildOnlyNativeRunUnsupportedReason(tgt)
-		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run tests for target %s: %s", tgt.Triple, reason))
+		writeTargetRuntimeDiagnostic(stderr, *diagnostics, fmt.Sprintf("cannot run tests for target %s: %s", tgt.Triple, reason))
 		return 2
 	}
 	if !canRunNativeExecutableTargetOnHost(tgt) {
-		writeDiagnostic(stderr, *diagnostics, fmt.Errorf("cannot run tests for target %s on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH))
+		writeTargetRuntimeDiagnostic(stderr, *diagnostics, fmt.Sprintf("cannot run tests for target %s on host %s/%s", tgt.Triple, runtime.GOOS, runtime.GOARCH))
 		return 2
 	}
 	if !explicitPaths && explicitTarget && projectCtx == nil && isRequiredTargetSuiteTriple(tgt.Triple) {
-		return runTargetDefaultSuite(tgt, *reportFormat, stdout, stderr)
+		return runTargetDefaultSuite(tgt, reportFormatValue, stdout, stderr)
 	}
 	if err := validateDiscoveredProjectLock(projectCtx, tgt.Triple); err != nil {
 		writeDiagnostic(stderr, *diagnostics, err)
@@ -253,11 +258,11 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 			results = append(results, result)
 			if code == 0 {
 				passed++
-				if *reportFormat == "text" {
+				if reportFormatValue == "text" {
 					fmt.Fprintf(stdout, "PASS %s\n", name)
 				}
 			} else {
-				if *reportFormat == "text" {
+				if reportFormatValue == "text" {
 					if result.Error != "" {
 						fmt.Fprintf(stdout, "FAIL %s (%s)\n", name, result.Error)
 					} else {
@@ -267,10 +272,10 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 			}
 		}
 	}
-	if *reportFormat == "json" {
+	if reportFormatValue == "json" {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(compiler.NewTestRunnerReport(results)); err != nil {
+		if err := enc.Encode(compiler.NewTestRunnerReportForTarget(results, tgt.Triple)); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
@@ -281,6 +286,31 @@ func runTest(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func resolveTestReportFormat(fs *flag.FlagSet, reportValue string, formatValue string, diagnostics string, stderr io.Writer) (string, bool) {
+	reportProvided := false
+	formatProvided := false
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "report":
+			reportProvided = true
+		case "format":
+			formatProvided = true
+		}
+	})
+	if !formatProvided {
+		return reportValue, true
+	}
+	if formatValue != "text" && formatValue != "json" {
+		writeValidationDiagnostic(stderr, diagnostics, "unsupported --format")
+		return "", false
+	}
+	if reportProvided && reportValue != formatValue {
+		writeValidationDiagnostic(stderr, diagnostics, "--format and --report must match when both are provided")
+		return "", false
+	}
+	return formatValue, true
 }
 
 func testProjectContextForFile(file string, module string, target string) (*cliProjectContext, compiler.WorldOptions, []string, error) {
@@ -360,7 +390,7 @@ func isRequiredTargetSuiteTriple(triple string) bool {
 }
 
 func runTargetDefaultSuite(tgt ctarget.Target, reportFormat string, stdout io.Writer, stderr io.Writer) int {
-	return writeTargetSuiteReport(runABISuiteResults(tgt), reportFormat, stdout, stderr)
+	return writeTargetSuiteReport(runABISuiteResults(tgt), tgt.Triple, reportFormat, stdout, stderr)
 }
 
 func unsupportedTargetTestSuiteDiagnostic(target string, abiSuite bool, atomicStress bool, fuzzSuite bool) error {
@@ -410,7 +440,7 @@ func runAllTargetsSuite(allTargets bool, brutal bool, diagnostics string, report
 			results = append(results, runFuzzSuiteResults(tgt)...)
 		}
 	}
-	return writeTargetSuiteReport(results, reportFormat, stdout, stderr)
+	return writeTargetSuiteReport(results, "", reportFormat, stdout, stderr)
 }
 
 func runABISuiteResults(tgt ctarget.Target) []compiler.TestRunnerResult {
@@ -473,7 +503,7 @@ func runTargetABISuite(targetName string, diagnostics string, reportFormat strin
 			writeDiagnostic(stderr, diagnostics, err)
 			return 1
 		}
-		return writeTargetSuiteReport(results, reportFormat, stdout, stderr)
+		return writeTargetSuiteReport(results, tgt.Triple, reportFormat, stdout, stderr)
 	}
 	if tgt.Triple == "linux-x64" {
 		results, err := runX64ABISuite()
@@ -481,7 +511,7 @@ func runTargetABISuite(targetName string, diagnostics string, reportFormat strin
 			writeDiagnostic(stderr, diagnostics, err)
 			return 1
 		}
-		return writeTargetSuiteReport(results, reportFormat, stdout, stderr)
+		return writeTargetSuiteReport(results, tgt.Triple, reportFormat, stdout, stderr)
 	}
 	if tgt.Triple != "linux-x32" {
 		checks, err := compiler.RunTargetABIChecks(tgt.Triple)
@@ -489,14 +519,14 @@ func runTargetABISuite(targetName string, diagnostics string, reportFormat strin
 			writeDiagnostic(stderr, diagnostics, unsupportedTargetTestSuiteDiagnostic(tgt.Triple, true, false, false))
 			return 2
 		}
-		return writeTargetSuiteReport(targetABICheckResults(tgt, checks), reportFormat, stdout, stderr)
+		return writeTargetSuiteReport(targetABICheckResults(tgt, checks), tgt.Triple, reportFormat, stdout, stderr)
 	}
 	results, err := runX32ABISuite()
 	if err != nil {
 		writeDiagnostic(stderr, diagnostics, err)
 		return 1
 	}
-	return writeTargetSuiteReport(results, reportFormat, stdout, stderr)
+	return writeTargetSuiteReport(results, tgt.Triple, reportFormat, stdout, stderr)
 }
 
 func runTargetAtomicStressSuite(targetName string, diagnostics string, reportFormat string, stdout io.Writer, stderr io.Writer) int {
@@ -509,7 +539,7 @@ func runTargetAtomicStressSuite(targetName string, diagnostics string, reportFor
 		writeDiagnostic(stderr, diagnostics, unsupportedTargetTestSuiteDiagnostic(tgt.Triple, false, true, false))
 		return 2
 	}
-	return writeTargetSuiteReport(targetAtomicStressCheckResults(tgt, checks), reportFormat, stdout, stderr)
+	return writeTargetSuiteReport(targetAtomicStressCheckResults(tgt, checks), tgt.Triple, reportFormat, stdout, stderr)
 }
 
 func runTargetFuzzSuite(targetName string, diagnostics string, reportFormat string, stdout io.Writer, stderr io.Writer) int {
@@ -522,10 +552,10 @@ func runTargetFuzzSuite(targetName string, diagnostics string, reportFormat stri
 		writeDiagnostic(stderr, diagnostics, unsupportedTargetTestSuiteDiagnostic(tgt.Triple, false, false, true))
 		return 2
 	}
-	return writeTargetSuiteReport(targetFuzzCheckResults(tgt, checks), reportFormat, stdout, stderr)
+	return writeTargetSuiteReport(targetFuzzCheckResults(tgt, checks), tgt.Triple, reportFormat, stdout, stderr)
 }
 
-func writeTargetSuiteReport(results []compiler.TestRunnerResult, reportFormat string, stdout io.Writer, stderr io.Writer) int {
+func writeTargetSuiteReport(results []compiler.TestRunnerResult, target string, reportFormat string, stdout io.Writer, stderr io.Writer) int {
 	passed := 0
 	for _, result := range results {
 		if result.Passed {
@@ -546,7 +576,7 @@ func writeTargetSuiteReport(results []compiler.TestRunnerResult, reportFormat st
 	if reportFormat == "json" {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(compiler.NewTestRunnerReport(results)); err != nil {
+		if err := enc.Encode(compiler.NewTestRunnerReportForTarget(results, target)); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}

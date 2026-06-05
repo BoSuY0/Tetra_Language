@@ -210,7 +210,11 @@ func formatLSPFuncDetail(fn *frontend.FuncDecl) string {
 		prefix = "async func"
 	}
 	typeParams := formatLSPTypeParams(fn.TypeParams, fn.TypeParamBounds)
-	detail := fmt.Sprintf("%s %s%s(%s) -> %s", prefix, fn.Name, typeParams, strings.Join(params, ", "), formatLSPTypeRef(fn.ReturnType))
+	returnType := formatLSPTypeRef(fn.ReturnType)
+	if fn.ReturnOwnership != "" {
+		returnType = fn.ReturnOwnership + " " + returnType
+	}
+	detail := fmt.Sprintf("%s %s%s(%s) -> %s", prefix, fn.Name, typeParams, strings.Join(params, ", "), returnType)
 	if fn.HasThrows {
 		detail += " throws " + formatLSPTypeRef(fn.Throws)
 	}
@@ -255,7 +259,11 @@ func formatLSPFuncSigDecl(sig frontend.FuncSigDecl) string {
 		prefix = "async func"
 	}
 	typeParams := formatLSPTypeParams(sig.TypeParams, nil)
-	detail := fmt.Sprintf("%s %s%s(%s) -> %s", prefix, sig.Name, typeParams, strings.Join(params, ", "), formatLSPTypeRef(sig.ReturnType))
+	returnType := formatLSPTypeRef(sig.ReturnType)
+	if sig.ReturnOwnership != "" {
+		returnType = sig.ReturnOwnership + " " + returnType
+	}
+	detail := fmt.Sprintf("%s %s%s(%s) -> %s", prefix, sig.Name, typeParams, strings.Join(params, ", "), returnType)
 	if sig.HasThrows {
 		detail += " throws " + formatLSPTypeRef(sig.Throws)
 	}
@@ -287,6 +295,9 @@ func formatLSPTypeRef(ref frontend.TypeRef) string {
 		ret := "?"
 		if ref.Return != nil {
 			ret = formatLSPTypeRef(*ref.Return)
+			if ref.ReturnOwnership != "" {
+				ret = ref.ReturnOwnership + " " + ret
+			}
 		}
 		out := "fn(" + strings.Join(params, ", ") + ") -> " + ret
 		if ref.Throws != nil {

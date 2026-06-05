@@ -1,0 +1,17 @@
+module examples.safe_view_string_borrow_return
+
+func view(text: borrow String) -> String:
+    return __method.borrow(text.window(1, 3))
+
+func main() -> Int:
+    let text: String = "abcdef"
+    let v: String = view(text)
+    if v.len != 3:
+        return v.len
+    if v[0] != 98:
+        return 1
+    if v[1] != 99:
+        return 2
+    if v[2] != 100:
+        return 3
+    return 0

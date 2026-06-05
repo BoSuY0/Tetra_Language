@@ -17,9 +17,9 @@ and `graphify update .`.
   `contains`, `writeFile`, `buildAndRun`, `runCLI`, and compiler diagnostic
   helpers.
 - `graphify query` for global architecture refactor connected the current
-  pressure points to `cli/cmd/tetra/main_test.go`, `cli/cmd/tetra/main.go`,
+  pressure points to split CLI command tests, `cli/cmd/tetra/main.go`,
   `compiler/internal/semantics/checker.go`, `compiler/internal/lower/lower.go`,
-  `compiler/function_typed_callable_test.go`, `tools/scriptstest/release_v1_test.go`,
+  `compiler/tests/callables/function_typed_callable_test.go`, split versioned release script tests,
   `tools/cmd/verify-docs`, and the existing full-project refactor plan.
 - `find . -name go.mod` found module roots at `.`, `cli`, `compiler`, and
   `tools`.
@@ -39,13 +39,13 @@ and `graphify update .`.
 
 | Area | Evidence | Risk | First safe move |
 | --- | --- | --- | --- |
-| CLI tests | `cli/cmd/tetra/main_test.go` is about 14.4k lines. | Mixed command coverage, shared fixtures, brittle navigation. | Add source-structure guards, then split cohesive command test groups without changing test logic. |
-| Function-typed callable tests | `compiler/function_typed_callable_test.go` started at about 11.7k lines and is now 6932 lines. | Large scenario matrix hides subdomain ownership. | Continue splitting by callable domain: direct symbols, captures, struct/enum payloads, cross-module/interface metadata. |
+| CLI tests | Historical monolithic CLI command tests were about 14.4k lines before being split across `cli/cmd/tetra/*_test.go`. | Mixed command coverage, shared fixtures, brittle navigation. | Add source-structure guards, then split cohesive command test groups without changing test logic. |
+| Function-typed callable tests | `compiler/tests/callables/function_typed_callable_test.go` started from the historical monolithic callable suite and is now 6932 lines. | Large scenario matrix hides subdomain ownership. | Continue splitting by callable domain: direct symbols, captures, struct/enum payloads, cross-module/interface metadata. |
 | Semantic checker | `compiler/internal/semantics/checker.go` is about 11.6k lines. | Central semantic state and diagnostics are tightly coupled. | Same-package extraction of pure helpers only after dependency/impact checks and focused compiler tests. |
-| Safety and ownership tests | `compiler/safety_diagnostics_test.go` and `compiler/ownership_test.go` exceed 7.5k and 6.2k lines. | Broad diagnostic/evidence matrices are hard to review. | Extract fixtures and table groups; preserve diagnostic text and JSON evidence. |
+| Safety and ownership tests | `compiler/tests/safety/safety_diagnostics_test.go` and `compiler/tests/ownership/ownership_test.go` exceed 7.5k and 6.2k lines. | Broad diagnostic/evidence matrices are hard to review. | Extract fixtures and table groups; preserve diagnostic text and JSON evidence. |
 | Lowering | `compiler/internal/lower/lower.go` remains about 4.3k lines after earlier callable extraction. | Mixed lowering responsibilities. | Continue same-package helper extraction with focused lower tests. |
 | CLI Eco | `cli/cmd/tetra/eco.go` is about 4.4k lines. | Package, trust, lock, vault, and publish concerns sit together. | Inventory command clusters before extraction; keep public CLI output stable. |
-| Release script tests | `tools/scriptstest/release_v1_test.go` started at about 4.1k lines. | Gate fixtures and artifact validators were intertwined. The file has now been removed after domain splits. | Keep the structure guard and continue with other oversized test hotspots. |
+| Release script tests | The historical monolithic v1 release script test file started at about 4.1k lines. | Gate fixtures and artifact validators were intertwined. The file has now been removed after domain splits. | Keep the structure guard and continue with other oversized test hotspots. |
 | Tools validators | Many `tools/cmd/validate-*` commands repeat JSON decode and report validation patterns. | Premature shared libraries could couple unrelated validators. | Extract only after proving at least three commands share the same pure helper contract. |
 | Docs/release evidence | Existing generated and release docs are numerous and partly historical. | Proxy green docs can be mistaken for release completeness. | Keep completion audits explicit; validators must distinguish blocker evidence from complete claims. |
 | Generated artifacts | `docs/generated/**` and reports contain large machine-written files. | Refactors should not churn generated evidence accidentally. | Modify only when the generator/validator slice requires it. |
@@ -59,11 +59,11 @@ and `graphify update .`.
 | Compiler structure | `compiler/**`; focused compiler package tests. | Hotspots identified in semantic checker, lowerer, function callable tests, ownership/safety tests. This pass split the initial function-typed throwing/direct-try cluster, throwing captured-closure return/cross-module cluster, full callable capture stress cluster, eight-slot captured-closure return stress cluster, local captured-closure direct/callback/matrix cluster, mutable-global captured-closure starter cluster, returned mutable-global/local captured-closure cluster, struct/nested-struct mutable-global captured-closure cluster, local enum-payload mutable-global captured-closure cluster, basic captured-closure callable cluster including captured return/direct-call/callback scenarios, parameter-return captured-closure storage, mutable/local/struct reassignment, enum-payload reassignment, returned struct/enum payload, and parameter field/payload return clusters, local direct-symbol/multi-target callable cluster, local return/parameter-alias/multi-target reassignment callable cluster, cross-module callback callable cluster including multi-target callback params and imported callback-argument returns, cross-module return/storage callable cluster, imported enum-payload callable cluster, cross-module multi-target direct/reassignment callable cluster, and cross-module direct-storage callable cluster into guarded files. `compiler/internal/testkit`, `compiler/tests/**`, and `compiler/testdata/callables/**` now define the directory target for follow-up moves. | in progress |
 | CLI structure | `cli/cmd/tetra/**`; CLI package tests. | Existing plan already reduced `main.go`; this pass split `main_test.go` LSP, new app/project info, and all current fmt/format groups behind `TestCLITestsAreSplitByCommandSurface`. `cli/testkit` and `cli/tests/**` now define the directory target. `eco.go` remains a hotspot. | in progress |
 | Tools structure | `tools/cmd/**`; `tools/scriptstest/**`; tools tests. | Validator and release-script hotspots identified. Ownership validator was already refactored in a prior goal. This pass split release script fixtures and started assertion splits with guarded v0.1.1 and v1.0 release tests. `tools/validators`, `tools/release/**`, `tools/testkit`, and versioned `tools/scriptstest/**` now define the directory target. | in progress |
-| Docs structure | `docs/**`; docs validators. | Ownership audit was already made readable. `docs/architecture` and `docs/audits` now separate architecture/audit artifacts from plans and release evidence. Broader docs/release/generated policy remains to audit. | in progress |
+| Docs structure | `docs/**`; docs validators. | Ownership audit was already made readable. `docs/architecture` and `docs/audits` now separate architecture/audit artifacts from plans and release evidence. Broader generated release-doc policy remains to audit. | in progress |
 | Release gates | `scripts/ci/test.sh`, `scripts/ci/test-all.sh`, release gate scripts, scriptstest. | Current dirty tree includes release gate work; release truth was not rewritten. This pass moved test fixtures and v1.0 gate/smoke assertions, verified `tools/scriptstest`, moved the mutating formatter, bootstrap binary builder, bounded fuzz nightly, and project dump implementations to `scripts/dev/**`, moved the canonical Go test-suite plus summarized test-all implementations to `scripts/ci/**`, and moved all release workflows/gates into `scripts/release/**`. `find scripts -maxdepth 1 -type f -print` now returns only `scripts/README.md`; remaining legacy path strings are negative test guards or documented generated-evidence snapshot exceptions. | in progress |
 | Generated artifacts | `docs/generated/**`, `reports/**`, generated validators. | Treat as evidence outputs, not primary refactor targets unless a generator slice requires updates. | open |
 | Examples | `examples/**`; smoke/test commands. | Examples are part of release and docs evidence; no example-specific refactor selected yet. | open |
-| Test suites | `*_test.go`, `tools/scriptstest`, focused package tests. | CLI test structure guard now enforces split ownership for metadata, doctor, clean, LSP, new app/project info, and fmt/format groups. Compiler function-typed callable throwing, throwing captured-closure return/cross-module, full-capture stress, eight-slot captured-return stress, local captured-closure direct/callback/matrix, mutable-global captured-closure starter, returned mutable-global/local captured-closure, struct/nested-struct mutable-global captured-closure, local enum-payload mutable-global captured-closure, basic captured-closure including captured return/direct-call/callback scenarios, parameter-return captured-closure storage, mutable/local/struct reassignment, enum-payload reassignment, returned struct/enum payload, and parameter field/payload return, local direct-symbol/multi-target, local return/parameter-alias/multi-target reassignment, cross-module callback including multi-target callback params and imported callback-argument returns, cross-module return/storage, imported enum-payload, cross-module multi-target direct/reassignment, and cross-module direct-storage tests now have guarded domain splits. `compiler/tests/**`, `cli/tests/**`, and versioned `tools/scriptstest/**` now define the directory target once `testkit` helpers are extracted. Release script tests now have guarded v0.1.1, v0.1.2, v0.1.3, v0.2.0, static v0.3.0 gate/checklist/security wrapper assertions, v0.3.0 evidence/preflight assertions, v0.3.0 stale report-dir assertions, v0.3.0 residual-risk assertions, v0.3.0 security-signoff policy assertions, v0.3.0 security-signoff acceptance/detached-hash assertions, v0.3.0 final-summary/artifact-hash assertions, v0.3.0 runtime-smoke evidence/archiving assertions, v0.3.0 runtime-smoke schema/type assertions, v0.4.0 gate readiness assertions, current surface docs guard, and bootstrap guard split out. `tools/scriptstest/release_v1_test.go` was removed after the split. Larger compiler test hotspots remain open. | in progress |
+| Test suites | `*_test.go`, `tools/scriptstest`, focused package tests. | CLI test structure guard now enforces split ownership for metadata, doctor, clean, LSP, new app/project info, and fmt/format groups. Compiler function-typed callable throwing, throwing captured-closure return/cross-module, full-capture stress, eight-slot captured-return stress, local captured-closure direct/callback/matrix, mutable-global captured-closure starter, returned mutable-global/local captured-closure, struct/nested-struct mutable-global captured-closure, local enum-payload mutable-global captured-closure, basic captured-closure including captured return/direct-call/callback scenarios, parameter-return captured-closure storage, mutable/local/struct reassignment, enum-payload reassignment, returned struct/enum payload, and parameter field/payload return, local direct-symbol/multi-target, local return/parameter-alias/multi-target reassignment, cross-module callback including multi-target callback params and imported callback-argument returns, cross-module return/storage, imported enum-payload, cross-module multi-target direct/reassignment, and cross-module direct-storage tests now have guarded domain splits. `compiler/tests/**`, `cli/tests/**`, and versioned `tools/scriptstest/**` now define the directory target once `testkit` helpers are extracted. Release script tests now have guarded v0.1.1, v0.1.2, v0.1.3, v0.2.0, static v0.3.0 gate/checklist/security wrapper assertions, v0.3.0 evidence/preflight assertions, v0.3.0 stale report-dir assertions, v0.3.0 residual-risk assertions, v0.3.0 security-signoff policy assertions, v0.3.0 security-signoff acceptance/detached-hash assertions, v0.3.0 final-summary/artifact-hash assertions, v0.3.0 runtime-smoke evidence/archiving assertions, v0.3.0 runtime-smoke schema/type assertions, v0.4.0 gate readiness assertions, current surface docs guard, and bootstrap guard split out. The historical monolithic v1 release script test file was removed after the split. Larger compiler test hotspots remain open. | in progress |
 | TDD/verification slices | Red/green/refactor loop per implementation slice. | Required before behavior-preserving code/test structure changes. | required |
 | Graphify freshness | `graphify update .` after code changes. | Graphify is available at `graphify-out/`; update after each code slice. | required |
 | No mock/placeholder claims | Completion audits and validators. | Keep claims tied to real files and command output. | required |
@@ -73,13 +73,13 @@ and `graphify update .`.
 
 ### Slice 1: CLI Main Test Structure Guard And Split
 
-**Goal:** Start reducing `cli/cmd/tetra/main_test.go` by introducing a
+**Goal:** Start reducing split CLI command test files by introducing a
 source-structure guard and moving a small cohesive command-test group into a
 focused file.
 
 **Files:**
 
-- Inspect/modify `cli/cmd/tetra/main_test.go`
+- Inspect/modify split CLI command test files
 - Add one focused `*_test.go` file in `cli/cmd/tetra`
 
 **Approach:**
@@ -112,12 +112,12 @@ split is enforced by a regression guard.
   `GOCACHE=/tmp/tetra-language-go-cache go test ./cli/cmd/tetra -run 'TestCLITestsAreSplitByCommandSurface|TestFmtCommandCheckAndStdout|TestCollectTetraFiles|TestFormatCommand' -count=1`,
   `GOCACHE=/tmp/tetra-language-go-cache go test ./cli/cmd/tetra -run 'TestCLITestsAreSplitByCommandSurface|TestFmt|TestFormatCommand|TestCollectTetraFiles' -count=1`,
   `GOCACHE=/tmp/tetra-language-go-cache go test ./cli/cmd/tetra -count=1`,
-  `git diff --check -- cli/cmd/tetra/main_test.go cli/cmd/tetra/fmt_test.go cli/cmd/tetra/lsp_test.go cli/cmd/tetra/new_app_test.go cli/cmd/tetra/test_structure_test.go`,
+  `git diff --check -- cli/cmd/tetra/fmt_test.go cli/cmd/tetra/lsp_test.go cli/cmd/tetra/new_app_test.go cli/cmd/tetra/test_structure_test.go`,
   and `graphify update .`.
 
 ### Slice 2: Function-Typed Callable Test Matrix Split
 
-**Goal:** Split `compiler/function_typed_callable_test.go` into cohesive
+**Goal:** Split `compiler/tests/callables/function_typed_callable_test.go` into cohesive
 subdomain files.
 
 **Verification:** Focused `go test ./compiler -run 'FunctionTyped|Callable'`
@@ -125,70 +125,70 @@ plus `go test ./compiler -count=1`.
 
 **2026-05-08 execution evidence:**
 
-- Added `compiler/function_typed_callable_structure_test.go` as a domain split
+- Added `compiler/tests/callables/function_typed_callable_structure_test.go` as a domain split
   guard.
 - Moved the initial throwing/direct-try cluster to
-  `compiler/function_typed_callable_throwing_test.go`.
+  `compiler/tests/callables/function_typed_callable_throwing_test.go`.
 - Moved the throwing captured-closure return/cross-module callable cluster into
-  `compiler/function_typed_callable_throwing_test.go`.
+  `compiler/tests/callables/function_typed_callable_throwing_test.go`.
 - Moved the full callable nine/twelve capture stress cluster to
-  `compiler/function_typed_callable_full_capture_test.go`.
+  `compiler/tests/callables/function_typed_callable_full_capture_test.go`.
 - Moved the eight-slot captured-closure cross-module return stress tests to
-  `compiler/function_typed_callable_full_capture_test.go`.
+  `compiler/tests/callables/function_typed_callable_full_capture_test.go`.
 - Moved the local captured-closure direct-call, callback matrix, five-slot ptr,
   optional/enum/composite capture, and mutable snapshot tests to
-  `compiler/function_typed_callable_captured_closure_test.go`.
+  `compiler/tests/callables/function_typed_callable_captured_closure_test.go`.
 - Moved the mutable-global captured-closure direct/callback starter cluster to
-  `compiler/function_typed_callable_mutable_global_test.go`.
+  `compiler/tests/callables/function_typed_callable_mutable_global_test.go`.
 - Moved the returned mutable-global/local captured-closure reassignment cluster
-  to `compiler/function_typed_callable_mutable_global_test.go`.
+  to `compiler/tests/callables/function_typed_callable_mutable_global_test.go`.
 - Moved the struct-field, whole-struct, and nested-struct mutable-global
   captured-closure reassignment/snapshot cluster to
-  `compiler/function_typed_callable_mutable_global_test.go`.
+  `compiler/tests/callables/function_typed_callable_mutable_global_test.go`.
 - Moved the local enum-payload and returned-enum-payload mutable-global
   captured-closure cluster to
-  `compiler/function_typed_callable_mutable_global_test.go`.
+  `compiler/tests/callables/function_typed_callable_mutable_global_test.go`.
 - Moved the basic captured pointer closure callable cluster to
-  `compiler/function_typed_callable_captured_closure_test.go`.
+  `compiler/tests/callables/function_typed_callable_captured_closure_test.go`.
 - Moved the captured-closure return/direct-call callable tests into
-  `compiler/function_typed_callable_captured_closure_test.go`.
+  `compiler/tests/callables/function_typed_callable_captured_closure_test.go`.
 - Moved the captured-closure callback-return callable tests into
-  `compiler/function_typed_callable_captured_closure_test.go`.
+  `compiler/tests/callables/function_typed_callable_captured_closure_test.go`.
 - Moved the parameter-return captured-closure storage callable cluster to
-  `compiler/function_typed_callable_parameter_return_capture_test.go`.
+  `compiler/tests/callables/function_typed_callable_parameter_return_capture_test.go`.
 - Moved the parameter-return captured-closure mutable/local/struct reassignment
   callable cluster to
-  `compiler/function_typed_callable_parameter_return_reassignment_test.go`.
+  `compiler/tests/callables/function_typed_callable_parameter_return_reassignment_test.go`.
 - Moved the parameter-return captured-closure enum-payload reassignment callable
   cluster to
-  `compiler/function_typed_callable_parameter_return_enum_reassignment_test.go`.
+  `compiler/tests/callables/function_typed_callable_parameter_return_enum_reassignment_test.go`.
 - Moved the returned struct/enum payload callable cluster to
-  `compiler/function_typed_callable_returned_struct_enum_payload_test.go`.
+  `compiler/tests/callables/function_typed_callable_returned_struct_enum_payload_test.go`.
 - Moved the parameter field/payload return captured-closure callable cluster to
-  `compiler/function_typed_callable_parameter_field_return_test.go`.
+  `compiler/tests/callables/function_typed_callable_parameter_field_return_test.go`.
 - Moved the local direct-symbol, multi-target return, and argument-label
-  callable cluster to `compiler/function_typed_callable_direct_symbol_test.go`.
+  callable cluster to `compiler/tests/callables/function_typed_callable_direct_symbol_test.go`.
 - Moved the local return, parameter alias, multi-target return, and direct
   callback-argument callable cluster to
-  `compiler/function_typed_callable_local_return_alias_test.go`.
+  `compiler/tests/callables/function_typed_callable_local_return_alias_test.go`.
 - Moved the local multi-target return alias and mutable-local reassignment
-  callable tests into `compiler/function_typed_callable_local_return_alias_test.go`.
+  callable tests into `compiler/tests/callables/function_typed_callable_local_return_alias_test.go`.
 - Moved the first cross-module callback callable cluster to
-  `compiler/function_typed_callable_cross_module_callback_test.go`.
+  `compiler/tests/callables/function_typed_callable_cross_module_callback_test.go`.
 - Moved the cross-module multi-target callback-param test into
-  `compiler/function_typed_callable_cross_module_callback_test.go`.
+  `compiler/tests/callables/function_typed_callable_cross_module_callback_test.go`.
 - Moved the imported/cross-module callback-argument return tests into
-  `compiler/function_typed_callable_cross_module_callback_test.go`.
+  `compiler/tests/callables/function_typed_callable_cross_module_callback_test.go`.
 - Moved the first cross-module direct return/storage callable cluster to
-  `compiler/function_typed_callable_cross_module_return_test.go`.
+  `compiler/tests/callables/function_typed_callable_cross_module_return_test.go`.
 - Moved the imported enum-payload callable parameter cluster to
-  `compiler/function_typed_callable_imported_enum_payload_test.go`.
+  `compiler/tests/callables/function_typed_callable_imported_enum_payload_test.go`.
 - Moved the cross-module multi-target direct call and reassignment callable
-  cluster to `compiler/function_typed_callable_cross_module_multi_target_test.go`.
+  cluster to `compiler/tests/callables/function_typed_callable_cross_module_multi_target_test.go`.
 - Moved the cross-module direct named-symbol struct/enum storage callable
-  cluster to `compiler/function_typed_callable_cross_module_direct_storage_test.go`.
+  cluster to `compiler/tests/callables/function_typed_callable_cross_module_direct_storage_test.go`.
 - Left later cross-module/global callable scenarios in
-  `compiler/function_typed_callable_test.go` for future domain splits.
+  `compiler/tests/callables/function_typed_callable_test.go` for future domain splits.
 - Verification:
   `GOCACHE=/tmp/tetra-language-go-cache go test ./compiler -run TestFunctionTypedCallableTestsAreSplitByDomain -count=1` failed RED before the move,
   `GOCACHE=/tmp/tetra-language-go-cache go test ./compiler -run 'TestFunctionTypedCallableTestsAreSplitByDomain|TestBuildFunctionTypedThrowing.*Smoke' -count=1`,
@@ -219,21 +219,21 @@ plus `go test ./compiler -count=1`.
   `GOCACHE=/tmp/tetra-language-go-cache go test ./compiler -run 'TestFunctionTypedCallableTestsAreSplitByDomain|TestBuildFunctionTyped(ReturnMultiTargetCrossModuleDirectCallSmoke|MutableLocalReassignmentFromMultiTargetCrossModuleReturnSmoke|StructFieldReassignmentFromMultiTargetCrossModuleReturnSmoke|MutableEnumPayloadReassignmentFromMultiTargetCrossModuleReturnSmoke)' -count=1`,
   `GOCACHE=/tmp/tetra-language-go-cache go test ./compiler -run 'TestFunctionTypedCallableTestsAreSplitByDomain|TestBuildFunctionTyped(StructFieldDirectNamedSymbolCrossModuleSmoke|EnumPayloadDirectNamedSymbolCrossModuleSmoke)' -count=1`,
   `GOCACHE=/tmp/tetra-language-go-cache go test ./compiler -count=1`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_throwing_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_full_capture_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_captured_closure_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_parameter_return_capture_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_parameter_return_reassignment_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_parameter_return_enum_reassignment_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_returned_struct_enum_payload_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_parameter_field_return_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_direct_symbol_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_local_return_alias_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_cross_module_callback_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_cross_module_return_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_imported_enum_payload_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_cross_module_multi_target_test.go compiler/function_typed_callable_structure_test.go`,
-  `git diff --check -- compiler/function_typed_callable_test.go compiler/function_typed_callable_cross_module_direct_storage_test.go compiler/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_throwing_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_full_capture_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_captured_closure_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_parameter_return_capture_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_parameter_return_reassignment_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_parameter_return_enum_reassignment_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_returned_struct_enum_payload_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_parameter_field_return_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_direct_symbol_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_local_return_alias_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_cross_module_callback_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_cross_module_return_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_imported_enum_payload_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_cross_module_multi_target_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
+  `git diff --check -- compiler/tests/callables/function_typed_callable_test.go compiler/tests/callables/function_typed_callable_cross_module_direct_storage_test.go compiler/tests/callables/function_typed_callable_structure_test.go`,
   and `graphify update .` (latest code graph: 10763 nodes, 38907 edges, 311 communities).
 
 ### Slice 2b: Directory-Based Project Structure Scaffold
@@ -953,7 +953,7 @@ non-generated callsites, and document intentional historical exceptions.
 ### Slice 4: Release Script Test Fixture Split
 
 **Goal:** Separate fake repo/report fixtures from assertions in
-`tools/scriptstest/release_v1_test.go`.
+the historical monolithic v1 release script test file.
 
 **Verification:** Focused release script tests and `go test ./tools/scriptstest -count=1`.
 
@@ -1021,7 +1021,7 @@ non-generated callsites, and document intentional historical exceptions.
   `tools/scriptstest/release_current_surface_test.go`.
 - Moved the bootstrap binary alias guard to
   `tools/scriptstest/release_bootstrap_test.go`.
-- Removed `tools/scriptstest/release_v1_test.go` after all tests and helpers
+- Removed the historical monolithic v1 release script test file after all tests and helpers
   were moved behind `tools/scriptstest/release_v1_structure_test.go`.
 - Verification:
   `GOCACHE=/tmp/tetra-language-go-cache go test ./tools/scriptstest -run TestReleaseV1TestsAreSplitByFixtureDomain -count=1` failed RED before the move,
@@ -1060,21 +1060,21 @@ non-generated callsites, and document intentional historical exceptions.
   `GOCACHE=/tmp/tetra-language-go-cache go test ./tools/scriptstest -run 'TestReleaseV1TestsAreSplitByFixtureDomain|TestReleaseV040Gate' -count=1`,
   `GOCACHE=/tmp/tetra-language-go-cache go test ./tools/scriptstest -run 'TestReleaseV1TestsAreSplitByFixtureDomain|TestCurrentSupportedSurfaceDocumentIsReleaseAligned|TestBootstrapBuildsTetraAndTAlias' -count=1`,
   `GOCACHE=/tmp/tetra-language-go-cache go test ./tools/scriptstest -count=1`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v011_gate_test.go tools/scriptstest/release_v030_fixtures_test.go tools/scriptstest/release_v10_fixtures_test.go tools/scriptstest/release_helpers_test.go tools/scriptstest/release_v10_gate_test.go tools/scriptstest/release_v10_policy_test.go tools/scriptstest/release_v10_web_smoke_test.go tools/scriptstest/release_v10_wasi_smoke_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v012_gate_test.go tools/scriptstest/release_v013_gate_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v013_gate_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v020_gate_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_static_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_evidence_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_report_dir_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_residual_risks_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_security_signoff_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_security_signoff_acceptance_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_final_summary_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_runtime_smoke_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v030_gate_runtime_smoke_schema_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_v1_test.go tools/scriptstest/release_v040_gate_test.go tools/scriptstest/release_v1_structure_test.go`,
-  `git diff --check -- tools/scriptstest/release_current_surface_test.go tools/scriptstest/release_bootstrap_test.go tools/scriptstest/release_v1_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v011_gate_test.go tools/scriptstest/release_v030_fixtures_test.go tools/scriptstest/release_v10_fixtures_test.go tools/scriptstest/release_helpers_test.go tools/scriptstest/release_v10_gate_test.go tools/scriptstest/release_v10_policy_test.go tools/scriptstest/release_v10_web_smoke_test.go tools/scriptstest/release_v10_wasi_smoke_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v012_gate_test.go tools/scriptstest/release_v013_gate_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v013_gate_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v020_gate_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_static_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_evidence_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_report_dir_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_residual_risks_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_security_signoff_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_security_signoff_acceptance_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_final_summary_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_runtime_smoke_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v030_gate_runtime_smoke_schema_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_v040_gate_test.go tools/scriptstest/release_v1_structure_test.go`,
+  `git diff --check -- tools/scriptstest/release_current_surface_test.go tools/scriptstest/release_bootstrap_test.go tools/scriptstest/release_v1_structure_test.go`,
   and `graphify update .`.
 
 ### Slice 4a: Scriptstest Shared Helper Extraction

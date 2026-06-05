@@ -25,6 +25,10 @@ for island IR paths rather than native island runtime semantics).
 | explicit `free(<island>)` | always | `islands`, `mem` | island handle |
 | `core.cap_io` | always | `capability`, `io` | returns `cap.io` |
 | `core.cap_mem` | always | `capability`, `mem` | returns `cap.mem` |
+| `core.raw_slice_u8_from_parts` | always | `mem` | `cap.mem` |
+| `core.raw_slice_u16_from_parts` | always | `mem` | `cap.mem` |
+| `core.raw_slice_i32_from_parts` | always | `mem` | `cap.mem` |
+| `core.raw_slice_bool_from_parts` | always | `mem` | `cap.mem` |
 | `core.load_i32` / `core.store_i32` | always | `mem` | `cap.mem` |
 | `core.load_u8` / `core.store_u8` | always | `mem` | `cap.mem` |
 | `core.load_ptr` / `core.store_ptr` | always | `mem` | `cap.mem` |
@@ -32,6 +36,47 @@ for island IR paths rather than native island runtime semantics).
 | `core.mmio_read_i32` / `core.mmio_write_i32` | always | `io`, `mmio` | `cap.io` |
 | `core.sym_addr` | always | `link` | none |
 | `core.ctx_switch` | always | `control`, `runtime` | `cap.mem` |
+
+Safe slice views are not raw gateways. `xs.window(start, count)`,
+`xs.prefix(count)`, and `xs.suffix(start)` require no capability token and
+trap/reject invalid ranges before constructing a view; they derive provenance
+from the source slice instead of accepting caller-supplied raw parts.
+
+## Memory Report Boundary
+
+Memory Production Core v1 exposes `tetra.memory-report.v1` through
+`--emit-memory-report`. The report is a projection of compiler-owned memory
+facts, not a source of truth and not an unsafe permission grant.
+
+Unsafe rows must keep their origin visible. Verified `core.alloc_bytes` roots
+may report `unsafe_verified_root` allocation-base metadata, while arbitrary raw
+external pointers and raw slices from unknown parts remain `unsafe_unknown` or
+`checked_external_unknown`. A report row must not convert unknown unsafe
+provenance into `safe_known`; validators reject that shape. MPC-7 also rejects
+`unsafe_unknown` rows that try to claim `provenance_known`, noalias,
+`index_in_range`, bounds-check-elimination, or trusted stack/region/island
+lowering. Raw allocation, pointer arithmetic, raw load/store, and raw-slice
+gateways carry explicit PLIR unsafe classes before report projection. Those
+rows may remain useful diagnostics, but they are never optimization permission.
+For verified `core.alloc_bytes` roots, pointer arithmetic and raw memory access
+may report `derived_allocation_offset`, `rejected_negative_offset`,
+`rejected_upper_bound`, or `rejected_access_width_overflow` as `unsafe_checked`
+evidence. Unknown raw pointers still report `checked_external_unknown` or
+`external_unknown`; they do not become safe facts or trusted bounds proofs.
+Memory Ideal v7 extends this boundary to FFI calls: external pointers project
+`ffi_pointer_external_unknown`, external calls may retain borrowed pointers,
+safe wrapper promotion without compiler-owned proof is rejected, and external
+calls invalidate broad noalias. These rows do not prove C-side lifetimes,
+arbitrary external allocator provenance, or safe wrapper promotion.
+Raw slice construction from a verified allocation root may report bounded
+`raw_slice_verified_allocation_root` evidence only when the constant
+`len * sizeof(T)` and `offset + lenBytes` fit inside allocation metadata.
+Negative raw-slice lengths trap before view construction on linux-x64 and report
+`rejected_negative_length` when statically classified. Metadata arithmetic
+overflow reports `rejected_length_overflow`; target byte-overflow traps are
+linux-x64 runtime evidence and may remain conservative in reports until
+target-aware raw-slice metadata is added. None of these rows produce
+`safe_known`, noalias, `index_in_range`, or bounds-check-elimination permission.
 
 Atomic and architecture-pointer raw memory builtins are also unsafe-only. The
 manifest expands them by operation, value width, and memory order; this literal

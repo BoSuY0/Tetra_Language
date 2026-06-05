@@ -69,6 +69,45 @@ func TestValidateCompletionAuditRejectsBlockedAuditWithoutMissingWorkSummary(t *
 	}
 }
 
+func TestValidateCompletionAuditRequiresReleaseEvidenceMatrix(t *testing.T) {
+	audit := strings.Replace(validBlockedCompletionAudit(), releaseEvidenceMatrixFixture(), "", 1)
+	err := validateCompletionAudit([]byte(audit), completionAuditOptions{
+		ExpectedStatus: "not-achieved",
+	})
+	if err == nil {
+		t.Fatalf("expected missing release evidence matrix failure")
+	}
+	if !strings.Contains(err.Error(), "missing \"Release Evidence Matrix\" section") {
+		t.Fatalf("error = %v, want missing release evidence matrix failure", err)
+	}
+}
+
+func TestValidateCompletionAuditRejectsMatrixRowWithoutNegativeTests(t *testing.T) {
+	audit := strings.Replace(validBlockedCompletionAudit(), "positive: go test ./compiler/...; negative: validator fixtures reject stale evidence", "positive: go test ./compiler/...", 1)
+	err := validateCompletionAudit([]byte(audit), completionAuditOptions{
+		ExpectedStatus: "not-achieved",
+	})
+	if err == nil {
+		t.Fatalf("expected negative-test evidence failure")
+	}
+	if !strings.Contains(err.Error(), "tests must include negative:") {
+		t.Fatalf("error = %v, want negative-test evidence failure", err)
+	}
+}
+
+func TestValidateCompletionAuditRejectsPassMatrixRowWithBlockerEvidence(t *testing.T) {
+	audit := strings.Replace(validBlockedCompletionAudit(), "ci: bash scripts/ci/test.sh | pass", "ci: blocked by dirty worktree | pass", 1)
+	err := validateCompletionAudit([]byte(audit), completionAuditOptions{
+		ExpectedStatus: "not-achieved",
+	})
+	if err == nil {
+		t.Fatalf("expected dirty-green evidence failure")
+	}
+	if !strings.Contains(err.Error(), "pass status contains blocker evidence") {
+		t.Fatalf("error = %v, want dirty-green evidence failure", err)
+	}
+}
+
 func validBlockedCompletionAudit() string {
 	return `# Tetra v0.4.0 Completion Audit
 
@@ -102,8 +141,20 @@ Status: not achieved.
 | Baseline tests pass | package tests | Needs rerun after scope edits. | pending rerun |
 | Worktree is clean for release | ` + "`git status --porcelain --untracked-files=all`" + ` | Worktree is dirty. | blocked for tag-ready release |
 
+` + releaseEvidenceMatrixFixture() + `
+
 ## Missing Work Summary
 
 The objective is not achieved.
+`
+}
+
+func releaseEvidenceMatrixFixture() string {
+	return `## Release Evidence Matrix
+
+| Requirement | File(s) | Tests | Docs | Evidence | Status |
+| --- | --- | --- | --- | --- | --- |
+| Compiler production core is production | implementation: compiler/compiler.go; compiler/internal/lower/lower.go | positive: go test ./compiler/...; negative: validator fixtures reject stale evidence | docs: docs/spec/current_supported_surface.md; manifest: docs/generated/manifest.json | report: compiler-production-linux-x64.json; graphify: graphify update .; ci: bash scripts/ci/test.sh | pass |
+| Memory production core is production | implementation: compiler/internal/runtimeabi/small_heap.go | positive: go test ./compiler/internal/runtimeabi; negative: allocation validator rejects forged storage | docs: docs/spec/runtime_abi.md; manifest: docs/generated/manifest.json | report: memory-production-linux-x64.json; graphify: graphify update .; ci: bash scripts/ci/test.sh | pending final evidence |
 `
 }

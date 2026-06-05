@@ -26,6 +26,7 @@ type manifest struct {
 		ActorsSupportedTargets   []string `json:"actors_supported_targets"`
 		ActorsRequiredSymbols    []string `json:"actors_required_symbols"`
 		TimeRequiredSymbols      []string `json:"time_required_symbols"`
+		SurfaceRequiredSymbols   []string `json:"surface_required_symbols"`
 		ActorsProgramGlueSymbols []string `json:"actors_program_glue_symbols"`
 	} `json:"runtime_abi"`
 	Features []featureManifest `json:"features"`
@@ -75,6 +76,7 @@ func main() {
 	checkContains("docs/spec/actors.md", m.RuntimeABI.ActorsSupportedTargets)
 	runtimeSymbols := append([]string(nil), m.RuntimeABI.ActorsRequiredSymbols...)
 	runtimeSymbols = append(runtimeSymbols, m.RuntimeABI.TimeRequiredSymbols...)
+	runtimeSymbols = append(runtimeSymbols, m.RuntimeABI.SurfaceRequiredSymbols...)
 	runtimeSymbols = append(runtimeSymbols, m.RuntimeABI.ActorsProgramGlueSymbols...)
 	checkContains("docs/spec/runtime_abi.md", runtimeSymbols)
 
@@ -137,6 +139,9 @@ func main() {
 	if err := verifyReleaseTruthDocs(currentReleaseTruthDocPaths()); err != nil {
 		errs = append(errs, err.Error())
 	}
+	if err := verifySurfaceReleaseDocs(surfaceReleaseDocPaths()); err != nil {
+		errs = append(errs, err.Error())
+	}
 	if err := verifyFeatureRegistry(m.Features); err != nil {
 		errs = append(errs, err.Error())
 	}
@@ -189,13 +194,19 @@ func verifyWASMBackendPlan(path string, plannedTargets []string) error {
 }
 
 type memoryProductionContractDocPaths struct {
-	RuntimeABI   string
-	Ownership    string
-	Unsafe       string
-	Capabilities string
-	Stdlib       string
-	StdlibGuide  string
-	CoreMemory   string
+	RuntimeABI             string
+	Ownership              string
+	Unsafe                 string
+	Capabilities           string
+	Stdlib                 string
+	StdlibGuide            string
+	CoreMemory             string
+	TargetCapabilityMatrix string
+	MemoryCostModel        string
+	MemoryFuzzOracle       string
+	MemoryProductionFinal  string
+	MemoryProductionMap    string
+	MemoryProductionClaims string
 }
 
 type memoryProductionContractRequirement struct {
@@ -206,13 +217,19 @@ type memoryProductionContractRequirement struct {
 
 func defaultMemoryProductionContractDocPaths() memoryProductionContractDocPaths {
 	return memoryProductionContractDocPaths{
-		RuntimeABI:   filepath.FromSlash("docs/spec/runtime_abi.md"),
-		Ownership:    filepath.FromSlash("docs/spec/ownership_v1.md"),
-		Unsafe:       filepath.FromSlash("docs/spec/unsafe.md"),
-		Capabilities: filepath.FromSlash("docs/spec/capabilities.md"),
-		Stdlib:       filepath.FromSlash("docs/spec/stdlib.md"),
-		StdlibGuide:  filepath.FromSlash("docs/user/standard_library_guide.md"),
-		CoreMemory:   filepath.FromSlash("lib/core/memory.tetra"),
+		RuntimeABI:             filepath.FromSlash("docs/spec/runtime_abi.md"),
+		Ownership:              filepath.FromSlash("docs/spec/ownership_v1.md"),
+		Unsafe:                 filepath.FromSlash("docs/spec/unsafe.md"),
+		Capabilities:           filepath.FromSlash("docs/spec/capabilities.md"),
+		Stdlib:                 filepath.FromSlash("docs/spec/stdlib.md"),
+		StdlibGuide:            filepath.FromSlash("docs/user/standard_library_guide.md"),
+		CoreMemory:             filepath.FromSlash("lib/core/memory.tetra"),
+		TargetCapabilityMatrix: filepath.FromSlash("docs/audits/memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.FromSlash("docs/design/memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.FromSlash("docs/audits/memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.FromSlash("docs/audits/memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.FromSlash("docs/audits/memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.FromSlash("docs/audits/memory-production-core-v1-nonclaims.md"),
 	}
 }
 
@@ -318,6 +335,113 @@ func memoryProductionContractRequirements(paths memoryProductionContractDocPaths
 				"caller owns pointer validity and bounds",
 				"func memset_u8",
 				"func memcpy_u8",
+			},
+		},
+		{
+			Name: "target capability matrix",
+			Path: paths.TargetCapabilityMatrix,
+			Required: []string{
+				"Target | Build | Lower | Run | Raw diagnostics | Region lowering | Alignment semantics | Claim level",
+				"| linux-x64 | yes | yes | yes | yes | yes/partial | yes | production/host_runtime |",
+				"| linux-x86 | yes | yes | no/host-dependent | partial | partial | partial | build_lower_only |",
+				"| linux-x32 | yes | yes | no/host-dependent | partial | partial | special | build_lower_only |",
+				"| macos-x64 | yes | yes | host-required | host-required | host-required | host-required | build_lower_only unless run |",
+				"| windows-x64 | yes | yes | host-required | host-required | host-required | host-required | build_lower_only unless run |",
+				"| wasm32-wasi | yes | yes | runner-smoke if available | safe-only | limited | wasm rules | artifact/runtime tiered |",
+				"| wasm32-web | yes | yes | browser-smoke if available | safe-only | limited | wasm rules | artifact/runtime tiered |",
+				"no cross-target memory production claim without target evidence",
+			},
+		},
+		{
+			Name: "memory cost model",
+			Path: paths.MemoryCostModel,
+			Required: []string{
+				"Memory Cost Model",
+				"zero_cost_proven",
+				"dynamic_check_required",
+				"instrumentation_only",
+				"unsupported_rejected",
+				"conservative_fallback",
+				"normal build does not run heavy validators at runtime",
+				"report generation is optional and artifact-only",
+				"unsafe_unknown may be checked, trapped, or conservative, but never optimized as trusted",
+				"`cost_class`",
+				"`normal_build_check`",
+			},
+		},
+		{
+			Name: "memory fuzz oracle",
+			Path: paths.MemoryFuzzOracle,
+			Required: []string{
+				"Memory Fuzz Oracle v1",
+				"tetra.memory-fuzz.oracle.v1",
+				"checker reject expected",
+				"runtime trap expected",
+				"compiled output equals interpreter/reference expected",
+				"compiler crash is bug",
+				"miscompile is bug",
+				"unsafe_unknown optimized as safe is bug",
+				"report validation failure is bug",
+				"Tier 1 short CI smoke",
+				"Tier 2 nightly fuzz",
+				"Tier 3 release-blocking focused memory fuzz",
+				"no safe metadata mutation",
+				"no borrowed escape",
+				"no unsafe_unknown -> safe_known",
+				"no removed bounds check without proof id",
+				"no stack/region storage if escape exists",
+				"reports validate against MemoryFactGraph",
+				"reports/memory-fuzz-short",
+			},
+		},
+		{
+			Name: "memory production final audit",
+			Path: paths.MemoryProductionFinal,
+			Required: []string{
+				"Memory Production Core v1 Final Audit",
+				"MPC-0",
+				"MPC-16",
+				"implemented",
+				"implemented_narrow",
+				"validated",
+				"conservative",
+				"rejected",
+				"future",
+				"explicit_non_goal",
+				"MemoryFactGraph",
+				"reports are projections",
+				"docs/audits/memory-production-core-v1-artifact-map.md",
+				"docs/audits/memory-production-core-v1-nonclaims.md",
+			},
+		},
+		{
+			Name: "memory production artifact map",
+			Path: paths.MemoryProductionMap,
+			Required: []string{
+				"Memory Production Core v1 Artifact Map",
+				"reports/memory-production-core-v1/test-all-quick",
+				"summary.json",
+				"summary.md",
+				"scripts/ci/test-all.sh --quick --keep-going",
+				"reports/memory-fuzz-short/mpc15/memory-fuzz-oracle.json",
+				"reports/memory-production-core-v1/mpc8/memory-production-linux-x64.json",
+				"reports/memory-production-core-v1/mpc9/memory-production-linux-x64.json",
+			},
+		},
+		{
+			Name: "memory production nonclaims",
+			Path: paths.MemoryProductionClaims,
+			Required: []string{
+				"Memory Production Core v1 Nonclaims",
+				"perfect memory in all possible programs",
+				"full Rust-like borrow checker parity",
+				"full FFI lifetime system",
+				"safety for arbitrary unsafe external pointers",
+				"full derived-pointer provenance for every raw address",
+				"full production actor runtime",
+				"full target runtime parity",
+				"fastest language",
+				"official benchmark result",
 			},
 		},
 	}
@@ -523,10 +647,13 @@ func verifyFeatureRegistry(features []featureManifest) error {
 		return fmt.Errorf("feature registry is required in generated manifest")
 	}
 	allowedStatus := map[string]bool{
-		"current":      true,
-		"experimental": true,
-		"planned":      true,
-		"post-v1":      true,
+		"current":              true,
+		"experimental":         true,
+		"release_candidate":    true,
+		"unsupported":          true,
+		"legacy_compatibility": true,
+		"planned":              true,
+		"post-v1":              true,
 	}
 	requiredStatus := map[string]bool{
 		"current": false,
@@ -872,6 +999,7 @@ func currentReleaseTruthDocPaths() []string {
 	return []string{
 		"README.md",
 		filepath.FromSlash("docs/spec/current_supported_surface.md"),
+		filepath.FromSlash("docs/spec/surface_v1.md"),
 		filepath.FromSlash("docs/spec/v0_2_scope.md"),
 		filepath.FromSlash("docs/spec/v1_feature_status.md"),
 		filepath.FromSlash("docs/spec/v1_scope.md"),
@@ -882,9 +1010,106 @@ func currentReleaseTruthDocPaths() []string {
 		filepath.FromSlash("docs/user/language_tour.md"),
 		filepath.FromSlash("docs/user/ownership_effects_guide.md"),
 		filepath.FromSlash("docs/user/standard_library_guide.md"),
+		filepath.FromSlash("docs/user/surface_guide.md"),
 		filepath.FromSlash("docs/user/troubleshooting.md"),
 		filepath.FromSlash("docs/user/wasm_ui_guide.md"),
 	}
+}
+
+func surfaceReleaseDocPaths() []string {
+	return []string{
+		filepath.FromSlash("docs/spec/current_supported_surface.md"),
+		filepath.FromSlash("docs/spec/surface_v1.md"),
+		filepath.FromSlash("docs/release/surface_v1_release_contract.md"),
+		filepath.FromSlash("docs/release/surface_v1_release_notes.md"),
+		filepath.FromSlash("docs/release/surface_v1_release_audit.md"),
+		filepath.FromSlash("docs/user/examples_index.md"),
+		filepath.FromSlash("docs/user/surface_guide.md"),
+	}
+}
+
+func verifySurfaceReleaseDocs(paths []string) error {
+	var errs []string
+	var combined strings.Builder
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", path, err))
+			continue
+		}
+		text := string(raw)
+		combined.WriteString(text)
+		combined.WriteByte('\n')
+		for _, clause := range surfaceReleaseDocClauses(text) {
+			lower := strings.ToLower(clause)
+			if surfaceReleaseClauseSafe(lower) {
+				continue
+			}
+			if containsAnySubstring(lower, []string{"macos surface", "macos/windows surface"}) &&
+				containsAnySubstring(lower, []string{"current", "release-ready", "production-supported", "production supported"}) {
+				errs = append(errs, fmt.Sprintf("%s: macOS Surface fake current claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if containsAnySubstring(lower, []string{"windows surface", "macos/windows surface"}) &&
+				containsAnySubstring(lower, []string{"current", "release-ready", "production-supported", "production supported"}) {
+				errs = append(errs, fmt.Sprintf("%s: Windows Surface fake current claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if strings.Contains(lower, "metadata-only") && strings.Contains(lower, "production accessibility") {
+				errs = append(errs, fmt.Sprintf("%s: metadata-only accessibility fake production claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if strings.Contains(lower, "dom ui") && strings.Contains(lower, "surface model") {
+				errs = append(errs, fmt.Sprintf("%s: DOM UI fake Surface model claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if containsAnySubstring(lower, []string{"user js", "user javascript"}) &&
+				containsAnySubstring(lower, []string{"allowed", "may use", "can use"}) {
+				errs = append(errs, fmt.Sprintf("%s: user JS fake allowance claim: %q", path, strings.TrimSpace(clause)))
+			}
+		}
+	}
+	combinedLower := strings.ToLower(combined.String())
+	for _, required := range []string{"unsupported", "macos", "windows", "wasm32-wasi"} {
+		if !strings.Contains(combinedLower, required) {
+			errs = append(errs, fmt.Sprintf("Surface release docs missing unsupported targets evidence: %s", required))
+		}
+	}
+	if !strings.Contains(combined.String(), "bash scripts/release/surface/release-gate.sh") {
+		errs = append(errs, "Surface release docs missing release-gate.sh command link")
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func surfaceReleaseDocClauses(text string) []string {
+	return strings.FieldsFunc(text, func(r rune) bool {
+		return r == '.' || r == '\n' || r == ';'
+	})
+}
+
+func surfaceReleaseClauseSafe(lower string) bool {
+	return containsAnySubstring(lower, []string{
+		" not ",
+		"not ",
+		"unsupported",
+		"outside",
+		"remain outside",
+		"requires real",
+		"require real",
+		"no release evidence",
+		"forbid",
+		"forbids",
+		"rejected",
+		"invalid until",
+	})
+}
+
+func containsAnySubstring(text string, needles []string) bool {
+	for _, needle := range needles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func verifySpecCodeBlocks(paths []string) error {
@@ -1508,12 +1733,13 @@ func expandStableEffect(effect string) ([]string, error) {
 		"mmio":        "mmio",
 		"privacy":     "privacy",
 		"runtime":     "runtime",
+		"surface":     "surface",
 	}
 	if name, ok := canonical[effect]; ok {
 		return []string{name}, nil
 	}
 	groups := map[string][]string{
-		"effects.all":     {"actors", "alloc", "budget", "capability", "control", "io", "islands", "link", "mem", "mmio", "privacy", "runtime"},
+		"effects.all":     {"actors", "alloc", "budget", "capability", "control", "io", "islands", "link", "mem", "mmio", "privacy", "runtime", "surface"},
 		"effects.cap.io":  {"capability", "io", "mmio"},
 		"effects.cap.mem": {"capability", "mem"},
 		"effects.memory":  {"alloc", "islands", "mem"},

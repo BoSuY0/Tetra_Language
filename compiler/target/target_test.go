@@ -1,6 +1,7 @@
 package target
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -474,21 +475,35 @@ func TestBuildOnlyArchitecturesHaveHonestRuntimeMetadata(t *testing.T) {
 	requiredEvidence := map[string][]string{
 		"x86": {
 			"i386 SysV ABI classifier",
-			"explicit filesystem/networking stdlib plus time/task/actors target-runtime boundary diagnostics",
-			"x86 pointer/native-libc/function-pointer @export diagnostics",
-			"source native scalar diagnostics",
+			"stdout write/string literal data",
+			"self-host logical time runtime smoke",
+			"fs_exists filesystem runtime plus filesystem/scheduler composition smoke",
+			"bounded two-spawn self-host actors/task/task-group runtime smokes",
+			"single-spawn typed-task/staged typed-task/typed task-group plus actor-state runtime smoke",
+			"raw pointer-slot base/offset load/store executable smokes",
+			"i386 ctx_switch object smoke",
+			"current core.net networking runtime smokes, Surface, distributed actors, and actor fanout above 2 runtime boundary diagnostics",
+			"x86 canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes",
+			"x86 function-pointer @export diagnostics",
+			"remaining source target-layout scalar diagnostics",
 			"pointer-only atomic ABI-width object check",
 			"source-level atomic diagnostics",
 		},
 		"x32": {
 			"x32 SysV ABI classifier",
+			"stdout write/string literal data",
 			"raw ptr_add/load/store",
 			"pointer load/store",
+			"raw pointer-slot base/offset executable smokes",
 			"MMIO read/write",
 			"scoped island bump allocation/free",
-			"explicit filesystem/networking stdlib plus x32 multi-spawn actors/task, task-group, and typed-task runtime boundary diagnostics",
-			"x32 pointer/native-libc/function-pointer @export diagnostics",
-			"source native scalar diagnostics",
+			"self-host runtime builds for time, bounded two-spawn actors/task/task-group, single-spawn typed-task/staged typed-task/typed task-group, actor-state, and filesystem/scheduler composition smokes",
+			"x32 ctx_switch object smoke",
+			"fs_exists-only filesystem runtime smoke",
+			"current x32 core.net networking runtime smokes, Surface, distributed actors, and x32 actor fanout above 2 runtime boundary diagnostics",
+			"scalar i32 plus canonical ptr/rawptr/nullable_ptr/ref, c_int/c_uint, and complete ILP32 native/libc scalar @export object smokes",
+			"x32 function-pointer @export diagnostics",
+			"remaining source target-layout scalar diagnostics",
 			"pointer-only atomic ABI-width object check",
 			"dword pointer atomics",
 			"x32 syscall numbers",
@@ -509,6 +524,145 @@ func TestBuildOnlyArchitecturesHaveHonestRuntimeMetadata(t *testing.T) {
 			if !strings.Contains(tgt.UnsupportedReason, want) {
 				t.Fatalf("%s unsupported reason missing %q: %q", raw, want, tgt.UnsupportedReason)
 			}
+		}
+	}
+}
+
+func TestLinuxNativeTargetsExposePromotionGateMetadata(t *testing.T) {
+	tests := []struct {
+		raw                string
+		runtimeStatus      string
+		stdlibStatus       string
+		ffiStatus          string
+		runnerProbeCommand string
+		releaseGate        string
+		evidenceArtifacts  []string
+	}{
+		{
+			raw:                "x64",
+			runtimeStatus:      "production",
+			stdlibStatus:       "production",
+			ffiStatus:          "scalar_object_smokes_partial",
+			runnerProbeCommand: "tetra test --target x64 --format=json <runner-smoke.tetra>",
+			releaseGate:        "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
+			evidenceArtifacts:  []string{"targets.json", "linux-x64-abi.json", "linux-x64-atomic-stress.json", "linux-x64-fuzz.json", "linux-x64-runner.json", "linux-native-targets-brutal.json", "artifact-hashes.json"},
+		},
+		{
+			raw:                "x86",
+			runtimeStatus:      "partial_build_only",
+			stdlibStatus:       "partial_build_only",
+			ffiStatus:          "ilp32_scalar_object_smokes_partial",
+			runnerProbeCommand: "tetra test --diagnostics=json --target x86 --format=json <runner-smoke.tetra>",
+			releaseGate:        "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
+			evidenceArtifacts:  []string{"targets.json", "linux-x86-abi.json", "linux-x86-atomic-stress.json", "linux-x86-fuzz.json", "linux-x86-runner.json", "linux-native-targets-brutal.json", "artifact-hashes.json"},
+		},
+		{
+			raw:                "x32",
+			runtimeStatus:      "partial_build_only",
+			stdlibStatus:       "partial_build_only",
+			ffiStatus:          "ilp32_scalar_object_smokes_partial",
+			runnerProbeCommand: "tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
+			releaseGate:        "scripts/release/post_v0_4/linux-native-targets-smoke.sh",
+			evidenceArtifacts:  []string{"targets.json", "linux-x32-abi.json", "linux-x32-atomic-stress.json", "linux-x32-fuzz.json", "linux-x32-runner.json", "linux-native-targets-brutal.json", "artifact-hashes.json"},
+		},
+	}
+	for _, tt := range tests {
+		tgt := mustParse(t, tt.raw)
+		if tgt.RuntimeStatus != tt.runtimeStatus {
+			t.Fatalf("%s runtime_status = %q, want %q", tt.raw, tgt.RuntimeStatus, tt.runtimeStatus)
+		}
+		if tgt.StdlibStatus != tt.stdlibStatus {
+			t.Fatalf("%s stdlib_status = %q, want %q", tt.raw, tgt.StdlibStatus, tt.stdlibStatus)
+		}
+		if tgt.FFIStatus != tt.ffiStatus {
+			t.Fatalf("%s ffi_status = %q, want %q", tt.raw, tgt.FFIStatus, tt.ffiStatus)
+		}
+		if tgt.RunnerProbeCommand != tt.runnerProbeCommand {
+			t.Fatalf("%s runner_probe_command = %q, want %q", tt.raw, tgt.RunnerProbeCommand, tt.runnerProbeCommand)
+		}
+		if tgt.ReleaseGate != tt.releaseGate {
+			t.Fatalf("%s release_gate = %q, want %q", tt.raw, tgt.ReleaseGate, tt.releaseGate)
+		}
+		if !reflect.DeepEqual(tgt.EvidenceArtifacts, tt.evidenceArtifacts) {
+			t.Fatalf("%s evidence_artifacts = %#v, want %#v", tt.raw, tgt.EvidenceArtifacts, tt.evidenceArtifacts)
+		}
+	}
+}
+
+func TestTargetsExposeMemoryCapabilityMatrixMetadata(t *testing.T) {
+	tests := []struct {
+		raw                string
+		build              string
+		lower              string
+		run                string
+		rawDiagnostics     string
+		regionLowering     string
+		alignmentSemantics string
+		claimLevel         string
+	}{
+		{"linux-x64", "yes", "yes", "yes", "yes", "yes/partial", "yes", "production/host_runtime"},
+		{"linux-x86", "yes", "yes", "no/host-dependent", "partial", "partial", "partial", "build_lower_only"},
+		{"linux-x32", "yes", "yes", "no/host-dependent", "partial", "partial", "special", "build_lower_only"},
+		{"macos-x64", "yes", "yes", "host-required", "host-required", "host-required", "host-required", "build_lower_only unless run"},
+		{"windows-x64", "yes", "yes", "host-required", "host-required", "host-required", "host-required", "build_lower_only unless run"},
+		{"wasm32-wasi", "yes", "yes", "runner-smoke if available", "safe-only", "limited", "wasm rules", "artifact/runtime tiered"},
+		{"wasm32-web", "yes", "yes", "browser-smoke if available", "safe-only", "limited", "wasm rules", "artifact/runtime tiered"},
+	}
+	for _, tt := range tests {
+		tgt := mustParse(t, tt.raw)
+		if tgt.MemoryBuild != tt.build || tgt.MemoryLower != tt.lower || tgt.MemoryRun != tt.run ||
+			tgt.MemoryRawDiagnostics != tt.rawDiagnostics || tgt.MemoryRegionLowering != tt.regionLowering ||
+			tgt.MemoryAlignmentSemantics != tt.alignmentSemantics || tgt.MemoryClaimLevel != tt.claimLevel {
+			t.Fatalf("%s memory capability metadata = build:%q lower:%q run:%q raw:%q region:%q alignment:%q claim:%q",
+				tt.raw, tgt.MemoryBuild, tgt.MemoryLower, tgt.MemoryRun, tgt.MemoryRawDiagnostics,
+				tgt.MemoryRegionLowering, tgt.MemoryAlignmentSemantics, tgt.MemoryClaimLevel)
+		}
+	}
+}
+
+func TestLinuxNativeTargetsExposeSyscallPackMetadata(t *testing.T) {
+	tests := []struct {
+		raw         string
+		instruction string
+		numbering   string
+		registers   []string
+		errorRange  string
+	}{
+		{
+			raw:         "x64",
+			instruction: "syscall",
+			numbering:   "x86_64",
+			registers:   []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"},
+			errorRange:  "-4095..-1",
+		},
+		{
+			raw:         "x86",
+			instruction: "int 0x80",
+			numbering:   "i386",
+			registers:   []string{"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp"},
+			errorRange:  "-4095..-1",
+		},
+		{
+			raw:         "x32",
+			instruction: "syscall",
+			numbering:   "x32_syscall_bit",
+			registers:   []string{"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"},
+			errorRange:  "-4095..-1",
+		},
+	}
+	for _, tt := range tests {
+		tgt := mustParse(t, tt.raw)
+		if tgt.SyscallInstruction != tt.instruction {
+			t.Fatalf("%s syscall_instruction = %q, want %q", tt.raw, tgt.SyscallInstruction, tt.instruction)
+		}
+		if tgt.SyscallNumbering != tt.numbering {
+			t.Fatalf("%s syscall_numbering = %q, want %q", tt.raw, tgt.SyscallNumbering, tt.numbering)
+		}
+		if !reflect.DeepEqual(tgt.SyscallArgRegisters, tt.registers) {
+			t.Fatalf("%s syscall_arg_registers = %#v, want %#v", tt.raw, tgt.SyscallArgRegisters, tt.registers)
+		}
+		if tgt.SyscallErrorRange != tt.errorRange {
+			t.Fatalf("%s syscall_error_range = %q, want %q", tt.raw, tgt.SyscallErrorRange, tt.errorRange)
 		}
 	}
 }

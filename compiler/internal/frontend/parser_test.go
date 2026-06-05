@@ -510,6 +510,61 @@ func TestParseOwnershipMarkerSyntaxDiagnostics(t *testing.T) {
 	}
 }
 
+func TestParseBorrowReturnSyntaxMatrix(t *testing.T) {
+	src := `
+protocol Views:
+    func middle(xs: borrow []u8) -> borrow []u8
+
+func view_bytes(xs: borrow []u8) -> borrow []u8:
+    return xs.borrow()
+
+func view_text(s: borrow String) -> borrow String:
+    return s.borrow()
+
+func accepts_callback(cb: fn(borrow []u8) -> borrow []u8, xs: borrow []u8) -> Int:
+    let v: []u8 = cb(xs)
+    return v.len
+`
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := prog.Protocols[0].Requirements[0].ReturnOwnership; got != "borrow" {
+		t.Fatalf("protocol borrow return ownership = %q, want borrow", got)
+	}
+	viewBytes := prog.Funcs[0]
+	if got := viewBytes.ReturnOwnership; got != "borrow" {
+		t.Fatalf("view_bytes return ownership = %q, want borrow", got)
+	}
+	if viewBytes.ReturnType.Kind != TypeRefSlice || viewBytes.ReturnType.Elem == nil || viewBytes.ReturnType.Elem.Name != "u8" {
+		t.Fatalf("view_bytes return type = %#v, want []u8", viewBytes.ReturnType)
+	}
+	viewText := prog.Funcs[1]
+	if got := viewText.ReturnOwnership; got != "borrow" {
+		t.Fatalf("view_text return ownership = %q, want borrow", got)
+	}
+	if viewText.ReturnType.Name != "String" {
+		t.Fatalf("view_text return type = %#v, want String", viewText.ReturnType)
+	}
+	cb := prog.Funcs[2].Params[0].Type
+	if cb.Kind != TypeRefFunction || cb.Return == nil {
+		t.Fatalf("callback type = %#v, want function return", cb)
+	}
+	if got := cb.ReturnOwnership; got != "borrow" {
+		t.Fatalf("callback return ownership = %q, want borrow", got)
+	}
+}
+
+func TestParseBorrowReturnRejectsMissingType(t *testing.T) {
+	_, err := Parse([]byte("func bad(xs: []u8) -> borrow:\n    return xs\n"))
+	if err == nil {
+		t.Fatalf("expected diagnostic")
+	}
+	if !strings.Contains(err.Error(), "expected return type after `borrow`") {
+		t.Fatalf("error = %v, want missing borrow return type diagnostic", err)
+	}
+}
+
 func TestParseFunctionTypeRef(t *testing.T) {
 	src := `
 func apply(cb: fn(Int, Bool) -> UInt8, value: Int, flag: Bool) -> UInt8:
@@ -1616,6 +1671,35 @@ func TestParseAllStatements(t *testing.T) {
 				t.Errorf("Parse: %v", err)
 			}
 		})
+	}
+}
+
+func TestParseFieldIndexAssignmentTargetShape(t *testing.T) {
+	prog, err := Parse([]byte(`
+func main() -> Int:
+    xs.ptr[0] = 1
+    return 0
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Funcs) != 1 || len(prog.Funcs[0].Body) < 1 {
+		t.Fatalf("missing parsed function body: %#v", prog)
+	}
+	assign, ok := prog.Funcs[0].Body[0].(*AssignStmt)
+	if !ok {
+		t.Fatalf("first stmt = %T, want *AssignStmt", prog.Funcs[0].Body[0])
+	}
+	index, ok := assign.Target.(*IndexExpr)
+	if !ok {
+		t.Fatalf("assign target = %T, want *IndexExpr", assign.Target)
+	}
+	field, ok := index.Base.(*FieldAccessExpr)
+	if !ok {
+		t.Fatalf("index base = %T, want *FieldAccessExpr", index.Base)
+	}
+	if field.Field != "ptr" {
+		t.Fatalf("field = %q, want ptr", field.Field)
 	}
 }
 
@@ -2727,6 +2811,24 @@ func TestParseStructDecl(t *testing.T) {
 	}
 	if st.Fields[0].Name != "x" || st.Fields[1].Name != "y" {
 		t.Errorf("field names = %q/%q, want x/y", st.Fields[0].Name, st.Fields[1].Name)
+	}
+	if st.Repr != StructReprDefault {
+		t.Fatalf("default struct repr = %q, want %q", st.Repr, StructReprDefault)
+	}
+}
+
+func TestParseReprCStructDecl(t *testing.T) {
+	src := "repr(C) struct Header { tag: c_int, ptr: ptr }\nfn main() -> i32 { return 0 }"
+	prog, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(prog.Structs) != 1 {
+		t.Fatalf("expected 1 struct, got %d", len(prog.Structs))
+	}
+	st := prog.Structs[0]
+	if st.Name != "Header" || st.Repr != StructReprC {
+		t.Fatalf("struct = %#v, want Header repr(C)", st)
 	}
 }
 

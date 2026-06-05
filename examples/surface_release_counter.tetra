@@ -1,0 +1,115 @@
+// Pure Tetra Surface v1 release counter over lib.core.widgets.
+module examples.surface_release_counter
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.component as component
+import lib.core.widgets as widgets
+import lib.core.style as style
+import lib.core.accessibility as accessibility
+
+struct SurfaceReleaseCounterApp:
+    count: Int
+    key_count: Int
+    reset_count: Int
+    width: Int
+    height: Int
+    tree: component.ComponentTree
+
+func release_counter_button_rect(width: Int, height: Int) -> surface.Rect:
+    return surface.Rect(x: 32, y: height / 2 - 24, w: 160, h: 48)
+
+func release_counter_status_rect(width: Int, height: Int) -> surface.Rect:
+    return surface.Rect(x: 32, y: height / 2 + 40, w: width - 64, h: 32)
+
+func draw_release_counter_scene(app: borrow SurfaceReleaseCounterApp, button: borrow widgets.Button, status: borrow widgets.StatusText, ctx: inout draw.DrawContext) -> Int
+uses mem:
+    let theme: style.Theme = style.default_theme()
+    let button_colors: style.WidgetColors = style.style_for_state(theme.button, style.state_focused())
+    let bg: surface.Color = surface.Color(r: 18, g: 24, b: 28, a: 255)
+    let fg: surface.Color = surface.Color(r: 236, g: 242, b: 240, a: 255)
+    let accent: surface.Color = surface.Color(r: 60, g: 142, b: 212, a: 255)
+    let reset_accent: surface.Color = surface.Color(r: 210, g: 96, b: 78, a: 255)
+    let status_accent: surface.Color = surface.Color(r: 88, g: 174, b: 128, a: 255)
+    let clear_status: Int = draw.clear(ctx, bg)
+    let title_status: Int = draw.text(ctx, "Surface Release Counter", 32, 28, fg)
+    let count_label: Int = draw.text(ctx, "Count", 32, 56, fg)
+    let count_bar: Int = draw.rect(ctx, surface.Rect(x: 96, y: 58, w: 24 + app.count * 8, h: 8), status_accent)
+    let key_label: Int = draw.text(ctx, "Key", 32, 76, fg)
+    var key_bar: Int = 0
+    if app.key_count > 0:
+        key_bar = draw.rect(ctx, surface.Rect(x: 96, y: 78, w: 24 + app.key_count * 8, h: 8), accent)
+    var reset_bar: Int = 0
+    if app.reset_count > 0:
+        reset_bar = draw.rect(ctx, surface.Rect(x: 136, y: 78, w: 24 + app.reset_count * 8, h: 8), reset_accent)
+    let button_fill: Int = draw.rect(ctx, button.rect, accent)
+    let button_outline: Int = draw.rect_outline(ctx, button.rect, fg)
+    let status_fill: Int = draw.rect(ctx, status.rect, surface.Color(r: 28, g: 36, b: 42, a: 255))
+    let status_mark: Int = draw.rect(ctx, surface.Rect(x: status.rect.x + 12, y: status.rect.y + 12, w: 24 + status.status_code * 12, h: 8), status_accent)
+    let border: Int = draw.rect_outline(ctx, surface.Rect(x: 0, y: 0, w: app.width, h: app.height), fg)
+    return clear_status + title_status + count_label + count_bar + key_label + key_bar + reset_bar + button_fill + button_outline + status_fill + status_mark + border + button_colors.bg - button_colors.bg
+
+func main() -> Int
+uses alloc, mem, surface:
+    var app: SurfaceReleaseCounterApp = SurfaceReleaseCounterApp(count: 0, key_count: 0, reset_count: 0, width: 320, height: 200, tree: component.tree_init_api(8))
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: app.width, h: app.height)
+    let root_id: Int = component.tree_add_root(app.tree, component.kind_root(), root_rect)
+    let button_rect: surface.Rect = release_counter_button_rect(app.width, app.height)
+    let status_rect: surface.Rect = release_counter_status_rect(app.width, app.height)
+    let button_id: Int = widgets.add_accessible_button(app.tree, root_id, button_rect, widgets.action_submit())
+    let status_id: Int = widgets.add_accessible_status(app.tree, root_id, status_rect)
+    let button_meta: accessibility.NodeMetadata = accessibility.button_metadata(accessibility.value_name(), 1, 2, accessibility.action_press())
+    let status_meta: accessibility.NodeMetadata = accessibility.status_metadata(accessibility.value_saved(), 3)
+    var button: widgets.Button = widgets.Button(rect: button_rect, focused: true, press_count: 0, action: widgets.action_submit())
+    var status: widgets.StatusText = widgets.StatusText(rect: status_rect, role: widgets.role_status(), text_len: 5, status_code: 0)
+    let button_init_status: Int = widgets.button_init(button, button_rect, widgets.action_submit())
+    let button_focus_status: Int = widgets.button_set_focus(button, true)
+    let status_init_status: Int = widgets.status_text_init(status, status_rect, 5, 0)
+    var win: surface.Surface = surface.open("Surface Release Counter", app.width, app.height)
+    var before_frame: surface.Frame = surface.begin_frame(win)
+    var before_ctx: draw.DrawContext = draw.DrawContext(frame: before_frame)
+    let before_draw: Int = draw_release_counter_scene(app, button, status, before_ctx)
+    let first_presented: Int = surface.present(before_ctx.frame)
+    let click_event: surface.Event = surface.poll_event(win)
+    if click_event.kind == surface.event_mouse_up():
+        app.count = app.count + 1
+        button.press_count = button.press_count + 1
+        status.status_code = 1
+    let key_event: surface.Event = surface.poll_event(win)
+    if key_event.kind == surface.event_key_down():
+        app.key_count = app.key_count + 1
+        if key_event.key == 82:
+            app.count = 0
+            app.reset_count = app.reset_count + 1
+            status.status_code = 2
+        else:
+            app.count = app.count + 1
+            status.status_code = 1
+    let resize_event: surface.Event = surface.poll_event(win)
+    if resize_event.kind == surface.event_resize():
+        app.width = resize_event.width
+        app.height = resize_event.height
+        win.width = app.width
+        win.height = app.height
+        let resized_button: surface.Rect = release_counter_button_rect(app.width, app.height)
+        let resized_status: surface.Rect = release_counter_status_rect(app.width, app.height)
+        let button_rect_status: Int = widgets.button_set_rect(button, resized_button)
+        let status_rect_status: Int = widgets.status_text_set_rect(status, resized_status)
+        button.press_count = button.press_count + button_rect_status - button_rect_status + status_rect_status - status_rect_status
+    let reset_event: surface.Event = surface.Event(kind: surface.event_key_down(), x: 0, y: 0, button: 0, key: 82, width: app.width, height: app.height, timestamp_ms: surface.now_ms(), text_len: 0)
+    if reset_event.key == 82:
+        app.count = 0
+        app.reset_count = app.reset_count + 1
+        status.status_code = 2
+    var after_frame: surface.Frame = surface.begin_frame(win)
+    var after_ctx: draw.DrawContext = draw.DrawContext(frame: after_frame)
+    let after_draw: Int = draw_release_counter_scene(app, button, status, after_ctx)
+    let second_presented: Int = surface.present(after_ctx.frame)
+    let closed: Int = surface.close(win)
+    let meta_ok: Bool = button_meta.role == accessibility.role_button() && button_meta.actions > 0 && status_meta.role == accessibility.role_status()
+    let tree_ok: Bool = root_id >= 0 && button_id > root_id && status_id > root_id && app.tree.len >= 3
+    let interaction_ok: Bool = button.press_count >= 1 && app.key_count >= 1 && app.reset_count >= 1 && app.count == 0
+    let resize_ok: Bool = app.width >= 320 && app.height >= 200 && button.rect.w == 160
+    if meta_ok && tree_ok && interaction_ok && resize_ok && first_presented == 0 && second_presented == 0 && closed == 0:
+        return 1 + before_draw - before_draw + after_draw - after_draw + button_init_status - button_init_status + button_focus_status - button_focus_status + status_init_status - status_init_status
+    return 31

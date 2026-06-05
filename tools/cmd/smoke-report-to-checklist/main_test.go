@@ -23,6 +23,7 @@ func nativeSmokeReportForTest(omit string) *smokeReport {
 		{"core_async_smoke", "examples/core_async_smoke.tetra", 42},
 		{"core_capability_smoke", "examples/core_capability_smoke.tetra", 42},
 		{"core_collections_smoke", "examples/core_collections_smoke.tetra", 42},
+		{"core_component_smoke", "examples/core_component_smoke.tetra", 42},
 		{"core_crypto_smoke", "examples/core_crypto_smoke.tetra", 42},
 		{"core_filesystem_smoke", "examples/core_filesystem_smoke.tetra", 42},
 		{"core_io_smoke", "examples/core_io_smoke.tetra", 42},

@@ -28,6 +28,26 @@ func TestValidateTestReportAcceptsValidReport(t *testing.T) {
 	}
 }
 
+func TestValidateTestReportAcceptsOptionalTargetIdentity(t *testing.T) {
+	report := `{
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "target": "linux-x32",
+  "duration_ms": 1,
+  "files": [
+    {"filename": "a.tetra", "total": 1, "passed": 1, "failed": 0, "duration_ms": 1}
+  ],
+  "results": [
+    {"name": "runner", "filename": "a.tetra", "index": 0, "function_name": "__tetra_test_0_runner", "exit_code": 0, "passed": true, "duration_ms": 1}
+  ]
+}`
+	out, err := runValidator(t, report)
+	if err != nil {
+		t.Fatalf("validator failed: %v\n%s", err, out)
+	}
+}
+
 func TestValidateTestReportRejectsNullArrays(t *testing.T) {
 	report := `{"total":0,"passed":0,"failed":0,"duration_ms":0,"files":null,"results":null}`
 	out, err := runValidator(t, report)

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"tetra_language/compiler"
@@ -49,7 +50,7 @@ func main() -> Int:
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	assertCLIJSONLifetimeDiagnostic(t, srcPath, "borrowed local 'x' cannot escape via return")
+	assertCLIJSONLifetimeDiagnostic(t, srcPath, "borrowed String return requires '-> borrow String' or '.copy()'")
 }
 
 func TestCheckCommandJSONDiagnosticsForLifetimeBorrowOptionalAssignmentEscapeCode(t *testing.T) {
@@ -81,7 +82,7 @@ func main() -> Int:
 	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	assertCLIJSONLifetimeDiagnostic(t, srcPath, "borrowed local 'x' cannot escape via return")
+	assertCLIJSONLifetimeDiagnostic(t, srcPath, "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot escape through owned return")
 }
 
 func TestCheckCommandJSONDiagnosticsForLifetimeBorrowSliceOptionalAssignmentCallEscapeCodes(t *testing.T) {
@@ -166,7 +167,7 @@ pub func leak(x: borrow []u8) -> []u8?:
     return maybe
 `,
 			wantCode: compiler.DiagnosticCodeSafetyLifetime,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot escape through owned return",
 		},
 		{
 			name: "owned",
@@ -251,7 +252,7 @@ func leak(x: borrow []u8) -> BufBox:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -310,7 +311,7 @@ pub struct BufBox:
 pub func leak(x: borrow []u8) -> BufBox:
     return BufBox(buf: x)
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -381,7 +382,7 @@ func leak(x: borrow []u8) -> OuterBox:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -449,7 +450,7 @@ pub struct OuterBox:
 pub func leak(x: borrow []u8) -> OuterBox:
     return OuterBox(box: BufBox(buf: x))
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -527,7 +528,7 @@ func leak(x: borrow []u8) -> OuterMsg:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -598,7 +599,7 @@ pub enum OuterMsg:
 pub func leak(x: borrow []u8) -> OuterMsg:
     return OuterMsg.wrap(BufBox(buf: x))
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -660,8 +661,9 @@ func main() -> Int:
 
 func TestCheckCommandJSONDiagnosticsForLifetimeBorrowSliceEnumEscapeCodes(t *testing.T) {
 	tests := []struct {
-		name string
-		src  string
+		name     string
+		src      string
+		wantText string
 	}{
 		{
 			name: "direct-return",
@@ -673,6 +675,7 @@ func leak(x: borrow []u8) -> BufMsg:
 func main() -> Int:
     return 0
 `,
+			wantText: "aggregate 'BufMsg' contains borrowed slice field 'BufMsg.send[1]' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -686,6 +689,7 @@ func leak(x: borrow []u8) -> BufMsg:
 func main() -> Int:
     return 0
 `,
+			wantText: "borrowed local 'x' cannot escape via return",
 		},
 	}
 	for _, tt := range tests {
@@ -695,15 +699,16 @@ func main() -> Int:
 			if err := os.WriteFile(srcPath, []byte(tt.src), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			assertCLIJSONLifetimeDiagnostic(t, srcPath, "borrowed local 'x' cannot escape via return")
+			assertCLIJSONLifetimeDiagnostic(t, srcPath, tt.wantText)
 		})
 	}
 }
 
 func TestCheckCommandJSONDiagnosticsForCrossModuleLifetimeBorrowSliceEnumEscapeCodes(t *testing.T) {
 	tests := []struct {
-		name   string
-		libSrc string
+		name     string
+		libSrc   string
+		wantText string
 	}{
 		{
 			name: "direct-return",
@@ -715,6 +720,7 @@ pub enum BufMsg:
 pub func leak(x: borrow []u8) -> BufMsg:
     return BufMsg.send(x)
 `,
+			wantText: "aggregate 'BufMsg' contains borrowed slice field 'BufMsg.send[1]' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -727,6 +733,7 @@ pub func leak(x: borrow []u8) -> BufMsg:
     let msg: BufMsg = BufMsg.send(x)
     return msg
 `,
+			wantText: "borrowed local 'x' cannot escape via return",
 		},
 	}
 	for _, tt := range tests {
@@ -747,7 +754,80 @@ import lib.leaks as leaks
 func main() -> Int:
     return 0
 `)
-			assertCLIJSONLifetimeDiagnosticForPath(t, srcPath, libPath, "borrowed local 'x' cannot escape via return")
+			assertCLIJSONLifetimeDiagnosticForPath(t, srcPath, libPath, tt.wantText)
 		})
 	}
+}
+
+func TestCheckCommandJSONDiagnosticsForSafeViewBorrowedOwnedReturnCode(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "bad_safe_view_owned_return.tetra")
+	src := `func bad(xs: borrow []u8) -> []u8:
+    return xs.borrow()
+
+func main() -> Int:
+    return 0
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	assertCLIJSONLifetimeDiagnostic(t, srcPath, "borrowed slice return requires '-> borrow []u8' or '.copy()'")
+}
+
+func TestCheckCommandJSONDiagnosticsForSafeViewActorBoundaryCode(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "bad_safe_view_actor_boundary.tetra")
+	src := `enum Msg:
+    case bytes([]u8)
+
+func main() -> Int
+uses actors, alloc, mem:
+    var xs: []u8 = make_u8(1)
+    return core.send_typed(core.self(), Msg.bytes(xs.borrow()))
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	assertCLIJSONDiagnosticForPath(t, srcPath, srcPath, compiler.DiagnosticCodeSafetyOwnership, "cannot cross actor boundary without copy")
+}
+
+func TestCheckCommandJSONDiagnosticsForSafeViewTaskBoundaryCode(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "bad_safe_view_task_boundary.tetra")
+	src := `enum TaskErr:
+    case bytes([]u8)
+
+func worker() -> Int throws TaskErr:
+    return 0
+
+func main() -> Int
+uses runtime:
+    let task = core.task_spawn_i32_typed<TaskErr>("worker")
+    return try core.task_join_i32_typed<TaskErr>(task)
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	diag := runCLIJSONDiagnostic(t, []string{"check", "--diagnostics=json", srcPath}, 1)
+	if diag.Severity != "error" || !strings.Contains(diag.Message, "typed task error payload must be sendable across task boundary") {
+		t.Fatalf("diagnostic = %#v", diag)
+	}
+}
+
+func TestCheckCommandJSONDiagnosticsForSafeViewAggregateHiddenBorrowCode(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "bad_safe_view_aggregate_return.tetra")
+	src := `struct Box:
+    bytes: []u8
+
+func bad(xs: borrow []u8) -> Box:
+    return Box(bytes: xs.window(0, 1).borrow())
+
+func main() -> Int:
+    return 0
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	assertCLIJSONLifetimeDiagnostic(t, srcPath, "aggregate 'Box' contains borrowed slice field 'bytes' that cannot escape through owned return")
 }

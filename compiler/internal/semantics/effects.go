@@ -20,6 +20,7 @@ var canonicalEffects = map[string]struct{}{
 	"mmio":       {},
 	"privacy":    {},
 	"runtime":    {},
+	"surface":    {},
 }
 
 var effectAliases = map[string]string{
@@ -33,7 +34,7 @@ var permissionMarkerEffects = map[string]struct{}{
 }
 
 var effectGroups = map[string][]string{
-	"effects.all":     {"actors", "alloc", "budget", "capability", "control", "io", "islands", "link", "mem", "mmio", "privacy", "runtime"},
+	"effects.all":     {"actors", "alloc", "budget", "capability", "control", "io", "islands", "link", "mem", "mmio", "privacy", "runtime", "surface"},
 	"effects.cap.io":  {"capability", "io", "mmio"},
 	"effects.cap.mem": {"capability", "mem"},
 	"effects.memory":  {"alloc", "islands", "mem"},

@@ -74,6 +74,11 @@ fi
 report_path="$(normalize_relative_dash_path "$report_path")"
 prepare_output_file_path
 
+if ! command -v node >/dev/null 2>&1; then
+  echo "release/v1_0/wasi-smoke: runtime prerequisite unavailable: node" >&2
+  exit 1
+fi
+
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 

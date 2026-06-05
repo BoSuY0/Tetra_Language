@@ -20,30 +20,47 @@ type Manifest struct {
 type FormatManifest = formats.Info
 
 type TargetManifest struct {
-	Triple                  string `json:"triple"`
-	Status                  string `json:"status"`
-	OS                      string `json:"os"`
-	Arch                    string `json:"arch"`
-	ABI                     string `json:"abi"`
-	DataModel               string `json:"data_model"`
-	Format                  string `json:"format"`
-	ExeExt                  string `json:"exe_ext"`
-	CollectImports          bool   `json:"collect_imports"`
-	RunMode                 string `json:"run_mode"`
-	UIRuntimeContract       string `json:"ui_runtime_contract,omitempty"`
-	UIRuntimeStatus         string `json:"ui_runtime_status"`
-	UIRuntimeEvidence       string `json:"ui_runtime_evidence,omitempty"`
-	PointerWidthBits        int    `json:"pointer_width_bits"`
-	RegisterWidthBits       int    `json:"register_width_bits"`
-	NativeIntWidthBits      int    `json:"native_int_width_bits"`
-	Endian                  string `json:"endian"`
-	StackAlignmentBytes     int    `json:"stack_alignment_bytes"`
-	MaxAtomicWidthBits      int    `json:"max_atomic_width_bits"`
-	AtomicWidthBits         []int  `json:"atomic_width_bits"`
-	AtomicPointerWidthBits  int    `json:"atomic_pointer_width_bits"`
-	UnsupportedReason       string `json:"unsupported_reason,omitempty"`
-	SupportsDebugInfo       bool   `json:"supports_debug_info"`
-	SupportsReleaseOptimize bool   `json:"supports_release_optimize"`
+	Triple                   string   `json:"triple"`
+	Status                   string   `json:"status"`
+	OS                       string   `json:"os"`
+	Arch                     string   `json:"arch"`
+	ABI                      string   `json:"abi"`
+	DataModel                string   `json:"data_model"`
+	Format                   string   `json:"format"`
+	ExeExt                   string   `json:"exe_ext"`
+	CollectImports           bool     `json:"collect_imports"`
+	RunMode                  string   `json:"run_mode"`
+	UIRuntimeContract        string   `json:"ui_runtime_contract,omitempty"`
+	UIRuntimeStatus          string   `json:"ui_runtime_status"`
+	UIRuntimeEvidence        string   `json:"ui_runtime_evidence,omitempty"`
+	PointerWidthBits         int      `json:"pointer_width_bits"`
+	RegisterWidthBits        int      `json:"register_width_bits"`
+	NativeIntWidthBits       int      `json:"native_int_width_bits"`
+	Endian                   string   `json:"endian"`
+	StackAlignmentBytes      int      `json:"stack_alignment_bytes"`
+	MaxAtomicWidthBits       int      `json:"max_atomic_width_bits"`
+	AtomicWidthBits          []int    `json:"atomic_width_bits"`
+	AtomicPointerWidthBits   int      `json:"atomic_pointer_width_bits"`
+	UnsupportedReason        string   `json:"unsupported_reason,omitempty"`
+	RuntimeStatus            string   `json:"runtime_status,omitempty"`
+	StdlibStatus             string   `json:"stdlib_status,omitempty"`
+	FFIStatus                string   `json:"ffi_status,omitempty"`
+	MemoryBuild              string   `json:"memory_build"`
+	MemoryLower              string   `json:"memory_lower"`
+	MemoryRun                string   `json:"memory_run"`
+	MemoryRawDiagnostics     string   `json:"memory_raw_diagnostics"`
+	MemoryRegionLowering     string   `json:"memory_region_lowering"`
+	MemoryAlignmentSemantics string   `json:"memory_alignment_semantics"`
+	MemoryClaimLevel         string   `json:"memory_claim_level"`
+	RunnerProbeCommand       string   `json:"runner_probe_command,omitempty"`
+	ReleaseGate              string   `json:"release_gate,omitempty"`
+	EvidenceArtifacts        []string `json:"evidence_artifacts,omitempty"`
+	SyscallInstruction       string   `json:"syscall_instruction,omitempty"`
+	SyscallNumbering         string   `json:"syscall_numbering,omitempty"`
+	SyscallArgRegisters      []string `json:"syscall_arg_registers,omitempty"`
+	SyscallErrorRange        string   `json:"syscall_error_range,omitempty"`
+	SupportsDebugInfo        bool     `json:"supports_debug_info"`
+	SupportsReleaseOptimize  bool     `json:"supports_release_optimize"`
 }
 
 type BuiltinManifest struct {
@@ -67,6 +84,7 @@ type RuntimeManifest struct {
 	TimeRequiredSymbols       []string `json:"time_required_symbols,omitempty"`
 	FilesystemRequiredSymbols []string `json:"filesystem_required_symbols,omitempty"`
 	NetRequiredSymbols        []string `json:"net_required_symbols,omitempty"`
+	SurfaceRequiredSymbols    []string `json:"surface_required_symbols,omitempty"`
 	ActorsProgramGlueSymbols  []string `json:"actors_program_glue_symbols"`
 }
 
@@ -92,30 +110,47 @@ func GetManifest() (Manifest, error) {
 	targetOut := make([]TargetManifest, 0, len(targets))
 	for _, t := range targets {
 		targetOut = append(targetOut, TargetManifest{
-			Triple:                  t.Triple,
-			Status:                  fmt.Sprint(t.Status),
-			OS:                      fmt.Sprint(t.OS),
-			Arch:                    fmt.Sprint(t.Arch),
-			ABI:                     fmt.Sprint(t.ABI),
-			DataModel:               fmt.Sprint(t.DataModel),
-			Format:                  fmt.Sprint(t.Format),
-			ExeExt:                  t.ExeExt,
-			CollectImports:          t.CollectImports,
-			RunMode:                 fmt.Sprint(t.RunMode),
-			UIRuntimeContract:       ctarget.UIRuntimeContract(t.Triple),
-			UIRuntimeStatus:         ctarget.UIRuntimeStatus(t.Triple),
-			UIRuntimeEvidence:       ctarget.UIRuntimeEvidence(t.Triple),
-			PointerWidthBits:        t.PointerWidthBits,
-			RegisterWidthBits:       t.RegisterWidthBits,
-			NativeIntWidthBits:      t.NativeIntWidthBits,
-			Endian:                  fmt.Sprint(t.Endian),
-			StackAlignmentBytes:     t.StackAlignmentBytes,
-			MaxAtomicWidthBits:      t.MaxAtomicWidthBits,
-			AtomicWidthBits:         t.AtomicWidthBits(),
-			AtomicPointerWidthBits:  manifestAtomicPointerWidthBits(t),
-			UnsupportedReason:       t.UnsupportedReason,
-			SupportsDebugInfo:       t.SupportsDebugInfo,
-			SupportsReleaseOptimize: t.SupportsReleaseOptimize,
+			Triple:                   t.Triple,
+			Status:                   fmt.Sprint(t.Status),
+			OS:                       fmt.Sprint(t.OS),
+			Arch:                     fmt.Sprint(t.Arch),
+			ABI:                      fmt.Sprint(t.ABI),
+			DataModel:                fmt.Sprint(t.DataModel),
+			Format:                   fmt.Sprint(t.Format),
+			ExeExt:                   t.ExeExt,
+			CollectImports:           t.CollectImports,
+			RunMode:                  fmt.Sprint(t.RunMode),
+			UIRuntimeContract:        ctarget.UIRuntimeContract(t.Triple),
+			UIRuntimeStatus:          ctarget.UIRuntimeStatus(t.Triple),
+			UIRuntimeEvidence:        ctarget.UIRuntimeEvidence(t.Triple),
+			PointerWidthBits:         t.PointerWidthBits,
+			RegisterWidthBits:        t.RegisterWidthBits,
+			NativeIntWidthBits:       t.NativeIntWidthBits,
+			Endian:                   fmt.Sprint(t.Endian),
+			StackAlignmentBytes:      t.StackAlignmentBytes,
+			MaxAtomicWidthBits:       t.MaxAtomicWidthBits,
+			AtomicWidthBits:          t.AtomicWidthBits(),
+			AtomicPointerWidthBits:   manifestAtomicPointerWidthBits(t),
+			UnsupportedReason:        t.UnsupportedReason,
+			RuntimeStatus:            t.RuntimeStatus,
+			StdlibStatus:             t.StdlibStatus,
+			FFIStatus:                t.FFIStatus,
+			MemoryBuild:              t.MemoryBuild,
+			MemoryLower:              t.MemoryLower,
+			MemoryRun:                t.MemoryRun,
+			MemoryRawDiagnostics:     t.MemoryRawDiagnostics,
+			MemoryRegionLowering:     t.MemoryRegionLowering,
+			MemoryAlignmentSemantics: t.MemoryAlignmentSemantics,
+			MemoryClaimLevel:         t.MemoryClaimLevel,
+			RunnerProbeCommand:       t.RunnerProbeCommand,
+			ReleaseGate:              t.ReleaseGate,
+			EvidenceArtifacts:        append([]string(nil), t.EvidenceArtifacts...),
+			SyscallInstruction:       t.SyscallInstruction,
+			SyscallNumbering:         t.SyscallNumbering,
+			SyscallArgRegisters:      append([]string(nil), t.SyscallArgRegisters...),
+			SyscallErrorRange:        t.SyscallErrorRange,
+			SupportsDebugInfo:        t.SupportsDebugInfo,
+			SupportsReleaseOptimize:  t.SupportsReleaseOptimize,
 		})
 	}
 
@@ -135,6 +170,7 @@ func GetManifest() (Manifest, error) {
 			TimeRequiredSymbols:       requiredTimeRuntimeSymbols(),
 			FilesystemRequiredSymbols: requiredFilesystemRuntimeSymbols(),
 			NetRequiredSymbols:        requiredNetRuntimeSymbols(),
+			SurfaceRequiredSymbols:    requiredSurfaceRuntimeSymbols(),
 			ActorsProgramGlueSymbols: []string{
 				"__tetra_actor_dispatch",
 				"__tetra_actor_main_entry_id",

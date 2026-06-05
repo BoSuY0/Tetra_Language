@@ -102,6 +102,9 @@ func configureClosureCaptures(
 		if info.Mutable && !allowMutableValueCaptures {
 			return lifetimeDiagnosticf(pos, "closure capture '%s' is mutable; %s", name, mutableClosureCaptureUnsupportedText())
 		}
+		if info.SurfaceFramePixelsSource != "" && len(captureBoundaryPhrase) > 0 && captureBoundaryPhrase[0] != "" {
+			return lifetimeDiagnosticf(pos, "surface frame pixels cannot escape via function capture; keep Frame.pixels local to the active Surface frame")
+		}
 		typeRef := frontend.TypeRef{At: pos, Kind: frontend.TypeRefNamed, Name: info.TypeName}
 		if !isClosureCaptureType(info.TypeName, types) {
 			unsupported = append(unsupported, unsupportedCapture{pos: pos, name: name, typeName: info.TypeName})

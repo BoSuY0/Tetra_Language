@@ -134,7 +134,9 @@ json_bool() {
 
 write_web_smoke_report() {
   local generated_at
-  if ! generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; then
+  if command -v date >/dev/null 2>&1; then
+    generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" || generated_at="1970-01-01T00:00:00Z"
+  else
     generated_at="1970-01-01T00:00:00Z"
   fi
   {
@@ -208,7 +210,21 @@ discover_browser() {
 }
 
 tmp_dir="$(mktemp -d)"
-trap 'rm -rf "$tmp_dir"' EXIT
+server_pid=""
+
+stop_web_smoke_server() {
+  if [[ -n "${server_pid:-}" ]]; then
+    kill "$server_pid" >/dev/null 2>&1 || true
+    wait "$server_pid" >/dev/null 2>&1 || true
+    server_pid=""
+  fi
+}
+
+cleanup_web_smoke() {
+  stop_web_smoke_server
+  rm -rf "$tmp_dir"
+}
+trap cleanup_web_smoke EXIT
 
 smoke_source_for_case() {
   local list_path="$1"
@@ -229,6 +245,23 @@ JS
 smoke_list="$tmp_dir/wasm32-web-smoke-list.json"
 ./tetra smoke --list --target wasm32-web --format=json >"$smoke_list"
 go run ./tools/cmd/validate-smoke-list --report "$smoke_list"
+
+wait_for_server_port() {
+  local log_path="$1"
+  local observed
+  for _ in {1..50}; do
+    observed="$(sed -n 's/.* port \([0-9][0-9]*\) .*/\1/p' "$log_path" | head -n 1)"
+    if [[ -n "$observed" ]]; then
+      port="$observed"
+      return 0
+    fi
+    if ! kill -0 "$server_pid" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.1
+  done
+  return 1
+}
 
 if [[ -n "$source_override" ]]; then
   source_path="$source_override"
@@ -471,43 +504,36 @@ HTML
     fi
 
     if [[ "$status" != "fail" ]]; then
-      port=""
-      for candidate in 8711 8712 8713 8714 8715; do
-        if command -v lsof >/dev/null 2>&1; then
-          if lsof -iTCP:"$candidate" -sTCP:LISTEN >/dev/null 2>&1; then
-            continue
-          fi
-        fi
-        port="$candidate"
-        break
-      done
-      if [[ -z "$port" ]]; then
-        blocker="unable to allocate local HTTP port"
-        status="blocked"
-      elif ! command -v python3 >/dev/null 2>&1; then
+      port="0"
+      if ! command -v python3 >/dev/null 2>&1; then
         blocker="runtime prerequisite unavailable: python3 -m http.server"
         status="blocked"
       else
         python3 -m http.server "$port" --bind 127.0.0.1 --directory "$tmp_dir" >"$tmp_dir/server.log" 2>&1 &
         server_pid=$!
-        sleep 1
-        dom_out="$tmp_dir/dom.html"
-        chromium_err="$tmp_dir/chromium.err"
-        if "$browser_runner" "${browser_flags[@]}" --virtual-time-budget=12000 --dump-dom "http://127.0.0.1:${port}/index.html" >"$dom_out" 2>"$chromium_err"; then
-          result="$(sed -n 's/.*id="result">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
-          runtime_trace="$(sed -n 's/.*id="runtime-trace">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
-          if [[ "$result" == ok:* ]]; then
-            for marker in main-exit:ok stdout:ok nonzero-exit:ok failure-propagation:ok repeated-instantiation:ok ui-event-dispatch:web-command-dispatch; do
-              if [[ "$runtime_trace" != *"$marker"* ]]; then
-                status="fail"
-                blocker="browser runtime trace missing ${marker}"
-                break
-              fi
-            done
-            if [[ "$scope_active" == "true" ]]; then
-              if [[ "$status" == "fail" ]]; then
-                :
-              elif [[ "$ui_schema" != "tetra.ui.v1" ]]; then
+	        if ! wait_for_server_port "$tmp_dir/server.log"; then
+	          blocker="unable to allocate local HTTP port"
+	          status="blocked"
+	        else
+	          status="running"
+	        fi
+	        dom_out="$tmp_dir/dom.html"
+	        chromium_err="$tmp_dir/chromium.err"
+	        if [[ "$status" != "blocked" ]] && "$browser_runner" "${browser_flags[@]}" --virtual-time-budget=12000 --dump-dom "http://127.0.0.1:${port}/index.html" >"$dom_out" 2>"$chromium_err"; then
+	          result="$(sed -n 's/.*id="result">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
+	          runtime_trace="$(sed -n 's/.*id="runtime-trace">\([^<]*\)<.*/\1/p' "$dom_out" | head -n 1)"
+	          if [[ "$result" == ok:* ]]; then
+	            if [[ "$scope_active" == "true" ]]; then
+	              for marker in main-exit:ok stdout:ok nonzero-exit:ok failure-propagation:ok repeated-instantiation:ok ui-event-dispatch:web-command-dispatch; do
+	                if [[ "$runtime_trace" != *"$marker"* ]]; then
+	                  status="fail"
+	                  blocker="browser runtime trace missing ${marker}"
+	                  break
+	                fi
+	              done
+	              if [[ "$status" == "fail" ]]; then
+	                :
+	              elif [[ "$ui_schema" != "tetra.ui.v1" ]]; then
                 status="fail"
                 blocker="unexpected UI schema '${ui_schema}'"
               elif [[ "$result" != ok:*:ui=* ]]; then
@@ -525,10 +551,12 @@ HTML
             blocker="browser automation did not produce ok:* result"
           fi
         else
-          status="blocked"
-          blocker="headless browser command failed: ${browser_runner}"
+          if [[ "$status" != "blocked" ]]; then
+            status="blocked"
+            blocker="headless browser command failed: ${browser_runner}"
+          fi
         fi
-        kill "$server_pid" >/dev/null 2>&1 || true
+        stop_web_smoke_server
       fi
     fi
   else

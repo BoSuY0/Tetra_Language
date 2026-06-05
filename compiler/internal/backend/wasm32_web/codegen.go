@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"tetra_language/compiler/internal/ir"
+	"tetra_language/compiler/internal/runtimeabi"
 )
 
 const (
@@ -35,6 +36,55 @@ type Object struct {
 type wasmFunctionSignature struct {
 	ParamSlots  int
 	ReturnSlots int
+}
+
+type wasmImportSpec struct {
+	Module      string
+	Name        string
+	ParamSlots  int
+	ReturnSlots int
+}
+
+func wasmImportsForObject(funcs []Function) []wasmImportSpec {
+	imports := []wasmImportSpec{
+		{Module: "tetra_web_v1", Name: "console_log", ParamSlots: 2, ReturnSlots: 0},
+		{Module: "tetra_web_v1", Name: "panic", ParamSlots: 3, ReturnSlots: 0},
+	}
+	usedSurface := make(map[string]struct{})
+	for _, fn := range funcs {
+		for _, instr := range fn.Instrs {
+			if instr.Kind != ir.IRCall {
+				continue
+			}
+			if _, ok := wasmSurfaceImportSignature(instr.Name); ok {
+				usedSurface[instr.Name] = struct{}{}
+			}
+		}
+	}
+	for _, name := range runtimeabi.RequiredSurfaceSymbols() {
+		if _, ok := usedSurface[name]; !ok {
+			continue
+		}
+		sig, _ := wasmSurfaceImportSignature(name)
+		imports = append(imports, wasmImportSpec{
+			Module:      "tetra_surface_host_v1",
+			Name:        name,
+			ParamSlots:  sig.ParamSlots,
+			ReturnSlots: sig.ReturnSlots,
+		})
+	}
+	return imports
+}
+
+func wasmSurfaceImportSignature(name string) (wasmFunctionSignature, bool) {
+	if !strings.HasPrefix(name, "__tetra_surface_") {
+		return wasmFunctionSignature{}, false
+	}
+	sig, ok := runtimeabi.SignatureForSymbol(name)
+	if !ok {
+		return wasmFunctionSignature{}, false
+	}
+	return wasmFunctionSignature{ParamSlots: sig.ParamSlots, ReturnSlots: sig.ReturnSlots}, true
 }
 
 func CodegenObject(funcs []ir.IRFunc, mainName string) (*Object, error) {
@@ -128,12 +178,6 @@ func LinkObject(obj *Object) ([]byte, error) {
 		mainName = "main"
 	}
 
-	const (
-		consoleLogImport = iota
-		panicImport
-		importCount
-	)
-
 	typeIdxBySig := map[string]uint32{}
 	var typeEntries []wasmFuncType
 	typeIndex := func(params int, returns int) uint32 {
@@ -150,14 +194,26 @@ func LinkObject(obj *Object) ([]byte, error) {
 		return idx
 	}
 
-	consoleLogType := typeIndex(2, 0)
-	panicType := typeIndex(3, 0)
+	imports := wasmImportsForObject(obj.Functions)
+	importTypeIdx := make([]uint32, len(imports))
+	importIndexByName := make(map[string]uint32, len(imports))
+	for i, imp := range imports {
+		importTypeIdx[i] = typeIndex(imp.ParamSlots, imp.ReturnSlots)
+		importIndexByName[imp.Name] = uint32(i)
+	}
+	consoleLogImport, ok := importIndexByName["console_log"]
+	if !ok {
+		return nil, fmt.Errorf("wasm backend: missing console_log import")
+	}
 
 	funcIndexByName := make(map[string]uint32, len(obj.Functions))
 	returnSlotsByName := make(map[string]int, len(obj.Functions))
 	funcTypeIdx := make([]uint32, 0, len(obj.Functions))
+	for _, imp := range imports {
+		funcIndexByName[imp.Name] = importIndexByName[imp.Name]
+	}
 	for i, fn := range obj.Functions {
-		funcIndexByName[fn.Name] = uint32(importCount + i)
+		funcIndexByName[fn.Name] = uint32(len(imports) + i)
 		returnSlotsByName[fn.Name] = fn.ReturnSlots
 		funcTypeIdx = append(funcTypeIdx, typeIndex(fn.ParamSlots, fn.ReturnSlots))
 	}
@@ -173,7 +229,7 @@ func LinkObject(obj *Object) ([]byte, error) {
 	codeBodies := make([][]byte, 0, len(obj.Functions))
 	const heapGlobalIndex = uint32(0)
 	for _, fn := range obj.Functions {
-		body, err := compileFunction(fn, data, funcIndexByName, consoleLogImport, heapGlobalIndex)
+		body, err := compileFunction(fn, data, funcIndexByName, int(consoleLogImport), heapGlobalIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -207,17 +263,13 @@ func LinkObject(obj *Object) ([]byte, error) {
 	})
 
 	writeSection(&module, 2, func(sec *bytes.Buffer) {
-		writeULEB(sec, 2)
-
-		writeName(sec, "tetra_web_v1")
-		writeName(sec, "console_log")
-		sec.WriteByte(0x00) // import kind: func
-		writeULEB(sec, consoleLogType)
-
-		writeName(sec, "tetra_web_v1")
-		writeName(sec, "panic")
-		sec.WriteByte(0x00) // import kind: func
-		writeULEB(sec, panicType)
+		writeULEB(sec, uint32(len(imports)))
+		for i, imp := range imports {
+			writeName(sec, imp.Module)
+			writeName(sec, imp.Name)
+			sec.WriteByte(0x00) // import kind: func
+			writeULEB(sec, importTypeIdx[i])
+		}
 	})
 
 	writeSection(&module, 3, func(sec *bytes.Buffer) {
@@ -309,6 +361,141 @@ func LoaderModule(wasmFileName string) []byte {
 		"  return new TextDecoder().decode(view.subarray(start, end));",
 		"}",
 		"",
+		"function createSurfaceHost(instanceRef) {",
+		"  const surfaces = new Map();",
+		"  let nextHandle = 1;",
+		"  let clipboard = new Uint8Array([84, 101, 116]);",
+		"  return {",
+		"    __tetra_surface_open(titlePtr, titleLen, width, height) {",
+		"      const instance = instanceRef.instance;",
+		"      const title = instance ? readUTF8(instance, titlePtr | 0, titleLen | 0) : \"\";",
+		"      const handle = nextHandle++;",
+		"      surfaces.set(handle, { title, width: width | 0, height: height | 0, presented: 0 });",
+		"      return handle | 0;",
+		"    },",
+		"    __tetra_surface_close(handle) {",
+		"      surfaces.delete(handle | 0);",
+		"      return 0;",
+		"    },",
+		"    __tetra_surface_poll_event_kind(handle) {",
+		"      return surfaces.has(handle | 0) ? 5 : 1;",
+		"    },",
+		"    __tetra_surface_poll_event_x(handle) {",
+		"      return surfaces.has(handle | 0) ? 48 : 0;",
+		"    },",
+		"    __tetra_surface_poll_event_y(handle) {",
+		"      return surfaces.has(handle | 0) ? 96 : 0;",
+		"    },",
+		"    __tetra_surface_poll_event_button(handle) {",
+		"      return surfaces.has(handle | 0) ? 1 : 0;",
+		"    },",
+		"    __tetra_surface_poll_event_into(handle, eventPtr, eventLen) {",
+		"      const instance = instanceRef.instance;",
+		"      const surface = surfaces.get(handle | 0);",
+		"      if (!surface || !instance || (eventLen | 0) < 9) {",
+		"        return 0;",
+		"      }",
+		"      const view = new DataView(instance.exports.memory.buffer);",
+		"      const start = eventPtr >>> 0;",
+		"      if (start + 36 > view.byteLength) {",
+		"        return 0;",
+		"      }",
+		"      view.setInt32(start, 5, true);",
+		"      view.setInt32(start + 4, 48, true);",
+		"      view.setInt32(start + 8, 96, true);",
+		"      view.setInt32(start + 12, 1, true);",
+		"      view.setInt32(start + 16, 0, true);",
+		"      view.setInt32(start + 20, surface.width | 0, true);",
+		"      view.setInt32(start + 24, surface.height | 0, true);",
+		"      view.setInt32(start + 28, 0, true);",
+		"      view.setInt32(start + 32, 0, true);",
+		"      return 9;",
+		"    },",
+		"    __tetra_surface_poll_event_text_len(handle) {",
+		"      return surfaces.has(handle | 0) ? 2 : 0;",
+		"    },",
+		"    __tetra_surface_poll_event_text_into(handle, textPtr, textLen) {",
+		"      const instance = instanceRef.instance;",
+		"      if (!surfaces.has(handle | 0) || !instance || (textLen | 0) < 2) {",
+		"        return 0;",
+		"      }",
+		"      const view = memoryView(instance);",
+		"      const start = textPtr >>> 0;",
+		"      if (start + 2 > view.length) {",
+		"        return 0;",
+		"      }",
+		"      view[start] = 79;",
+		"      view[start + 1] = 75;",
+		"      return 2;",
+		"    },",
+		"    __tetra_surface_clipboard_write_text(handle, textPtr, textLen) {",
+		"      const instance = instanceRef.instance;",
+		"      if (!surfaces.has(handle | 0) || !instance || (textLen | 0) < 0) {",
+		"        return 0;",
+		"      }",
+		"      const view = memoryView(instance);",
+		"      const start = textPtr >>> 0;",
+		"      const len = textLen | 0;",
+		"      if (start + len > view.length) {",
+		"        return 0;",
+		"      }",
+		"      clipboard = new Uint8Array(view.subarray(start, start + len));",
+		"      return len;",
+		"    },",
+		"    __tetra_surface_clipboard_read_text_into(handle, textPtr, textLen) {",
+		"      const instance = instanceRef.instance;",
+		"      if (!surfaces.has(handle | 0) || !instance) {",
+		"        return 0;",
+		"      }",
+		"      const view = memoryView(instance);",
+		"      const start = textPtr >>> 0;",
+		"      const cap = textLen | 0;",
+		"      const copied = Math.min(cap, clipboard.length) | 0;",
+		"      if (copied < 0 || start + copied > view.length) {",
+		"        return 0;",
+		"      }",
+		"      view.set(clipboard.subarray(0, copied), start);",
+		"      return copied;",
+		"    },",
+		"    __tetra_surface_poll_composition_into(handle, eventPtr, eventLen) {",
+		"      const instance = instanceRef.instance;",
+		"      if (!surfaces.has(handle | 0) || !instance || (eventLen | 0) < 4) {",
+		"        return 0;",
+		"      }",
+		"      const view = new DataView(instance.exports.memory.buffer);",
+		"      const start = eventPtr >>> 0;",
+		"      if (start + 16 > view.byteLength) {",
+		"        return 0;",
+		"      }",
+		"      view.setInt32(start, 1, true);",
+		"      view.setInt32(start + 4, 1, true);",
+		"      view.setInt32(start + 8, 1, true);",
+		"      view.setInt32(start + 12, 1, true);",
+		"      return 4;",
+		"    },",
+		"    __tetra_surface_begin_frame(handle) {",
+		"      return surfaces.has(handle | 0) ? 0 : 1;",
+		"    },",
+		"    __tetra_surface_present_rgba(handle, pixelsPtr, pixelsLen, width, height, stride) {",
+		"      const surface = surfaces.get(handle | 0);",
+		"      if (!surface) {",
+		"        return 1;",
+		"      }",
+		"      surface.width = width | 0;",
+		"      surface.height = height | 0;",
+		"      surface.presented = (surface.presented + 1) | 0;",
+		"      surface.lastFrame = { pixelsPtr: pixelsPtr | 0, pixelsLen: pixelsLen | 0, stride: stride | 0 };",
+		"      return 0;",
+		"    },",
+		"    __tetra_surface_now_ms() {",
+		"      return 0;",
+		"    },",
+		"    __tetra_surface_request_redraw(handle) {",
+		"      return surfaces.has(handle | 0) ? 0 : 1;",
+		"    },",
+		"  };",
+		"}",
+		"",
 		"function createImports(instanceRef) {",
 		"  return {",
 		"    tetra_web_v1: {",
@@ -328,6 +515,7 @@ func LoaderModule(wasmFileName string) []byte {
 		"        throw new Error(\"tetra panic(\" + (code | 0) + \"): \" + message);",
 		"      },",
 		"    },",
+		"    tetra_surface_host_v1: createSurfaceHost(instanceRef),",
 		"  };",
 		"}",
 		"",
@@ -408,6 +596,49 @@ func wasmMemoryMinPagesForBytes(used uint32) uint32 {
 		return 1
 	}
 	return uint32(pages)
+}
+
+func emitHeapBumpAndGrow(body *bytes.Buffer, heapGlobalIndex uint32, tempPtr int, tempByteLen int, tempVal int) {
+	body.WriteByte(0x23) // global.get heap
+	writeULEB(body, heapGlobalIndex)
+	body.WriteByte(0x21) // local.set tempPtr
+	writeULEB(body, uint32(tempPtr))
+
+	body.WriteByte(0x23) // global.get heap
+	writeULEB(body, heapGlobalIndex)
+	body.WriteByte(0x20) // local.get tempByteLen
+	writeULEB(body, uint32(tempByteLen))
+	body.WriteByte(0x6a) // i32.add
+	body.WriteByte(0x21) // local.set tempVal (new heap end)
+	writeULEB(body, uint32(tempVal))
+
+	body.WriteByte(0x20) // local.get tempVal
+	writeULEB(body, uint32(tempVal))
+	body.WriteByte(0x24) // global.set heap
+	writeULEB(body, heapGlobalIndex)
+
+	body.WriteByte(0x20) // local.get tempVal
+	writeULEB(body, uint32(tempVal))
+	body.WriteByte(0x3f) // memory.size
+	body.WriteByte(0x00)
+	writeI32Const(body, 16)
+	body.WriteByte(0x74) // i32.shl: current pages to bytes
+	body.WriteByte(0x4b) // i32.gt_u
+	body.WriteByte(0x04) // if
+	body.WriteByte(0x40)
+	body.WriteByte(0x20) // local.get tempVal
+	writeULEB(body, uint32(tempVal))
+	writeI32Const(body, int32(wasmPageSize-1))
+	body.WriteByte(0x6a) // i32.add
+	writeI32Const(body, 16)
+	body.WriteByte(0x76) // i32.shr_u: required pages
+	body.WriteByte(0x3f) // memory.size
+	body.WriteByte(0x00)
+	body.WriteByte(0x6b) // i32.sub: delta pages
+	body.WriteByte(0x40) // memory.grow
+	body.WriteByte(0x00)
+	body.WriteByte(0x1a) // drop previous page count
+	body.WriteByte(0x0b) // end if
 }
 
 func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]uint32, consoleLogImport int, heapGlobalIndex uint32) ([]byte, error) {
@@ -587,33 +818,36 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			}
 			body.WriteByte(0x21) // local.set tempLen
 			writeULEB(&body, uint32(tempLen))
-			body.WriteByte(0x20) // local.get tempLen
-			writeULEB(&body, uint32(tempLen))
-			switch instr.Kind {
-			case ir.IRMakeSliceU16:
-				writeI32Const(&body, 1)
-				body.WriteByte(0x74) // i32.shl
-			case ir.IRMakeSliceI32:
-				writeI32Const(&body, 2)
-				body.WriteByte(0x74) // i32.shl
-			}
-			body.WriteByte(0x21) // local.set tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x21) // local.set tempPtr
-			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x20) // local.get tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x6a) // i32.add
-			body.WriteByte(0x24) // global.set heap
-			writeULEB(&body, heapGlobalIndex)
+			emitWasmMakeSliceContract(&body, instr.Kind, heapGlobalIndex, tempPtr, tempLen, tempByteLen, tempVal)
 			body.WriteByte(0x20) // local.get tempPtr
 			writeULEB(&body, uint32(tempPtr))
 			body.WriteByte(0x20) // local.get tempLen
 			writeULEB(&body, uint32(tempLen))
+			push(2)
+		case ir.IRRawSliceFromParts:
+			if err := pop(3, "raw_slice_from_parts"); err != nil {
+				return nil, err
+			}
+			body.WriteByte(0x21) // local.set tempByteLen, discard cap.mem token
+			writeULEB(&body, uint32(tempByteLen))
+			body.WriteByte(0x21) // local.set tempLen
+			writeULEB(&body, uint32(tempLen))
+			body.WriteByte(0x21) // local.set tempPtr
+			writeULEB(&body, uint32(tempPtr))
+			body.WriteByte(0x20) // local.get tempPtr
+			writeULEB(&body, uint32(tempPtr))
+			body.WriteByte(0x20) // local.get tempLen
+			writeULEB(&body, uint32(tempLen))
+			push(2)
+		case ir.IRSliceWindow, ir.IRSlicePrefix, ir.IRSliceSuffix:
+			popSlots := 3
+			if instr.Kind == ir.IRSliceWindow {
+				popSlots = 4
+			}
+			if err := pop(popSlots, "slice_view"); err != nil {
+				return nil, err
+			}
+			emitWasmSliceView(&body, instr.Kind, byte(instr.Imm), tempPtr, tempLen, tempIdx, tempVal)
 			push(2)
 		case ir.IRIslandNew:
 			if err := pop(1, "island_new"); err != nil {
@@ -621,17 +855,7 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			}
 			body.WriteByte(0x21) // local.set tempByteLen
 			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x21) // local.set tempPtr
-			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x20) // local.get tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x6a) // i32.add
-			body.WriteByte(0x24) // global.set heap
-			writeULEB(&body, heapGlobalIndex)
+			emitHeapBumpAndGrow(&body, heapGlobalIndex, tempPtr, tempByteLen, tempVal)
 			body.WriteByte(0x20) // local.get tempPtr
 			writeULEB(&body, uint32(tempPtr))
 			push(1)
@@ -643,29 +867,7 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			writeULEB(&body, uint32(tempLen))
 			body.WriteByte(0x21) // local.set tempPtr (discard island handle)
 			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x20) // local.get tempLen
-			writeULEB(&body, uint32(tempLen))
-			switch instr.Kind {
-			case ir.IRIslandMakeSliceU16:
-				writeI32Const(&body, 1)
-				body.WriteByte(0x74) // i32.shl
-			case ir.IRIslandMakeSliceI32:
-				writeI32Const(&body, 2)
-				body.WriteByte(0x74) // i32.shl
-			}
-			body.WriteByte(0x21) // local.set tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x21) // local.set tempPtr
-			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x23) // global.get heap
-			writeULEB(&body, heapGlobalIndex)
-			body.WriteByte(0x20) // local.get tempByteLen
-			writeULEB(&body, uint32(tempByteLen))
-			body.WriteByte(0x6a) // i32.add
-			body.WriteByte(0x24) // global.set heap
-			writeULEB(&body, heapGlobalIndex)
+			emitWasmMakeSliceContract(&body, instr.Kind, heapGlobalIndex, tempPtr, tempLen, tempByteLen, tempVal)
 			body.WriteByte(0x20) // local.get tempPtr
 			writeULEB(&body, uint32(tempPtr))
 			body.WriteByte(0x20) // local.get tempLen
@@ -675,7 +877,8 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			if err := pop(1, "island_free"); err != nil {
 				return nil, err
 			}
-		case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
+		case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
+			ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 			if err := pop(3, "index_load"); err != nil {
 				return nil, err
 			}
@@ -685,34 +888,37 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			writeULEB(&body, uint32(tempLen))
 			body.WriteByte(0x21)
 			writeULEB(&body, uint32(tempPtr))
-			body.WriteByte(0x20)
-			writeULEB(&body, uint32(tempIdx))
-			body.WriteByte(0x20)
-			writeULEB(&body, uint32(tempLen))
-			body.WriteByte(0x4f) // i32.ge_u
-			body.WriteByte(0x04)
-			body.WriteByte(0x40)
-			body.WriteByte(0x00) // unreachable
-			body.WriteByte(0x0b)
+			checked := instr.Kind == ir.IRIndexLoadI32 || instr.Kind == ir.IRIndexLoadU8 || instr.Kind == ir.IRIndexLoadU16
+			if checked {
+				body.WriteByte(0x20)
+				writeULEB(&body, uint32(tempIdx))
+				body.WriteByte(0x20)
+				writeULEB(&body, uint32(tempLen))
+				body.WriteByte(0x4f) // i32.ge_u
+				body.WriteByte(0x04)
+				body.WriteByte(0x40)
+				body.WriteByte(0x00) // unreachable
+				body.WriteByte(0x0b)
+			}
 			body.WriteByte(0x20)
 			writeULEB(&body, uint32(tempPtr))
 			body.WriteByte(0x20)
 			writeULEB(&body, uint32(tempIdx))
 			switch instr.Kind {
-			case ir.IRIndexLoadI32:
+			case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 				writeI32Const(&body, 2)
 				body.WriteByte(0x74)
-			case ir.IRIndexLoadU16:
+			case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 				writeI32Const(&body, 1)
 				body.WriteByte(0x74)
 			}
 			body.WriteByte(0x6a)
 			switch instr.Kind {
-			case ir.IRIndexLoadI32:
+			case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 				body.WriteByte(0x28)
 				writeULEB(&body, 2)
 				writeULEB(&body, 0)
-			case ir.IRIndexLoadU16:
+			case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 				body.WriteByte(0x2f)
 				writeULEB(&body, 1)
 				writeULEB(&body, 0)
@@ -1111,33 +1317,36 @@ func emitWebNonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, d
 		}
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempLen))
+		emitWasmMakeSliceContract(body, instr.Kind, heapGlobalIndex, tempPtr, tempLen, tempByteLen, tempVal)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempPtr))
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempLen))
-		switch instr.Kind {
-		case ir.IRMakeSliceU16:
-			writeI32Const(body, 1)
-			body.WriteByte(0x74)
-		case ir.IRMakeSliceI32:
-			writeI32Const(body, 2)
-			body.WriteByte(0x74)
+		push(2)
+	case ir.IRRawSliceFromParts:
+		if err := pop(3, "raw_slice_from_parts"); err != nil {
+			return 0, err
 		}
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempLen))
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x6a)
-		body.WriteByte(0x24)
-		writeULEB(body, heapGlobalIndex)
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempPtr))
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempLen))
+		push(2)
+	case ir.IRSliceWindow, ir.IRSlicePrefix, ir.IRSliceSuffix:
+		popSlots := 3
+		if instr.Kind == ir.IRSliceWindow {
+			popSlots = 4
+		}
+		if err := pop(popSlots, "slice_view"); err != nil {
+			return 0, err
+		}
+		emitWasmSliceView(body, instr.Kind, byte(instr.Imm), tempPtr, tempLen, tempIdx, tempVal)
 		push(2)
 	case ir.IRIslandNew:
 		if err := pop(1, "island_new"); err != nil {
@@ -1145,17 +1354,7 @@ func emitWebNonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, d
 		}
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
-		body.WriteByte(0x21)
-		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x6a)
-		body.WriteByte(0x24)
-		writeULEB(body, heapGlobalIndex)
+		emitHeapBumpAndGrow(body, heapGlobalIndex, tempPtr, tempByteLen, tempVal)
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempPtr))
 		push(1)
@@ -1167,29 +1366,7 @@ func emitWebNonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, d
 		writeULEB(body, uint32(tempLen))
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempLen))
-		switch instr.Kind {
-		case ir.IRIslandMakeSliceU16:
-			writeI32Const(body, 1)
-			body.WriteByte(0x74)
-		case ir.IRIslandMakeSliceI32:
-			writeI32Const(body, 2)
-			body.WriteByte(0x74)
-		}
-		body.WriteByte(0x21)
-		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
-		body.WriteByte(0x21)
-		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x23)
-		writeULEB(body, heapGlobalIndex)
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempByteLen))
-		body.WriteByte(0x6a)
-		body.WriteByte(0x24)
-		writeULEB(body, heapGlobalIndex)
+		emitWasmMakeSliceContract(body, instr.Kind, heapGlobalIndex, tempPtr, tempLen, tempByteLen, tempVal)
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempPtr))
 		body.WriteByte(0x20)
@@ -1199,7 +1376,8 @@ func emitWebNonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, d
 		if err := pop(1, "island_free"); err != nil {
 			return 0, err
 		}
-	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
+	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
+		ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 		if err := pop(3, "index_load"); err != nil {
 			return 0, err
 		}
@@ -1209,34 +1387,37 @@ func emitWebNonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, d
 		writeULEB(body, uint32(tempLen))
 		body.WriteByte(0x21)
 		writeULEB(body, uint32(tempPtr))
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempIdx))
-		body.WriteByte(0x20)
-		writeULEB(body, uint32(tempLen))
-		body.WriteByte(0x4f)
-		body.WriteByte(0x04)
-		body.WriteByte(0x40)
-		body.WriteByte(0x00)
-		body.WriteByte(0x0b)
+		checked := instr.Kind == ir.IRIndexLoadI32 || instr.Kind == ir.IRIndexLoadU8 || instr.Kind == ir.IRIndexLoadU16
+		if checked {
+			body.WriteByte(0x20)
+			writeULEB(body, uint32(tempIdx))
+			body.WriteByte(0x20)
+			writeULEB(body, uint32(tempLen))
+			body.WriteByte(0x4f)
+			body.WriteByte(0x04)
+			body.WriteByte(0x40)
+			body.WriteByte(0x00)
+			body.WriteByte(0x0b)
+		}
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempPtr))
 		body.WriteByte(0x20)
 		writeULEB(body, uint32(tempIdx))
 		switch instr.Kind {
-		case ir.IRIndexLoadI32:
+		case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 			writeI32Const(body, 2)
 			body.WriteByte(0x74)
-		case ir.IRIndexLoadU16:
+		case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 			writeI32Const(body, 1)
 			body.WriteByte(0x74)
 		}
 		body.WriteByte(0x6a)
 		switch instr.Kind {
-		case ir.IRIndexLoadI32:
+		case ir.IRIndexLoadI32, ir.IRIndexLoadI32Unchecked:
 			body.WriteByte(0x28)
 			writeULEB(body, 2)
 			writeULEB(body, 0)
-		case ir.IRIndexLoadU16:
+		case ir.IRIndexLoadU16, ir.IRIndexLoadU16Unchecked:
 			body.WriteByte(0x2f)
 			writeULEB(body, 1)
 			writeULEB(body, 0)
@@ -1384,13 +1565,20 @@ func wasmStackEffect(instr ir.IRInstr) (int, int, bool) {
 		return 0, 0, true
 	case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
 		return 1, 2, true
+	case ir.IRRawSliceFromParts:
+		return 3, 2, true
+	case ir.IRSliceWindow:
+		return 4, 2, true
+	case ir.IRSlicePrefix, ir.IRSliceSuffix:
+		return 3, 2, true
 	case ir.IRIslandNew:
 		return 1, 1, true
 	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
 		return 2, 2, true
 	case ir.IRIslandFree:
 		return 1, 0, true
-	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
+	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
+		ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 		return 3, 1, true
 	case ir.IRIndexStoreI32, ir.IRIndexStoreU8, ir.IRIndexStoreU16:
 		return 4, 0, true
@@ -1559,7 +1747,10 @@ func validateWasmCallMetadata(fnName string, instr ir.IRInstr, functionSigs map[
 	}
 	sig, ok := functionSigs[instr.Name]
 	if !ok {
-		return fmt.Errorf("wasm backend: function '%s' calls unsupported symbol '%s'", fnName, instr.Name)
+		sig, ok = wasmSurfaceImportSignature(instr.Name)
+		if !ok {
+			return fmt.Errorf("wasm backend: function '%s' calls unsupported symbol '%s'", fnName, instr.Name)
+		}
 	}
 	if instr.ArgSlots != sig.ParamSlots || instr.RetSlots != sig.ReturnSlots {
 		return fmt.Errorf("wasm backend: function '%s' call %q ABI mismatch args=%d rets=%d want args=%d rets=%d", fnName, instr.Name, instr.ArgSlots, instr.RetSlots, sig.ParamSlots, sig.ReturnSlots)
@@ -1604,6 +1795,151 @@ var wasmSymbolTokenHash = func(name string) uint32 {
 
 func wasmSymbolToken(name string) uint32 {
 	return wasmSymbolTokenHash(name)
+}
+
+func emitWasmMakeSliceContract(body *bytes.Buffer, kind ir.IRInstrKind, heapGlobalIndex uint32, tempPtr int, tempLen int, tempByteLen int, tempVal int) {
+	emitWasmLocalNonNegativeCheck(body, tempLen)
+	body.WriteByte(0x20) // local.get tempLen
+	writeULEB(body, uint32(tempLen))
+	body.WriteByte(0x45) // i32.eqz
+	body.WriteByte(0x04) // if
+	body.WriteByte(0x40)
+	writeI32Const(body, 0)
+	body.WriteByte(0x21) // local.set tempPtr
+	writeULEB(body, uint32(tempPtr))
+	body.WriteByte(0x05) // else
+	if max, ok := wasmMakeSliceMaxElements(kind); ok {
+		body.WriteByte(0x20) // local.get tempLen
+		writeULEB(body, uint32(tempLen))
+		writeI32Const(body, max)
+		body.WriteByte(0x4a) // i32.gt_s
+		emitWasmTrapIf(body)
+	}
+	body.WriteByte(0x20) // local.get tempLen
+	writeULEB(body, uint32(tempLen))
+	if shift := wasmMakeSliceShift(kind); shift > 0 {
+		writeI32Const(body, int32(shift))
+		body.WriteByte(0x74) // i32.shl
+	}
+	body.WriteByte(0x21) // local.set tempByteLen
+	writeULEB(body, uint32(tempByteLen))
+	emitHeapBumpAndGrow(body, heapGlobalIndex, tempPtr, tempByteLen, tempVal)
+	body.WriteByte(0x0b) // end if
+}
+
+func wasmMakeSliceShift(kind ir.IRInstrKind) byte {
+	switch kind {
+	case ir.IRMakeSliceU16, ir.IRIslandMakeSliceU16:
+		return 1
+	case ir.IRMakeSliceI32, ir.IRIslandMakeSliceI32:
+		return 2
+	default:
+		return 0
+	}
+}
+
+func wasmMakeSliceMaxElements(kind ir.IRInstrKind) (int32, bool) {
+	switch kind {
+	case ir.IRMakeSliceU16, ir.IRIslandMakeSliceU16:
+		return 2147483647 / 2, true
+	case ir.IRMakeSliceI32, ir.IRIslandMakeSliceI32:
+		return 2147483647 / 4, true
+	default:
+		return 0, false
+	}
+}
+
+func emitWasmSliceView(body *bytes.Buffer, kind ir.IRInstrKind, shift byte, tempPtr int, tempLen int, tempIdx int, tempVal int) {
+	switch kind {
+	case ir.IRSliceWindow:
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempVal))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempIdx))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempPtr))
+		emitWasmLocalNonNegativeCheck(body, tempIdx)
+		emitWasmLocalNonNegativeCheck(body, tempVal)
+		emitWasmGreaterThanTrap(body, tempIdx, tempLen)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempVal))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempIdx))
+		body.WriteByte(0x6b)
+		body.WriteByte(0x4a)
+		emitWasmTrapIf(body)
+		emitWasmWindowResult(body, shift, tempPtr, tempIdx)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempVal))
+	case ir.IRSlicePrefix:
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempVal))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempPtr))
+		emitWasmLocalNonNegativeCheck(body, tempVal)
+		emitWasmGreaterThanTrap(body, tempVal, tempLen)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempPtr))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempVal))
+	case ir.IRSliceSuffix:
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempIdx))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempPtr))
+		emitWasmLocalNonNegativeCheck(body, tempIdx)
+		emitWasmGreaterThanTrap(body, tempIdx, tempLen)
+		emitWasmWindowResult(body, shift, tempPtr, tempIdx)
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempLen))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempIdx))
+		body.WriteByte(0x6b)
+	}
+}
+
+func emitWasmLocalNonNegativeCheck(body *bytes.Buffer, local int) {
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(local))
+	writeI32Const(body, 0)
+	body.WriteByte(0x48)
+	emitWasmTrapIf(body)
+}
+
+func emitWasmGreaterThanTrap(body *bytes.Buffer, left int, right int) {
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(left))
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(right))
+	body.WriteByte(0x4a)
+	emitWasmTrapIf(body)
+}
+
+func emitWasmWindowResult(body *bytes.Buffer, shift byte, tempPtr int, tempIdx int) {
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(tempPtr))
+	body.WriteByte(0x20)
+	writeULEB(body, uint32(tempIdx))
+	if shift > 0 {
+		writeI32Const(body, int32(shift))
+		body.WriteByte(0x74)
+	}
+	body.WriteByte(0x6a)
+}
+
+func emitWasmTrapIf(body *bytes.Buffer) {
+	body.WriteByte(0x04)
+	body.WriteByte(0x40)
+	body.WriteByte(0x00)
+	body.WriteByte(0x0b)
 }
 
 func writeSection(dst *bytes.Buffer, id byte, fn func(*bytes.Buffer)) {

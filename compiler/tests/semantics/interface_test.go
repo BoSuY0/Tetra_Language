@@ -63,6 +63,101 @@ pub func identity(f: fn(Int) -> Int) -> fn(Int) -> Int:
 	}
 }
 
+func TestGenerateInterfaceFromSourcePreservesBorrowedReturnContract(t *testing.T) {
+	src := []byte(`module lib.views
+
+pub func view(xs: borrow []u8) -> borrow []u8:
+    return xs.window(0, 1).borrow()
+`)
+	out, err := compiler.GenerateInterfaceFromSource(src, "lib/views.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"func view(xs: borrow []u8) -> borrow []u8:",
+		"// tetra-interface-lifetime: return=borrow source=xs provenance=param lifetime=call",
+		"    return xs",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("interface missing %q:\n%s", want, text)
+		}
+	}
+
+	iface, err := compiler.ParseFile(out, "lib/views.t4i")
+	if err != nil {
+		t.Fatalf("ParseFile generated interface: %v\n%s", err, out)
+	}
+	app, err := compiler.ParseFile([]byte(`module app.main
+import lib.views as views
+
+func relay(xs: borrow []u8) -> borrow []u8:
+    return views.view(xs)
+
+func main() -> Int:
+    return 0
+`), "app/main.t4")
+	if err != nil {
+		t.Fatalf("ParseFile app: %v", err)
+	}
+	checked, err := compiler.CheckWorld(&compiler.World{
+		EntryModule:      "app.main",
+		Files:            []*compiler.FileAST{iface, app},
+		InterfaceModules: map[string]bool{"lib.views": true},
+		ByModule: map[string]*compiler.FileAST{
+			"lib.views": iface,
+			"app.main":  app,
+		},
+	})
+	if err != nil {
+		t.Fatalf("CheckWorld: %v\ninterface:\n%s", err, out)
+	}
+	if got := checked.FuncSigs["lib.views.view"].ReturnOwnership; got != "borrow" {
+		t.Fatalf("imported view ReturnOwnership = %q, want borrow; interface:\n%s", got, out)
+	}
+}
+
+func TestInterfaceFingerprintTracksBorrowedReturnLifetimeSource(t *testing.T) {
+	srcA := []byte(`module lib.views
+
+pub func choose(a: borrow []u8, b: borrow []u8) -> borrow []u8:
+    return a.borrow()
+`)
+	srcB := []byte(strings.Replace(string(srcA), "return a.borrow()", "return b.borrow()", 1))
+
+	hashA, err := compiler.InterfaceFingerprintFromSource(srcA, "lib/views.t4")
+	if err != nil {
+		t.Fatalf("InterfaceFingerprintFromSource A: %v", err)
+	}
+	hashB, err := compiler.InterfaceFingerprintFromSource(srcB, "lib/views.t4")
+	if err != nil {
+		t.Fatalf("InterfaceFingerprintFromSource B: %v", err)
+	}
+	if hashA == hashB {
+		t.Fatalf("borrowed return lifetime source did not affect interface hash: %s", hashA)
+	}
+}
+
+func TestInterfaceFingerprintRejectsTamperedBorrowedReturnLifetimeMetadata(t *testing.T) {
+	src := []byte(`module lib.views
+
+pub func view(xs: borrow []u8) -> borrow []u8:
+    return xs.borrow()
+`)
+	iface, err := compiler.GenerateInterfaceFromSource(src, "lib/views.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	tampered := strings.Replace(string(iface), "source=xs", "source=ys", 1)
+	if tampered == string(iface) {
+		t.Fatalf("test fixture did not find borrowed return lifetime metadata:\n%s", iface)
+	}
+	_, err = compiler.InterfaceFingerprintFromT4I([]byte(tampered))
+	if err == nil || !strings.Contains(err.Error(), "invalid .t4i hash") {
+		t.Fatalf("InterfaceFingerprintFromT4I tampered error = %v, want invalid .t4i hash", err)
+	}
+}
+
 func TestGenerateInterfaceFromSourcePreservesReturnedFunctionHandleMetadata(t *testing.T) {
 	src := []byte(`module lib.maker
 

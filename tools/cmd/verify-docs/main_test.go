@@ -193,15 +193,21 @@ func TestVerifyWASMBackendPlanRequiresConcreteGateCommands(t *testing.T) {
 func TestVerifyMemoryProductionContractDocsRejectsIncompleteContract(t *testing.T) {
 	dir := t.TempDir()
 	paths := memoryProductionContractDocPaths{
-		RuntimeABI:   filepath.Join(dir, "runtime_abi.md"),
-		Ownership:    filepath.Join(dir, "ownership_v1.md"),
-		Unsafe:       filepath.Join(dir, "unsafe.md"),
-		Capabilities: filepath.Join(dir, "capabilities.md"),
-		Stdlib:       filepath.Join(dir, "stdlib.md"),
-		StdlibGuide:  filepath.Join(dir, "standard_library_guide.md"),
-		CoreMemory:   filepath.Join(dir, "memory.tetra"),
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
 	}
-	for _, path := range []string{paths.RuntimeABI, paths.Ownership, paths.Unsafe, paths.Capabilities, paths.Stdlib, paths.StdlibGuide, paths.CoreMemory} {
+	for _, path := range []string{paths.RuntimeABI, paths.Ownership, paths.Unsafe, paths.Capabilities, paths.Stdlib, paths.StdlibGuide, paths.CoreMemory, paths.TargetCapabilityMatrix, paths.MemoryCostModel, paths.MemoryFuzzOracle, paths.MemoryProductionFinal, paths.MemoryProductionMap, paths.MemoryProductionClaims} {
 		if err := os.WriteFile(path, []byte("memory docs\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -221,13 +227,19 @@ func TestVerifyMemoryProductionContractDocsRejectsIncompleteContract(t *testing.
 func TestVerifyMemoryProductionContractDocsAcceptsRequiredContract(t *testing.T) {
 	dir := t.TempDir()
 	paths := memoryProductionContractDocPaths{
-		RuntimeABI:   filepath.Join(dir, "runtime_abi.md"),
-		Ownership:    filepath.Join(dir, "ownership_v1.md"),
-		Unsafe:       filepath.Join(dir, "unsafe.md"),
-		Capabilities: filepath.Join(dir, "capabilities.md"),
-		Stdlib:       filepath.Join(dir, "stdlib.md"),
-		StdlibGuide:  filepath.Join(dir, "standard_library_guide.md"),
-		CoreMemory:   filepath.Join(dir, "memory.tetra"),
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
 	}
 	for _, requirement := range memoryProductionContractRequirements(paths) {
 		body := strings.Join(requirement.Required, "\n")
@@ -238,6 +250,204 @@ func TestVerifyMemoryProductionContractDocsAcceptsRequiredContract(t *testing.T)
 
 	if err := verifyMemoryProductionContractDocs(paths); err != nil {
 		t.Fatalf("verifyMemoryProductionContractDocs: %v", err)
+	}
+}
+
+func TestVerifyMemoryProductionContractDocsRequiresTargetCapabilityMatrix(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
+	}
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		if requirement.Path == paths.TargetCapabilityMatrix {
+			continue
+		}
+		body := strings.Join(requirement.Required, "\n")
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyMemoryProductionContractDocs(paths)
+	if err == nil || !strings.Contains(err.Error(), "memory-target-capability-matrix.md") {
+		t.Fatalf("expected missing target capability matrix failure, got %v", err)
+	}
+}
+
+func TestVerifyMemoryProductionContractDocsRequiresMemoryCostModel(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
+	}
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		if requirement.Path == paths.MemoryCostModel {
+			continue
+		}
+		body := strings.Join(requirement.Required, "\n")
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyMemoryProductionContractDocs(paths)
+	if err == nil || !strings.Contains(err.Error(), "memory_cost_model.md") {
+		t.Fatalf("expected missing memory cost model failure, got %v", err)
+	}
+}
+
+func TestVerifyMemoryProductionContractDocsRequiresMemoryFuzzOracle(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
+	}
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		if requirement.Path == paths.MemoryFuzzOracle {
+			continue
+		}
+		body := strings.Join(requirement.Required, "\n")
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyMemoryProductionContractDocs(paths)
+	if err == nil || !strings.Contains(err.Error(), "memory-fuzz-oracle-v1.md") {
+		t.Fatalf("expected missing memory fuzz oracle failure, got %v", err)
+	}
+}
+
+func TestVerifyMemoryProductionContractDocsRequiresFinalAuditDocs(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
+	}
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		if requirement.Path == paths.MemoryProductionFinal {
+			continue
+		}
+		body := strings.Join(requirement.Required, "\n")
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyMemoryProductionContractDocs(paths)
+	if err == nil || !strings.Contains(err.Error(), "memory-production-core-v1-final.md") {
+		t.Fatalf("expected missing final audit failure, got %v", err)
+	}
+}
+
+func TestVerifyMemoryProductionContractDocsRequiresArtifactMap(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
+	}
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		if requirement.Path == paths.MemoryProductionMap {
+			continue
+		}
+		body := strings.Join(requirement.Required, "\n")
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyMemoryProductionContractDocs(paths)
+	if err == nil || !strings.Contains(err.Error(), "memory-production-core-v1-artifact-map.md") {
+		t.Fatalf("expected missing artifact map failure, got %v", err)
+	}
+}
+
+func TestVerifyMemoryProductionContractDocsRequiresNonclaims(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
+	}
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		if requirement.Path == paths.MemoryProductionClaims {
+			continue
+		}
+		body := strings.Join(requirement.Required, "\n")
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyMemoryProductionContractDocs(paths)
+	if err == nil || !strings.Contains(err.Error(), "memory-production-core-v1-nonclaims.md") {
+		t.Fatalf("expected missing nonclaims failure, got %v", err)
 	}
 }
 
@@ -312,6 +522,9 @@ func TestVerifyFeatureRegistryAcceptsRequiredStatuses(t *testing.T) {
 		{ID: "language.full-v1-guarantees", Name: "v1", Status: "planned", Scope: "v1", Stability: "planned", Docs: []string{"docs/spec/v1_scope.md"}},
 		{ID: "eco.distributed-network", Name: "EcoNet", Status: "post-v1", Scope: "network", Stability: "deferred", Docs: []string{"docs/release/post_v1_promotion_checklist.md"}},
 		{ID: "language.full-first-class-callables", Name: "Callables", Status: "current", Since: "v0.4.0", Scope: "safe by-value first-class callable semantics", Stability: "current safe-capture model", Docs: []string{"docs/spec/v1_feature_status.md"}},
+		{ID: "ui.surface-core", Name: "Tetra Surface core", Status: "release_candidate", Scope: "surface-v1-linux-web", Stability: "release gate candidate", Docs: []string{"docs/spec/surface_v1.md"}},
+		{ID: "ui.surface-macos-x64", Name: "macOS Surface host", Status: "unsupported", Scope: "not in Surface v1", Stability: "no release evidence", Docs: []string{"docs/spec/surface_v1.md"}},
+		{ID: "ui.metadata-legacy", Name: "UI metadata legacy compatibility", Status: "legacy_compatibility", Scope: "legacy metadata compatibility", Stability: "compatibility bridge", Docs: []string{"docs/spec/ui_v1.md"}},
 	}
 	if err := verifyFeatureRegistry(features); err != nil {
 		t.Fatalf("verifyFeatureRegistry: %v", err)
@@ -396,10 +609,12 @@ func TestCurrentReleaseTruthDocPathsCoverCurrentUserAndSpecDocs(t *testing.T) {
 	for _, want := range []string{
 		"README.md",
 		"docs/spec/current_supported_surface.md",
+		"docs/spec/surface_v1.md",
 		"docs/spec/v0_2_scope.md",
 		"docs/user/examples_index.md",
 		"docs/user/getting_started.md",
 		"docs/user/language_tour.md",
+		"docs/user/surface_guide.md",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("currentReleaseTruthDocPaths missing %s in %v", want, paths)
@@ -410,6 +625,95 @@ func TestCurrentReleaseTruthDocPathsCoverCurrentUserAndSpecDocs(t *testing.T) {
 			t.Fatalf("currentReleaseTruthDocPaths should not include historical %s paths: %v", forbidden, paths)
 		}
 	}
+}
+
+func TestVerifySurfaceReleaseDocsRejectsFakePromotionClaims(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "macos-current",
+			body: "macOS Surface is current for Surface v1.\nUnsupported targets: wasm32-wasi.\nbash scripts/release/surface/release-gate.sh\n",
+			want: "macOS Surface",
+		},
+		{
+			name: "windows-current",
+			body: "Windows Surface is release-ready for Surface v1.\nUnsupported targets: wasm32-wasi.\nbash scripts/release/surface/release-gate.sh\n",
+			want: "Windows Surface",
+		},
+		{
+			name: "metadata-only-production-accessibility",
+			body: "metadata-only accessibility is production accessibility.\nUnsupported targets: macOS, Windows, wasm32-wasi.\nbash scripts/release/surface/release-gate.sh\n",
+			want: "metadata-only",
+		},
+		{
+			name: "dom-ui-model",
+			body: "DOM UI is the Surface model.\nUnsupported targets: macOS, Windows, wasm32-wasi.\nbash scripts/release/surface/release-gate.sh\n",
+			want: "DOM UI",
+		},
+		{
+			name: "user-js-allowed",
+			body: "user JS app logic is allowed in Surface apps.\nUnsupported targets: macOS, Windows, wasm32-wasi.\nbash scripts/release/surface/release-gate.sh\n",
+			want: "user JS",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := writeSurfaceReleaseDoc(t, tc.body)
+			err := verifySurfaceReleaseDocs([]string{doc})
+			if err == nil {
+				t.Fatalf("expected Surface release docs fake-promotion failure")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestVerifySurfaceReleaseDocsRequireUnsupportedTargetsAndReleaseGate(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "missing-unsupported-targets",
+			body: "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas.\nbash scripts/release/surface/release-gate.sh\n",
+			want: "unsupported targets",
+		},
+		{
+			name: "missing-release-gate-command",
+			body: "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. Unsupported targets: macOS, Windows, wasm32-wasi.\n",
+			want: "release-gate.sh",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := writeSurfaceReleaseDoc(t, tc.body)
+			err := verifySurfaceReleaseDocs([]string{doc})
+			if err == nil {
+				t.Fatalf("expected Surface release docs requirement failure")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	okDoc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Metadata-only accessibility is not production accessibility. DOM UI and user JavaScript app logic are outside the Surface model.\n\nbash scripts/release/surface/release-gate.sh\n")
+	if err := verifySurfaceReleaseDocs([]string{okDoc}); err != nil {
+		t.Fatalf("verifySurfaceReleaseDocs accepted doc: %v", err)
+	}
+}
+
+func writeSurfaceReleaseDoc(t *testing.T, body string) string {
+	t.Helper()
+	doc := filepath.Join(t.TempDir(), "surface_v1.md")
+	if err := os.WriteFile(doc, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return doc
 }
 
 func TestExtractTetraDoctestsParsesCommentFence(t *testing.T) {

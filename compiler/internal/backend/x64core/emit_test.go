@@ -119,6 +119,31 @@ func TestCtxSwitchUnsupportedABIDiagnostic(t *testing.T) {
 	}
 }
 
+func TestIRRawSliceFromPartsEmitsLengthContractGuards(t *testing.T) {
+	code := emitOneFunc(t, x64abi.LinuxSysV(), ir.IRFunc{
+		Name:        "main",
+		ReturnSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRConstI32, Imm: 2},
+			{Kind: ir.IRCapMem},
+			{Kind: ir.IRRawSliceFromParts, Imm: 2},
+			{Kind: ir.IRReturn},
+		},
+	})
+	if !bytes.Contains(code, []byte{0x85, 0xC9, 0x0F, 0x8C}) {
+		t.Fatalf("raw_slice_from_parts did not emit signed i32 negative-length guard: % x", code)
+	}
+	wantCmp := []byte{0x48, 0x81, 0xF9, 0xFF, 0xFF, 0xFF, 0x1F}
+	if !bytes.Contains(code, wantCmp) {
+		t.Fatalf("raw_slice_i32_from_parts did not emit i32 byte-overflow guard % x in: % x", wantCmp, code)
+	}
+	wantExit2 := []byte{0xBF, 0x02, 0x00, 0x00, 0x00, 0xB8, 0x3C, 0x00, 0x00, 0x00, 0x0F, 0x05}
+	if !bytes.Contains(code, wantExit2) {
+		t.Fatalf("raw_slice_from_parts did not emit deterministic trap exit 2: % x", code)
+	}
+}
+
 func findCtxSwitchInternalTarget(t *testing.T, buf []byte) (callOp int, target int) {
 	t.Helper()
 
@@ -295,6 +320,56 @@ func TestObjectEmitSharedLiteralAddsDataRelocArtifacts(t *testing.T) {
 	}
 	if art.leaPatches[0].At < 0 || art.leaPatches[0].At+4 > len(art.code) {
 		t.Fatalf("lea patch offset out of range: at=%d len=%d", art.leaPatches[0].At, len(art.code))
+	}
+}
+
+func TestScalarRegisterCallEmissionUsesTargetABIFrames(t *testing.T) {
+	fn := ir.IRFunc{
+		Name:        "main",
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 41},
+			{Kind: ir.IRCall, Name: "inc", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRReturn},
+		},
+	}
+
+	sysv := emitWithArtifacts(t, x64abi.LinuxSysV(), fn)
+	if len(sysv.callPatches) != 1 || sysv.callPatches[0].Name != "inc" {
+		t.Fatalf("SysV call patches = %#v, want inc", sysv.callPatches)
+	}
+	for _, forbidden := range [][]byte{{0x50}, {0x58}, {0x59}} {
+		if bytes.Contains(sysv.code, forbidden) {
+			t.Fatalf("SysV register call emitted stack-machine push/pop byte % x: % x", forbidden, sysv.code)
+		}
+	}
+	shadow := &x64.Emitter{}
+	shadow.SubRspImm32(32)
+	if bytes.Contains(sysv.code, shadow.Buf) {
+		t.Fatalf("SysV register call emitted Win64 shadow space: % x", sysv.code)
+	}
+
+	win := emitWithArtifacts(t, x64abi.NewWin64(), fn)
+	if len(win.callPatches) != 1 || win.callPatches[0].Name != "inc" {
+		t.Fatalf("Win64 call patches = %#v, want inc", win.callPatches)
+	}
+	for _, forbidden := range [][]byte{{0x50}, {0x58}, {0x59}} {
+		if bytes.Contains(win.code, forbidden) {
+			t.Fatalf("Win64 register call emitted stack-machine push/pop byte % x: % x", forbidden, win.code)
+		}
+	}
+	addShadow := &x64.Emitter{}
+	addShadow.AddRspImm32(32)
+	callAt := bytes.IndexByte(win.code, 0xE8)
+	if callAt < len(shadow.Buf) {
+		t.Fatalf("Win64 call opcode too early for shadow-space prologue: % x", win.code)
+	}
+	if !bytes.Equal(win.code[callAt-len(shadow.Buf):callAt], shadow.Buf) {
+		t.Fatalf("Win64 register call missing shadow-space prologue: % x", win.code)
+	}
+	callEnd := callAt + 5
+	if callEnd+len(addShadow.Buf) > len(win.code) || !bytes.Equal(win.code[callEnd:callEnd+len(addShadow.Buf)], addShadow.Buf) {
+		t.Fatalf("Win64 register call missing shadow-space epilogue: % x", win.code)
 	}
 }
 

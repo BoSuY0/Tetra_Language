@@ -286,6 +286,54 @@ func buildSysVUnixX64(entries []string, sysMmap uint32, mapFlags uint32, distrib
 	if err := emitFunc("__tetra_net_close", func() error { return emitNetClose(e) }); err != nil {
 		return nil, err
 	}
+	if err := emitFunc("__tetra_surface_open", func() error { return emitSurfaceOpen(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_close", func() error { return emitSurfaceClose(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_poll_event_kind", func() error { return emitSurfaceConst(e, 5) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_poll_event_x", func() error { return emitSurfaceConst(e, 48) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_poll_event_y", func() error { return emitSurfaceConst(e, 96) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_poll_event_button", func() error { return emitSurfaceConst(e, 1) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_poll_event_into", func() error { return emitSurfacePollEventInto(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_poll_event_text_len", func() error { return emitSurfaceConst(e, 2) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_poll_event_text_into", func() error { return emitSurfacePollEventTextInto(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_clipboard_write_text", func() error { return emitSurfaceClipboardWriteText(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_clipboard_read_text_into", func() error { return emitSurfaceClipboardReadTextInto(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_poll_composition_into", func() error { return emitSurfacePollCompositionInto(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_begin_frame", func() error { return emitSurfaceOK(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_present_rgba", func() error { return emitSurfacePresentRGBA(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_now_ms", func() error { return emitSurfaceOK(e) }); err != nil {
+		return nil, err
+	}
+	if err := emitFunc("__tetra_surface_request_redraw", func() error { return emitSurfaceOK(e) }); err != nil {
+		return nil, err
+	}
 	if distributedActorNet {
 		if err := emitFunc("__tetra_actor_node_connect", func() error { return emitActorNodeConnect(e) }); err != nil {
 			return nil, err

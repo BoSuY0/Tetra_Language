@@ -19,7 +19,7 @@ the artifact exists in the current worktree.
 
 | Task range | Epic | Consolidated evidence artifacts | Evidence commands / checks |
 | --- | --- | --- | --- |
-| T250-001..T250-025 | Scope, Contracts, Governance | `reports/plan250/agent-docs-evidence.md`; `reports/plan250/generated-manifest.json`; `reports/plan250/tetra-docs.md`; `reports/plan250/smoke-list-linux-x64.json`; release docs/spec/checklist files named inline in this range. | `./tetra version`; `./tetra features --format=json`; `go test ./compiler -run FeatureRegistry -count=1`; `go test ./tools/scriptstest -run 'ReleaseV10Gate|CurrentSupportedSurface' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go run ./tools/cmd/validate-manifest --manifest reports/plan250/generated-manifest.json`; `git diff --check`. |
+| T250-001..T250-025 | Scope, Contracts, Governance | `reports/plan250/agent-docs-evidence.md`; `reports/plan250/generated-manifest.json`; `reports/plan250/tetra-docs.md`; `reports/plan250/smoke-list-linux-x64.json`; release docs, spec, and checklist files named inline in this range. | `./tetra version`; `./tetra features --format=json`; `go test ./compiler -run FeatureRegistry -count=1`; `go test ./tools/scriptstest -run 'ReleaseV10Gate|CurrentSupportedSurface' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go run ./tools/cmd/validate-manifest --manifest reports/plan250/generated-manifest.json`; `git diff --check`. |
 | T250-026..T250-050 | Frontend (Lexer, Parser, Formatter, Flow) | `reports/plan250/wave2-implC-frontend-evidence.md`; `reports/plan250/frontend-summary.md`; parser/lexer/formatter fixtures named in the wave report. | `go test ./compiler/internal/frontend/... -count=1`; `./tetra fmt --check examples lib __rt compiler/selfhostrt`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt`; targeted `tools/scriptstest` flow/formatter checks. |
 | T250-051..T250-075 | Semantics (Types, Generics, Protocols, Enums, Modules) | `reports/plan250/wave2-implC-semantics-evidence.md`; `reports/plan250/semantics-summary.md`; `reports/plan250/tetra-docs.md`. | `go test ./compiler/... -run 'Type|Inference|Enum|Optional|Protocol|Extension|Module|Generic|Conformance' -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `go run ./tools/cmd/validate-api-docs --docs reports/plan250/tetra-docs.md`; `go test ./compiler -run FeatureRegistry -count=1`. |
 | T250-076..T250-100 | Safety (Ownership, Lifetimes, Effects, Privacy, Budgets) | `reports/plan250/agent-safety-runtime-evidence.md`; `reports/plan250/safety-summary.md`; docs/spec and docs/user files named in the wave report. | `go test ./compiler -run 'Plan250Safety|Plan250Runtime|Plan250Link' -count=1`; `go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1`; `go test ./tools/cmd/validate-diagnostic/... -count=1`; `go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json`; `git diff --check`. |
@@ -40,7 +40,7 @@ the artifact exists in the current worktree.
 - [x] T250-006 Додати явний mapping `feature -> evidence command -> artifact path` для runtime scope. Evidence: `docs/spec/v1_scope.md`, `reports/plan250/wave2-implD-evidence.md`.
 - [x] T250-007 Додати явний mapping `feature -> evidence command -> artifact path` для backend scope. Evidence: `docs/spec/v1_scope.md`, `reports/plan250/wave2-implD-evidence.md`.
 - [x] T250-008 Додати явний mapping `feature -> evidence command -> artifact path` для CLI/tools scope. Evidence: `docs/spec/v1_scope.md`, `reports/plan250/wave2-implD-evidence.md`.
-- [x] T250-009 Додати явний mapping `feature -> evidence command -> artifact path` для docs/LSP/Eco scope. Evidence: `docs/spec/v1_scope.md`, `reports/plan250/wave2-implD-evidence.md`.
+- [x] T250-009 Додати явний mapping `feature -> evidence command -> artifact path` для docs, LSP, and Eco scope. Evidence: `docs/spec/v1_scope.md`, `reports/plan250/wave2-implD-evidence.md`.
 - [x] T250-010 Нормалізувати статуси у `compiler/features.go` (`current/experimental/planned/post-v1`) проти docs truth. Evidence: `./tetra features --format=json`, `go test ./compiler -run 'TestFeatureRegistry' -count=1`.
 - [x] T250-011 Перевірити, що `./tetra features --format=json` відображає ті самі статуси, що й docs. Evidence: `reports/plan250/wave2-implD-evidence.md`.
 - [x] T250-012 Додати regression test на consistency feature registry vs docs manifest anchors. Evidence: `go test ./tools/cmd/verify-docs ...`, `go test ./compiler -run 'TestFeatureRegistry' -count=1`.
@@ -72,7 +72,7 @@ the artifact exists in the current worktree.
 - [x] T250-035 Додати lexer tests для invalid UTF-8 і deterministic diagnostic positions.
 - [x] T250-036 Додати lexer tests для string escape corner cases.
 - [x] T250-037 Додати lexer tests для doc-comment tokenization rules.
-- [x] T250-038 Додати formatter idempotence tests на representative corpus з `examples/lib/__rt`.
+- [x] T250-038 Додати formatter idempotence tests на representative corpus з `examples`, `lib`, and `__rt`.
 - [x] T250-039 Додати formatter regression tests для comment-preservation у складних блоках.
 - [x] T250-040 Додати formatter regression tests для blank-line normalization rules.
 - [x] T250-041 Додати formatter diagnostics tests на malformed syntax input.
@@ -88,7 +88,7 @@ the artifact exists in the current worktree.
 
 ## Epic 03: Semantics (Types, Generics, Protocols, Enums, Modules) (T250-051..T250-075)
 
-- [x] T250-051 Перевірити canonical type display policy (`i32/u8/bool/str/ptr/...`) проти docs/api-docs.
+- [x] T250-051 Перевірити canonical type display policy (`i32/u8/bool/str/ptr/...`) проти generated API docs.
 - [x] T250-052 Додати regression tests на type alias normalization у diagnostics.
 - [x] T250-053 Додати regression tests на struct field resolution diagnostics.
 - [x] T250-054 Додати regression tests на module boundary visibility diagnostics.
@@ -250,7 +250,7 @@ the artifact exists in the current worktree.
 - [x] T250-195 Додати docs QA note щодо expected evidence date/version binding. Evidence: `docs/release/artifact_policy.md`.
 - [x] T250-196 Перевірити, що docs не містять суперечливих "current release line" тверджень. Evidence: `reports/plan250/wave2-implD-evidence.md`.
 - [x] T250-197 Перевірити, що всі user guides посилаються на `current_supported_surface`. Evidence: `rg -n "current_supported_surface" docs/user`.
-- [x] T250-198 Перевірити `git diff --check` після docs/stdlib wave. Evidence: `reports/plan250/wave2-implD-evidence.md`.
+- [x] T250-198 Перевірити `git diff --check` після stdlib docs wave. Evidence: `reports/plan250/wave2-implD-evidence.md`.
 - [x] T250-199 Оновити `docs/generated/manifest.json` тільки за потреби і з валідацією. Evidence: generated report manifest matched tracked manifest; no update needed.
 - [x] T250-200 Згенерувати audit note `reports/plan250/docs-stdlib-summary.md`. Evidence: `reports/plan250/docs-stdlib-summary.md`.
 
@@ -297,7 +297,7 @@ the artifact exists in the current worktree.
 - [x] T250-236 Перевірити availability і валідність required artifact set для handoff. Evidence: `reports/plan250/waveB-impl4-evidence.md`, `reports/plan250/waveB-v0_3_gate/artifacts/release-state.txt`, `reports/plan250/waveC-impl2-plan-reconcile.md`.
 - [x] T250-237 Оновити `docs/release/v0_3_0_final_handoff.md` з новим report-dir evidence. Evidence: `reports/plan250/waveB-impl4-evidence.md`.
 - [x] T250-238 Оновити `docs/release-notes/v0_3_0.md` з фактичним переліком підтверджених slices. Evidence: `reports/plan250/waveB-impl4-evidence.md`.
-- [x] T250-239 Підготувати `docs/release/known_issues_template.md` instance для поточного кандидата. Evidence: `reports/plan250/waveB-impl4-evidence.md`, `docs/release/known_issues_v0_3_0_waveB_candidate.md`.
+- [x] T250-239 Підготувати `docs/release/known_issues_template.md` instance для поточного кандидата. Evidence: `reports/plan250/waveB-impl4-evidence.md`, `docs/release/known_issues_v0_3_0.md`.
 - [x] T250-240 Звірити відповідність final handoff з `docs/checklists/v0_3_0_release_gate.md`. Evidence: `reports/plan250/waveB-impl4-evidence.md`.
 - [x] T250-241 Звірити відповідність final handoff з `docs/spec/current_supported_surface.md`. Evidence: `reports/plan250/waveB-impl4-evidence.md`.
 - [x] T250-242 Звірити відповідність final handoff з `compiler/features.go` runtime truth. Evidence: `reports/plan250/waveB-impl4-evidence.md`.

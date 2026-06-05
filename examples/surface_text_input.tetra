@@ -1,0 +1,69 @@
+// Pure Tetra Surface TextBox component smoke.
+module examples.surface_text_input
+
+import lib.core.surface as surface
+import lib.core.draw as draw
+import lib.core.component as component
+
+struct TextBox:
+    rect: surface.Rect
+    focused: Bool
+    text_len: Int
+    accepted: Bool
+    buffer: []u8
+
+extension TextBox:
+    func measure(self: borrow TextBox, max: surface.Size) -> surface.Size:
+        let desired: surface.Size = surface.Size(w: 192, h: 48)
+        return component.clamp_size(desired, max)
+    func layout(self: inout TextBox, rect: surface.Rect) -> Int:
+        self.rect = rect
+        return rect.w + rect.h
+    func focus(self: inout TextBox, focused: Bool) -> Int:
+        self.focused = focused
+        return 1
+    func text_input(self: inout TextBox, event: surface.Event) -> Int:
+        if event.kind == surface.event_text_input() && event.text_len > 0:
+            self.text_len = event.text_len
+            if self.buffer[0] == 79 && self.buffer[1] == 75:
+                self.accepted = true
+                return 1
+        return 0
+    func accessibility_role(self: borrow TextBox) -> Int:
+        return component.accessibility_role_label()
+    func draw(self: borrow TextBox, ctx: inout draw.DrawContext) -> Int
+    uses mem:
+        let bg: surface.Color = surface.Color(r: 18, g: 22, b: 27, a: 255)
+        let fg: surface.Color = surface.Color(r: 238, g: 241, b: 245, a: 255)
+        let ok: surface.Color = surface.Color(r: 34, g: 160, b: 104, a: 255)
+        let clear_status: Int = draw.clear(ctx, surface.Color(r: 20, g: 24, b: 26, a: 255))
+        let title_status: Int = draw.text(ctx, "TextBox", 32, 24, fg)
+        let fill_status: Int = draw.rect(ctx, self.rect, bg)
+        let outline_status: Int = draw.rect_outline(ctx, self.rect, fg)
+        if self.accepted:
+            let marker: surface.Rect = surface.Rect(x: self.rect.x + 12, y: self.rect.y + 16, w: 32, h: 12)
+            let marker_status: Int = draw.rect(ctx, marker, ok)
+            return clear_status + title_status + fill_status + outline_status + marker_status
+        return clear_status + title_status + fill_status + outline_status
+
+func main() -> Int
+uses alloc, mem, surface:
+    var storage: []u8 = core.make_u8(8)
+    var box: TextBox = TextBox(rect: surface.Rect(x: 0, y: 0, w: 0, h: 0), focused: false, text_len: 0, accepted: false, buffer: storage)
+    let win: surface.Surface = surface.open("Surface Text Input", 320, 180)
+    let measured: surface.Size = TextBox.measure(box, surface.Size(w: 320, h: 180))
+    let layout_status: Int = TextBox.layout(box, surface.Rect(x: 32, y: 56, w: measured.w, h: measured.h))
+    let focus_status: Int = TextBox.focus(box, true)
+    let accessibility_status: Int = TextBox.accessibility_role(box)
+    let host_text_len: Int = surface.poll_event_text_len(win)
+    let copied_text_len: Int = surface.poll_event_text_into(win, box.buffer)
+    let text_event: surface.Event = surface.Event(kind: surface.event_text_input(), x: 0, y: 0, button: 0, key: 0, width: measured.w, height: measured.h, timestamp_ms: surface.now_ms(), text_len: copied_text_len)
+    let text_status: Int = TextBox.text_input(box, text_event)
+    var frame: surface.Frame = surface.begin_frame(win)
+    var ctx: draw.DrawContext = draw.DrawContext(frame: frame)
+    let draw_status: Int = TextBox.draw(box, ctx)
+    let presented: Int = surface.present(ctx.frame)
+    let closed: Int = surface.close(win)
+    if host_text_len == 2 && copied_text_len == 2 && box.text_len == 2 && box.accepted && box.buffer[0] == 79 && box.buffer[1] == 75 && text_status == 1 && presented == 0 && closed == 0:
+        return 42 + layout_status - layout_status + focus_status - focus_status + accessibility_status - accessibility_status + draw_status - draw_status
+    return 3

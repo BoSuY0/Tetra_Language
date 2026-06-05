@@ -6,12 +6,12 @@
 // For the “human-editable” version, see the repository root `__rt/` folder.
 module __rt.actors_win64
 
-struct task_join_typed_3:
+repr(C) struct task_join_typed_3:
     r0: i32
     r1: i32
     r2: i32
 
-struct task_join_typed_4:
+repr(C) struct task_join_typed_4:
     r0: i32
     r1: i32
     r2: i32

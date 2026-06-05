@@ -19,6 +19,8 @@ func TestReleaseV10WASISmokeWorkflowLivesInVersionedReleaseScript(t *testing.T) 
 	text := string(raw)
 	for _, want := range []string{
 		"Usage: bash scripts/release/v1_0/wasi-smoke.sh",
+		`command -v node`,
+		`runtime prerequisite unavailable: node`,
 		`./tetra smoke --target wasm32-wasi --run=true --report "$report_path"`,
 		`go run ./tools/cmd/validate-wasi-smoke-report --mode runtime --report "$report_path"`,
 	} {
@@ -27,6 +29,19 @@ func TestReleaseV10WASISmokeWorkflowLivesInVersionedReleaseScript(t *testing.T) 
 		}
 	}
 	assertNoLegacyMention(t, text, "scripts/release_v1_0_wasi_smoke.sh", "scripts/release/v1_0/wasi-smoke.sh")
+}
+
+func TestReleaseV10WASISmokeScriptChecksNodePrerequisiteBeforeParsingSmokeList(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release", "v1_0", "wasi-smoke.sh"))
+	if err != nil {
+		t.Fatalf("read wasi smoke script: %v", err)
+	}
+	text := string(raw)
+	guard := strings.Index(text, "command -v node")
+	smokeList := strings.Index(text, `./tetra smoke --list --target wasm32-wasi --format=json >"$smoke_list"`)
+	if guard < 0 || smokeList < 0 || guard > smokeList {
+		t.Fatalf("wasi smoke must check node before parsing the smoke list")
+	}
 }
 
 func TestReleaseV10WASISmokeScriptRejectsUISidecarsForDogfood(t *testing.T) {

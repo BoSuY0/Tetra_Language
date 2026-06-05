@@ -61,6 +61,27 @@ uses alloc, mem:
 `, "cannot assign to slice internals ('ptr'/'len'); assign elements via index instead")
 }
 
+func TestSliceRepresentationMetadataRegistryRejectsReservedNames(t *testing.T) {
+	for _, field := range []string{
+		"owner_id",
+		"region_id",
+		"provenance_id",
+		"borrow_source",
+		"storage_class",
+		"unsafe_class",
+	} {
+		t.Run(field, func(t *testing.T) {
+			testkit.RequireCheckErrorContains(t, fmt.Sprintf(`
+func main() -> Int
+uses alloc, mem:
+    var xs: []u8 = make_u8(1)
+    xs.%s = 1
+    return 0
+`, field), "cannot assign to slice internals ('ptr'/'len'); assign elements via index instead")
+		})
+	}
+}
+
 func TestSliceMetadataAssignmentRejectsNestedLen(t *testing.T) {
 	testkit.RequireCheckErrorContains(t, `
 struct Box:
@@ -72,6 +93,113 @@ uses alloc, mem:
     box.bytes.len = 64
     return 0
 `, "cannot assign to slice internals ('ptr'/'len'); assign elements via index instead")
+}
+
+func TestSliceMetadataAssignmentRejectsNestedPtr(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+struct Box:
+    bytes: []u8
+
+func main() -> Int
+uses alloc, mem:
+    var box: Box = Box(bytes: make_u8(1))
+    box.bytes.ptr = 0
+    return 0
+`, "cannot assign to slice internals ('ptr'/'len'); assign elements via index instead")
+}
+
+func TestSliceMetadataAssignmentRejectsGenericNestedPtr(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+struct Box<T>:
+    value: T
+
+func main() -> Int
+uses alloc, mem:
+    var box: Box<[]u8> = Box<[]u8>{value: make_u8(1)}
+    box.value.ptr = 0
+    return 0
+`, "cannot assign to slice internals ('ptr'/'len'); assign elements via index instead")
+}
+
+func TestSliceMetadataAssignmentRejectsInoutLen(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+func mutate(xs: inout []u8) -> Int:
+    xs.len = 64
+    return 0
+`, "cannot assign to slice internals ('ptr'/'len'); assign elements via index instead")
+}
+
+func TestSliceMetadataAssignmentRejectsOptionalPayloadLen(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+func main() -> Int
+uses alloc, mem:
+    var maybe: []u8? = make_u8(1)
+    if let some(xs) = maybe:
+        xs.len = 64
+    return 0
+`, "cannot assign to slice internals ('ptr'/'len'); assign elements via index instead")
+}
+
+func TestSliceMetadataAssignmentRejectsEnumPayloadPtr(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+enum BufferMsg:
+    case bytes([]u8)
+
+func main() -> Int
+uses alloc, mem:
+    var msg: BufferMsg = BufferMsg.bytes(make_u8(1))
+    match msg:
+        case BufferMsg.bytes(xs):
+            xs.ptr = 0
+    return 0
+`, "cannot assign to slice internals ('ptr'/'len'); assign elements via index instead")
+}
+
+func TestRawSliceFromPartsRequiresUnsafe(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+func forge(p: ptr, n: Int, mem: cap.mem) -> []u8
+uses capability, mem:
+    return core.raw_slice_u8_from_parts(p, n, mem)
+`, "'core.raw_slice_u8_from_parts' is only allowed in unsafe blocks")
+}
+
+func TestRawSliceFromPartsUnsafeGatewayTypeChecks(t *testing.T) {
+	testkit.RequireCheckOK(t, `
+func main() -> Int
+uses alloc, capability, mem:
+    var xs: []u8 = make_u8(1)
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let ys: []u8 = core.raw_slice_u8_from_parts(xs.ptr, xs.len, mem)
+        return ys.len
+    return 0
+`)
+}
+
+func TestBuildRawSliceFromPartsSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	src := `fun main(): i32 uses alloc, capability, mem {
+  var xs: []u8 = make_u8(2)
+  xs[0] = 41
+  xs[1] = 1
+  unsafe {
+    let mem: cap.mem = core.cap_mem()
+    let ys: []u8 = core.raw_slice_u8_from_parts(xs.ptr, xs.len, mem)
+    return ys[0] + ys[1]
+  }
+  return 0
+}
+`
+	stdout, exitCode := buildAndRun(t, src)
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: %d", exitCode)
+	}
 }
 
 func TestBuildMakeBoolSliceSmoke(t *testing.T) {

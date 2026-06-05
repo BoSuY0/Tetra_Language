@@ -58,11 +58,26 @@ const (
 	IRMakeSliceU8
 	IRMakeSliceU16
 	IRMakeSliceI32
+	IRStackSliceU8
+	IRStackSliceU16
+	IRStackSliceI32
+	IRRegionEnter
+	IRRegionMakeSliceU8
+	IRRegionMakeSliceU16
+	IRRegionMakeSliceI32
+	IRRegionReset
+	IRRawSliceFromParts
+	IRSliceWindow
+	IRSlicePrefix
+	IRSliceSuffix
 	IRIndexLoadI32
+	IRIndexLoadI32Unchecked
 	IRIndexStoreI32
 	IRIndexLoadU8
+	IRIndexLoadU8Unchecked
 	IRIndexStoreU8
 	IRIndexLoadU16
+	IRIndexLoadU16Unchecked
 	IRIndexStoreU16
 	// Islands memory model
 	IRIslandNew
@@ -160,7 +175,15 @@ const (
 // RET -> popRet
 // ALLOC -> pop1 push1
 // MAKE_SLICE -> pop1 push2
+// STACK_SLICE -> pop1 push2
+// REGION_ENTER -> no stack effect
+// REGION_MAKE_SLICE -> pop1 push2
+// REGION_RESET -> no stack effect
+// RAW_SLICE_FROM_PARTS -> pop3 push2
+// SLICE_WINDOW -> pop4 push2 (ptr, len, start, count -> ptr+start*elem, count)
+// SLICE_PREFIX/SUFFIX -> pop3 push2
 // INDEX_LOAD -> pop3 push1
+// INDEX_LOAD_UNCHECKED -> pop3 push1 (requires ProofID)
 // INDEX_STORE -> pop4
 // ISLAND_NEW -> pop1 push1
 // ISLAND_MAKE_SLICE -> pop2 push2
@@ -220,6 +243,7 @@ type IRInstr struct {
 	Name     string
 	ArgSlots int
 	RetSlots int
+	ProofID  string
 	Str      []byte
 	Pos      frontend.Position
 }

@@ -340,4 +340,4 @@ go test ./cli/... ./tools/... -run 'Eco|Vault|Capsule|Lock|API'
 - [x] `./tetra version` returns `v1.0.x` on release branch.
 - [x] `scripts/release/v1_0/gate.sh` passes end-to-end.
 - [x] No mandatory v1 TODO in this roadmap remains open.
-- [x] All generated release artifacts (docs/manifest/release notes/api diff proofs) are current and verified.
+- [x] All generated release artifacts for docs, manifest, release notes, and API diff proofs are current and verified.

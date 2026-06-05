@@ -309,6 +309,7 @@ func validateRequiredSmokeCases(target string, seen map[string]bool) error {
 			"core_async_smoke",
 			"core_capability_smoke",
 			"core_collections_smoke",
+			"core_component_smoke",
 			"core_crypto_smoke",
 			"core_filesystem_smoke",
 			"core_io_smoke",

@@ -40,6 +40,22 @@ func DescribeBuiltins() ([]BuiltinManifest, error) {
 		"store_arch_ptr",
 		"sym_addr",
 		"ctx_switch",
+		"surface_open",
+		"surface_close",
+		"surface_poll_event_kind",
+		"surface_poll_event_x",
+		"surface_poll_event_y",
+		"surface_poll_event_button",
+		"surface_poll_event_into",
+		"surface_poll_event_text_len",
+		"surface_poll_event_text_into",
+		"surface_clipboard_write_text",
+		"surface_clipboard_read_text_into",
+		"surface_poll_composition_into",
+		"surface_begin_frame",
+		"surface_present_rgba",
+		"surface_now_ms",
+		"surface_request_redraw",
 		"time_now_ms",
 		"sleep_ms",
 		"sleep_until",
@@ -156,6 +172,13 @@ func builtinEffects(name string) []string {
 		effects = []string{"alloc", "mem"}
 	case "core.make_u8", "core.make_u16", "core.make_i32", "core.make_bool":
 		effects = []string{"alloc", "mem"}
+	case "core.slice_copy_u8", "core.slice_copy_u16", "core.slice_copy_i32", "core.slice_copy_bool", "core.string_copy":
+		effects = []string{"alloc", "mem"}
+	case "core.slice_copy_into_u8", "core.slice_copy_into_u16", "core.slice_copy_into_i32", "core.slice_copy_into_bool", "core.string_copy_into":
+		effects = []string{"mem"}
+	case "core.raw_slice_u8_from_parts", "core.raw_slice_u16_from_parts",
+		"core.raw_slice_i32_from_parts", "core.raw_slice_bool_from_parts":
+		effects = []string{"mem"}
 	case "core.island_new":
 		effects = []string{"alloc", "islands", "mem"}
 	case "core.island_make_u8", "core.island_make_u16", "core.island_make_i32", "core.island_make_bool":
@@ -185,6 +208,13 @@ func builtinEffects(name string) []string {
 		effects = []string{"link"}
 	case "core.ctx_switch":
 		effects = []string{"control", "runtime"}
+	case "core.surface_open", "core.surface_close", "core.surface_poll_event_kind", "core.surface_poll_event_x",
+		"core.surface_poll_event_y", "core.surface_poll_event_button", "core.surface_poll_event_text_len", "core.surface_begin_frame",
+		"core.surface_now_ms", "core.surface_request_redraw":
+		effects = []string{"surface"}
+	case "core.surface_present_rgba", "core.surface_poll_event_into", "core.surface_poll_event_text_into",
+		"core.surface_clipboard_write_text", "core.surface_clipboard_read_text_into", "core.surface_poll_composition_into":
+		effects = []string{"mem", "surface"}
 	case "core.time_now_ms", "core.sleep_ms", "core.sleep_until", "core.deadline_ms", "core.timer_ready":
 		effects = []string{"runtime"}
 	case "core.yield":

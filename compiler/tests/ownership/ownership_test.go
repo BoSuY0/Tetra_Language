@@ -62,6 +62,24 @@ func main() -> Int:
 	}
 }
 
+func TestMemoryIdealV0SequentialInoutAndCopyThenInout(t *testing.T) {
+	testkit.RequireCheckOK(t, `
+func fill(xs: inout []u8) -> Int
+uses mem:
+    xs[0] = xs[0] + 1
+    return xs[0]
+
+func main() -> Int
+uses alloc, mem:
+    var xs: []u8 = make_u8(1)
+    xs[0] = 1
+    let first: Int = fill(xs)
+    let second: Int = fill(xs)
+    var owned: []u8 = xs.copy()
+    return first + second + fill(owned)
+`)
+}
+
 func TestOwnershipInoutRequiresMutableLocal(t *testing.T) {
 	src := []byte(`
 func bump(x: inout Int) -> Int:
@@ -123,7 +141,7 @@ func main() -> Int:
 	if err == nil {
 		t.Fatalf("expected escaping borrowed local error")
 	}
-	if !strings.Contains(err.Error(), "borrow") || !strings.Contains(err.Error(), "escape") {
+	if !strings.Contains(err.Error(), "borrowed slice return requires '-> borrow []u8' or '.copy()'") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -188,7 +206,7 @@ func main() -> Int:
 	if err == nil {
 		t.Fatalf("expected escaping borrowed alias error")
 	}
-	if !strings.Contains(err.Error(), "borrow") || !strings.Contains(err.Error(), "escape") {
+	if !strings.Contains(err.Error(), "borrowed slice return requires '-> borrow []u8' or '.copy()'") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -201,7 +219,7 @@ func leak(x: borrow [2]Int) -> [2]Int:
 
 func main() -> Int:
     return 0
-`, "borrowed local 'x' cannot escape via return")
+	`, "borrowed local 'x' cannot escape via return")
 }
 
 func TestOwnershipRejectsCrossModuleBorrowEscapeViaFixedArrayAliasReturn(t *testing.T) {
@@ -230,7 +248,7 @@ func leak(x: borrow str) -> str:
 
 func main() -> Int:
     return 0
-`, "borrowed local 'x' cannot escape via return")
+	`, "borrowed String return requires '-> borrow String' or '.copy()'")
 }
 
 func TestOwnershipRejectsBorrowedSliceGlobalAssignment(t *testing.T) {
@@ -1809,6 +1827,21 @@ func main() -> Int:
 `, "aliases inout argument")
 }
 
+func TestOwnershipRejectsOverlappingMutableInoutSliceBorrow(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+func mix(left: inout []u8, right: inout []u8) -> Int
+uses mem:
+    left[0] = 1
+    right[0] = 2
+    return left[0] + right[0]
+
+func main() -> Int
+uses alloc, mem:
+    var xs: []u8 = make_u8(1)
+    return mix(xs, xs)
+`, "used more than once")
+}
+
 func TestOwnershipRejectsInoutConsumeAliasWithInoutFirst(t *testing.T) {
 	testkit.RequireCheckErrorContains(t, `
 func mix(write: inout Int, taken: consume Int) -> Int:
@@ -2852,7 +2885,7 @@ func main() -> Int:
     return 0
 `,
 	}
-	requireCheckWorldFilesErrorContains(t, files, "lib/leak.t4", "borrowed local 'x' cannot escape via return")
+	requireCheckWorldFilesErrorContains(t, files, "lib/leak.t4", "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot escape through owned return")
 }
 
 func TestOwnershipRejectsCrossModuleBorrowedSliceEscapeViaOptionalAssignmentOwnedCall(t *testing.T) {
@@ -3707,7 +3740,7 @@ func leak(x: borrow []u8) -> BufBox:
 
 func main() -> Int:
     return 0
-`, "borrowed local 'x' cannot escape via return")
+	`, "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return")
 }
 
 func TestOwnershipRejectsBorrowEscapeViaStructAliasReturn(t *testing.T) {
@@ -3741,7 +3774,7 @@ func main() -> Int:
     return 0
 `,
 	}
-	requireCheckWorldFilesErrorContains(t, files, "lib/leaks.t4", "borrowed local 'x' cannot escape via return")
+	requireCheckWorldFilesErrorContains(t, files, "lib/leaks.t4", "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return")
 }
 
 func TestOwnershipRejectsCrossModuleBorrowEscapeViaStructAliasReturn(t *testing.T) {
@@ -3857,7 +3890,7 @@ func leak(x: borrow []u8) -> []u8?:
 
 func main() -> Int:
     return 0
-`, "borrowed local 'x' cannot escape via return")
+`, "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot escape through owned return")
 }
 
 func TestOwnershipRejectsBorrowedPtrEscapeViaOptionalAssignmentIfLetGlobalAssignment(t *testing.T) {
@@ -4795,7 +4828,7 @@ func leak(maybe: borrow []u8?) -> Int:
 
 func main() -> Int:
     return 0
-`, "borrowed local 'maybe' cannot escape via global assignment to 'leaked'")
+`, "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot be stored in global")
 }
 
 func TestOwnershipRejectsCrossModuleBorrowedSliceOptionalPayloadGlobalAssignment(t *testing.T) {
@@ -4819,7 +4852,7 @@ func main() -> Int:
     return 0
 `,
 	}
-	requireCheckWorldFilesErrorContains(t, files, "lib/leaks.t4", "borrowed local 'maybe' cannot escape via global assignment to 'leaked'")
+	requireCheckWorldFilesErrorContains(t, files, "lib/leaks.t4", "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot be stored in global")
 }
 
 func TestOwnershipRejectsCrossModuleBorrowedSliceGlobalAssignment(t *testing.T) {
@@ -5096,7 +5129,7 @@ func leak(x: borrow []u8) -> OuterBox:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -5161,7 +5194,7 @@ pub struct OuterBox:
 pub func leak(x: borrow []u8) -> OuterBox:
     return OuterBox(box: BufBox(buf: x))
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -5234,7 +5267,7 @@ func leak(x: borrow []u8) -> OuterMsg:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -5302,7 +5335,7 @@ pub enum OuterMsg:
 pub func leak(x: borrow []u8) -> OuterMsg:
     return OuterMsg.wrap(BufBox(buf: x))
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias-return",
@@ -5757,7 +5790,7 @@ func leak(x: borrow []u8) -> BufMsg:
 
 func main() -> Int:
     return 0
-`, "borrowed local 'x' cannot escape via return")
+	`, "aggregate 'BufMsg' contains borrowed slice field 'BufMsg.send[1]' that cannot escape through owned return")
 }
 
 func TestOwnershipRejectsBorrowEscapeViaEnumAliasReturn(t *testing.T) {
@@ -5890,7 +5923,7 @@ func main() -> Int:
     return 0
 `,
 	}
-	requireCheckWorldFilesErrorContains(t, files, "lib/leaks.t4", "borrowed local 'x' cannot escape via return")
+	requireCheckWorldFilesErrorContains(t, files, "lib/leaks.t4", "aggregate 'BufMsg' contains borrowed slice field 'BufMsg.send[1]' that cannot escape through owned return")
 }
 
 func TestOwnershipRejectsCrossModuleBorrowEscapeViaEnumAliasReturn(t *testing.T) {

@@ -28,8 +28,8 @@
 - Modify `compiler/internal/lower/callables.go`: lower escaping callables as fixed-width handles; keep `fnptr` fast path for local snapshots.
 - Modify `compiler/internal/ir/ir.go`: add callable-handle IR instructions only if existing `IRCall` plus runtime helpers cannot express the handle cleanly.
 - Modify `compiler/internal/backend/x64core/emit.go` and `compiler/internal/backend/x64abi/*.go` only for tests proving no new return-slot width is needed.
-- Modify `compiler/function_typed_callable_test.go`, `compiler/closures_semantic_clauses_test.go`, and `compiler/internal/lower/callable_test.go`: add red/green coverage for escaping handles and diagnostics.
-- Modify `compiler/features.go`, `compiler/features_test.go`, `docs/release/v0_4_0_callable_evidence_map.md`, `docs/release/v0_4_0_completion_audit.md`, and `docs/spec/current_supported_surface.md` only after implementation gates pass.
+- Modify `compiler/tests/callables/function_typed_callable_test.go`, `compiler/tests/semantics/closures_semantic_clauses_test.go`, and `compiler/internal/lower/callable_test.go`: add red/green coverage for escaping handles and diagnostics.
+- Modify `compiler/features.go`, `compiler/tests/semantics/features_test.go`, `docs/release/v0_4_0_callable_evidence_map.md`, `docs/release/v0_4_0_completion_audit.md`, and `docs/spec/current_supported_surface.md` only after implementation gates pass.
 
 ## Task 1: Lock the Current Failing Completion Baseline
 
@@ -78,12 +78,12 @@ Expected: all three commands exit 0.
 ## Task 2: Add Red Tests for Fat Handle Behavior
 
 **Files:**
-- Modify: `compiler/function_typed_callable_test.go`
-- Modify: `compiler/closures_semantic_clauses_test.go`
+- Modify: `compiler/tests/callables/function_typed_callable_test.go`
+- Modify: `compiler/tests/semantics/closures_semantic_clauses_test.go`
 
 - [x] **Step 1: Add a runtime smoke for a 9-capture escaping callable return**
 
-Add this test to `compiler/function_typed_callable_test.go` near the captured callable build smokes:
+Add this test to `compiler/tests/callables/function_typed_callable_test.go` near the captured callable build smokes:
 
 ```go
 func TestBuildFullCallableEscapedNineCaptureReturnSmoke(t *testing.T) {
@@ -117,7 +117,7 @@ func main() -> Int:
 
 - [x] **Step 2: Add a runtime smoke for same-module global storage**
 
-Add this test to `compiler/function_typed_callable_test.go`:
+Add this test to `compiler/tests/callables/function_typed_callable_test.go`:
 
 ```go
 func TestBuildFullCallableEscapedGlobalNineCaptureSmoke(t *testing.T) {
@@ -157,7 +157,7 @@ func main() -> Int:
 
 - [x] **Step 3: Add a stable diagnostic for mutable capture global escape**
 
-Add this test to `compiler/closures_semantic_clauses_test.go`:
+Add this test to `compiler/tests/semantics/closures_semantic_clauses_test.go`:
 
 ```go
 func TestFullCallableGlobalEscapeRejectsMutableCaptureDiagnostic(t *testing.T) {
@@ -466,7 +466,7 @@ Expected after this task: runtime handle smokes pass on linux/amd64; ABI tests s
 ## Task 7: Complete Cross-Module and Container Matrix
 
 **Files:**
-- Modify: `compiler/function_typed_callable_test.go`
+- Modify: `compiler/tests/callables/function_typed_callable_test.go`
 - Modify: `compiler/internal/lower/callable_test.go`
 - Modify: `compiler/interface_test.go`
 - Modify: `.t4i` generation code discovered by `rg -n "FunctionCaptures|FunctionEscape" compiler/internal compiler -g'*.go'`
@@ -510,7 +510,7 @@ Expected: all new matrix tests pass.
 
 **Files:**
 - Modify: `compiler/features.go`
-- Modify: `compiler/features_test.go`
+- Modify: `compiler/tests/semantics/features_test.go`
 - Modify: `docs/release/v0_4_0_callable_evidence_map.md`
 - Modify: `docs/release/v0_4_0_completion_audit.md`
 - Modify: `docs/spec/current_supported_surface.md`
@@ -531,7 +531,7 @@ Expected: all commands exit 0.
 
 - [x] **Step 2: Promote registry after implementation evidence exists**
 
-Change `language.full-first-class-callables` in `compiler/features.go` from `FeatureStatusPostV1` to `FeatureStatusCurrent` and set `Since: "v0.4.0"`. Update `compiler/features_test.go` to require current status and scope text covering fat callable handle, escape classifier, capture matrix, and stable diagnostics.
+Change `language.full-first-class-callables` in `compiler/features.go` from `FeatureStatusPostV1` to `FeatureStatusCurrent` and set `Since: "v0.4.0"`. Update `compiler/tests/semantics/features_test.go` to require current status and scope text covering fat callable handle, escape classifier, capture matrix, and stable diagnostics.
 
 - [x] **Step 3: Update release docs**
 
@@ -573,7 +573,7 @@ go test ./compiler/... -run 'Closure|Callable|FunctionType|Lifetime|Ownership|Ge
 go test ./compiler/internal/backend/... -run 'Callable|Closure|FunctionType|ABI' -count=1
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 go run ./tools/cmd/validate-features --report /tmp/tetra-v04-features.json
-git diff --check -- compiler/internal/semantics/types.go compiler/internal/semantics/callable_escape.go compiler/internal/semantics/checker.go compiler/internal/semantics/diagnostics.go compiler/internal/lower/callables.go compiler/function_typed_callable_test.go compiler/closures_semantic_clauses_test.go compiler/internal/lower/callable_test.go compiler/features.go compiler/features_test.go docs/release/v0_4_0_callable_evidence_map.md docs/release/v0_4_0_completion_audit.md docs/spec/current_supported_surface.md docs/spec/v1_feature_status.md
+git diff --check -- compiler/internal/semantics/types.go compiler/internal/semantics/callable_escape.go compiler/internal/semantics/checker.go compiler/internal/semantics/diagnostics.go compiler/internal/lower/callables.go compiler/tests/callables/function_typed_callable_test.go compiler/tests/semantics/closures_semantic_clauses_test.go compiler/internal/lower/callable_test.go compiler/features.go compiler/tests/semantics/features_test.go docs/release/v0_4_0_callable_evidence_map.md docs/release/v0_4_0_completion_audit.md docs/spec/current_supported_surface.md docs/spec/v1_feature_status.md
 ```
 
 Expected: all commands exit 0.

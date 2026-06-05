@@ -120,6 +120,9 @@ func looksLikeFlowSyntax(src []byte) bool {
 		if strings.HasPrefix(header, "struct ") && strings.HasSuffix(header, ":") {
 			return true
 		}
+		if strings.HasPrefix(header, "repr(C) struct ") && strings.HasSuffix(header, ":") {
+			return true
+		}
 		if strings.HasPrefix(header, "enum ") && strings.HasSuffix(header, ":") {
 			return true
 		}

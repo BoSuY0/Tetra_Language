@@ -112,6 +112,27 @@ func TestReleaseV10WebSmokeScript_bindHTTPServerToLoopback(t *testing.T) {
 	}
 }
 
+func TestReleaseV10WebSmokeScriptUsesEphemeralPortAndTrapCleanup(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts", "release", "v1_0", "web-smoke.sh"))
+	if err != nil {
+		t.Fatalf("read web smoke script: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`cleanup_web_smoke()`,
+		`trap cleanup_web_smoke EXIT`,
+		`port="0"`,
+		`wait_for_server_port "$tmp_dir/server.log"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("web smoke script missing ephemeral-port cleanup contract %q", want)
+		}
+	}
+	if strings.Contains(text, "for candidate in 8711 8712 8713 8714 8715") {
+		t.Fatalf("web smoke script must not use fixed local port range")
+	}
+}
+
 func Test_release_v1_0_web_smokeRejectsMissingReportArgument(t *testing.T) {
 	root := releaseV10WebSmokeFakeRepo(t)
 

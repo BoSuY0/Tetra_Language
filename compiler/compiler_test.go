@@ -3815,6 +3815,44 @@ pub func add(a: Int, b: Int) -> Int:
 	}
 }
 
+func TestBuildInterfaceOnlyModeRejectsTamperedBorrowedReturnLifetimeMetadata(t *testing.T) {
+	tmp := t.TempDir()
+	iface, err := GenerateInterfaceFromSource([]byte(`module lib.views
+
+pub func view(xs: borrow []u8) -> borrow []u8:
+    return xs.borrow()
+`), "lib/views.t4")
+	if err != nil {
+		t.Fatalf("GenerateInterfaceFromSource: %v", err)
+	}
+	tampered := strings.Replace(string(iface), "source=xs", "source=ys", 1)
+	if tampered == string(iface) {
+		t.Fatalf("test fixture did not find borrowed return lifetime metadata:\n%s", iface)
+	}
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.views as views
+
+func relay(xs: borrow []u8) -> borrow []u8:
+    return views.view(xs)
+
+func main() -> Int:
+    return 0
+`,
+		"lib/views.t4i": tampered,
+	})
+
+	_, err = BuildFileWithStatsOpt(
+		filepath.Join(tmp, filepath.FromSlash("app/main.t4")),
+		filepath.Join(tmp, "out", "app"),
+		"linux-x64",
+		BuildOptions{Jobs: 1, InterfaceOnly: true},
+	)
+	if err == nil || !strings.Contains(err.Error(), "invalid .t4i hash") {
+		t.Fatalf("BuildFileWithStatsOpt tampered lifetime metadata error = %v, want invalid .t4i hash", err)
+	}
+}
+
 func TestBuildInterfaceOnlyModePreservesTypedErrorResourceThrowProvenance(t *testing.T) {
 	tmp := t.TempDir()
 	iface, err := GenerateInterfaceFromSource([]byte(`module lib.resources

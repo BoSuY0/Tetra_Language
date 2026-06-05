@@ -1,0 +1,72 @@
+{
+  "title": "Tetra audit findings 500 plus",
+  "slug": "tetra-audit-findings-500-plus",
+  "created_at": "2026-06-04T08:24:21+00:00",
+  "status": "in_progress",
+  "approval": {
+    "required": "destructive or release-archive regeneration only",
+    "granted": "not_needed_for_read_only_and_focused_local_fixes",
+    "notes": "User explicitly requested sub-agents; four read-only agents were spawned."
+  },
+  "packets": [
+    {
+      "id": "P-A",
+      "title": "build toolchain scripts",
+      "status": "completed_read_only",
+      "result": "results/P-A-build-toolchain-scripts.md"
+    },
+    {
+      "id": "P-B",
+      "title": "generated release dump binary evidence",
+      "status": "completed_read_only",
+      "result": "results/P-B-generated-release-evidence.md"
+    },
+    {
+      "id": "P-C",
+      "title": "missing referenced artifacts",
+      "status": "completed_read_only",
+      "result": "results/P-C-missing-references.md"
+    },
+    {
+      "id": "P-D",
+      "title": "placeholders and bug ledgers",
+      "status": "completed_read_only",
+      "result": "results/P-D-placeholders-bug-ledgers.md"
+    },
+    {
+      "id": "P-I",
+      "title": "integration and live fixes",
+      "status": "in_progress"
+    },
+    {
+      "id": "P-V",
+      "title": "verification",
+      "status": "not_started"
+    }
+  ],
+  "verification": {
+    "status": "in_progress",
+    "checks": [
+      {
+        "name": "no testing.T.Chdir",
+        "status": "passed",
+        "evidence": "GREEN: no testing.T.Chdir usage"
+      },
+      {
+        "name": "validate-v0-4-readiness package",
+        "status": "passed",
+        "evidence": "GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-audit-f0001-green go test -p=1 ./tools/cmd/validate-v0-4-readiness -count=1"
+      },
+      {
+        "name": "release v1.0 script syntax/static",
+        "status": "passed",
+        "evidence": "bash -n scripts/release/v1_0/wasi-smoke.sh scripts/release/v1_0/web-smoke.sh scripts/release/v1_0/security-review.sh scripts/release/v1_0/reproducible-build.sh; GREEN: F-0744..F-0748 syntax/static release-script checks passed"
+      },
+      {
+        "name": "release v1.0 script tests",
+        "status": "passed",
+        "evidence": "GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-audit-release-scripts go test -p=1 ./tools/scriptstest -run 'ReleaseV10(WASI|Web|Repro)|SecurityReview' -count=1"
+      }
+    ]
+  }
+}

@@ -25,6 +25,7 @@ func TestManifestDescribeBuiltinsSortedAndAliasStable(t *testing.T) {
 	foundMakeU16 := false
 	foundMakeBool := false
 	foundIslandMakeBool := false
+	foundRawSliceU8 := false
 	for _, entry := range got {
 		switch entry.Name {
 		case "core.make_u8":
@@ -62,6 +63,17 @@ func TestManifestDescribeBuiltinsSortedAndAliasStable(t *testing.T) {
 			if entry.UnsafePolicy != "conditional" {
 				t.Fatalf("core.island_make_bool unsafe policy = %q, want conditional", entry.UnsafePolicy)
 			}
+		case "core.raw_slice_u8_from_parts":
+			foundRawSliceU8 = true
+			if !reflect.DeepEqual(entry.ParamTypes, []string{"ptr", "i32", "cap.mem"}) {
+				t.Fatalf("core.raw_slice_u8_from_parts params = %#v, want ptr/i32/cap.mem", entry.ParamTypes)
+			}
+			if entry.ReturnType != "[]u8" {
+				t.Fatalf("core.raw_slice_u8_from_parts return type = %q, want []u8", entry.ReturnType)
+			}
+			if entry.UnsafePolicy != "always" {
+				t.Fatalf("core.raw_slice_u8_from_parts unsafe policy = %q, want always", entry.UnsafePolicy)
+			}
 		}
 	}
 	if !foundMakeU8 {
@@ -75,6 +87,9 @@ func TestManifestDescribeBuiltinsSortedAndAliasStable(t *testing.T) {
 	}
 	if !foundIslandMakeBool {
 		t.Fatalf("missing core.island_make_bool in manifest output")
+	}
+	if !foundRawSliceU8 {
+		t.Fatalf("missing core.raw_slice_u8_from_parts in manifest output")
 	}
 }
 
@@ -192,6 +207,88 @@ func TestManifestDescribeBuiltinsIncludesAtomicSurface(t *testing.T) {
 		}
 		if entry.UnsafePolicy != "always" {
 			t.Fatalf("%s unsafe policy = %q, want always", tt.name, entry.UnsafePolicy)
+		}
+	}
+}
+
+func TestManifestDescribeBuiltinsIncludesSafeSliceViews(t *testing.T) {
+	got, err := DescribeBuiltins()
+	if err != nil {
+		t.Fatalf("DescribeBuiltins: %v", err)
+	}
+	byName := map[string]BuiltinManifest{}
+	for _, entry := range got {
+		byName[entry.Name] = entry
+	}
+
+	for _, elem := range []string{"u8", "u16", "i32", "bool"} {
+		for _, tc := range []struct {
+			kind       string
+			params     []string
+			returnType string
+			effects    []string
+		}{
+			{kind: "window", params: []string{"[]" + elem, "i32", "i32"}, returnType: "[]" + elem},
+			{kind: "prefix", params: []string{"[]" + elem, "i32"}, returnType: "[]" + elem},
+			{kind: "suffix", params: []string{"[]" + elem, "i32"}, returnType: "[]" + elem},
+			{kind: "borrow", params: []string{"[]" + elem}, returnType: "[]" + elem},
+			{kind: "copy", params: []string{"[]" + elem}, returnType: "[]" + elem, effects: []string{"alloc", "mem"}},
+			{kind: "copy_into", params: []string{"[]" + elem, "[]" + elem}, returnType: "i32", effects: []string{"mem"}},
+		} {
+			name := "core.slice_" + tc.kind + "_" + elem
+			entry, ok := byName[name]
+			if !ok {
+				t.Fatalf("manifest missing %s", name)
+			}
+			if !reflect.DeepEqual(entry.ParamTypes, tc.params) {
+				t.Fatalf("%s param types = %#v, want %#v", name, entry.ParamTypes, tc.params)
+			}
+			if entry.ReturnType != tc.returnType {
+				t.Fatalf("%s return type = %q, want %s", name, entry.ReturnType, tc.returnType)
+			}
+			if len(entry.Aliases) != 0 {
+				t.Fatalf("%s aliases = %#v, want none", name, entry.Aliases)
+			}
+			if !reflect.DeepEqual(entry.Effects, tc.effects) {
+				t.Fatalf("%s effects = %#v, want %#v", name, entry.Effects, tc.effects)
+			}
+			if entry.UnsafePolicy != "never" {
+				t.Fatalf("%s unsafe policy = %q, want never", name, entry.UnsafePolicy)
+			}
+		}
+	}
+
+	for _, tc := range []struct {
+		name       string
+		params     []string
+		returnType string
+		effects    []string
+	}{
+		{name: "core.string_window", params: []string{"str", "i32", "i32"}, returnType: "str"},
+		{name: "core.string_prefix", params: []string{"str", "i32"}, returnType: "str"},
+		{name: "core.string_suffix", params: []string{"str", "i32"}, returnType: "str"},
+		{name: "core.string_borrow", params: []string{"str"}, returnType: "str"},
+		{name: "core.string_copy", params: []string{"str"}, returnType: "str", effects: []string{"alloc", "mem"}},
+		{name: "core.string_copy_into", params: []string{"str", "[]u8"}, returnType: "i32", effects: []string{"mem"}},
+	} {
+		entry, ok := byName[tc.name]
+		if !ok {
+			t.Fatalf("manifest missing %s", tc.name)
+		}
+		if !reflect.DeepEqual(entry.ParamTypes, tc.params) {
+			t.Fatalf("%s param types = %#v, want %#v", tc.name, entry.ParamTypes, tc.params)
+		}
+		if entry.ReturnType != tc.returnType {
+			t.Fatalf("%s return type = %q, want %s", tc.name, entry.ReturnType, tc.returnType)
+		}
+		if len(entry.Aliases) != 0 {
+			t.Fatalf("%s aliases = %#v, want none", tc.name, entry.Aliases)
+		}
+		if !reflect.DeepEqual(entry.Effects, tc.effects) {
+			t.Fatalf("%s effects = %#v, want %#v", tc.name, entry.Effects, tc.effects)
+		}
+		if entry.UnsafePolicy != "never" {
+			t.Fatalf("%s unsafe policy = %q, want never", tc.name, entry.UnsafePolicy)
 		}
 	}
 }

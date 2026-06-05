@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 const soReusePort = 0x0f
@@ -119,6 +120,29 @@ func Write(fd int, buf []byte) (int, error) {
 
 func Send(fd int, buf []byte) (int, error) {
 	return syscall.SendmsgN(fd, buf, nil, nil, 0)
+}
+
+func Writev(fd int, chunks [][]byte) (int, error) {
+	iovecs := make([]syscall.Iovec, 0, len(chunks))
+	for _, chunk := range chunks {
+		if len(chunk) == 0 {
+			continue
+		}
+		iovecs = append(iovecs, syscall.Iovec{Base: &chunk[0]})
+		iovecs[len(iovecs)-1].SetLen(len(chunk))
+	}
+	if len(iovecs) == 0 {
+		return 0, nil
+	}
+	n, _, errno := syscall.Syscall(syscall.SYS_WRITEV, uintptr(fd), uintptr(unsafe.Pointer(&iovecs[0])), uintptr(len(iovecs)))
+	if errno != 0 {
+		return int(n), errno
+	}
+	return int(n), nil
+}
+
+func Sendfile(outFD int, inFD int, offset *int64, count int) (int, error) {
+	return syscall.Sendfile(outFD, inFD, offset, count)
 }
 
 func Close(fd int) error {

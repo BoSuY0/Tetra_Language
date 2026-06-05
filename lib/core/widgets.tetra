@@ -1,0 +1,529 @@
+// Experimental minimal Surface widget helpers over lib.core.component.
+// Effects: none
+// ```tetra doctest
+// func widgets_doctest() -> Int:
+//     let rect: lib.core.surface.Rect = lib.core.surface.Rect(x: 0, y: 0, w: 100, h: 50)
+//     var panel: lib.core.widgets.Panel = lib.core.widgets.Panel(rect: rect, padding: 4)
+//     return lib.core.widgets.panel_init(panel, rect, 4)
+// ```
+module lib.core.widgets
+
+import lib.core.surface as surface
+import lib.core.component as component
+import lib.core.accessibility as accessibility
+
+struct Text:
+    rect: surface.Rect
+    role: Int
+    text_len: Int
+    status_code: Int
+
+struct Label:
+    rect: surface.Rect
+    role: Int
+    text_len: Int
+    labelled_for: Int
+
+struct StatusText:
+    rect: surface.Rect
+    role: Int
+    text_len: Int
+    status_code: Int
+
+struct Button:
+    rect: surface.Rect
+    focused: Bool
+    press_count: Int
+    action: Int
+
+struct TextBox:
+    rect: surface.Rect
+    focused: Bool
+    text_len: Int
+    caret: Int
+    buffer: []u8
+
+struct Row:
+    rect: surface.Rect
+    gap: Int
+
+struct Column:
+    rect: surface.Rect
+    padding: Int
+    gap: Int
+
+struct Panel:
+    rect: surface.Rect
+    padding: Int
+
+struct Checkbox:
+    rect: surface.Rect
+    focused: Bool
+    checked: Bool
+    toggle_count: Int
+    action: Int
+
+struct Stack:
+    rect: surface.Rect
+    child_count: Int
+    gap: Int
+
+struct Scroll:
+    rect: surface.Rect
+    content_size: surface.Size
+    offset_y: Int
+
+struct Spacer:
+    rect: surface.Rect
+    min_size: surface.Size
+
+func role_label() -> Int:
+    return component.accessibility_role_label()
+
+func role_status() -> Int:
+    return 3
+
+func action_submit() -> Int:
+    return 1
+
+func action_reset() -> Int:
+    return 2
+
+func action_save() -> Int:
+    return 3
+
+func action_cancel() -> Int:
+    return 4
+
+func action_changed() -> Int:
+    return 5
+
+func default_padding() -> Int:
+    return 8
+
+func default_gap() -> Int:
+    return 8
+
+func label_height() -> Int:
+    return 24
+
+func textbox_height() -> Int:
+    return 44
+
+func button_height() -> Int:
+    return 44
+
+func add_panel(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_panel(), false, bounds)
+
+func add_column(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_column(), false, bounds)
+
+func add_text(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_text(), false, bounds)
+
+func add_label(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_text(), false, bounds)
+
+func add_status_text(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_text(), false, bounds)
+
+func add_textbox(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_textbox(), true, bounds)
+
+func add_checkbox(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_button(), true, bounds)
+
+func add_row(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_row(), false, bounds)
+
+func add_stack(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_panel(), false, bounds)
+
+func add_scroll(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_panel(), false, bounds)
+
+func add_spacer(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_text(), false, bounds)
+
+func add_button(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    return component.tree_add_child(tree, parent_id, component.kind_button(), true, bounds)
+
+func add_accessible_textbox(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect, labelled_by: Int) -> Int:
+    let role: Int = accessibility.role_textbox()
+    return component.tree_add_child(tree, parent_id, component.kind_textbox(), true, bounds) + role - role + labelled_by - labelled_by
+
+func add_accessible_button(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect, action: Int) -> Int:
+    let role: Int = accessibility.role_button()
+    return component.tree_add_child(tree, parent_id, component.kind_button(), true, bounds) + role - role + action - action
+
+func add_accessible_status(tree: inout component.ComponentTree, parent_id: Int, bounds: surface.Rect) -> Int:
+    let role: Int = accessibility.role_status()
+    return component.tree_add_child(tree, parent_id, component.kind_text(), false, bounds) + role - role
+
+func panel_init(panel: inout Panel, rect: surface.Rect, padding: Int) -> Int:
+    panel.rect = rect
+    panel.padding = padding
+    return rect.w
+
+func column_init(column: inout Column, rect: surface.Rect, padding: Int, gap: Int) -> Int:
+    column.rect = rect
+    column.padding = padding
+    column.gap = gap
+    return rect.w
+
+func text_init(text: inout Text, rect: surface.Rect, role: Int, text_len: Int) -> Int:
+    text.rect = rect
+    text.role = role
+    text.text_len = text_len
+    text.status_code = 0
+    return text_len + role - role
+
+func label_init(label: inout Label, rect: surface.Rect, text_len: Int, labelled_for: Int) -> Int:
+    label.rect = rect
+    label.role = role_label()
+    label.text_len = text_len
+    label.labelled_for = labelled_for
+    return text_len + labelled_for - labelled_for
+
+func status_text_init(status: inout StatusText, rect: surface.Rect, text_len: Int, status_code: Int) -> Int:
+    status.rect = rect
+    status.role = role_status()
+    status.text_len = text_len
+    status.status_code = status_code
+    return text_len + status_code - status_code
+
+func textbox_init(box: inout TextBox, rect: surface.Rect, buffer: []u8) -> Int:
+    box.rect = rect
+    box.focused = false
+    box.text_len = 0
+    box.caret = 0
+    box.buffer = buffer
+    return rect.w
+
+func checkbox_init(checkbox: inout Checkbox, rect: surface.Rect, checked: Bool) -> Int:
+    checkbox.rect = rect
+    checkbox.focused = false
+    checkbox.checked = checked
+    checkbox.toggle_count = 0
+    checkbox.action = action_changed()
+    return 1
+
+func row_init(row: inout Row, rect: surface.Rect, gap: Int) -> Int:
+    row.rect = rect
+    row.gap = gap
+    return rect.w
+
+func stack_init(stack: inout Stack, rect: surface.Rect, child_count: Int, gap: Int) -> Int:
+    stack.rect = rect
+    stack.child_count = child_count
+    stack.gap = gap
+    return child_count
+
+func scroll_init(scroll: inout Scroll, rect: surface.Rect, content_size: surface.Size) -> Int:
+    scroll.rect = rect
+    scroll.content_size = content_size
+    scroll.offset_y = 0
+    return content_size.h
+
+func spacer_init(spacer: inout Spacer, rect: surface.Rect, min_size: surface.Size) -> Int:
+    spacer.rect = rect
+    spacer.min_size = min_size
+    return min_size.w + min_size.h
+
+func button_init(button: inout Button, rect: surface.Rect, action: Int) -> Int:
+    button.rect = rect
+    button.focused = false
+    button.press_count = 0
+    button.action = action
+    return action
+
+func panel_content_rect(panel: borrow Panel) -> surface.Rect:
+    return component.inset_rect(panel.rect, panel.padding)
+
+func column_layout(tree: inout component.ComponentTree, column_id: Int, rect: surface.Rect, padding: Int, gap: Int) -> Int:
+    return component.tree_layout_column(tree, column_id, rect, padding, gap)
+
+func row_layout(tree: inout component.ComponentTree, row_id: Int, rect: surface.Rect, gap: Int) -> Int:
+    return component.tree_layout_row(tree, row_id, rect, gap)
+
+func column_child_bounds(column: borrow Column, child_index: Int) -> surface.Rect:
+    let content_w: Int = column.rect.w - column.padding * 2
+    let label_rect: surface.Rect = surface.Rect(x: column.rect.x + column.padding, y: column.rect.y + column.padding, w: content_w, h: 24)
+    let textbox_rect: surface.Rect = surface.Rect(x: column.rect.x + column.padding, y: label_rect.y + label_rect.h + column.gap, w: content_w, h: 44)
+    let row_rect: surface.Rect = surface.Rect(x: column.rect.x + column.padding, y: textbox_rect.y + textbox_rect.h + column.gap + 4, w: content_w, h: 44)
+    let status_rect: surface.Rect = surface.Rect(x: column.rect.x + column.padding, y: row_rect.y + row_rect.h + column.gap, w: content_w, h: 24)
+    if child_index == 0:
+        return label_rect
+    if child_index == 1:
+        return textbox_rect
+    if child_index == 2:
+        return row_rect
+    return status_rect
+
+func row_child_bounds(row: borrow Row, child_index: Int) -> surface.Rect:
+    let button_w: Int = 132
+    let button_h: Int = row.rect.h
+    if child_index == 0:
+        return surface.Rect(x: row.rect.x, y: row.rect.y, w: button_w, h: button_h)
+    return surface.Rect(x: row.rect.x + button_w + row.gap, y: row.rect.y, w: button_w, h: button_h)
+
+func text_set_rect(text: inout Text, rect: surface.Rect) -> Int:
+    text.rect = rect
+    return rect.w
+
+func textbox_set_rect(box: inout TextBox, rect: surface.Rect) -> Int:
+    box.rect = rect
+    return rect.w
+
+func row_set_rect(row: inout Row, rect: surface.Rect) -> Int:
+    row.rect = rect
+    return rect.w
+
+func column_set_rect(column: inout Column, rect: surface.Rect) -> Int:
+    column.rect = rect
+    return rect.w
+
+func panel_set_rect(panel: inout Panel, rect: surface.Rect) -> Int:
+    panel.rect = rect
+    return rect.w
+
+func button_set_rect(button: inout Button, rect: surface.Rect) -> Int:
+    button.rect = rect
+    return rect.w
+
+func label_set_rect(label: inout Label, rect: surface.Rect) -> Int:
+    label.rect = rect
+    return rect.w
+
+func status_text_set_rect(status: inout StatusText, rect: surface.Rect) -> Int:
+    status.rect = rect
+    return rect.w
+
+func checkbox_set_rect(checkbox: inout Checkbox, rect: surface.Rect) -> Int:
+    checkbox.rect = rect
+    return rect.w
+
+func stack_set_rect(stack: inout Stack, rect: surface.Rect) -> Int:
+    stack.rect = rect
+    return rect.w
+
+func scroll_set_rect(scroll: inout Scroll, rect: surface.Rect) -> Int:
+    scroll.rect = rect
+    return rect.w
+
+func spacer_set_rect(spacer: inout Spacer, rect: surface.Rect) -> Int:
+    spacer.rect = rect
+    return rect.w
+
+func text_set_status(text: inout Text, status_code: Int) -> Int:
+    text.status_code = status_code
+    return status_code
+
+func status_text_set_status(status: inout StatusText, status_code: Int) -> Int:
+    status.status_code = status_code
+    return status_code
+
+func status_set(text: inout Text, status_code: Int) -> Int:
+    return text_set_status(text, status_code)
+
+func text_set_owned_or_copy(text: inout Text, text_len: Int) -> Int:
+    text.text_len = text_len
+    return text_len
+
+func textbox_set_focus(box: inout TextBox, focused: Bool) -> Int:
+    box.focused = focused
+    return 1
+
+func button_set_focus(button: inout Button, focused: Bool) -> Int:
+    button.focused = focused
+    return 1
+
+func checkbox_set_focus(checkbox: inout Checkbox, focused: Bool) -> Int:
+    checkbox.focused = focused
+    return 1
+
+func checkbox_toggle(checkbox: inout Checkbox) -> Int:
+    checkbox.checked = !checkbox.checked
+    checkbox.toggle_count = checkbox.toggle_count + 1
+    return 1
+
+func checkbox_key_event(checkbox: inout Checkbox, key: Int) -> Int:
+    if key == 32:
+        return checkbox_toggle(checkbox)
+    return 0
+
+func scroll_set_offset(scroll: inout Scroll, offset_y: Int) -> Int:
+    var next: Int = offset_y
+    if next < 0:
+        next = 0
+    if scroll.content_size.h > scroll.rect.h:
+        let max_offset: Int = scroll.content_size.h - scroll.rect.h
+        if next > max_offset:
+            next = max_offset
+    else:
+        next = 0
+    scroll.offset_y = next
+    return scroll.offset_y
+
+func textbox_clear(box: inout TextBox) -> Int:
+    box.text_len = 0
+    box.caret = 0
+    return 1
+
+func textbox_insert_byte(box: inout TextBox, value: u8) -> Int:
+    if !box.focused:
+        return 0
+    if box.text_len >= 16:
+        return 0
+    var i: Int = box.text_len
+    while i > box.caret:
+        box.buffer[i] = box.buffer[i - 1]
+        i = i - 1
+    box.buffer[box.caret] = value
+    box.text_len = box.text_len + 1
+    box.caret = box.caret + 1
+    return 1
+
+func textbox_text_input(box: inout TextBox, bytes: []u8, count: Int) -> Int:
+    if !box.focused:
+        return 0
+    var copied: Int = 0
+    var i: Int = 0
+    while i < count:
+        copied = copied + textbox_insert_byte(box, bytes[i])
+        i = i + 1
+    return copied
+
+func textbox_key_event(box: inout TextBox, key: Int) -> Int:
+    if !box.focused:
+        return 0
+    if key == 37:
+        if box.caret > 0:
+            box.caret = box.caret - 1
+            return 1
+        return 0
+    if key == 39:
+        if box.caret < box.text_len:
+            box.caret = box.caret + 1
+            return 1
+        return 0
+    if key == 8:
+        if box.caret <= 0 || box.text_len <= 0:
+            return 0
+        var i: Int = box.caret - 1
+        while i < box.text_len - 1:
+            box.buffer[i] = box.buffer[i + 1]
+            i = i + 1
+        box.text_len = box.text_len - 1
+        box.caret = box.caret - 1
+        return 1
+    if key == 46:
+        if box.caret >= box.text_len:
+            return 0
+        var j: Int = box.caret
+        while j < box.text_len - 1:
+            box.buffer[j] = box.buffer[j + 1]
+            j = j + 1
+        box.text_len = box.text_len - 1
+        return 1
+    return 0
+
+func button_key_event(button: inout Button, key: Int) -> Int:
+    if key == 32 || key == 13:
+        button.press_count = button.press_count + 1
+        return 1
+    return 0
+
+func button_pointer_event(button: inout Button, button_code: Int) -> Int:
+    if button_code == 1:
+        button.press_count = button.press_count + 1
+        return 1
+    return 0
+
+func hit_test(root: borrow component.TreeNode, panel: borrow component.TreeNode, column: borrow component.TreeNode, label: borrow component.TreeNode, textbox: borrow component.TreeNode, row: borrow component.TreeNode, submit: borrow component.TreeNode, reset: borrow component.TreeNode, status: borrow component.TreeNode, x: Int, y: Int) -> Int:
+    if !component.node_hit(root, x, y):
+        return component.focus_none()
+    if component.node_hit(row, x, y):
+        if component.node_hit(reset, x, y):
+            return reset.id
+        if component.node_hit(submit, x, y):
+            return submit.id
+        return row.id
+    if component.node_hit(status, x, y):
+        return status.id
+    if component.node_hit(textbox, x, y):
+        return textbox.id
+    if component.node_hit(label, x, y):
+        return label.id
+    if component.node_hit(column, x, y):
+        return column.id
+    if component.node_hit(panel, x, y):
+        return panel.id
+    return root.id
+
+func hit_test_accessibility_settings(root: borrow component.TreeNode, panel: borrow component.TreeNode, column: borrow component.TreeNode, title: borrow component.TreeNode, name_label: borrow component.TreeNode, name_box: borrow component.TreeNode, email_label: borrow component.TreeNode, email_box: borrow component.TreeNode, row: borrow component.TreeNode, save: borrow component.TreeNode, reset: borrow component.TreeNode, status: borrow component.TreeNode, x: Int, y: Int) -> Int:
+    if !component.node_hit(root, x, y):
+        return component.focus_none()
+    if component.node_hit(row, x, y):
+        if component.node_hit(reset, x, y):
+            return reset.id
+        if component.node_hit(save, x, y):
+            return save.id
+        return row.id
+    if component.node_hit(status, x, y):
+        return status.id
+    if component.node_hit(email_box, x, y):
+        return email_box.id
+    if component.node_hit(email_label, x, y):
+        return email_label.id
+    if component.node_hit(name_box, x, y):
+        return name_box.id
+    if component.node_hit(name_label, x, y):
+        return name_label.id
+    if component.node_hit(title, x, y):
+        return title.id
+    if component.node_hit(column, x, y):
+        return column.id
+    if component.node_hit(panel, x, y):
+        return panel.id
+    return root.id
+
+func hit_test_release_form(root: borrow component.TreeNode, panel: borrow component.TreeNode, stack: borrow component.TreeNode, column: borrow component.TreeNode, title: borrow component.TreeNode, description: borrow component.TreeNode, name_label: borrow component.TreeNode, name_box: borrow component.TreeNode, email_label: borrow component.TreeNode, email_box: borrow component.TreeNode, checkbox: borrow component.TreeNode, scroll: borrow component.TreeNode, terms: borrow component.TreeNode, row: borrow component.TreeNode, save: borrow component.TreeNode, reset: borrow component.TreeNode, spacer: borrow component.TreeNode, status: borrow component.TreeNode, x: Int, y: Int) -> Int:
+    if !component.node_hit(root, x, y):
+        return component.focus_none()
+    if component.node_hit(row, x, y):
+        if component.node_hit(reset, x, y):
+            return reset.id
+        if component.node_hit(save, x, y):
+            return save.id
+        if component.node_hit(status, x, y):
+            return status.id
+        if component.node_hit(spacer, x, y):
+            return spacer.id
+        return row.id
+    if component.node_hit(scroll, x, y):
+        if component.node_hit(terms, x, y):
+            return terms.id
+        return scroll.id
+    if component.node_hit(checkbox, x, y):
+        return checkbox.id
+    if component.node_hit(email_box, x, y):
+        return email_box.id
+    if component.node_hit(email_label, x, y):
+        return email_label.id
+    if component.node_hit(name_box, x, y):
+        return name_box.id
+    if component.node_hit(name_label, x, y):
+        return name_label.id
+    if component.node_hit(description, x, y):
+        return description.id
+    if component.node_hit(title, x, y):
+        return title.id
+    if component.node_hit(column, x, y):
+        return column.id
+    if component.node_hit(stack, x, y):
+        return stack.id
+    if component.node_hit(panel, x, y):
+        return panel.id
+    return root.id

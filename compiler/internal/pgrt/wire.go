@@ -17,6 +17,8 @@ const (
 	AuthSASLContinue      uint32 = 11
 	AuthSASLFinal         uint32 = 12
 	Int4OID               uint32 = 23
+	TextFormat            int16  = 0
+	BinaryFormat          int16  = 1
 )
 
 var (
@@ -25,6 +27,7 @@ var (
 	ErrUnsupportedAuth      = errors.New("unsupported PostgreSQL authentication method")
 	ErrUnexpectedMessage    = errors.New("unexpected PostgreSQL message")
 	ErrPostgresErrorMessage = errors.New("PostgreSQL error response")
+	ErrInvalidInt4          = errors.New("invalid PostgreSQL int4 value")
 )
 
 type StartupConfig struct {
@@ -50,6 +53,20 @@ type Column struct {
 }
 
 type Row [][]byte
+
+type RowStorage string
+
+const (
+	RowStorageBorrowed RowStorage = "borrowed"
+	RowStorageCopied   RowStorage = "copied"
+)
+
+type RowDecodeReport struct {
+	Columns       int
+	BorrowedCells int
+	CopiedCells   int
+	Storage       RowStorage
+}
 
 func (r Row) String(index int) string {
 	if index < 0 || index >= len(r) || r[index] == nil {
@@ -127,10 +144,17 @@ func AppendParse(dst []byte, statement string, query string, paramTypeOIDs []uin
 }
 
 func AppendBind(dst []byte, portal string, statement string, values [][]byte) []byte {
+	return AppendBindFormat(dst, portal, statement, nil, values, nil)
+}
+
+func AppendBindFormat(dst []byte, portal string, statement string, paramFormats []int16, values [][]byte, resultFormats []int16) []byte {
 	return appendTypedPayload(dst, 'B', func(payload []byte) []byte {
 		payload = appendCString(payload, portal)
 		payload = appendCString(payload, statement)
-		payload = appendInt16(payload, 0)
+		payload = appendInt16(payload, int16(len(paramFormats)))
+		for _, format := range paramFormats {
+			payload = appendInt16(payload, format)
+		}
 		payload = appendInt16(payload, int16(len(values)))
 		for _, value := range values {
 			if value == nil {
@@ -140,7 +164,10 @@ func AppendBind(dst []byte, portal string, statement string, values [][]byte) []
 			payload = appendInt32(payload, int32(len(value)))
 			payload = append(payload, value...)
 		}
-		payload = appendInt16(payload, 0)
+		payload = appendInt16(payload, int16(len(resultFormats)))
+		for _, format := range resultFormats {
+			payload = appendInt16(payload, format)
+		}
 		return payload
 	})
 }
@@ -241,32 +268,43 @@ func DecodeRowDescription(payload []byte) ([]Column, error) {
 }
 
 func DecodeDataRow(payload []byte) (Row, error) {
+	row, _, err := DecodeDataRowBorrowed(payload, nil)
+	return row, err
+}
+
+func DecodeDataRowBorrowed(payload []byte, scratch Row) (Row, RowDecodeReport, error) {
 	r := payloadReader{data: payload}
 	count, ok := r.int16()
 	if !ok || count < 0 {
-		return nil, ErrMalformedFrame
+		return nil, RowDecodeReport{}, ErrMalformedFrame
 	}
-	row := make(Row, 0, count)
+	row := scratch[:0]
+	if cap(row) < int(count) {
+		row = make(Row, 0, count)
+	}
+	report := RowDecodeReport{Columns: int(count), Storage: RowStorageBorrowed}
 	for i := 0; i < int(count); i++ {
 		n, ok := r.int32()
 		if !ok {
-			return nil, ErrMalformedFrame
+			return nil, RowDecodeReport{}, ErrMalformedFrame
 		}
 		if n == -1 {
 			row = append(row, nil)
+			report.BorrowedCells++
 			continue
 		}
 		if n < 0 || len(r.data)-r.off < int(n) {
-			return nil, ErrMalformedFrame
+			return nil, RowDecodeReport{}, ErrMalformedFrame
 		}
-		value := append([]byte(nil), r.data[r.off:r.off+int(n)]...)
+		value := r.data[r.off : r.off+int(n)]
 		r.off += int(n)
 		row = append(row, value)
+		report.BorrowedCells++
 	}
 	if !r.done() {
-		return nil, ErrMalformedFrame
+		return nil, RowDecodeReport{}, ErrMalformedFrame
 	}
-	return row, nil
+	return row, report, nil
 }
 
 func DecodeCommandComplete(payload []byte) (string, error) {
@@ -357,8 +395,12 @@ func (c *Conn) Prepare(ctx context.Context, name string, query string, paramType
 }
 
 func (c *Conn) ExecPrepared(ctx context.Context, name string, values [][]byte) (Result, error) {
+	return c.ExecPreparedFormat(ctx, name, nil, values, nil)
+}
+
+func (c *Conn) ExecPreparedFormat(ctx context.Context, name string, paramFormats []int16, values [][]byte, resultFormats []int16) (Result, error) {
 	var payload []byte
-	payload = AppendBind(payload, "", name, values)
+	payload = AppendBindFormat(payload, "", name, paramFormats, values, resultFormats)
 	payload = AppendDescribePortal(payload, "")
 	payload = AppendExecute(payload, "", 0)
 	payload = AppendSync(payload)
@@ -369,10 +411,14 @@ func (c *Conn) ExecPrepared(ctx context.Context, name string, values [][]byte) (
 }
 
 func (c *Conn) PreparedQuery(ctx context.Context, name string, query string, paramTypeOIDs []uint32, values [][]byte) (Result, error) {
+	return c.PreparedQueryFormat(ctx, name, query, paramTypeOIDs, nil, values, nil)
+}
+
+func (c *Conn) PreparedQueryFormat(ctx context.Context, name string, query string, paramTypeOIDs []uint32, paramFormats []int16, values [][]byte, resultFormats []int16) (Result, error) {
 	if err := c.Prepare(ctx, name, query, paramTypeOIDs); err != nil {
 		return Result{}, err
 	}
-	return c.ExecPrepared(ctx, name, values)
+	return c.ExecPreparedFormat(ctx, name, paramFormats, values, resultFormats)
 }
 
 func (c *Conn) SimpleQuery(ctx context.Context, query string) (Result, error) {
@@ -662,4 +708,56 @@ func appendInt32(dst []byte, value int32) []byte {
 	var b [4]byte
 	binary.BigEndian.PutUint32(b[:], uint32(value))
 	return append(dst, b[:]...)
+}
+
+func AppendInt4Binary(dst []byte, value int) []byte {
+	return appendInt32(dst, int32(value))
+}
+
+func DecodeInt4(value []byte, format int16) (int, error) {
+	switch format {
+	case BinaryFormat:
+		if len(value) != 4 {
+			return 0, ErrInvalidInt4
+		}
+		return int(int32(binary.BigEndian.Uint32(value))), nil
+	case TextFormat:
+		n, ok := parseInt4Text(value)
+		if !ok {
+			return 0, ErrInvalidInt4
+		}
+		return n, nil
+	default:
+		return 0, ErrInvalidInt4
+	}
+}
+
+func parseInt4Text(value []byte) (int, bool) {
+	if len(value) == 0 {
+		return 0, false
+	}
+	sign := 1
+	off := 0
+	if value[0] == '-' {
+		sign = -1
+		off = 1
+		if off == len(value) {
+			return 0, false
+		}
+	}
+	n := 0
+	for ; off < len(value); off++ {
+		c := value[off]
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		n = n*10 + int(c-'0')
+		if sign == 1 && n > 2147483647 {
+			return 0, false
+		}
+		if sign == -1 && n > 2147483648 {
+			return 0, false
+		}
+	}
+	return sign * n, true
 }

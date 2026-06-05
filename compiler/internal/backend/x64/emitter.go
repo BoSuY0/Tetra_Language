@@ -6,12 +6,16 @@ import (
 )
 
 type CodegenOptions struct {
-	IslandsDebug       bool
-	DebugInfo          bool
-	ReleaseOptimize    bool
-	PointerWidthBits   int
-	NativeIntWidthBits int
-	RegisterWidthBits  int
+	IslandsDebug        bool
+	DebugInfo           bool
+	ReleaseOptimize     bool
+	DisableMachinePaths bool
+	EnableSmallHeap     bool
+	DisableSmallHeap    bool
+	PointerWidthBits    int
+	NativeIntWidthBits  int
+	RegisterWidthBits   int
+	TargetFeatures      TargetFeatures
 }
 
 const IslandsDebugPageSize = 4096
@@ -88,6 +92,13 @@ func (e *Emitter) LeaRsiRipDisp() int {
 func (e *Emitter) LeaRaxRipDisp() int {
 	e.Emit(0x48, 0x8D, 0x05, 0x00, 0x00, 0x00, 0x00)
 	return len(e.Buf) - 4
+}
+
+func (e *Emitter) LeaRaxRbpDisp(disp int32) {
+	e.Emit(0x48, 0x8D, 0x85)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(disp))
+	e.Emit(buf[:]...)
 }
 
 func (e *Emitter) LeaRdxRipDisp() int {
@@ -180,6 +191,10 @@ func (e *Emitter) MovR8Rdx() {
 	e.Emit(0x49, 0x89, 0xD0)
 }
 
+func (e *Emitter) MovR8Rax() {
+	e.Emit(0x49, 0x89, 0xC0)
+}
+
 func (e *Emitter) MovRdxR8() {
 	e.Emit(0x4C, 0x89, 0xC2)
 }
@@ -216,6 +231,10 @@ func (e *Emitter) MovEaxEcx() {
 	e.Emit(0x89, 0xC8)
 }
 
+func (e *Emitter) XorEcxEcx() {
+	e.Emit(0x31, 0xC9)
+}
+
 func (e *Emitter) MovEaxEsi() {
 	e.Emit(0x89, 0xF0)
 }
@@ -232,6 +251,10 @@ func (e *Emitter) MovEaxR9d() {
 	e.Emit(0x44, 0x89, 0xC8)
 }
 
+func (e *Emitter) MovEaxR10d() {
+	e.Emit(0x44, 0x89, 0xD0)
+}
+
 func (e *Emitter) MovEaxR14d() {
 	e.Emit(0x41, 0x8B, 0xC6)
 }
@@ -246,6 +269,10 @@ func (e *Emitter) MovEdxEcx() {
 
 func (e *Emitter) MovEdxEax() {
 	e.Emit(0x89, 0xC2)
+}
+
+func (e *Emitter) MovR8dEdx() {
+	e.Emit(0x41, 0x89, 0xD0)
 }
 
 func (e *Emitter) MovEdxEdi() {
@@ -303,6 +330,13 @@ func (e *Emitter) AddRdiImm32(v int32) {
 
 func (e *Emitter) AddRsiImm32(v int32) {
 	e.Emit(0x48, 0x81, 0xC6)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(v))
+	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) AddRdxImm32(v int32) {
+	e.Emit(0x48, 0x81, 0xC2)
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], uint32(v))
 	e.Emit(buf[:]...)
@@ -687,6 +721,14 @@ func (e *Emitter) SubEaxEcx() {
 	e.Emit(0x29, 0xC8)
 }
 
+func (e *Emitter) SubEcxEdx() {
+	e.Emit(0x29, 0xD1)
+}
+
+func (e *Emitter) SubR8dEcx() {
+	e.Emit(0x41, 0x29, 0xC8)
+}
+
 func (e *Emitter) SubRaxRdi() {
 	e.Emit(0x48, 0x29, 0xF8)
 }
@@ -761,6 +803,14 @@ func (e *Emitter) CmpEaxEdx() {
 
 func (e *Emitter) CmpEdxEcx() {
 	e.Emit(0x39, 0xCA)
+}
+
+func (e *Emitter) CmpEbxEcx() {
+	e.Emit(0x39, 0xCB)
+}
+
+func (e *Emitter) CmpR8dImm8(v byte) {
+	e.Emit(0x41, 0x83, 0xF8, v)
 }
 
 func (e *Emitter) SeteAl() {
@@ -843,6 +893,10 @@ func (e *Emitter) MovzxEaxWordPtrRdi() {
 	e.Emit(0x0F, 0xB7, 0x07)
 }
 
+func (e *Emitter) MovzxEaxBytePtrRsiRcx() {
+	e.Emit(0x0F, 0xB6, 0x04, 0x0E)
+}
+
 func (e *Emitter) MovMem32RaxPtrR8d() {
 	e.Emit(0x44, 0x89, 0x00)
 }
@@ -863,6 +917,10 @@ func (e *Emitter) MovMem16RaxPtrR8w() {
 	e.Emit(0x66, 0x44, 0x89, 0x00)
 }
 
+func (e *Emitter) MovMem8RdiRcxPtrAl() {
+	e.Emit(0x88, 0x04, 0x0F)
+}
+
 func (e *Emitter) MovMem8RaxPtrCl() {
 	e.Emit(0x88, 0x08)
 }
@@ -875,8 +933,16 @@ func (e *Emitter) TestEdxEdx() {
 	e.Emit(0x85, 0xD2)
 }
 
+func (e *Emitter) TestEcxEcx() {
+	e.Emit(0x85, 0xC9)
+}
+
 func (e *Emitter) TestRaxRax() {
 	e.Emit(0x48, 0x85, 0xC0)
+}
+
+func (e *Emitter) TestRcxRcx() {
+	e.Emit(0x48, 0x85, 0xC9)
 }
 
 func (e *Emitter) Leave() {
@@ -896,6 +962,16 @@ func (e *Emitter) JaeRel32() int {
 	return len(e.Buf) - 4
 }
 
+func (e *Emitter) JlRel32() int {
+	e.Emit(0x0F, 0x8C, 0x00, 0x00, 0x00, 0x00)
+	return len(e.Buf) - 4
+}
+
+func (e *Emitter) JgRel32() int {
+	e.Emit(0x0F, 0x8F, 0x00, 0x00, 0x00, 0x00)
+	return len(e.Buf) - 4
+}
+
 // ===================== ISLANDS EMITTER METHODS =====================
 
 func (e *Emitter) AddEaxImm32(v int32) {
@@ -903,6 +979,10 @@ func (e *Emitter) AddEaxImm32(v int32) {
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], uint32(v))
 	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) AddEcxImm8(v byte) {
+	e.Emit(0x83, 0xC1, v)
 }
 
 func (e *Emitter) SubEaxImm32(v int32) {
@@ -1181,6 +1261,13 @@ func (e *Emitter) CmpRaxImm32(v int32) {
 	e.Emit(buf[:]...)
 }
 
+func (e *Emitter) CmpRcxImm32(v int32) {
+	e.Emit(0x48, 0x81, 0xF9)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(v))
+	e.Emit(buf[:]...)
+}
+
 func (e *Emitter) CmpEdiImm32(v int32) {
 	e.Emit(0x81, 0xFF)
 	var buf [4]byte
@@ -1190,6 +1277,13 @@ func (e *Emitter) CmpEdiImm32(v int32) {
 
 func (e *Emitter) CmpEdxImm32(v int32) {
 	e.Emit(0x81, 0xFA)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(v))
+	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) CmpEbxImm32(v int32) {
+	e.Emit(0x81, 0xFB)
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], uint32(v))
 	e.Emit(buf[:]...)
@@ -1270,6 +1364,10 @@ func (e *Emitter) MovR9R8() {
 	e.Emit(0x4D, 0x89, 0xC1)
 }
 
+func (e *Emitter) MovR9Rax() {
+	e.Emit(0x49, 0x89, 0xC1)
+}
+
 func (e *Emitter) MovR8dR8d() {
 	e.Emit(0x45, 0x89, 0xC0)
 }
@@ -1295,6 +1393,20 @@ func (e *Emitter) AddR9Rsi() {
 	e.Emit(0x49, 0x01, 0xF1)
 }
 
+func (e *Emitter) AddR9Imm32(v int32) {
+	e.Emit(0x49, 0x81, 0xC1)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(v))
+	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) AndR9Imm32(v int32) {
+	e.Emit(0x49, 0x81, 0xE1)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(v))
+	e.Emit(buf[:]...)
+}
+
 func (e *Emitter) CmpR9R8() {
 	// cmp r9, r8
 	e.Emit(0x4D, 0x39, 0xC1)
@@ -1303,6 +1415,66 @@ func (e *Emitter) CmpR9R8() {
 func (e *Emitter) MovMem32RaxPtrFromR9d() {
 	// mov [rax], r9d
 	e.Emit(0x44, 0x89, 0x08)
+}
+
+func (e *Emitter) MovR8dFromRdiRcxScale4() {
+	e.Emit(0x44, 0x8B, 0x04, 0x8F)
+}
+
+func (e *Emitter) MovR8dFromR9RcxScale4() {
+	e.Emit(0x45, 0x8B, 0x04, 0x89)
+}
+
+func (e *Emitter) PxorXmm1Xmm1() {
+	e.Emit(0x66, 0x0F, 0xEF, 0xC9)
+}
+
+func (e *Emitter) PxorXmm0Xmm0() {
+	e.Emit(0x66, 0x0F, 0xEF, 0xC0)
+}
+
+func (e *Emitter) MovdquXmm0FromR9RcxScale4() {
+	e.Emit(0xF3, 0x41, 0x0F, 0x6F, 0x04, 0x89)
+}
+
+func (e *Emitter) MovdquR9RcxScale4FromXmm0() {
+	e.Emit(0xF3, 0x41, 0x0F, 0x7F, 0x04, 0x89)
+}
+
+func (e *Emitter) MovdquXmm0FromR9Rcx() {
+	e.Emit(0xF3, 0x41, 0x0F, 0x6F, 0x04, 0x09)
+}
+
+func (e *Emitter) MovdquRdiRcxFromXmm0() {
+	e.Emit(0xF3, 0x0F, 0x7F, 0x04, 0x0F)
+}
+
+func (e *Emitter) PadddXmm1Xmm0() {
+	e.Emit(0x66, 0x0F, 0xFE, 0xC8)
+}
+
+func (e *Emitter) PadddXmm0Xmm1() {
+	e.Emit(0x66, 0x0F, 0xFE, 0xC1)
+}
+
+func (e *Emitter) PshufdXmm0Xmm1Imm8(v byte) {
+	e.Emit(0x66, 0x0F, 0x70, 0xC1, v)
+}
+
+func (e *Emitter) PshufdXmm1Xmm1Imm8(v byte) {
+	e.Emit(0x66, 0x0F, 0x70, 0xC9, v)
+}
+
+func (e *Emitter) MovdXmm1Eax() {
+	e.Emit(0x66, 0x0F, 0x6E, 0xC8)
+}
+
+func (e *Emitter) MovdEaxXmm1() {
+	e.Emit(0x66, 0x0F, 0x7E, 0xC8)
+}
+
+func (e *Emitter) AddMem32R9RcxScale4Imm8(v byte) {
+	e.Emit(0x41, 0x83, 0x04, 0x89, v)
 }
 
 func (e *Emitter) JaRel32() int {
@@ -1314,6 +1486,35 @@ func (e *Emitter) JaRel32() int {
 func (e *Emitter) AddRdxRax() {
 	// add rdx, rax
 	e.Emit(0x48, 0x01, 0xC2)
+}
+
+func (e *Emitter) AddRdxRsi() {
+	e.Emit(0x48, 0x01, 0xF2)
+}
+
+func (e *Emitter) CmpRdxR8() {
+	e.Emit(0x4C, 0x39, 0xC2)
+}
+
+func (e *Emitter) AndRsiImm32(v int32) {
+	e.Emit(0x48, 0x81, 0xE6)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(v))
+	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) MovR8FromRdiDisp(disp int32) {
+	e.Emit(0x4C, 0x8B, 0x87)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(disp))
+	e.Emit(buf[:]...)
+}
+
+func (e *Emitter) MovMem64RdiDispRdx(disp int32) {
+	e.Emit(0x48, 0x89, 0x97)
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(disp))
+	e.Emit(buf[:]...)
 }
 
 func (e *Emitter) MovMem32RaxPtrImm32(disp int32, val int32) {

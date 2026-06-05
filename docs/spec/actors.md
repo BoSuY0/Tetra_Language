@@ -25,7 +25,7 @@ Actors are supported on x64 targets:
 ## Non-goals (MVP)
 
 - Multi-threaded scheduling.
-- Zero-copy message passing of region-backed data.
+- Broad zero-copy message passing of arbitrary region-backed data.
 - Arbitrary generic actor mailboxes or reference-carrying typed messages.
 - Shared mutable actor state across OS threads.
 
@@ -147,21 +147,40 @@ Typed actor messages are supported as an enum-only MVP:
 - The message type must be an enum. The enum payload is limited to value-only
   data that the checker can lower into actor message slots: current scalar
   payloads such as `Int`, `Bool`, and `UInt8`, nested structs/enums built only
-  from supported value-only payloads, and checked `island` transfer payloads.
+  from supported value-only payloads, explicit owned copies of `String`/slice
+  views, checked `island` transfer payloads, and the local P6.1 owned
+  island-backed slice move form described below.
 - Typed actor message payloads support at most 8 value slots. The enum tag is
   carried separately from those payload slots.
 - Distributed typed actor frames carry `hash(enum type name) + case ordinal` as
   their wire tag. This keeps `send_typed` and `recv_typed<MessageEnum>()`
   aligned when messages cross the actor network boundary.
-- Reference-shaped payloads such as `String`, pointer payloads, and unrelated
-  runtime handles are rejected by the current value-only payload rule.
-- `island` payload transfer is the only checked ownership-transfer path in this
-  typed actor payload MVP. Sending an `island` payload is validated as a move
-  and consumes the sent source (including nested struct/enum construction
-  sources).
+- Borrowed reference-shaped payloads such as borrowed `String` or slice views
+  are rejected unless the payload expression explicitly uses `.copy()`. Raw
+  pointer payloads, actor/task handles, and unrelated runtime handles are still
+  rejected by the current value-only payload rule.
+- `island` payload transfer is checked as a move and consumes the sent source
+  (including nested struct/enum construction sources).
+- P6.1 adds a narrow local zero-copy move for owned region-backed slices:
+  a non-`.copy()` slice payload is accepted only when the checker knows it was
+  created by `core.island_make_*` and the same typed message payload also
+  carries the owning `island` value, for example
+  `MoveMsg.region(region, xs)`. The sender loses access to both the island and
+  the sent slice after `send_typed`; receiver-side pattern bindings own the
+  received values.
+- P6.2 adds typed mailbox metadata to
+  `<output>.actor-transfer.json`. The report has `mailboxes[]` rows with the
+  enum message schema, fixed local message capacity, explicit backpressure hook,
+  max payload slots, slot width, and ownership metadata status. Its `sends[]`
+  rows classify scalar payload copies, island moves, explicit view copies, and
+  zero-copy island-backed slice moves with `ownership`, `transfer_mode`,
+  `runtime_path`, `bytes_copied`, and `zero_copy` fields.
 - Actor/task handle transfer in typed actor payloads is outside the current
   transfer contract and remains a stable rejection boundary under the same
   value-only payload rule.
+- Distributed typed actor frames still serialize fixed wire values. The P6.1
+  zero-copy region-slice path is a local typed mailbox guarantee, not a
+  cross-node pointer transfer guarantee.
 
 Typed actor messages currently provide blocking send/receive only. There is no
 typed equivalent of `recv_poll`, `recv_until`, or `recv_msg_until`, and there is
@@ -180,11 +199,12 @@ isolation guarantees.
   runnable actor. The public `actor` type is still opaque; sending to an
   invalid handle is outside the current guarantee.
 - Built-in x64 runtime message pool: 64 KiB, bump-allocated, with no message
-  reclamation during a run. The current message node size is 56 bytes, so 1170
-  single-slot messages fit in the pool. The same node shape is used for tagged
-  and typed messages, with typed payloads still capped at 8 value slots by the
-  checker. Message pool overflow is not a checked runtime error in the current
-  built-in runtime; behavior after the bump pointer passes the pool is
+  reclamation during a run. The current message node size is 88 bytes because
+  typed mailbox payload slots are stored as local 64-bit slots; this gives room
+  for pointer-like local slice fields while keeping typed payloads capped at 8
+  value slots by the checker. With the fixed 64 KiB pool, 744 single-slot messages
+  fit in the pool. Message pool overflow is not a checked runtime error in the
+  current built-in runtime; behavior after the bump pointer passes the pool is
   unspecified and must not be treated as a recoverable capacity signal.
 - Built-in x64 runtime actor state: 8 state slots per actor, each one `i32`
   storage cell. The checker enforces this limit for actor declarations and
@@ -197,20 +217,23 @@ isolation guarantees.
 
 ## Runtime sources
 
-The canonical self-host runtime sources live under `__rt/actors_sysv.tetra` and
-`__rt/actors_win64.tetra`. The compiler embeds matching copies from
-`compiler/selfhostrt/actors_sysv.tetra` and `compiler/selfhostrt/actors_win64.tetra`
-when `--runtime=selfhost` is used, or when `--runtime=auto` can use the
-self-host mailbox-only actor surface (no actor-state/task/time builtins).
+The canonical self-host runtime sources live under `__rt/actors_sysv.tetra`,
+`__rt/actors_i386.tetra`, and `__rt/actors_win64.tetra`. The compiler embeds matching copies from
+`compiler/selfhostrt/actors_sysv.tetra`, `compiler/selfhostrt/actors_i386.tetra`,
+and `compiler/selfhostrt/actors_win64.tetra` when `--runtime=selfhost` is used,
+or when `--runtime=auto` can use a self-host actor/task surface for a target
+without a builtin runtime.
 
-The canonical modules are `__rt.actors_sysv` for `linux-x64`/`macos-x64` and
-`__rt.actors_win64` for `windows-x64`.
+The canonical modules are `__rt.actors_sysv` for `linux-x64`/`macos-x64`/
+`linux-x32`, `__rt.actors_i386` for `linux-x86`, and `__rt.actors_win64` for
+`windows-x64`.
 
 The older `actors_poc_*` files are retained as historical PoC snapshots and
 compatibility references.
 
 Future extensions (post-MVP):
 - Copy-based passing of `[]u8` into a receiver-owned island.
+- Distributed serialization contracts for owned-region payloads.
 - Typed nonblocking/timed receive helpers if promoted by a future runtime
   profile.
 - Generic actor mailbox APIs beyond the current enum-only message calls.

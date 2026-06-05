@@ -116,8 +116,10 @@ formatting commands when you intend to rewrite files.
 Create a curated repository dump for agents:
 
 ```sh
-go run ./tools/cmd/dump-project
+bash scripts/dev/dump-project.sh
 ```
 
+The wrapper runs `go run ./tools/cmd/dump-project`, prints the release artifact
+marker, and writes the timestamped dump under `dumps/`.
 Useful flags include `--all`, `--only <prefix>`, and
 `--exclude-prefix <prefix>`.

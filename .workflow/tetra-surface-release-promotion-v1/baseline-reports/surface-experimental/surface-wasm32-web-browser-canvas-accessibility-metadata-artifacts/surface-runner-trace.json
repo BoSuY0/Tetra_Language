@@ -1,0 +1,147 @@
+{
+  "schema": "tetra.surface.browser-canvas-trace.v1",
+  "wasm_path": "/home/tetra/Desktop/Projects/Tetra_Language/.workflow/tetra-surface-release-promotion-v1/baseline-reports/surface-experimental/surface-wasm32-web-browser-canvas-accessibility-metadata-artifacts/surface-accessibility-settings.wasm",
+  "canvas": {
+    "opened": true,
+    "width": 480,
+    "height": 320,
+    "readback": true
+  },
+  "browser_events": [
+    {
+      "order": 1,
+      "native_type": "pointerup",
+      "kind": 5,
+      "x": 40,
+      "y": 100,
+      "key": 0,
+      "width": 320,
+      "height": 240,
+      "text_len": 0
+    },
+    {
+      "order": 2,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 240,
+      "text_len": 3
+    },
+    {
+      "order": 3,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 240,
+      "text_len": 0
+    },
+    {
+      "order": 4,
+      "native_type": "beforeinput",
+      "kind": 8,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 320,
+      "height": 240,
+      "text_len": 5
+    },
+    {
+      "order": 5,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 240,
+      "text_len": 0
+    },
+    {
+      "order": 6,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 32,
+      "width": 320,
+      "height": 240,
+      "text_len": 0
+    },
+    {
+      "order": 7,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 240,
+      "text_len": 0
+    },
+    {
+      "order": 8,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 13,
+      "width": 320,
+      "height": 240,
+      "text_len": 0
+    },
+    {
+      "order": 9,
+      "native_type": "keydown",
+      "kind": 6,
+      "x": 0,
+      "y": 0,
+      "key": 9,
+      "width": 320,
+      "height": 240,
+      "text_len": 0
+    },
+    {
+      "order": 10,
+      "native_type": "resize",
+      "kind": 2,
+      "x": 0,
+      "y": 0,
+      "key": 0,
+      "width": 480,
+      "height": 320,
+      "text_len": 0
+    }
+  ],
+  "frames": [
+    {
+      "order": 1,
+      "width": 320,
+      "height": 240,
+      "stride": 1280,
+      "pixels_len": 307200,
+      "source_checksum": "768dd05227e872d9dc48138a4c0c6127c9c10d8f5c28be2c8d051193a4ed2bce",
+      "canvas_checksum": "768dd05227e872d9dc48138a4c0c6127c9c10d8f5c28be2c8d051193a4ed2bce",
+      "checksum": "768dd05227e872d9dc48138a4c0c6127c9c10d8f5c28be2c8d051193a4ed2bce",
+      "presented": true
+    },
+    {
+      "order": 5,
+      "width": 480,
+      "height": 320,
+      "stride": 1920,
+      "pixels_len": 614400,
+      "source_checksum": "333694f208c873229299d85038586c35991a757c5c3f54cf7b6f2246a8beaf11",
+      "canvas_checksum": "333694f208c873229299d85038586c35991a757c5c3f54cf7b6f2246a8beaf11",
+      "checksum": "333694f208c873229299d85038586c35991a757c5c3f54cf7b6f2246a8beaf11",
+      "presented": true
+    }
+  ],
+  "app_exit_code": 1
+}

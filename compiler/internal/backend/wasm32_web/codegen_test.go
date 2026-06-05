@@ -2,6 +2,7 @@ package wasm32_web
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"tetra_language/compiler/internal/ir"
@@ -79,6 +80,72 @@ func TestLinkObjectWebImportExportShape(t *testing.T) {
 	}
 	if _, ok := exports["_start"]; ok {
 		t.Fatalf("web module exported _start: %#v", exports)
+	}
+}
+
+func TestLinkObjectImportsSurfaceHostABI(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{
+		{
+			Name:        "main",
+			ParamSlots:  0,
+			LocalSlots:  0,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRStrLit, Str: []byte("Surface")},
+				{Kind: ir.IRConstI32, Imm: 320},
+				{Kind: ir.IRConstI32, Imm: 200},
+				{Kind: ir.IRCall, Name: "__tetra_surface_open", ArgSlots: 4, RetSlots: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	mod, err := LinkObject(obj)
+	if err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+
+	imports := wasmImports(t, mod)
+	if got := imports["tetra_surface_host_v1"]; !stringSetHas(got, "__tetra_surface_open") {
+		t.Fatalf("surface host imports = %#v", imports)
+	}
+	if _, ok := imports["tetra_ui_v1"]; ok {
+		t.Fatalf("Surface wasm module must not import legacy UI metadata runtime: %#v", imports)
+	}
+}
+
+func TestLoaderModuleProvidesCompilerOwnedSurfaceHostABI(t *testing.T) {
+	src := string(LoaderModule("app.wasm"))
+	for _, want := range []string{
+		"function createSurfaceHost(instanceRef)",
+		"tetra_surface_host_v1: createSurfaceHost(instanceRef)",
+		"__tetra_surface_open(titlePtr, titleLen, width, height)",
+		"__tetra_surface_poll_event_x(handle)",
+		"__tetra_surface_poll_event_y(handle)",
+		"__tetra_surface_poll_event_button(handle)",
+		"__tetra_surface_poll_event_into(handle, eventPtr, eventLen)",
+		"__tetra_surface_poll_event_text_len(handle)",
+		"__tetra_surface_poll_event_text_into(handle, textPtr, textLen)",
+		"__tetra_surface_clipboard_write_text(handle, textPtr, textLen)",
+		"__tetra_surface_clipboard_read_text_into(handle, textPtr, textLen)",
+		"__tetra_surface_poll_composition_into(handle, eventPtr, eventLen)",
+		"__tetra_surface_present_rgba(handle, pixelsPtr, pixelsLen, width, height, stride)",
+		"__tetra_surface_now_ms()",
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("loader missing %q:\n%s", want, src)
+		}
+	}
+	for _, forbidden := range []string{
+		"document.",
+		"tetra.ui.v1",
+		".ui.web.mjs",
+	} {
+		if strings.Contains(src, forbidden) {
+			t.Fatalf("Surface loader must not contain legacy DOM/UI marker %q:\n%s", forbidden, src)
+		}
 	}
 }
 
@@ -1146,6 +1213,102 @@ func TestLinkObjectWebSupportsU8U16ArrayIR(t *testing.T) {
 	}
 	if _, err := LinkObject(obj); err != nil {
 		t.Fatalf("LinkObject: %v", err)
+	}
+}
+
+func TestLinkObjectWebMakeSliceLengthContractGuards(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{{
+		Name:        "main",
+		ParamSlots:  0,
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 536870912},
+			{Kind: ir.IRMakeSliceI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	mod, err := LinkObject(obj)
+	if err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0x48, 0x04, 0x40, 0x00, 0x0b}, // i32.lt_s; if; unreachable; end
+		{0x45, 0x04, 0x40},             // i32.eqz; if zero empty-slice path
+		{0x4a, 0x04, 0x40, 0x00, 0x0b}, // i32.gt_s; if; unreachable; end
+	} {
+		if !bytes.Contains(mod, want) {
+			t.Fatalf("web wasm make_slice length contract missing % x in module:\n% x", want, mod)
+		}
+	}
+}
+
+func TestLinkObjectWebRawSliceFromPartsBuildsScopedView(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{{
+		Name:        "main",
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRRawSliceFromParts},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	mod, err := LinkObject(obj)
+	if err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+	viewProjection := []byte{0x21, 0x06, 0x21, 0x03, 0x21, 0x02, 0x20, 0x02, 0x20, 0x03}
+	if !bytes.Contains(mod, viewProjection) {
+		t.Fatalf("web raw_slice_from_parts missing scoped view projection % x in module:\n% x", viewProjection, mod)
+	}
+}
+
+func TestLinkObjectWebIslandMakeSliceLengthContractGuards(t *testing.T) {
+	obj, err := CodegenObject([]ir.IRFunc{{
+		Name:        "main",
+		ParamSlots:  0,
+		LocalSlots:  2,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 4096},
+			{Kind: ir.IRConstI32, Imm: 536870912},
+			{Kind: ir.IRIslandMakeSliceI32},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}, "main")
+	if err != nil {
+		t.Fatalf("CodegenObject: %v", err)
+	}
+	mod, err := LinkObject(obj)
+	if err != nil {
+		t.Fatalf("LinkObject: %v", err)
+	}
+	for _, want := range [][]byte{
+		{0x48, 0x04, 0x40, 0x00, 0x0b},
+		{0x45, 0x04, 0x40},
+		{0x4a, 0x04, 0x40, 0x00, 0x0b},
+	} {
+		if !bytes.Contains(mod, want) {
+			t.Fatalf("web wasm island_make_slice length contract missing % x in module:\n% x", want, mod)
+		}
 	}
 }
 

@@ -1,0 +1,27 @@
+// Stable core text stdlib smoke.
+module examples.core_text_smoke
+
+import lib.core.text as text
+
+func main() -> Int
+uses alloc, mem:
+    var storage: []u8 = core.make_u8(8)
+    var bytes: []u8 = core.make_u8(2)
+    bytes[0] = 79
+    bytes[1] = 75
+    var buf: text.TextBuffer = text.buffer_init(storage)
+    var cursor: text.TextCursor = text.caret_start(buf)
+    var selection: text.TextSelection = text.clear_selection()
+    let inserted: text.TextEditResult = text.insert_bytes(buf, cursor, bytes)
+    if !inserted.ok || text.len_bytes(buf) != 2 || cursor.byte_index != 2:
+        return 10
+    let moved: text.TextCursor = text.move_left(buf, cursor)
+    if moved.byte_index != 1:
+        return 20
+    let removed: text.TextEditResult = text.backspace(buf, cursor, selection)
+    if !removed.ok || text.len_bytes(buf) != 1:
+        return 30
+    let composition: text.TextComposition = text.composition_clear()
+    if composition.active:
+        return 40
+    return 42

@@ -135,6 +135,27 @@ func RequiredNetSymbols() []string {
 	}
 }
 
+func RequiredSurfaceSymbols() []string {
+	return []string{
+		"__tetra_surface_open",
+		"__tetra_surface_close",
+		"__tetra_surface_poll_event_kind",
+		"__tetra_surface_poll_event_x",
+		"__tetra_surface_poll_event_y",
+		"__tetra_surface_poll_event_button",
+		"__tetra_surface_poll_event_into",
+		"__tetra_surface_poll_event_text_len",
+		"__tetra_surface_poll_event_text_into",
+		"__tetra_surface_clipboard_write_text",
+		"__tetra_surface_clipboard_read_text_into",
+		"__tetra_surface_poll_composition_into",
+		"__tetra_surface_begin_frame",
+		"__tetra_surface_present_rgba",
+		"__tetra_surface_now_ms",
+		"__tetra_surface_request_redraw",
+	}
+}
+
 func SignatureForSymbol(name string) (Signature, bool) {
 	switch name {
 	case "__tetra_entry":
@@ -243,6 +264,21 @@ func SignatureForSymbol(name string) (Signature, bool) {
 		return Signature{ParamSlots: 5, ReturnSlots: 1}, true
 	case "__tetra_net_set_nonblocking", "__tetra_net_set_reuseport", "__tetra_net_set_tcp_nodelay", "__tetra_net_close":
 		return Signature{ParamSlots: 2, ReturnSlots: 1}, true
+	case "__tetra_surface_open":
+		return Signature{ParamSlots: 4, ReturnSlots: 1}, true
+	case "__tetra_surface_close", "__tetra_surface_poll_event_kind", "__tetra_surface_poll_event_x", "__tetra_surface_poll_event_y",
+		"__tetra_surface_poll_event_button", "__tetra_surface_poll_event_text_len", "__tetra_surface_begin_frame", "__tetra_surface_request_redraw":
+		return Signature{ParamSlots: 1, ReturnSlots: 1}, true
+	case "__tetra_surface_poll_event_text_into":
+		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
+	case "__tetra_surface_poll_event_into":
+		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
+	case "__tetra_surface_clipboard_write_text", "__tetra_surface_clipboard_read_text_into", "__tetra_surface_poll_composition_into":
+		return Signature{ParamSlots: 3, ReturnSlots: 1}, true
+	case "__tetra_surface_present_rgba":
+		return Signature{ParamSlots: 6, ReturnSlots: 1}, true
+	case "__tetra_surface_now_ms":
+		return Signature{ParamSlots: 0, ReturnSlots: 1}, true
 	}
 
 	const typedJoinPrefix = "__tetra_task_join_typed_"

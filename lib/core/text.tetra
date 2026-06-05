@@ -1,0 +1,266 @@
+// Surface v1 text buffer helpers over caller-owned UTF-8 byte storage.
+// Effects: none
+// ```tetra doctest
+// func text_doctest() -> Int:
+//     let empty: lib.core.text.TextSelection = lib.core.text.clear_selection()
+//     if empty.active:
+//         return 1
+//     return lib.core.text.error_none()
+// ```
+module lib.core.text
+
+struct TextBuffer:
+    bytes: []u8
+    len: Int
+    capacity: Int
+
+struct TextCursor:
+    byte_index: Int
+
+struct TextSelection:
+    anchor: Int
+    focus: Int
+    active: Bool
+
+struct TextEditResult:
+    ok: Bool
+    error: Int
+
+struct TextComposition:
+    active: Bool
+    start: Int
+    len: Int
+    preview_len: Int
+
+func error_none() -> Int:
+    return 0
+
+func error_capacity() -> Int:
+    return 1
+
+func error_invalid_utf8() -> Int:
+    return 2
+
+func error_invalid_range() -> Int:
+    return 3
+
+func make_result(ok: Bool, bytes_written: Int, caret: Int, changed: Bool, error: Int) -> TextEditResult:
+    return TextEditResult(ok: ok, error: error)
+
+func buffer_init(storage: []u8) -> TextBuffer:
+    return TextBuffer(bytes: storage, len: 0, capacity: storage.len)
+
+func buffer_clear(buf: inout TextBuffer) -> TextEditResult:
+    let changed: Bool = buf.len > 0
+    buf.len = 0
+    return make_result(true, 0, 0, changed, error_none())
+
+func len_bytes(buf: borrow TextBuffer) -> Int:
+    return buf.len
+
+func is_empty(buf: TextBuffer) -> Bool:
+    return buf.len == 0
+
+func caret_start(buf: TextBuffer) -> TextCursor:
+    return TextCursor(byte_index: 0)
+
+func caret_end(buf: TextBuffer) -> TextCursor:
+    return TextCursor(byte_index: buf.len)
+
+func clamp_index(buf: TextBuffer, index: Int) -> Int:
+    if index < 0:
+        return 0
+    if index > buf.len:
+        return buf.len
+    return index
+
+func is_continuation_byte(value: u8) -> Bool:
+    return value >= 128 && value < 192
+
+func previous_codepoint_start(buf: TextBuffer, index: Int) -> Int:
+    var i: Int = clamp_index(buf, index)
+    if i <= 0:
+        return 0
+    i = i - 1
+    while i > 0 && is_continuation_byte(buf.bytes[i]):
+        i = i - 1
+    return i
+
+func next_codepoint_start(buf: TextBuffer, index: Int) -> Int:
+    var i: Int = clamp_index(buf, index)
+    if i >= buf.len:
+        return buf.len
+    i = i + 1
+    while i < buf.len && is_continuation_byte(buf.bytes[i]):
+        i = i + 1
+    return i
+
+func move_left(buf: TextBuffer, cursor: TextCursor) -> TextCursor:
+    return TextCursor(byte_index: previous_codepoint_start(buf, cursor.byte_index))
+
+func move_right(buf: TextBuffer, cursor: TextCursor) -> TextCursor:
+    return TextCursor(byte_index: next_codepoint_start(buf, cursor.byte_index))
+
+func move_home(buf: TextBuffer, cursor: TextCursor) -> TextCursor:
+    return TextCursor(byte_index: 0)
+
+func move_end(buf: TextBuffer, cursor: TextCursor) -> TextCursor:
+    return TextCursor(byte_index: buf.len)
+
+func clear_selection() -> TextSelection:
+    return TextSelection(anchor: 0, focus: 0, active: false)
+
+func composition_clear() -> TextComposition:
+    return TextComposition(active: false, start: 0, len: 0, preview_len: 0)
+
+func select_range(buf: TextBuffer, start: Int, end: Int) -> TextSelection:
+    var anchor: Int = clamp_index(buf, start)
+    var focus: Int = clamp_index(buf, end)
+    return TextSelection(anchor: anchor, focus: focus, active: anchor != focus)
+
+func selection_start(selection: TextSelection) -> Int:
+    if selection.anchor <= selection.focus:
+        return selection.anchor
+    return selection.focus
+
+func selection_end(selection: TextSelection) -> Int:
+    if selection.anchor <= selection.focus:
+        return selection.focus
+    return selection.anchor
+
+func valid_range(buf: TextBuffer, start: Int, end: Int) -> Bool:
+    return start >= 0 && end >= start && end <= buf.len
+
+func is_utf8_continuation(value: u8) -> Bool:
+    return value >= 128 && value < 192
+
+func has_utf8_continuation(bytes: borrow []u8, index: Int) -> Bool:
+    if index < 0 || index >= bytes.len:
+        return false
+    return is_utf8_continuation(bytes[index])
+
+func validate_utf8(bytes: borrow []u8) -> Bool:
+    var i: Int = 0
+    while i < bytes.len:
+        let b0: u8 = bytes[i]
+        if b0 < 128:
+            i = i + 1
+        else if b0 >= 194 && b0 <= 223:
+            if !has_utf8_continuation(bytes, i + 1):
+                return false
+            i = i + 2
+        else if b0 >= 224 && b0 <= 239:
+            if !has_utf8_continuation(bytes, i + 1) || !has_utf8_continuation(bytes, i + 2):
+                return false
+            let b1: u8 = bytes[i + 1]
+            if b0 == 224 && b1 < 160:
+                return false
+            if b0 == 237 && b1 >= 160:
+                return false
+            i = i + 3
+        else if b0 >= 240 && b0 <= 244:
+            if !has_utf8_continuation(bytes, i + 1) || !has_utf8_continuation(bytes, i + 2) || !has_utf8_continuation(bytes, i + 3):
+                return false
+            let b1_four: u8 = bytes[i + 1]
+            if b0 == 240 && b1_four < 144:
+                return false
+            if b0 == 244 && b1_four >= 144:
+                return false
+            i = i + 4
+        else:
+            return false
+    return true
+
+func insert_bytes(buf: inout TextBuffer, cursor: inout TextCursor, bytes: borrow []u8) -> TextEditResult:
+    if !validate_utf8(bytes):
+        return make_result(false, 0, cursor.byte_index, false, error_invalid_utf8())
+    let idx: Int = clamp_index(buf, cursor.byte_index)
+    if idx != cursor.byte_index:
+        return make_result(false, 0, idx, false, error_invalid_range())
+    if buf.len + bytes.len > buf.capacity:
+        return make_result(false, 0, cursor.byte_index, false, error_capacity())
+    var tail: Int = buf.len
+    while tail > idx:
+        buf.bytes[tail + bytes.len - 1] = buf.bytes[tail - 1]
+        tail = tail - 1
+    var i: Int = 0
+    while i < bytes.len:
+        buf.bytes[idx + i] = bytes[i]
+        i = i + 1
+    buf.len = buf.len + bytes.len
+    cursor.byte_index = idx + bytes.len
+    return make_result(true, bytes.len, cursor.byte_index, bytes.len > 0, error_none())
+
+func string_len(value: borrow String) -> Int:
+    var count: Int = 0
+    for ch in value:
+        count = count + 1
+    return count
+
+func insert_string(buf: inout TextBuffer, cursor: inout TextCursor, value: borrow String) -> TextEditResult:
+    let count: Int = string_len(value)
+    let idx: Int = clamp_index(buf, cursor.byte_index)
+    if idx != cursor.byte_index:
+        return make_result(false, 0, idx, false, error_invalid_range())
+    if buf.len + count > buf.capacity:
+        return make_result(false, 0, cursor.byte_index, false, error_capacity())
+    var tail: Int = buf.len
+    while tail > idx:
+        buf.bytes[tail + count - 1] = buf.bytes[tail - 1]
+        tail = tail - 1
+    var i: Int = 0
+    for ch in value:
+        buf.bytes[idx + i] = ch
+        i = i + 1
+    buf.len = buf.len + count
+    cursor.byte_index = idx + count
+    return make_result(true, count, cursor.byte_index, count > 0, error_none())
+
+func delete_range(buf: inout TextBuffer, cursor: inout TextCursor, start: Int, end: Int) -> TextEditResult:
+    if !valid_range(buf, start, end):
+        return make_result(false, 0, cursor.byte_index, false, error_invalid_range())
+    let removed: Int = end - start
+    var tail: Int = end
+    while tail < buf.len:
+        buf.bytes[start + tail - end] = buf.bytes[tail]
+        tail = tail + 1
+    buf.len = buf.len - removed
+    cursor.byte_index = start
+    return make_result(true, 0, cursor.byte_index, removed > 0, error_none())
+
+func replace_selection(buf: inout TextBuffer, cursor: inout TextCursor, selection: inout TextSelection, bytes: borrow []u8) -> TextEditResult:
+    if !selection.active:
+        return insert_bytes(buf, cursor, bytes)
+    let start: Int = selection_start(selection)
+    let end: Int = selection_end(selection)
+    let deleted: TextEditResult = delete_range(buf, cursor, start, end)
+    if !deleted.ok:
+        return deleted
+    selection = clear_selection()
+    return insert_bytes(buf, cursor, bytes)
+
+func backspace(buf: inout TextBuffer, cursor: inout TextCursor, selection: inout TextSelection) -> TextEditResult:
+    if selection.active:
+        let selected_start: Int = selection_start(selection)
+        let selected_end: Int = selection_end(selection)
+        selection = clear_selection()
+        return delete_range(buf, cursor, selected_start, selected_end)
+    let idx: Int = clamp_index(buf, cursor.byte_index)
+    if idx <= 0:
+        cursor.byte_index = 0
+        return make_result(true, 0, 0, false, error_none())
+    let previous_start: Int = previous_codepoint_start(buf, idx)
+    return delete_range(buf, cursor, previous_start, idx)
+
+func delete(buf: inout TextBuffer, cursor: inout TextCursor, selection: inout TextSelection) -> TextEditResult:
+    if selection.active:
+        let selected_start: Int = selection_start(selection)
+        let selected_end: Int = selection_end(selection)
+        selection = clear_selection()
+        return delete_range(buf, cursor, selected_start, selected_end)
+    let idx: Int = clamp_index(buf, cursor.byte_index)
+    if idx >= buf.len:
+        cursor.byte_index = buf.len
+        return make_result(true, 0, cursor.byte_index, false, error_none())
+    let next_end: Int = next_codepoint_start(buf, idx)
+    return delete_range(buf, cursor, idx, next_end)

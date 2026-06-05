@@ -153,7 +153,7 @@ func TestEmitCallReturnSlotLayout(t *testing.T) {
 			{slots: 7, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12"}},
 			{slots: 8, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12", "r13"}},
 			{slots: 9, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12", "r13", "r14"}},
-			{slots: 10, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"}},
+			{slots: 10, regs: []string{"rax", "rdx", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "rbx"}},
 		} {
 			t.Run(tc.name+"/"+returnSlotName(ret.slots), func(t *testing.T) {
 				e := &x64.Emitter{}
@@ -333,28 +333,130 @@ func TestEmitIslandFreeDebugEmitsDoubleFreeGuard(t *testing.T) {
 	}
 }
 
-func TestSysVAllocBytesEmitsDeterministicMmapFailureGuard(t *testing.T) {
-	e := &x64.Emitter{}
-	stackDepth := 1
-	if err := LinuxSysV().EmitAllocBytes(e, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
-		t.Fatalf("EmitAllocBytes: %v", err)
-	}
-	if stackDepth != 1 {
-		t.Fatalf("stack depth = %d, want 1", stackDepth)
+func TestEmitIslandNewRejectsInvalidSizeBeforeAllocator(t *testing.T) {
+	cases := []struct {
+		name          string
+		abi           ABI
+		importPatches *[]x64obj.ImportPatch
+		allocatorCode []byte
+	}{
+		{name: "sysv", abi: LinuxSysV(), allocatorCode: []byte{0x0F, 0x05}},
+		{name: "win64", abi: NewWin64(), importPatches: &[]x64obj.ImportPatch{}, allocatorCode: []byte{0xFF, 0x15}},
 	}
 
-	cmpMmapErrorRange := []byte{0x48, 0x3D, 0x01, 0xF0, 0xFF, 0xFF}
-	if !bytes.Contains(e.Buf, cmpMmapErrorRange) {
-		t.Fatalf("alloc_bytes missing mmap error-range compare\n got=% x\nwant contains=% x", e.Buf, cmpMmapErrorRange)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &x64.Emitter{}
+			stackDepth := 1
+			e.PushRax()
+			if err := tc.abi.EmitIslandNew(e, &stackDepth, x64.CodegenOptions{}, tc.importPatches); err != nil {
+				t.Fatalf("EmitIslandNew: %v", err)
+			}
+			if stackDepth != 1 {
+				t.Fatalf("stack depth = %d, want 1", stackDepth)
+			}
+			negativeGuard := []byte{0x48, 0x85, 0xC0, 0x0F, 0x8C}
+			overflowGuard := []byte{0x48, 0x3D, 0xEF, 0xFF, 0xFF, 0x7F, 0x0F, 0x8F}
+			negativeAt := bytes.Index(e.Buf, negativeGuard)
+			overflowAt := bytes.Index(e.Buf, overflowGuard)
+			allocatorAt := bytes.Index(e.Buf, tc.allocatorCode)
+			if negativeAt < 0 {
+				t.Fatalf("island_new missing negative-size guard before allocator:\n% x", e.Buf)
+			}
+			if overflowAt < 0 {
+				t.Fatalf("island_new missing max-payload guard before allocator:\n% x", e.Buf)
+			}
+			if allocatorAt < 0 {
+				t.Fatalf("island_new missing allocator marker % x:\n% x", tc.allocatorCode, e.Buf)
+			}
+			if negativeAt > allocatorAt || overflowAt > allocatorAt {
+				t.Fatalf("island_new guards must precede allocator: neg=%d overflow=%d allocator=%d\n% x", negativeAt, overflowAt, allocatorAt, e.Buf)
+			}
+		})
 	}
-	jaeRel32 := []byte{0x0F, 0x83}
-	if !bytes.Contains(e.Buf, jaeRel32) {
-		t.Fatalf("alloc_bytes missing mmap failure branch\n got=% x", e.Buf)
+}
+
+func TestEmitIslandMakeSliceAlignsBumpToContract(t *testing.T) {
+	e := &x64.Emitter{}
+	stackDepth := 2
+	e.PushRax()
+	e.PushRax()
+	if err := LinuxSysV().EmitIslandMakeSlice(e, ir.IRIslandMakeSliceU8, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+		t.Fatalf("EmitIslandMakeSlice: %v", err)
 	}
-	exit2 := &x64.Emitter{}
-	exit2.MovEdiImm32(2)
-	if !bytes.Contains(e.Buf, exit2.Buf) {
-		t.Fatalf("alloc_bytes missing deterministic failure exit code 2\n got=% x", e.Buf)
+	if stackDepth != 2 {
+		t.Fatalf("stack depth = %d, want 2", stackDepth)
+	}
+	addAlign := []byte{0x49, 0x81, 0xC1, 0x0F, 0x00, 0x00, 0x00}
+	maskAlign := []byte{0x49, 0x81, 0xE1, 0xF0, 0xFF, 0xFF, 0xFF}
+	capacityCmp := []byte{0x4D, 0x39, 0xC1}
+	commitBump := []byte{0x44, 0x89, 0x08}
+	addAt := bytes.Index(e.Buf, addAlign)
+	maskAt := bytes.Index(e.Buf, maskAlign)
+	cmpAt := bytes.Index(e.Buf, capacityCmp)
+	commitAt := bytes.Index(e.Buf, commitBump)
+	if addAt < 0 || maskAt < 0 {
+		t.Fatalf("island_make_slice missing 16-byte bump alignment:\n% x", e.Buf)
+	}
+	if cmpAt < 0 || commitAt < 0 {
+		t.Fatalf("island_make_slice missing capacity check/commit:\n% x", e.Buf)
+	}
+	if !(addAt < maskAt && maskAt < cmpAt && cmpAt < commitAt) {
+		t.Fatalf("island_make_slice alignment must happen before capacity check and bump commit: add=%d mask=%d cmp=%d commit=%d\n% x", addAt, maskAt, cmpAt, commitAt, e.Buf)
+	}
+}
+
+func TestSysVAllocBytesEmitsDeterministicMmapFailureGuard(t *testing.T) {
+	tests := []struct {
+		name       string
+		abi        *SysVUnix
+		wantMmap   []byte
+		wantExit2  []byte
+		forbidCode [][]byte
+	}{
+		{
+			name:      "linux-x64",
+			abi:       LinuxSysV(),
+			wantMmap:  []byte{0xB8, 0x09, 0x00, 0x00, 0x00, 0x0F, 0x05},
+			wantExit2: []byte{0xBF, 0x02, 0x00, 0x00, 0x00, 0xB8, 0x3C, 0x00, 0x00, 0x00, 0x0F, 0x05},
+		},
+		{
+			name:      "linux-x32",
+			abi:       LinuxX32SysV(),
+			wantMmap:  []byte{0xB8, 0x09, 0x00, 0x00, 0x40, 0x0F, 0x05},
+			wantExit2: []byte{0xBF, 0x02, 0x00, 0x00, 0x00, 0xB8, 0x3C, 0x00, 0x00, 0x40, 0x0F, 0x05},
+			forbidCode: [][]byte{
+				{0xB8, 0x09, 0x00, 0x00, 0x00, 0x0F, 0x05},
+				{0xB8, 0x3C, 0x00, 0x00, 0x00, 0x0F, 0x05},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &x64.Emitter{}
+			stackDepth := 1
+			if err := tc.abi.EmitAllocBytes(e, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+				t.Fatalf("EmitAllocBytes: %v", err)
+			}
+			if stackDepth != 1 {
+				t.Fatalf("stack depth = %d, want 1", stackDepth)
+			}
+
+			for _, want := range [][]byte{
+				tc.wantMmap,
+				{0x48, 0x3D, 0x01, 0xF0, 0xFF, 0xFF, 0x0F, 0x83},
+				tc.wantExit2,
+			} {
+				if !bytes.Contains(e.Buf, want) {
+					t.Fatalf("alloc_bytes missing mmap failure guard bytes\n got=% x\nwant contains=% x", e.Buf, want)
+				}
+			}
+			for _, forbid := range tc.forbidCode {
+				if bytes.Contains(e.Buf, forbid) {
+					t.Fatalf("alloc_bytes contains forbidden syscall bytes\n got=% x\nforbid=% x", e.Buf, forbid)
+				}
+			}
+		})
 	}
 }
 
@@ -490,13 +592,77 @@ func TestEmitMakeSliceZeroLengthBypassesAllocator(t *testing.T) {
 			if stackDepth != 2 {
 				t.Fatalf("stackDepth = %d, want 2", stackDepth)
 			}
-			if !bytes.Contains(e.Buf, []byte{0x48, 0x85, 0xC0, 0x0F, 0x84}) {
+			testAt := bytes.Index(e.Buf, []byte{0x48, 0x85, 0xC0})
+			zeroAt := bytes.Index(e.Buf, []byte{0x0F, 0x84})
+			allocatorAt := bytes.Index(e.Buf, []byte{0x0F, 0x05})
+			if tc.name == "win64" {
+				allocatorAt = bytes.Index(e.Buf, []byte{0xFF, 0x15})
+			}
+			if testAt < 0 || zeroAt < 0 || zeroAt < testAt {
 				t.Fatalf("make_slice missing zero-length test/jz bypass:\n% x", e.Buf)
+			}
+			if allocatorAt >= 0 && zeroAt > allocatorAt {
+				t.Fatalf("make_slice zero-length branch must precede allocator: zero=%d allocator=%d\n% x", zeroAt, allocatorAt, e.Buf)
 			}
 			if !bytes.Contains(e.Buf, []byte{0x50, 0x50}) {
 				t.Fatalf("make_slice empty branch does not push ptr/len zeros:\n% x", e.Buf)
 			}
 		})
+	}
+}
+
+func TestEmitMakeSliceLengthContractGuardsBeforeAllocator(t *testing.T) {
+	e := &x64.Emitter{}
+	stackDepth := 1
+	e.PushRax()
+	if err := LinuxSysV().EmitMakeSlice(e, ir.IRMakeSliceI32, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+		t.Fatalf("EmitMakeSlice: %v", err)
+	}
+	negativeGuard := []byte{0x48, 0x85, 0xC0, 0x0F, 0x8C}
+	overflowGuard := []byte{0x48, 0x3D, 0xFF, 0xFF, 0xFF, 0x1F, 0x0F, 0x8F}
+	syscall := []byte{0x0F, 0x05}
+	negativeAt := bytes.Index(e.Buf, negativeGuard)
+	overflowAt := bytes.Index(e.Buf, overflowGuard)
+	syscallAt := bytes.Index(e.Buf, syscall)
+	if negativeAt < 0 {
+		t.Fatalf("make_slice missing negative-length guard before allocation:\n% x", e.Buf)
+	}
+	if overflowAt < 0 {
+		t.Fatalf("make_slice missing byte-size overflow guard before allocation:\n% x", e.Buf)
+	}
+	if syscallAt < 0 {
+		t.Fatalf("make_slice missing allocator syscall:\n% x", e.Buf)
+	}
+	if negativeAt > syscallAt || overflowAt > syscallAt {
+		t.Fatalf("make_slice guards must precede allocator syscall: neg=%d overflow=%d syscall=%d\n% x", negativeAt, overflowAt, syscallAt, e.Buf)
+	}
+}
+
+func TestEmitIslandMakeSliceLengthContractGuardsBeforeMetadataAccess(t *testing.T) {
+	e := &x64.Emitter{}
+	stackDepth := 2
+	e.PushRax()
+	e.PushRax()
+	if err := LinuxSysV().EmitIslandMakeSlice(e, ir.IRIslandMakeSliceI32, &stackDepth, x64.CodegenOptions{}, nil); err != nil {
+		t.Fatalf("EmitIslandMakeSlice: %v", err)
+	}
+	negativeGuard := []byte{0x48, 0x85, 0xC9, 0x0F, 0x8C}
+	overflowGuard := []byte{0x48, 0x81, 0xF9, 0xFF, 0xFF, 0xFF, 0x1F, 0x0F, 0x8F}
+	metadataRead := []byte{0x8B, 0x10}
+	negativeAt := bytes.Index(e.Buf, negativeGuard)
+	overflowAt := bytes.Index(e.Buf, overflowGuard)
+	metadataAt := bytes.Index(e.Buf, metadataRead)
+	if negativeAt < 0 {
+		t.Fatalf("island_make_slice missing negative-length guard before metadata access:\n% x", e.Buf)
+	}
+	if overflowAt < 0 {
+		t.Fatalf("island_make_slice missing byte-size overflow guard before metadata access:\n% x", e.Buf)
+	}
+	if metadataAt < 0 {
+		t.Fatalf("island_make_slice missing island metadata read:\n% x", e.Buf)
+	}
+	if negativeAt > metadataAt || overflowAt > metadataAt {
+		t.Fatalf("island_make_slice guards must precede metadata read: neg=%d overflow=%d metadata=%d\n% x", negativeAt, overflowAt, metadataAt, e.Buf)
 	}
 }
 
@@ -529,8 +695,8 @@ func emitReturnSlotPushes(e *x64.Emitter, regs []string) {
 			e.PushR13()
 		case "r14":
 			e.PushR14()
-		case "r15":
-			e.PushR15()
+		case "rbx":
+			e.PushRbx()
 		default:
 			panic(fmt.Sprintf("unknown return register %q", reg))
 		}

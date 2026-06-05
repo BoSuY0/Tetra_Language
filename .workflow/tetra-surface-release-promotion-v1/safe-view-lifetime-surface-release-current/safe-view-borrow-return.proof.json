@@ -1,0 +1,514 @@
+{
+  "schema_version": 1,
+  "kind": "proof",
+  "target": "linux-x64",
+  "bounds": {
+    "schema_version": 1,
+    "kind": "bounds",
+    "target": "linux-x64",
+    "totals": {
+      "removed": 0,
+      "left": 8
+    },
+    "functions": [
+      {
+        "function": "examples.safe_view_borrow_return.main",
+        "removed": 0,
+        "left": 8,
+        "sites": [
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:6:5",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:7:5",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:8:5",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:9:5",
+            "kind": "u8.store",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:11:9",
+            "kind": "u8.load",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:11:16",
+            "kind": "u8.load",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:13:15",
+            "kind": "u8.load",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          },
+          {
+            "site": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:13:22",
+            "kind": "u8.load",
+            "removed": false,
+            "reason": "left_missing_dominance"
+          }
+        ]
+      }
+    ]
+  },
+  "plir": {
+    "funcs": [
+      {
+        "name": "examples.safe_view_borrow_return.main",
+        "module": "examples.safe_view_borrow_return",
+        "values": [
+          {
+            "id": "alloc_intent:xs",
+            "kind": "alloc_intent",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:5:20",
+            "region": "allocation:xs",
+            "alloc": {
+              "element_type": "u8",
+              "element_size": 1,
+              "length_expr": "4",
+              "length_const_known": true,
+              "length_const": 4,
+              "zero_guard_status": "valid_empty_no_allocator",
+              "negative_guard_status": "reject_before_allocation",
+              "overflow_guard_status": "reject_before_allocation",
+              "builtin": "core.make_u8",
+              "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:5:20"
+            },
+            "provenance": {
+              "kind": "allocation",
+              "root": "xs"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:5:20",
+              "owner": "xs"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "local:v",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:3:6",
+            "region": "fn:examples.safe_view_borrow_return.main",
+            "provenance": {
+              "kind": "unknown"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "v"
+            },
+            "escape": "unknown"
+          },
+          {
+            "id": "local:xs",
+            "kind": "local",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:3:6",
+            "region": "fn:examples.safe_view_borrow_return.main",
+            "provenance": {
+              "kind": "stack",
+              "root": "local:xs"
+            },
+            "lifetime": {
+              "birth": "entry",
+              "death": "return",
+              "owner": "xs"
+            },
+            "mutable": true,
+            "escape": "unknown"
+          },
+          {
+            "id": "view:slice_view:0",
+            "kind": "view",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:10:35",
+            "region": "fn:examples.safe_view_borrow_return.main",
+            "provenance": {
+              "kind": "allocation",
+              "root": "derived:xs"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:10:35",
+              "owner": "slice_view:0"
+            },
+            "borrow": "immutable",
+            "mutable": true,
+            "escape": "no_escape"
+          },
+          {
+            "id": "view:v",
+            "kind": "view",
+            "type": "[]u8",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:10:19",
+            "region": "fn:examples.safe_view_borrow_return.main",
+            "provenance": {
+              "kind": "unknown"
+            },
+            "lifetime": {
+              "birth": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:10:19",
+              "owner": "v"
+            },
+            "borrow": "immutable",
+            "escape": "no_escape"
+          }
+        ],
+        "ops": [
+          {
+            "id": "op0",
+            "kind": "alloc_intent",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:5:20",
+            "outputs": [
+              "alloc_intent:xs"
+            ],
+            "note": "make<u8> length contract: zero valid, negative and overflow reject before allocation"
+          },
+          {
+            "id": "op1",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:6:5",
+            "inputs": [
+              "xs",
+              "0"
+            ]
+          },
+          {
+            "id": "op2",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:7:5",
+            "inputs": [
+              "xs",
+              "1"
+            ]
+          },
+          {
+            "id": "op3",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:8:5",
+            "inputs": [
+              "xs",
+              "2"
+            ]
+          },
+          {
+            "id": "op4",
+            "kind": "index_store",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:9:5",
+            "inputs": [
+              "xs",
+              "3"
+            ]
+          },
+          {
+            "id": "op5",
+            "kind": "slice_window",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:10:35",
+            "inputs": [
+              "xs",
+              "1",
+              "2"
+            ],
+            "outputs": [
+              "view:slice_view:0"
+            ],
+            "note": "core.slice_window_u8 range xs[1..1+2]"
+          },
+          {
+            "id": "op6",
+            "kind": "call",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:10:19",
+            "outputs": [
+              "view:v"
+            ],
+            "note": "core.slice_borrow_u8 creates borrowed view without allocation"
+          },
+          {
+            "id": "op7",
+            "kind": "index_load",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:11:9",
+            "inputs": [
+              "v",
+              "0"
+            ]
+          },
+          {
+            "id": "op8",
+            "kind": "index_load",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:11:16",
+            "inputs": [
+              "v",
+              "1"
+            ]
+          },
+          {
+            "id": "op9",
+            "kind": "guard",
+            "block": "entry",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:11:5",
+            "inputs": [
+              ""
+            ]
+          },
+          {
+            "id": "op10",
+            "kind": "return",
+            "block": "if_then:0",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:12:9",
+            "inputs": [
+              "0"
+            ]
+          },
+          {
+            "id": "op11",
+            "kind": "index_load",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:13:15",
+            "inputs": [
+              "v",
+              "0"
+            ]
+          },
+          {
+            "id": "op12",
+            "kind": "index_load",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:13:22",
+            "inputs": [
+              "v",
+              "1"
+            ]
+          },
+          {
+            "id": "op13",
+            "kind": "return",
+            "block": "if_join:1",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:13:7",
+            "inputs": [
+              ""
+            ]
+          }
+        ],
+        "facts": [
+          {
+            "id": "f0",
+            "kind": "no_actor_send",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:3:6",
+            "reason": "semantics checker enforced declared effects",
+            "uses": [
+              "alloc",
+              "mem"
+            ]
+          },
+          {
+            "id": "f2",
+            "kind": "region_alive",
+            "value_id": "local:v",
+            "region": "fn:examples.safe_view_borrow_return.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f3",
+            "kind": "provenance_known",
+            "value_id": "local:xs",
+            "reason": "checked parameter/local memory value"
+          },
+          {
+            "id": "f4",
+            "kind": "region_alive",
+            "value_id": "local:xs",
+            "region": "fn:examples.safe_view_borrow_return.main",
+            "reason": "function region is alive"
+          },
+          {
+            "id": "f5",
+            "kind": "provenance_known",
+            "value_id": "alloc_intent:xs",
+            "reason": "compiler-known allocation intent"
+          },
+          {
+            "id": "f6",
+            "kind": "len_stable",
+            "value_id": "alloc_intent:xs",
+            "reason": "slice metadata is opaque in safe code"
+          },
+          {
+            "id": "f7",
+            "kind": "region_alive",
+            "value_id": "alloc_intent:xs",
+            "region": "allocation:xs"
+          },
+          {
+            "id": "f8",
+            "kind": "derived_window",
+            "value_id": "view:slice_view:0",
+            "range": "xs[1..1+2]",
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:10:35",
+            "reason": "safe slice view range is checked before construction"
+          },
+          {
+            "id": "f9",
+            "kind": "region_alive",
+            "value_id": "view:slice_view:0",
+            "region": "fn:examples.safe_view_borrow_return.main"
+          },
+          {
+            "id": "f10",
+            "kind": "borrowed_imm",
+            "value_id": "view:slice_view:0"
+          },
+          {
+            "id": "f11",
+            "kind": "no_escape",
+            "value_id": "view:slice_view:0",
+            "reason": "slice view may not escape its owner"
+          },
+          {
+            "id": "f12",
+            "kind": "provenance_known",
+            "value_id": "view:slice_view:0",
+            "reason": "slice view provenance is derived from source slice"
+          },
+          {
+            "id": "f13",
+            "kind": "len_stable",
+            "value_id": "view:slice_view:0",
+            "reason": "safe slice view metadata is constructed by checked compiler builtin"
+          },
+          {
+            "id": "f14",
+            "kind": "borrowed_imm",
+            "value_id": "view:v",
+            "reason": "explicit borrow view"
+          },
+          {
+            "id": "f15",
+            "kind": "no_escape",
+            "value_id": "view:v",
+            "reason": "explicit borrowed view may not escape owner"
+          },
+          {
+            "id": "f16",
+            "kind": "region_alive",
+            "value_id": "view:v",
+            "region": "fn:examples.safe_view_borrow_return.main"
+          },
+          {
+            "id": "f17",
+            "kind": "provenance_unknown",
+            "value_id": "view:v",
+            "reason": "borrow source provenance is external or unknown"
+          },
+          {
+            "id": "f18",
+            "kind": "provenance_unknown",
+            "value_id": "local:v",
+            "reason": "borrow source provenance is external or unknown"
+          }
+        ],
+        "blocks": [
+          {
+            "id": "entry",
+            "kind": "entry",
+            "entry": true,
+            "succs": [
+              "if_join:1",
+              "if_then:0"
+            ],
+            "ops": [
+              "op0",
+              "op1",
+              "op2",
+              "op3",
+              "op4",
+              "op5",
+              "op6",
+              "op7",
+              "op8",
+              "op9"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:3:6"
+          },
+          {
+            "id": "if_then:0",
+            "kind": "if_then",
+            "preds": [
+              "entry"
+            ],
+            "succs": [
+              "if_join:1"
+            ],
+            "ops": [
+              "op10"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:11:5"
+          },
+          {
+            "id": "if_join:1",
+            "kind": "if_join",
+            "exit": true,
+            "preds": [
+              "entry",
+              "if_then:0"
+            ],
+            "ops": [
+              "op11",
+              "op12",
+              "op13"
+            ],
+            "source": "/home/tetra/Desktop/Projects/Tetra_Language/examples/safe_view_borrow_return.tetra:11:5"
+          }
+        ],
+        "dominators": [
+          {
+            "block": "entry",
+            "dominators": [
+              "entry"
+            ]
+          },
+          {
+            "block": "if_then:0",
+            "dominators": [
+              "entry",
+              "if_then:0"
+            ]
+          },
+          {
+            "block": "if_join:1",
+            "dominators": [
+              "entry",
+              "if_join:1"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

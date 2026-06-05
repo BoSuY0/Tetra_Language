@@ -7,6 +7,54 @@ import (
 	"testing"
 )
 
+func TestSanitizeArgsAlwaysDumpsWholeProject(t *testing.T) {
+	root := t.TempDir()
+	dumpDir := filepath.Join(root, "dumps")
+
+	forward, outputPath, err := sanitizeArgs(root, dumpDir, nil)
+	if err != nil {
+		t.Fatalf("sanitize args: %v", err)
+	}
+
+	if !hasArg(forward, "--all") {
+		t.Fatalf("forward args = %#v, want automatic --all", forward)
+	}
+	if !hasArg(forward, "--no-summary") {
+		t.Fatalf("forward args = %#v, want internal --no-summary", forward)
+	}
+	if outputPath == "" || filepath.Dir(outputPath) != dumpDir {
+		t.Fatalf("output path = %q, want file inside dumps", outputPath)
+	}
+}
+
+func TestSanitizeArgsRejectsDumpModeFlags(t *testing.T) {
+	root := t.TempDir()
+	dumpDir := filepath.Join(root, "dumps")
+
+	for _, args := range [][]string{
+		{"--all"},
+		{"--only", "compiler"},
+		{"--exclude-prefix", "reports"},
+		{"--max-file-bytes", "42"},
+		{"--no-summary"},
+	} {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			if _, _, err := sanitizeArgs(root, dumpDir, args); err == nil {
+				t.Fatalf("sanitizeArgs(%#v) succeeded, want rejection", args)
+			}
+		})
+	}
+}
+
+func hasArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestNormalizeOutputPathForcesMarkdownInDumps(t *testing.T) {
 	root := t.TempDir()
 	dumpDir := filepath.Join(root, "dumps")

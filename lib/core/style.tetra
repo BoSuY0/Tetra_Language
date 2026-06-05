@@ -1,0 +1,94 @@
+// Stable Surface v1 widget style primitives.
+// Effects: none
+// ```tetra doctest
+// func style_doctest() -> Int:
+//     let theme: lib.core.style.Theme = lib.core.style.default_theme()
+//     let colors: lib.core.style.WidgetColors = lib.core.style.style_for_state(theme.button, lib.core.style.state_focused())
+//     return colors.bg + colors.border.r
+// ```
+module lib.core.style
+
+import lib.core.draw as draw
+
+struct Spacing:
+    x: Int
+    y: Int
+
+struct Padding:
+    left: Int
+    top: Int
+    right: Int
+    bottom: Int
+
+struct Margin:
+    left: Int
+    top: Int
+    right: Int
+    bottom: Int
+
+struct Border:
+    width: Int
+    radius: Int
+
+struct WidgetColors:
+    fg: draw.Color
+    bg: Int
+    border: draw.Color
+
+struct WidgetStyle:
+    seed: Int
+
+struct Theme:
+    spacing: Spacing
+    padding: Padding
+    button: WidgetStyle
+    textbox: WidgetStyle
+    panel: WidgetStyle
+    text: WidgetStyle
+
+func color(r: Int, g: Int, b: Int, a: Int) -> draw.Color:
+    return draw.Color(r: r, g: g, b: b, a: a)
+
+func colors(fg: draw.Color, bg: draw.Color, border: draw.Color) -> WidgetColors:
+    return WidgetColors(fg: fg, bg: bg.a, border: border)
+
+func state_normal() -> Int:
+    return 0
+
+func state_focused() -> Int:
+    return 1
+
+func state_hovered() -> Int:
+    return 2
+
+func state_pressed() -> Int:
+    return 3
+
+func state_disabled() -> Int:
+    return 4
+
+func state_error() -> Int:
+    return 5
+
+func default_widget_style() -> WidgetStyle:
+    return WidgetStyle(seed: 1)
+
+func default_theme() -> Theme:
+    let spacing: Spacing = Spacing(x: 8, y: 8)
+    let padding: Padding = Padding(left: 12, top: 12, right: 12, bottom: 12)
+    let base: WidgetStyle = default_widget_style()
+    return Theme(spacing: spacing, padding: padding, button: base, textbox: base, panel: base, text: base)
+
+func style_for_state(style: WidgetStyle, state: Int) -> WidgetColors:
+    let bg: draw.Color = color(28 + style.seed, 38, 46, 255)
+    if state == state_focused():
+        return colors(color(235, 242, 244, 255), bg, color(235, 196, 64, 255))
+    if state == state_hovered():
+        return colors(color(235, 242, 244, 255), color(35, 48, 58, 255), color(95, 117, 128, 255))
+    if state == state_pressed():
+        return colors(color(235, 242, 244, 255), color(45, 68, 84, 255), color(235, 196, 64, 255))
+    if state == state_disabled():
+        return colors(color(128, 140, 145, 255), bg, color(95, 117, 128, 255))
+    if state == state_error():
+        return colors(color(235, 242, 244, 255), bg, color(210, 84, 74, 255))
+    return colors(color(235, 242, 244, 255), bg, color(95, 117, 128, 255))

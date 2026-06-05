@@ -24,7 +24,7 @@ The `tetra` CLI command surface is:
 | `build` | Build one input, defaulting to `Capsule.t4` `entry` or `main.t4`/`main.tetra`; a project directory argument uses the capsule entry; `--interface-only` validates the graph without emitting an artifact; `--artifacts=auto` repairs project artifacts before compiling. | `--diagnostics=json` on failure. |
 | `run` | Build and execute one host-runnable input or project directory, returning the program exit code. | `--diagnostics=json` on failure. |
 | `fmt` | Format one file to stdout, rewrite with `--write`, or verify with `--check`. | `--diagnostics=json` on failure. |
-| `test` | Discover top-level `test "name":` blocks and run them on the host target; project directories use discovered source roots. | `--report=json`; `--diagnostics=json` on command failure. |
+| `test` | Discover top-level `test "name":` blocks and run them on the host target; project directories use discovered source roots. | `--report=json`; `--format=json` alias for JSON reports; `--diagnostics=json` on command failure. |
 | `doc` | Generate API docs for files/directories, or discovered `Capsule.t4` source roots when no paths are given. | Markdown output; `--diagnostics=json` on failure. |
 | `interface` | Generate a `.t4i` interface file from one source file, or verify it with `--check`. | T4 interface output; `--diagnostics=json` on failure. |
 | `smoke` | Build and optionally run the canonical smoke matrix. | `--list --format=json`; `--report <path>`. |
@@ -96,15 +96,26 @@ canonical for the contract revision being validated.
   `arch`, `abi`, `data_model`, `format`, `exe_ext`, `build_only`,
   `run_mode`, `run_runner`, `run_supported`, pointer/register/native-int
   widths, endian, stack alignment, atomic widths, and any
-  `unsupported_reason`. `run_mode` is one of `host_native`, `host_probed`,
+  `unsupported_reason`. Linux native entries also expose
+  `runtime_status`, `stdlib_status`, `ffi_status`, `runner_probe_command`,
+  `release_gate`, and `evidence_artifacts`; these fields are promotion-gate
+  metadata, not support claims. `linux-x86` and `linux-x32` keep
+  `partial_build_only` runtime/stdlib status until real runner-backed gates
+  pass. Linux native entries also expose their syscall pack through
+  `syscall_instruction`, `syscall_numbering`, `syscall_arg_registers`, and
+  `syscall_error_range`: x64 uses the x86_64 `syscall` pack, x86 uses the
+  i386 `int 0x80` pack, and x32 uses x86_64 registers with
+  `x32_syscall_bit` numbering. `run_mode` is one of `host_native`, `host_probed`,
   `wasi_runner`, or `web_runner`.
   `run_supported` is the CLI contract for whether `tetra run --target <triple>`
   is runnable in the current host environment. Native targets are runnable only
   when they match the detected host. Build-only native targets such as
   `linux-x86` and `linux-x32` use `run_mode: "host_probed"`: the CLI may run
   them only when the current host can execute that exact ABI, and a failed
-  probe must report `run_supported: false` with a no-host-fallback
-  `run_unsupported_reason`. General target limitations stay in
+  probe must report `run_supported: false` with a
+  `run_unsupported_reason` that includes the host identity, the exact
+  `runner_probe_command`, and the no-host-fallback reason. General target
+  limitations stay in
   `unsupported_reason`. `wasm32-wasi` uses
   `run_mode: "wasi_runner"` and is runnable when the CLI can discover
   `wasmtime` or the Node WASI fallback. `wasm32-web` uses
@@ -113,6 +124,27 @@ canonical for the contract revision being validated.
   the production `wasm32-web` runtime runner. Missing runners set
   `run_supported: false` with a `run_unsupported_reason`. `run_runner` records
   the selected runner only when `run_supported` is true.
+  Linux native target promotion is additionally guarded by
+  `tools/cmd/validate-linux-native-targets`: `linux-x64` must remain the
+  runnable LP64 baseline, `linux-x86` must remain i386 SysV build-only until
+  full runtime/stdlib/FFI evidence passes, and `linux-x32` must remain x32 SysV
+  build-only with x86_64 registers plus 32-bit pointer/native-int facts until
+  its own evidence passes. The validator rejects premature `supported` status,
+  x32-to-x64/x86 collapse, host fallback, and fake/skipped/report-only target
+  suite evidence, and requires a validated `artifact-hashes.json` manifest for
+  the same report directory. Full-family evidence that includes x64, x86, and
+  x32 also requires the all-targets brutal report. Per-target ABI, atomic,
+  fuzz, and passing runner reports must carry matching top-level `target`
+  identity. Passing Linux native runner reports must include the release runner
+  smoke results `runner arithmetic`, `runner alloc memory`, `runner filesystem`,
+  `runner stderr fd`, `runner time`, `runner network socket`, and
+  `runner network options`, and `runner task join`, so a runnable report proves more than a trivial
+  arithmetic executable. Blocked x86/x32 runner diagnostics must
+  include the target, host identity, probe command, and no-host-fallback reason.
+  Runner evidence must agree with target metadata: a passing runner report is
+  valid only when `run_supported` is true for that target, while a no-host
+  diagnostic is valid only when the same `targets.json` records
+  `run_supported: false`.
 - `features --format=json` emits `schema`, `version`, and `features` entries
   with `id`, `name`, `status`, `scope`, `stability`, and `docs`. Status is one
   of `current`, `experimental`, `planned`, or `post-v1`.
@@ -131,7 +163,13 @@ canonical for the contract revision being validated.
   requires the executable `tetra.actors.distributed-runtime.v1` report accepted
   by `tools/cmd/validate-distributed-actor-runtime`.
 - `test --report=json` emits `total`, `passed`, `failed`, `duration_ms`,
-  `files`, and `results`; validate it with `tools/cmd/validate-test-report`.
+  `files`, and `results`; single-target reports also include canonical
+  `target` identity such as `linux-x64`, `linux-x86`, or `linux-x32`.
+  Validate it with `tools/cmd/validate-test-report`. `test --format=json` is an
+  alias for the same report output, including target-suite commands such as
+  `test --all-targets --brutal --format=json`; multi-target reports omit a
+  single `target` value.
+  If both `--report` and `--format` are provided, they must match.
 - `smoke --list --format=json` emits the smoke matrix; validate it with
   `tools/cmd/validate-smoke-list`.
   Its top-level `run_supported` is smoke-list metadata and is not a substitute

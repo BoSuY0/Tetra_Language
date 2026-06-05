@@ -208,7 +208,7 @@ func main() -> Int:
     return 0
 `,
 			wantCode: compiler.DiagnosticCodeSafetyLifetime,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "borrowed slice return requires '-> borrow []u8' or '.copy()'",
 		},
 		{
 			name: "lifetime borrowed slice struct literal return escape",
@@ -223,7 +223,7 @@ func main() -> Int:
     return 0
 `,
 			wantCode: compiler.DiagnosticCodeSafetyLifetime,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "lifetime borrowed slice struct alias return escape",
@@ -270,7 +270,7 @@ func main() -> Int:
     return 0
 `,
 			wantCode: compiler.DiagnosticCodeSafetyLifetime,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufMsg' contains borrowed slice field 'BufMsg.send[1]' that cannot escape through owned return",
 		},
 		{
 			name: "lifetime borrowed slice enum alias return escape",
@@ -284,7 +284,7 @@ func leak(x: borrow []u8) -> BufMsg:
 
 func main() -> Int:
     return 0
-`,
+	`,
 			wantCode: compiler.DiagnosticCodeSafetyLifetime,
 			wantText: "borrowed local 'x' cannot escape via return",
 		},
@@ -760,7 +760,7 @@ func leak(x: borrow ptr) -> ptr?:
 
 func main() -> Int:
     return 0
-`,
+	`,
 			wantCode: compiler.DiagnosticCodeSafetyLifetime,
 			wantText: "borrowed local 'x' cannot escape via return",
 		},
@@ -884,9 +884,9 @@ func leak(x: borrow []u8) -> []u8?:
 
 func main() -> Int:
     return 0
-`,
+	`,
 			wantCode: compiler.DiagnosticCodeSafetyLifetime,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot escape through owned return",
 		},
 		{
 			name: "ownership borrowed slice optional assignment owned escape",
@@ -5876,9 +5876,9 @@ var leaked: []u8? = none
         return 0
     else:
         return 0
-`,
+			`,
 			params:   "maybe: borrow []u8?",
-			wantText: "borrowed local 'maybe' cannot escape via global assignment to 'leaked'",
+			wantText: "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot be stored in global",
 		},
 		{
 			name: "match global",
@@ -5894,7 +5894,7 @@ var leaked: []u8? = none
         return 0
 `,
 			params:   "maybe: borrow []u8?",
-			wantText: "borrowed local 'maybe' cannot escape via global assignment to 'leaked'",
+			wantText: "aggregate '[]u8?' contains borrowed slice field '$elem' that cannot be stored in global",
 		},
 	}
 
@@ -5989,7 +5989,7 @@ func leak(x: borrow []u8) -> OuterBox:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias return",
@@ -6045,7 +6045,7 @@ func leak(read: borrow []u8) -> Int:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'read' cannot escape via global assignment to 'leaked'",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot be stored in global",
 		},
 	}
 
@@ -6091,7 +6091,7 @@ func main() -> Int:
     return 0
 `,
 			},
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias return",
@@ -6165,7 +6165,7 @@ func main() -> Int:
     return 0
 `,
 			},
-			wantText: "borrowed local 'read' cannot escape via global assignment to 'leaked'",
+			wantText: "aggregate 'lib.model.BufBox' contains borrowed slice field 'buf' that cannot be stored in global",
 		},
 	}
 
@@ -6229,7 +6229,7 @@ func leak(x: borrow []u8) -> OuterMsg:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias return",
@@ -6288,7 +6288,7 @@ func leak(read: borrow []u8) -> Int:
 func main() -> Int:
     return 0
 `,
-			wantText: "borrowed local 'read' cannot escape via global assignment to 'leaked'",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot be stored in global",
 		},
 	}
 
@@ -6335,7 +6335,7 @@ func main() -> Int:
     return 0
 `,
 			},
-			wantText: "borrowed local 'x' cannot escape via return",
+			wantText: "aggregate 'BufBox' contains borrowed slice field 'buf' that cannot escape through owned return",
 		},
 		{
 			name: "alias return",
@@ -6412,7 +6412,7 @@ func main() -> Int:
     return 0
 `,
 			},
-			wantText: "borrowed local 'read' cannot escape via global assignment to 'leaked'",
+			wantText: "aggregate 'lib.model.BufBox' contains borrowed slice field 'buf' that cannot be stored in global",
 		},
 	}
 

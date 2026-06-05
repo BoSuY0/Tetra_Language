@@ -7,12 +7,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+
+	"tetra_language/compiler"
 )
 
 func TestTestCommandJSONDiagnosticsForWASMRuntimeUnsupported(t *testing.T) {
 	diag := runCLIJSONDiagnostic(t, []string{"test", "--diagnostics=json", "--target", "wasm32-web"}, 2)
+	if diag.Code != compiler.DiagnosticCodeTargetRuntime || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v, want code %s severity error", diag, compiler.DiagnosticCodeTargetRuntime)
+	}
 	for _, want := range []string{"cannot run tests for target wasm32-web", "WASM test runner is not part of the current production runtime contract", "smoke/runtime reports"} {
 		if !strings.Contains(diag.Message, want) {
 			t.Fatalf("diagnostic missing %q: %#v", want, diag)
@@ -30,7 +36,15 @@ func TestTestCommandJSONDiagnosticsForBuildOnlyRuntimeUnsupported(t *testing.T) 
 		t.Fatal(err)
 	}
 	diag := runCLIJSONDiagnostic(t, []string{"test", "--diagnostics=json", "--target", "x32", srcPath}, 2)
-	for _, want := range []string{"cannot run tests for target linux-x32", "host does not support Linux x32 ABI execution", "no host fallback"} {
+	if diag.Code != compiler.DiagnosticCodeTargetRuntime || diag.Severity != "error" {
+		t.Fatalf("diagnostic identity = %#v, want code %s severity error", diag, compiler.DiagnosticCodeTargetRuntime)
+	}
+	for _, want := range []string{
+		"cannot run tests for target linux-x32",
+		"host " + runtime.GOOS + "/" + runtime.GOARCH + " does not support Linux x32 ABI execution",
+		"no host fallback",
+		"probe command: tetra test --diagnostics=json --target x32 --format=json <runner-smoke.tetra>",
+	} {
 		if !strings.Contains(diag.Message, want) {
 			t.Fatalf("diagnostic missing %q: %#v", want, diag)
 		}
@@ -80,15 +94,42 @@ func TestTestCommandRunsDefaultTargetSuitesWithoutProject(t *testing.T) {
 				"PASS x86 target model",
 				"PASS x86 i386 SysV classifier",
 				"PASS x86 varargs and sret ABI",
-				"PASS x86 pointer/native-libc FFI diagnostics",
+				"PASS x86 pointer FFI object smoke",
+				"PASS x86 c_int FFI object smoke",
+				"PASS x86 c_uint FFI object smoke",
+				"PASS x86 ILP32 native/libc FFI object smoke",
+				"PASS x86 ref FFI null-return diagnostics",
+				"PASS x86 function-pointer FFI diagnostics",
 				"PASS x86 source native scalar diagnostics",
+				"PASS x86 stdout executable smoke",
+				"PASS x86 stderr fd runtime smoke",
+				"PASS x86 allocator executable smoke",
+				"PASS x86 allocator failure executable smoke",
+				"PASS x86 raw memory bounds executable smoke",
+				"PASS x86 raw pointer slot executable smoke",
+				"PASS x86 raw pointer offset slot executable smoke",
+				"PASS x86 island free executable smoke",
 				"PASS x86 stdlib runtime boundary diagnostics",
+				"PASS x86 filesystem runtime smoke",
+				"PASS x86 filesystem scheduler composition smoke",
+				"PASS x86 time runtime smoke",
+				"PASS x86 single-actor self-host runtime smoke",
+				"PASS x86 single-task self-host runtime smoke",
+				"PASS x86 typed-task self-host runtime smoke",
+				"PASS x86 staged typed-task self-host runtime smoke",
+				"PASS x86 task-group self-host runtime smoke",
+				"PASS x86 typed-task-group self-host runtime smoke",
+				"PASS x86 actor-state self-host runtime smoke",
+				"PASS x86 ctx_switch object smoke",
 				"PASS x86 target runtime boundary diagnostics",
+				"PASS x86 networking runtime boundary diagnostics",
+				"PASS x86 networking lifecycle runtime smoke",
+				"PASS x86 surface/distributed runtime boundary diagnostics",
 				"PASS x86 pointer atomic ABI width",
 				"PASS x86 object ABI smoke",
 				"PASS x86 atomic ABI object",
 				"PASS x86 executable matrix smoke",
-				"Tetra tests: 11/11 passed",
+				"Tetra tests: 38/38 passed",
 			},
 		},
 		{
@@ -98,11 +139,17 @@ func TestTestCommandRunsDefaultTargetSuitesWithoutProject(t *testing.T) {
 				"PASS x64 SysV classifier",
 				"PASS x64 SysV varargs and aggregates",
 				"PASS x64 source native scalar diagnostics",
+				"PASS x64 pointer FFI regression smoke",
+				"PASS x64 c_int FFI object smoke",
+				"PASS x64 c_uint FFI object smoke",
+				"PASS x64 filesystem scheduler composition smoke",
+				"PASS x64 networking runtime smoke",
+				"PASS x64 scheduler restriction regression smoke",
 				"PASS x64 pointer atomic ABI width",
 				"PASS x64 object ABI smoke",
 				"PASS x64 atomic ABI object",
 				"PASS x64 executable matrix smoke",
-				"Tetra tests: 8/8 passed",
+				"Tetra tests: 14/14 passed",
 			},
 		},
 		{
@@ -111,15 +158,42 @@ func TestTestCommandRunsDefaultTargetSuitesWithoutProject(t *testing.T) {
 				"PASS x32 target model",
 				"PASS x32 SysV classifier",
 				"PASS x32 SysV varargs and aggregates",
-				"PASS x32 pointer/native-libc FFI diagnostics",
+				"PASS x32 pointer FFI object smoke",
+				"PASS x32 c_int FFI object smoke",
+				"PASS x32 c_uint FFI object smoke",
+				"PASS x32 ILP32 native/libc FFI object smoke",
+				"PASS x32 ref FFI null-return diagnostics",
+				"PASS x32 function-pointer FFI diagnostics",
 				"PASS x32 source native scalar diagnostics",
+				"PASS x32 stdout executable smoke",
+				"PASS x32 stderr fd runtime smoke",
+				"PASS x32 allocator executable smoke",
+				"PASS x32 allocator failure executable smoke",
+				"PASS x32 raw memory bounds executable smoke",
+				"PASS x32 raw pointer slot executable smoke",
+				"PASS x32 raw pointer offset slot executable smoke",
+				"PASS x32 island free executable smoke",
 				"PASS x32 stdlib runtime boundary diagnostics",
+				"PASS x32 time runtime smoke",
+				"PASS x32 filesystem runtime smoke",
+				"PASS x32 filesystem scheduler composition smoke",
+				"PASS x32 single-actor self-host runtime smoke",
+				"PASS x32 single-task self-host runtime smoke",
+				"PASS x32 typed-task self-host runtime smoke",
+				"PASS x32 staged typed-task self-host runtime smoke",
+				"PASS x32 task-group self-host runtime smoke",
+				"PASS x32 typed-task-group self-host runtime smoke",
+				"PASS x32 actor-state self-host runtime smoke",
+				"PASS x32 ctx_switch object smoke",
 				"PASS x32 target runtime boundary diagnostics",
+				"PASS x32 networking runtime boundary diagnostics",
+				"PASS x32 networking lifecycle runtime smoke",
+				"PASS x32 surface/distributed runtime boundary diagnostics",
 				"PASS x32 pointer atomic ABI width",
 				"PASS x32 object ABI smoke",
 				"PASS x32 atomic ABI object",
 				"PASS x32 executable matrix smoke",
-				"Tetra tests: 11/11 passed",
+				"Tetra tests: 38/38 passed",
 			},
 		},
 	} {
@@ -157,7 +231,7 @@ func TestTestCommandRunsDefaultTargetSuitesWithoutProject(t *testing.T) {
 func TestTestCommandJSONDiagnosticsForHostTargetMismatch(t *testing.T) {
 	target := nonHostTarget(t)
 	diag := runCLIJSONDiagnostic(t, []string{"test", "--diagnostics=json", "--target", target}, 2)
-	if diag.Code != "TETRA0001" || diag.Severity != "error" || !strings.Contains(diag.Message, "cannot run tests for target "+target) {
+	if diag.Code != compiler.DiagnosticCodeTargetRuntime || diag.Severity != "error" || !strings.Contains(diag.Message, "cannot run tests for target "+target) {
 		t.Fatalf("diagnostic = %#v", diag)
 	}
 }
@@ -181,14 +255,44 @@ func TestTestCommandRunsAllTargetsBrutalSuite(t *testing.T) {
 	out := stdout.String()
 	for _, want := range []string{
 		"PASS x86 target model",
-		"PASS x86 pointer/native-libc FFI diagnostics",
+		"PASS x86 pointer FFI object smoke",
+		"PASS x86 c_int FFI object smoke",
+		"PASS x86 c_uint FFI object smoke",
+		"PASS x86 ILP32 native/libc FFI object smoke",
+		"PASS x86 ref FFI null-return diagnostics",
+		"PASS x86 function-pointer FFI diagnostics",
 		"PASS x86 source native scalar diagnostics",
+		"PASS x86 stdout executable smoke",
+		"PASS x86 stderr fd runtime smoke",
+		"PASS x86 allocator executable smoke",
+		"PASS x86 allocator failure executable smoke",
+		"PASS x86 raw memory bounds executable smoke",
+		"PASS x86 raw pointer slot executable smoke",
+		"PASS x86 raw pointer offset slot executable smoke",
+		"PASS x86 island free executable smoke",
 		"PASS x86 stdlib runtime boundary diagnostics",
+		"PASS x86 filesystem runtime smoke",
+		"PASS x86 filesystem scheduler composition smoke",
+		"PASS x86 time runtime smoke",
+		"PASS x86 typed-task self-host runtime smoke",
+		"PASS x86 staged typed-task self-host runtime smoke",
+		"PASS x86 task-group self-host runtime smoke",
+		"PASS x86 typed-task-group self-host runtime smoke",
+		"PASS x86 ctx_switch object smoke",
 		"PASS x86 target runtime boundary diagnostics",
+		"PASS x86 networking runtime boundary diagnostics",
+		"PASS x86 networking lifecycle runtime smoke",
+		"PASS x86 surface/distributed runtime boundary diagnostics",
 		"PASS x86 pointer atomic ABI width",
 		"PASS x64 atomic object matrix",
 		"PASS x64 pointer atomic object width",
 		"PASS x64 source native scalar diagnostics",
+		"PASS x64 pointer FFI regression smoke",
+		"PASS x64 c_int FFI object smoke",
+		"PASS x64 c_uint FFI object smoke",
+		"PASS x64 filesystem scheduler composition smoke",
+		"PASS x64 networking runtime smoke",
+		"PASS x64 scheduler restriction regression smoke",
 		"PASS x64 pointer atomic ABI width",
 		"PASS x32 layout fuzz",
 		"PASS x64 layout fuzz",
@@ -200,10 +304,37 @@ func TestTestCommandRunsAllTargetsBrutalSuite(t *testing.T) {
 		"PASS x86 object signature fuzz",
 		"PASS x32 SysV classifier",
 		"PASS x32 SysV varargs and aggregates",
-		"PASS x32 pointer/native-libc FFI diagnostics",
+		"PASS x32 pointer FFI object smoke",
+		"PASS x32 c_int FFI object smoke",
+		"PASS x32 c_uint FFI object smoke",
+		"PASS x32 ILP32 native/libc FFI object smoke",
+		"PASS x32 ref FFI null-return diagnostics",
+		"PASS x32 function-pointer FFI diagnostics",
 		"PASS x32 source native scalar diagnostics",
+		"PASS x32 stdout executable smoke",
+		"PASS x32 stderr fd runtime smoke",
+		"PASS x32 allocator executable smoke",
+		"PASS x32 allocator failure executable smoke",
+		"PASS x32 raw memory bounds executable smoke",
+		"PASS x32 raw pointer slot executable smoke",
+		"PASS x32 raw pointer offset slot executable smoke",
+		"PASS x32 island free executable smoke",
 		"PASS x32 stdlib runtime boundary diagnostics",
+		"PASS x32 time runtime smoke",
+		"PASS x32 filesystem runtime smoke",
+		"PASS x32 filesystem scheduler composition smoke",
+		"PASS x32 single-actor self-host runtime smoke",
+		"PASS x32 single-task self-host runtime smoke",
+		"PASS x32 typed-task self-host runtime smoke",
+		"PASS x32 staged typed-task self-host runtime smoke",
+		"PASS x32 task-group self-host runtime smoke",
+		"PASS x32 typed-task-group self-host runtime smoke",
+		"PASS x32 actor-state self-host runtime smoke",
+		"PASS x32 ctx_switch object smoke",
 		"PASS x32 target runtime boundary diagnostics",
+		"PASS x32 networking runtime boundary diagnostics",
+		"PASS x32 networking lifecycle runtime smoke",
+		"PASS x32 surface/distributed runtime boundary diagnostics",
 		"PASS x32 pointer atomic ABI width",
 		"PASS x32 pointer atomic object width",
 		"PASS macos-x64 SysV classifier",
@@ -222,7 +353,7 @@ func TestTestCommandRunsAllTargetsBrutalSuite(t *testing.T) {
 		"PASS x32 atomic concurrency stress oracle",
 		"PASS macos-x64 object signature fuzz",
 		"PASS windows-x64 object signature fuzz",
-		"Tetra tests: 82/82 passed",
+		"Tetra tests: 142/142 passed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("test stdout missing %q: %q", want, out)
@@ -234,10 +365,20 @@ func TestTestCommandRunsAllTargetsBrutalSuite(t *testing.T) {
 }
 
 func TestTestCommandAllTargetsBrutalJSONUsesTargetSpecificFiles(t *testing.T) {
+	assertAllTargetsBrutalJSONReport(t, []string{"test", "--all-targets", "--brutal", "--report=json"})
+}
+
+func TestTestCommandAllTargetsBrutalFormatJSONUsesTargetSpecificFiles(t *testing.T) {
+	assertAllTargetsBrutalJSONReport(t, []string{"test", "--all-targets", "--brutal", "--format=json"})
+}
+
+func assertAllTargetsBrutalJSONReport(t *testing.T, args []string) {
+	t.Helper()
 	var report struct {
-		Total  int `json:"total"`
-		Passed int `json:"passed"`
-		Failed int `json:"failed"`
+		Total  int    `json:"total"`
+		Passed int    `json:"passed"`
+		Failed int    `json:"failed"`
+		Target string `json:"target"`
 		Files  []struct {
 			Filename string `json:"filename"`
 		} `json:"files"`
@@ -249,8 +390,8 @@ func TestTestCommandAllTargetsBrutalJSONUsesTargetSpecificFiles(t *testing.T) {
 			Passed       bool   `json:"passed"`
 		} `json:"results"`
 	}
-	runCLIJSONStdout(t, []string{"test", "--all-targets", "--brutal", "--report=json"}, 0, &report)
-	if report.Total != 82 || report.Passed != 82 || report.Failed != 0 || len(report.Results) != 82 {
+	runCLIJSONStdout(t, args, 0, &report)
+	if report.Total != 142 || report.Passed != 142 || report.Failed != 0 || len(report.Results) != 142 {
 		t.Fatalf("report = %#v", report)
 	}
 	files := map[string]bool{}
@@ -273,26 +414,82 @@ func TestTestCommandAllTargetsBrutalJSONUsesTargetSpecificFiles(t *testing.T) {
 		}
 	}
 	wantFilenameByName := map[string]string{
-		"x64 SysV classifier":                          "tetra:x64-abi",
-		"x64 pointer atomic ABI width":                 "tetra:x64-abi",
-		"macos-x64 SysV classifier":                    "tetra:macos-x64-abi",
-		"macos-x64 object ABI smoke":                   "tetra:macos-x64-abi",
-		"macos-x64 pointer atomic ABI width":           "tetra:macos-x64-abi",
-		"windows-x64 Win64 classifier":                 "tetra:windows-x64-abi",
-		"windows-x64 object ABI smoke":                 "tetra:windows-x64-abi",
-		"windows-x64 pointer atomic ABI width":         "tetra:windows-x64-abi",
-		"x64 atomic object matrix":                     "tetra:x64-atomic-stress",
-		"x64 pointer atomic object width":              "tetra:x64-atomic-stress",
-		"x64 atomic concurrency stress oracle":         "tetra:x64-atomic-stress",
-		"macos-x64 atomic object matrix":               "tetra:macos-x64-atomic-stress",
-		"macos-x64 pointer atomic object width":        "tetra:macos-x64-atomic-stress",
-		"macos-x64 atomic concurrency stress oracle":   "tetra:macos-x64-atomic-stress",
-		"windows-x64 atomic object matrix":             "tetra:windows-x64-atomic-stress",
-		"windows-x64 pointer atomic object width":      "tetra:windows-x64-atomic-stress",
-		"windows-x64 atomic concurrency stress oracle": "tetra:windows-x64-atomic-stress",
-		"x64 object signature fuzz":                    "tetra:x64-fuzz",
-		"macos-x64 object signature fuzz":              "tetra:macos-x64-fuzz",
-		"windows-x64 object signature fuzz":            "tetra:windows-x64-fuzz",
+		"x64 SysV classifier":                                  "tetra:x64-abi",
+		"x64 pointer FFI regression smoke":                     "tetra:x64-abi",
+		"x64 c_int FFI object smoke":                           "tetra:x64-abi",
+		"x64 c_uint FFI object smoke":                          "tetra:x64-abi",
+		"x64 filesystem scheduler composition smoke":           "tetra:x64-abi",
+		"x64 networking runtime smoke":                         "tetra:x64-abi",
+		"x64 scheduler restriction regression smoke":           "tetra:x64-abi",
+		"x64 pointer atomic ABI width":                         "tetra:x64-abi",
+		"x86 pointer FFI object smoke":                         "tetra:x86-abi",
+		"x86 c_int FFI object smoke":                           "tetra:x86-abi",
+		"x86 c_uint FFI object smoke":                          "tetra:x86-abi",
+		"x86 ILP32 native/libc FFI object smoke":               "tetra:x86-abi",
+		"x86 stdout executable smoke":                          "tetra:x86-abi",
+		"x86 stderr fd runtime smoke":                          "tetra:x86-abi",
+		"x86 allocator executable smoke":                       "tetra:x86-abi",
+		"x86 allocator failure executable smoke":               "tetra:x86-abi",
+		"x86 raw memory bounds executable smoke":               "tetra:x86-abi",
+		"x86 raw pointer slot executable smoke":                "tetra:x86-abi",
+		"x86 raw pointer offset slot executable smoke":         "tetra:x86-abi",
+		"x86 island free executable smoke":                     "tetra:x86-abi",
+		"x86 filesystem runtime smoke":                         "tetra:x86-abi",
+		"x86 filesystem scheduler composition smoke":           "tetra:x86-abi",
+		"x86 single-actor self-host runtime smoke":             "tetra:x86-abi",
+		"x86 single-task self-host runtime smoke":              "tetra:x86-abi",
+		"x86 typed-task self-host runtime smoke":               "tetra:x86-abi",
+		"x86 staged typed-task self-host runtime smoke":        "tetra:x86-abi",
+		"x86 task-group self-host runtime smoke":               "tetra:x86-abi",
+		"x86 typed-task-group self-host runtime smoke":         "tetra:x86-abi",
+		"x86 actor-state self-host runtime smoke":              "tetra:x86-abi",
+		"x86 networking runtime boundary diagnostics":          "tetra:x86-abi",
+		"x86 networking lifecycle runtime smoke":               "tetra:x86-abi",
+		"x86 surface/distributed runtime boundary diagnostics": "tetra:x86-abi",
+		"x32 pointer FFI object smoke":                         "tetra:x32-abi",
+		"x32 c_int FFI object smoke":                           "tetra:x32-abi",
+		"x32 c_uint FFI object smoke":                          "tetra:x32-abi",
+		"x32 ILP32 native/libc FFI object smoke":               "tetra:x32-abi",
+		"x32 time runtime smoke":                               "tetra:x32-abi",
+		"x32 filesystem runtime smoke":                         "tetra:x32-abi",
+		"x32 stdout executable smoke":                          "tetra:x32-abi",
+		"x32 stderr fd runtime smoke":                          "tetra:x32-abi",
+		"x32 allocator executable smoke":                       "tetra:x32-abi",
+		"x32 allocator failure executable smoke":               "tetra:x32-abi",
+		"x32 raw memory bounds executable smoke":               "tetra:x32-abi",
+		"x32 raw pointer slot executable smoke":                "tetra:x32-abi",
+		"x32 raw pointer offset slot executable smoke":         "tetra:x32-abi",
+		"x32 island free executable smoke":                     "tetra:x32-abi",
+		"x32 filesystem scheduler composition smoke":           "tetra:x32-abi",
+		"x32 single-actor self-host runtime smoke":             "tetra:x32-abi",
+		"x32 single-task self-host runtime smoke":              "tetra:x32-abi",
+		"x32 typed-task self-host runtime smoke":               "tetra:x32-abi",
+		"x32 staged typed-task self-host runtime smoke":        "tetra:x32-abi",
+		"x32 task-group self-host runtime smoke":               "tetra:x32-abi",
+		"x32 typed-task-group self-host runtime smoke":         "tetra:x32-abi",
+		"x32 actor-state self-host runtime smoke":              "tetra:x32-abi",
+		"x32 ctx_switch object smoke":                          "tetra:x32-abi",
+		"x32 networking runtime boundary diagnostics":          "tetra:x32-abi",
+		"x32 networking lifecycle runtime smoke":               "tetra:x32-abi",
+		"x32 surface/distributed runtime boundary diagnostics": "tetra:x32-abi",
+		"macos-x64 SysV classifier":                            "tetra:macos-x64-abi",
+		"macos-x64 object ABI smoke":                           "tetra:macos-x64-abi",
+		"macos-x64 pointer atomic ABI width":                   "tetra:macos-x64-abi",
+		"windows-x64 Win64 classifier":                         "tetra:windows-x64-abi",
+		"windows-x64 object ABI smoke":                         "tetra:windows-x64-abi",
+		"windows-x64 pointer atomic ABI width":                 "tetra:windows-x64-abi",
+		"x64 atomic object matrix":                             "tetra:x64-atomic-stress",
+		"x64 pointer atomic object width":                      "tetra:x64-atomic-stress",
+		"x64 atomic concurrency stress oracle":                 "tetra:x64-atomic-stress",
+		"macos-x64 atomic object matrix":                       "tetra:macos-x64-atomic-stress",
+		"macos-x64 pointer atomic object width":                "tetra:macos-x64-atomic-stress",
+		"macos-x64 atomic concurrency stress oracle":           "tetra:macos-x64-atomic-stress",
+		"windows-x64 atomic object matrix":                     "tetra:windows-x64-atomic-stress",
+		"windows-x64 pointer atomic object width":              "tetra:windows-x64-atomic-stress",
+		"windows-x64 atomic concurrency stress oracle":         "tetra:windows-x64-atomic-stress",
+		"x64 object signature fuzz":                            "tetra:x64-fuzz",
+		"macos-x64 object signature fuzz":                      "tetra:macos-x64-fuzz",
+		"windows-x64 object signature fuzz":                    "tetra:windows-x64-fuzz",
 	}
 	for name, wantFile := range wantFilenameByName {
 		found := false
@@ -461,15 +658,42 @@ func TestTestCommandRunsX32ABISuite(t *testing.T) {
 		"PASS x32 target model",
 		"PASS x32 SysV classifier",
 		"PASS x32 SysV varargs and aggregates",
-		"PASS x32 pointer/native-libc FFI diagnostics",
+		"PASS x32 pointer FFI object smoke",
+		"PASS x32 c_int FFI object smoke",
+		"PASS x32 c_uint FFI object smoke",
+		"PASS x32 ILP32 native/libc FFI object smoke",
+		"PASS x32 ref FFI null-return diagnostics",
+		"PASS x32 function-pointer FFI diagnostics",
 		"PASS x32 source native scalar diagnostics",
+		"PASS x32 stdout executable smoke",
+		"PASS x32 stderr fd runtime smoke",
+		"PASS x32 allocator executable smoke",
+		"PASS x32 allocator failure executable smoke",
+		"PASS x32 raw memory bounds executable smoke",
+		"PASS x32 raw pointer slot executable smoke",
+		"PASS x32 raw pointer offset slot executable smoke",
+		"PASS x32 island free executable smoke",
 		"PASS x32 stdlib runtime boundary diagnostics",
+		"PASS x32 time runtime smoke",
+		"PASS x32 filesystem runtime smoke",
+		"PASS x32 filesystem scheduler composition smoke",
+		"PASS x32 single-actor self-host runtime smoke",
+		"PASS x32 single-task self-host runtime smoke",
+		"PASS x32 typed-task self-host runtime smoke",
+		"PASS x32 staged typed-task self-host runtime smoke",
+		"PASS x32 task-group self-host runtime smoke",
+		"PASS x32 typed-task-group self-host runtime smoke",
+		"PASS x32 actor-state self-host runtime smoke",
+		"PASS x32 ctx_switch object smoke",
 		"PASS x32 target runtime boundary diagnostics",
+		"PASS x32 networking runtime boundary diagnostics",
+		"PASS x32 networking lifecycle runtime smoke",
+		"PASS x32 surface/distributed runtime boundary diagnostics",
 		"PASS x32 pointer atomic ABI width",
 		"PASS x32 object ABI smoke",
 		"PASS x32 atomic ABI object",
 		"PASS x32 executable matrix smoke",
-		"Tetra tests: 11/11 passed",
+		"Tetra tests: 38/38 passed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("test stdout missing %q: %q", want, out)
@@ -488,15 +712,42 @@ func TestTestCommandRunsX86ABISuite(t *testing.T) {
 		"PASS x86 target model",
 		"PASS x86 i386 SysV classifier",
 		"PASS x86 varargs and sret ABI",
-		"PASS x86 pointer/native-libc FFI diagnostics",
+		"PASS x86 pointer FFI object smoke",
+		"PASS x86 c_int FFI object smoke",
+		"PASS x86 c_uint FFI object smoke",
+		"PASS x86 ILP32 native/libc FFI object smoke",
+		"PASS x86 ref FFI null-return diagnostics",
+		"PASS x86 function-pointer FFI diagnostics",
 		"PASS x86 source native scalar diagnostics",
+		"PASS x86 stdout executable smoke",
+		"PASS x86 stderr fd runtime smoke",
+		"PASS x86 allocator executable smoke",
+		"PASS x86 allocator failure executable smoke",
+		"PASS x86 raw memory bounds executable smoke",
+		"PASS x86 raw pointer slot executable smoke",
+		"PASS x86 raw pointer offset slot executable smoke",
+		"PASS x86 island free executable smoke",
 		"PASS x86 stdlib runtime boundary diagnostics",
+		"PASS x86 filesystem runtime smoke",
+		"PASS x86 filesystem scheduler composition smoke",
+		"PASS x86 time runtime smoke",
+		"PASS x86 single-actor self-host runtime smoke",
+		"PASS x86 single-task self-host runtime smoke",
+		"PASS x86 typed-task self-host runtime smoke",
+		"PASS x86 staged typed-task self-host runtime smoke",
+		"PASS x86 task-group self-host runtime smoke",
+		"PASS x86 typed-task-group self-host runtime smoke",
+		"PASS x86 actor-state self-host runtime smoke",
+		"PASS x86 ctx_switch object smoke",
 		"PASS x86 target runtime boundary diagnostics",
+		"PASS x86 networking runtime boundary diagnostics",
+		"PASS x86 networking lifecycle runtime smoke",
+		"PASS x86 surface/distributed runtime boundary diagnostics",
 		"PASS x86 pointer atomic ABI width",
 		"PASS x86 object ABI smoke",
 		"PASS x86 atomic ABI object",
 		"PASS x86 executable matrix smoke",
-		"Tetra tests: 11/11 passed",
+		"Tetra tests: 38/38 passed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("test stdout missing %q: %q", want, out)
@@ -541,11 +792,17 @@ func TestTestCommandRunsX64ABISuite(t *testing.T) {
 		"PASS x64 SysV classifier",
 		"PASS x64 SysV varargs and aggregates",
 		"PASS x64 source native scalar diagnostics",
+		"PASS x64 pointer FFI regression smoke",
+		"PASS x64 c_int FFI object smoke",
+		"PASS x64 c_uint FFI object smoke",
+		"PASS x64 filesystem scheduler composition smoke",
+		"PASS x64 networking runtime smoke",
+		"PASS x64 scheduler restriction regression smoke",
 		"PASS x64 pointer atomic ABI width",
 		"PASS x64 object ABI smoke",
 		"PASS x64 atomic ABI object",
 		"PASS x64 executable matrix smoke",
-		"Tetra tests: 8/8 passed",
+		"Tetra tests: 14/14 passed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("test stdout missing %q: %q", want, out)
@@ -555,9 +812,10 @@ func TestTestCommandRunsX64ABISuite(t *testing.T) {
 
 func TestTestCommandX32ABISuiteJSONReport(t *testing.T) {
 	var report struct {
-		Total  int `json:"total"`
-		Passed int `json:"passed"`
-		Failed int `json:"failed"`
+		Total  int    `json:"total"`
+		Passed int    `json:"passed"`
+		Failed int    `json:"failed"`
+		Target string `json:"target"`
 		Files  []struct {
 			Filename string `json:"filename"`
 			Total    int    `json:"total"`
@@ -571,13 +829,16 @@ func TestTestCommandX32ABISuiteJSONReport(t *testing.T) {
 		} `json:"results"`
 	}
 	runCLIJSONStdout(t, []string{"test", "--target", "x32", "--abi", "--report=json"}, 0, &report)
-	if report.Total != 11 || report.Passed != 11 || report.Failed != 0 || len(report.Results) != 11 {
+	if report.Total != 38 || report.Passed != 38 || report.Failed != 0 || len(report.Results) != 38 {
 		t.Fatalf("report = %#v", report)
 	}
-	if len(report.Files) != 1 || report.Files[0].Filename != "tetra:x32-abi" || report.Files[0].Total != 11 || report.Files[0].Passed != 11 || report.Files[0].Failed != 0 {
+	if report.Target != "linux-x32" {
+		t.Fatalf("report target = %q, want linux-x32", report.Target)
+	}
+	if len(report.Files) != 1 || report.Files[0].Filename != "tetra:x32-abi" || report.Files[0].Total != 38 || report.Files[0].Passed != 38 || report.Files[0].Failed != 0 {
 		t.Fatalf("files = %#v", report.Files)
 	}
-	wantNames := []string{"x32 target model", "x32 SysV classifier", "x32 SysV varargs and aggregates", "x32 pointer/native-libc FFI diagnostics", "x32 source native scalar diagnostics", "x32 stdlib runtime boundary diagnostics", "x32 target runtime boundary diagnostics", "x32 pointer atomic ABI width", "x32 object ABI smoke", "x32 atomic ABI object", "x32 executable matrix smoke"}
+	wantNames := []string{"x32 target model", "x32 SysV classifier", "x32 SysV varargs and aggregates", "x32 pointer FFI object smoke", "x32 c_int FFI object smoke", "x32 c_uint FFI object smoke", "x32 ILP32 native/libc FFI object smoke", "x32 ref FFI null-return diagnostics", "x32 function-pointer FFI diagnostics", "x32 source native scalar diagnostics", "x32 stdout executable smoke", "x32 stderr fd runtime smoke", "x32 allocator executable smoke", "x32 allocator failure executable smoke", "x32 raw memory bounds executable smoke", "x32 raw pointer slot executable smoke", "x32 raw pointer offset slot executable smoke", "x32 island free executable smoke", "x32 stdlib runtime boundary diagnostics", "x32 time runtime smoke", "x32 filesystem runtime smoke", "x32 filesystem scheduler composition smoke", "x32 single-actor self-host runtime smoke", "x32 single-task self-host runtime smoke", "x32 typed-task self-host runtime smoke", "x32 staged typed-task self-host runtime smoke", "x32 task-group self-host runtime smoke", "x32 typed-task-group self-host runtime smoke", "x32 actor-state self-host runtime smoke", "x32 ctx_switch object smoke", "x32 target runtime boundary diagnostics", "x32 networking runtime boundary diagnostics", "x32 networking lifecycle runtime smoke", "x32 surface/distributed runtime boundary diagnostics", "x32 pointer atomic ABI width", "x32 object ABI smoke", "x32 atomic ABI object", "x32 executable matrix smoke"}
 	for i, want := range wantNames {
 		if report.Results[i].Name != want || report.Results[i].Filename != "tetra:x32-abi" || !report.Results[i].Passed {
 			t.Fatalf("result[%d] = %#v", i, report.Results[i])
@@ -801,10 +1062,11 @@ func TestTestCommandJSONReport(t *testing.T) {
 		t.Fatal(err)
 	}
 	var report struct {
-		Total      int   `json:"total"`
-		Passed     int   `json:"passed"`
-		Failed     int   `json:"failed"`
-		DurationMS int64 `json:"duration_ms"`
+		Total      int    `json:"total"`
+		Passed     int    `json:"passed"`
+		Failed     int    `json:"failed"`
+		Target     string `json:"target"`
+		DurationMS int64  `json:"duration_ms"`
 		Files      []struct {
 			Filename   string `json:"filename"`
 			Total      int    `json:"total"`
@@ -818,9 +1080,13 @@ func TestTestCommandJSONReport(t *testing.T) {
 			DurationMS int64  `json:"duration_ms"`
 		} `json:"results"`
 	}
-	runCLIJSONStdout(t, []string{"test", "--target", mustHostTarget(t), "--report=json", srcPath}, 0, &report)
+	target := mustHostTarget(t)
+	runCLIJSONStdout(t, []string{"test", "--target", target, "--report=json", srcPath}, 0, &report)
 	if report.Total != 1 || report.Passed != 1 || report.Failed != 0 || len(report.Results) != 1 || report.Results[0].Name != "math" || !report.Results[0].Passed {
 		t.Fatalf("report = %#v", report)
+	}
+	if report.Target != target {
+		t.Fatalf("report target = %q, want %s", report.Target, target)
 	}
 	if report.DurationMS <= 0 || report.Results[0].DurationMS <= 0 {
 		t.Fatalf("durations missing: %#v", report)

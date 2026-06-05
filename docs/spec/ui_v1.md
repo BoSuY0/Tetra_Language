@@ -1,17 +1,20 @@
 # UI v1 Surface
 
-Status: current `v0.4.0` metadata UI surface with web and native shell scalar
-command-dispatch previews plus Linux-x64 native and wasm32-web browser-backed
-runtime smoke paths. The post-v0.4 full-platform promotion contract is
-`tetra.ui.platform.v1`, but Windows/macOS are not production UI runtime targets
-until real target-host reports pass the full-platform gate. This does not claim
-GTK/Qt/OS widget backends or platform accessibility integration.
+Status: current `v0.4.0` legacy metadata UI surface with web and native shell
+scalar command-dispatch previews plus Linux-x64 native and wasm32-web
+browser-backed runtime smoke paths. This is the legacy metadata UI surface. It
+is not the new Tetra Surface runtime. The post-v0.4 full-platform promotion
+contract is `tetra.ui.platform.v1`, but Windows/macOS are not production UI
+runtime targets until real target-host reports pass the full-platform gate. This
+does not claim GTK/Qt/OS widget backends or platform accessibility integration.
 
 This document defines the UI syntax and backend artifact contract that is in
 scope for the `v0.4.0` metadata contract. It intentionally describes a
 metadata-first UI surface: the compiler validates UI declarations, lowers them
 to deterministic metadata, and emits preview artifacts for web and native shell
-targets when the relevant gated paths are exercised.
+targets when the relevant gated paths are exercised. New pure-Tetra UI work
+should target `docs/spec/surface_v1.md`; this document remains for legacy
+metadata compatibility.
 
 ## Syntax
 

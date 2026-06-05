@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,6 +45,7 @@ func TestValidateManifestAcceptsGeneratedShape(t *testing.T) {
 	    "typed_task_required_symbols": ["__tetra_task_result_begin","__tetra_task_result_slot","__tetra_task_result_get","__tetra_task_join_typed_2","__tetra_task_join_typed_3","__tetra_task_join_typed_4","__tetra_task_join_typed_5","__tetra_task_join_typed_6","__tetra_task_join_typed_7","__tetra_task_join_typed_8"],
 	    "time_required_symbols": ["__tetra_time_now_ms","__tetra_sleep_ms","__tetra_sleep_until_ms","__tetra_deadline_ms","__tetra_timer_ready_ms"],
     "filesystem_required_symbols": ["__tetra_fs_exists"],
+	    "surface_required_symbols": ["__tetra_surface_open","__tetra_surface_close","__tetra_surface_poll_event_kind","__tetra_surface_poll_event_x","__tetra_surface_poll_event_y","__tetra_surface_poll_event_button","__tetra_surface_poll_event_into","__tetra_surface_poll_event_text_len","__tetra_surface_poll_event_text_into","__tetra_surface_clipboard_write_text","__tetra_surface_clipboard_read_text_into","__tetra_surface_poll_composition_into","__tetra_surface_begin_frame","__tetra_surface_present_rgba","__tetra_surface_now_ms","__tetra_surface_request_redraw"],
 	    "actors_program_glue_symbols": ["__tetra_actor_dispatch","__tetra_actor_main_entry_id"]
 	  },
   "features": [
@@ -61,7 +63,7 @@ func TestValidateManifestAcceptsGeneratedShape(t *testing.T) {
     {"id":"language.resource-lifetime-mvp","name":"Resource lifetime MVP","status":"current","since":"v0.2.0","scope":"conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them, including double-use and ambiguous provenance diagnostics","stability":"supported conservative MVP; tracks common local scope and control-flow merge cases, but is not a full SSA lifetime solver","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/v1_scope.md"]},
     {"id":"actors.task-transfer-safety","name":"Actor/task transfer safety MVP","status":"current","since":"v0.2.0","scope":"conservative actor/task ownership transfer checks for worker entrypoints and use-after-transfer diagnostics","stability":"supported conservative local MVP; distributed actors remain outside current support","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/v1_scope.md"]},
     {"id":"language.lifetime-ssa","name":"Lifetime SSA local join solver","status":"current","since":"v0.4.0","scope":"production SSA-like local lifetime join analysis for ownership consume state, resource finalization state, branch/match/loop flow snapshots, and maybe-consumed diagnostics","stability":"current local/control-flow solver; richer interprocedural lifetime proofs, broad alias modeling, race proofs, and full formal lifetime guarantees remain under full-v1 scope","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/v1_scope.md"]},
-    {"id":"safety.production-core","name":"Production safety core","status":"current","since":"v0.4.0","scope":"production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates","stability":"release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/effects_capabilities_privacy_v1.md"]},
+    {"id":"safety.production-core","name":"Production safety core","status":"current","since":"v0.4.0","scope":"production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates, and a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, and a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims","stability":"release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees","docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md","docs/spec/effects_capabilities_privacy_v1.md","docs/design/memory_cost_model.md","docs/audits/memory-fuzz-oracle-v1.md","docs/audits/memory-production-core-v1-final.md","docs/audits/memory-production-core-v1-artifact-map.md","docs/audits/memory-production-core-v1-nonclaims.md","docs/audits/memory-ideal-vslice-v0-baseline.md","docs/audits/memory-ideal-vslice-v0-correlation.md","docs/audits/memory-ideal-vslice-v0-final.md","docs/audits/memory-ideal-vslice-v1-correlation.md","docs/audits/memory-ideal-vslice-v1-final.md","docs/audits/memory-ideal-vslice-v2-correlation.md","docs/audits/memory-ideal-vslice-v2-final.md","docs/audits/memory-ideal-vslice-v3-correlation.md","docs/audits/memory-ideal-vslice-v3-final.md"]},
     {"id":"language.callable-level2","name":"Callable Level 2","status":"current","since":"v0.4.0","scope":"production captured closure Level 2 slice with function-typed locals called directly","stability":"captured callback passing and full first-class callable semantics remain out of scope","docs":["docs/spec/current_supported_surface.md","docs/spec/flow_syntax_v1.md","docs/spec/v1_feature_status.md"]},
     {"id":"ui.metadata-v1","name":"UI metadata v1","status":"current","since":"v0.4.0","scope":"production UI metadata contract with deterministic tetra.ui.v1 JSON","stability":"web command dispatch; native widgets remain post-v1","docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v1.md","docs/user/wasm_ui_guide.md"]},
     {"id":"wasm.runtime-execution","name":"WASM runtime execution","status":"current","since":"v0.4.0","scope":"production WASI runner and browser-backed wasm32-web execution","stability":"supported with runner/browser availability diagnostics","docs":["docs/spec/current_supported_surface.md","docs/backend/wasm_backend_plan.md","docs/user/wasm_ui_guide.md"]},
@@ -92,16 +94,57 @@ func TestValidateFeaturesAcceptsMachineReadableCurrentFutureClaims(t *testing.T)
 		{ID: "language.resource-lifetime-mvp", Name: "Resource lifetime MVP", Status: "current", Since: "v0.2.0", Scope: "conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them, including double-use and ambiguous provenance diagnostics", Stability: "supported conservative MVP; tracks common local scope and control-flow merge cases, but is not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "actors.task-transfer-safety", Name: "Actor/task transfer safety MVP", Status: "current", Since: "v0.2.0", Scope: "conservative actor/task ownership transfer checks for worker entrypoints and use-after-transfer diagnostics", Stability: "supported conservative local MVP; distributed actors remain outside current support", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.lifetime-ssa", Name: "Lifetime SSA local join solver", Status: "current", Since: "v0.4.0", Scope: "production SSA-like local lifetime join analysis for ownership consume state, resource finalization state, branch/match/loop flow snapshots, and maybe-consumed diagnostics", Stability: "current local/control-flow solver; richer interprocedural lifetime proofs, broad alias modeling, race proofs, and full formal lifetime guarantees remain under full-v1 scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "safety.production-core", Name: "Production safety core", Status: "current", Since: "v0.4.0", Scope: "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates", Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md"}},
+		{ID: "safety.production-core", Name: "Production safety core", Status: "current", Since: "v0.4.0", Scope: "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates, and a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, and a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims", Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"}},
 		{ID: "language.callable-level2", Name: "Callable Level 2", Status: "current", Since: "v0.4.0", Scope: "production captured closure Level 2 slice with function-typed locals called directly", Stability: "captured callback passing and full first-class callable semantics remain out of scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_feature_status.md"}},
 		{ID: "ui.metadata-v1", Name: "UI metadata v1", Status: "current", Since: "v0.4.0", Scope: "production UI metadata contract with deterministic tetra.ui.v1 JSON", Stability: "web command dispatch; native widgets remain post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"}},
 		{ID: "wasm.runtime-execution", Name: "WASM runtime execution", Status: "current", Since: "v0.4.0", Scope: "production WASI runner and browser-backed wasm32-web execution", Stability: "supported with runner/browser availability diagnostics", Docs: []string{"docs/spec/current_supported_surface.md", "docs/backend/wasm_backend_plan.md", "docs/user/wasm_ui_guide.md"}},
 		{ID: "language.full-v1-guarantees", Name: "v1", Status: "planned", Scope: "v1", Stability: "planned", Docs: []string{"docs/spec/v1_scope.md"}},
 		{ID: "eco.distributed-network", Name: "EcoNet", Status: "post-v1", Scope: "network", Stability: "deferred", Docs: []string{"docs/release/post_v1_promotion_checklist.md"}},
 		{ID: "language.full-first-class-callables", Name: "Callables", Status: "current", Since: "v0.4.0", Scope: "safe by-value first-class callable semantics", Stability: "current safe-capture model", Docs: []string{"docs/spec/v1_feature_status.md"}},
+		{ID: "ui.surface-macos-x64", Name: "macOS Surface", Status: "unsupported", Scope: "unsupported for Surface v1", Stability: "not promoted without target evidence", Docs: []string{"docs/spec/current_supported_surface.md"}},
+		{ID: "ui.surface-legacy-metadata", Name: "Legacy UI metadata", Status: "legacy_compatibility", Scope: "legacy metadata compatibility", Stability: "not a new current runtime", Docs: []string{"docs/spec/current_supported_surface.md"}},
+		{ID: "ui.surface-next", Name: "Surface next", Status: "release_candidate", Scope: "candidate evidence under review", Stability: "not current until release gate passes", Docs: []string{"docs/spec/current_supported_surface.md"}},
 	}
 	if err := validateFeatures(features); err != nil {
 		t.Fatalf("validateFeatures: %v", err)
+	}
+}
+
+func TestValidateFeaturesRequiresMemoryProductionFinalAuditDocs(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Features []featureManifest `json:"features"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for i := range manifest.Features {
+		if manifest.Features[i].ID != "safety.production-core" {
+			continue
+		}
+		filtered := manifest.Features[i].Docs[:0]
+		for _, doc := range manifest.Features[i].Docs {
+			if strings.Contains(doc, "memory-production-core-v1-final.md") ||
+				strings.Contains(doc, "memory-production-core-v1-artifact-map.md") ||
+				strings.Contains(doc, "memory-production-core-v1-nonclaims.md") {
+				continue
+			}
+			filtered = append(filtered, doc)
+		}
+		manifest.Features[i].Docs = filtered
+		break
+	}
+
+	err = validateFeatures(manifest.Features)
+	if err == nil {
+		t.Fatalf("expected safety.production-core final audit doc requirement failure")
+	}
+	if !strings.Contains(err.Error(), "memory production final audit") &&
+		!strings.Contains(err.Error(), "memory-production-core-v1-final.md") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -120,7 +163,7 @@ func TestValidateFeaturesRejectsFutureStatusPromotionWithoutRegistryUpdate(t *te
 		{ID: "language.ownership-markers-mvp", Name: "Ownership markers MVP", Status: "current", Since: "v0.2.0", Scope: "conservative borrow/inout/consume marker checks with use-after-consume and borrow escape diagnostics", Stability: "supported conservative MVP; not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.resource-lifetime-mvp", Name: "Resource lifetime MVP", Status: "current", Since: "v0.2.0", Scope: "conservative resource finalization checks for task handles, task groups, island handles, region-backed slices, and structs containing them, including double-use and ambiguous provenance diagnostics", Stability: "supported conservative MVP; tracks common local scope and control-flow merge cases, but is not a full SSA lifetime solver", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "actors.task-transfer-safety", Name: "Actor/task transfer safety MVP", Status: "current", Since: "v0.2.0", Scope: "conservative actor/task ownership transfer checks for worker entrypoints and use-after-transfer diagnostics", Stability: "supported conservative local MVP; distributed actors remain outside current support", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
-		{ID: "safety.production-core", Name: "Production safety core", Status: "current", Since: "v0.4.0", Scope: "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates", Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md"}},
+		{ID: "safety.production-core", Name: "Production safety core", Status: "current", Since: "v0.4.0", Scope: "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, and pointer/MMIO/memory capability gates, and a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, and a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims", Stability: "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, and runtime-wide guarantees", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"}},
 		{ID: "language.lifetime-ssa", Name: "Lifetime SSA solver", Status: "planned", Scope: "stale planned lifetime solver fixture", Stability: "unsupported stale fixture", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/v1_scope.md"}},
 		{ID: "language.callable-level2", Name: "Callable Level 2", Status: "current", Since: "v0.4.0", Scope: "production captured closure Level 2 slice with function-typed locals called directly", Stability: "captured callback passing and full first-class callable semantics remain out of scope", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_feature_status.md"}},
 		{ID: "ui.metadata-v1", Name: "UI metadata v1", Status: "current", Since: "v0.4.0", Scope: "production UI metadata contract with deterministic tetra.ui.v1 JSON", Stability: "web command dispatch; native widgets remain post-v1", Docs: []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"}},
@@ -262,6 +305,32 @@ func TestValidateManifestRejectsMissingTimeRuntimeSymbols(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeABIRejectsMissingSurfaceRuntimeSymbols(t *testing.T) {
+	abi := validRuntimeABIManifestForTest()
+	abi.SurfaceRequiredSymbols = nil
+
+	err := validateRuntimeABI(abi, validRuntimeTargetsForTest())
+	if err == nil {
+		t.Fatalf("expected surface_required_symbols validation error")
+	}
+	if !strings.Contains(err.Error(), "surface_required_symbols must not be empty") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateRuntimeABIRejectsWrongSurfaceRuntimeSymbols(t *testing.T) {
+	abi := validRuntimeABIManifestForTest()
+	abi.SurfaceRequiredSymbols = []string{"__tetra_surface_open"}
+
+	err := validateRuntimeABI(abi, validRuntimeTargetsForTest())
+	if err == nil {
+		t.Fatalf("expected surface_required_symbols set validation error")
+	}
+	if !strings.Contains(err.Error(), "surface_required_symbols got") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateManifestRejectsInvalidUnsafePolicy(t *testing.T) {
 	manifest := `{
   "compiler_version": "v0.6.0",
@@ -375,6 +444,45 @@ func TestValidateManifestRejectsUnsortedTargets(t *testing.T) {
 	}
 }
 
+func TestValidateManifestRejectsInflatedMemoryCapabilityClaims(t *testing.T) {
+	manifest := `{
+  "compiler_version": "v0.6.0",
+  "targets": [
+    {"triple":"linux-x64","status":"supported","os":"linux","arch":"x64","abi":"sysv","data_model":"lp64","format":"elf","exe_ext":"","collect_imports":false,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"yes","memory_raw_diagnostics":"yes","memory_region_lowering":"yes/partial","memory_alignment_semantics":"yes","memory_claim_level":"production/host_runtime","evidence_artifacts":["targets.json","linux-x64-abi.json","linux-x64-atomic-stress.json","linux-x64-fuzz.json","linux-x64-runner.json","linux-native-targets-brutal.json","artifact-hashes.json"]},
+    {"triple":"windows-x64","status":"supported","os":"windows","arch":"x64","abi":"win64","data_model":"llp64","format":"pe","exe_ext":".exe","collect_imports":true,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"host-required","memory_raw_diagnostics":"host-required","memory_region_lowering":"host-required","memory_alignment_semantics":"host-required","memory_claim_level":"build_lower_only unless run"},
+    {"triple":"macos-x64","status":"supported","os":"macos","arch":"x64","abi":"sysv","data_model":"lp64","format":"macho","exe_ext":"","collect_imports":false,"run_mode":"host_native","memory_build":"yes","memory_lower":"yes","memory_run":"host-required","memory_raw_diagnostics":"host-required","memory_region_lowering":"host-required","memory_alignment_semantics":"host-required","memory_claim_level":"build_lower_only unless run"},
+    {"triple":"wasm32-wasi","status":"supported","os":"wasi","arch":"wasm32","abi":"wasi","data_model":"ilp32","format":"wasm","exe_ext":".wasm","collect_imports":false,"run_mode":"wasi_runner","memory_build":"yes","memory_lower":"yes","memory_run":"runner-smoke if available","memory_raw_diagnostics":"safe-only","memory_region_lowering":"limited","memory_alignment_semantics":"wasm rules","memory_claim_level":"artifact/runtime tiered"},
+    {"triple":"wasm32-web","status":"supported","os":"web","arch":"wasm32","abi":"web","data_model":"ilp32","format":"wasm","exe_ext":".wasm","collect_imports":false,"run_mode":"web_runner","memory_build":"yes","memory_lower":"yes","memory_run":"browser-smoke if available","memory_raw_diagnostics":"safe-only","memory_region_lowering":"limited","memory_alignment_semantics":"wasm rules","memory_claim_level":"artifact/runtime tiered"},
+    {"triple":"linux-x86","status":"build_only","os":"linux","arch":"x86","abi":"i386-sysv","data_model":"ilp32","format":"elf","exe_ext":"","collect_imports":false,"run_mode":"host_probed","runtime_status":"partial_build_only","memory_build":"yes","memory_lower":"yes","memory_run":"yes","memory_raw_diagnostics":"partial","memory_region_lowering":"partial","memory_alignment_semantics":"partial","memory_claim_level":"production/host_runtime"},
+    {"triple":"linux-x32","status":"build_only","os":"linux","arch":"x64","abi":"x32-sysv","data_model":"x32","format":"elf","exe_ext":"","collect_imports":false,"run_mode":"host_probed","runtime_status":"partial_build_only","memory_build":"yes","memory_lower":"yes","memory_run":"no/host-dependent","memory_raw_diagnostics":"partial","memory_region_lowering":"partial","memory_alignment_semantics":"special","memory_claim_level":"build_lower_only"}
+  ],
+  "builtins": [
+    {"name":"core.load_i32","param_types":["ptr","cap.mem"],"return_type":"i32","effects":["mem"],"unsafe_policy":"always"}
+  ],
+  "runtime_abi": {
+    "reserved_prefix": "__tetra_",
+    "actors_supported_targets": ["linux-x64","macos-x64","windows-x64"],
+    "actors_required_symbols": ["__tetra_entry","__tetra_actor_spawn","__tetra_actor_send","__tetra_actor_send_msg","__tetra_actor_send_begin","__tetra_actor_send_slot","__tetra_actor_send_commit","__tetra_actor_recv","__tetra_actor_recv_msg","__tetra_actor_recv_poll","__tetra_actor_recv_until","__tetra_actor_recv_msg_until","__tetra_actor_recv_begin","__tetra_actor_recv_slot","__tetra_actor_recv_count","__tetra_actor_self","__tetra_actor_sender","__tetra_actor_yield_now"],
+    "actor_state_required_symbols": ["__tetra_actor_state_load","__tetra_actor_state_store"],
+    "task_required_symbols": ["__tetra_task_spawn_i32","__tetra_task_join_i32","__tetra_task_join_result_i32","__tetra_task_join_until_i32","__tetra_task_poll_i32","__tetra_task_is_canceled","__tetra_task_checkpoint"],
+    "task_group_required_symbols": ["__tetra_task_group_open","__tetra_task_group_close","__tetra_task_group_cancel","__tetra_task_group_current","__tetra_task_group_status","__tetra_task_spawn_group_i32"],
+    "typed_task_required_symbols": ["__tetra_task_result_begin","__tetra_task_result_slot","__tetra_task_result_get","__tetra_task_join_typed_2","__tetra_task_join_typed_3","__tetra_task_join_typed_4","__tetra_task_join_typed_5","__tetra_task_join_typed_6","__tetra_task_join_typed_7","__tetra_task_join_typed_8"],
+    "time_required_symbols": ["__tetra_time_now_ms","__tetra_sleep_ms","__tetra_sleep_until_ms","__tetra_deadline_ms","__tetra_timer_ready_ms"],
+    "filesystem_required_symbols": ["__tetra_fs_exists"],
+    "surface_required_symbols": ["__tetra_surface_open","__tetra_surface_close","__tetra_surface_poll_event_kind","__tetra_surface_poll_event_x","__tetra_surface_poll_event_y","__tetra_surface_poll_event_button","__tetra_surface_poll_event_into","__tetra_surface_poll_event_text_len","__tetra_surface_poll_event_text_into","__tetra_surface_clipboard_write_text","__tetra_surface_clipboard_read_text_into","__tetra_surface_poll_composition_into","__tetra_surface_begin_frame","__tetra_surface_present_rgba","__tetra_surface_now_ms","__tetra_surface_request_redraw"],
+    "actors_program_glue_symbols": ["__tetra_actor_dispatch","__tetra_actor_main_entry_id"]
+  },
+  "features": []
+}`
+	out, err := runManifestValidator(t, manifest)
+	if err == nil {
+		t.Fatalf("expected inflated memory capability claim rejection")
+	}
+	if !strings.Contains(string(out), "runtime memory claim") {
+		t.Fatalf("expected runtime memory claim rejection, got err=%v out=%s", err, out)
+	}
+}
+
 func TestValidateManifestRejectsUnsortedBuiltins(t *testing.T) {
 	manifest := `{
   "compiler_version": "v0.6.0",
@@ -406,6 +514,101 @@ func TestValidateManifestRejectsUnsortedBuiltins(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "builtins must be sorted") {
 		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func validRuntimeABIManifestForTest() runtimeABIManifest {
+	return runtimeABIManifest{
+		ReservedPrefix:         "__tetra_",
+		ActorsSupportedTargets: []string{"linux-x64", "macos-x64", "windows-x64"},
+		ActorsRequiredSymbols: []string{
+			"__tetra_entry",
+			"__tetra_actor_spawn",
+			"__tetra_actor_send",
+			"__tetra_actor_send_msg",
+			"__tetra_actor_send_begin",
+			"__tetra_actor_send_slot",
+			"__tetra_actor_send_commit",
+			"__tetra_actor_recv",
+			"__tetra_actor_recv_msg",
+			"__tetra_actor_recv_poll",
+			"__tetra_actor_recv_until",
+			"__tetra_actor_recv_msg_until",
+			"__tetra_actor_recv_begin",
+			"__tetra_actor_recv_slot",
+			"__tetra_actor_recv_count",
+			"__tetra_actor_self",
+			"__tetra_actor_sender",
+			"__tetra_actor_yield_now",
+		},
+		ActorStateRequiredSymbols: []string{
+			"__tetra_actor_state_load",
+			"__tetra_actor_state_store",
+		},
+		TaskRequiredSymbols: []string{
+			"__tetra_task_spawn_i32",
+			"__tetra_task_join_i32",
+			"__tetra_task_join_result_i32",
+			"__tetra_task_join_until_i32",
+			"__tetra_task_poll_i32",
+			"__tetra_task_is_canceled",
+			"__tetra_task_checkpoint",
+		},
+		TaskGroupRequiredSymbols: []string{
+			"__tetra_task_group_open",
+			"__tetra_task_group_close",
+			"__tetra_task_group_cancel",
+			"__tetra_task_group_current",
+			"__tetra_task_group_status",
+			"__tetra_task_spawn_group_i32",
+		},
+		TypedTaskRequiredSymbols: []string{
+			"__tetra_task_result_begin",
+			"__tetra_task_result_slot",
+			"__tetra_task_result_get",
+			"__tetra_task_join_typed_2",
+			"__tetra_task_join_typed_3",
+			"__tetra_task_join_typed_4",
+			"__tetra_task_join_typed_5",
+			"__tetra_task_join_typed_6",
+			"__tetra_task_join_typed_7",
+			"__tetra_task_join_typed_8",
+		},
+		TimeRequiredSymbols: []string{
+			"__tetra_time_now_ms",
+			"__tetra_sleep_ms",
+			"__tetra_sleep_until_ms",
+			"__tetra_deadline_ms",
+			"__tetra_timer_ready_ms",
+		},
+		FilesystemRequiredSymbols: []string{"__tetra_fs_exists"},
+		SurfaceRequiredSymbols: []string{
+			"__tetra_surface_open",
+			"__tetra_surface_close",
+			"__tetra_surface_poll_event_kind",
+			"__tetra_surface_poll_event_x",
+			"__tetra_surface_poll_event_y",
+			"__tetra_surface_poll_event_button",
+			"__tetra_surface_poll_event_into",
+			"__tetra_surface_poll_event_text_len",
+			"__tetra_surface_poll_event_text_into",
+			"__tetra_surface_begin_frame",
+			"__tetra_surface_present_rgba",
+			"__tetra_surface_now_ms",
+			"__tetra_surface_request_redraw",
+		},
+		ActorsProgramGlueSymbols: []string{
+			"__tetra_actor_dispatch",
+			"__tetra_actor_main_entry_id",
+		},
+	}
+}
+
+func validRuntimeTargetsForTest() map[string]bool {
+	return map[string]bool{
+		"linux-x64":   true,
+		"macos-x64":   true,
+		"windows-x64": true,
 	}
 }
 

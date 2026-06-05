@@ -95,6 +95,33 @@ func VerifyFunc(fn ir.IRFunc) error {
 			if instr.Local < 0 || instr.Local >= fn.LocalSlots {
 				return verifyError(fn, i, "local slot %d out of bounds (locals=%d)", instr.Local, fn.LocalSlots)
 			}
+		case ir.IRStackSliceU8, ir.IRStackSliceU16, ir.IRStackSliceI32:
+			if instr.Name == "" {
+				return verifyError(fn, i, "stack slice is missing allocation name")
+			}
+			if instr.ArgSlots < 0 {
+				return verifyError(fn, i, "stack slice %q has negative backing slots %d", instr.Name, instr.ArgSlots)
+			}
+			if instr.Imm < 0 {
+				return verifyError(fn, i, "stack slice %q has negative logical length %d", instr.Name, instr.Imm)
+			}
+			if instr.ArgSlots == 0 {
+				if instr.Local != -1 {
+					return verifyError(fn, i, "empty stack slice %q must use local -1", instr.Name)
+				}
+				break
+			}
+			if instr.Local < 0 || instr.Local+instr.ArgSlots > fn.LocalSlots {
+				return verifyError(fn, i, "stack slice %q backing slots [%d,%d) out of bounds (locals=%d)", instr.Name, instr.Local, instr.Local+instr.ArgSlots, fn.LocalSlots)
+			}
+		case ir.IRRegionMakeSliceU8, ir.IRRegionMakeSliceU16, ir.IRRegionMakeSliceI32:
+			if instr.Name == "" {
+				return verifyError(fn, i, "region slice is missing allocation name")
+			}
+		case ir.IRRawSliceFromParts:
+			if instr.Imm < 0 || instr.Imm > 2 {
+				return verifyError(fn, i, "raw slice element-size shift %d out of supported range [0,2]", instr.Imm)
+			}
 		case ir.IRLoadGlobal, ir.IRStoreGlobal:
 			if instr.Local < 0 {
 				return verifyError(fn, i, "global slot %d out of bounds", instr.Local)
@@ -112,6 +139,10 @@ func VerifyFunc(fn ir.IRFunc) error {
 		case ir.IRSymAddr:
 			if instr.Name == "" {
 				return verifyError(fn, i, "symbol address is missing name")
+			}
+		case ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
+			if instr.ProofID == "" {
+				return verifyError(fn, i, "unchecked index load is missing proof id")
 			}
 		}
 	}
@@ -411,9 +442,20 @@ func stackEffect(instr ir.IRInstr) (pop int, push int, known bool) {
 		return 0, 0, true
 	case ir.IRAllocBytes, ir.IRIslandNew:
 		return 1, 1, true
-	case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32:
+	case ir.IRMakeSliceU8, ir.IRMakeSliceU16, ir.IRMakeSliceI32,
+		ir.IRStackSliceU8, ir.IRStackSliceU16, ir.IRStackSliceI32,
+		ir.IRRegionMakeSliceU8, ir.IRRegionMakeSliceU16, ir.IRRegionMakeSliceI32:
 		return 1, 2, true
-	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16:
+	case ir.IRRegionEnter, ir.IRRegionReset:
+		return 0, 0, true
+	case ir.IRRawSliceFromParts:
+		return 3, 2, true
+	case ir.IRSliceWindow:
+		return 4, 2, true
+	case ir.IRSlicePrefix, ir.IRSliceSuffix:
+		return 3, 2, true
+	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
+		ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 		return 3, 1, true
 	case ir.IRIndexStoreI32, ir.IRIndexStoreU8, ir.IRIndexStoreU16:
 		return 4, 0, true
