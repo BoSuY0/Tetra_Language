@@ -34,10 +34,18 @@ func TestCIWorkflowIncludesStabilizationAndRobustnessJobs(t *testing.T) {
 		"bash scripts/dev/fuzz-nightly.sh --short --out-dir \"$RUNNER_TEMP/fuzz-short\"",
 		"fuzz-nightly-linux:",
 		"bash scripts/dev/fuzz-nightly.sh --fuzztime 10m --out-dir \"$RUNNER_TEMP/fuzz-nightly\"",
-		"schedule:",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("ci workflow missing %q", want)
+		}
+	}
+	for _, blocked := range []string{
+		"  push:",
+		"  pull_request:",
+		"  schedule:",
+	} {
+		if strings.Contains(text, blocked) {
+			t.Fatalf("ci workflow must not auto-trigger while GitHub Actions billing is locked; found %q", blocked)
 		}
 	}
 }

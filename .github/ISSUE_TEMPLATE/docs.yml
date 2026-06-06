@@ -1,43 +1,31 @@
 name: Docs or README issue
-description: Report missing, stale, confusing, or misleading documentation.
+description: Documentation, README, guides, release notes, examples text, or wording.
 title: "[Docs]: "
-labels: ["type: docs", "area: docs", "status: needs triage"]
+labels: ["area: docs", "status: needs triage"]
 body:
   - type: dropdown
-    id: area
+    id: issue_type
     attributes:
-      label: Area
-      description: Which documentation area is affected?
+      label: Issue type
       options:
-        - Docs / README
-        - Install / packages
-        - Compiler
-        - Syntax / language design
-        - Memory / ownership
-        - Runtime / actors / tasks
-        - CLI / tooling
-        - Examples / tests
+        - Bug
+        - Feature request
+        - Question
+        - Docs or wording
     validations:
       required: true
   - type: textarea
     id: location
     attributes:
       label: Location
-      description: Link or path to the doc, section, or README area.
+      description: Link or path to the doc, README section, release page, or example text.
       placeholder: docs/user/install.md, README.md, release page, etc.
     validations:
       required: true
   - type: textarea
-    id: issue
+    id: details
     attributes:
-      label: What is wrong or missing?
-      description: Explain what confused you or what should be corrected.
+      label: What should change?
+      description: Explain what is missing, stale, confusing, or misleading.
     validations:
       required: true
-  - type: textarea
-    id: expected
-    attributes:
-      label: Suggested wording or outcome
-      description: Optional wording, links, or acceptance criteria.
-    validations:
-      required: false

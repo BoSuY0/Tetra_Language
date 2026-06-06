@@ -1,0 +1,31 @@
+name: Runtime, actors, or tasks issue
+description: Runtime execution, async, tasks, actors, targets, or platform behavior.
+title: "[Runtime]: "
+labels: ["area: runtime", "status: needs triage"]
+body:
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Issue type
+      options:
+        - Bug
+        - Feature request
+        - Question
+        - Docs or wording
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What runtime behavior should be reviewed?
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Include target, command, runtime output, and expected behavior.
+      render: text
+    validations:
+      required: true

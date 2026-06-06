@@ -1,0 +1,31 @@
+name: Memory or ownership issue
+description: Ownership, borrowing, memory evidence, safety reports, or unsafe boundaries.
+title: "[Memory]: "
+labels: ["area: memory", "status: needs triage"]
+body:
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Issue type
+      options:
+        - Bug
+        - Feature request
+        - Question
+        - Docs or wording
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What ownership or memory behavior should be reviewed?
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Include examples, memory reports, diagnostics, and expected evidence.
+      render: text
+    validations:
+      required: true

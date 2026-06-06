@@ -1,0 +1,31 @@
+name: Install or package issue
+description: Releases, installers, containers, Homebrew, GHCR, or distribution.
+title: "[Packages]: "
+labels: ["area: packages", "status: needs triage"]
+body:
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Issue type
+      options:
+        - Bug
+        - Feature request
+        - Question
+        - Docs or wording
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What install, package, or release behavior should be reviewed?
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Include install command, package source, OS/arch, output, and expected behavior.
+      render: shell
+    validations:
+      required: true

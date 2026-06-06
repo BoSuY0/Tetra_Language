@@ -1,28 +1,28 @@
 # GitHub Issue Triage Implementation Plan
 
-**Goal:** Make new GitHub issues self-classifying by type and project area.
-**Context:** The repository currently has no `.github/ISSUE_TEMPLATE` files and only the default GitHub labels.
+**Goal:** Make new GitHub issues self-classifying by project area without requiring GitHub Actions.
+**Context:** GitHub Actions is blocked by an account billing lock, so issue triage must work through static issue form labels.
 **Execution:** Implement directly in the current `main` checkout.
 
 ## Tasks
 
 1. Add issue forms
-   - **Files:** `.github/ISSUE_TEMPLATE/bug.yml`, `feature.yml`, `docs.yml`, `question.yml`, `config.yml`.
-   - **Approach:** Provide four entry points with required summary/details fields and a shared `Area` dropdown.
+   - **Files:** `.github/ISSUE_TEMPLATE/compiler.yml`, `syntax.yml`, `memory.yml`, `runtime.yml`, `cli.yml`, `docs.yml`, `packages.yml`, `examples.yml`, `config.yml`.
+   - **Approach:** Provide one entry point per project area. Each form applies its `area:*` label statically, without a workflow.
    - **Verification:** Parse each YAML file and confirm required top-level keys exist.
-   - **Done when:** The issue chooser offers bug, feature, docs, and question forms with explicit area choices.
+   - **Done when:** The issue chooser offers area-specific forms that apply area labels without Actions.
 
-2. Add automatic area labeling
-   - **Files:** `.github/workflows/issue-triage.yml`.
-   - **Approach:** On issue open/edit/reopen, parse the rendered issue body, read the `Area` section, remove old `area:*` labels, and add the matching one.
-   - **Verification:** Run `actionlint` and YAML parsing.
-   - **Done when:** The workflow can map every form area option to a repository label.
+2. Avoid automatic Actions usage
+   - **Files:** `.github/workflows/ci.yml`; remove `.github/workflows/issue-triage.yml`.
+   - **Approach:** Keep CI jobs available for manual `workflow_dispatch`, but remove branch push, pull request, schedule, and issue triage workflow triggers.
+   - **Verification:** Run `actionlint`, YAML parsing, and workflow tests.
+   - **Done when:** Normal pushes no longer start GitHub-hosted runners.
 
 3. Create repository labels
    - **Labels:** `type:*`, `area:*`, and `status: needs triage`.
-   - **Approach:** Use `gh label create` or `gh label edit` so issue forms and the workflow can apply labels immediately.
+   - **Approach:** Use `gh label create` or `gh label edit` so issue forms can apply labels immediately.
    - **Verification:** Query `gh label list` and confirm all expected labels exist.
-   - **Done when:** All labels referenced by forms/workflow exist on GitHub.
+   - **Done when:** All labels referenced by forms exist on GitHub.
 
 4. Publish
    - **Approach:** Commit the GitHub issue triage configuration and push `main`.

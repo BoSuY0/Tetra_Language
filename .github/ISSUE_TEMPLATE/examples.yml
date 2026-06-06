@@ -1,0 +1,31 @@
+name: Examples or tests issue
+description: Examples, smoke files, tests, fixtures, demos, or reproduction cases.
+title: "[Examples]: "
+labels: ["area: examples", "status: needs triage"]
+body:
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Issue type
+      options:
+        - Bug
+        - Feature request
+        - Question
+        - Docs or wording
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Which example, test, or fixture should be reviewed?
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Include file paths, commands, output, and expected behavior.
+      render: text
+    validations:
+      required: true
