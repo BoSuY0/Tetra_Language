@@ -9,7 +9,7 @@ Other targets remain governed by the target evidence in the release docs.
 Use the GitHub Release installer after a matching release exists:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/BoSuY0/Tetra_Language/main/install.sh | bash
+curl -fsSL https://github.com/BoSuY0/Tetra_Language/releases/download/v0.4.0/install.sh | bash
 tetra version
 ```
 
@@ -22,8 +22,10 @@ installer can download private release assets through the GitHub API:
 
 ```sh
 GITHUB_TOKEN="$(gh auth token)"
-curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  https://raw.githubusercontent.com/BoSuY0/Tetra_Language/main/install.sh |
+GH_TOKEN="${GITHUB_TOKEN}" gh release download v0.4.0 \
+  --repo BoSuY0/Tetra_Language \
+  --pattern install.sh \
+  --output - |
   GITHUB_TOKEN="${GITHUB_TOKEN}" bash
 ```
 
@@ -31,7 +33,7 @@ Override the install directory or version with:
 
 ```sh
 TETRA_INSTALL_DIR="$HOME/bin" TETRA_VERSION=v0.4.0 \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/BoSuY0/Tetra_Language/main/install.sh)"
+  bash -c "$(curl -fsSL https://github.com/BoSuY0/Tetra_Language/releases/download/v0.4.0/install.sh)"
 ```
 
 ## Container Image

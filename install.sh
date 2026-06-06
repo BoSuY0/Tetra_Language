@@ -7,7 +7,7 @@ install_dir="${TETRA_INSTALL_DIR:-$HOME/.local/bin}"
 
 usage() {
   cat <<'USAGE'
-Usage: curl -fsSL https://raw.githubusercontent.com/BoSuY0/Tetra_Language/main/install.sh | bash
+Usage: curl -fsSL https://github.com/BoSuY0/Tetra_Language/releases/download/v0.4.0/install.sh | bash
 
 Environment:
   TETRA_VERSION      Release version to install. Default: v0.4.0

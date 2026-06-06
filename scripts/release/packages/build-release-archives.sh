@@ -15,6 +15,7 @@ Usage: bash scripts/release/packages/build-release-archives.sh [--version vX.Y.Z
 Builds the installable linux-x64 release archive:
 - tetra-<version>-linux-x64.tar.gz
 - tetra-<version>-linux-x64.sha256
+- install.sh
 - checksums.txt
 USAGE
 }
@@ -78,6 +79,7 @@ package_root="$build_root/$package_root_name"
 
 rm -rf "$build_root"
 mkdir -p "$package_root/bin" "$out_dir"
+install -m 0755 install.sh "$out_dir/install.sh"
 
 if [[ -z "${GOCACHE:-}" ]]; then
   export GOCACHE="${XDG_CACHE_HOME:-$HOME/.cache}/tetra-language/go-build-release-packages"
@@ -119,4 +121,5 @@ git archive --format=tar.gz --prefix="tetra-${version}-source/" -o "$out_dir/$so
 
 echo "Archive: $out_dir/$archive_name"
 echo "Source: $out_dir/$source_archive_name"
+echo "Installer: $out_dir/install.sh"
 echo "Checksum: $out_dir/checksums.txt"

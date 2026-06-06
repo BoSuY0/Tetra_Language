@@ -79,7 +79,7 @@ Hello from Flow!
 Linux x64 release installer:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/BoSuY0/Tetra_Language/main/install.sh | bash
+curl -fsSL https://github.com/BoSuY0/Tetra_Language/releases/download/v0.4.0/install.sh | bash
 tetra version
 ```
 
