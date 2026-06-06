@@ -1,0 +1,92 @@
+name: issue-triage
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  apply-area-label:
+    if: github.event.issue.pull_request == null
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Apply area label from issue form
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || "";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const areaLabels = new Map([
+              ["Compiler", "area: compiler"],
+              ["Syntax / language design", "area: syntax"],
+              ["Memory / ownership", "area: memory"],
+              ["Runtime / actors / tasks", "area: runtime"],
+              ["CLI / tooling", "area: cli"],
+              ["Docs / README", "area: docs"],
+              ["Install / packages", "area: packages"],
+              ["Examples / tests", "area: examples"],
+            ]);
+
+            function escapeRegExp(value) {
+              return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            }
+
+            function issueFormValue(label) {
+              const pattern = new RegExp(`###\\s+${escapeRegExp(label)}\\s*\\n+([\\s\\S]*?)(?=\\n###\\s+|$)`, "i");
+              const match = body.match(pattern);
+              if (!match) {
+                return "";
+              }
+              return match[1]
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter((line) => line && line !== "_No response_")[0] || "";
+            }
+
+            const selectedArea = issueFormValue("Area");
+            const nextLabel = areaLabels.get(selectedArea);
+            if (!nextLabel) {
+              core.info(`No recognized Area value found. Area=${JSON.stringify(selectedArea)}`);
+              return;
+            }
+
+            const currentLabels = issue.labels.map((label) => label.name);
+            for (const label of areaLabels.values()) {
+              if (label === nextLabel || !currentLabels.includes(label)) {
+                continue;
+              }
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  name: label,
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
+
+            if (!currentLabels.includes(nextLabel)) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issue.number,
+                labels: [nextLabel],
+              });
+            }
+
+            core.info(`Applied ${nextLabel}`);

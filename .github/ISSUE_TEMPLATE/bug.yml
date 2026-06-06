@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a reproducible problem in Tetra.
+title: "[Bug]: "
+labels: ["type: bug", "status: needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make Tetra more precise. Please keep the report focused and reproducible.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Tetra is affected?
+      options:
+        - Compiler
+        - Syntax / language design
+        - Memory / ownership
+        - Runtime / actors / tasks
+        - CLI / tooling
+        - Docs / README
+        - Install / packages
+        - Examples / tests
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and why it is wrong.
+      placeholder: The compiler/runtime/tooling did...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Commands, source snippet, target, and environment needed to reproduce the issue.
+      placeholder: |
+        1. Run `...`
+        2. Use this `.tetra` / `.t4` file:
+        3. Observe `...`
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or diagnostics
+      description: Paste the exact compiler/runtime/CLI output if available.
+      render: text
+    validations:
+      required: false

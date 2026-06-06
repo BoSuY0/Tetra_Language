@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the current release surface
+    url: https://github.com/BoSuY0/Tetra_Language/blob/main/docs/spec/current_supported_surface.md
+    about: Check what is currently supported before opening a broad feature request.
+  - name: Installation guide
+    url: https://github.com/BoSuY0/Tetra_Language/blob/main/docs/user/install.md
+    about: Start here for release, package, and local install questions.
