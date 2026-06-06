@@ -1,0 +1,20 @@
+class Tetra < Formula
+  desc "Green-path systems language with explicit effects and ownership-aware memory"
+  homepage "https://github.com/BoSuY0/Tetra_Language"
+  url "__SOURCE_URL__"
+  sha256 "__SOURCE_SHA256__"
+  license "Apache-2.0"
+  head "https://github.com/BoSuY0/Tetra_Language.git", branch: "main"
+
+  depends_on "go" => :build
+
+  def install
+    ENV["CGO_ENABLED"] = "0"
+    system "go", "build", "-trimpath", "-ldflags", "-s -w", "-o", bin/"tetra", "./cli/cmd/tetra"
+    bin.install_symlink "tetra" => "t"
+  end
+
+  test do
+    assert_match "__VERSION__", shell_output("#{bin}/tetra version")
+  end
+end

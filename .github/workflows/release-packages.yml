@@ -1,0 +1,193 @@
+name: release-packages
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. v0.4.0"
+        required: true
+        default: "v0.4.0"
+      update_homebrew_tap:
+        description: "Commit Formula/tetra.rb to the Homebrew tap repository"
+        required: true
+        type: boolean
+        default: false
+      homebrew_tap_repository:
+        description: "owner/repo for the tap; requires HOMEBREW_TAP_TOKEN"
+        required: true
+        default: "BoSuY0/homebrew-tetra"
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOMEBREW_TAP_REPOSITORY: ${{ inputs.homebrew_tap_repository || 'BoSuY0/homebrew-tetra' }}
+      UPDATE_HOMEBREW_TAP: ${{ inputs.update_homebrew_tap || false }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Prepare release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME}"
+          fi
+          case "$version" in
+            v*) ;;
+            *) version="v${version}" ;;
+          esac
+          image_owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/${image_owner}/tetra-language"
+          {
+            echo "version=${version}"
+            echo "image_version=${version#v}"
+            echo "image=${image}"
+            echo "out_dir=dist/releases/${version}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build release archives
+        shell: bash
+        run: bash scripts/release/packages/build-release-archives.sh --version "${{ steps.meta.outputs.version }}" --out "${{ steps.meta.outputs.out_dir }}"
+
+      - name: Render Homebrew formula
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.meta.outputs.version }}"
+          out_dir="${{ steps.meta.outputs.out_dir }}"
+          source_archive="tetra-${version}-source.tar.gz"
+          source_sha="$(awk -v file="$source_archive" '$2 == file { print $1 }' "$out_dir/checksums.txt")"
+          if [[ -z "$source_sha" ]]; then
+            echo "missing source archive checksum for $source_archive" >&2
+            exit 1
+          fi
+          source_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${version}/${source_archive}"
+          bash scripts/release/packages/render-homebrew-formula.sh \
+            --version "$version" \
+            --source-url "$source_url" \
+            --source-sha256 "$source_sha" \
+            --out "$out_dir/tetra.rb"
+
+      - name: Smoke release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.meta.outputs.version }}"
+          archive="${{ steps.meta.outputs.out_dir }}/tetra-${version}-linux-x64.tar.gz"
+          mkdir -p "${{ steps.meta.outputs.out_dir }}/smoke"
+          tar -xzf "$archive" -C "${{ steps.meta.outputs.out_dir }}/smoke"
+          "${{ steps.meta.outputs.out_dir }}/smoke/tetra-${version}-linux-x64/bin/tetra" version
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-${{ steps.meta.outputs.version }}-release-packages
+          path: |
+            ${{ steps.meta.outputs.out_dir }}/*.tar.gz
+            ${{ steps.meta.outputs.out_dir }}/*.sha256
+            ${{ steps.meta.outputs.out_dir }}/checksums.txt
+            ${{ steps.meta.outputs.out_dir }}/tetra.rb
+
+      - name: Create or update GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.meta.outputs.version }}"
+          out_dir="${{ steps.meta.outputs.out_dir }}"
+          notes="$out_dir/release-notes.md"
+          cat > "$notes" <<EOF
+          Tetra Language ${version}
+
+          Install Linux x64:
+
+          \`\`\`sh
+          curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/install.sh | bash
+          \`\`\`
+
+          Container:
+
+          \`\`\`sh
+          docker run --rm ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.image_version }} tetra version
+          \`\`\`
+
+          This release publishes the current v0.4.0 local compiler/tooling profile. Linux x64 is the release binary baseline; other runtime target claims remain gated by project evidence.
+          EOF
+          if gh release view "$version" >/dev/null 2>&1; then
+            gh release upload "$version" "$out_dir"/*.tar.gz "$out_dir"/*.sha256 "$out_dir"/checksums.txt "$out_dir"/tetra.rb --clobber
+          else
+            gh release create "$version" "$out_dir"/*.tar.gz "$out_dir"/*.sha256 "$out_dir"/checksums.txt "$out_dir"/tetra.rb \
+              --title "Tetra Language ${version}" \
+              --notes-file "$notes" \
+              --target "$GITHUB_SHA" \
+              --prerelease
+          fi
+
+      - name: Build container image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --build-arg TETRA_VERSION="${{ steps.meta.outputs.version }}" \
+            -t "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.image_version }}" \
+            -t "${{ steps.meta.outputs.image }}:latest" \
+            .
+
+      - name: Publish GHCR image
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+          docker push "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.image_version }}"
+          docker push "${{ steps.meta.outputs.image }}:latest"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Update Homebrew tap
+        if: env.UPDATE_HOMEBREW_TAP == 'true'
+        shell: bash
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HOMEBREW_TAP_TOKEN:-}" ]]; then
+            echo "HOMEBREW_TAP_TOKEN is required when update_homebrew_tap is true" >&2
+            exit 1
+          fi
+          tap_repo="${HOMEBREW_TAP_REPOSITORY}"
+          work_dir="$(mktemp -d)"
+          trap 'rm -rf "$work_dir"' EXIT
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${tap_repo}.git" "$work_dir/tap"
+          mkdir -p "$work_dir/tap/Formula"
+          cp "${{ steps.meta.outputs.out_dir }}/tetra.rb" "$work_dir/tap/Formula/tetra.rb"
+          git -C "$work_dir/tap" config user.name "github-actions[bot]"
+          git -C "$work_dir/tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$work_dir/tap" add Formula/tetra.rb
+          if git -C "$work_dir/tap" diff --cached --quiet; then
+            echo "Homebrew tap already up to date"
+          else
+            git -C "$work_dir/tap" commit -m "Update Tetra formula to ${{ steps.meta.outputs.version }}"
+            git -C "$work_dir/tap" push
+          fi
