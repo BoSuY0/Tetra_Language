@@ -74,6 +74,35 @@ Hello from Flow!
 
 ---
 
+## Install
+
+Linux x64 release installer:
+
+```sh
+curl -fsSL https://github.com/BoSuY0/Tetra_Language/releases/download/v0.4.0/install.sh | bash
+tetra version
+```
+
+Container package:
+
+```sh
+docker run --rm ghcr.io/bosuy0/tetra-language:0.4.0 tetra version
+```
+
+Homebrew tap:
+
+```sh
+brew tap BoSuY0/tetra
+brew install tetra
+tetra version
+```
+
+The binary release baseline is `linux-x64`. Other target/runtime claims remain
+gated by the evidence named in the release docs. Private release downloads need
+a GitHub token; see `docs/user/install.md`.
+
+---
+
 ## Syntax at a glance
 
 ```tetra
@@ -108,6 +137,7 @@ uses io:
 | Topic | File |
 | --- | --- |
 | Language tour | `docs/user/language_tour.md` |
+| Install | `docs/user/install.md` |
 | Flow syntax | `docs/spec/flow_syntax_v1.md` |
 | Ownership/effects | `docs/user/ownership_effects_guide.md` |
 | Async/actors | `docs/user/async_actors_guide.md` |

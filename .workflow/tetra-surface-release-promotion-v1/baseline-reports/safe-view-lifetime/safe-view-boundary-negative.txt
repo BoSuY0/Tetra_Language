@@ -1,4 +1,0 @@
-/tmp/tmp.Bhc9FuDT9g/bad-actor.tetra:7:51: cannot send borrowed view across actor boundary; use .copy() (borrowed value derived from 'xs' cannot cross actor boundary without copy)
-exit status 1
-/tmp/tmp.Bhc9FuDT9g/bad-task.tetra:9:5: cannot infer type for 'task': /tmp/tmp.Bhc9FuDT9g/bad-task.tetra:9:42: typed task error payload must be sendable across task boundary: type '[]u8' is not sendable
-exit status 1

@@ -12,6 +12,7 @@ examples/.tetra_cache/
 
 # Local agent/orchestration state
 .orchestrator/
+.workflow/
 
 # Local release/security evidence
 /security-review.md
