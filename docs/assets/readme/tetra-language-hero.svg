@@ -79,8 +79,8 @@
     <g class="mono" font-size="18">
       <text x="26" y="36" fill="#94a3b8">func main() -&gt; Int</text>
       <text x="26" y="62" fill="#64748b">uses io:</text>
-      <text x="26" y="88"><tspan fill="#0f172a">    print(</tspan><tspan fill="#059669">&quot;Hello from Tetra!&quot;</tspan><tspan fill="#0f172a">)</tspan></text>
-      <text x="26" y="114" fill="#0f172a">    return 0</text>
+      <text x="54" y="88"><tspan fill="#0f172a">print(</tspan><tspan fill="#059669">&quot;Hello from Tetra!&quot;</tspan><tspan fill="#0f172a">)</tspan></text>
+      <text x="54" y="114" fill="#0f172a">return 0</text>
     </g>
   </g>
 
