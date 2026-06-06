@@ -13,22 +13,26 @@ const (
 type WrapperKind string
 
 const (
-	WrapperNone                 WrapperKind = "none"
-	WrapperStructField          WrapperKind = "struct_field"
-	WrapperOptionalPayload      WrapperKind = "optional_payload"
-	WrapperEnumPayload          WrapperKind = "enum_payload"
-	WrapperGenericWrapper       WrapperKind = "generic_wrapper"
-	WrapperFunctionValue        WrapperKind = "function_value"
-	WrapperCallbackArg          WrapperKind = "callback_arg"
-	WrapperInterfaceValue       WrapperKind = "interface_value"
-	WrapperProtocolDispatch     WrapperKind = "protocol_dispatch"
-	WrapperAsyncBoundary        WrapperKind = "async_boundary"
-	WrapperTaskBoundary         WrapperKind = "task_boundary"
-	WrapperActorBoundary        WrapperKind = "actor_boundary"
-	WrapperFFICall              WrapperKind = "ffi_call"
-	WrapperSafeWrapperPromotion WrapperKind = "safe_wrapper_promotion"
-	WrapperRawPointer           WrapperKind = "raw_pointer"
-	WrapperRawSliceFromParts    WrapperKind = "raw_slice_from_parts"
+	WrapperNone                   WrapperKind = "none"
+	WrapperStructField            WrapperKind = "struct_field"
+	WrapperOptionalPayload        WrapperKind = "optional_payload"
+	WrapperEnumPayload            WrapperKind = "enum_payload"
+	WrapperGenericWrapper         WrapperKind = "generic_wrapper"
+	WrapperFunctionValue          WrapperKind = "function_value"
+	WrapperCallbackArg            WrapperKind = "callback_arg"
+	WrapperInterfaceValue         WrapperKind = "interface_value"
+	WrapperProtocolDispatch       WrapperKind = "protocol_dispatch"
+	WrapperDynamicExistential     WrapperKind = "dynamic_existential"
+	WrapperStaticWitness          WrapperKind = "static_witness"
+	WrapperWitnessTableLookup     WrapperKind = "witness_table_lookup"
+	WrapperAsyncBoundary          WrapperKind = "async_boundary"
+	WrapperTaskBoundary           WrapperKind = "task_boundary"
+	WrapperActorBoundary          WrapperKind = "actor_boundary"
+	WrapperActorReentrantCallback WrapperKind = "actor_reentrant_callback"
+	WrapperFFICall                WrapperKind = "ffi_call"
+	WrapperSafeWrapperPromotion   WrapperKind = "safe_wrapper_promotion"
+	WrapperRawPointer             WrapperKind = "raw_pointer"
+	WrapperRawSliceFromParts      WrapperKind = "raw_slice_from_parts"
 )
 
 type EscapeKind string
@@ -39,6 +43,8 @@ const (
 	EscapeStore             EscapeKind = "store"
 	EscapeBeforeSuspension  EscapeKind = "before_suspension"
 	EscapeAcrossAwait       EscapeKind = "across_await"
+	EscapeAfterCancellation EscapeKind = "after_cancellation"
+	EscapeCancellation      EscapeKind = "cancellation"
 	EscapeTaskBoundary      EscapeKind = "task_boundary"
 	EscapeActorBoundary     EscapeKind = "actor_boundary"
 	EscapeFFIBoundary       EscapeKind = "ffi_boundary"
@@ -81,17 +87,19 @@ const (
 type InoutEvent string
 
 const (
-	EventStartInout            InoutEvent = "start_inout"
-	EventEndInout              InoutEvent = "end_inout"
-	EventAliasRead             InoutEvent = "alias_read"
-	EventAliasWrite            InoutEvent = "alias_write"
-	EventUnknownCall           InoutEvent = "unknown_call"
-	EventBranchMerge           InoutEvent = "branch_merge"
-	EventCallbackReentrantCall InoutEvent = "callback_reentrant_call"
-	EventProtocolDispatchCall  InoutEvent = "protocol_dispatch_call"
-	EventTaskBoundaryCall      InoutEvent = "task_boundary_call"
-	EventActorBoundaryCall     InoutEvent = "actor_boundary_call"
-	EventExternalCall          InoutEvent = "external_call"
+	EventStartInout                  InoutEvent = "start_inout"
+	EventEndInout                    InoutEvent = "end_inout"
+	EventAliasRead                   InoutEvent = "alias_read"
+	EventAliasWrite                  InoutEvent = "alias_write"
+	EventUnknownCall                 InoutEvent = "unknown_call"
+	EventBranchMerge                 InoutEvent = "branch_merge"
+	EventCallbackReentrantCall       InoutEvent = "callback_reentrant_call"
+	EventProtocolDispatchCall        InoutEvent = "protocol_dispatch_call"
+	EventDynamicProtocolDispatchCall InoutEvent = "dynamic_protocol_dispatch_call"
+	EventTaskBoundaryCall            InoutEvent = "task_boundary_call"
+	EventTaskGroupBoundaryCall       InoutEvent = "task_group_boundary_call"
+	EventActorBoundaryCall           InoutEvent = "actor_boundary_call"
+	EventExternalCall                InoutEvent = "external_call"
 )
 
 type Outcome string
@@ -137,6 +145,16 @@ const (
 	OutcomeValidHeapFallbackReasonPreserved          Outcome = "valid_heap_fallback_reason_preserved"
 	OutcomeInvalidHeapFallbackEvidence               Outcome = "invalid_heap_fallback_evidence"
 	OutcomeConservativeBoundaryStorage               Outcome = "conservative_boundary_storage"
+	OutcomeValidPreAwaitLocalBorrow                  Outcome = "valid_pre_await_local_borrow"
+	OutcomeConservativePostAwaitBorrow               Outcome = "conservative_post_await_borrow"
+	OutcomeInvalidCancellationBorrowLifetime         Outcome = "invalid_cancellation_borrow_lifetime"
+	OutcomeConservativeTaskGroupNoAlias              Outcome = "conservative_task_group_noalias"
+	OutcomeConservativeActorReentrantCallback        Outcome = "conservative_actor_reentrant_callback"
+	OutcomeConservativeDynamicExistentialBorrow      Outcome = "conservative_dynamic_existential_borrow"
+	OutcomeValidStaticWitnessBorrowFact              Outcome = "valid_static_witness_borrow_fact"
+	OutcomeInvalidStaticWitnessMissingParent         Outcome = "invalid_static_witness_missing_parent"
+	OutcomeInvalidDynamicProtocolNoAlias             Outcome = "invalid_dynamic_protocol_noalias"
+	OutcomeInvalidWitnessProvenancePromotion         Outcome = "invalid_witness_provenance_promotion"
 )
 
 type Scenario struct {
@@ -169,6 +187,15 @@ type Result struct {
 }
 
 func Evaluate(s Scenario) Result {
+	if storagePlanIsTrusted(s.StoragePlan) && escapeCrossesStorageBoundary(s.Escape) {
+		return Result{Outcome: OutcomeInvalidEscapedTrustedStorage, Reason: "escaped value cannot lower as trusted stack, region, task, actor, or island storage"}
+	}
+	if result, ok := evaluateDynamicProtocolV11(s); ok {
+		return result
+	}
+	if result, ok := evaluateAsyncV10(s); ok {
+		return result
+	}
 	if result, ok := evaluateStorage(s); ok {
 		return result
 	}
@@ -212,6 +239,38 @@ func Evaluate(s Scenario) Result {
 		return Result{Outcome: OutcomeInvalidBorrowReturnEscape, Reason: "borrowed aggregate cannot escape its owner"}
 	}
 	return Result{Outcome: OutcomeValidBorrowLocal, Valid: true, Reason: "borrowed view stays in local scope"}
+}
+
+func evaluateDynamicProtocolV11(s Scenario) (Result, bool) {
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperDynamicExistential {
+		return Result{Outcome: OutcomeConservativeDynamicExistentialBorrow, Reason: "dynamic existential or protocol borrow carrier remains conservative unless statically resolved"}, true
+	}
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperStaticWitness {
+		if s.SourceFactIDPresent {
+			return Result{Outcome: OutcomeValidStaticWitnessBorrowFact, Valid: true, Reason: "static witness proof carries borrow facts only with compiler-owned parent fact"}, true
+		}
+		return Result{Outcome: OutcomeInvalidStaticWitnessMissingParent, Reason: "static witness proof requires compiler-owned parent fact"}, true
+	}
+	if s.Wrapper == WrapperWitnessTableLookup && (s.Source == SourceUnsafeUnknown || s.Source == SourceExternalPointer) {
+		return Result{Outcome: OutcomeInvalidWitnessProvenancePromotion, Reason: "witness table lookup cannot promote unsafe or unknown provenance to safe_known"}, true
+	}
+	return Result{}, false
+}
+
+func evaluateAsyncV10(s Scenario) (Result, bool) {
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperAsyncBoundary && s.Escape == EscapeBeforeSuspension && s.NoEscapeProof {
+		return Result{Outcome: OutcomeValidPreAwaitLocalBorrow, Valid: true, Reason: "borrowed value is used before suspension with compiler-owned local no-escape proof"}, true
+	}
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperAsyncBoundary && s.Escape == EscapeAfterCancellation {
+		return Result{Outcome: OutcomeConservativePostAwaitBorrow, Reason: "borrowed value used after suspension or cancellation remains conservative"}, true
+	}
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperTaskBoundary && s.Escape == EscapeCancellation {
+		return Result{Outcome: OutcomeInvalidCancellationBorrowLifetime, Reason: "cancellation invalidates task-owned borrowed lifetime assumptions"}, true
+	}
+	if s.Source == SourceBorrowedView && s.Wrapper == WrapperActorReentrantCallback && s.Escape == EscapeActorBoundary {
+		return Result{Outcome: OutcomeConservativeActorReentrantCallback, Reason: "actor reentrant callback keeps borrowed state and storage conservative without separate proof"}, true
+	}
+	return Result{}, false
 }
 
 func evaluateStorage(s Scenario) (Result, bool) {
@@ -383,6 +442,14 @@ func evaluateInout(events []InoutEvent) Result {
 		case EventProtocolDispatchCall:
 			if active {
 				return Result{Outcome: OutcomeInvalidProtocolDispatchNoAlias, Reason: "protocol or interface dispatch invalidates broad inout noalias"}
+			}
+		case EventDynamicProtocolDispatchCall:
+			if active {
+				return Result{Outcome: OutcomeInvalidDynamicProtocolNoAlias, Reason: "dynamic protocol dispatch cannot validate broad noalias"}
+			}
+		case EventTaskGroupBoundaryCall:
+			if active {
+				return Result{Outcome: OutcomeConservativeTaskGroupNoAlias, Reason: "task group or structured concurrency boundary cannot validate broad inout noalias"}
 			}
 		case EventTaskBoundaryCall, EventActorBoundaryCall:
 			if active {

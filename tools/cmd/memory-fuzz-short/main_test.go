@@ -27,11 +27,17 @@ func TestRunMemoryFuzzShortWritesValidatedArtifacts(t *testing.T) {
 	if err := compiler.ValidateMemoryFuzzOracleReport(report); err != nil {
 		t.Fatalf("ValidateMemoryFuzzOracleReport: %v\n%s", err, raw)
 	}
+	if len(report.Requirements) != 5 {
+		t.Fatalf("requirements count = %d, want 5: %#v", len(report.Requirements), report.Requirements)
+	}
+	if len(report.SliceCoverage) != 12 {
+		t.Fatalf("slice coverage count = %d, want v0-v11 coverage: %#v", len(report.SliceCoverage), report.SliceCoverage)
+	}
 	summary, err := os.ReadFile(filepath.Join(dir, "summary.md"))
 	if err != nil {
 		t.Fatalf("read summary: %v", err)
 	}
-	for _, want := range []string{"# Memory Fuzz Short Summary", "tetra.memory-fuzz.oracle.v1", "Tier 1", "memory-fuzz-oracle.json"} {
+	for _, want := range []string{"# Memory Fuzz Short Summary", "tetra.memory-fuzz.oracle.v1", "Tier 1", "memory-fuzz-oracle.json", "MEM-FUZZ-001", "v0-v11"} {
 		if !strings.Contains(string(summary), want) {
 			t.Fatalf("summary missing %q:\n%s", want, summary)
 		}

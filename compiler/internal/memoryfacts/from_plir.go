@@ -1087,9 +1087,6 @@ func addBorrowMetadataFacts(graph *Graph, parent Fact, value plir.Value, op plir
 }
 
 func addBorrowAggregateV0Facts(graph *Graph, parent Fact, value plir.Value, op plir.Operation) error {
-	if isUnsafeUnknown(parent) {
-		return nil
-	}
 	ownerPath := ownerPathForPLIRValue(value)
 	owner := nonEmpty(ownerFromOperationInput(op, 0), normalizeOwnerID(ownerPath), parent.OwnerID)
 	if owner == "" {
@@ -1102,6 +1099,166 @@ func addBorrowAggregateV0Facts(graph *Graph, parent Fact, value plir.Value, op p
 	claim, ok := memoryIdealBorrowWrapperClaim(value, op, parent, paramPath)
 	if !ok {
 		return nil
+	}
+	if isUnsafeUnknown(parent) {
+		if claim == "witness_provenance_promotion_rejected" {
+			id, err := graph.DeriveFact(parent.ID, Fact{
+				ID:              derivedFactID(parent.ID, claim),
+				FunctionID:      parent.FunctionID,
+				ValueID:         parent.ValueID,
+				SiteID:          parent.SiteID,
+				SourceSpan:      parent.SourceSpan,
+				TypeName:        parent.TypeName,
+				SourceStage:     StagePLIR,
+				ProvenanceClass: ProvenanceUnsafeUnknown,
+				UnsafeClass:     UnsafeUnknown,
+				RegionID:        parent.RegionID,
+				OwnerID:         owner,
+				ParamPath:       paramPath,
+				BorrowState:     parent.BorrowState,
+				EscapeState:     EscapeConservative,
+				Claim:           claim,
+				ValidatorName:   borrowWrapperValidatorName(claim),
+				CostClass:       CostUnsupportedRejected,
+				Reason:          fmt.Sprintf("Memory Ideal v11 rejects witness provenance promotion for owner %q", owner),
+			})
+			if err != nil {
+				return err
+			}
+			return graph.InvalidateFact(id, fmt.Sprintf("Memory Ideal v11 rejects witness provenance promotion for owner %q", owner))
+		}
+		return nil
+	}
+	if claim == "dynamic_existential_borrow_conservative" {
+		_, err := graph.DeriveFact(parent.ID, Fact{
+			ID:              derivedFactID(parent.ID, claim),
+			FunctionID:      parent.FunctionID,
+			ValueID:         parent.ValueID,
+			SiteID:          parent.SiteID,
+			SourceSpan:      parent.SourceSpan,
+			TypeName:        parent.TypeName,
+			SourceStage:     StagePLIR,
+			ProvenanceClass: ProvenanceUnsafeUnknown,
+			UnsafeClass:     UnsafeUnknown,
+			RegionID:        parent.RegionID,
+			OwnerID:         owner,
+			ParamPath:       paramPath,
+			BorrowState:     parent.BorrowState,
+			EscapeState:     EscapeConservative,
+			AliasState:      AliasUnknownConservative,
+			Claim:           claim,
+			ValidatorName:   borrowWrapperValidatorName(claim),
+			CostClass:       CostConservativeFallback,
+			Reason:          fmt.Sprintf("Memory Ideal v11 keeps dynamic existential/protocol borrow conservative for owner %q", owner),
+		})
+		return err
+	}
+	if claim == "static_witness_borrow_parent_validated" || claim == "protocol_dispatch_report_integrity" {
+		cost := CostZeroCostProven
+		normalBuildCheck := false
+		if claim == "protocol_dispatch_report_integrity" {
+			cost = CostDynamicCheckRequired
+			normalBuildCheck = true
+		}
+		id, err := graph.DeriveFact(parent.ID, Fact{
+			ID:               derivedFactID(parent.ID, claim),
+			FunctionID:       parent.FunctionID,
+			ValueID:          parent.ValueID,
+			SiteID:           parent.SiteID,
+			SourceSpan:       parent.SourceSpan,
+			TypeName:         parent.TypeName,
+			SourceStage:      StagePLIR,
+			ProvenanceClass:  ProvenanceSafeBorrowed,
+			UnsafeClass:      UnsafeSafe,
+			RegionID:         parent.RegionID,
+			OwnerID:          owner,
+			ParamPath:        paramPath,
+			BorrowState:      parent.BorrowState,
+			EscapeState:      EscapeNoEscape,
+			Claim:            claim,
+			CostClass:        cost,
+			NormalBuildCheck: normalBuildCheck,
+			Reason:           fmt.Sprintf("Memory Ideal v11 validates %s for owner %q with compiler-owned parent fact", claim, owner),
+		})
+		if err != nil {
+			return err
+		}
+		return graph.MarkValidated(id, borrowWrapperValidatorName(claim))
+	}
+	if claim == "pre_await_local_borrow_validated" {
+		id, err := graph.DeriveFact(parent.ID, Fact{
+			ID:              derivedFactID(parent.ID, claim),
+			FunctionID:      parent.FunctionID,
+			ValueID:         parent.ValueID,
+			SiteID:          parent.SiteID,
+			SourceSpan:      parent.SourceSpan,
+			TypeName:        parent.TypeName,
+			SourceStage:     StagePLIR,
+			ProvenanceClass: ProvenanceSafeBorrowed,
+			UnsafeClass:     UnsafeSafe,
+			RegionID:        parent.RegionID,
+			OwnerID:         owner,
+			ParamPath:       paramPath,
+			BorrowState:     parent.BorrowState,
+			EscapeState:     EscapeNoEscape,
+			Claim:           claim,
+			CostClass:       CostZeroCostProven,
+			Reason:          fmt.Sprintf("Memory Ideal v10 validates pre-await local borrow for owner %q only with compiler-owned no-escape proof", owner),
+		})
+		if err != nil {
+			return err
+		}
+		return graph.MarkValidated(id, borrowWrapperValidatorName(claim))
+	}
+	if claim == "post_await_borrow_conservative" || claim == "actor_reentrant_callback_conservative" {
+		_, err := graph.DeriveFact(parent.ID, Fact{
+			ID:              derivedFactID(parent.ID, claim),
+			FunctionID:      parent.FunctionID,
+			ValueID:         parent.ValueID,
+			SiteID:          parent.SiteID,
+			SourceSpan:      parent.SourceSpan,
+			TypeName:        parent.TypeName,
+			SourceStage:     StagePLIR,
+			ProvenanceClass: ProvenanceUnsafeUnknown,
+			UnsafeClass:     UnsafeUnknown,
+			RegionID:        parent.RegionID,
+			OwnerID:         owner,
+			ParamPath:       paramPath,
+			BorrowState:     parent.BorrowState,
+			EscapeState:     EscapeConservative,
+			AliasState:      AliasUnknownConservative,
+			Claim:           claim,
+			ValidatorName:   borrowWrapperValidatorName(claim),
+			CostClass:       CostConservativeFallback,
+			Reason:          fmt.Sprintf("Memory Ideal v10 keeps %s conservative for owner %q", claim, owner),
+		})
+		return err
+	}
+	if claim == "cancellation_borrow_lifetime_invalidated" {
+		id, err := graph.DeriveFact(parent.ID, Fact{
+			ID:              derivedFactID(parent.ID, claim),
+			FunctionID:      parent.FunctionID,
+			ValueID:         parent.ValueID,
+			SiteID:          parent.SiteID,
+			SourceSpan:      parent.SourceSpan,
+			TypeName:        parent.TypeName,
+			SourceStage:     StagePLIR,
+			ProvenanceClass: ProvenanceSafeBorrowed,
+			UnsafeClass:     UnsafeSafe,
+			RegionID:        parent.RegionID,
+			OwnerID:         owner,
+			ParamPath:       paramPath,
+			BorrowState:     parent.BorrowState,
+			EscapeState:     EscapeTask,
+			Claim:           claim,
+			ValidatorName:   borrowWrapperValidatorName(claim),
+			CostClass:       CostUnsupportedRejected,
+			Reason:          fmt.Sprintf("Memory Ideal v10 rejects task-owned borrow lifetime after cancellation for owner %q", owner),
+		})
+		if err != nil {
+			return err
+		}
+		return graph.InvalidateFact(id, fmt.Sprintf("Memory Ideal v10 rejects task-owned borrow lifetime after cancellation for owner %q", owner))
 	}
 	if claim == "protocol_dispatch_borrow_conservative" {
 		_, err := graph.DeriveFact(parent.ID, Fact{
@@ -1212,6 +1369,44 @@ func memoryIdealBorrowWrapperClaim(value plir.Value, op plir.Operation, parent F
 		parent.Reason,
 		paramPath,
 	}, " "))
+	if (strings.Contains(context, "pre-await") || strings.Contains(context, "pre_await") || strings.Contains(context, "before suspension")) &&
+		(strings.Contains(context, "no_escape_proof") || strings.Contains(context, "no-escape proof") || strings.Contains(context, "no escape proof")) {
+		return "pre_await_local_borrow_validated", true
+	}
+	if strings.Contains(context, "post-await") ||
+		strings.Contains(context, "post_await") ||
+		strings.Contains(context, "after await") ||
+		strings.Contains(context, "after suspension") {
+		return "post_await_borrow_conservative", true
+	}
+	if strings.Contains(context, "cancellation") || strings.Contains(context, "cancel") {
+		return "cancellation_borrow_lifetime_invalidated", true
+	}
+	if strings.Contains(context, "actor reentrant") ||
+		strings.Contains(context, "actor_reentrant") ||
+		strings.Contains(context, "reentrant_callback") {
+		return "actor_reentrant_callback_conservative", true
+	}
+	if strings.Contains(context, "witness table lookup") ||
+		strings.Contains(context, "witness_table_lookup") ||
+		strings.Contains(context, "witness lookup") {
+		return "witness_provenance_promotion_rejected", true
+	}
+	if strings.Contains(context, "report integrity") ||
+		(strings.Contains(context, "normal_build_check") && strings.Contains(context, "source_fact_id") && strings.Contains(context, "cost_class")) {
+		return "protocol_dispatch_report_integrity", true
+	}
+	if strings.Contains(context, "static witness") ||
+		strings.Contains(context, "static_witness") ||
+		strings.Contains(context, "conformance proof") ||
+		strings.Contains(context, "compiler-owned parent fact") {
+		return "static_witness_borrow_parent_validated", true
+	}
+	if strings.Contains(context, "dynamic existential") ||
+		strings.Contains(context, "dynamic_existential") ||
+		strings.Contains(context, "existential protocol") {
+		return "dynamic_existential_borrow_conservative", true
+	}
 	if strings.Contains(context, "callback_arg") || strings.Contains(context, "callback arg") || strings.Contains(context, "callback parameter") {
 		return "callback_arg_contains_borrow", true
 	}
@@ -1258,8 +1453,24 @@ func borrowWrapperValidatorName(claim string) string {
 		return "interface_borrow_escape_validator"
 	case "protocol_dispatch_borrow_conservative":
 		return "protocol_dispatch_borrow_validator"
+	case "dynamic_existential_borrow_conservative":
+		return "dynamic_existential_borrow_conservative_validator"
+	case "static_witness_borrow_parent_validated":
+		return "static_witness_parent_fact_validator"
+	case "witness_provenance_promotion_rejected":
+		return "witness_provenance_promotion_validator"
+	case "protocol_dispatch_report_integrity":
+		return "protocol_dispatch_report_integrity_validator"
 	case "async_boundary_borrow_conservative":
 		return "async_boundary_borrow_validator"
+	case "pre_await_local_borrow_validated":
+		return "pre_await_local_borrow_validator"
+	case "post_await_borrow_conservative":
+		return "post_await_borrow_conservative_validator"
+	case "cancellation_borrow_lifetime_invalidated":
+		return "cancellation_lifetime_invalidation_validator"
+	case "actor_reentrant_callback_conservative":
+		return "actor_reentrant_callback_boundary_validator"
 	case "task_boundary_borrow_rejected":
 		return "task_boundary_borrow_validator"
 	case "actor_boundary_borrow_rejected":
@@ -1322,6 +1533,51 @@ func addNoAliasMetadataFacts(graph *Graph, parent Fact, value plir.Value) error 
 		return nil
 	}
 	owner := nonEmpty(ownerForPLIRValue(value), parent.OwnerID)
+	if dynamicProtocolNoAliasRejectedContext(parent, value) {
+		id, err := graph.DeriveFact(parent.ID, Fact{
+			ID:              derivedFactID(parent.ID, "dynamic_protocol_noalias_rejected"),
+			FunctionID:      parent.FunctionID,
+			ValueID:         parent.ValueID,
+			SiteID:          parent.SiteID,
+			SourceSpan:      parent.SourceSpan,
+			TypeName:        parent.TypeName,
+			SourceStage:     StagePLIR,
+			ProvenanceClass: ProvenanceSafeKnown,
+			UnsafeClass:     UnsafeSafe,
+			RegionID:        parent.RegionID,
+			OwnerID:         owner,
+			AliasState:      AliasInvalidatedByCall,
+			Claim:           "dynamic_protocol_noalias_rejected",
+			ValidatorName:   "dynamic_protocol_noalias_rejection_validator",
+			CostClass:       CostUnsupportedRejected,
+			Reason:          "dynamic protocol dispatch cannot validate broad noalias evidence",
+		})
+		if err != nil {
+			return err
+		}
+		return graph.InvalidateFact(id, "dynamic protocol dispatch cannot validate broad noalias evidence")
+	}
+	if taskGroupNoAliasConservativeContext(parent, value) {
+		_, err := graph.DeriveFact(parent.ID, Fact{
+			ID:              derivedFactID(parent.ID, "task_group_noalias_conservative"),
+			FunctionID:      parent.FunctionID,
+			ValueID:         parent.ValueID,
+			SiteID:          parent.SiteID,
+			SourceSpan:      parent.SourceSpan,
+			TypeName:        parent.TypeName,
+			SourceStage:     StagePLIR,
+			ProvenanceClass: ProvenanceUnsafeUnknown,
+			UnsafeClass:     UnsafeUnknown,
+			RegionID:        parent.RegionID,
+			OwnerID:         owner,
+			AliasState:      AliasInvalidatedByCall,
+			Claim:           "task_group_noalias_conservative",
+			ValidatorName:   "task_group_boundary_conservative_validator",
+			CostClass:       CostConservativeFallback,
+			Reason:          "task group or structured concurrency boundary invalidates broad noalias evidence",
+		})
+		return err
+	}
 	if boundaryNoAliasConservativeContext(parent, value) {
 		_, err := graph.DeriveFact(parent.ID, Fact{
 			ID:              derivedFactID(parent.ID, "boundary_noalias_conservative"),
@@ -1445,6 +1701,35 @@ func addNoAliasMetadataFacts(graph *Graph, parent Fact, value plir.Value) error 
 		}
 	}
 	return nil
+}
+
+func dynamicProtocolNoAliasRejectedContext(parent Fact, value plir.Value) bool {
+	context := strings.ToLower(strings.Join([]string{
+		parent.Claim,
+		parent.Reason,
+		parent.ValueID,
+		parent.SiteID,
+		value.ID,
+		value.Provenance.Root,
+		value.Lifetime.Owner,
+	}, " "))
+	return strings.Contains(context, "dynamic protocol dispatch") &&
+		(strings.Contains(context, "broad noalias") || strings.Contains(context, "cannot validate"))
+}
+
+func taskGroupNoAliasConservativeContext(parent Fact, value plir.Value) bool {
+	context := strings.ToLower(strings.Join([]string{
+		parent.Claim,
+		parent.Reason,
+		parent.ValueID,
+		parent.SiteID,
+		value.ID,
+		value.Provenance.Root,
+		value.Lifetime.Owner,
+	}, " "))
+	return strings.Contains(context, "task group") ||
+		strings.Contains(context, "task_group") ||
+		strings.Contains(context, "structured concurrency")
 }
 
 func callbackInoutConservativeContext(parent Fact, value plir.Value) bool {

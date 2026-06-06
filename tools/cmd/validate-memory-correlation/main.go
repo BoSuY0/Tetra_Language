@@ -86,6 +86,22 @@ var requiredV9RequirementIDs = map[string]bool{
 	"MEM-STORAGE-004": true,
 }
 
+var requiredV10RequirementIDs = map[string]bool{
+	"MEM-ASYNC-001": true,
+	"MEM-ASYNC-002": true,
+	"MEM-ASYNC-003": true,
+	"MEM-ASYNC-004": true,
+	"MEM-ASYNC-005": true,
+}
+
+var requiredV11RequirementIDs = map[string]bool{
+	"MEM-DYNPROTO-001": true,
+	"MEM-DYNPROTO-002": true,
+	"MEM-DYNPROTO-003": true,
+	"MEM-DYNPROTO-004": true,
+	"MEM-DYNPROTO-005": true,
+}
+
 var expectedV8Statuses = map[string]string{
 	"MEM-REPORT-001": "validated_narrow",
 	"MEM-REPORT-002": "validated_narrow",
@@ -99,6 +115,22 @@ var expectedV9Statuses = map[string]string{
 	"MEM-STORAGE-002": "validated_narrow",
 	"MEM-STORAGE-003": "validated_narrow",
 	"MEM-STORAGE-004": "conservative",
+}
+
+var expectedV10Statuses = map[string]string{
+	"MEM-ASYNC-001": "validated_narrow",
+	"MEM-ASYNC-002": "conservative",
+	"MEM-ASYNC-003": "rejected",
+	"MEM-ASYNC-004": "conservative",
+	"MEM-ASYNC-005": "conservative",
+}
+
+var expectedV11Statuses = map[string]string{
+	"MEM-DYNPROTO-001": "conservative",
+	"MEM-DYNPROTO-002": "validated_narrow",
+	"MEM-DYNPROTO-003": "rejected",
+	"MEM-DYNPROTO-004": "rejected",
+	"MEM-DYNPROTO-005": "validated_narrow",
 }
 
 var allowedStatuses = map[string]bool{
@@ -218,6 +250,12 @@ func validateCorrelationRows(rows []map[string]string) error {
 		if want, ok := expectedV9Statuses[id]; ok && status != "" && status != want {
 			issues = append(issues, fmt.Sprintf("%s: widened v9 status %q, want %q", prefix, status, want))
 		}
+		if want, ok := expectedV10Statuses[id]; ok && status != "" && status != want {
+			issues = append(issues, fmt.Sprintf("%s: widened v10 status %q, want %q", prefix, status, want))
+		}
+		if want, ok := expectedV11Statuses[id]; ok && status != "" && status != want {
+			issues = append(issues, fmt.Sprintf("%s: widened v11 status %q, want %q", prefix, status, want))
+		}
 		if issue := validateMemoryClaimDrift(row); issue != "" {
 			issues = append(issues, prefix+": "+issue)
 		}
@@ -237,6 +275,12 @@ func validateCorrelationRows(rows []map[string]string) error {
 func requiredRequirementIDsForRows(rows []map[string]string) map[string]bool {
 	for _, row := range rows {
 		id := strings.TrimSpace(row["requirement_id"])
+		if requiredV11RequirementIDs[id] {
+			return requiredV11RequirementIDs
+		}
+		if requiredV10RequirementIDs[id] {
+			return requiredV10RequirementIDs
+		}
 		if requiredV9RequirementIDs[id] {
 			return requiredV9RequirementIDs
 		}

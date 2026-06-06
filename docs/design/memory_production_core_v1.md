@@ -178,6 +178,34 @@ allocation correctness, target parity, performance evidence, production actor
 runtime proof, full async lifetime proof, arbitrary FFI lifetime proof,
 arbitrary external pointer safety, or a "Memory 100%" claim.
 
+Memory Ideal Vertical Slice v10 adds narrow async cancellation and structured
+boundary conservatism evidence. `pre_await_local_borrow_validated` validates
+only compiler-visible local non-escaping borrows used before suspension.
+`post_await_borrow_conservative` keeps post-await borrow evidence conservative,
+`cancellation_borrow_lifetime_invalidated` rejects task-owned borrowed lifetime
+assumptions after cancellation, `task_group_noalias_conservative` prevents task
+group boundaries from becoming broad noalias, and
+`actor_reentrant_callback_conservative` keeps actor reentrant callback
+borrow/storage evidence conservative. This does not implement production actor
+runtime proof, distributed actors, a full async lifetime system, complete
+structured concurrency proof, target parity, performance evidence, broad
+noalias, arbitrary FFI/runtime lifetime proof, arbitrary external pointer
+safety, or a "Memory 100%" claim.
+
+Memory Ideal Vertical Slice v11 adds narrow dynamic protocol / witness-table
+conservatism evidence. `dynamic_existential_borrow_conservative` keeps dynamic
+existential/protocol borrow carriers conservative unless statically resolved.
+`static_witness_borrow_parent_validated` validates only static
+witness/conformance proof tied to a compiler-owned parent fact.
+`dynamic_protocol_noalias_rejected` rejects broad noalias from dynamic protocol
+dispatch. `witness_provenance_promotion_rejected` rejects unsafe/dynamic/unknown
+provenance promotion to `safe_known`. `protocol_dispatch_report_integrity`
+preserves `source_fact_id`, `cost_class`, and `normal_build_check`. This does
+not implement full trait-object/existential runtime proof, complete
+witness-table ABI safety proof, production dynamic dispatch runtime safety,
+target parity, performance evidence, broad noalias, arbitrary unsafe/external
+pointer promotion, or a "Memory 100%" claim.
+
 ## Compiler Integration
 
 `BuildOptions.EmitMemoryReport` and `--emit-memory-report` request a report
@@ -225,6 +253,15 @@ Memory Ideal v9 additionally validates escape-aware storage and lowering
 integrity so escaped or boundary-crossing values cannot be projected as
 trusted stack/region/task/actor storage without compiler-owned no-escape
 evidence, and heap fallback rows remain traceable and reasoned.
+Memory Ideal v10 additionally projects async cancellation and structured
+boundary evidence so pre-await local borrows can be narrow-validated while
+post-await, cancellation, task-group, and actor reentrant callback paths remain
+conservative or rejected.
+Memory Ideal v11 additionally projects dynamic protocol/existential and
+witness/conformance evidence so dynamic carriers remain conservative, static
+witness proof requires compiler-owned parent facts, dynamic protocol noalias
+and unsafe/unknown provenance promotion are rejected, and report integrity rows
+preserve `source_fact_id`, `cost_class`, and `normal_build_check`.
 
 ## Memory Cost Model
 

@@ -215,6 +215,16 @@ only with validator tests and manifest-visible schema notes.
   `task_boundary_borrow_rejected`,
   `actor_boundary_borrow_rejected`,
   `boundary_noalias_conservative`,
+  `pre_await_local_borrow_validated`,
+  `post_await_borrow_conservative`,
+  `cancellation_borrow_lifetime_invalidated`,
+  `task_group_noalias_conservative`,
+  `actor_reentrant_callback_conservative`,
+  `dynamic_existential_borrow_conservative`,
+  `static_witness_borrow_parent_validated`,
+  `dynamic_protocol_noalias_rejected`,
+  `witness_provenance_promotion_rejected`,
+  `protocol_dispatch_report_integrity`,
   `unsafe_unknown_rejected_safe_facts`,
   `unsafe_verified_root_allocation_base`,
   `ffi_call_may_retain_borrow`,
@@ -658,6 +668,98 @@ external_pointer_provenance_validator`, and projects `claim_level: rejected`.
 These rows do not grant arbitrary external pointer safety, C/FFI lifetime
 safety, safe wrapper promotion, broad unsafe noalias, target parity,
 performance, or arbitrary external allocator provenance.
+
+## Memory Ideal Vertical Slice v10 Async Cancellation Rows
+
+The v10 slice projects only the five correlated rows needed for
+`MEM-ASYNC-001`, `MEM-ASYNC-002`, `MEM-ASYNC-003`, `MEM-ASYNC-004`, and
+`MEM-ASYNC-005`:
+
+```text
+pre_await_local_borrow_validated
+post_await_borrow_conservative
+cancellation_borrow_lifetime_invalidated
+task_group_noalias_conservative
+actor_reentrant_callback_conservative
+```
+
+`pre_await_local_borrow_validated` is derived from a safe borrowed parent fact
+only when compiler-visible evidence shows the borrow is local, non-escaping,
+and used before suspension. It requires `parent_fact_id`, uses
+`validator_name: pre_await_local_borrow_validator`, and projects
+`claim_level: validated` with `cost_class: zero_cost_proven`.
+
+`post_await_borrow_conservative` is derived from a borrowed parent fact that
+crosses or is used after await/suspend. It requires `parent_fact_id`, uses
+`validator_name: post_await_borrow_conservative_validator`, and remains
+conservative rather than validated.
+
+`cancellation_borrow_lifetime_invalidated` is derived from task-owned borrowed
+lifetime evidence on a cancellation path. It requires `parent_fact_id`, uses
+`validator_name: cancellation_lifetime_invalidation_validator`, and projects
+`claim_level: rejected` with `cost_class: unsupported_rejected`.
+
+`task_group_noalias_conservative` is derived from noalias evidence at a task
+group or structured concurrency boundary. It requires `parent_fact_id`, uses
+`validator_name: task_group_boundary_conservative_validator`, carries
+`alias_state: invalidated_by_call`, and remains conservative.
+
+`actor_reentrant_callback_conservative` is derived from actor reentrant
+callback borrow evidence. It requires `parent_fact_id`, uses
+`validator_name: actor_reentrant_callback_boundary_validator`, and keeps the
+borrow/storage relationship conservative unless a later narrow proof exists.
+
+These rows do not grant production actor runtime proof, distributed actor
+memory safety, a full async lifetime system, complete structured concurrency
+proof, target parity, performance, broad noalias, arbitrary FFI/runtime
+lifetime proof, arbitrary external pointer safety, or "Memory 100%".
+
+## Memory Ideal Vertical Slice v11 Dynamic Protocol Rows
+
+The v11 slice projects only the five correlated rows needed for
+`MEM-DYNPROTO-001`, `MEM-DYNPROTO-002`, `MEM-DYNPROTO-003`,
+`MEM-DYNPROTO-004`, and `MEM-DYNPROTO-005`:
+
+```text
+dynamic_existential_borrow_conservative
+static_witness_borrow_parent_validated
+dynamic_protocol_noalias_rejected
+witness_provenance_promotion_rejected
+protocol_dispatch_report_integrity
+```
+
+`dynamic_existential_borrow_conservative` is derived from safe borrowed parent
+evidence carried by a dynamic existential or protocol surface. It requires
+`parent_fact_id`, uses `validator_name:
+dynamic_existential_borrow_conservative_validator`, and remains conservative
+unless a compiler-owned static resolution proof exists.
+
+`static_witness_borrow_parent_validated` is derived only from a safe borrowed
+parent fact and static witness/conformance proof. It requires
+`parent_fact_id`, uses `validator_name: static_witness_parent_fact_validator`,
+and projects `claim_level: validated` with `cost_class: zero_cost_proven`.
+
+`dynamic_protocol_noalias_rejected` is derived from dynamic protocol dispatch
+noalias evidence. It requires `parent_fact_id`, uses `validator_name:
+dynamic_protocol_noalias_rejection_validator`, carries `alias_state:
+invalidated_by_call`, and projects `claim_level: rejected` with `cost_class:
+unsupported_rejected`.
+
+`witness_provenance_promotion_rejected` is derived from witness/conformance
+lookup evidence with unsafe or unknown provenance. It requires
+`parent_fact_id`, uses `validator_name:
+witness_provenance_promotion_validator`, and rejects promotion to `safe_known`.
+
+`protocol_dispatch_report_integrity` is derived from protocol/existential
+dispatch report integrity evidence. It requires `parent_fact_id`, uses
+`validator_name: protocol_dispatch_report_integrity_validator`, projects
+`cost_class: dynamic_check_required`, and requires `normal_build_check` so the
+projection cannot drop reviewable runtime/check evidence.
+
+These rows do not grant full trait-object/existential runtime proof, complete
+witness-table ABI safety proof, production dynamic dispatch runtime safety,
+target parity, performance, broad noalias, arbitrary unsafe/external pointer
+promotion, or "Memory 100%".
 
 ## Function Summary Rows
 

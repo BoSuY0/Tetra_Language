@@ -482,6 +482,58 @@ func TestValidateMemoryReportRejectsV3DerivedRowsWithoutParent(t *testing.T) {
 	}
 }
 
+func TestValidateMemoryReportRejectsV11DerivedRowsWithoutParent(t *testing.T) {
+	for _, claim := range []string{
+		"dynamic_existential_borrow_conservative",
+		"static_witness_borrow_parent_validated",
+		"dynamic_protocol_noalias_rejected",
+		"witness_provenance_promotion_rejected",
+		"protocol_dispatch_report_integrity",
+	} {
+		t.Run(claim, func(t *testing.T) {
+			report := validMemoryReport()
+			report.Rows[0].Claim = claim
+			report.Rows[0].ParentFactID = ""
+			report.Rows[0].OwnerID = "xs"
+			report.Rows[0].ProvenanceClass = ProvenanceSafeBorrowed
+			report.Rows[0].UnsafeClass = UnsafeSafe
+			report.Rows[0].LoweredArtifactID = ""
+			report.Rows[0].PlannedStorage = ""
+			report.Rows[0].ActualLoweringStorage = ""
+			if strings.Contains(claim, "rejected") {
+				report.Rows[0].ClaimLevel = ClaimRejected
+				report.Rows[0].ValidatorStatus = ValidatorFail
+				report.Rows[0].CostClass = CostUnsupportedRejected
+			}
+
+			err := ValidateReport(report)
+			if err == nil || !strings.Contains(err.Error(), "parent_fact_id") {
+				t.Fatalf("ValidateReport error = %v, want parent_fact_id rejection", err)
+			}
+		})
+	}
+}
+
+func TestValidateMemoryReportRejectsV11ProtocolDispatchIntegrityWithoutReportFields(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].Claim = "protocol_dispatch_report_integrity"
+	report.Rows[0].ParentFactID = "fact:parent"
+	report.Rows[0].ProvenanceClass = ProvenanceSafeBorrowed
+	report.Rows[0].UnsafeClass = UnsafeSafe
+	report.Rows[0].LoweredArtifactID = ""
+	report.Rows[0].PlannedStorage = ""
+	report.Rows[0].ActualLoweringStorage = ""
+	report.Rows[0].ValidatorName = "protocol_dispatch_report_integrity_validator"
+	report.Rows[0].ValidatorStatus = ValidatorPass
+	report.Rows[0].CostClass = CostZeroCostProven
+	report.Rows[0].NormalBuildCheck = false
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "cost_class") || !strings.Contains(err.Error(), "normal_build_check") {
+		t.Fatalf("ValidateReport error = %v, want cost_class and normal_build_check rejection", err)
+	}
+}
+
 func TestValidateMemoryReportRejectsV4DerivedRowsWithoutParent(t *testing.T) {
 	for _, claim := range []string{"async_boundary_borrow_conservative", "task_boundary_borrow_rejected", "actor_boundary_borrow_rejected", "boundary_noalias_conservative"} {
 		t.Run(claim, func(t *testing.T) {

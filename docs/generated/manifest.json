@@ -5717,7 +5717,7 @@
       "name": "Production safety core",
       "status": "current",
       "since": "v0.4.0",
-      "scope": "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, pointer/MMIO/memory capability gates, Memory Production Core v1 report evidence through compiler-owned facts rather than report-reconstructed truth, a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims",
+      "scope": "production local safety model for ownership/lifetime/borrow/consume/inout checks, resource finalization, callable escape diagnostics, effects/capabilities/privacy/consent/budget policy, unsafe boundaries, actor/task transfer safety, pointer/MMIO/memory capability gates, Memory Production Core v1 report evidence through compiler-owned facts rather than report-reconstructed truth, a memory cost model with zero_cost_proven, dynamic_check_required, instrumentation_only, unsupported_rejected, and conservative_fallback report classes, a memory fuzz oracle with Tier 1 short CI smoke, Tier 2 nightly fuzz, Tier 3 release-blocking focused memory fuzz, explicit oracle categories, MEM-FUZZ-012 deterministic v0-v11 release evidence rows, required crash/miscompile repro artifacts, release-blocking unsafe/bounds/storage/report classifications, and no unsupported unsafe pointer safety claim, and a memory production final audit with artifact map and explicit nonclaims",
       "stability": "release-gated current profile with explicit diagnostics for unsupported distributed, cryptographic, formal-proof, runtime-wide guarantees, and arbitrary unsafe external pointer safety",
       "docs": [
         "docs/spec/current_supported_surface.md",
@@ -5728,6 +5728,7 @@
         "docs/design/memory_production_core_v1.md",
         "docs/design/memory_cost_model.md",
         "docs/audits/memory-fuzz-oracle-v1.md",
+        "docs/testing/fuzz_property_stress.md",
         "docs/audits/memory-production-core-v1-baseline.md",
         "docs/audits/memory-production-core-v1-gap-map.md",
         "docs/audits/memory-production-core-v1-supported-surface.md",
@@ -5755,7 +5756,11 @@
         "docs/audits/memory-ideal-vslice-v8-report-correlation.md",
         "docs/audits/memory-ideal-vslice-v8-report-final.md",
         "docs/audits/memory-ideal-vslice-v9-storage-correlation.md",
-        "docs/audits/memory-ideal-vslice-v9-storage-final.md"
+        "docs/audits/memory-ideal-vslice-v9-storage-final.md",
+        "docs/audits/memory-ideal-vslice-v10-async-cancel-correlation.md",
+        "docs/audits/memory-ideal-vslice-v10-async-cancel-final.md",
+        "docs/audits/memory-ideal-vslice-v11-dynproto-correlation.md",
+        "docs/audits/memory-ideal-vslice-v11-dynproto-final.md"
       ]
     },
     {

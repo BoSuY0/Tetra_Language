@@ -185,6 +185,56 @@ func TestValidateMemoryCorrelationAcceptsV9StorageRows(t *testing.T) {
 	}
 }
 
+func TestValidateMemoryCorrelationAcceptsV10AsyncCancelRows(t *testing.T) {
+	path := writeCorrelationFixture(t, validV10CorrelationMarkdown())
+	if err := validateCorrelationFile(path); err != nil {
+		t.Fatalf("validateCorrelationFile v10 failed: %v", err)
+	}
+}
+
+func TestValidateMemoryCorrelationRejectsV10MissingCancellationRow(t *testing.T) {
+	raw := strings.Replace(validV10CorrelationMarkdown(), "| MEM-ASYNC-003 | cancellation path invalidates borrowed task-owned lifetime assumptions | memorymodel:asyncV10:cancel:borrow_lifetime_invalidated | cancellation_lifetime_invalidation_validator | cancellation_borrow_lifetime_invalidated | TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases | linux-x64:narrow | rejected |\n", "", 1)
+	path := writeCorrelationFixture(t, raw)
+	err := validateCorrelationFile(path)
+	if err == nil || !strings.Contains(err.Error(), "MEM-ASYNC-003") {
+		t.Fatalf("validateCorrelationFile error = %v, want missing MEM-ASYNC-003", err)
+	}
+}
+
+func TestValidateMemoryCorrelationRejectsV10WidenedBoundaryStatus(t *testing.T) {
+	raw := strings.Replace(validV10CorrelationMarkdown(), "| linux-x64:narrow | conservative |\n", "| linux-x64:narrow | validated_narrow |\n", 1)
+	path := writeCorrelationFixture(t, raw)
+	err := validateCorrelationFile(path)
+	if err == nil || !strings.Contains(err.Error(), "widened v10 status") {
+		t.Fatalf("validateCorrelationFile error = %v, want widened v10 status rejection", err)
+	}
+}
+
+func TestValidateMemoryCorrelationAcceptsV11DynamicProtocolRows(t *testing.T) {
+	path := writeCorrelationFixture(t, validV11CorrelationMarkdown())
+	if err := validateCorrelationFile(path); err != nil {
+		t.Fatalf("validateCorrelationFile v11 failed: %v", err)
+	}
+}
+
+func TestValidateMemoryCorrelationRejectsV11MissingWitnessRow(t *testing.T) {
+	raw := strings.Replace(validV11CorrelationMarkdown(), "| MEM-DYNPROTO-002 | static witness or conformance proof may carry borrow facts only with compiler-owned parent fact | memorymodel:dynprotoV11:witness:static_witness_parent_fact | static_witness_parent_fact_validator | static_witness_borrow_parent_validated | TestMiniMemoryModelV11DynamicProtocolWitnessCases,TestMemoryIdealV11ProjectsDynamicProtocolWitnessFacts | linux-x64:narrow | validated_narrow |\n", "", 1)
+	path := writeCorrelationFixture(t, raw)
+	err := validateCorrelationFile(path)
+	if err == nil || !strings.Contains(err.Error(), "MEM-DYNPROTO-002") {
+		t.Fatalf("validateCorrelationFile error = %v, want missing MEM-DYNPROTO-002", err)
+	}
+}
+
+func TestValidateMemoryCorrelationRejectsV11WidenedDynamicRow(t *testing.T) {
+	raw := strings.Replace(validV11CorrelationMarkdown(), "| linux-x64:narrow | conservative |\n", "| linux-x64:narrow | validated_narrow |\n", 1)
+	path := writeCorrelationFixture(t, raw)
+	err := validateCorrelationFile(path)
+	if err == nil || !strings.Contains(err.Error(), "widened v11 status") {
+		t.Fatalf("validateCorrelationFile error = %v, want widened v11 status rejection", err)
+	}
+}
+
 func TestValidateMemoryCorrelationRejectsV8MissingClaimDriftRow(t *testing.T) {
 	raw := strings.Replace(validV8CorrelationMarkdown(), "| MEM-REPORT-005 | memory release or audit docs cannot claim broad safety from conservative or rejected rows | report:v8:claim-drift | memory_claim_drift_validator | memory_claim_drift | TestValidateMemoryCorrelationRejectsV8BroadSafetyClaimDrift | all:docs | rejected |\n", "", 1)
 	path := writeCorrelationFixture(t, raw)
@@ -397,5 +447,31 @@ func validV9CorrelationMarkdown() string {
 | MEM-STORAGE-002 | trusted stack or region storage requires compiler-owned no-escape proof | allocplan:storageV9:noescape:trusted_storage_requires_no_escape_proof | storage_no_escape_proof_validator | trusted_storage_requires_no_escape_proof | TestVerifyPlanRejectsTrustedStorageWithoutNoEscapeProof | linux-x64:narrow | validated_narrow |
 | MEM-STORAGE-003 | heap or conservative fallback preserves source_fact_id and reason | allocplan:storageV9:fallback:heap_fallback_reason_preserved | heap_fallback_reason_validator | heap_fallback_reason_preserved | TestFromPLIRAndAllocPlanRejectsHeapFallbackWithoutReason,TestValidateMemoryReportRejectsHeapFallbackWithoutReason | linux-x64:narrow | validated_narrow |
 | MEM-STORAGE-004 | async task actor FFI or unknown-call escape keeps storage conservative | allocplan:storageV9:boundary:boundary_storage_conservative | boundary_storage_conservative_validator | boundary_storage_conservative | TestVerifyPlanRejectsEscapedActualTrustedLowering,TestMiniMemoryModelV9StorageCases | linux-x64:narrow | conservative |
+`
+}
+
+func validV10CorrelationMarkdown() string {
+	return `# Memory Ideal Vertical Slice v10 Async Cancellation Correlation
+
+| requirement_id | claim | source_fact_id | validator | report_row | negative_test | target_level | status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| MEM-ASYNC-001 | borrowed value may be used only before suspension when proven local and non-escaping | memorymodel:asyncV10:preawait:local_borrow_before_suspension | pre_await_local_borrow_validator | pre_await_local_borrow_validated | TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases | linux-x64:narrow | validated_narrow |
+| MEM-ASYNC-002 | borrowed value crossing await or suspend remains conservative or rejected | memorymodel:asyncV10:postawait:borrow_after_suspension_conservative | post_await_borrow_conservative_validator | post_await_borrow_conservative | TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases | linux-x64:narrow | conservative |
+| MEM-ASYNC-003 | cancellation path invalidates borrowed task-owned lifetime assumptions | memorymodel:asyncV10:cancel:borrow_lifetime_invalidated | cancellation_lifetime_invalidation_validator | cancellation_borrow_lifetime_invalidated | TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases | linux-x64:narrow | rejected |
+| MEM-ASYNC-004 | task group structured concurrency boundary cannot validate broad noalias | memorymodel:asyncV10:taskgroup:task_group_noalias_conservative | task_group_boundary_conservative_validator | task_group_noalias_conservative | TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases,TestValidateMemoryReportRejectsBroadNoAliasClaim | linux-x64:narrow | conservative |
+| MEM-ASYNC-005 | actor reentrant callback boundary keeps borrow and storage conservative unless separately proven | memorymodel:asyncV10:actor:actor_reentrant_callback_conservative | actor_reentrant_callback_boundary_validator | actor_reentrant_callback_conservative | TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases | linux-x64:narrow | conservative |
+`
+}
+
+func validV11CorrelationMarkdown() string {
+	return `# Memory Ideal Vertical Slice v11 Dynamic Protocol Correlation
+
+| requirement_id | claim | source_fact_id | validator | report_row | negative_test | target_level | status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| MEM-DYNPROTO-001 | dynamic existential or protocol borrow carriers remain conservative unless statically resolved | memorymodel:dynprotoV11:dynamic:existential_borrow_conservative | dynamic_existential_borrow_conservative_validator | dynamic_existential_borrow_conservative | TestMiniMemoryModelV11DynamicProtocolWitnessCases,TestMemoryIdealV11ProjectsDynamicProtocolWitnessFacts | linux-x64:narrow | conservative |
+| MEM-DYNPROTO-002 | static witness or conformance proof may carry borrow facts only with compiler-owned parent fact | memorymodel:dynprotoV11:witness:static_witness_parent_fact | static_witness_parent_fact_validator | static_witness_borrow_parent_validated | TestMiniMemoryModelV11DynamicProtocolWitnessCases,TestMemoryIdealV11ProjectsDynamicProtocolWitnessFacts | linux-x64:narrow | validated_narrow |
+| MEM-DYNPROTO-003 | dynamic protocol dispatch cannot validate broad noalias | memorymodel:dynprotoV11:dispatch:dynamic_protocol_noalias_rejected | dynamic_protocol_noalias_rejection_validator | dynamic_protocol_noalias_rejected | TestMiniMemoryModelV11DynamicProtocolWitnessCases,TestValidateMemoryReportRejectsBroadNoAliasClaim | linux-x64:narrow | rejected |
+| MEM-DYNPROTO-004 | witness or conformance table lookup cannot promote unsafe dynamic unknown provenance to safe_known | memorymodel:dynprotoV11:witness:witness_provenance_promotion_rejected | witness_provenance_promotion_validator | witness_provenance_promotion_rejected | TestMiniMemoryModelV11DynamicProtocolWitnessCases,TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown | linux-x64:narrow | rejected |
+| MEM-DYNPROTO-005 | protocol or existential dispatch report rows preserve source_fact_id cost_class and normal_build_check | report:v11:dynproto:protocol_dispatch_report_integrity | protocol_dispatch_report_integrity_validator | protocol_dispatch_report_integrity | TestMemoryIdealV11ProjectsDynamicProtocolWitnessFacts,TestValidateReportProjectionRejectsAlteredCostClass,TestValidateReportProjectionRejectsDroppedNormalBuildCheck | linux-x64:narrow | validated_narrow |
 `
 }

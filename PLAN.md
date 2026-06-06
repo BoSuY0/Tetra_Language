@@ -1,49 +1,44 @@
-# Tetra Surface Release Promotion v1 Execution Plan
+# MEM-RELEASE-013 Execution Plan
 
-Canonical plan:
+Canonical goal: `GOAL.md`
+Workflow directory: `.workflow/memory-release-v13/`
 
-- `/home/tetra/Downloads/tetra_surface_release_promotion_v1_full_plan.md`
+## Goal
 
-Operational rules:
+Produce a release-grade memory evidence freeze for v0-v12 and classify the
+dirty worktree blocker without destructive cleanup or widened safety claims.
 
-- Work one vertical slice at a time.
-- Use Graphify MCP before architecture/code navigation.
-- Inspect concrete files before editing.
-- Prefer TDD for feature and bugfix work when practical.
-- Verify before marking any section complete.
+## Current Strategy
 
-## Section Status
+Treat v13 as an evidence/triage slice. First freeze `git status --short`, then
+classify every entry, then regenerate v13 fuzz evidence and run the existing
+memory/report/docs gates from the frozen state. Preserve v12 as accepted
+`validated_narrow`, but keep clean-release blocked until status is clean or
+every dirty entry has explicit triage.
 
-- [x] Sections 1-12: release contract, release evidence slices, schemas,
-  validators, and release-gate scaffolding.
-- [x] Section 13: Safe View Lifetime integration.
-- [x] Section 14: Feature registry promotion.
-- [x] Section 15: Docs promotion.
-- [x] Section 16: API docs and stdlib stability.
-- [x] Section 17: CI integration.
-- [x] Section 18: Release examples.
-- [x] Section 19: Negative anti-fake tests.
-- [x] Section 20: Final release audit artifact.
-- [x] Section 21+: final command matrix, failure modes, completion checklist,
-  and goal closeout from the plan.
+## Phases
 
-## Current Section: Complete
+- [x] Inspect active goal state, `GOAL.md`, `AGENTS.md`, current dirty status,
+  and Graphify memory/release context.
+- [x] Compile user-provided v13 requirements into `GOAL.md`.
+- [x] Capture `git status --short` into
+  `reports/memory-release-v13/git-status-short.txt`.
+- [x] Classify every status entry in `reports/memory-release-v13/triage.md`.
+- [x] Build `reports/memory-release-v13/evidence-packet.md` for v0-v12.
+- [x] Regenerate and validate `reports/memory-fuzz-short/v13/`.
+- [x] Add release-summary lint evidence for broad-claim rejection.
+- [x] Run correlation, docs/manifest, broad, CI, hygiene, and Graphify gates.
+- [x] Write `.workflow/memory-release-v13/final-report.md`.
+- [x] Complete only when every `GOAL.md done_when` item has evidence.
 
-Acceptance targets from the plan:
+## Open Decisions
 
-- All Definition of Done items have current evidence.
-- Final release gate, experimental regression gate, safe-view lifetime gate,
-  focused/broad tests, docs/manifest/API checks, release-state validator,
-  hygiene checks, Graphify update, and final dumps passed.
-- Dirty worktree status and the Section 22 broad-test repair are recorded
-  without reverting unrelated work.
+- None for product intent. Stop and ask only if v13 requires destructive
+  cleanup, broad fuzz runtime, target parity, arbitrary unsafe proof, long
+  nightly run as mandatory Tier 1, or automatic resolution of unrelated dirty
+  files.
 
-Immediate checklist:
+## Current Iteration
 
-- [x] Inspect current DoD items and derive a command/evidence matrix.
-- [x] Run final gates into `/tmp/tetra-surface-release-v1-current`,
-  `/tmp/tetra-surface-experimental-regression-current`, and
-  `/tmp/tetra-safe-view-lifetime-surface-release-current`.
-- [x] Run docs, manifest, API, release-state, hygiene, Graphify, and final dump commands.
-- [x] Run broad tests and repair the safety/no-wrapper blocker with focused
-  evidence before rerunning the broad matrix.
+- Completion audit passed against every `GOAL.md done_when` item. Ready to mark
+  the active goal complete.

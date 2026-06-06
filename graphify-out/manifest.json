@@ -544,12 +544,12 @@
     "hash": "e80c817d443737651987dd59a7fe12c9"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/memory_fuzz_oracle_v1_test.go": {
-    "mtime": 1780547648.0678332,
-    "hash": "b31c6f9f4812ee65c04cc23e675ed6b8"
+    "mtime": 1780740919.9076371,
+    "hash": "24a80525183087825c721dcf058bafea"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/memory_fuzz_oracle_v1.go": {
-    "mtime": 1780547999.7384346,
-    "hash": "5c8e3f2998040895561e3be50847b6c2"
+    "mtime": 1780740919.9088502,
+    "hash": "cbba197dc0ea285cf3de2e7eb9adb538"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/actorsrt/windows_x64_emit.go": {
     "mtime": 1777411400.5509486,
@@ -1676,8 +1676,8 @@
     "hash": "86224c9e80375ee35d574c4349f92139"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memoryfacts/report_test.go": {
-    "mtime": 1780701775.4373639,
-    "hash": "81ccecbd91b13931dc6398bf8e465fae"
+    "mtime": 1780736597.080484,
+    "hash": "1e23556c6b3169bf0cdd118a482974f3"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memoryfacts/doc.go": {
     "mtime": 1780522184.9674864,
@@ -1692,20 +1692,20 @@
     "hash": "a8e197bdf63efd00d2221530f9dd3906"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memoryfacts/validate.go": {
-    "mtime": 1780701978.4048243,
-    "hash": "1fbd333446cb289d9be63211d3d8476c"
+    "mtime": 1780736480.8521128,
+    "hash": "db783c73b7d38913c5fade73236c8a9b"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memoryfacts/report.go": {
-    "mtime": 1780701964.8761265,
-    "hash": "40a5edd4475254f4e5e3e143f4b52afc"
+    "mtime": 1780736615.37807,
+    "hash": "e7c733475a7795b3f41ae31c815d3cbc"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memoryfacts/from_plir.go": {
-    "mtime": 1780701958.8352613,
-    "hash": "2f3296c390c050ad9e6c11910e79a349"
+    "mtime": 1780736457.1986477,
+    "hash": "c8831c9b74a3841b9ec492566e817d01"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memoryfacts/from_plir_test.go": {
-    "mtime": 1780701767.8595335,
-    "hash": "66a526443e2112703bfe84672a0a5ab8"
+    "mtime": 1780736204.8931441,
+    "hash": "7f1eb4f080f60b0441d3d45e97dac3e4"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memoryfacts/from_validation_test.go": {
     "mtime": 1780687793.1207979,
@@ -1716,12 +1716,12 @@
     "hash": "e6c9e7fe825e3279e4dc57380662b9aa"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memorymodel/mini.go": {
-    "mtime": 1780702022.0958488,
-    "hash": "4be7c42fb3dbb5b355c91dd311900c6c"
+    "mtime": 1780736495.3587847,
+    "hash": "7e5e5014566762559f1b2fd489115034"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/internal/memorymodel/mini_test.go": {
-    "mtime": 1780701830.217137,
-    "hash": "c80437bf787da4ec23f672e126ebcb8e"
+    "mtime": 1780736204.8903544,
+    "hash": "178aa70a7a0dbca6de576b5a3f8b364e"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/compiler/actorwire/frame.go": {
     "mtime": 1779312023.9428103,
@@ -2864,28 +2864,28 @@
     "hash": "b1860d4874a29ecf683181a09bd5fe4a"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/memory-fuzz-short/main_test.go": {
-    "mtime": 1780547648.068833,
-    "hash": "03e3ecda8e45c92c5d585c0658414b33"
+    "mtime": 1780740657.8795145,
+    "hash": "6e0dc3be5ca24d6317e6bf35043e2869"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/memory-fuzz-short/main.go": {
-    "mtime": 1780548012.5571601,
-    "hash": "4343719d3a24077279be7dd5a0c059b1"
+    "mtime": 1780740914.7999613,
+    "hash": "da64b8d08fd7db9bfd928d1a97d5f3c7"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-memory-fuzz-oracle/main_test.go": {
-    "mtime": 1780547648.068833,
-    "hash": "871f2c6f63d6c620f3bd8c565ed202ff"
+    "mtime": 1780740657.8795145,
+    "hash": "1016b11f43e7b44f0f5e37b569baf70b"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-memory-fuzz-oracle/main.go": {
     "mtime": 1780547878.6430125,
     "hash": "3c8ecac6f36370832ef756334849f041"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-memory-correlation/main_test.go": {
-    "mtime": 1780701803.9557252,
-    "hash": "e20d4fcfbe5501c462b220a2478046e6"
+    "mtime": 1780736204.8893545,
+    "hash": "8f66011ae8034f8bc2ba306887bc54df"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/cmd/validate-memory-correlation/main.go": {
-    "mtime": 1780702016.5879717,
-    "hash": "c0edb2db965326e8ae01844194036cde"
+    "mtime": 1780736383.6763105,
+    "hash": "d7bc536241279ac6903e30c4363c3077"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/tools/scriptstest/api_diff_report_test.go": {
     "mtime": 1779693463.0447206,
@@ -19275,10 +19275,6 @@
     "mtime": 1777273980.867326,
     "hash": "657294452403496584f5f2a2a6ab8c6e"
   },
-  "/home/tetra/Desktop/Projects/Tetra_Language/README.md": {
-    "mtime": 1780332662.1561158,
-    "hash": "268e991da9027122fda48a716c187ef9"
-  },
   "/home/tetra/Desktop/Projects/Tetra_Language/TetraProjects_Bugs.md": {
     "mtime": 1779257357.296485,
     "hash": "5a1d9be9bdcabac48927714dd6b15593"
@@ -19295,29 +19291,33 @@
     "mtime": 1780393950.1585567,
     "hash": "778882abf33802f1af221dbd4b8d28af"
   },
-  "/home/tetra/Desktop/Projects/Tetra_Language/PLAN.md": {
-    "mtime": 1780562818.0565848,
-    "hash": "4a4c903e512daea23f7c9347147c25f8"
-  },
-  "/home/tetra/Desktop/Projects/Tetra_Language/ATTEMPTS.md": {
-    "mtime": 1780517889.400881,
-    "hash": "ffd538c0c03a292dfd799b17717097a4"
-  },
-  "/home/tetra/Desktop/Projects/Tetra_Language/NOTES.md": {
-    "mtime": 1780517821.009506,
-    "hash": "f7bbbc7833325629fd159bb03d21feb8"
-  },
-  "/home/tetra/Desktop/Projects/Tetra_Language/CONTROL.md": {
-    "mtime": 1780517829.378307,
-    "hash": "eb0331c9233d56ef8fc6910d3f07e234"
-  },
   "/home/tetra/Desktop/Projects/Tetra_Language/Tetra_Analyz_Compilier-Verify.md": {
     "mtime": 1780520446.107138,
     "hash": "73649b8c7b806937e546be7f5e1ba235"
   },
+  "/home/tetra/Desktop/Projects/Tetra_Language/README.md": {
+    "mtime": 1780756330.1749897,
+    "hash": "a035b2512a8c6b3e0cee509e3e714bee"
+  },
   "/home/tetra/Desktop/Projects/Tetra_Language/GOAL.md": {
-    "mtime": 1780702093.1032643,
-    "hash": "a3c677358ab53c3f2fc66092686bb442"
+    "mtime": 1780756644.9199958,
+    "hash": "9839d4fd838cc44b0b0561d09018243f"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/PLAN.md": {
+    "mtime": 1780756606.781833,
+    "hash": "0b6666212b7f7137e42d7673f8eaf8d4"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/ATTEMPTS.md": {
+    "mtime": 1780756644.9189959,
+    "hash": "130f44e65a5aa809e39f3178ceed69db"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/NOTES.md": {
+    "mtime": 1780755729.066492,
+    "hash": "d732e5685c9a47f6513b7a57e19461b1"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/CONTROL.md": {
+    "mtime": 1780755729.066492,
+    "hash": "a3159325de4d62f86a2699147733a748"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/cli/internal/README.md": {
     "mtime": 1779257357.3034847,
@@ -19700,8 +19700,8 @@
     "hash": "9648563b88c140a47edd2fd484f632bf"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/spec/memory_report_schema_v1.md": {
-    "mtime": 1780702164.4566734,
-    "hash": "51597292d863caeda0da827410e67d91"
+    "mtime": 1780736794.9128737,
+    "hash": "7a1e312c5139d638d4a0ac457fad2617"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/contributing/compiler_and_release_guide.md": {
     "mtime": 1779257357.3164845,
@@ -20136,8 +20136,8 @@
     "hash": "bc25c7652912905f0bd9b6679410d861"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/testing/fuzz_property_stress.md": {
-    "mtime": 1780547991.1526182,
-    "hash": "456811d67320cd460513af5818eed682"
+    "mtime": 1780741043.4221513,
+    "hash": "fa3816b721aab59a49517919699152dc"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/user/async_actors_guide.md": {
     "mtime": 1780396495.9045622,
@@ -20424,8 +20424,8 @@
     "hash": "d75040340378cd81133378b3ed26a351"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/audits/memory-fuzz-oracle-v1.md": {
-    "mtime": 1780547991.1496181,
-    "hash": "f39dae84461a035cdd69becbe9e63046"
+    "mtime": 1780741043.4211514,
+    "hash": "434eb473f53aee646d6fd987e3d28e21"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/audits/memory-production-core-v1-final.md": {
     "mtime": 1780551337.7436795,
@@ -20523,6 +20523,22 @@
     "mtime": 1780702155.9548628,
     "hash": "9df457dec8f85a5d4e6558256d3997f7"
   },
+  "/home/tetra/Desktop/Projects/Tetra_Language/docs/audits/memory-ideal-vslice-v10-async-cancel-correlation.md": {
+    "mtime": 1780706593.0784726,
+    "hash": "94f8774b70712f69bd314f01cf04c516"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/docs/audits/memory-ideal-vslice-v10-async-cancel-final.md": {
+    "mtime": 1780706559.0422897,
+    "hash": "9a332455deeb59067c5c56fc5edf7824"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/docs/audits/memory-ideal-vslice-v11-dynproto-correlation.md": {
+    "mtime": 1780736773.0085053,
+    "hash": "af57d6d91036ddf5cf38423230a3b78d"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/docs/audits/memory-ideal-vslice-v11-dynproto-final.md": {
+    "mtime": 1780737233.706087,
+    "hash": "19a309f0f6d4e6e632231e3799ad203c"
+  },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/superpowers/plans/2026-05-06-full-first-class-callables-fat-handle.md": {
     "mtime": 1780562517.5074835,
     "hash": "1176d1b04435e621aaadff91cb1a0108"
@@ -20588,8 +20604,8 @@
     "hash": "908f38f0be1f3bfc84fba0d90f7af321"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/design/memory_production_core_v1.md": {
-    "mtime": 1780702177.0683923,
-    "hash": "c84390109a53c2e22438cc52de29f1a0"
+    "mtime": 1780736813.9985783,
+    "hash": "d89f5f9e7ffdfb807293ecb8e385c6ea"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/docs/design/memory_cost_model.md": {
     "mtime": 1780546319.0452764,
@@ -31523,6 +31539,30 @@
     "mtime": 1780548150.995182,
     "hash": "8fa0c743c97239c7b82bcf54fa9f9834"
   },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/memory-fuzz-short/v12/summary.md": {
+    "mtime": 1780740974.370662,
+    "hash": "faf97058aaadbe13486d36baf3457d4e"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/memory-fuzz-short/v13/summary.md": {
+    "mtime": 1780756096.4862282,
+    "hash": "b601cf72e67a1c76e4573e4095620294"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/memory-release-v13/git-status-short.txt": {
+    "mtime": 1780756613.5036855,
+    "hash": "c6641896f28f02231713a39ac9ebab25"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/memory-release-v13/triage.md": {
+    "mtime": 1780756644.9189959,
+    "hash": "4b925e3cebeaa9e314045c6d256943a9"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/memory-release-v13/evidence-packet.md": {
+    "mtime": 1780756080.053597,
+    "hash": "28c94a695838338f402950f891077db2"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/reports/memory-release-v13/release-summary-lint.md": {
+    "mtime": 1780756080.054597,
+    "hash": "7e33fa46ed8e656aa02bbbc928a9d65f"
+  },
   "/home/tetra/Desktop/Projects/Tetra_Language/benchmarks/techempower/tetra/README.md": {
     "mtime": 1779699400.8105705,
     "hash": "3f8d849a02edbf4304e792a03c407986"
@@ -31535,17 +31575,21 @@
     "mtime": 1780492742.2351696,
     "hash": "d88192e68b79c39f8b6559941804f328"
   },
-  "/home/tetra/Desktop/Projects/Tetra_Language/dumps/tetra_language_dump_20260605_230838Z_part_001.md": {
-    "mtime": 1780700919.3755565,
-    "hash": "be543e9f21307278f63b57a9756ffe43"
+  "/home/tetra/Desktop/Projects/Tetra_Language/dumps/tetra_language_dump_20260606_103038Z_part_001.md": {
+    "mtime": 1780741839.0215497,
+    "hash": "255fe40a9ef88294c6a31490b867e35e"
   },
-  "/home/tetra/Desktop/Projects/Tetra_Language/dumps/tetra_language_dump_20260605_230838Z_part_002.md": {
-    "mtime": 1780700919.3795564,
-    "hash": "4f424d025ec1d1512188fdd11fe2bb55"
+  "/home/tetra/Desktop/Projects/Tetra_Language/dumps/tetra_language_dump_20260606_103038Z_part_002.md": {
+    "mtime": 1780741839.0255497,
+    "hash": "f9ea46952400c73aa0b415afa7f9e296"
   },
-  "/home/tetra/Desktop/Projects/Tetra_Language/dumps/tetra_language_dump_20260605_230838Z_part_003.md": {
-    "mtime": 1780700919.3825564,
-    "hash": "0a377c394c3206789f0a4b0ba3369a34"
+  "/home/tetra/Desktop/Projects/Tetra_Language/dumps/tetra_language_dump_20260606_103038Z_part_003.md": {
+    "mtime": 1780741839.0305495,
+    "hash": "80af8c074d6e1b7a56abcdd8e6fc496a"
+  },
+  "/home/tetra/Desktop/Projects/Tetra_Language/docs/assets/readme/tetra-language-hero.svg": {
+    "mtime": 1780704710.372749,
+    "hash": "89307f4c71774a781d347df46f936663"
   },
   "/home/tetra/Desktop/Projects/Tetra_Language/reports/stabilization/profiles/native-scram-perf-record-flamegraph.svg": {
     "mtime": 1779638445.5173326,

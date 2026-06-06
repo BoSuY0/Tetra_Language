@@ -294,6 +294,14 @@ func validateReportRow(index int, row ReportRow) []string {
 	if row.CostClass == CostDynamicCheckRequired && !row.NormalBuildCheck {
 		issues = append(issues, prefix+": dynamic_check_required requires normal_build_check")
 	}
+	if row.Claim == "protocol_dispatch_report_integrity" {
+		if row.CostClass != CostDynamicCheckRequired {
+			issues = append(issues, prefix+": protocol_dispatch_report_integrity requires cost_class dynamic_check_required")
+		}
+		if !row.NormalBuildCheck {
+			issues = append(issues, prefix+": protocol_dispatch_report_integrity requires normal_build_check")
+		}
+	}
 	if row.ClaimLevel == ClaimValidated && row.ValidatorStatus != ValidatorPass {
 		issues = append(issues, prefix+": validated claim requires validator_status pass")
 	}

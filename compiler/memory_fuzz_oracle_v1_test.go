@@ -151,6 +151,157 @@ func TestValidateMemoryFuzzOracleReportRejectsDrift(t *testing.T) {
 	}
 }
 
+func TestMemoryFuzzOracleReportCoversV12ReleaseEvidence(t *testing.T) {
+	report, err := BuildMemoryFuzzOracleReport()
+	if err != nil {
+		t.Fatalf("BuildMemoryFuzzOracleReport: %v", err)
+	}
+	if err := ValidateMemoryFuzzOracleReport(report); err != nil {
+		t.Fatalf("ValidateMemoryFuzzOracleReport: %v", err)
+	}
+
+	requirements := map[MemoryFuzzRequirementID]MemoryFuzzRequirementRow{}
+	for _, row := range report.Requirements {
+		requirements[row.ID] = row
+		if row.Status == "" || len(row.Evidence) == 0 || len(row.Tests) == 0 || len(row.Boundaries) == 0 {
+			t.Fatalf("requirement %s missing release evidence: %#v", row.ID, row)
+		}
+	}
+	wantRequirementStatuses := map[MemoryFuzzRequirementID]string{
+		MemoryFuzzRequirementTier1V0V11Coverage:         "validated_narrow",
+		MemoryFuzzRequirementCrashMiscompileArtifacts:   "validated_narrow",
+		MemoryFuzzRequirementBlockingMemoryFailures:     "release_blocking",
+		MemoryFuzzRequirementTier2NightlySeedTriage:     "boundary_recorded",
+		MemoryFuzzRequirementTier3ReleasePassOrClassify: "release_blocking",
+	}
+	for _, id := range memoryFuzzRequirementIDs() {
+		row, ok := requirements[id]
+		if !ok {
+			t.Fatalf("missing requirement %s: %#v", id, report.Requirements)
+		}
+		if row.Status != wantRequirementStatuses[id] {
+			t.Fatalf("requirement %s status = %q, want %q", id, row.Status, wantRequirementStatuses[id])
+		}
+	}
+
+	coverage := map[string]MemoryFuzzSliceCoverageRow{}
+	for _, row := range report.SliceCoverage {
+		coverage[row.SliceID] = row
+		if row.Status != "covered" || len(row.Surface) == 0 || len(row.OracleCategories) == 0 || len(row.Invariants) == 0 || len(row.Evidence) == 0 || len(row.Tests) == 0 || len(row.Boundaries) == 0 {
+			t.Fatalf("slice coverage %s incomplete: %#v", row.SliceID, row)
+		}
+	}
+	for _, sliceID := range []string{"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"} {
+		if _, ok := coverage[sliceID]; !ok {
+			t.Fatalf("missing deterministic Tier 1 slice coverage %s: %#v", sliceID, report.SliceCoverage)
+		}
+	}
+
+	for _, kind := range []string{"compiler_crash_reproducer", "miscompile_reducer", "miscompile_reproducer"} {
+		if !memoryFuzzHasArtifactKind(report.Artifacts, kind) {
+			t.Fatalf("missing required artifact kind %q: %#v", kind, report.Artifacts)
+		}
+	}
+
+	blocking := map[MemoryFuzzBlockingCaseID]MemoryFuzzBlockingCaseRow{}
+	for _, row := range report.BlockingCases {
+		blocking[row.ID] = row
+		if row.Status != "blocks_release" || !row.BlocksRelease || len(row.Evidence) == 0 || len(row.Tests) == 0 || len(row.Boundaries) == 0 {
+			t.Fatalf("blocking case %s incomplete: %#v", row.ID, row)
+		}
+	}
+	for _, id := range memoryFuzzBlockingCaseIDs() {
+		if _, ok := blocking[id]; !ok {
+			t.Fatalf("missing blocking case %s: %#v", id, report.BlockingCases)
+		}
+	}
+
+	policies := map[MemoryFuzzTier]MemoryFuzzTierPolicyRow{}
+	for _, row := range report.TierPolicies {
+		policies[row.Tier] = row
+	}
+	tier2 := policies[MemoryFuzzTier2Nightly]
+	if tier2.Status != "boundary_recorded" || !tier2.SeedsPreserved || !tier2.UnstableTriageRequired || !tier2.MinimizedReproducerRequired {
+		t.Fatalf("Tier 2 policy incomplete: %#v", tier2)
+	}
+	tier3 := policies[MemoryFuzzTier3ReleaseFocused]
+	if tier3.Status != "release_blocking" || !tier3.ReleasePromotionBlockedUntilClassified || !tier3.MinimizedReproducerRequired {
+		t.Fatalf("Tier 3 policy incomplete: %#v", tier3)
+	}
+}
+
+func TestValidateMemoryFuzzOracleReportRejectsV12ReleaseEvidenceDrift(t *testing.T) {
+	base, err := BuildMemoryFuzzOracleReport()
+	if err != nil {
+		t.Fatalf("BuildMemoryFuzzOracleReport: %v", err)
+	}
+	tests := []struct {
+		name   string
+		mutate func(*MemoryFuzzOracleReport)
+		want   string
+	}{
+		{
+			name: "missing requirement",
+			mutate: func(report *MemoryFuzzOracleReport) {
+				report.Requirements = report.Requirements[1:]
+			},
+			want: "missing requirement MEM-FUZZ-001",
+		},
+		{
+			name: "missing v11 slice coverage",
+			mutate: func(report *MemoryFuzzOracleReport) {
+				report.SliceCoverage = removeMemoryFuzzSliceCoverage(report.SliceCoverage, "v11")
+			},
+			want: "missing slice coverage v11",
+		},
+		{
+			name: "compiler crash reproducer missing",
+			mutate: func(report *MemoryFuzzOracleReport) {
+				report.Artifacts = removeMemoryFuzzArtifactKind(report.Artifacts, "compiler_crash_reproducer")
+			},
+			want: "compiler_crash_reproducer",
+		},
+		{
+			name: "miscompile reducer missing",
+			mutate: func(report *MemoryFuzzOracleReport) {
+				report.Artifacts = removeMemoryFuzzArtifactKind(report.Artifacts, "miscompile_reducer")
+			},
+			want: "miscompile_reducer",
+		},
+		{
+			name: "unsafe optimized as safe does not block",
+			mutate: func(report *MemoryFuzzOracleReport) {
+				report.BlockingCase(MemoryFuzzBlockingUnsafeUnknownOptimizedAsSafe).BlocksRelease = false
+			},
+			want: "blocks_release",
+		},
+		{
+			name: "tier 2 seed preservation dropped",
+			mutate: func(report *MemoryFuzzOracleReport) {
+				report.TierPolicy(MemoryFuzzTier2Nightly).SeedsPreserved = false
+			},
+			want: "Tier 2 nightly fuzz seed preservation",
+		},
+		{
+			name: "tier 3 release classification dropped",
+			mutate: func(report *MemoryFuzzOracleReport) {
+				report.TierPolicy(MemoryFuzzTier3ReleaseFocused).ReleasePromotionBlockedUntilClassified = false
+			},
+			want: "Tier 3 release-blocking memory fuzz",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			report := cloneMemoryFuzzOracleReport(base)
+			tc.mutate(&report)
+			err := ValidateMemoryFuzzOracleReport(report)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ValidateMemoryFuzzOracleReport error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func assertMemoryFuzzOracleRow(t *testing.T, row MemoryFuzzOracleRow, wantResult MemoryFuzzOracleResult, wants []string) {
 	t.Helper()
 	if row.ExpectedResult != wantResult {
@@ -162,4 +313,33 @@ func assertMemoryFuzzOracleRow(t *testing.T, row MemoryFuzzOracleRow, wantResult
 			t.Fatalf("row %s missing %q: %#v", row.Category, want, row)
 		}
 	}
+}
+
+func memoryFuzzHasArtifactKind(artifacts []MemoryFuzzArtifact, kind string) bool {
+	for _, artifact := range artifacts {
+		if artifact.Kind == kind && artifact.Required {
+			return true
+		}
+	}
+	return false
+}
+
+func removeMemoryFuzzArtifactKind(artifacts []MemoryFuzzArtifact, kind string) []MemoryFuzzArtifact {
+	var kept []MemoryFuzzArtifact
+	for _, artifact := range artifacts {
+		if artifact.Kind != kind {
+			kept = append(kept, artifact)
+		}
+	}
+	return kept
+}
+
+func removeMemoryFuzzSliceCoverage(rows []MemoryFuzzSliceCoverageRow, sliceID string) []MemoryFuzzSliceCoverageRow {
+	var kept []MemoryFuzzSliceCoverageRow
+	for _, row := range rows {
+		if row.SliceID != sliceID {
+			kept = append(kept, row)
+		}
+	}
+	return kept
 }

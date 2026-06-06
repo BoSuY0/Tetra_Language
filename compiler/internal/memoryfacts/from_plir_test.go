@@ -753,6 +753,211 @@ func TestMemoryIdealV4UnknownTaskActorTargetDoesNotEmitTrustedBoundaryFacts(t *t
 	}
 }
 
+func TestMemoryIdealV10ProjectsAsyncCancellationBoundaryFacts(t *testing.T) {
+	prog := &plir.Program{Funcs: []plir.Function{{
+		Name: "borrowCarrierV10",
+		Values: []plir.Value{
+			{
+				ID:         "view:pre.await",
+				Kind:       plir.ValueView,
+				Type:       "[]u8",
+				Source:     "test.tetra:5:17",
+				Region:     "fn:borrowCarrierV10",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "derived:xs.pre_await"},
+				Lifetime:   plir.Lifetime{Birth: "test.tetra:5:17", Death: "before_await", Owner: "xs.pre_await"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeNoEscape,
+			},
+			{
+				ID:         "view:post.await",
+				Kind:       plir.ValueView,
+				Type:       "[]u8",
+				Source:     "test.tetra:9:17",
+				Region:     "fn:borrowCarrierV10",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "derived:ys.post_await"},
+				Lifetime:   plir.Lifetime{Birth: "test.tetra:9:17", Death: "after_await", Owner: "ys.post_await"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeConservative,
+			},
+			{
+				ID:         "view:cancel",
+				Kind:       plir.ValueView,
+				Type:       "[]u8",
+				Source:     "test.tetra:13:17",
+				Region:     "fn:borrowCarrierV10",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "derived:task_owned.cancel"},
+				Lifetime:   plir.Lifetime{Birth: "test.tetra:13:17", Death: "cancel", Owner: "task_owned.cancel"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeTask,
+			},
+			{
+				ID:         "param:task_group_dst",
+				Kind:       plir.ValueParam,
+				Type:       "[]u8",
+				Source:     "test.tetra:17:13",
+				Region:     "fn:borrowCarrierV10",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "task_group_dst"},
+				Lifetime:   plir.Lifetime{Birth: "entry", Death: "return", Owner: "task_group_dst"},
+				Borrow:     plir.BorrowMut,
+				Escape:     plir.EscapeNoEscape,
+			},
+			{
+				ID:         "view:actor.reentrant",
+				Kind:       plir.ValueView,
+				Type:       "[]u8",
+				Source:     "test.tetra:21:17",
+				Region:     "fn:borrowCarrierV10",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "derived:actor_state.reentrant_callback"},
+				Lifetime:   plir.Lifetime{Birth: "test.tetra:21:17", Death: "actor_reentrant_callback", Owner: "actor_state.reentrant_callback"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeActor,
+			},
+		},
+		Ops: []plir.Operation{
+			{ID: "op_pre_await", Kind: plir.OpCall, Source: "test.tetra:5:17", Inputs: []string{"xs"}, Outputs: []string{"view:pre.await"}, Note: "pre-await local borrow before suspension has compiler-owned no-escape proof"},
+			{ID: "op_post_await", Kind: plir.OpCall, Source: "test.tetra:9:17", Inputs: []string{"ys"}, Outputs: []string{"view:post.await"}, Note: "borrow used after await suspension remains conservative"},
+			{ID: "op_cancel", Kind: plir.OpCall, Source: "test.tetra:13:17", Inputs: []string{"task_owned"}, Outputs: []string{"view:cancel"}, Note: "cancellation path invalidates task-owned borrowed lifetime"},
+			{ID: "op_actor_reentrant", Kind: plir.OpCall, Source: "test.tetra:21:17", Inputs: []string{"actor_state"}, Outputs: []string{"view:actor.reentrant"}, Note: "actor reentrant callback captures borrowed state and remains conservative"},
+		},
+		Facts: []plir.Fact{
+			{ID: "f_pre_await_borrow", Kind: plir.FactBorrowedImm, ValueID: "view:pre.await", Source: "test.tetra:5:17", Reason: "pre-await local borrow before suspension no_escape_proof"},
+			{ID: "f_post_await_borrow", Kind: plir.FactBorrowedImm, ValueID: "view:post.await", Source: "test.tetra:9:17", Reason: "borrow used after await suspension"},
+			{ID: "f_cancel_borrow", Kind: plir.FactBorrowedImm, ValueID: "view:cancel", Source: "test.tetra:13:17", Reason: "cancellation path invalidates task-owned borrowed lifetime"},
+			{ID: "f_task_group_noalias", Kind: plir.FactNoAlias, ValueID: "param:task_group_dst", Source: "test.tetra:17:13", Reason: "task group structured concurrency boundary cannot validate broad noalias"},
+			{ID: "f_actor_reentrant_borrow", Kind: plir.FactBorrowedImm, ValueID: "view:actor.reentrant", Source: "test.tetra:21:17", Reason: "actor reentrant callback captures borrowed state"},
+		},
+	}}}
+
+	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	if err != nil {
+		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+	}
+	report := BuildReportFromGraph(graph)
+	for _, tc := range []struct {
+		claim     string
+		validator string
+		level     ClaimLevel
+		cost      CostClass
+	}{
+		{claim: "pre_await_local_borrow_validated", validator: "pre_await_local_borrow_validator", level: ClaimValidated, cost: CostZeroCostProven},
+		{claim: "post_await_borrow_conservative", validator: "post_await_borrow_conservative_validator", level: ClaimConservative, cost: CostConservativeFallback},
+		{claim: "cancellation_borrow_lifetime_invalidated", validator: "cancellation_lifetime_invalidation_validator", level: ClaimRejected, cost: CostUnsupportedRejected},
+		{claim: "task_group_noalias_conservative", validator: "task_group_boundary_conservative_validator", level: ClaimConservative, cost: CostConservativeFallback},
+		{claim: "actor_reentrant_callback_conservative", validator: "actor_reentrant_callback_boundary_validator", level: ClaimConservative, cost: CostConservativeFallback},
+	} {
+		row, ok := reportRowByClaim(report, tc.claim)
+		if !ok {
+			t.Fatalf("memory report missing claim %q:\n%+v", tc.claim, report.Rows)
+		}
+		if row.ParentFactID == "" || row.OwnerID == "" || row.ValidatorName != tc.validator || row.ClaimLevel != tc.level || row.CostClass != tc.cost {
+			t.Fatalf("%s row = %+v, want parent, owner, validator %q, level %s, cost %s", tc.claim, row, tc.validator, tc.level, tc.cost)
+		}
+	}
+}
+
+func TestMemoryIdealV11ProjectsDynamicProtocolWitnessFacts(t *testing.T) {
+	prog := &plir.Program{Funcs: []plir.Function{{
+		Name: "borrowCarrierV11",
+		Values: []plir.Value{
+			{
+				ID:         "view:dynamic.existential",
+				Kind:       plir.ValueView,
+				Type:       "dyn Drawable",
+				Source:     "test.tetra:5:17",
+				Region:     "fn:borrowCarrierV11",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "derived:xs.dynamic_existential"},
+				Lifetime:   plir.Lifetime{Birth: "test.tetra:5:17", Death: "dynamic_dispatch", Owner: "xs.dynamic_existential"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeConservative,
+			},
+			{
+				ID:         "view:static.witness",
+				Kind:       plir.ValueView,
+				Type:       "Witness<Drawable>",
+				Source:     "test.tetra:9:17",
+				Region:     "fn:borrowCarrierV11",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "derived:ys.static_witness"},
+				Lifetime:   plir.Lifetime{Birth: "test.tetra:9:17", Death: "return", Owner: "ys.static_witness"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeNoEscape,
+			},
+			{
+				ID:         "param:dispatch_dst",
+				Kind:       plir.ValueParam,
+				Type:       "[]u8",
+				Source:     "test.tetra:13:13",
+				Region:     "fn:borrowCarrierV11",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "dispatch_dst"},
+				Lifetime:   plir.Lifetime{Birth: "entry", Death: "return", Owner: "dispatch_dst"},
+				Borrow:     plir.BorrowMut,
+				Escape:     plir.EscapeNoEscape,
+			},
+			{
+				ID:         "view:witness.lookup",
+				Kind:       plir.ValueView,
+				Type:       "dyn Drawable",
+				Source:     "test.tetra:17:17",
+				Region:     "fn:borrowCarrierV11",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceUnknown, Root: "witness_lookup"},
+				Lifetime:   plir.Lifetime{Birth: "test.tetra:17:17", Death: "return", Owner: "witness_lookup"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeConservative,
+			},
+			{
+				ID:         "view:report.integrity",
+				Kind:       plir.ValueView,
+				Type:       "dyn Drawable",
+				Source:     "test.tetra:21:17",
+				Region:     "fn:borrowCarrierV11",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "derived:zs.protocol_dispatch_report"},
+				Lifetime:   plir.Lifetime{Birth: "test.tetra:21:17", Death: "dynamic_dispatch", Owner: "zs.protocol_dispatch_report"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeConservative,
+			},
+		},
+		Ops: []plir.Operation{
+			{ID: "op_dynamic_existential", Kind: plir.OpCall, Source: "test.tetra:5:17", Inputs: []string{"xs"}, Outputs: []string{"view:dynamic.existential"}, Note: "dynamic existential protocol borrow carrier remains conservative unless statically resolved"},
+			{ID: "op_static_witness", Kind: plir.OpCall, Source: "test.tetra:9:17", Inputs: []string{"ys"}, Outputs: []string{"view:static.witness"}, Note: "static witness conformance proof carries borrow facts only with compiler-owned parent fact"},
+			{ID: "op_witness_lookup", Kind: plir.OpCall, Source: "test.tetra:17:17", Inputs: []string{"unknown"}, Outputs: []string{"view:witness.lookup"}, Note: "witness table lookup cannot promote unknown provenance to safe_known"},
+			{ID: "op_report_integrity", Kind: plir.OpCall, Source: "test.tetra:21:17", Inputs: []string{"zs"}, Outputs: []string{"view:report.integrity"}, Note: "protocol existential dispatch report rows preserve source_fact_id cost_class normal_build_check"},
+		},
+		Facts: []plir.Fact{
+			{ID: "f_dynamic_existential_borrow", Kind: plir.FactBorrowedImm, ValueID: "view:dynamic.existential", Source: "test.tetra:5:17", Reason: "dynamic existential protocol borrow carrier remains conservative"},
+			{ID: "f_static_witness_borrow", Kind: plir.FactBorrowedImm, ValueID: "view:static.witness", Source: "test.tetra:9:17", Reason: "static witness conformance proof has compiler-owned parent fact"},
+			{ID: "f_dynamic_protocol_noalias", Kind: plir.FactNoAlias, ValueID: "param:dispatch_dst", Source: "test.tetra:13:13", Reason: "dynamic protocol dispatch cannot validate broad noalias"},
+			{ID: "f_witness_lookup_unknown", Kind: plir.FactBorrowedImm, ValueID: "view:witness.lookup", Source: "test.tetra:17:17", Reason: "witness table lookup cannot promote unknown provenance to safe_known"},
+			{ID: "f_report_integrity", Kind: plir.FactBorrowedImm, ValueID: "view:report.integrity", Source: "test.tetra:21:17", Reason: "protocol existential dispatch report rows preserve source_fact_id cost_class normal_build_check"},
+		},
+	}}}
+
+	graph, err := FromPLIRAndAllocPlan("program", prog, nil)
+	if err != nil {
+		t.Fatalf("FromPLIRAndAllocPlan: %v", err)
+	}
+	report := BuildReportFromGraph(graph)
+	for _, tc := range []struct {
+		claim            string
+		validator        string
+		level            ClaimLevel
+		cost             CostClass
+		normalBuildCheck bool
+	}{
+		{claim: "dynamic_existential_borrow_conservative", validator: "dynamic_existential_borrow_conservative_validator", level: ClaimConservative, cost: CostConservativeFallback},
+		{claim: "static_witness_borrow_parent_validated", validator: "static_witness_parent_fact_validator", level: ClaimValidated, cost: CostZeroCostProven},
+		{claim: "dynamic_protocol_noalias_rejected", validator: "dynamic_protocol_noalias_rejection_validator", level: ClaimRejected, cost: CostUnsupportedRejected},
+		{claim: "witness_provenance_promotion_rejected", validator: "witness_provenance_promotion_validator", level: ClaimRejected, cost: CostUnsupportedRejected},
+		{claim: "protocol_dispatch_report_integrity", validator: "protocol_dispatch_report_integrity_validator", level: ClaimValidated, cost: CostDynamicCheckRequired, normalBuildCheck: true},
+	} {
+		row, ok := reportRowByClaim(report, tc.claim)
+		if !ok {
+			t.Fatalf("memory report missing claim %q:\n%+v", tc.claim, report.Rows)
+		}
+		if row.ParentFactID == "" || row.ValidatorName != tc.validator || row.ClaimLevel != tc.level || row.CostClass != tc.cost || row.NormalBuildCheck != tc.normalBuildCheck {
+			t.Fatalf("%s row = %+v, want parent, validator %q, level %s, cost %s, normal_build_check %v", tc.claim, row, tc.validator, tc.level, tc.cost, tc.normalBuildCheck)
+		}
+	}
+}
+
 func TestMemoryIdealV0ProjectsNarrowInoutNoAliasFacts(t *testing.T) {
 	prog := &plir.Program{Funcs: []plir.Function{{
 		Name: "mutate",

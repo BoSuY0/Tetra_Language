@@ -57,5 +57,5 @@ func runMemoryFuzzShort(opt memoryFuzzShortOptions) error {
 }
 
 func memoryFuzzShortSummary(report compiler.MemoryFuzzOracleReport, reportPath string) string {
-	return fmt.Sprintf("# Memory Fuzz Short Summary\n\n- schema: `%s`\n- scope: `%s`\n- tier: `Tier 1 short CI smoke`\n- report: `%s`\n- oracle_categories: `%d`\n- tier1_short_ci_smoke_cases: `%d`\n\n", report.SchemaVersion, report.Scope, filepath.ToSlash(reportPath), len(report.Rows), report.Tier1ShortCISmokeCases)
+	return fmt.Sprintf("# Memory Fuzz Short Summary\n\n- schema: `%s`\n- scope: `%s`\n- tier: `Tier 1 short CI smoke`\n- report: `%s`\n- oracle_categories: `%d`\n- release_evidence_requirements: `%d` (`MEM-FUZZ-001`..`MEM-FUZZ-005`)\n- deterministic_slice_coverage: `%d` (`v0-v11`)\n- tier1_short_ci_smoke_cases: `%d`\n\n", report.SchemaVersion, report.Scope, filepath.ToSlash(reportPath), len(report.Rows), len(report.Requirements), len(report.SliceCoverage), report.Tier1ShortCISmokeCases)
 }

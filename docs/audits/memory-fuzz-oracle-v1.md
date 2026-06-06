@@ -33,6 +33,35 @@ used as release evidence.
 - Tier 3 release-blocking focused memory fuzz: release-focused memory fuzz and
   stress gates whose failures block promotion until reduced or classified.
 
+## MEM-FUZZ-012 Release Evidence Rows
+
+`MEM-FUZZ-012` narrows the oracle into an auditable release-evidence layer for
+the v0-v11 Memory Ideal chain:
+
+- `MEM-FUZZ-001`: Tier 1 short CI smoke covers deterministic v0-v11 memory
+  oracle cases.
+- `MEM-FUZZ-002`: compiler crash and miscompile outcomes require
+  reducer/reproducer artifact slots.
+- `MEM-FUZZ-003`: `unsafe_unknown` optimized as safe, bounds check elimination
+  without proof id, trusted storage under escape, or report validation failure
+  blocks release promotion.
+- `MEM-FUZZ-004`: Tier 2 nightly fuzz records seed preservation, unstable
+  triage, and minimized repro expectations.
+- `MEM-FUZZ-005`: Tier 3 release-blocking focused memory fuzz must pass or
+  classify every failure before release promotion.
+
+The Tier 1 v12 command writes:
+
+```sh
+GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-memory-v12-fuzz-oracle go run ./tools/cmd/memory-fuzz-short --tier=1 --report-dir reports/memory-fuzz-short/v12
+GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-memory-v12-fuzz-validate go run ./tools/cmd/validate-memory-fuzz-oracle --report reports/memory-fuzz-short/v12/memory-fuzz-oracle.json
+```
+
+The generated report includes five `MEM-FUZZ-*` requirement rows, twelve
+deterministic slice coverage rows (`v0` through `v11`), blocking-case rows, Tier
+policy rows, and required artifact kinds for compiler-crash reproducers,
+miscompile reproducers, and miscompile reducers.
+
 ## Generator Surface Tiers
 
 - Tier 1 supported now: slices, Strings, borrow/copy, simple
@@ -55,8 +84,24 @@ used as release evidence.
 - memory report rows keep `cost_class` and `normal_build_check` rules from the
   memory cost model.
 
+## Release-Blocking Cases
+
+The oracle treats these as blocking classifications before promotion:
+
+- `unsafe_unknown_optimized_as_safe`
+- `bounds_check_eliminated_without_proof_id`
+- `trusted_storage_under_escape`
+- `report_validation_failure`
+
+These are not runtime proofs. They are report/oracle classifications that keep
+release evidence conservative until the underlying MemoryFactGraph validators
+and focused repro artifacts support the claim.
+
 ## Non-Claims
 
 This artifact is not exhaustive fuzzing, a full program-correctness proof, a
 full unsafe pointer safety claim, a performance claim, a runtime behavior
-change, or a safe-program semantics change.
+change, or a safe-program semantics change. `MEM-FUZZ-012` also makes no
+arbitrary unsafe safety claim, no full runtime/ABI/target parity proof, no
+clean-release claim under a dirty worktree, no replacement for MemoryFactGraph
+validators, and no "Memory 100%" claim.

@@ -67,13 +67,13 @@ func inferCostClass(f Fact) CostClass {
 		return CostConservativeFallback
 	}
 	switch claim {
-	case "derived_allocation_offset", "raw_memory_access_checked", "raw_slice_verified_allocation_root", "unsafe_contract_runtime_checkable", "bounds_check_retained_dynamic", "raw_bounds_runtime_check_normal_build":
+	case "derived_allocation_offset", "raw_memory_access_checked", "raw_slice_verified_allocation_root", "unsafe_contract_runtime_checkable", "bounds_check_retained_dynamic", "raw_bounds_runtime_check_normal_build", "protocol_dispatch_report_integrity":
 		return CostDynamicCheckRequired
-	case "allocation_base_metadata", "unsafe_verified_root_allocation_base", "provenance_known", "region_alive", "len_stable", "index_in_range", "bounds_check_eliminated", "bounds_check_removed_with_proof_id", "non_null", "maybe_null", "aligned", "owned", "borrowed_imm", "borrowed_mut", "moved", "borrow_owner", "borrow_source_fact_id", "aggregate_contains_borrow", "optional_contains_borrow", "enum_payload_contains_borrow", "generic_wrapper_contains_borrow", "function_value_contains_borrow", "callback_arg_contains_borrow", "interface_value_contains_borrow", "copy_owned", "copy_source_fact_id", "copy_into_destination_fact_id", "no_alias", "mutable_exclusive", "start_inout_exclusive", "end_inout_exclusive", "no_alias_validated_narrow_unique_local", "no_alias_validated_narrow_sequential_inout":
+	case "allocation_base_metadata", "unsafe_verified_root_allocation_base", "provenance_known", "region_alive", "len_stable", "index_in_range", "bounds_check_eliminated", "bounds_check_removed_with_proof_id", "non_null", "maybe_null", "aligned", "owned", "borrowed_imm", "borrowed_mut", "moved", "borrow_owner", "borrow_source_fact_id", "aggregate_contains_borrow", "optional_contains_borrow", "enum_payload_contains_borrow", "generic_wrapper_contains_borrow", "function_value_contains_borrow", "callback_arg_contains_borrow", "interface_value_contains_borrow", "static_witness_borrow_parent_validated", "copy_owned", "copy_source_fact_id", "copy_into_destination_fact_id", "no_alias", "mutable_exclusive", "start_inout_exclusive", "end_inout_exclusive", "no_alias_validated_narrow_unique_local", "no_alias_validated_narrow_sequential_inout":
 		return CostZeroCostProven
-	case "callback_inout_conservative", "protocol_dispatch_borrow_conservative", "protocol_dispatch_noalias_conservative", "async_boundary_borrow_conservative", "boundary_noalias_conservative", "unsafe_contract_static_untrusted":
+	case "callback_inout_conservative", "protocol_dispatch_borrow_conservative", "protocol_dispatch_noalias_conservative", "dynamic_existential_borrow_conservative", "async_boundary_borrow_conservative", "boundary_noalias_conservative", "unsafe_contract_static_untrusted":
 		return CostConservativeFallback
-	case "task_boundary_borrow_rejected", "actor_boundary_borrow_rejected", "unsafe_unknown_rejected_safe_facts", "bounds_check_removal_rejected_missing_proof_id":
+	case "task_boundary_borrow_rejected", "actor_boundary_borrow_rejected", "dynamic_protocol_noalias_rejected", "witness_provenance_promotion_rejected", "unsafe_unknown_rejected_safe_facts", "bounds_check_removal_rejected_missing_proof_id":
 		return CostUnsupportedRejected
 	case "storage_lowering":
 		if f.ActualLoweringStorage == StorageHeap && f.StoragePlan != "" && f.StoragePlan != StorageHeap {
@@ -202,8 +202,17 @@ func claimRequiresParentFactID(claim string) bool {
 		"callback_arg_contains_borrow", "callback_inout_conservative",
 		"interface_value_contains_borrow", "protocol_dispatch_borrow_conservative",
 		"protocol_dispatch_noalias_conservative",
+		"dynamic_existential_borrow_conservative",
+		"static_witness_borrow_parent_validated",
+		"dynamic_protocol_noalias_rejected",
+		"witness_provenance_promotion_rejected",
+		"protocol_dispatch_report_integrity",
 		"async_boundary_borrow_conservative", "task_boundary_borrow_rejected",
 		"actor_boundary_borrow_rejected", "boundary_noalias_conservative",
+		"pre_await_local_borrow_validated", "post_await_borrow_conservative",
+		"cancellation_borrow_lifetime_invalidated",
+		"task_group_noalias_conservative",
+		"actor_reentrant_callback_conservative",
 		"unsafe_unknown_rejected_safe_facts",
 		"unsafe_verified_root_allocation_base",
 		"bounds_check_removed_with_proof_id",

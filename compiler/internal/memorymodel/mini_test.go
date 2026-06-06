@@ -519,3 +519,97 @@ func TestMiniMemoryModelV9StorageCases(t *testing.T) {
 		})
 	}
 }
+
+func TestMiniMemoryModelV10AsyncCancellationStructuredBoundaryCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   Scenario
+		outcome Outcome
+		valid   bool
+	}{
+		{
+			name:    "pre_await_local_non_escaping_borrow_validated",
+			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperAsyncBoundary, Escape: EscapeBeforeSuspension, BranchOwners: []string{"xs"}, NoEscapeProof: true},
+			outcome: OutcomeValidPreAwaitLocalBorrow,
+			valid:   true,
+		},
+		{
+			name:    "post_await_borrow_use_conservative",
+			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperAsyncBoundary, Escape: EscapeAfterCancellation, BranchOwners: []string{"xs"}},
+			outcome: OutcomeConservativePostAwaitBorrow,
+		},
+		{
+			name:    "cancellation_invalidates_task_owned_borrow",
+			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperTaskBoundary, Escape: EscapeCancellation, BranchOwners: []string{"task-owned"}},
+			outcome: OutcomeInvalidCancellationBorrowLifetime,
+		},
+		{
+			name:    "task_group_boundary_noalias_conservative",
+			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventTaskGroupBoundaryCall, EventEndInout}},
+			outcome: OutcomeConservativeTaskGroupNoAlias,
+		},
+		{
+			name:    "actor_reentrant_callback_conservative",
+			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperActorReentrantCallback, Escape: EscapeActorBoundary, BranchOwners: []string{"actor-state"}, StoragePlan: StoragePlanHeapFallback, SourceFactIDPresent: true, StorageFallbackReasonPresent: true},
+			outcome: OutcomeConservativeActorReentrantCallback,
+		},
+		{
+			name:    "async_boundary_trusted_storage_rejected",
+			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperAsyncBoundary, Escape: EscapeAcrossAwait, StoragePlan: StoragePlanTrustedStack},
+			outcome: OutcomeInvalidEscapedTrustedStorage,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := Evaluate(test.input)
+			if got.Outcome != test.outcome || got.Valid != test.valid {
+				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+			}
+			if got.Reason == "" {
+				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
+			}
+		})
+	}
+}
+
+func TestMiniMemoryModelV11DynamicProtocolWitnessCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   Scenario
+		outcome Outcome
+		valid   bool
+	}{
+		{
+			name:    "dynamic_existential_borrow_carrier_conservative",
+			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperDynamicExistential, Escape: EscapeStore, BranchOwners: []string{"xs"}},
+			outcome: OutcomeConservativeDynamicExistentialBorrow,
+		},
+		{
+			name:    "static_witness_parent_fact_validated",
+			input:   Scenario{Source: SourceBorrowedView, Wrapper: WrapperStaticWitness, Escape: EscapeLocalUse, BranchOwners: []string{"xs"}, SourceFactIDPresent: true},
+			outcome: OutcomeValidStaticWitnessBorrowFact,
+			valid:   true,
+		},
+		{
+			name:    "dynamic_protocol_dispatch_noalias_rejected",
+			input:   Scenario{InoutEvents: []InoutEvent{EventStartInout, EventDynamicProtocolDispatchCall, EventEndInout}},
+			outcome: OutcomeInvalidDynamicProtocolNoAlias,
+		},
+		{
+			name:    "witness_lookup_unknown_provenance_promotion_rejected",
+			input:   Scenario{Source: SourceUnsafeUnknown, Wrapper: WrapperWitnessTableLookup, Escape: EscapeLocalUse},
+			outcome: OutcomeInvalidWitnessProvenancePromotion,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := Evaluate(test.input)
+			if got.Outcome != test.outcome || got.Valid != test.valid {
+				t.Fatalf("Evaluate() = %+v, want outcome %s valid %v", got, test.outcome, test.valid)
+			}
+			if got.Reason == "" {
+				t.Fatalf("Evaluate() = %+v, want reviewable reason", got)
+			}
+		})
+	}
+}

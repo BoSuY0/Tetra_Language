@@ -35,6 +35,21 @@ expected, runtime trap expected, compiled output equals interpreter/reference
 expected, compiler crash is bug, miscompile is bug, unsafe_unknown optimized as
 safe is bug, and report validation failure is bug.
 
+`MEM-FUZZ-012` uses the same oracle schema as deterministic release evidence
+for the v0-v11 Memory Ideal chain:
+
+```sh
+GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-memory-v12-fuzz-oracle go run ./tools/cmd/memory-fuzz-short --tier=1 --report-dir reports/memory-fuzz-short/v12
+GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-memory-v12-fuzz-validate go run ./tools/cmd/validate-memory-fuzz-oracle --report reports/memory-fuzz-short/v12/memory-fuzz-oracle.json
+```
+
+The v12 report must include `MEM-FUZZ-001` through `MEM-FUZZ-005`, deterministic
+slice coverage rows for `v0` through `v11`, required compiler-crash and
+miscompile reducer/reproducer artifact kinds, blocking cases for unsafe
+promotion, missing bounds proof id, trusted storage under escape, and report
+validation failure, plus Tier 2/Tier 3 seed, triage, minimized-repro, and
+release-classification policy rows.
+
 ## Nightly Fuzz Commands
 
 Run the one-command wrapper for agent and CI reproducibility:
