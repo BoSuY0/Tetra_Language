@@ -16,6 +16,8 @@ Environment:
   TETRA_BASE_URL     Override release download base URL.
   TETRA_ARCHIVE_URL  Override archive URL directly.
   TETRA_CHECKSUM_URL Override checksums.txt URL directly.
+  GITHUB_TOKEN/GH_TOKEN
+                     Token used with gh to download private GitHub release assets.
 USAGE
 }
 
@@ -45,14 +47,23 @@ asset="tetra-${version}-${target}.tar.gz"
 base_url="${TETRA_BASE_URL:-https://github.com/${repo}/releases/download/${version}}"
 archive_url="${TETRA_ARCHIVE_URL:-${base_url}/${asset}}"
 checksum_url="${TETRA_CHECKSUM_URL:-${base_url}/checksums.txt}"
+auth_token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 
 if command -v curl >/dev/null 2>&1; then
   download() {
-    curl -fsSL "$1" -o "$2"
+    if [[ -n "$auth_token" ]]; then
+      curl -fsSL -H "Authorization: Bearer ${auth_token}" "$1" -o "$2"
+    else
+      curl -fsSL "$1" -o "$2"
+    fi
   }
 elif command -v wget >/dev/null 2>&1; then
   download() {
-    wget -qO "$2" "$1"
+    if [[ -n "$auth_token" ]]; then
+      wget --header="Authorization: Bearer ${auth_token}" -qO "$2" "$1"
+    else
+      wget -qO "$2" "$1"
+    fi
   }
 else
   echo "install.sh: curl or wget is required" >&2
@@ -65,9 +76,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Downloading $archive_url"
-download "$archive_url" "$tmp_dir/$asset"
-download "$checksum_url" "$tmp_dir/checksums.txt"
+if [[ -n "$auth_token" && -z "${TETRA_ARCHIVE_URL:-}" && -z "${TETRA_CHECKSUM_URL:-}" ]] && command -v gh >/dev/null 2>&1; then
+  echo "Downloading private release assets with gh"
+  GH_TOKEN="$auth_token" GITHUB_TOKEN="$auth_token" gh release download "$version" --repo "$repo" --pattern "$asset" --dir "$tmp_dir"
+  GH_TOKEN="$auth_token" GITHUB_TOKEN="$auth_token" gh release download "$version" --repo "$repo" --pattern "checksums.txt" --dir "$tmp_dir"
+else
+  echo "Downloading $archive_url"
+  download "$archive_url" "$tmp_dir/$asset"
+  download "$checksum_url" "$tmp_dir/checksums.txt"
+fi
 
 if command -v sha256sum >/dev/null 2>&1; then
   expected_line="$(grep -F " $asset" "$tmp_dir/checksums.txt" || true)"

@@ -98,7 +98,8 @@ tetra version
 ```
 
 The binary release baseline is `linux-x64`. Other target/runtime claims remain
-gated by the evidence named in the release docs.
+gated by the evidence named in the release docs. Private release downloads need
+a GitHub token; see `docs/user/install.md`.
 
 ---
 

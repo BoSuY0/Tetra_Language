@@ -17,6 +17,16 @@ The installer downloads `tetra-v0.4.0-linux-x64.tar.gz`, verifies
 `checksums.txt`, and installs `tetra` plus the `t` alias into
 `${HOME}/.local/bin` by default.
 
+For the current private repository, use GitHub CLI authentication so the
+installer can download private release assets through the GitHub API:
+
+```sh
+GITHUB_TOKEN="$(gh auth token)"
+curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  https://raw.githubusercontent.com/BoSuY0/Tetra_Language/main/install.sh |
+  GITHUB_TOKEN="${GITHUB_TOKEN}" bash
+```
+
 Override the install directory or version with:
 
 ```sh
