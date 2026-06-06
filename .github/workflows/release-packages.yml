@@ -35,7 +35,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       HOMEBREW_TAP_REPOSITORY: ${{ inputs.homebrew_tap_repository || 'BoSuY0/homebrew-tetra' }}
-      UPDATE_HOMEBREW_TAP: ${{ inputs.update_homebrew_tap || false }}
+      UPDATE_HOMEBREW_TAP: ${{ inputs.update_homebrew_tap && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
         with:
