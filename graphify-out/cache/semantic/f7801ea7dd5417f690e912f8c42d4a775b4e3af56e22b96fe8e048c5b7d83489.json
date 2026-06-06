@@ -1,1 +1,0 @@
-{"nodes": [{"id": "unsafe_blocks_policy_spec", "label": "Unsafe Blocks", "file_type": "document", "source_file": "docs/spec/unsafe.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null, "rationale": "Declares unsafe-only operation registry and effect/capability gating policy."}], "edges": [], "hyperedges": []}

@@ -17,9 +17,8 @@ examples/.tetra_cache/
 # Local release/security evidence
 /security-review.md
 
-# Graphify generated cache and large machine graph.
-graphify-out/cache/
-graphify-out/graph.json
+# Graphify generated artifacts.
+graphify-out/
 
 # Build outputs
 dumps/
