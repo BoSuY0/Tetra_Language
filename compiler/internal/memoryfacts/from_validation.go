@@ -27,7 +27,11 @@ func AddBoundsProofFacts(graph *Graph, report validation.ProofReport) error {
 		}
 	}
 	if report.LeftChecks > 0 {
-		if _, err := graph.AddFact(boundsRetainedDynamicFact(report.LeftChecks)); err != nil {
+		parentID, err := graph.AddFact(boundsRetainedDynamicGuardFact(report.LeftChecks))
+		if err != nil {
+			return err
+		}
+		if _, err := graph.DeriveFact(parentID, boundsRetainedDynamicFact(parentID, report.LeftChecks)); err != nil {
 			return err
 		}
 	}
@@ -62,7 +66,7 @@ func AddBoundsProofRejectionFact(graph *Graph, functionID string, siteID string,
 
 func boundsProofGuardFact(removed validation.RemovedCheck) Fact {
 	siteID := boundsSiteID(removed.Function, removed.Site)
-	return Fact{
+	fact := Fact{
 		ID:              boundsProofGuardFactID(removed),
 		FunctionID:      removed.Function,
 		SiteID:          siteID,
@@ -75,11 +79,13 @@ func boundsProofGuardFact(removed validation.RemovedCheck) Fact {
 		CostClass:       CostInstrumentationOnly,
 		Reason:          fmt.Sprintf("proof id %s validates %s using %s", removed.ProofID, removed.Kind, strings.Join(removed.FactsUsed, ",")),
 	}
+	attachBoundsProofTerm(&fact, removed)
+	return fact
 }
 
 func boundsRemovedWithProofFact(parentID FactID, removed validation.RemovedCheck) Fact {
 	siteID := boundsSiteID(removed.Function, removed.Site)
-	return Fact{
+	fact := Fact{
 		ID:              derivedFactID(parentID, "bounds_check_removed_with_proof_id"),
 		FunctionID:      removed.Function,
 		SiteID:          siteID,
@@ -92,11 +98,28 @@ func boundsRemovedWithProofFact(parentID FactID, removed validation.RemovedCheck
 		CostClass:       CostZeroCostProven,
 		Reason:          fmt.Sprintf("removed %s bounds check carries compiler-owned proof id %s", removed.Kind, removed.ProofID),
 	}
+	attachBoundsProofTerm(&fact, removed)
+	return fact
 }
 
-func boundsRetainedDynamicFact(leftChecks int) Fact {
+func boundsRetainedDynamicGuardFact(leftChecks int) Fact {
 	return Fact{
-		ID:               FactID(fmt.Sprintf("validation:bounds:retained_dynamic:%d", leftChecks)),
+		ID:              FactID(fmt.Sprintf("validation:bounds:retained_dynamic:%d:guard", leftChecks)),
+		SiteID:          "bounds:retained_dynamic",
+		SourceStage:     StageValidation,
+		ProvenanceClass: ProvenanceSafeKnown,
+		UnsafeClass:     UnsafeSafe,
+		Claim:           "normal_build_bounds_check_guard",
+		ValidationState: ValidationPass,
+		ValidatorName:   "normal_build_bounds_check_validator",
+		CostClass:       CostInstrumentationOnly,
+		Reason:          fmt.Sprintf("%d bounds checks remain in the normal build", leftChecks),
+	}
+}
+
+func boundsRetainedDynamicFact(parentID FactID, leftChecks int) Fact {
+	return Fact{
+		ID:               derivedFactID(parentID, "bounds_check_retained_dynamic"),
 		SiteID:           "bounds:retained_dynamic",
 		SourceStage:      StageValidation,
 		ProvenanceClass:  ProvenanceSafeKnown,
@@ -125,4 +148,23 @@ func sanitizeFactIDPart(value string) string {
 	}
 	replacer := strings.NewReplacer(" ", "_", "\t", "_", "\n", "_")
 	return replacer.Replace(value)
+}
+
+func attachBoundsProofTerm(fact *Fact, removed validation.RemovedCheck) {
+	if fact == nil {
+		return
+	}
+	fact.ProofID = removed.ProofID
+	if removed.ProofTerm == nil {
+		return
+	}
+	term := removed.ProofTerm
+	fact.ProofKind = term.Kind
+	fact.ProofSubjectBaseID = term.SubjectBaseID
+	fact.ProofIndexValueID = term.IndexValueID
+	fact.ProofOperation = term.Operation
+	fact.ProofRange = term.Range
+	fact.IslandID = term.IslandID
+	fact.Epoch = term.Epoch
+	fact.BaseID = term.BaseID
 }

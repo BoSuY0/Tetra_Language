@@ -6444,6 +6444,7 @@ func checkDeferBody(
 	savedOwnershipAliases := copyStringMap(state.ownershipAliases)
 	savedBorrowedPtrAliases := copyStringMap(state.borrowedPtrAliases)
 	savedOwnedRegionSliceOwners := copyStringMap(state.ownedRegionSliceOwners)
+	savedAwaitInvalidatedBorrow := copyPositionByIntMap(state.awaitInvalidatedBorrow)
 	savedConsumedResources := copyConsumedResources(state.consumedResources)
 	savedResourceVars := copyResourceVars(state.resourceVars)
 	savedUnknownResources := copyUnknownResources(state.unknownResources)
@@ -6471,6 +6472,7 @@ func checkDeferBody(
 		state.ownershipAliases = savedOwnershipAliases
 		state.borrowedPtrAliases = savedBorrowedPtrAliases
 		state.ownedRegionSliceOwners = savedOwnedRegionSliceOwners
+		state.awaitInvalidatedBorrow = savedAwaitInvalidatedBorrow
 		state.consumedResources = savedConsumedResources
 		state.resourceVars = savedResourceVars
 		state.unknownResources = savedUnknownResources
@@ -6591,6 +6593,17 @@ func copyOwnershipJoinConflicts(src map[string]ownershipJoinConflict) map[string
 }
 
 func copyConsumedResources(src map[int]frontend.Position) map[int]frontend.Position {
+	if len(src) == 0 {
+		return make(map[int]frontend.Position)
+	}
+	dst := make(map[int]frontend.Position, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func copyPositionByIntMap(src map[int]frontend.Position) map[int]frontend.Position {
 	if len(src) == 0 {
 		return make(map[int]frontend.Position)
 	}
@@ -6853,6 +6866,21 @@ func mergeUnknownResources(a, b map[int]bool) map[int]bool {
 	return merged
 }
 
+func mergeAwaitInvalidatedBorrowRegions(a, b map[int]frontend.Position) map[int]frontend.Position {
+	if len(a) == 0 && len(b) == 0 {
+		return make(map[int]frontend.Position)
+	}
+	merged := copyPositionByIntMap(a)
+	for regionID, pos := range b {
+		if existing, exists := merged[regionID]; exists {
+			merged[regionID] = earliestPosition(existing, pos)
+			continue
+		}
+		merged[regionID] = pos
+	}
+	return merged
+}
+
 func mergeResourceVars(state *regionState, a, b map[string]int, consumed map[int]frontend.Position, finalized map[int]resourceFinalization, unknown map[int]bool, leftLabel, rightLabel string) map[string]int {
 	if len(a) == 0 && len(b) == 0 {
 		return make(map[string]int)
@@ -6940,6 +6968,7 @@ type flowSnapshot struct {
 	ownershipAliases       map[string]string
 	borrowedPtrAliases     map[string]string
 	ownedRegionSliceOwners map[string]string
+	awaitInvalidatedBorrow map[int]frontend.Position
 	consumedResources      map[int]frontend.Position
 	resourceVars           map[string]int
 	unknownResources       map[int]bool
@@ -6966,6 +6995,7 @@ func snapshotFlow(state *regionState) flowSnapshot {
 		ownershipAliases:       copyStringMap(state.ownershipAliases),
 		borrowedPtrAliases:     copyStringMap(state.borrowedPtrAliases),
 		ownedRegionSliceOwners: copyStringMap(state.ownedRegionSliceOwners),
+		awaitInvalidatedBorrow: copyPositionByIntMap(state.awaitInvalidatedBorrow),
 		consumedResources:      copyConsumedResources(state.consumedResources),
 		resourceVars:           copyResourceVars(state.resourceVars),
 		unknownResources:       copyUnknownResources(state.unknownResources),
@@ -6980,6 +7010,7 @@ func restoreFlow(state *regionState, snap flowSnapshot) {
 	state.ownershipAliases = copyStringMap(snap.ownershipAliases)
 	state.borrowedPtrAliases = copyStringMap(snap.borrowedPtrAliases)
 	state.ownedRegionSliceOwners = copyStringMap(snap.ownedRegionSliceOwners)
+	state.awaitInvalidatedBorrow = copyPositionByIntMap(snap.awaitInvalidatedBorrow)
 	state.consumedResources = copyConsumedResources(snap.consumedResources)
 	state.resourceVars = copyResourceVars(snap.resourceVars)
 	state.unknownResources = copyUnknownResources(snap.unknownResources)
@@ -7013,6 +7044,7 @@ func mergeFlowWithLabels(state *regionState, a, b flowSnapshot, leftLabel, right
 	state.ownershipAliases = mergeOwnershipAliases(a.ownershipAliases, b.ownershipAliases)
 	state.borrowedPtrAliases = mergeBorrowedPtrAliases(a.borrowedPtrAliases, b.borrowedPtrAliases)
 	state.ownedRegionSliceOwners = mergeOwnershipAliases(a.ownedRegionSliceOwners, b.ownedRegionSliceOwners)
+	state.awaitInvalidatedBorrow = mergeAwaitInvalidatedBorrowRegions(a.awaitInvalidatedBorrow, b.awaitInvalidatedBorrow)
 	state.consumedResources = consumedResources
 	state.unknownResources = unknownResources
 	state.finalizedResources = finalizedResources
@@ -8737,9 +8769,12 @@ func validateFunctionTypedAssignmentValue(
 	return nil
 }
 
-func allowCapturedGlobalFunctionSnapshot(value frontend.Expr, locals map[string]LocalInfo, types map[string]*TypeInfo) (bool, error) {
+func allowCapturedGlobalFunctionSnapshot(value frontend.Expr, locals map[string]LocalInfo, types map[string]*TypeInfo, state *regionState) (bool, error) {
 	if closure, ok := value.(*frontend.ClosureExpr); ok {
 		if err := rejectMutableGlobalFunctionCaptures(closure.Captures, locals); err != nil {
+			return false, err
+		}
+		if err := rejectBorrowedFunctionCaptures(closure.Captures, state); err != nil {
 			return false, err
 		}
 		if _, _, err := classifyCallableEscape(callableBoundaryGlobal, closure.Captures, types); err != nil {
@@ -8752,7 +8787,7 @@ func allowCapturedGlobalFunctionSnapshot(value frontend.Expr, locals map[string]
 		if err != nil || !found {
 			return false, err
 		}
-		return allowFunctionFieldGlobalSnapshot(fieldInfo, value.Pos(), locals, types)
+		return allowFunctionFieldGlobalSnapshot(fieldInfo, value.Pos(), locals, types, state)
 	}
 	id, ok := value.(*frontend.IdentExpr)
 	if !ok {
@@ -8769,6 +8804,9 @@ func allowCapturedGlobalFunctionSnapshot(value frontend.Expr, locals map[string]
 		len(source.FunctionCaptures) > 0 &&
 		len(source.FunctionEscapeCaptures) == 0 {
 		if err := rejectMutableGlobalFunctionCaptures(source.FunctionCaptures, locals); err != nil {
+			return false, err
+		}
+		if err := rejectBorrowedFunctionCaptures(source.FunctionCaptures, state); err != nil {
 			return false, err
 		}
 		captureSlots, err := functionCaptureSlotCount(source.FunctionCaptures, types)
@@ -8792,6 +8830,9 @@ func allowCapturedGlobalFunctionSnapshot(value frontend.Expr, locals map[string]
 		if err := rejectMutableGlobalFunctionCaptures(source.FunctionCaptures, locals); err != nil {
 			return false, err
 		}
+		if err := rejectBorrowedFunctionCaptures(source.FunctionCaptures, state); err != nil {
+			return false, err
+		}
 		captureSlots, err := functionCaptureSlotCount(source.FunctionCaptures, types)
 		if err != nil {
 			return false, err
@@ -8813,6 +8854,9 @@ func allowCapturedGlobalFunctionSnapshot(value frontend.Expr, locals map[string]
 		if err := rejectMutableGlobalFunctionCaptures(source.FunctionEscapeCaptures, locals); err != nil {
 			return false, err
 		}
+		if err := rejectBorrowedFunctionCaptures(source.FunctionEscapeCaptures, state); err != nil {
+			return false, err
+		}
 		captureSlots, err := functionCaptureSlotCount(source.FunctionEscapeCaptures, types)
 		if err != nil {
 			return false, err
@@ -8830,6 +8874,28 @@ func allowCapturedGlobalFunctionSnapshot(value frontend.Expr, locals map[string]
 	return false, nil
 }
 
+func rejectBorrowedFunctionCaptures(captures []frontend.ClosureCapture, state *regionState) error {
+	if state == nil {
+		return nil
+	}
+	for _, capture := range captures {
+		for path, regionID := range state.regionVars {
+			if path != capture.Name && !strings.HasPrefix(path, capture.Name+".") {
+				continue
+			}
+			if _, borrowed := state.borrowedParamOwner(regionID); !borrowed {
+				continue
+			}
+			name := path
+			if name == "" {
+				name = capture.Name
+			}
+			return lifetimeDiagnosticf(capture.At, "borrowed local '%s' cannot escape via function capture", name)
+		}
+	}
+	return nil
+}
+
 func rejectMutableGlobalFunctionCaptures(captures []frontend.ClosureCapture, locals map[string]LocalInfo) error {
 	for _, capture := range captures {
 		if capture.Mutable {
@@ -8842,7 +8908,7 @@ func rejectMutableGlobalFunctionCaptures(captures []frontend.ClosureCapture, loc
 	return nil
 }
 
-func allowFunctionFieldGlobalSnapshot(info FunctionFieldInfo, pos frontend.Position, locals map[string]LocalInfo, types map[string]*TypeInfo) (bool, error) {
+func allowFunctionFieldGlobalSnapshot(info FunctionFieldInfo, pos frontend.Position, locals map[string]LocalInfo, types map[string]*TypeInfo, state *regionState) (bool, error) {
 	if info.FunctionParamName != "" || info.FunctionValue == "" {
 		return false, nil
 	}
@@ -8863,6 +8929,9 @@ func allowFunctionFieldGlobalSnapshot(info FunctionFieldInfo, pos frontend.Posit
 		return false, nil
 	}
 	if err := rejectMutableGlobalFunctionCaptures(captures, locals); err != nil {
+		return false, err
+	}
+	if err := rejectBorrowedFunctionCaptures(captures, state); err != nil {
 		return false, err
 	}
 	captureSlots, err := functionCaptureSlotCount(captures, types)
@@ -11296,7 +11365,7 @@ func checkStmts(
 							FunctionThrowsType:      g.FunctionThrowsType,
 							FunctionEffects:         append([]string(nil), g.FunctionEffects...),
 						}
-						allowCapturedGlobalSnapshot, err := allowCapturedGlobalFunctionSnapshot(s.Value, locals, types)
+						allowCapturedGlobalSnapshot, err := allowCapturedGlobalFunctionSnapshot(s.Value, locals, types, state)
 						if err != nil {
 							return err
 						}
@@ -11440,6 +11509,9 @@ func checkStmts(
 				}
 				if typeMayContainRegion(valType, types) || typeMayContainRegion(targetType, types) ||
 					typeMayContainPtr(valType, types) || typeMayContainPtr(targetType, types) {
+					if err := checkBorrowedAggregateEscape(s.Value, targetType, "be stored in global", locals, globals, funcs, types, module, imports, state, effects, analysis, s.At); err != nil {
+						return err
+					}
 					if err := checkBorrowedEscape(s.Value, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
 						return lifetimeDiagnosticf(s.At, "borrowed local '%s' cannot escape via global assignment to '%s'", borrowedName, targetInfo.Name)
 					}); err != nil {

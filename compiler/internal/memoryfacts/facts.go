@@ -128,6 +128,9 @@ type Fact struct {
 	FunctionID            string          `json:"function_id,omitempty"`
 	BlockID               string          `json:"block_id,omitempty"`
 	ValueID               string          `json:"value_id,omitempty"`
+	IslandID              string          `json:"island_id,omitempty"`
+	Epoch                 int             `json:"epoch,omitempty"`
+	BaseID                string          `json:"base_id,omitempty"`
 	SiteID                string          `json:"site_id,omitempty"`
 	SourceSpan            string          `json:"source_span,omitempty"`
 	TypeName              string          `json:"type_name,omitempty"`
@@ -144,6 +147,12 @@ type Fact struct {
 	UnsafeClass           UnsafeClass     `json:"unsafe_class,omitempty"`
 	StoragePlan           StorageClass    `json:"storage_plan,omitempty"`
 	ActualLoweringStorage StorageClass    `json:"actual_lowering_storage,omitempty"`
+	ProofID               string          `json:"proof_id,omitempty"`
+	ProofKind             string          `json:"proof_kind,omitempty"`
+	ProofSubjectBaseID    string          `json:"proof_subject_base_id,omitempty"`
+	ProofIndexValueID     string          `json:"proof_index_value_id,omitempty"`
+	ProofOperation        string          `json:"proof_operation,omitempty"`
+	ProofRange            string          `json:"proof_range,omitempty"`
 	ValidationState       ValidationState `json:"validation_state,omitempty"`
 	SourceStage           SourceStage     `json:"source_stage,omitempty"`
 	ParentFactID          FactID          `json:"parent_fact_id,omitempty"`

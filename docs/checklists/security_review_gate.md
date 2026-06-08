@@ -1,7 +1,7 @@
 # v1.0 Security Review Gate
 
 Status: future v1.0 evidence checklist. This checklist is required before
-`v1.0.0` signoff, but it is not a claim that the current `v0.3.0` baseline
+`v1.0.0` signoff, but it is not a claim that the current `v0.4.0` baseline
 satisfies the future v1.0 security signoff.
 
 ## Scope

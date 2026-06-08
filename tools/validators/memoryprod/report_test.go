@@ -142,6 +142,49 @@ func TestValidateBenchmarksRejectsLegacySmallHeapEvidenceWithoutPerCoreReuse(t *
 	}
 }
 
+func TestValidateBenchmarksRejectsOfficialFastestOrTargetParityClaims(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		evidence string
+		want     string
+	}{
+		{
+			name:     "official benchmark",
+			evidence: "allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill; official benchmark result",
+			want:     "official benchmark",
+		},
+		{
+			name:     "fastest language",
+			evidence: "allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill; fastest language allocator",
+			want:     "fastest language",
+		},
+		{
+			name:     "target parity",
+			evidence: "allocation report schema v2 shows 64 per_core_small_heap rows with same_core_same_size_class_free_list reuse policy inside one 64KiB chunk refill; proves target parity",
+			want:     "target parity",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			issues := validateBenchmarks([]BenchmarkReport{{
+				Name:             "small heap allocation syscall reduction",
+				Kind:             "allocator",
+				Metric:           "estimated_os_syscalls",
+				Unit:             "syscalls",
+				BaselineValue:    64,
+				MeasuredValue:    1,
+				ImprovementRatio: 64,
+				Evidence:         tc.evidence,
+				Ran:              true,
+				Pass:             true,
+			}})
+			joined := strings.ToLower(strings.Join(issues, "; "))
+			if !strings.Contains(joined, tc.want) {
+				t.Fatalf("validateBenchmarks issues = %v, want %q rejection", issues, tc.want)
+			}
+		})
+	}
+}
+
 func TestValidateReportRejectsMissingRawPointerBoundsMetadataEvidence(t *testing.T) {
 	issues := validateContracts([]ContractReport{
 		{Name: "allocator runtime model", Status: "pass", Evidence: "allocator lifecycle"},

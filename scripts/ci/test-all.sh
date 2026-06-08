@@ -389,6 +389,150 @@ check_safety_readiness() {
   go test ./compiler/... -run 'Ownership|Borrow|Consume|Inout|Lifetime|Resource|Island|Actor|Task|Unsafe|Capability|Effect|Privacy|Consent|Budget|MMIO|Mem' -count=1 || return 1
 }
 
+require_named_go_test_names() {
+  local label="$1"
+  shift
+  local package="$1"
+  local pattern="$2"
+  shift 2
+  local list_out
+  if ! list_out="$(go test "$package" -list "$pattern")"; then
+    return 1
+  fi
+  local name
+  for name in "$@"; do
+    if ! printf '%s\n' "$list_out" | grep -qx "$name"; then
+      echo "missing required $label test: $package $name" >&2
+      return 1
+    fi
+  done
+}
+
+require_go_test_names() {
+  require_named_go_test_names "unsafe promotion blocker" "$@"
+}
+
+require_bounds_go_test_names() {
+  require_named_go_test_names "bounds proof blocker" "$@"
+}
+
+require_memory_fuzz_go_test_names() {
+  require_named_go_test_names "memory fuzz oracle gate" "$@"
+}
+
+require_host_leak_go_test_names() {
+  require_named_go_test_names "host leak blocker" "$@"
+}
+
+check_unsafe_promotion_blockers() {
+  require_go_test_names ./compiler/internal/memoryfacts 'UnsafeUnknown|UnsafeVerified|Promotion' \
+    TestMemoryFactsRejectsUnsafeUnknownToSafeKnown \
+    TestMemoryFactsRejectsDirectSafeBorrowedFromUnsafeUnknown \
+    TestMemoryFactsRejectsDirectSafeOwnedFromUnsafeUnknown \
+    TestMemoryFactsRejectsUnsafeUnknownNoAliasAndBoundsProofClaims \
+    TestMemoryFactsRejectsUnsafeCheckedGenericPromotions \
+    TestMemoryFactsRejectsUnsafeVerifiedRootGenericClaims \
+    TestMemoryFactsRejectsValidatedUnsafeUnknownTrustedStorage \
+    TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaims \
+    TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotions \
+    TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaims \
+    TestValidateMemoryReportRejectsValidatedUnsafeUnknownTrustedStorage || return 1
+  go test ./compiler/internal/memoryfacts -run 'UnsafeUnknown|UnsafeVerified|Promotion' -count=1 || return 1
+
+  require_go_test_names ./tools/cmd/validate-memory-report 'Unsafe|Promotion|Optimization|TrustedStorage' \
+    TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown \
+    TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim \
+    TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotion \
+    TestValidateMemoryReportRejectsUnsafeUnknownZeroCost \
+    TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaim \
+    TestValidateMemoryReportRejectsUnsafeUnknownTrustedStorage || return 1
+  go test ./tools/cmd/validate-memory-report -run 'Unsafe|Promotion|Optimization|TrustedStorage' -count=1 || return 1
+
+  require_go_test_names ./compiler 'Unsafe|Raw|MemoryFuzzOracle' \
+    TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants \
+    TestClassifyMemoryFuzzOracleObservation \
+    TestValidateMemoryFuzzOracleReportRejectsDrift \
+    TestMemoryFuzzOracleReportCoversV12ReleaseEvidence \
+    TestValidateMemoryFuzzOracleReportRejectsV12ReleaseEvidenceDrift || return 1
+  go test ./compiler -run 'Unsafe|Raw|MemoryFuzzOracle' -count=1 || return 1
+
+  require_go_test_names ./tools/cmd/validate-memory-fuzz-oracle 'MemoryFuzzOracle|Unsafe|Promotion|Blocking' \
+    TestValidateMemoryFuzzOracleReportFileAcceptsCompilerReport \
+    TestValidateMemoryFuzzOracleReportFileRejectsInvalidReport \
+    TestValidateMemoryFuzzOracleReportFileRejectsMissingV12ReleaseEvidence || return 1
+  go test ./tools/cmd/validate-memory-fuzz-oracle -run 'MemoryFuzzOracle|Unsafe|Promotion|Blocking' -count=1
+}
+
+check_bounds_proof_blockers() {
+  require_bounds_go_test_names ./compiler/internal/validation 'Bounds|Proof|Unchecked' \
+    TestCheckBoundsProofsRejectsRemovedCheckWithoutProofID \
+    TestCheckBoundsProofsWithPLIRRejectsUnknownLiveProof \
+    TestValidateTranslationRejectsMissingProofIDAfterTransform || return 1
+  require_bounds_go_test_names ./compiler/internal/plir 'Bounds|Proof|Unchecked' \
+    TestVerifierRejectsUnknownProofUse \
+    TestVerifierRejectsNonDominatingProofUse || return 1
+  require_bounds_go_test_names ./compiler/internal/lower 'Bounds|Proof|Unchecked' \
+    TestForSliceLoopUsesProofTaggedUncheckedIndexLoad \
+    TestWhileLessThanLenUsesProofTaggedUncheckedIndexLoad \
+    TestCopyLoopSourceLoadUsesProofTaggedUncheckedIndexLoad || return 1
+  go test ./compiler/internal/plir ./compiler/internal/lower ./compiler/internal/validation -run 'Bounds|Proof|Unchecked' -count=1 || return 1
+
+  require_bounds_go_test_names ./compiler/internal/memoryfacts 'Bounds|Proof' \
+    TestMemoryIdealV6ProjectsBoundsProofFacts \
+    TestMemoryIdealV6ProjectsMissingProofRejection \
+    TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
+    TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID || return 1
+  require_bounds_go_test_names ./tools/cmd/validate-memory-report 'Bounds|Proof' \
+    TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
+    TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID || return 1
+  go test ./compiler/internal/memoryfacts ./tools/cmd/validate-memory-report -run 'Bounds|Proof' -count=1 || return 1
+
+  require_bounds_go_test_names ./compiler 'Bounds|MemoryFuzzOracle' \
+    TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants \
+    TestMemoryFuzzOracleReportCoversV12ReleaseEvidence \
+    TestValidateMemoryFuzzOracleReportRejectsV12ReleaseEvidenceDrift \
+    TestBuildBoundsAndProofReportsShowWhileRangeReason || return 1
+  go test ./compiler -run 'Bounds|MemoryFuzzOracle' -count=1
+}
+
+check_memory_fuzz_oracle_gate() {
+  local fuzz_dir="$report_dir/memory-fuzz-tier1"
+
+  require_memory_fuzz_go_test_names ./tools/cmd/memory-fuzz-short 'MemoryFuzzShort|Tier|ReportDir' \
+    TestRunMemoryFuzzShortWritesValidatedArtifacts \
+    TestRunMemoryFuzzShortRejectsUnsupportedTier \
+    TestRunMemoryFuzzShortRejectsStaleReportDir || return 1
+  require_memory_fuzz_go_test_names ./tools/cmd/validate-memory-fuzz-oracle 'MemoryFuzzOracle|Artifact|Provenance' \
+    TestValidateMemoryFuzzOracleReportFileAcceptsCompilerReport \
+    TestValidateMemoryFuzzOracleReportFileAcceptsTier1ArtifactBundle \
+    TestValidateMemoryFuzzOracleReportFileRejectsInvalidReport \
+    TestValidateMemoryFuzzOracleReportFileRejectsMissingV12ReleaseEvidence \
+    TestValidateMemoryFuzzOracleReportFileRejectsMissingArtifactSummary \
+    TestValidateMemoryFuzzOracleReportFileRejectsMissingValidatorProvenance || return 1
+  require_memory_fuzz_go_test_names ./compiler 'MemoryFuzzOracle' \
+    TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants \
+    TestClassifyMemoryFuzzOracleObservation \
+    TestValidateMemoryFuzzOracleReportRejectsDrift \
+    TestMemoryFuzzOracleReportCoversV12ReleaseEvidence \
+    TestValidateMemoryFuzzOracleReportRejectsV12ReleaseEvidenceDrift || return 1
+
+  go test ./compiler -run MemoryFuzzOracle -count=1 || return 1
+  go test ./tools/cmd/memory-fuzz-short ./tools/cmd/validate-memory-fuzz-oracle -count=1 || return 1
+  go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir "$fuzz_dir" || return 1
+  go run ./tools/cmd/validate-memory-fuzz-oracle --report "$fuzz_dir/memory-fuzz-oracle.json" --artifact-dir "$fuzz_dir" || return 1
+  test -s "$fuzz_dir/memory-fuzz-oracle.json" || return 1
+  test -s "$fuzz_dir/summary.md" || return 1
+  test -s "$fuzz_dir/summary.json"
+}
+
+check_host_leak_blockers() {
+  require_host_leak_go_test_names ./cli/internal/actornet 'Broker|Leak|CloseWithoutCancel' \
+    TestBrokerCloseWithoutCancelStopsServeWatcher \
+    TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport \
+    TestBrokerReportsNodeDownForMissingDestination || return 1
+  go test ./cli/internal/actornet -run 'Broker|Leak|CloseWithoutCancel' -count=1
+}
+
 check_performance_report() {
   local report="docs/generated/v1_0/performance-regression.json"
   if [[ ! -f "$report" ]]; then
@@ -660,6 +804,10 @@ if [[ "$json_only" != true ]]; then
 fi
 
 run_step "go test all packages" go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "unsafe promotion blocker suite" check_unsafe_promotion_blockers
+run_step "bounds proof blocker suite" check_bounds_proof_blockers
+run_step "memory fuzz oracle artifact gate" check_memory_fuzz_oracle_gate
+run_step "host leak blocker suite" check_host_leak_blockers
 
 if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
   run_step "repo test script" bash scripts/ci/test.sh

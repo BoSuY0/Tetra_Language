@@ -57,13 +57,24 @@ uses io:
 
 <p>
   <span style="color:#0ea5e9"><strong>Fast path.</strong></span>
-  Bootstrap the CLI, check the canonical Flow example, then run it.
+  Bootstrap the CLI, check the canonical Flow example, then build it.
 </p>
 
 ```sh
 bash scripts/dev/bootstrap.sh
 ./tetra check examples/flow_hello.tetra
-./tetra run examples/flow_hello.tetra
+./tetra build --target linux-x64 -o app examples/flow_hello.tetra
+```
+
+`check` and `build` are the core user workflow: `check` gives the same
+semantic safety feedback without writing an artifact, and `build` emits the
+program. `run`, `test`, `smoke`, metadata, and release commands remain tooling
+around that workflow, not extra safety levels.
+
+Run the built executable when you want to see the program output:
+
+```sh
+./app
 ```
 
 Expected output:
@@ -124,7 +135,8 @@ uses io:
 | --- | --- |
 | Compiler profile | `v0.4.0` local compiler/tooling profile |
 | Release truth | `docs/spec/current_supported_surface.md` |
-| CLI workflow | `check`, `build`, `run`, `fmt`, `test`, `doc`, `doctor`, `targets`, `features`, `formats`, `lsp`, `workspace`, `smoke`, `eco` |
+| Core CLI workflow | `check`, `build` |
+| Tooling commands | `run`, `fmt`, `test`, `doc`, `doctor`, `targets`, `features`, `formats`, `lsp`, `workspace`, `smoke`, `eco` |
 | Memory evidence | `MemoryFactGraph`, `tetra.memory-report.v1`, and `tetra.memory-fuzz.oracle.v1` evidence; no broad "Memory 100%" claim |
 | Async/tasks/actors | current local async/task/actor behavior with explicit support boundaries |
 | Targets | `linux-x64` is the production Linux baseline; macOS/Windows are build-only unless target evidence says otherwise |

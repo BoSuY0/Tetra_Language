@@ -87,6 +87,14 @@ func TestCheckBoundsProofsWithPLIRAcceptsLiveDominatingProof(t *testing.T) {
 			OpID:    "op0",
 			UseKind: "bounds_check",
 		}},
+		ProofTerms: []plir.ProofTerm{{
+			ID:            "proof:while:i:xs:1:1",
+			Kind:          "bounds_check",
+			SubjectBaseID: "xs",
+			IndexValueID:  "local:i",
+			Operation:     "index_load",
+			Range:         "0..xs.len",
+		}},
 	}}}
 	report, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
 	if err != nil {
@@ -108,6 +116,102 @@ func TestCheckBoundsProofsWithPLIRRejectsUnknownLiveProof(t *testing.T) {
 	_, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
 	if err == nil || !strings.Contains(err.Error(), "not found in PLIR proof guards") {
 		t.Fatalf("CheckBoundsProofsWithPLIR error = %v, want missing live proof", err)
+	}
+}
+
+func TestCheckBoundsProofsWithPLIRRejectsGuardWithoutTypedProofTerm(t *testing.T) {
+	irProg := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name: "main",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRIndexLoadI32Unchecked, ProofID: "proof:while:i:xs:1:1"},
+		},
+	}}}
+	plirProg := &plir.Program{Funcs: []plir.Function{{
+		Name: "main",
+		Values: []plir.Value{{
+			ID:         "local:i",
+			Type:       "i32",
+			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
+		}},
+		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
+		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
+		Facts: []plir.Fact{{
+			ID:      "f0",
+			Kind:    plir.FactIndexInRange,
+			ValueID: "local:i",
+			Range:   "0..xs.len",
+			ProofID: "proof:while:i:xs:1:1",
+			Source:  "test:1:1",
+		}},
+		ProofGuards: []plir.ProofGuard{{
+			ID:        "proof:while:i:xs:1:1",
+			Kind:      "range",
+			Block:     "body",
+			OpID:      "op0",
+			Condition: "i < xs.len",
+		}},
+		ProofUses: []plir.ProofUse{{
+			ProofID: "proof:while:i:xs:1:1",
+			Block:   "body",
+			OpID:    "op0",
+			UseKind: "bounds_check",
+		}},
+	}}}
+	_, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
+	if err == nil || !strings.Contains(err.Error(), "typed proof term") {
+		t.Fatalf("CheckBoundsProofsWithPLIR error = %v, want missing typed proof term rejection", err)
+	}
+}
+
+func TestCheckBoundsProofsWithPLIRRejectsTypedProofBaseMismatch(t *testing.T) {
+	irProg := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name: "main",
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRIndexLoadI32Unchecked, ProofID: "proof:while:i:xs:1:1"},
+		},
+	}}}
+	plirProg := &plir.Program{Funcs: []plir.Function{{
+		Name: "main",
+		Values: []plir.Value{{
+			ID:         "local:i",
+			Type:       "i32",
+			Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
+		}},
+		Blocks: []plir.BasicBlock{{ID: "body", Kind: "while_body", Entry: true, Exit: true, Ops: []string{"op0"}}},
+		Ops:    []plir.Operation{{ID: "op0", Kind: plir.OpIndexLoad, Block: "body"}},
+		Facts: []plir.Fact{{
+			ID:      "f0",
+			Kind:    plir.FactIndexInRange,
+			ValueID: "local:i",
+			Range:   "0..xs.len",
+			ProofID: "proof:while:i:xs:1:1",
+			Source:  "test:1:1",
+		}},
+		ProofGuards: []plir.ProofGuard{{
+			ID:        "proof:while:i:xs:1:1",
+			Kind:      "range",
+			Block:     "body",
+			OpID:      "op0",
+			Condition: "i < xs.len",
+		}},
+		ProofUses: []plir.ProofUse{{
+			ProofID: "proof:while:i:xs:1:1",
+			Block:   "body",
+			OpID:    "op0",
+			UseKind: "bounds_check",
+		}},
+		ProofTerms: []plir.ProofTerm{{
+			ID:            "proof:while:i:xs:1:1",
+			Kind:          "bounds_check",
+			SubjectBaseID: "ys",
+			IndexValueID:  "local:i",
+			Operation:     "index_load",
+			Range:         "0..ys.len",
+		}},
+	}}}
+	_, err := CheckBoundsProofsWithPLIR(irProg, plirProg)
+	if err == nil || !strings.Contains(err.Error(), "subject base") {
+		t.Fatalf("CheckBoundsProofsWithPLIR error = %v, want subject-base mismatch rejection", err)
 	}
 }
 
@@ -462,6 +566,48 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandIR(t *testing.T) {
 	}
 }
 
+func TestValidateAllocationLoweringAcceptsExplicitIslandParamDerivedReturn(t *testing.T) {
+	plan := &allocplan.Plan{Functions: []allocplan.FunctionPlan{{
+		Name: "make_buf",
+		Allocations: []allocplan.Allocation{{
+			ID:                                 "buf",
+			SiteID:                             "allocsite:make_buf:buf:line_1_1",
+			ValueID:                            "alloc_intent:buf",
+			Builtin:                            "core.island_make_i32",
+			ElementType:                        "i32",
+			ElementSize:                        4,
+			LengthExpr:                         "n",
+			LengthStatus:                       allocplan.LengthStatusNormal,
+			Escape:                             allocplan.EscapeNoEscape,
+			Storage:                            allocplan.StorageExplicitIsland,
+			PlannedStorage:                     allocplan.StorageExplicitIsland,
+			ActualLoweringStorage:              allocplan.StorageExplicitIsland,
+			ValidationStatus:                   "validated_explicit_island_scope",
+			LoweringStatus:                     "explicit_island_lowering",
+			RegionID:                           "island:isl",
+			Lifetime:                           "island:isl:scope",
+			ExplicitIslandHandleParamSlotKnown: true,
+			ExplicitIslandHandleParamSlot:      0,
+			Reason:                             "test",
+		}},
+	}}}
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:        "make_buf",
+		ParamSlots:  2,
+		LocalSlots:  2,
+		ReturnSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "buf"},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	if err := ValidateAllocationLowering(plan, prog); err != nil {
+		t.Fatalf("ValidateAllocationLowering: %v", err)
+	}
+}
+
 func TestValidateAllocationLoweringAcceptsExplicitIslandHandleReturnedFromCall(t *testing.T) {
 	plan := explicitIslandValidationPlan("main")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{
@@ -611,6 +757,27 @@ func TestValidateAllocationLoweringRejectsUseAfterExplicitIslandFree(t *testing.
 	}
 }
 
+func TestValidateAllocationLoweringRejectsExplicitIslandMakeWithHandleInLengthOperand(t *testing.T) {
+	plan := explicitIslandValidationPlan("bad")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "bad",
+		LocalSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "no active island handle operand") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want island handle operand rejection", err)
+	}
+}
+
 func TestValidateAllocationLoweringRejectsExplicitIslandDoubleFree(t *testing.T) {
 	plan := explicitIslandValidationPlan("bad")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
@@ -635,6 +802,179 @@ func TestValidateAllocationLoweringRejectsExplicitIslandDoubleFree(t *testing.T)
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "double free") {
 		t.Fatalf("ValidateAllocationLowering error = %v, want explicit island double-free rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsExplicitIslandDoubleFreeOnBranchMerge(t *testing.T) {
+	plan := explicitIslandValidationPlan("bad")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "bad",
+		LocalSlots: 3,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "double free") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want branch-merge explicit island double-free rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsExplicitIslandUseAfterFreeThroughIndex(t *testing.T) {
+	plan := explicitIslandValidationPlan("bad")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:        "bad",
+		LocalSlots:  3,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRIndexLoadI32},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "use after free") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want index use-after-free rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringAcceptsExplicitIslandResetReturnedHandle(t *testing.T) {
+	plan := explicitIslandValidationPlan("main")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "main",
+		LocalSlots: 3,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRIslandReset},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 2},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandFree},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	if err := ValidateAllocationLowering(plan, prog); err != nil {
+		t.Fatalf("ValidateAllocationLowering: %v", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsExplicitIslandUseAfterReset(t *testing.T) {
+	plan := explicitIslandValidationPlan("bad")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "bad",
+		LocalSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRIslandReset},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRLoadLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "use after free") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want reset invalidation rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsExplicitIslandUnknownCallReturnedHandle(t *testing.T) {
+	plan := explicitIslandValidationPlan("bad")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "bad",
+		LocalSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 64},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRCall, Name: "__unknown_island_identity", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "no active island handle operand") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want unknown-call conservative handle rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsReturnedExplicitIslandAllocationThroughCallSummary(t *testing.T) {
+	plan := explicitIslandValidationPlan("bad")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{
+		{
+			Name:        "identity_slice",
+			ParamSlots:  2,
+			LocalSlots:  2,
+			ReturnSlots: 2,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:        "bad",
+			LocalSlots:  3,
+			ReturnSlots: 2,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 64},
+				{Kind: ir.IRIslandNew},
+				{Kind: ir.IRStoreLocal, Local: 0},
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRConstI32, Imm: 4},
+				{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+				{Kind: ir.IRStoreLocal, Local: 2},
+				{Kind: ir.IRStoreLocal, Local: 1},
+				{Kind: ir.IRLoadLocal, Local: 1},
+				{Kind: ir.IRLoadLocal, Local: 2},
+				{Kind: ir.IRCall, Name: "identity_slice", ArgSlots: 2, RetSlots: 2},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "escapes via return") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want call-summary return escape rejection", err)
 	}
 }
 
@@ -702,6 +1042,108 @@ func TestValidateAllocationLoweringRejectsReturnedFunctionTempRegionAllocation(t
 	err := ValidateAllocationLowering(plan, prog)
 	if err == nil || !strings.Contains(err.Error(), "escapes via return") {
 		t.Fatalf("ValidateAllocationLowering error = %v, want returned region allocation rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsFunctionTempRegionResetThatDoesNotDominateBranchReturn(t *testing.T) {
+	plan := functionTempRegionValidationPlan("branchy")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:        "branchy",
+		LocalSlots:  4,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRRegionEnter},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRRegionMakeSliceU8, Name: "copied"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRJmpIfZero, Label: 1},
+			{Kind: ir.IRRegionReset},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "function-temp region reset does not dominate return") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want branch reset-dominance rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsFunctionTempRegionMakeWithoutEnter(t *testing.T) {
+	plan := functionTempRegionValidationPlan("no_enter")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:        "no_enter",
+		LocalSlots:  4,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRRegionMakeSliceU8, Name: "copied"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRRegionReset},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "function-temp region enter does not dominate make") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want missing region-enter rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringRejectsFunctionTempRegionLoopExitWithoutReset(t *testing.T) {
+	plan := functionTempRegionValidationPlan("loop_exit")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:        "loop_exit",
+		LocalSlots:  4,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRRegionEnter},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRRegionMakeSliceU8, Name: "copied"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRJmpIfZero, Label: 2},
+			{Kind: ir.IRJmp, Label: 1},
+			{Kind: ir.IRLabel, Label: 2},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, prog)
+	if err == nil || !strings.Contains(err.Error(), "function-temp region reset does not dominate return") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want loop-exit reset-dominance rejection", err)
+	}
+}
+
+func TestValidateAllocationLoweringAcceptsFunctionTempRegionResetAfterLoopExit(t *testing.T) {
+	plan := functionTempRegionValidationPlan("loop_exit")
+	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:        "loop_exit",
+		LocalSlots:  4,
+		ReturnSlots: 1,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRRegionEnter},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRRegionMakeSliceU8, Name: "copied"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRLabel, Label: 1},
+			{Kind: ir.IRConstI32, Imm: 0},
+			{Kind: ir.IRJmpIfZero, Label: 2},
+			{Kind: ir.IRJmp, Label: 1},
+			{Kind: ir.IRLabel, Label: 2},
+			{Kind: ir.IRLoadLocal, Local: 1},
+			{Kind: ir.IRRegionReset},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	if err := ValidateAllocationLowering(plan, prog); err != nil {
+		t.Fatalf("ValidateAllocationLowering: %v", err)
 	}
 }
 

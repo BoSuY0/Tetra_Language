@@ -38,6 +38,287 @@ func TestTestAllQuickJSONIncludesStepExitCodes(t *testing.T) {
 	}
 }
 
+func TestTestAllRunsUnsafePromotionBlockerSuite(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test-all script: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "unsafe promotion blocker suite" check_unsafe_promotion_blockers`,
+		`require_go_test_names ./compiler/internal/memoryfacts 'UnsafeUnknown|UnsafeVerified|Promotion'`,
+		`TestMemoryFactsRejectsUnsafeUnknownToSafeKnown`,
+		`TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim`,
+		`TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants`,
+		`TestValidateMemoryFuzzOracleReportFileRejectsInvalidReport`,
+		`go test ./compiler/internal/memoryfacts -run 'UnsafeUnknown|UnsafeVerified|Promotion' -count=1`,
+		`go test ./compiler -run 'Unsafe|Raw|MemoryFuzzOracle' -count=1`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("scripts/ci/test-all.sh missing unsafe promotion blocker requirement %q", want)
+		}
+	}
+}
+
+func TestTestAllQuickReportsUnsafePromotionBlockerSuite(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if !hasTestAllStep(summary, "unsafe promotion blocker suite") {
+		t.Fatalf("summary missing passing unsafe promotion blocker suite step: %#v", summary.Steps)
+	}
+}
+
+func TestTestAllQuickFailsWhenUnsafePromotionBlockerSuiteMissing(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST=1"}, "--quick", "--keep-going", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected unsafe promotion blocker suite failure\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary status/counts = %q/%d, want fail/1: %#v", summary.Status, summary.FailedCount, summary.Steps)
+	}
+	var sawUnsafePromotionFailure bool
+	var unsafePromotionLog string
+	for _, step := range summary.Steps {
+		if step.Name == "unsafe promotion blocker suite" {
+			sawUnsafePromotionFailure = true
+			if step.Status != "fail" || step.ExitCode == nil || *step.ExitCode == 0 {
+				t.Fatalf("unsafe promotion blocker step = %#v", step)
+			}
+			if !strings.Contains(step.Log, "unsafe-promotion-blocker-suite.log") {
+				t.Fatalf("unsafe promotion blocker log path = %q", step.Log)
+			}
+			unsafePromotionLog = step.Log
+		}
+	}
+	if !sawUnsafePromotionFailure {
+		t.Fatalf("summary missing failing unsafe promotion blocker suite step: %#v", summary.Steps)
+	}
+	logPath := filepath.Join(reportDir, unsafePromotionLog)
+	logRaw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read unsafe promotion blocker log: %v", err)
+	}
+	if !strings.Contains(string(logRaw), "missing required unsafe promotion blocker test") {
+		t.Fatalf("unsafe promotion blocker log missing required-test failure:\n%s", logRaw)
+	}
+}
+
+func TestTestAllRunsBoundsProofBlockerSuite(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test-all script: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "bounds proof blocker suite" check_bounds_proof_blockers`,
+		`require_bounds_go_test_names ./compiler/internal/validation 'Bounds|Proof|Unchecked'`,
+		`TestCheckBoundsProofsRejectsRemovedCheckWithoutProofID`,
+		`TestCheckBoundsProofsWithPLIRRejectsUnknownLiveProof`,
+		`TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID`,
+		`TestMemoryFuzzOracleReportCoversV12ReleaseEvidence`,
+		`go test ./compiler/internal/plir ./compiler/internal/lower ./compiler/internal/validation -run 'Bounds|Proof|Unchecked' -count=1`,
+		`go test ./compiler -run 'Bounds|MemoryFuzzOracle' -count=1`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("scripts/ci/test-all.sh missing bounds proof blocker requirement %q", want)
+		}
+	}
+}
+
+func TestTestAllQuickReportsBoundsProofBlockerSuite(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if !hasTestAllStep(summary, "bounds proof blocker suite") {
+		t.Fatalf("summary missing passing bounds proof blocker suite step: %#v", summary.Steps)
+	}
+}
+
+func TestTestAllQuickFailsWhenBoundsProofBlockerSuiteMissing(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_SKIP_BOUNDS_PROOF_LIST=1"}, "--quick", "--keep-going", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected bounds proof blocker suite failure\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary status/counts = %q/%d, want fail/1: %#v", summary.Status, summary.FailedCount, summary.Steps)
+	}
+	var sawBoundsProofFailure bool
+	var boundsProofLog string
+	for _, step := range summary.Steps {
+		if step.Name == "bounds proof blocker suite" {
+			sawBoundsProofFailure = true
+			if step.Status != "fail" || step.ExitCode == nil || *step.ExitCode == 0 {
+				t.Fatalf("bounds proof blocker step = %#v", step)
+			}
+			if !strings.Contains(step.Log, "bounds-proof-blocker-suite.log") {
+				t.Fatalf("bounds proof blocker log path = %q", step.Log)
+			}
+			boundsProofLog = step.Log
+		}
+	}
+	if !sawBoundsProofFailure {
+		t.Fatalf("summary missing failing bounds proof blocker suite step: %#v", summary.Steps)
+	}
+	logRaw, err := os.ReadFile(filepath.Join(reportDir, boundsProofLog))
+	if err != nil {
+		t.Fatalf("read bounds proof blocker log: %v", err)
+	}
+	if !strings.Contains(string(logRaw), "missing required bounds proof blocker test") {
+		t.Fatalf("bounds proof blocker log missing required-test failure:\n%s", logRaw)
+	}
+}
+
+func TestTestAllRunsMemoryFuzzOracleGate(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test-all script: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "memory fuzz oracle artifact gate" check_memory_fuzz_oracle_gate`,
+		`local fuzz_dir="$report_dir/memory-fuzz-tier1"`,
+		`go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir "$fuzz_dir"`,
+		`go run ./tools/cmd/validate-memory-fuzz-oracle --report "$fuzz_dir/memory-fuzz-oracle.json" --artifact-dir "$fuzz_dir"`,
+		`require_memory_fuzz_go_test_names ./tools/cmd/memory-fuzz-short 'MemoryFuzzShort|Tier|ReportDir'`,
+		`TestRunMemoryFuzzShortWritesValidatedArtifacts`,
+		`TestRunMemoryFuzzShortRejectsStaleReportDir`,
+		`TestValidateMemoryFuzzOracleReportFileAcceptsTier1ArtifactBundle`,
+		`TestValidateMemoryFuzzOracleReportFileRejectsMissingArtifactSummary`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("scripts/ci/test-all.sh missing memory fuzz oracle gate requirement %q", want)
+		}
+	}
+}
+
+func TestTestAllQuickReportsMemoryFuzzOracleGate(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if !hasTestAllStep(summary, "memory fuzz oracle artifact gate") {
+		t.Fatalf("summary missing passing memory fuzz oracle artifact gate step: %#v", summary.Steps)
+	}
+}
+
+func TestTestAllQuickFailsWhenMemoryFuzzOracleGateTestsMissing(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_SKIP_MEMORY_FUZZ_ORACLE_LIST=1"}, "--quick", "--keep-going", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected memory fuzz oracle gate failure\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary status/counts = %q/%d, want fail/1: %#v", summary.Status, summary.FailedCount, summary.Steps)
+	}
+	var fuzzLog string
+	for _, step := range summary.Steps {
+		if step.Name == "memory fuzz oracle artifact gate" {
+			if step.Status != "fail" || step.ExitCode == nil || *step.ExitCode == 0 {
+				t.Fatalf("memory fuzz oracle gate step = %#v", step)
+			}
+			fuzzLog = step.Log
+		}
+	}
+	if fuzzLog == "" {
+		t.Fatalf("summary missing failing memory fuzz oracle artifact gate step: %#v", summary.Steps)
+	}
+	logRaw, err := os.ReadFile(filepath.Join(reportDir, fuzzLog))
+	if err != nil {
+		t.Fatalf("read memory fuzz oracle gate log: %v", err)
+	}
+	if !strings.Contains(string(logRaw), "missing required memory fuzz oracle gate test") {
+		t.Fatalf("memory fuzz oracle gate log missing required-test failure:\n%s", logRaw)
+	}
+}
+
+func TestTestAllRunsHostLeakBlockerSuite(t *testing.T) {
+	raw, err := readTestAllScript(t)
+	if err != nil {
+		t.Fatalf("read test-all script: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`run_step "host leak blocker suite" check_host_leak_blockers`,
+		`require_host_leak_go_test_names ./cli/internal/actornet 'Broker|Leak|CloseWithoutCancel'`,
+		`TestBrokerCloseWithoutCancelStopsServeWatcher`,
+		`go test ./cli/internal/actornet -run 'Broker|Leak|CloseWithoutCancel' -count=1`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("scripts/ci/test-all.sh missing host leak blocker requirement %q", want)
+		}
+	}
+}
+
+func TestTestAllQuickReportsHostLeakBlockerSuite(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, nil, "--quick", "--json-only", "--report-dir", reportDir)
+	if err != nil {
+		t.Fatalf("test_all quick failed: %v\n%s", err, out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if !hasTestAllStep(summary, "host leak blocker suite") {
+		t.Fatalf("summary missing passing host leak blocker suite step: %#v", summary.Steps)
+	}
+}
+
+func TestTestAllQuickFailsWhenHostLeakBlockerSuiteMissing(t *testing.T) {
+	root := testAllFakeRepo(t, false)
+	reportDir := filepath.Join(root, "report")
+	out, err := runTestAll(t, root, []string{"TETRA_FAKE_SKIP_HOST_LEAK_LIST=1"}, "--quick", "--keep-going", "--json-only", "--report-dir", reportDir)
+	if err == nil {
+		t.Fatalf("expected host leak blocker suite failure\n%s", out)
+	}
+	summary := decodeTestAllSummary(t, out)
+	if summary.Status != "fail" || summary.FailedCount != 1 {
+		t.Fatalf("summary status/counts = %q/%d, want fail/1: %#v", summary.Status, summary.FailedCount, summary.Steps)
+	}
+	var sawHostLeakFailure bool
+	var hostLeakLog string
+	for _, step := range summary.Steps {
+		if step.Name == "host leak blocker suite" {
+			sawHostLeakFailure = true
+			if step.Status != "fail" || step.ExitCode == nil || *step.ExitCode == 0 {
+				t.Fatalf("host leak blocker step = %#v", step)
+			}
+			if !strings.Contains(step.Log, "host-leak-blocker-suite.log") {
+				t.Fatalf("host leak blocker log path = %q", step.Log)
+			}
+			hostLeakLog = step.Log
+		}
+	}
+	if !sawHostLeakFailure {
+		t.Fatalf("summary missing failing host leak blocker suite step: %#v", summary.Steps)
+	}
+	logRaw, err := os.ReadFile(filepath.Join(reportDir, hostLeakLog))
+	if err != nil {
+		t.Fatalf("read host leak blocker log: %v", err)
+	}
+	if !strings.Contains(string(logRaw), "missing required host leak blocker test") {
+		t.Fatalf("host leak blocker log missing required-test failure:\n%s", logRaw)
+	}
+}
+
 func TestTestAllWorkflowLivesInCIEntryPoint(t *testing.T) {
 	root := repoRoot(t)
 	ciPath := filepath.Join(root, "scripts", "ci", "test-all.sh")

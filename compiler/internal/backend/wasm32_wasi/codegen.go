@@ -589,6 +589,15 @@ func compileFunction(fn Function, data *dataBuilder, funcIndexByName map[string]
 			if err := pop(1, "island_free"); err != nil {
 				return nil, err
 			}
+		case ir.IRIslandReset:
+			if err := pop(1, "island_reset"); err != nil {
+				return nil, err
+			}
+			body.WriteByte(0x21) // local.set tempPtr
+			writeULEB(&body, uint32(tempPtr))
+			body.WriteByte(0x20) // local.get tempPtr
+			writeULEB(&body, uint32(tempPtr))
+			push(1)
 		case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
 			ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 			if err := pop(3, "index_load"); err != nil {
@@ -1143,6 +1152,15 @@ func emitWASINonControlInstr(body *bytes.Buffer, fn Function, instr ir.IRInstr, 
 		if err := pop(1, "island_free"); err != nil {
 			return 0, err
 		}
+	case ir.IRIslandReset:
+		if err := pop(1, "island_reset"); err != nil {
+			return 0, err
+		}
+		body.WriteByte(0x21)
+		writeULEB(body, uint32(tempPtr))
+		body.WriteByte(0x20)
+		writeULEB(body, uint32(tempPtr))
+		push(1)
 	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
 		ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 		if err := pop(3, "index_load"); err != nil {
@@ -1344,6 +1362,8 @@ func wasmStackEffect(instr ir.IRInstr) (int, int, bool) {
 		return 2, 2, true
 	case ir.IRIslandFree:
 		return 1, 0, true
+	case ir.IRIslandReset:
+		return 1, 1, true
 	case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
 		ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 		return 3, 1, true

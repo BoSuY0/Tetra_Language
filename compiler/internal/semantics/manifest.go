@@ -35,6 +35,7 @@ func DescribeBuiltins() ([]BuiltinManifest, error) {
 		"island_make_u16",
 		"island_make_i32",
 		"island_make_bool",
+		"island_reset",
 		"load_ptr",
 		"store_ptr",
 		"store_arch_ptr",
@@ -183,6 +184,8 @@ func builtinEffects(name string) []string {
 		effects = []string{"alloc", "islands", "mem"}
 	case "core.island_make_u8", "core.island_make_u16", "core.island_make_i32", "core.island_make_bool":
 		effects = []string{"alloc", "islands", "mem"}
+	case "core.island_reset":
+		effects = []string{"islands", "mem"}
 	case "core.cap_io":
 		effects = []string{"capability", "io"}
 	case "core.cap_mem":

@@ -124,6 +124,9 @@ func (g *Graph) MarkValidated(factID FactID, validatorName string) error {
 	}
 	f.ValidationState = ValidationPass
 	f.ValidatorName = validatorName
+	if f.CostClass == CostInstrumentationOnly && zeroCostValidationRequiredClaim(f.Claim) {
+		f.CostClass = inferCostClass(f)
+	}
 	if err := g.validateFact(f); err != nil {
 		return err
 	}
@@ -182,6 +185,11 @@ func (g *Graph) validateFact(f Fact) error {
 	if f.ValidationState == ValidationPass && strings.TrimSpace(f.ValidatorName) == "" {
 		return fmt.Errorf("memoryfacts: validated fact %q requires validator_name", f.ID)
 	}
+	if f.ValidationState == ValidationPass && boundsTypedProofClaim(f.Claim) {
+		if missing := missingTypedProofFields(f.ProofID, f.ProofKind, f.ProofSubjectBaseID, f.ProofIndexValueID, f.ProofOperation, f.ProofRange); len(missing) > 0 {
+			return fmt.Errorf("memoryfacts: validated bounds proof fact %q requires typed proof fields: %s", f.ID, strings.Join(missing, ", "))
+		}
+	}
 	if !knownSourceStage(f.SourceStage) {
 		return fmt.Errorf("memoryfacts: unknown source_stage %q", f.SourceStage)
 	}
@@ -197,6 +205,21 @@ func (g *Graph) validateFact(f Fact) error {
 	if !knownCostClass(f.CostClass) {
 		return fmt.Errorf("memoryfacts: unknown cost_class %q", f.CostClass)
 	}
+	if islandBackedFact(f) && f.Epoch <= 0 {
+		return fmt.Errorf("memoryfacts: island-backed fact %q requires positive epoch", f.ID)
+	}
+	if f.Epoch > 0 && strings.TrimSpace(f.IslandID) == "" {
+		return fmt.Errorf("memoryfacts: fact %q epoch requires island_id", f.ID)
+	}
+	if strings.TrimSpace(f.IslandID) != "" && strings.TrimSpace(f.BaseID) == "" {
+		return fmt.Errorf("memoryfacts: fact %q island_id requires base_id", f.ID)
+	}
+	if dynamicRawRuntimeCheckCostDisallowed(f.Claim, f.CostClass) {
+		return fmt.Errorf("memoryfacts: dynamic raw check fact %q with claim %q must use %s, got %s", f.ID, f.Claim, CostDynamicCheckRequired, f.CostClass)
+	}
+	if zeroCostProvenClaimDisallowed(f) {
+		return fmt.Errorf("memoryfacts: zero_cost_proven fact %q requires validated compiler-owned proof for claim %q", f.ID, f.Claim)
+	}
 	if f.CostClass == CostDynamicCheckRequired && !f.NormalBuildCheck {
 		return fmt.Errorf("memoryfacts: dynamic_check_required fact %q requires normal_build_check", f.ID)
 	}
@@ -208,6 +231,9 @@ func (g *Graph) validateFact(f Fact) error {
 	}
 	if broadNoAliasClaim(f.Claim) {
 		return fmt.Errorf("memoryfacts: broad noalias claim %q is outside Memory Ideal v0", f.Claim)
+	}
+	if f.ValidationState == ValidationPass && conservativeNoAliasBoundaryClaim(f.Claim) {
+		return fmt.Errorf("memoryfacts: conservative noalias boundary fact %q cannot be validated", f.ID)
 	}
 	if claimRequiresParentFactID(f.Claim) && f.ParentFactID == "" {
 		return fmt.Errorf("memoryfacts: derived claim %q requires parent_fact_id", f.Claim)
@@ -221,14 +247,26 @@ func (g *Graph) validateFact(f Fact) error {
 	if f.CostClass == CostDynamicCheckRequired && memoryOptimizationClaim(f.Claim, f.AliasState) && !f.NormalBuildCheck {
 		return fmt.Errorf("memoryfacts: dynamic_check_required optimization claim %q requires normal_build_check for fact %q", f.Claim, f.ID)
 	}
+	if bareBoundsCheckEliminatedClaim(f.Claim) {
+		return fmt.Errorf("memoryfacts: bounds_check_eliminated fact %q requires compiler-owned proof id; use bounds_check_removed_with_proof_id", f.ID)
+	}
 	if unsafeVerifiedRootDisallowedClaim(f.ProvenanceClass, f.UnsafeClass, f.Claim) {
 		return fmt.Errorf("memoryfacts: unsafe_verified_root fact %q cannot claim %q without bounded raw metadata", f.ID, f.Claim)
+	}
+	if unsafeCheckedDisallowedClaim(f.ProvenanceClass, f.UnsafeClass, f.Claim) {
+		return fmt.Errorf("memoryfacts: unsafe_checked fact %q cannot claim %q outside checked runtime/bounds evidence", f.ID, f.Claim)
+	}
+	if capMemDisallowedProofClaim(f.Claim, f.ValidatorName, f.Reason) {
+		return fmt.Errorf("memoryfacts: cap.mem authorization fact %q cannot claim %q; cap.mem authorizes raw operations only and does not prove pointer validity, bounds, ownership, noalias, or safe provenance", f.ID, f.Claim)
 	}
 	if isUnsafeUnknown(f) && f.ValidationState == ValidationPass && unsafeUnknownTrustedStorage(f.StoragePlan, f.ActualLoweringStorage) {
 		return fmt.Errorf("memoryfacts: unsafe_unknown fact %q cannot validate trusted storage lowering %q/%q", f.ID, f.StoragePlan, f.ActualLoweringStorage)
 	}
 	if f.ValidationState == ValidationPass && validatedTrustedStorageHeapFallback(f.StoragePlan, f.ActualLoweringStorage) {
 		return fmt.Errorf("memoryfacts: validated %s claim cannot lower as Heap for fact %q", f.StoragePlan, f.ID)
+	}
+	if f.ValidationState == ValidationPass && runtimeProofRequiredStorage(f.StoragePlan, f.ActualLoweringStorage) {
+		return fmt.Errorf("memoryfacts: validated runtime boundary storage %q/%q for fact %q requires production runtime proof", f.StoragePlan, f.ActualLoweringStorage, f.ID)
 	}
 	if f.ValidationState == ValidationPass && strings.Contains(f.Claim, "no_alias") && !validatedNoAliasState(f.AliasState) {
 		return fmt.Errorf("memoryfacts: validated no_alias fact %q requires unique or mutable_exclusive alias state, got unknown alias %q", f.ID, f.AliasState)
@@ -246,6 +284,10 @@ func (g *Graph) validateFact(f Fact) error {
 		return fmt.Errorf("memoryfacts: fact %q has negative param_index %d", f.ID, *f.ParamIndex)
 	}
 	return nil
+}
+
+func islandBackedFact(f Fact) bool {
+	return strings.TrimSpace(f.IslandID) != "" || f.StoragePlan == StorageExplicitIsland || f.ActualLoweringStorage == StorageExplicitIsland
 }
 
 func (g *Graph) SortedFactsForTest() []Fact {

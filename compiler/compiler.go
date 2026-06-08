@@ -1513,6 +1513,9 @@ func buildWASM32WASIWithStatsOpt(inputPath, outputPath string, tgt ctarget.Targe
 	if err := emitUIArtifacts(outputPath, tgt.Triple, checked); err != nil {
 		return nil, err
 	}
+	if err := emitExplainReports(outputPath, tgt.Triple, checked, opt); err != nil {
+		return nil, err
+	}
 	return stats, nil
 }
 
@@ -1595,6 +1598,9 @@ func buildWASM32WEBWithStatsOpt(inputPath, outputPath string, tgt ctarget.Target
 		return nil, err
 	}
 	if err := emitUIArtifacts(outputPath, tgt.Triple, checked); err != nil {
+		return nil, err
+	}
+	if err := emitExplainReports(outputPath, tgt.Triple, checked, opt); err != nil {
 		return nil, err
 	}
 	return stats, nil

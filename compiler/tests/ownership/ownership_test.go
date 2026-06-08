@@ -516,6 +516,55 @@ func main() -> Int:
 	}
 }
 
+func TestOwnershipRejectsCapturedFunctionTypedLocalBorrowInoutAlias(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+func main() -> Int:
+    var a: Int = 1
+    let bias: Int = 0
+    let cb: fn(borrow Int, inout Int) -> Int = fn(read: borrow Int, write: inout Int) -> Int:
+        write = write + read + bias
+        return write
+    return cb(a, a)
+`, "inout argument 'a' aliases borrowed argument in function-typed callback 'cb'")
+}
+
+func TestOwnershipRejectsCapturedFunctionTypedLocalConsumeInoutAlias(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+func main() -> Int:
+    var a: Int = 1
+    let bias: Int = 0
+    let cb: fn(consume Int, inout Int) -> Int = fn(taken: consume Int, write: inout Int) -> Int:
+        write = write + taken + bias
+        return write
+    return cb(a, a)
+`, "inout argument 'a' aliases consumed argument in function-typed callback 'cb'")
+}
+
+func TestOwnershipRejectsCapturedFunctionTypedLocalUseAfterConsume(t *testing.T) {
+	testkit.RequireCheckErrorContains(t, `
+func main() -> Int:
+    let value: Int = 1
+    let bias: Int = 0
+    let cb: fn(consume Int) -> Int = fn(taken: consume Int) -> Int:
+        return taken + bias
+    let moved: Int = cb(value)
+    return value + moved
+`, "cannot use consumed value 'value'")
+}
+
+func TestOwnershipAllowsCapturedFunctionTypedLocalDistinctBorrowInout(t *testing.T) {
+	testkit.RequireCheckOK(t, `
+func main() -> Int:
+    var read: Int = 1
+    var write: Int = 2
+    let bias: Int = 0
+    let cb: fn(borrow Int, inout Int) -> Int = fn(left: borrow Int, right: inout Int) -> Int:
+        right = right + left + bias
+        return right
+    return cb(read, write)
+`)
+}
+
 func TestOwnershipRejectsPassingBorrowedValueToOwnedParameter(t *testing.T) {
 	testkit.RequireCheckErrorContains(t, `
 func sink(x: []u8) -> Int:

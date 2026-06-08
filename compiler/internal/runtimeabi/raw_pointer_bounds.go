@@ -32,6 +32,7 @@ const (
 	RawSliceBoundsExternalUnknown        RawSliceBoundsStatus = "external_unknown"
 	RawSliceBoundsRejectedNegativeLength RawSliceBoundsStatus = "rejected_negative_length"
 	RawSliceBoundsRejectedLengthOverflow RawSliceBoundsStatus = "rejected_length_overflow"
+	RawSliceBoundsRejectedInvalidElement RawSliceBoundsStatus = "rejected_invalid_element_width"
 )
 
 type RawPointerBoundsABI struct {
@@ -70,6 +71,8 @@ type RawSliceBoundsMetadata struct {
 	VerifiedAllocationRoot bool                   `json:"verified_allocation_root"`
 	Reason                 string                 `json:"reason,omitempty"`
 }
+
+const maxRawSliceByteLength = int64(1<<31 - 1)
 
 func RuntimeRawPointerBoundsABI() RawPointerBoundsABI {
 	return RawPointerBoundsABI{
@@ -159,7 +162,13 @@ func DeriveRawPointerBounds(base RawPointerBoundsMetadata, offsetBytes int64, ac
 
 func RawSliceBoundsFromParts(ptr RawPointerBoundsMetadata, length int64, elemSize int64) RawSliceBoundsMetadata {
 	if elemSize <= 0 {
-		elemSize = 1
+		return RawSliceBoundsMetadata{
+			Status:        RawSliceBoundsRejectedInvalidElement,
+			PointerStatus: ptr.Status,
+			BaseID:        ptr.BaseID,
+			BaseBytes:     ptr.BaseBytes,
+			Reason:        "raw slice element byte width must be positive",
+		}
 	}
 	lengthBytes, lengthOK := checkedMulInt64(length, elemSize)
 	if length < 0 {
@@ -179,6 +188,16 @@ func RawSliceBoundsFromParts(ptr RawPointerBoundsMetadata, length int64, elemSiz
 			BaseID:        ptr.BaseID,
 			BaseBytes:     ptr.BaseBytes,
 			Reason:        "raw slice length byte computation overflows before view construction",
+		}
+	}
+	if lengthBytes > maxRawSliceByteLength {
+		return RawSliceBoundsMetadata{
+			Status:        RawSliceBoundsRejectedLengthOverflow,
+			PointerStatus: ptr.Status,
+			BaseID:        ptr.BaseID,
+			BaseBytes:     ptr.BaseBytes,
+			LengthBytes:   lengthBytes,
+			Reason:        "raw slice length byte computation exceeds signed 32-bit runtime view limit",
 		}
 	}
 	endOffset, offsetOK := checkedAddInt64(ptr.OffsetBytes, lengthBytes)

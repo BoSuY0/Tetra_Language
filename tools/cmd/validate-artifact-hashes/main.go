@@ -78,9 +78,13 @@ func main() {
 }
 
 func buildHashManifest(root string, manifestName string) (hashManifest, error) {
-	root = filepath.Clean(root)
+	var err error
+	root, err = cleanArtifactRoot(root)
+	if err != nil {
+		return hashManifest{}, err
+	}
 	var artifacts []hashedArtifact
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -94,6 +98,9 @@ func buildHashManifest(root string, manifestName string) (hashManifest, error) {
 		rel = filepath.ToSlash(rel)
 		if rel == manifestName {
 			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symlink artifact %s is not allowed", rel)
 		}
 		artifact, err := hashFile(root, rel)
 		if err != nil {
@@ -114,6 +121,10 @@ func buildHashManifest(root string, manifestName string) (hashManifest, error) {
 }
 
 func validateHashManifest(manifestPath string) error {
+	manifestPath = filepath.Clean(manifestPath)
+	if err := rejectSymlinkPath(manifestPath, "hash manifest"); err != nil {
+		return err
+	}
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return err
@@ -135,6 +146,10 @@ func validateHashManifest(manifestPath string) error {
 		return fmt.Errorf("artifacts must not be empty")
 	}
 	root := filepath.Join(filepath.Dir(manifestPath), filepath.FromSlash(manifest.Root))
+	root, err = cleanArtifactRoot(root)
+	if err != nil {
+		return err
+	}
 	manifestRel, err := filepath.Rel(root, manifestPath)
 	if err != nil {
 		return err
@@ -219,6 +234,16 @@ func validateSHA256(value string, path string) error {
 
 func hashFile(root string, rel string) (hashedArtifact, error) {
 	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := rejectSymlinkPath(path, "symlink artifact "+filepath.ToSlash(rel)); err != nil {
+		return hashedArtifact{}, err
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return hashedArtifact{}, err
+	}
+	if !info.Mode().IsRegular() {
+		return hashedArtifact{}, fmt.Errorf("artifact %s is not a regular file", filepath.ToSlash(rel))
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return hashedArtifact{}, err
@@ -254,6 +279,9 @@ func listArtifactPaths(root string, manifestName string) ([]string, error) {
 		if rel == manifestName {
 			return nil
 		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symlink artifact %s is not allowed", rel)
+		}
 		paths = append(paths, rel)
 		return nil
 	})
@@ -262,6 +290,32 @@ func listArtifactPaths(root string, manifestName string) ([]string, error) {
 	}
 	sort.Strings(paths)
 	return paths, nil
+}
+
+func cleanArtifactRoot(root string) (string, error) {
+	root = filepath.Clean(root)
+	info, err := os.Lstat(root)
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("symlink artifact root %s is not allowed", root)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("artifact root %s is not a directory", root)
+	}
+	return root, nil
+}
+
+func rejectSymlinkPath(path string, label string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%s is not allowed", label)
+	}
+	return nil
 }
 
 func detectJSONSchema(path string) string {
@@ -273,10 +327,14 @@ func detectJSONSchema(path string) string {
 		return ""
 	}
 	var envelope struct {
-		Schema string `json:"schema"`
+		Schema        string `json:"schema"`
+		SchemaVersion string `json:"schema_version"`
 	}
 	if err := json.Unmarshal(raw, &envelope); err != nil {
 		return ""
 	}
-	return envelope.Schema
+	if envelope.Schema != "" {
+		return envelope.Schema
+	}
+	return envelope.SchemaVersion
 }

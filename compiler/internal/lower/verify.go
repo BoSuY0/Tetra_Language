@@ -461,6 +461,8 @@ func stackEffect(instr ir.IRInstr) (pop int, push int, known bool) {
 		return 4, 0, true
 	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
 		return 2, 2, true
+	case ir.IRIslandReset:
+		return 1, 1, true
 	case ir.IRIslandFree:
 		return 1, 0, true
 	case ir.IRCapIO, ir.IRCapMem, ir.IRSymAddr:

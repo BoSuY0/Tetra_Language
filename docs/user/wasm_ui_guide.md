@@ -51,7 +51,7 @@ For a `pass` web UI smoke report, validator-enforced evidence now includes:
   button, input, list, panel, focus, change, select, click, timer, async
   command, redraw/update, and error recovery
 
-Support boundary for v0.3.0:
+Current support boundary:
 
 - Web UI validates metadata, mounts a DOM preview shell, and dispatches
   supported events to lowered scalar state command operations.

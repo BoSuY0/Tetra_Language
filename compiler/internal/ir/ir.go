@@ -85,6 +85,7 @@ const (
 	IRIslandMakeSliceU16
 	IRIslandMakeSliceI32
 	IRIslandFree
+	IRIslandReset
 	// Capabilities + MMIO
 	IRCapIO
 	IRCapMem

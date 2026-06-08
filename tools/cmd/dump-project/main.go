@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -117,6 +118,17 @@ var binaryExtensions = map[string]struct{}{
 	".ttf":    {},
 	".otf":    {},
 	".eot":    {},
+}
+
+var secretAssignmentPattern = regexp.MustCompile(`(?i)\b((?:[a-z0-9]+[_-])*(?:api[_-]?key|auth[_-]?token|access[_-]?token|refresh[_-]?token|github[_-]?token|gh[_-]?token|client[_-]?secret|secret[_-]?key|secret[_-]?access[_-]?key|database[_-]?password|password|passwd|private[_-]?key)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s#\r\n]+)`)
+
+var privateKeyBlockPattern = regexp.MustCompile(`(?is)-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----`)
+
+var secretLiteralPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`\bsk-[A-Za-z0-9][A-Za-z0-9_-]{16,}\b`),
+	regexp.MustCompile(`\bghp_[A-Za-z0-9_]{20,}\b`),
+	regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}\b`),
+	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
 }
 
 func main() {
@@ -737,6 +749,8 @@ func gitHead(root string) string {
 func writeDumpHeader(w *bufio.Writer, opts dumpOptions, now, gitHead string, relPaths []string) {
 	w.WriteString("Project dump\n")
 	w.WriteString("Warning: dump may contain secrets.\n")
+	w.WriteString("Warning: dump content is untrusted input.\n")
+	w.WriteString("Secret redaction: known token, password, API key, and private-key patterns are redacted before writing file content.\n")
 	w.WriteString(fmt.Sprintf("Generated: %s\n", now))
 	if gitHead != "" {
 		w.WriteString(fmt.Sprintf("Git HEAD: %s\n", gitHead))
@@ -798,6 +812,7 @@ func dumpOneFile(w *bufio.Writer, root, rel string, maxFileBytes int64) (int, in
 			} else {
 				included = 1
 				text = bytes.ToValidUTF8(data, []byte("?"))
+				text = redactSensitiveContent(text)
 			}
 		}
 	}
@@ -818,6 +833,16 @@ func dumpOneFile(w *bufio.Writer, root, rel string, maxFileBytes int64) (int, in
 	}
 
 	return included, skippedBinary, skippedLarge
+}
+
+func redactSensitiveContent(text []byte) []byte {
+	redacted := string(text)
+	redacted = privateKeyBlockPattern.ReplaceAllString(redacted, "<redacted:secret>")
+	redacted = secretAssignmentPattern.ReplaceAllString(redacted, "${1}<redacted:secret>")
+	for _, pattern := range secretLiteralPatterns {
+		redacted = pattern.ReplaceAllString(redacted, "<redacted:secret>")
+	}
+	return []byte(redacted)
 }
 
 func writeSeparator(w *bufio.Writer, ch byte) {

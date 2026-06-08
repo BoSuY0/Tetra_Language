@@ -1,7 +1,8 @@
-# v0.3 Preview And Boundary Guide
+# v0.3 Historical Boundary Guide
 
-Status: user-facing map for the `v0.3.0` current profile and remaining preview
-boundaries.
+Status: historical user-facing map for the `v0.3.0` promotion boundary. The
+current public profile is `v0.4.0`; use `docs/spec/current_supported_surface.md`
+for current release truth.
 
 ## Promoted In v0.3.0
 

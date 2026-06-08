@@ -209,6 +209,9 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 		if b.Kind != "allocator" {
 			issues = append(issues, fmt.Sprintf("benchmark %s kind is %q, want allocator", name, b.Kind))
 		}
+		for _, issue := range forbiddenPerformanceClaimIssues("benchmark "+name, b.Name, b.Kind, b.Metric, b.Unit, b.Evidence) {
+			issues = append(issues, issue)
+		}
 		if strings.TrimSpace(b.Metric) == "" {
 			issues = append(issues, fmt.Sprintf("benchmark %s metric is required", name))
 		}
@@ -238,9 +241,20 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 			issues = append(issues, fmt.Sprintf("benchmark %s evidence is required", name))
 		}
 		if name == "small heap allocation syscall reduction" {
+			if b.Metric != "estimated_os_syscalls" {
+				issues = append(issues, fmt.Sprintf("benchmark %s metric is %q, want estimated_os_syscalls", name, b.Metric))
+			}
+			if b.Unit != "syscalls" {
+				issues = append(issues, fmt.Sprintf("benchmark %s unit is %q, want syscalls", name, b.Unit))
+			}
 			for _, marker := range []string{"per_core_small_heap", "same_core_same_size_class_free_list"} {
 				if !strings.Contains(evidence, marker) {
 					issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention %s", name, marker))
+				}
+			}
+			for _, marker := range []string{"allocation report schema v2", "64KiB chunk refill"} {
+				if !strings.Contains(evidence, marker) {
+					issues = append(issues, fmt.Sprintf("benchmark %s evidence must mention scoped local artifact marker %s", name, marker))
 				}
 			}
 		}
@@ -251,6 +265,69 @@ func validateBenchmarks(benchmarks []BenchmarkReport) []string {
 		}
 	}
 	return issues
+}
+
+func forbiddenPerformanceClaimIssues(label string, fields ...string) []string {
+	var issues []string
+	for _, field := range fields {
+		lower := strings.ToLower(field)
+		if explicitPerformanceNonClaimContext(lower) {
+			continue
+		}
+		for _, claim := range []struct {
+			label   string
+			markers []string
+		}{
+			{label: "fastest language", markers: []string{"fastest language", "fastest-language"}},
+			{label: "official benchmark", markers: []string{"official benchmark", "official techempower"}},
+			{label: "target parity", markers: []string{"target parity", "target-parity"}},
+			{label: "zero-cost performance", markers: []string{"zero-cost performance", "zero cost performance"}},
+		} {
+			for _, marker := range claim.markers {
+				if strings.Contains(lower, marker) {
+					issues = append(issues, fmt.Sprintf("%s contains forbidden %s claim", label, claim.label))
+					break
+				}
+			}
+		}
+	}
+	return issues
+}
+
+func explicitPerformanceNonClaimContext(lower string) bool {
+	for _, marker := range []string{
+		"does not claim",
+		"do not claim",
+		"does not prove",
+		"do not prove",
+		"does not promote",
+		"do not promote",
+		"must not use",
+		"not an official",
+		"not a fastest",
+		"not fastest",
+		"not target parity",
+		"not a benchmark",
+		"not a full",
+		"not full",
+		"not a runtime measurement",
+		"no official",
+		"no fastest",
+		"no target parity",
+		"no full",
+		"makes no",
+		"without an official",
+		"without official",
+		"forbid",
+		"forbidden",
+		"non-claim",
+		"nonclaim",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateContracts(contracts []ContractReport) []string {

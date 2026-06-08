@@ -883,6 +883,10 @@ func NewEmitFunc(abi x64abi.ABI) x64obj.EmitFunc {
 				if err := abi.EmitIslandFree(e, &stackDepth, opt, importPatches); err != nil {
 					return err
 				}
+			case ir.IRIslandReset:
+				if err := abi.EmitIslandReset(e, &stackDepth, opt, importPatches); err != nil {
+					return err
+				}
 			case ir.IRCapIO:
 				e.MovEaxImm32(0xC10)
 				e.PushRax()

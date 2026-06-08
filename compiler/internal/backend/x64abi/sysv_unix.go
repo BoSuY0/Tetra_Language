@@ -526,3 +526,32 @@ func (a *SysVUnix) EmitIslandFree(e *x64.Emitter, stackDepth *int, opt x64.Codeg
 	e.Syscall()
 	return nil
 }
+
+func (a *SysVUnix) EmitIslandReset(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error {
+	_ = importPatches
+	if stackDepth == nil {
+		return fmt.Errorf("internal error: missing stackDepth")
+	}
+	if *stackDepth < 1 {
+		return fmt.Errorf("stack underflow in island_reset")
+	}
+	*stackDepth--
+	e.PopRdi()
+	if opt.IslandsDebug {
+		e.MovEaxFromRdiDisp(12)
+		e.TestEaxEax()
+		okAt := e.JzRel32()
+		if err := a.EmitExit(e, 2, *stackDepth, nil); err != nil {
+			return err
+		}
+		okOff := len(e.Buf)
+		if err := x64.PatchRel32(e.Buf, okAt, okOff); err != nil {
+			return err
+		}
+	}
+	cfg := runtimeabi.RuntimeRegionAllocatorConfig(opt.IslandsDebug)
+	e.MovMem32RdiDispImm32(0, cfg.HeaderBytes)
+	e.PushRdi()
+	*stackDepth++
+	return nil
+}

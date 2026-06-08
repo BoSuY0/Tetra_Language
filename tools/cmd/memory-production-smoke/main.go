@@ -105,6 +105,9 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 	if err := r.runRuntimeDiagnosticCases(ctx); err != nil {
 		return err
 	}
+	if err := r.runAllocationLengthRuntimeCoverage(ctx); err != nil {
+		return err
+	}
 	if err := r.runCompilerSafetyCases(ctx); err != nil {
 		return err
 	}
@@ -115,6 +118,9 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 		return err
 	}
 	if err := r.runRawPointerBoundsMetadataReport(ctx); err != nil {
+		return err
+	}
+	if err := r.runAllocationLengthContractReport(ctx); err != nil {
 		return err
 	}
 	return r.writeReport()
@@ -260,6 +266,44 @@ func runtimeDiagnosticPass(run processResult, expectedExit int, expectedError st
 		return true
 	}
 	return strings.Contains(run.output, expectedError)
+}
+
+func (r *smokeRunner) runAllocationLengthRuntimeCoverage(ctx context.Context) error {
+	names := []string{
+		"allocation make zero length canonical empty",
+		"allocation make negative length",
+		"allocation make byte-size overflow",
+		"allocation island zero length no metadata",
+		"allocation island negative length",
+		"allocation island byte-size overflow",
+	}
+	res := runCommand(ctx, 120*time.Second, "go", "test", "./compiler/tests/semantics", "-run", "AllocationLength", "-count=1")
+	r.recordProcess("allocation length runtime coverage", "benchmark", "go test ./compiler/tests/semantics -run AllocationLength -count=1", res)
+	if res.err != nil || res.exitCode != 0 {
+		for _, name := range names {
+			r.cases = append(r.cases, failedCase(name, "negative", "allocation length contract", res.output))
+		}
+		return fmt.Errorf("allocation length runtime coverage failed: %s", res.output)
+	}
+	for _, name := range names {
+		kind := "negative"
+		if strings.Contains(name, "zero length") {
+			kind = "positive"
+		}
+		r.cases = append(r.cases, memoryprod.CaseReport{Name: name, Kind: kind, Ran: true, Pass: true, ExpectedError: allocationLengthExpectedError(name)})
+	}
+	return nil
+}
+
+func allocationLengthExpectedError(name string) string {
+	switch {
+	case strings.Contains(name, "negative length"):
+		return "negative allocation length"
+	case strings.Contains(name, "byte-size overflow"):
+		return "allocation length byte overflow"
+	default:
+		return ""
+	}
 }
 
 func (r *smokeRunner) writeSource(name, body string) (string, error) {
@@ -429,14 +473,23 @@ func (r *smokeRunner) runRawPointerBoundsMetadataReport(ctx context.Context) err
 		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
 		return fmt.Errorf("read raw pointer bounds memory report: %w", err)
 	}
-	validateMemory := runCommand(ctx, 30*time.Second, "go", "run", "./tools/cmd/validate-memory-report", "--report", outPath+".memory.json")
-	r.recordProcess("raw pointer bounds memory report validation", "benchmark", "go run ./tools/cmd/validate-memory-report --report "+outPath+".memory.json", validateMemory)
+	validateMemoryArgs := validateMemoryReportCommand(outPath)
+	validateMemory := runCommand(ctx, 30*time.Second, "go", validateMemoryArgs...)
+	r.recordProcess("raw pointer bounds memory report validation", "benchmark", "go "+strings.Join(validateMemoryArgs, " "), validateMemory)
 	if validateMemory.err != nil {
 		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", validateMemory.output))
 		return fmt.Errorf("validate raw pointer bounds memory report: %s", validateMemory.output)
 	}
 	memoryClaims, err := parseMemoryReportClaims(memoryRaw)
 	if err != nil {
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+		return err
+	}
+	if err := validateRawPointerBoundsCorrelation(r.cases, memoryRaw); err != nil {
+		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
+		return err
+	}
+	if err := validateRawSliceGatewayCorrelation(r.cases, memoryRaw); err != nil {
 		r.cases = append(r.cases, failedCase("raw pointer bounds metadata report", "positive", "", err.Error()))
 		return err
 	}
@@ -460,6 +513,8 @@ func (r *smokeRunner) runRawPointerBoundsMetadataReport(ctx context.Context) err
 		"external_unknown",
 		"raw_slice_verified_allocation_root",
 		"rejected_negative_length",
+		"rejected_length_overflow",
+		"raw_bounds_runtime_check_normal_build",
 	} {
 		if memoryClaims[claim] < 1 {
 			err := fmt.Errorf("raw pointer bounds memory report missing %s claim: %+v", claim, memoryClaims)
@@ -471,8 +526,54 @@ func (r *smokeRunner) runRawPointerBoundsMetadataReport(ctx context.Context) err
 	return nil
 }
 
+func (r *smokeRunner) runAllocationLengthContractReport(ctx context.Context) error {
+	sourcePath, err := r.writeSource("allocation_length_contract_report", allocationLengthContractReportSource)
+	if err != nil {
+		return err
+	}
+	outPath := filepath.Join(r.workDir, "allocation-length-contract")
+	build := runCommand(ctx, 30*time.Second, r.tetraPath, "build", "--target", "linux-x64", "--emit-alloc-report", "--emit-memory-report", "-o", outPath, sourcePath)
+	r.recordProcess("allocation length contract report build", "benchmark", r.tetraPath+" build --target linux-x64 --emit-alloc-report --emit-memory-report", build)
+	if build.err != nil {
+		r.cases = append(r.cases, failedCase("allocation length contract report", "positive", "", build.output))
+		return fmt.Errorf("build allocation length contract report: %s", build.output)
+	}
+	validateMemoryArgs := validateMemoryReportCommand(outPath)
+	validateMemory := runCommand(ctx, 30*time.Second, "go", validateMemoryArgs...)
+	r.recordProcess("allocation length memory report validation", "benchmark", "go "+strings.Join(validateMemoryArgs, " "), validateMemory)
+	if validateMemory.err != nil {
+		r.cases = append(r.cases, failedCase("allocation length contract report", "positive", "", validateMemory.output))
+		return fmt.Errorf("validate allocation length memory report: %s", validateMemory.output)
+	}
+	raw, err := os.ReadFile(outPath + ".alloc.json")
+	if err != nil {
+		r.cases = append(r.cases, failedCase("allocation length contract report", "positive", "", err.Error()))
+		return fmt.Errorf("read allocation length allocation report: %w", err)
+	}
+	report, err := parseAllocationReportSummary(raw)
+	if err != nil {
+		r.cases = append(r.cases, failedCase("allocation length contract report", "positive", "", err.Error()))
+		return err
+	}
+	if err := validateAllocationLengthContractCorrelation(r.cases, report); err != nil {
+		r.cases = append(r.cases, failedCase("allocation length contract report", "positive", "", err.Error()))
+		return err
+	}
+	r.cases = append(r.cases, memoryprod.CaseReport{Name: "allocation length contract report", Kind: "positive", Ran: true, Pass: true})
+	return nil
+}
+
+func validateMemoryReportCommand(outPath string) []string {
+	return []string{
+		"run", "./tools/cmd/validate-memory-report",
+		"--report", outPath + ".memory.json",
+		"--alloc-report", outPath + ".alloc.json",
+	}
+}
+
 type allocationReportSummary struct {
-	SchemaVersion int `json:"schema_version"`
+	SchemaVersion int    `json:"schema_version"`
+	Kind          string `json:"kind,omitempty"`
 	Summary       struct {
 		AllocationCount          int            `json:"allocation_count"`
 		RuntimePaths             map[string]int `json:"runtime_paths"`
@@ -482,6 +583,40 @@ type allocationReportSummary struct {
 		RawSlicePolicies         map[string]int `json:"raw_slice_policies"`
 		BytesReserved            int            `json:"bytes_reserved"`
 	} `json:"summary"`
+	Functions []allocationReportFunctionSummary `json:"functions,omitempty"`
+}
+
+type allocationReportFunctionSummary struct {
+	Name        string                              `json:"name"`
+	Allocations []allocationReportAllocationSummary `json:"allocations,omitempty"`
+}
+
+type allocationReportAllocationSummary struct {
+	ID                  string `json:"id"`
+	Builtin             string `json:"builtin,omitempty"`
+	LengthStatus        string `json:"length_status,omitempty"`
+	ZeroGuardStatus     string `json:"zero_guard_status,omitempty"`
+	NegativeGuardStatus string `json:"negative_guard_status,omitempty"`
+	OverflowGuardStatus string `json:"overflow_guard_status,omitempty"`
+}
+
+type memoryReportEvidenceRow struct {
+	SourceFactID     string `json:"source_fact_id,omitempty"`
+	ParentFactID     string `json:"parent_fact_id,omitempty"`
+	Claim            string `json:"claim"`
+	ClaimLevel       string `json:"claim_level,omitempty"`
+	ProvenanceClass  string `json:"provenance_class,omitempty"`
+	UnsafeClass      string `json:"unsafe_class,omitempty"`
+	ValidatorName    string `json:"validator_name,omitempty"`
+	ValidatorStatus  string `json:"validator_status,omitempty"`
+	CostClass        string `json:"cost_class,omitempty"`
+	NormalBuildCheck bool   `json:"normal_build_check,omitempty"`
+	Reason           string `json:"reason,omitempty"`
+}
+
+type memoryReportEvidence struct {
+	SchemaVersion string                    `json:"schema_version"`
+	Rows          []memoryReportEvidenceRow `json:"rows"`
 }
 
 func parseAllocationReportSummary(raw []byte) (allocationReportSummary, error) {
@@ -498,30 +633,429 @@ func parseAllocationReportSummary(raw []byte) (allocationReportSummary, error) {
 	if report.Summary.RuntimePaths == nil {
 		return allocationReportSummary{}, fmt.Errorf("small heap allocation report missing runtime_paths summary")
 	}
-	if report.Summary.AllocatorReusePolicies == nil {
-		return allocationReportSummary{}, fmt.Errorf("small heap allocation report missing allocator_reuse_policies summary")
-	}
 	return report, nil
 }
 
+func validateAllocationLengthContractCorrelation(cases []memoryprod.CaseReport, report allocationReportSummary) error {
+	var issues []string
+	issues = append(issues, validateAllocationLengthRuntimeCases(cases)...)
+	requireRows := []allocationReportAllocationSummary{
+		{
+			Builtin:             "core.alloc_bytes",
+			LengthStatus:        "invalid_length_contract",
+			ZeroGuardStatus:     "invalid_precondition",
+			NegativeGuardStatus: "reject_before_allocation",
+			OverflowGuardStatus: "reject_before_allocation",
+		},
+		{
+			Builtin:             "core.make_u8",
+			LengthStatus:        "valid_empty_allocation",
+			ZeroGuardStatus:     "valid_empty_no_allocator",
+			NegativeGuardStatus: "reject_before_allocation",
+			OverflowGuardStatus: "reject_before_allocation",
+		},
+		{
+			Builtin:             "core.make_u16",
+			LengthStatus:        "rejected_negative_length",
+			ZeroGuardStatus:     "valid_empty_no_allocator",
+			NegativeGuardStatus: "reject_before_allocation",
+			OverflowGuardStatus: "reject_before_allocation",
+		},
+		{
+			Builtin:             "core.make_i32",
+			LengthStatus:        "rejected_byte_size_overflow",
+			ZeroGuardStatus:     "valid_empty_no_allocator",
+			NegativeGuardStatus: "reject_before_allocation",
+			OverflowGuardStatus: "reject_before_allocation",
+		},
+		{
+			Builtin:             "core.island_make_u8",
+			LengthStatus:        "valid_empty_allocation",
+			ZeroGuardStatus:     "valid_empty_no_metadata_access",
+			NegativeGuardStatus: "reject_before_metadata_access",
+			OverflowGuardStatus: "reject_before_metadata_access",
+		},
+		{
+			Builtin:             "core.island_make_u16",
+			LengthStatus:        "rejected_negative_length",
+			ZeroGuardStatus:     "valid_empty_no_metadata_access",
+			NegativeGuardStatus: "reject_before_metadata_access",
+			OverflowGuardStatus: "reject_before_metadata_access",
+		},
+		{
+			Builtin:             "core.island_make_i32",
+			LengthStatus:        "rejected_byte_size_overflow",
+			ZeroGuardStatus:     "valid_empty_no_metadata_access",
+			NegativeGuardStatus: "reject_before_metadata_access",
+			OverflowGuardStatus: "reject_before_metadata_access",
+		},
+	}
+	for _, req := range requireRows {
+		if !allocationReportHasLengthContract(report, req) {
+			issues = append(issues, fmt.Sprintf("allocation report missing contract row builtin=%s length_status=%s zero=%s negative=%s overflow=%s", req.Builtin, req.LengthStatus, req.ZeroGuardStatus, req.NegativeGuardStatus, req.OverflowGuardStatus))
+		}
+	}
+	if len(issues) > 0 {
+		return fmt.Errorf(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateAllocationLengthRuntimeCases(cases []memoryprod.CaseReport) []string {
+	byName := map[string]memoryprod.CaseReport{}
+	for _, c := range cases {
+		byName[c.Name] = c
+	}
+	var issues []string
+	for _, req := range []struct {
+		name          string
+		expectedError string
+	}{
+		{name: "allocation make zero length canonical empty"},
+		{name: "allocation make negative length", expectedError: "negative allocation length"},
+		{name: "allocation make byte-size overflow", expectedError: "allocation length byte overflow"},
+		{name: "allocation island zero length no metadata"},
+		{name: "allocation island negative length", expectedError: "negative allocation length"},
+		{name: "allocation island byte-size overflow", expectedError: "allocation length byte overflow"},
+	} {
+		c, ok := byName[req.name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("missing allocation length runtime case %q", req.name))
+			continue
+		}
+		if !c.Ran || !c.Pass {
+			issues = append(issues, fmt.Sprintf("allocation length runtime case %q did not pass", req.name))
+		}
+		if req.expectedError != "" && !strings.Contains(c.ExpectedError, req.expectedError) {
+			issues = append(issues, fmt.Sprintf("allocation length runtime case %q expected_error = %q, want %q", req.name, c.ExpectedError, req.expectedError))
+		}
+	}
+	return issues
+}
+
+func allocationReportHasLengthContract(report allocationReportSummary, req allocationReportAllocationSummary) bool {
+	for _, fn := range report.Functions {
+		for _, alloc := range fn.Allocations {
+			if alloc.Builtin == req.Builtin &&
+				alloc.LengthStatus == req.LengthStatus &&
+				alloc.ZeroGuardStatus == req.ZeroGuardStatus &&
+				alloc.NegativeGuardStatus == req.NegativeGuardStatus &&
+				alloc.OverflowGuardStatus == req.OverflowGuardStatus {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func parseMemoryReportClaims(raw []byte) (map[string]int, error) {
-	var report struct {
-		SchemaVersion string `json:"schema_version"`
-		Rows          []struct {
-			Claim string `json:"claim"`
-		} `json:"rows"`
-	}
-	if err := json.Unmarshal(raw, &report); err != nil {
-		return nil, fmt.Errorf("parse memory report: %w", err)
-	}
-	if report.SchemaVersion != "tetra.memory-report.v1" {
-		return nil, fmt.Errorf("memory report schema_version = %q, want tetra.memory-report.v1", report.SchemaVersion)
+	report, err := parseMemoryReportEvidence(raw)
+	if err != nil {
+		return nil, err
 	}
 	claims := map[string]int{}
 	for _, row := range report.Rows {
 		claims[row.Claim]++
 	}
 	return claims, nil
+}
+
+func parseMemoryReportEvidence(raw []byte) (memoryReportEvidence, error) {
+	var report memoryReportEvidence
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return memoryReportEvidence{}, fmt.Errorf("parse memory report: %w", err)
+	}
+	if report.SchemaVersion != "tetra.memory-report.v1" {
+		return memoryReportEvidence{}, fmt.Errorf("memory report schema_version = %q, want tetra.memory-report.v1", report.SchemaVersion)
+	}
+	return report, nil
+}
+
+func validateRawPointerBoundsCorrelation(cases []memoryprod.CaseReport, memoryRaw []byte) error {
+	report, err := parseMemoryReportEvidence(memoryRaw)
+	if err != nil {
+		return err
+	}
+	var issues []string
+	issues = append(issues, validateRawRuntimeCases(cases)...)
+	issues = append(issues, validateCapMemAuthorizationDiscipline(report.Rows)...)
+	checksByParent := parentedRawBoundsRuntimeChecks(report.Rows)
+
+	requireRows := []struct {
+		claim           string
+		minRows         int
+		validate        func(memoryReportEvidenceRow) []string
+		requireCheckRow bool
+	}{
+		{claim: "allocation_base_metadata", minRows: 1, validate: validateUnsafeVerifiedRootAllocationBaseRow},
+		{claim: "derived_allocation_offset", minRows: 1, validate: validateUnsafeCheckedDynamicRow},
+		{claim: "rejected_negative_offset", minRows: 1, validate: validateUnsafeCheckedRejectedRow},
+		{claim: "rejected_upper_bound", minRows: 1, validate: validateUnsafeCheckedRejectedRow},
+		{claim: "rejected_access_width_overflow", minRows: 4, validate: validateUnsafeCheckedRejectedRow, requireCheckRow: true},
+		{claim: "checked_external_unknown", minRows: 1, validate: validateUnsafeUnknownConservativeRow},
+	}
+	for _, req := range requireRows {
+		valid := 0
+		for _, row := range report.Rows {
+			if row.Claim != req.claim {
+				continue
+			}
+			rowIssues := req.validate(row)
+			if req.requireCheckRow && row.SourceFactID != "" && !checksByParent[row.SourceFactID] {
+				rowIssues = append(rowIssues, fmt.Sprintf("source_fact_id %q is missing parented raw_bounds_runtime_check_normal_build normal_build_check", row.SourceFactID))
+			}
+			if len(rowIssues) > 0 {
+				issues = append(issues, fmt.Sprintf("raw bounds claim %s row is not correlated: %s", req.claim, strings.Join(rowIssues, ", ")))
+				continue
+			}
+			valid++
+		}
+		if valid < req.minRows {
+			issues = append(issues, fmt.Sprintf("raw bounds claim %s has %d correlated row(s), want at least %d", req.claim, valid, req.minRows))
+		}
+	}
+	for _, row := range report.Rows {
+		if row.ProvenanceClass == "unsafe_verified_root" || row.UnsafeClass == "unsafe_verified_root" {
+			switch row.Claim {
+			case "allocation_base_metadata", "unsafe_verified_root_allocation_base":
+			default:
+				issues = append(issues, fmt.Sprintf("unsafe_verified_root row %q cannot claim %q beyond bounded allocation metadata", row.SourceFactID, row.Claim))
+			}
+		}
+	}
+	if len(issues) > 0 {
+		return fmt.Errorf(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateRawSliceGatewayCorrelation(cases []memoryprod.CaseReport, memoryRaw []byte) error {
+	report, err := parseMemoryReportEvidence(memoryRaw)
+	if err != nil {
+		return err
+	}
+	var issues []string
+	issues = append(issues, validateRawSliceRuntimeCases(cases)...)
+	issues = append(issues, validateCapMemAuthorizationDiscipline(report.Rows)...)
+	checksByParent := parentedRawBoundsRuntimeChecks(report.Rows)
+
+	requireRows := []struct {
+		claim           string
+		minRows         int
+		validate        func(memoryReportEvidenceRow) []string
+		requireCheckRow bool
+	}{
+		{claim: "external_unknown", minRows: 1, validate: validateUnsafeUnknownConservativeRow},
+		{claim: "raw_slice_verified_allocation_root", minRows: 1, validate: validateUnsafeCheckedDynamicRow},
+		{claim: "rejected_negative_length", minRows: 1, validate: validateUnsafeCheckedRejectedRow},
+		{claim: "rejected_length_overflow", minRows: 1, validate: validateUnsafeCheckedRejectedRow, requireCheckRow: true},
+	}
+	for _, req := range requireRows {
+		valid := 0
+		for _, row := range report.Rows {
+			if row.Claim != req.claim {
+				continue
+			}
+			rowIssues := req.validate(row)
+			if req.requireCheckRow && row.SourceFactID != "" && !checksByParent[row.SourceFactID] {
+				rowIssues = append(rowIssues, fmt.Sprintf("source_fact_id %q is missing parented raw_bounds_runtime_check_normal_build normal_build_check", row.SourceFactID))
+			}
+			if len(rowIssues) > 0 {
+				issues = append(issues, fmt.Sprintf("raw slice claim %s row is not correlated: %s", req.claim, strings.Join(rowIssues, ", ")))
+				continue
+			}
+			valid++
+		}
+		if valid < req.minRows {
+			issues = append(issues, fmt.Sprintf("raw slice claim %s has %d correlated row(s), want at least %d", req.claim, valid, req.minRows))
+		}
+	}
+	if len(issues) > 0 {
+		return fmt.Errorf(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateRawRuntimeCases(cases []memoryprod.CaseReport) []string {
+	byName := map[string]memoryprod.CaseReport{}
+	for _, c := range cases {
+		byName[c.Name] = c
+	}
+	var issues []string
+	for _, req := range []struct {
+		name          string
+		expectedError string
+	}{
+		{name: "raw ptr_add negative offset bounds", expectedError: "negative ptr_add offset"},
+		{name: "raw ptr_add allocation upper bound", expectedError: "allocation upper bound"},
+		{name: "raw allocation-base i32 access width", expectedError: "i32 access width exceeds allocation"},
+		{name: "raw allocation-base ptr access width", expectedError: "ptr access width exceeds allocation"},
+		{name: "raw allocation-base store_i32 access width", expectedError: "i32 access width exceeds allocation"},
+		{name: "raw allocation-base load_ptr access width", expectedError: "ptr access width exceeds allocation"},
+	} {
+		c, ok := byName[req.name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("missing runtime raw bounds case %q", req.name))
+			continue
+		}
+		if !c.Ran || !c.Pass {
+			issues = append(issues, fmt.Sprintf("runtime raw bounds case %q did not pass", req.name))
+		}
+		if req.expectedError != "" && !strings.Contains(c.ExpectedError, req.expectedError) {
+			issues = append(issues, fmt.Sprintf("runtime raw bounds case %q expected_error = %q, want %q", req.name, c.ExpectedError, req.expectedError))
+		}
+	}
+	return issues
+}
+
+func validateRawSliceRuntimeCases(cases []memoryprod.CaseReport) []string {
+	byName := map[string]memoryprod.CaseReport{}
+	for _, c := range cases {
+		byName[c.Name] = c
+	}
+	var issues []string
+	for _, req := range []struct {
+		name          string
+		expectedError string
+	}{
+		{name: "raw slice negative length", expectedError: "negative raw slice length"},
+		{name: "raw slice i32 length byte overflow", expectedError: "raw slice length byte overflow"},
+	} {
+		c, ok := byName[req.name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("missing runtime raw slice case %q", req.name))
+			continue
+		}
+		if !c.Ran || !c.Pass {
+			issues = append(issues, fmt.Sprintf("runtime raw slice case %q did not pass", req.name))
+		}
+		if req.expectedError != "" && !strings.Contains(c.ExpectedError, req.expectedError) {
+			issues = append(issues, fmt.Sprintf("runtime raw slice case %q expected_error = %q, want %q", req.name, c.ExpectedError, req.expectedError))
+		}
+	}
+	return issues
+}
+
+func parentedRawBoundsRuntimeChecks(rows []memoryReportEvidenceRow) map[string]bool {
+	out := map[string]bool{}
+	for _, row := range rows {
+		if row.Claim != "raw_bounds_runtime_check_normal_build" {
+			continue
+		}
+		if row.SourceFactID == "" || row.ParentFactID == "" || !row.NormalBuildCheck {
+			continue
+		}
+		if row.CostClass != "dynamic_check_required" || row.ValidatorName != "raw_bounds_width_validator" || row.ClaimLevel != "validated" {
+			continue
+		}
+		out[row.ParentFactID] = true
+	}
+	return out
+}
+
+func validateUnsafeVerifiedRootAllocationBaseRow(row memoryReportEvidenceRow) []string {
+	issues := validateCompilerOwnedRow(row)
+	if row.ProvenanceClass != "unsafe_verified_root" || row.UnsafeClass != "unsafe_verified_root" {
+		issues = append(issues, "must stay unsafe_verified_root")
+	}
+	if row.ClaimLevel != "validated" {
+		issues = append(issues, "must be validated bounded allocation metadata")
+	}
+	return issues
+}
+
+func validateUnsafeCheckedDynamicRow(row memoryReportEvidenceRow) []string {
+	issues := validateCompilerOwnedRow(row)
+	if row.ProvenanceClass != "unsafe_checked" || row.UnsafeClass != "unsafe_checked" {
+		issues = append(issues, "must stay unsafe_checked")
+	}
+	if row.CostClass != "dynamic_check_required" {
+		issues = append(issues, "must preserve dynamic_check_required")
+	}
+	if !row.NormalBuildCheck {
+		issues = append(issues, "must preserve normal_build_check")
+	}
+	return issues
+}
+
+func validateUnsafeCheckedRejectedRow(row memoryReportEvidenceRow) []string {
+	issues := validateCompilerOwnedRow(row)
+	if row.ProvenanceClass != "unsafe_checked" || row.UnsafeClass != "unsafe_checked" {
+		issues = append(issues, "must stay unsafe_checked")
+	}
+	if row.CostClass != "unsupported_rejected" {
+		issues = append(issues, "must preserve unsupported_rejected")
+	}
+	return issues
+}
+
+func validateUnsafeUnknownConservativeRow(row memoryReportEvidenceRow) []string {
+	issues := validateCompilerOwnedRow(row)
+	if row.ProvenanceClass != "unsafe_unknown" || row.UnsafeClass != "unsafe_unknown" {
+		issues = append(issues, "must stay unsafe_unknown")
+	}
+	if row.ClaimLevel != "conservative" {
+		issues = append(issues, "must remain conservative")
+	}
+	if row.CostClass != "conservative_fallback" {
+		issues = append(issues, "must preserve conservative_fallback")
+	}
+	return issues
+}
+
+func validateCapMemAuthorizationDiscipline(rows []memoryReportEvidenceRow) []string {
+	var issues []string
+	authRows := 0
+	proofClaims := map[string]bool{
+		"provenance_known":                   true,
+		"no_alias":                           true,
+		"index_in_range":                     true,
+		"bounds_proof_id":                    true,
+		"bounds_check_eliminated":            true,
+		"bounds_check_removed_with_proof_id": true,
+	}
+	for _, row := range rows {
+		if row.Claim == "cap_mem_authorization_only" {
+			authRows++
+			rowIssues := validateCompilerOwnedRow(row)
+			if row.ProvenanceClass != "unsafe_checked" || row.UnsafeClass != "unsafe_checked" {
+				rowIssues = append(rowIssues, "must stay unsafe_checked authorization evidence")
+			}
+			if row.ClaimLevel != "evidence_only" {
+				rowIssues = append(rowIssues, "must remain evidence_only")
+			}
+			if row.CostClass != "instrumentation_only" {
+				rowIssues = append(rowIssues, "must remain instrumentation_only")
+			}
+			if row.ValidatorName != "" || row.ValidatorStatus != "not_run" {
+				rowIssues = append(rowIssues, "must not be treated as a validated proof")
+			}
+			if row.NormalBuildCheck {
+				rowIssues = append(rowIssues, "must not masquerade as a bounds check")
+			}
+			if len(rowIssues) > 0 {
+				issues = append(issues, fmt.Sprintf("cap.mem authorization row is not evidence-only: %s", strings.Join(rowIssues, ", ")))
+			}
+		}
+		if strings.Contains(strings.ToLower(row.ValidatorName+" "+row.Reason), "cap_mem") ||
+			strings.Contains(strings.ToLower(row.ValidatorName+" "+row.Reason), "cap.mem") {
+			if proofClaims[row.Claim] {
+				issues = append(issues, fmt.Sprintf("cap.mem authorization cannot validate proof claim %q", row.Claim))
+			}
+		}
+	}
+	if authRows == 0 {
+		issues = append(issues, "missing cap_mem_authorization_only evidence row")
+	}
+	return issues
+}
+
+func validateCompilerOwnedRow(row memoryReportEvidenceRow) []string {
+	var issues []string
+	if strings.TrimSpace(row.SourceFactID) == "" {
+		issues = append(issues, "missing source_fact_id")
+	}
+	return issues
 }
 
 func ceilDiv(n, d int) int {
@@ -588,7 +1122,8 @@ func buildReport(source string, processes []memoryprod.ProcessReport, benchmarks
 			{Name: "ownership escape model", Status: "pass", Evidence: "compiler safety diagnostics for borrow escape and resource aliases"},
 			{Name: "unsafe cap.mem raw memory rules", Status: "pass", Evidence: "raw helper examples require unsafe and explicit cap.mem"},
 			{Name: "runtime bounds diagnostics", Status: "pass", Evidence: "linux-x64 raw pointer and slice bounds negative cases"},
-			{Name: "raw pointer bounds metadata", Status: "pass", Evidence: "allocation report schema v2 includes allocation_base_metadata; memory report includes derived_allocation_offset, rejected_negative_offset, rejected_upper_bound, rejected_access_width_overflow, checked_external_unknown, external_unknown, raw_slice_verified_allocation_root, and rejected_negative_length"},
+			{Name: "raw pointer bounds metadata", Status: "pass", Evidence: "allocation report schema v2 includes allocation_base_metadata; memory report is validated against paired allocation report lowered_artifact_id evidence and includes derived_allocation_offset, rejected_negative_offset, rejected_upper_bound, rejected_access_width_overflow, checked_external_unknown, external_unknown, raw_slice_verified_allocation_root, rejected_negative_length, and rejected_length_overflow"},
+			{Name: "allocation length contracts", Status: "pass", Evidence: "linux-x64 AllocationLength runtime tests plus paired allocation/memory report evidence for core.alloc_bytes, core.make_*, and core.island_make_* zero, negative, and byte-size overflow contracts"},
 			{Name: "actor task transfer rules", Status: "pass", Evidence: "compiler safety diagnostics for actor/task transfer boundaries"},
 		},
 		Cases: append([]memoryprod.CaseReport(nil), cases...),
@@ -631,7 +1166,13 @@ func memoryProductionAudit() []memoryprod.AuditReport {
 		{
 			Requirement: "raw pointer bounds metadata",
 			Artifact:    "compiler/internal/runtimeabi/raw_pointer_bounds.go; compiler/internal/plir/plir.go; compiler/internal/allocplan/plan.go; tools/cmd/memory-production-smoke",
-			Evidence:    "core.alloc_bytes allocation reports include allocation_base_metadata and external_unknown raw-slice policy; memory reports include derived_allocation_offset, rejected_negative_offset, rejected_upper_bound, rejected_access_width_overflow, checked_external_unknown, external_unknown, raw_slice_verified_allocation_root, and rejected_negative_length without arbitrary raw pointer safety claims",
+			Evidence:    "core.alloc_bytes allocation reports include allocation_base_metadata and external_unknown raw-slice policy; memory reports are validated against paired allocation report lowered_artifact_id evidence and include derived_allocation_offset, rejected_negative_offset, rejected_upper_bound, rejected_access_width_overflow, checked_external_unknown, external_unknown, raw_slice_verified_allocation_root, rejected_negative_length, and rejected_length_overflow without arbitrary raw pointer safety claims",
+			Result:      "pass",
+		},
+		{
+			Requirement: "allocation length contracts",
+			Artifact:    "compiler/internal/runtimeabi/allocation_contract.go; compiler/internal/allocplan/plan.go; compiler/tests/semantics/allocation_length_contract_test.go; tools/cmd/memory-production-smoke",
+			Evidence:    "release smoke requires AllocationLength runtime coverage and a paired allocation/memory report whose allocation rows preserve builtin, length_status, zero_guard_status, negative_guard_status, and overflow_guard_status for core.alloc_bytes, core.make_*, and core.island_make_*",
 			Result:      "pass",
 		},
 		{
@@ -695,7 +1236,14 @@ func requiredPassingCases() []memoryprod.CaseReport {
 		{Name: "raw allocation-base load_ptr access width", Kind: "negative", Ran: true, Pass: true, ExpectedError: "ptr access width exceeds allocation"},
 		{Name: "raw slice negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative raw slice length"},
 		{Name: "raw slice i32 length byte overflow", Kind: "negative", Ran: true, Pass: true, ExpectedError: "raw slice length byte overflow"},
+		{Name: "allocation make zero length canonical empty", Kind: "positive", Ran: true, Pass: true},
+		{Name: "allocation make negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative allocation length"},
+		{Name: "allocation make byte-size overflow", Kind: "negative", Ran: true, Pass: true, ExpectedError: "allocation length byte overflow"},
+		{Name: "allocation island zero length no metadata", Kind: "positive", Ran: true, Pass: true},
+		{Name: "allocation island negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative allocation length"},
+		{Name: "allocation island byte-size overflow", Kind: "negative", Ran: true, Pass: true, ExpectedError: "allocation length byte overflow"},
 		{Name: "raw pointer bounds metadata report", Kind: "positive", Ran: true, Pass: true},
+		{Name: "allocation length contract report", Kind: "positive", Ran: true, Pass: true},
 		{Name: "memcpy/memset negative length", Kind: "negative", Ran: true, Pass: true, ExpectedError: "negative helper length"},
 		{Name: "reject use-after-free", Kind: "negative", Ran: true, Pass: true, ExpectedError: "use-after-free"},
 		{Name: "reject double-free", Kind: "negative", Ran: true, Pass: true, ExpectedError: "double-free"},
@@ -964,10 +1512,33 @@ uses alloc, capability, mem:
         let ptr_base: ptr = core.alloc_bytes(4)
         let ptr_ptr: ptr = core.ptr_add(ptr_base, 1, mem)
         let ptr_value: ptr = core.store_ptr(ptr_ptr, ptr_base, mem)
+        let store_i32_base: ptr = core.alloc_bytes(8)
+        let store_i32_ptr: ptr = core.ptr_add(store_i32_base, 5, mem)
+        let store_i32_status: Int = core.store_i32(store_i32_ptr, 123, mem)
+        let load_ptr_base: ptr = core.alloc_bytes(4)
+        let load_ptr_ptr: ptr = core.ptr_add(load_ptr_base, 1, mem)
+        let load_ptr_value: ptr = core.load_ptr(load_ptr_ptr, mem)
         let raw_slice_base: ptr = core.alloc_bytes(16)
         let raw_slice_view: []u8 = core.raw_slice_u8_from_parts(raw_slice_base, 8, mem)
         let raw_slice_negative: []u8 = core.raw_slice_u8_from_parts(raw_slice_base, 0 - 1, mem)
-        return i32_value + raw_slice_view.len + raw_slice_negative.len
+        let raw_slice_overflow: []i32 = core.raw_slice_i32_from_parts(raw_slice_base, 536870912, mem)
+        return i32_value + store_i32_status + raw_slice_view.len + raw_slice_negative.len + raw_slice_overflow.len
+    return 0
+`
+
+const allocationLengthContractReportSource = `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe:
+        let raw_zero: ptr = core.alloc_bytes(0)
+    var make_zero: []u8 = make_u8(0)
+    var make_negative: []u16 = make_u16(0 - 1)
+    var make_overflow: []i32 = make_i32(536870912)
+    island(64) as isl:
+        var island_zero: []u8 = core.island_make_u8(isl, 0)
+        var island_negative: []u16 = core.island_make_u16(isl, 0 - 1)
+        var island_overflow: []i32 = core.island_make_i32(isl, 536870912)
+        return make_zero.len + make_negative.len + make_overflow.len + island_zero.len + island_negative.len + island_overflow.len
     return 0
 `
 

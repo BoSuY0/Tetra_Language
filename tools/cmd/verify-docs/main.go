@@ -461,11 +461,164 @@ func verifyMemoryProductionContractDocs(paths memoryProductionContractDocPaths) 
 				errs = append(errs, fmt.Sprintf("%s: missing %q for %s memory production contract", requirement.Path, want, requirement.Name))
 			}
 		}
+		if requirement.Path != paths.MemoryProductionClaims {
+			for _, claim := range forbiddenPublicPerformanceClaims(text) {
+				errs = append(errs, fmt.Sprintf("%s: forbidden %s claim in %s memory production contract", requirement.Path, claim, requirement.Name))
+			}
+		}
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+func forbiddenPublicPerformanceClaims(text string) []string {
+	lower := strings.ToLower(text)
+	var claims []string
+	for _, phrase := range []string{
+		"fastest language",
+		"fastest-language",
+		"official benchmark result",
+		"official benchmark",
+		"official techempower result",
+		"official techempower",
+		"target parity",
+		"target-parity",
+		"zero-cost performance",
+		"zero cost performance",
+		"memory 100%",
+		"memory 100 percent",
+		"perfect memory",
+		"leak-free",
+		"leak free",
+		"islandkernel complete",
+		"islandkernel is complete",
+		"island kernel complete",
+		"island kernel is complete",
+		"full islandkernel",
+		"full island kernel",
+		"arbitrary unsafe pointer safety",
+		"arbitrary external pointer safety",
+	} {
+		searchFrom := 0
+		for {
+			index := strings.Index(lower[searchFrom:], phrase)
+			if index < 0 {
+				break
+			}
+			absolute := searchFrom + index
+			if !explicitNonClaimContext(sentenceAround(lower, absolute, len(phrase), 640)) {
+				claims = append(claims, phrase)
+			}
+			searchFrom = absolute + len(phrase)
+		}
+	}
+	sort.Strings(claims)
+	return compactStrings(claims)
+}
+
+func excerptAround(text string, index int, length int, radius int) string {
+	start := index - radius
+	if start < 0 {
+		start = 0
+	}
+	end := index + length + radius
+	if end > len(text) {
+		end = len(text)
+	}
+	return text[start:end]
+}
+
+func sentenceAround(text string, index int, length int, maxSide int) string {
+	start := index
+	for start > 0 && !sentenceBoundary(text, start-1) {
+		start--
+		if index-start >= maxSide {
+			break
+		}
+	}
+	end := index + length
+	for end < len(text) && !sentenceBoundary(text, end) {
+		end++
+		if end-(index+length) >= maxSide {
+			break
+		}
+	}
+	if end < len(text) && sentenceBoundary(text, end) {
+		end++
+	}
+	return text[start:end]
+}
+
+func sentenceBoundary(text string, index int) bool {
+	if index < 0 || index >= len(text) || !strings.ContainsRune(".!?", rune(text[index])) {
+		return false
+	}
+	return strings.Count(text[:index], "`")%2 == 0
+}
+
+func explicitNonClaimContext(lower string) bool {
+	normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(lower)
+	for _, marker := range []string{
+		"does not claim",
+		"do not claim",
+		"does not prove",
+		"do not prove",
+		"does not promote",
+		"do not promote",
+		"must not use",
+		"not an official",
+		"not a fastest",
+		"not fastest",
+		"not target parity",
+		"not a benchmark",
+		"not a full",
+		"not full",
+		"not a runtime measurement",
+		"not complete",
+		"not leak-free",
+		"not leak free",
+		"not memory 100",
+		"no official",
+		"no fastest",
+		"no target parity",
+		"no leak-free",
+		"no leak free",
+		"no memory 100",
+		"no broad memory",
+		"no full",
+		"makes no",
+		"model-only",
+		"model only",
+		"without an official",
+		"without official",
+		"forbid",
+		"forbidden",
+		"non-claim",
+		"nonclaim",
+	} {
+		if strings.Contains(lower, marker) || strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func compactStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := values[:0]
+	var previous string
+	for _, value := range values {
+		if value == previous {
+			continue
+		}
+		out = append(out, value)
+		previous = value
+	}
+	return out
 }
 
 type networkingRuntimeBoundaryDocPaths struct {
@@ -884,6 +1037,7 @@ func verifyReleaseTruthDocs(paths []string) error {
 		re    *regexp.Regexp
 	}
 	patterns := []confusingPattern{
+		{label: "current.*v0.3", re: regexp.MustCompile(`(?is)\bcurrent\b.{0,120}\bv0\.3\.0\b`)},
 		{label: "current.*v0.6", re: regexp.MustCompile(`(?is)\bcurrent\b.{0,120}\bv0\.6\b`)},
 		{label: "v0.1.2", re: regexp.MustCompile(`\bv0\.1\.2\b`)},
 		{label: "ready for v1.0", re: regexp.MustCompile(`(?is)\bready\s+for\s+` + "`?" + `v1\.0`)},
@@ -904,6 +1058,9 @@ func verifyReleaseTruthDocs(paths []string) error {
 			if pattern.re.MatchString(text) {
 				errs = append(errs, fmt.Sprintf("%s: misleading release language matched %q", path, pattern.label))
 			}
+		}
+		for _, claim := range forbiddenPublicPerformanceClaims(text) {
+			errs = append(errs, fmt.Sprintf("%s: forbidden %s claim in release truth docs", path, claim))
 		}
 	}
 	if len(errs) > 0 {

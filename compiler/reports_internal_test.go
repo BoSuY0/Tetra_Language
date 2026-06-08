@@ -9,6 +9,7 @@ import (
 	"tetra_language/compiler/internal/frontend"
 	"tetra_language/compiler/internal/ir"
 	"tetra_language/compiler/internal/machine"
+	"tetra_language/compiler/internal/memoryfacts"
 	"tetra_language/compiler/internal/semantics"
 )
 
@@ -47,6 +48,64 @@ func TestValidateAllocationPlanReportRejectsMismatch(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "allocation report mismatch") {
 		t.Fatalf("validateAllocationPlanReport error = %v, want mismatch rejection", err)
 	}
+}
+
+func TestValidateMemoryReportForEmissionRejectsAlteredProjection(t *testing.T) {
+	graph := emissionProjectionGraph(t)
+	report := memoryfacts.BuildReportFromGraph(graph)
+	report.Rows[0].CostClass = memoryfacts.CostConservativeFallback
+
+	err := validateMemoryReportForEmission(graph, report)
+	if err == nil || !strings.Contains(err.Error(), "validate memory report projection") || !strings.Contains(err.Error(), "cost_class") {
+		t.Fatalf("validateMemoryReportForEmission error = %v, want projection cost_class rejection", err)
+	}
+}
+
+func TestValidateMemoryReportForEmissionRejectsDroppedProjectedFact(t *testing.T) {
+	graph := emissionProjectionGraph(t)
+	report := memoryfacts.BuildReportFromGraph(graph)
+	report.Rows = report.Rows[:1]
+
+	err := validateMemoryReportForEmission(graph, report)
+	if err == nil || !strings.Contains(err.Error(), "missing report row") {
+		t.Fatalf("validateMemoryReportForEmission error = %v, want missing projected fact rejection", err)
+	}
+}
+
+func emissionProjectionGraph(t *testing.T) *memoryfacts.Graph {
+	t.Helper()
+
+	graph := memoryfacts.NewGraph("program")
+	if _, err := graph.AddFact(memoryfacts.Fact{
+		ID:               "fact:emission:borrow",
+		FunctionID:       "main",
+		SiteID:           "site:borrow",
+		SourceStage:      memoryfacts.StagePLIR,
+		Claim:            "borrowed view",
+		ProvenanceClass:  memoryfacts.ProvenanceSafeBorrowed,
+		BorrowState:      memoryfacts.BorrowImmutable,
+		UnsafeClass:      memoryfacts.UnsafeSafe,
+		ValidationState:  memoryfacts.ValidationPass,
+		ValidatorName:    "test-emission",
+		CostClass:        memoryfacts.CostDynamicCheckRequired,
+		NormalBuildCheck: true,
+	}); err != nil {
+		t.Fatalf("add borrow fact: %v", err)
+	}
+	if _, err := graph.AddFact(memoryfacts.Fact{
+		ID:              "fact:emission:borrow-sibling",
+		FunctionID:      "main",
+		SiteID:          "site:borrow-sibling",
+		SourceStage:     memoryfacts.StagePLIR,
+		Claim:           "borrowed sibling view",
+		ProvenanceClass: memoryfacts.ProvenanceSafeBorrowed,
+		BorrowState:     memoryfacts.BorrowImmutable,
+		UnsafeClass:     memoryfacts.UnsafeSafe,
+		CostClass:       memoryfacts.CostInstrumentationOnly,
+	}); err != nil {
+		t.Fatalf("add sibling borrow fact: %v", err)
+	}
+	return graph
 }
 
 func TestBuildLayoutReportRecordsP21DefaultReprCAndExportDecisions(t *testing.T) {

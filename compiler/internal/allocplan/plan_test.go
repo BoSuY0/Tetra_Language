@@ -338,6 +338,31 @@ uses alloc, islands, mem:
 	}
 }
 
+func TestPlannerRecordsExplicitIslandHandleParamSlot(t *testing.T) {
+	plan := allocationPlan(t, `
+func make_buf(prefix: []u8, isl: island, n: Int) -> []u8
+uses alloc, islands, mem:
+    var buf: []u8 = core.island_make_u8(isl, n)
+    buf[0] = prefix[0]
+    return buf
+
+func main() -> Int
+uses alloc, islands, mem:
+    var src: []u8 = make_u8(1)
+    src[0] = 9
+    island(64) as isl:
+        var out: []u8 = make_buf(src, isl, 4)
+        out[0] = 1
+        return out[0]
+    return 0
+`)
+
+	island := findAllocation(t, plan, "make_buf", "buf")
+	if !island.ExplicitIslandHandleParamSlotKnown || island.ExplicitIslandHandleParamSlot != 2 {
+		t.Fatalf("island handle param slot = known:%v slot:%d, want known slot 2: %+v", island.ExplicitIslandHandleParamSlotKnown, island.ExplicitIslandHandleParamSlot, island)
+	}
+}
+
 func TestPlannerReportsExplicitIslandRegionForGuardedLengths(t *testing.T) {
 	plan := allocationPlan(t, `
 func empty() -> Int

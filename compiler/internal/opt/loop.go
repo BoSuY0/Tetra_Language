@@ -219,7 +219,7 @@ func loopHasUnknownMutation(kind ir.IRInstrKind) bool {
 		ir.IRStackSliceU8, ir.IRStackSliceU16, ir.IRStackSliceI32,
 		ir.IRRawSliceFromParts, ir.IRSliceWindow, ir.IRSlicePrefix, ir.IRSliceSuffix,
 		ir.IRIslandNew, ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16,
-		ir.IRIslandMakeSliceI32, ir.IRIslandFree:
+		ir.IRIslandMakeSliceI32, ir.IRIslandFree, ir.IRIslandReset:
 		return true
 	default:
 		return false

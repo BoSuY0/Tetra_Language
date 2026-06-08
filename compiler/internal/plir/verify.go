@@ -61,7 +61,12 @@ func VerifyFunction(fn Function) error {
 	if err != nil {
 		return err
 	}
+	proofTerms, err := verifyProofTerms(fn, proofGuards)
+	if err != nil {
+		return err
+	}
 	rangeProofs := map[string]bool{}
+	indexFactsByProof := map[string][]Fact{}
 	for _, fact := range fn.RangeFacts {
 		if fact.Value == "" {
 			return fmt.Errorf("plir verifier: %s range fact has empty value", fn.Name)
@@ -87,6 +92,20 @@ func VerifyFunction(fn Function) error {
 		if fact.ValueID != "" && !hasValue {
 			return fmt.Errorf("plir verifier: %s fact %q references unknown value %q", fn.Name, fact.ID, fact.ValueID)
 		}
+		if fact.IslandID != "" {
+			if fact.Epoch <= 0 {
+				return fmt.Errorf("plir verifier: %s fact %q island_id requires positive epoch", fn.Name, fact.ID)
+			}
+			if fact.BaseID == "" {
+				return fmt.Errorf("plir verifier: %s fact %q island_id requires base_id", fn.Name, fact.ID)
+			}
+			if hasValue && value.Provenance.Kind != ProvenanceIsland {
+				return fmt.Errorf("plir verifier: %s fact %q island_id contradicts non-island value %q", fn.Name, fact.ID, fact.ValueID)
+			}
+		}
+		if fact.Epoch > 0 && fact.IslandID == "" {
+			return fmt.Errorf("plir verifier: %s fact %q epoch requires island_id", fn.Name, fact.ID)
+		}
 		switch fact.Kind {
 		case FactLenStable:
 			if !hasValue {
@@ -109,6 +128,7 @@ func VerifyFunction(fn Function) error {
 				return fmt.Errorf("plir verifier: %s fact %q index_in_range references unknown proof id %q", fn.Name, fact.ID, fact.ProofID)
 			}
 			rangeProofs[fact.ProofID] = true
+			indexFactsByProof[fact.ProofID] = append(indexFactsByProof[fact.ProofID], fact)
 		case FactProvenanceKnown:
 			if !hasValue {
 				return fmt.Errorf("plir verifier: %s fact %q provenance_known requires a value", fn.Name, fact.ID)
@@ -159,17 +179,129 @@ func VerifyFunction(fn Function) error {
 			if value.Borrow == BorrowImm || value.Borrow == BorrowMut {
 				return fmt.Errorf("plir verifier: %s fact %q moved contradicts borrowed value %q", fn.Name, fact.ID, fact.ValueID)
 			}
+		case FactIslandEpochAdvanced:
+			if fact.IslandID == "" || fact.Epoch <= 0 || fact.BaseID == "" {
+				return fmt.Errorf("plir verifier: %s fact %q island_epoch_advanced requires island_id, positive epoch, and base_id", fn.Name, fact.ID)
+			}
+			if strings.TrimSpace(fact.Source) == "" {
+				return fmt.Errorf("plir verifier: %s fact %q island_epoch_advanced requires source", fn.Name, fact.ID)
+			}
+			if strings.TrimSpace(fact.Reason) == "" {
+				return fmt.Errorf("plir verifier: %s fact %q island_epoch_advanced requires reason", fn.Name, fact.ID)
+			}
 		}
 	}
 	for _, use := range fn.ProofUses {
 		if !rangeProofs[use.ProofID] {
 			return fmt.Errorf("plir verifier: %s proof use %q has no explicit range proof fact", fn.Name, use.ProofID)
 		}
+		if _, ok := proofTerms[use.ProofID]; !ok {
+			return fmt.Errorf("plir verifier: %s proof use %q has no typed proof term", fn.Name, use.ProofID)
+		}
+	}
+	for _, term := range fn.ProofTerms {
+		if term.Kind != "bounds_check" {
+			continue
+		}
+		if !typedProofTermMatchesIndexFact(term, indexFactsByProof[term.ID]) {
+			return fmt.Errorf("plir verifier: %s typed proof term %q subject base/index/range does not match index_in_range fact", fn.Name, term.ID)
+		}
 	}
 	if err := verifyFunctionFactConsistency(fn, values); err != nil {
 		return err
 	}
+	if err := verifyFunctionSummaryCompleteness(fn, values); err != nil {
+		return err
+	}
 	return nil
+}
+
+func verifyProofTerms(fn Function, guards map[string]ProofGuard) (map[string]ProofTerm, error) {
+	terms := map[string]ProofTerm{}
+	for _, term := range fn.ProofTerms {
+		if strings.TrimSpace(term.ID) == "" {
+			return nil, fmt.Errorf("plir verifier: %s has typed proof term with empty id", fn.Name)
+		}
+		if _, exists := terms[term.ID]; exists {
+			return nil, fmt.Errorf("plir verifier: %s duplicate typed proof term %q", fn.Name, term.ID)
+		}
+		if _, ok := guards[term.ID]; !ok {
+			return nil, fmt.Errorf("plir verifier: %s typed proof term %q references unknown proof guard", fn.Name, term.ID)
+		}
+		switch term.Kind {
+		case "bounds_check":
+			if strings.TrimSpace(term.SubjectBaseID) == "" {
+				return nil, fmt.Errorf("plir verifier: %s typed proof term %q requires subject base", fn.Name, term.ID)
+			}
+			if strings.TrimSpace(term.IndexValueID) == "" {
+				return nil, fmt.Errorf("plir verifier: %s typed proof term %q requires index value", fn.Name, term.ID)
+			}
+			if strings.TrimSpace(term.Operation) == "" {
+				return nil, fmt.Errorf("plir verifier: %s typed proof term %q requires operation", fn.Name, term.ID)
+			}
+			if strings.TrimSpace(term.Range) == "" {
+				return nil, fmt.Errorf("plir verifier: %s typed proof term %q requires range", fn.Name, term.ID)
+			}
+		default:
+			return nil, fmt.Errorf("plir verifier: %s typed proof term %q has unknown kind %q", fn.Name, term.ID, term.Kind)
+		}
+		if term.Epoch > 0 && strings.TrimSpace(term.IslandID) == "" {
+			return nil, fmt.Errorf("plir verifier: %s typed proof term %q epoch requires island_id", fn.Name, term.ID)
+		}
+		if strings.TrimSpace(term.IslandID) != "" && (term.Epoch <= 0 || strings.TrimSpace(term.BaseID) == "") {
+			return nil, fmt.Errorf("plir verifier: %s typed proof term %q island proof requires positive epoch and base_id", fn.Name, term.ID)
+		}
+		terms[term.ID] = term
+	}
+	return terms, nil
+}
+
+func typedProofTermMatchesIndexFact(term ProofTerm, facts []Fact) bool {
+	for _, fact := range facts {
+		if fact.ValueID != term.IndexValueID {
+			continue
+		}
+		if fact.Range != term.Range {
+			continue
+		}
+		if rangeSubjectBase(fact.Range) != term.SubjectBaseID {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func rangeSubjectBase(rangeText string) string {
+	text := strings.TrimSpace(rangeText)
+	if parts := strings.Split(text, ".."); len(parts) == 2 {
+		return baseFromRangeUpper(parts[1])
+	}
+	if comma := strings.LastIndex(text, ","); comma >= 0 {
+		upper := strings.TrimRight(strings.TrimSpace(text[comma+1:]), ")] ")
+		return baseFromRangeUpper(upper)
+	}
+	return ""
+}
+
+func baseFromRangeUpper(upper string) string {
+	upper = strings.TrimSpace(upper)
+	if minus := strings.Index(upper, " - "); minus >= 0 {
+		upper = strings.TrimSpace(upper[:minus])
+	}
+	upper = strings.TrimSuffix(upper, ".len")
+	return strings.TrimSpace(upper)
+}
+
+func VerifyFunctionSummaryCompleteness(fn Function) error {
+	values := map[string]Value{}
+	for _, value := range fn.Values {
+		if value.ID == "" {
+			continue
+		}
+		values[value.ID] = value
+	}
+	return verifyFunctionSummaryCompleteness(fn, values)
 }
 
 func verifyCFG(fn Function) (map[string]BasicBlock, map[string]Operation, error) {
@@ -360,4 +492,216 @@ func verifyFunctionFactConsistency(fn Function, values map[string]Value) error {
 func isCopyAllocBuiltin(name string) bool {
 	return name == "core.string_copy" ||
 		(strings.HasPrefix(name, "core.slice_copy_") && !strings.HasPrefix(name, "core.slice_copy_into_"))
+}
+
+func verifyFunctionSummaryCompleteness(fn Function, values map[string]Value) error {
+	moduleBoundary := strings.TrimSpace(fn.Module) != "" || (fn.Summary != nil && fn.Summary.Public)
+	if !moduleBoundary {
+		return nil
+	}
+	if fn.Summary == nil {
+		if functionHasSummaryObligation(fn, values) {
+			return fmt.Errorf("plir verifier: %s summary completeness: module-boundary memory-bearing function requires FunctionSummary", fn.Name)
+		}
+		return nil
+	}
+	if err := verifySummaryParameterMetadata(fn, values); err != nil {
+		return err
+	}
+	if err := verifySummaryReturnMetadata(fn, values); err != nil {
+		return err
+	}
+	return nil
+}
+
+func functionHasSummaryObligation(fn Function, values map[string]Value) bool {
+	for _, op := range fn.Ops {
+		switch op.Kind {
+		case OpReturn:
+			for _, input := range op.Inputs {
+				for _, value := range summaryValuesForPath(input, values) {
+					if memoryBearingSummaryType(value.Type) {
+						return true
+					}
+				}
+			}
+		case OpGlobalStore, OpActorSend, OpClosure:
+			if operationHasMemoryBearingInput(op, values) {
+				return true
+			}
+		case OpCall:
+			if isTaskSummaryOperation(op) || isUnknownExternalSummaryOperation(op) {
+				if operationHasMemoryBearingInput(op, values) {
+					return true
+				}
+			}
+		}
+	}
+	for _, fact := range fn.Facts {
+		value, ok := values[fact.ValueID]
+		if !ok || !memoryBearingSummaryType(value.Type) {
+			continue
+		}
+		switch fact.Kind {
+		case FactMoved, FactBorrowedMut, FactNoAlias, FactProvenanceUnknown:
+			return true
+		}
+	}
+	return false
+}
+
+func verifySummaryParameterMetadata(fn Function, values map[string]Value) error {
+	for _, value := range values {
+		if value.Kind != ValueParam || !memoryBearingSummaryType(value.Type) {
+			continue
+		}
+		name := summaryParamNameForValue(value)
+		index := indexOfString(fn.Summary.ParamNames, name)
+		if index < 0 {
+			return fmt.Errorf("plir verifier: %s summary completeness: param_names missing memory-bearing parameter %q", fn.Name, name)
+		}
+		if index >= len(fn.Summary.ParamTypes) || strings.TrimSpace(fn.Summary.ParamTypes[index]) == "" {
+			return fmt.Errorf("plir verifier: %s summary completeness: param_types missing memory-bearing parameter %q", fn.Name, name)
+		}
+		if (value.Borrow == BorrowMut || value.Borrow == BorrowMove) && (index >= len(fn.Summary.ParamOwnership) || strings.TrimSpace(fn.Summary.ParamOwnership[index]) == "") {
+			return fmt.Errorf("plir verifier: %s summary completeness: param_ownership missing borrowed/moved memory-bearing parameter %q", fn.Name, name)
+		}
+	}
+	return nil
+}
+
+func verifySummaryReturnMetadata(fn Function, values map[string]Value) error {
+	for _, op := range fn.Ops {
+		if op.Kind != OpReturn {
+			continue
+		}
+		for _, input := range op.Inputs {
+			for _, value := range summaryValuesForPath(input, values) {
+				if !borrowedRegionSummaryType(value.Type) || !summaryReturnIsBorrowed(value) {
+					continue
+				}
+				if fn.Summary.ReturnOwnership != "borrow" {
+					return fmt.Errorf("plir verifier: %s summary completeness: borrowed memory return %q requires return_ownership borrow", fn.Name, value.ID)
+				}
+				if len(fn.Summary.ReturnRegionSummary) == 0 && !fn.Summary.ReturnRegionUnknown {
+					return fmt.Errorf("plir verifier: %s summary completeness: borrowed memory return %q requires return_region_summary or return_region_unknown", fn.Name, value.ID)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func operationHasMemoryBearingInput(op Operation, values map[string]Value) bool {
+	for _, input := range op.Inputs {
+		for _, value := range summaryValuesForPath(input, values) {
+			if memoryBearingSummaryType(value.Type) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func summaryValuesForPath(path string, values map[string]Value) []Value {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	if value, ok := values[path]; ok {
+		return []Value{value}
+	}
+	owner := summaryOwnerPath(path)
+	candidates := []string{owner}
+	for _, prefix := range []string{"view:", "alloc_intent:", "local:", "param:"} {
+		candidates = append(candidates, prefix+owner)
+	}
+	if owner != path {
+		candidates = append(candidates, path)
+		for _, prefix := range []string{"view:", "alloc_intent:", "local:", "param:"} {
+			candidates = append(candidates, prefix+path)
+		}
+	}
+	out := []Value(nil)
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		if candidate == "" || seen[candidate] {
+			continue
+		}
+		seen[candidate] = true
+		if value, ok := values[candidate]; ok {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func summaryOwnerPath(path string) string {
+	path = strings.TrimSpace(path)
+	for _, prefix := range []string{"view:", "alloc_intent:", "local:", "param:"} {
+		path = strings.TrimPrefix(path, prefix)
+	}
+	for strings.HasPrefix(path, "derived:") {
+		path = strings.TrimPrefix(path, "derived:")
+	}
+	return path
+}
+
+func summaryParamNameForValue(value Value) string {
+	name := summaryOwnerPath(value.ID)
+	if name == "" {
+		name = summaryOwnerPath(value.Provenance.Root)
+	}
+	if name == "" {
+		name = summaryOwnerPath(value.Lifetime.Owner)
+	}
+	return name
+}
+
+func summaryReturnIsBorrowed(value Value) bool {
+	if value.Borrow != BorrowNone {
+		return true
+	}
+	if value.Provenance.Kind == ProvenanceParam && strings.TrimSpace(value.Provenance.Root) != "" {
+		return true
+	}
+	return strings.Contains(summaryOwnerPath(value.Provenance.Root), ".")
+}
+
+func memoryBearingSummaryType(typeName string) bool {
+	typeName = strings.TrimSpace(typeName)
+	return typeName == "ptr" ||
+		typeName == "String" ||
+		typeName == "island" ||
+		strings.HasPrefix(typeName, "[]") ||
+		strings.Contains(strings.ToLower(typeName), "resource")
+}
+
+func borrowedRegionSummaryType(typeName string) bool {
+	typeName = strings.TrimSpace(typeName)
+	return typeName == "String" ||
+		typeName == "island" ||
+		strings.HasPrefix(typeName, "[]") ||
+		strings.Contains(strings.ToLower(typeName), "resource")
+}
+
+func isTaskSummaryOperation(op Operation) bool {
+	note := strings.ToLower(strings.TrimSpace(op.Note))
+	return strings.Contains(note, "task_spawn") || strings.Contains(note, "task_group")
+}
+
+func isUnknownExternalSummaryOperation(op Operation) bool {
+	note := strings.ToLower(strings.TrimSpace(op.Note))
+	return strings.Contains(note, "unknown external") ||
+		strings.Contains(note, "external call") ||
+		strings.HasPrefix(note, "ffi.") ||
+		strings.Contains(note, " extern")
+}
+
+func indexOfString(values []string, want string) int {
+	for index, value := range values {
+		if value == want {
+			return index
+		}
+	}
+	return -1
 }

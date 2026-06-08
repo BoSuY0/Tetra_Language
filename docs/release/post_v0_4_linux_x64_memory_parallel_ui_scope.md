@@ -37,8 +37,29 @@ The current Memory Production Core release-gate entrypoint is
 `bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir <dir>`.
 It writes `memory-production-linux-x64.json` and runs
 `go run ./tools/cmd/memory-production-smoke --report <path>`, followed by
-`go run ./tools/cmd/validate-memory-production --report <path>` and
-`go run ./tools/cmd/validate-artifact-hashes --manifest <dir>/artifact-hashes.json`.
+`go run ./tools/cmd/validate-memory-production --report <path>`,
+`go run ./cli/cmd/tetra targets --format=json > <dir>/targets.json`,
+`go run ./tools/cmd/validate-targets --report <dir>/targets.json`,
+`go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir <dir>/memory-fuzz-tier1`,
+`go run ./tools/cmd/validate-memory-fuzz-oracle --report <dir>/memory-fuzz-tier1/memory-fuzz-oracle.json --artifact-dir <dir>/memory-fuzz-tier1`,
+and
+`go run ./tools/cmd/validate-artifact-hashes --manifest <dir>/artifact-hashes.json`,
+then
+`go run ./tools/cmd/validate-memory-production --report <dir>/memory-production-linux-x64.json --manifest <dir>/memory-release-manifest.json --report-dir <dir>`.
+The `<dir>` value must be a fresh --report-dir: the gate refuses symlink,
+non-directory, and non-empty report directories before it writes memory
+evidence, so stale artifacts cannot be promoted as same-run proof. Local triage
+keeps the boundary text exact:
+`quick evidence is not full, stabilization, nightly, or release proof` unless
+the matching full gate and validators ran for that artifact set.
+The report directory must also contain `memory-release-manifest.json` linking
+the memory production report, target report, Tier 1 fuzz reports, artifact hash
+manifest, command provenance, target, git head, and report schemas. The Tier 1
+fuzz oracle subdirectory must contain `memory-fuzz-oracle.json`, `summary.md`,
+and `summary.json`; the validator checks those generated artifacts and command
+provenance in addition to the oracle JSON. Tier 2 nightly seed triage and Tier
+3 release-blocking focused fuzz remain policy boundaries for scheduled/release
+evidence, not an exhaustive fuzz proof.
 Its required memory evidence includes a deterministic `memcpy_u8`/`memset_u8`
 fuzz-like length sweep in addition to positive, negative, and stress cases. The
 gate also builds and runs checked-in memory examples for core memory,

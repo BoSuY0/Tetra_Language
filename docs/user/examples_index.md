@@ -108,35 +108,35 @@ Legacy `tetra.ui.v1` metadata examples are compatibility evidence for
 | `examples/wait_composition_smoke.tetra` | Poll, yield, timer-ready, tagged receive deadline, and task/timer select smoke. | native | exits 0 |
 | `examples/ctx_switch_sysv_smoke.tetra` | `core.ctx_switch` SysV x64 stack-switch smoke. | native linux-x64 macos-x64 | exits 66 |
 | `examples/ctx_switch_win64_smoke.tetra` | `core.ctx_switch` Win64 stack-switch smoke. | native windows-x64 | exits 66; excluded from linux-x64 smoke profile by target |
-| `examples/core_async_smoke.tetra` | Current v0.3.0 core async helper smoke for `select_or`, with `pair_sum` probe coverage kept compile-visible. | native | exits 42 through the deterministic `select_or` path; does not claim broader async runtime coverage |
+| `examples/core_async_smoke.tetra` | Current core async helper smoke for `select_or`, with `pair_sum` probe coverage kept compile-visible. | native | exits 42 through the deterministic `select_or` path; does not claim broader async runtime coverage |
 | `examples/core_accessibility_smoke.tetra` | Experimental Tetra Surface accessibility metadata smoke for role, action, value, and validation helper counts through `lib.core.accessibility`. | native | exits 42 through pure metadata helper calls; does not claim production accessibility tree runtime support |
-| `examples/core_capability_smoke.tetra` | Current v0.3.0 core capability token acquisition smoke for `cap.mem` and `cap.io`. | native | exits 42 using only caller-owned heap memory and local MMIO storage; does not imply host permission grant |
+| `examples/core_capability_smoke.tetra` | Current core capability token acquisition smoke for `cap.mem` and `cap.io`. | native | exits 42 using only caller-owned heap memory and local MMIO storage; does not imply host permission grant |
 | `examples/core_collections_smoke.tetra` | Current core collections smoke for stable generic `Vec<T>`/`HashMap<K,V>` source views plus legacy `[]i32` length, contains, count, and first-or helpers. | native | exits 42 |
 | `examples/core_component_smoke.tetra` | Planned Tetra Surface static component helper smoke for `clamp_size`, `inset_rect`, and `center_rect`. | native | exits 42 through pure measurement/layout helpers; does not claim dynamic component lists or runtime widget dispatch |
 | `examples/core_widgets_smoke.tetra` | Experimental Tetra Surface minimal widget helper smoke for `Panel` initialization and content bounds through `lib.core.widgets`. | native | exits 42 through pure widget helper calls; does not claim production widget toolkit support |
-| `examples/core_crypto_smoke.tetra` | Current v0.3.0 core crypto placeholder smoke for checksum, seed mixing, and equality branches. | native | exits 42; placeholder helpers are not cryptographic primitives |
+| `examples/core_crypto_smoke.tetra` | Current core crypto placeholder smoke for checksum, seed mixing, and equality branches. | native | exits 42; placeholder helpers are not cryptographic primitives |
 | `examples/core_draw_smoke.tetra` | Planned Tetra Surface software draw helper smoke for RGBA clear, rectangles, outlines, and text markers. | native linux-x64 | exits 42 through the starter scalar Surface host ABI; full `tetra.surface.runtime.v1` frame/event/checksum validation remains future |
 | `examples/core_style_smoke.tetra` | Stable Surface v1 widget style and theme helper smoke for default themes and focused state colors through `lib.core.style`. | native | exits 42 through pure style helper calls; does not claim production widget toolkit support |
-| `examples/core_filesystem_smoke.tetra` | Current v0.3.0 core filesystem placeholder smoke for path-string helper behavior. | native | exits 42; does not perform host filesystem access |
+| `examples/core_filesystem_smoke.tetra` | Current core filesystem placeholder smoke for path-string helper behavior. | native | exits 42; does not perform host filesystem access |
 | `examples/core_http_smoke.tetra` | Current v0.4.0 core HTTP/1.1 String and byte-buffer request-line routing, request-head framing, and response byte-buffer helper smoke for TechEmpower paths. | native | exits 42 using caller-owned heap memory; does not open sockets, parse full request bodies, or talk to PostgreSQL |
-| `examples/core_io_smoke.tetra` | Current v0.3.0 core IO capability/MMIO helper smoke. | native | exits 42 using caller-owned local MMIO storage; does not imply host IO permission grant |
+| `examples/core_io_smoke.tetra` | Current core IO capability/MMIO helper smoke. | native | exits 42 using caller-owned local MMIO storage; does not imply host IO permission grant |
 | `examples/core_json_smoke.tetra` | Current v0.4.0 core JSON byte-buffer helper smoke for compact response object writing and escaping. | native | exits 42 using caller-owned heap memory; does not perform HTTP or network IO |
-| `examples/core_math_smoke.tetra` | Current v0.3.0 core math module smoke for `add_i32`, `min_i32`, `max_i32`, and `clamp_i32`. | native | exits 42 |
-| `examples/core_memory_smoke.tetra` | Current v0.3.0 core memory module smoke for capability-bound `memset_u8` and `memcpy_u8`. | native | exits 42 |
-| `examples/core_memory_negative_length_smoke.tetra` | Current v0.3.0 core memory negative-length diagnostic smoke for capability-bound `memset_u8` and `memcpy_u8`. | native | exits 2 when both helpers reject negative lengths |
+| `examples/core_math_smoke.tetra` | Current core math module smoke for `add_i32`, `min_i32`, `max_i32`, and `clamp_i32`. | native | exits 42 |
+| `examples/core_memory_smoke.tetra` | Current core memory module smoke for capability-bound `memset_u8` and `memcpy_u8`. | native | exits 42 |
+| `examples/core_memory_negative_length_smoke.tetra` | Current core memory negative-length diagnostic smoke for capability-bound `memset_u8` and `memcpy_u8`. | native | exits 2 when both helpers reject negative lengths |
 | `examples/core_net_smoke.tetra` | Current v0.4.0 core networking runtime smoke for real linux-x64 TCP socket open, nonblocking mode, `SO_REUSEPORT`, `TCP_NODELAY`, loopback bind/listen, epoll create/add-read/add-read-write/mod-read-write/mod-read/delete/wait-zero/wait-one-into-zero, fd/flag extraction, event predicates, and close helpers; compiler integration separately covers loopback connect plus read/recv/write/send payload exchange. | native linux-x64 | exits 42; does not accept clients, read/write payloads, run a full event-loop abstraction, or talk to PostgreSQL |
-| `examples/core_networking_smoke.tetra` | Current v0.3.0 core networking placeholder smoke for port and retry-backoff helpers. | native | exits 42; does not perform network IO |
+| `examples/core_networking_smoke.tetra` | Current core networking placeholder smoke for port and retry-backoff helpers. | native | exits 42; does not perform network IO |
 | `examples/core_postgres_smoke.tetra` | Current v0.4.0 core PostgreSQL wire-frame byte-buffer helper smoke for startup, Simple Query, Terminate, and big-endian length fields. | native | exits 42 using caller-owned heap memory; does not open sockets, authenticate, parse server frames, or pool connections |
 | `examples/core_postgres_prepared_smoke.tetra` | Current v0.4.0 core PostgreSQL prepared-statement wire-frame smoke for Parse, Bind, Describe, Execute, Sync, one- and two-parameter text binds, and i16/i32 length fields. | native | exits 42 using caller-owned heap memory; does not open sockets, authenticate, parse server frames, manage prepared statement state, or pool connections |
 | `examples/core_postgres_result_smoke.tetra` | Current v0.4.0 core PostgreSQL result-frame smoke for typed frame headers, RowDescription type OIDs, DataRow value offsets/lengths, ASCII integer values, CommandComplete affected rows, and ReadyForQuery status bytes. | native | exits 42 using caller-owned heap memory; does not open sockets, authenticate, own connection state, manage prepared statements, or pool connections |
-| `examples/core_serialization_smoke.tetra` | Current v0.3.0 core serialization helper smoke for byte-pair packing and checksum behavior. | native | exits 42 |
-| `examples/core_slices_smoke.tetra` | Current v0.3.0 core slices helper smoke for `sum_i32`, `weighted_sum_i32`, and `sum_u8`. | native | exits 42 |
-| `examples/core_strings_smoke.tetra` | Current v0.3.0 core strings helper smoke for `ascii_len`, `ascii_sum`, and `is_empty`. | native | exits 42 |
+| `examples/core_serialization_smoke.tetra` | Current core serialization helper smoke for byte-pair packing and checksum behavior. | native | exits 42 |
+| `examples/core_slices_smoke.tetra` | Current core slices helper smoke for `sum_i32`, `weighted_sum_i32`, and `sum_u8`. | native | exits 42 |
+| `examples/core_strings_smoke.tetra` | Current core strings helper smoke for `ascii_len`, `ascii_sum`, and `is_empty`. | native | exits 42 |
 | `examples/core_text_smoke.tetra` | Surface v1 core text buffer helper smoke for caller-owned UTF-8 byte storage, caret movement, backspace, and composition-clear metadata. | native | exits 42 using caller-owned heap memory; does not claim IME, clipboard, rich text, or platform text-input host evidence |
 | `examples/core_surface_smoke.tetra` | Planned Tetra Surface core type-contract smoke for `Size`, `Rect`, and host/frame/event wrapper visibility. | native linux-x64 | exits 42 through the starter scalar Surface host ABI; full `tetra.surface.runtime.v1` frame/event/checksum validation remains future |
-| `examples/core_sync_smoke.tetra` | Current v0.3.0 core sync helper smoke for status merge, countdown, barrier target, and readiness behavior. | native | exits 42 |
-| `examples/core_testing_smoke.tetra` | Current v0.3.0 core testing helper smoke for assertion status composition. | native | exits 42 |
-| `examples/core_time_smoke.tetra` | Current v0.3.0 core time helper smoke for deterministic duration arithmetic. | native | exits 42; does not claim wall-clock runtime behavior |
+| `examples/core_sync_smoke.tetra` | Current core sync helper smoke for status merge, countdown, barrier target, and readiness behavior. | native | exits 42 |
+| `examples/core_testing_smoke.tetra` | Current core testing helper smoke for assertion status composition. | native | exits 42 |
+| `examples/core_time_smoke.tetra` | Current core time helper smoke for deterministic duration arithmetic. | native | exits 42; does not claim wall-clock runtime behavior |
 | `examples/experimental_math_smoke.tetra` | Experimental stdlib math mirror smoke; evidence only, not a stable support claim. | native | experimental evidence only; Excluded from linux-x64 smoke profile; exits 42 in linux/amd64 compiler test evidence |
 | `examples/experimental_memcpy_smoke.tetra` | Experimental stdlib memory mirror memcpy/memset smoke; evidence only, not a stable support claim. | native | experimental evidence only; Excluded from linux-x64 smoke profile; exits 93 in linux/amd64 compiler test evidence |
 | `examples/extension_smoke.tetra` | Extension method smoke. | native | exits 42 |
@@ -255,7 +255,9 @@ Use these notes to separate unsupported profile boundaries from real regressions
 
 - `generic`, `protocol`, and `extension` MVP examples are required in native smoke and should fail loudly on semantic regressions.
 - `generic_struct` coverage is experimental evidence only unless the feature registry promotes generic structs to `current`.
-- Enum payload constructor/match examples are current only for the narrow `v0.3.0` positional match/catch/if-let slice.
+- Enum payload constructor/match examples are current only for the narrow
+  positional match/catch/if-let slice recorded in
+  `docs/spec/current_supported_surface.md`.
 
 ### Safety/runtime examples (`V020-0731..0735`)
 

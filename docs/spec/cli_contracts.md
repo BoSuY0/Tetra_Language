@@ -9,6 +9,11 @@ in the v1 scope and release-gate documents, not in this current contract.
 
 The `tetra` CLI command surface is:
 
+The core user compiler workflow is `check` and `build`: `check` validates
+source without writing artifacts, and `build` applies the same language safety
+contract while emitting or linking artifacts. The remaining commands are
+release-covered tooling around that workflow, not optional safety levels.
+
 | Command | Primary behavior | Structured output |
 | --- | --- | --- |
 | `version` | Print the compiler version. | Text only. |

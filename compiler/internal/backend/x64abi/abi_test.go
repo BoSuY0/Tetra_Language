@@ -333,6 +333,62 @@ func TestEmitIslandFreeDebugEmitsDoubleFreeGuard(t *testing.T) {
 	}
 }
 
+func TestEmitIslandResetDebugChecksFreedMarkerAndReturnsHandle(t *testing.T) {
+	cases := []struct {
+		name              string
+		abi               ABI
+		wantExitCodeBytes func() []byte
+	}{
+		{
+			name: "sysv",
+			abi:  LinuxSysV(),
+			wantExitCodeBytes: func() []byte {
+				want := &x64.Emitter{}
+				want.MovEdiImm32(2)
+				return want.Buf
+			},
+		},
+		{
+			name: "win64",
+			abi:  NewWin64(),
+			wantExitCodeBytes: func() []byte {
+				want := &x64.Emitter{}
+				want.MovEcxImm32(2)
+				return want.Buf
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &x64.Emitter{}
+			stackDepth := 1
+			var importPatches []x64obj.ImportPatch
+			if err := tc.abi.EmitIslandReset(e, &stackDepth, x64.CodegenOptions{IslandsDebug: true}, &importPatches); err != nil {
+				t.Fatalf("EmitIslandReset: %v", err)
+			}
+			if stackDepth != 1 {
+				t.Fatalf("stack depth = %d, want 1", stackDepth)
+			}
+
+			freedCheck := &x64.Emitter{}
+			freedCheck.MovEaxFromRdiDisp(12)
+			freedCheck.TestEaxEax()
+			if !bytes.Contains(e.Buf, freedCheck.Buf) {
+				t.Fatalf("debug island reset freed check not emitted\n got=% x\nwant contains=% x", e.Buf, freedCheck.Buf)
+			}
+			if !bytes.Contains(e.Buf, tc.wantExitCodeBytes()) {
+				t.Fatalf("debug island reset exit code 2 not emitted\n got=% x", e.Buf)
+			}
+			headerReset := &x64.Emitter{}
+			headerReset.MovMem32RdiDispImm32(0, x64.IslandsDebugPageSize)
+			if !bytes.Contains(e.Buf, headerReset.Buf) {
+				t.Fatalf("debug island reset header cursor not emitted\n got=% x\nwant contains=% x", e.Buf, headerReset.Buf)
+			}
+		})
+	}
+}
+
 func TestEmitIslandNewRejectsInvalidSizeBeforeAllocator(t *testing.T) {
 	cases := []struct {
 		name          string

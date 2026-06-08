@@ -9,7 +9,7 @@ import (
 	compiler "tetra_language/compiler"
 )
 
-func TestBuildMakeConstructorsZeroLengthAndZeroIterationLinuxX64(t *testing.T) {
+func TestAllocationLengthMakeConstructorsZeroLengthAndZeroIterationLinuxX64(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
 	}
@@ -47,7 +47,7 @@ func TestBuildMakeConstructorsZeroLengthAndZeroIterationLinuxX64(t *testing.T) {
 	}
 }
 
-func TestBuildMakeConstructorsRejectNegativeLengthLinuxX64(t *testing.T) {
+func TestAllocationLengthMakeConstructorsRejectNegativeLengthLinuxX64(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
 	}
@@ -79,7 +79,7 @@ func TestBuildMakeConstructorsRejectNegativeLengthLinuxX64(t *testing.T) {
 	}
 }
 
-func TestBuildMakeConstructorsRejectByteSizeOverflowLinuxX64(t *testing.T) {
+func TestAllocationLengthMakeConstructorsRejectByteSizeOverflowLinuxX64(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
 	}
@@ -109,7 +109,7 @@ func TestBuildMakeConstructorsRejectByteSizeOverflowLinuxX64(t *testing.T) {
 	}
 }
 
-func TestBuildMakeConstructorsWasmBuildOnly(t *testing.T) {
+func TestAllocationLengthMakeConstructorsWasmBuildOnly(t *testing.T) {
 	src := `func main() -> Int
 uses alloc, islands, mem:
     var total = 0

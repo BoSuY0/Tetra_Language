@@ -124,11 +124,11 @@ runtime, host, or security guarantee.
 
 | Module | Function signature | Effects | Stability | Contract notes |
 | --- | --- | --- | --- | --- |
-| `lib.core.async` | `async func ready(value: Int) -> Int` | none | stable `v0.3.0` core | Async helper surface; no scheduler/runtime progress guarantee is implied. |
-| `lib.core.async` | `async func pair_sum(lhs: Int, rhs: Int) -> Int` | none | stable `v0.3.0` core | Async helper surface; awaits local helper calls only. |
-| `lib.core.async` | `func select_or(value: Int, fallback: Int) -> Int` | none | stable `v0.3.0` core | Pure fallback helper. |
-| `lib.core.capability` | `func mem() -> cap.mem` | `capability, mem` | stable `v0.3.0` core | Unsafe capability wrapper; callers still need matching effects. |
-| `lib.core.capability` | `func io() -> cap.io` | `capability, io` | stable `v0.3.0` core | Unsafe capability wrapper; callers still need matching effects. |
+| `lib.core.async` | `async func ready(value: Int) -> Int` | none | stable core | Async helper surface; no scheduler/runtime progress guarantee is implied. |
+| `lib.core.async` | `async func pair_sum(lhs: Int, rhs: Int) -> Int` | none | stable core | Async helper surface; awaits local helper calls only. |
+| `lib.core.async` | `func select_or(value: Int, fallback: Int) -> Int` | none | stable core | Pure fallback helper. |
+| `lib.core.capability` | `func mem() -> cap.mem` | `capability, mem` | stable core | Unsafe capability wrapper; callers still need matching effects. |
+| `lib.core.capability` | `func io() -> cap.io` | `capability, io` | stable core | Unsafe capability wrapper; callers still need matching effects. |
 | `lib.core.collections` | `func vec_from_slice<T>(items: []T) -> Vec<T>` | `mem` | stable `v0.4.0` core | Source-level generic view over caller-owned slice storage; no internal allocation. |
 | `lib.core.collections` | `func vec_len<T>(vec: Vec<T>) -> Int` | none | stable `v0.4.0` core | Returns the logical length captured by `vec_from_slice`; not a runtime allocator-backed vector. |
 | `lib.core.collections` | `func vec_first_or<T>(vec: Vec<T>, fallback: T) -> T` | `mem` | stable `v0.4.0` core | Generic first-value helper over caller-owned slice storage; returns fallback for an empty view. |
@@ -138,23 +138,23 @@ runtime, host, or security guarantee.
 | `lib.core.collections` | `func hash_map_first_value_or<K, V>(map: HashMap<K,V>, fallback: V) -> V` | `mem` | stable `v0.4.0` core | Generic first-value helper; no key lookup, hashing, resizing, or collision handling is implied. |
 | `lib.core.collections` | `func hash_map_get_i32_i32_or(map: HashMap<Int,Int>, key: Int, fallback: Int) -> Int` | `mem` | stable `v0.4.0` core | Specialized equality lookup for common `Int` keys and `Int` values over caller-owned slices. |
 | `lib.core.collections` | `func hash_map_get_u8_i32_or(map: HashMap<UInt8,Int>, key: UInt8, fallback: Int) -> Int` | `mem` | stable `v0.4.0` core | Specialized equality lookup for common `UInt8` keys and `Int` values over caller-owned slices. |
-| `lib.core.collections` | `func len_i32(values: []i32) -> Int` | `mem` | stable `v0.3.0` core | Legacy `[]i32` scan helper retained alongside generic collection views. |
-| `lib.core.collections` | `func contains_i32(values: []i32, needle: Int) -> Bool` | `mem` | stable `v0.3.0` core | Legacy `[]i32` scan helper retained alongside generic collection views. |
-| `lib.core.collections` | `func count_i32(values: []i32, needle: Int) -> Int` | `mem` | stable `v0.3.0` core | Legacy `[]i32` scan helper retained alongside generic collection views. |
-| `lib.core.collections` | `func first_or_i32(values: []i32, fallback: Int) -> Int` | `mem` | stable `v0.3.0` core | Legacy `[]i32` scan helper; returns fallback for an empty slice. |
-| `lib.core.crypto` | `func interface_strength() -> Int` | none | stable `v0.3.0` core | Stable interface marker for examples and API docs. |
-| `lib.core.crypto` | `func mix_seed(seed: Int, value: Int) -> Int` | none | stable `v0.3.0` core | Deterministic non-negative mixer for reproducible interface tests, saturating the i32 minimum normalization case; no encryption or authentication claim. |
-| `lib.core.crypto` | `func checksum_u8(values: []u8) -> Int` | `mem` | stable `v0.3.0` core | Deterministic byte checksum for examples and API-shape tests. |
-| `lib.core.crypto` | `func constant_time_eq_u8(lhs: []u8, rhs: []u8) -> Bool` | `mem` | stable `v0.3.0` core | Equality helper for byte slices; scans equal-length inputs without early value mismatch exit. |
+| `lib.core.collections` | `func len_i32(values: []i32) -> Int` | `mem` | stable core | Legacy `[]i32` scan helper retained alongside generic collection views. |
+| `lib.core.collections` | `func contains_i32(values: []i32, needle: Int) -> Bool` | `mem` | stable core | Legacy `[]i32` scan helper retained alongside generic collection views. |
+| `lib.core.collections` | `func count_i32(values: []i32, needle: Int) -> Int` | `mem` | stable core | Legacy `[]i32` scan helper retained alongside generic collection views. |
+| `lib.core.collections` | `func first_or_i32(values: []i32, fallback: Int) -> Int` | `mem` | stable core | Legacy `[]i32` scan helper; returns fallback for an empty slice. |
+| `lib.core.crypto` | `func interface_strength() -> Int` | none | stable core | Stable interface marker for examples and API docs. |
+| `lib.core.crypto` | `func mix_seed(seed: Int, value: Int) -> Int` | none | stable core | Deterministic non-negative mixer for reproducible interface tests, saturating the i32 minimum normalization case; no encryption or authentication claim. |
+| `lib.core.crypto` | `func checksum_u8(values: []u8) -> Int` | `mem` | stable core | Deterministic byte checksum for examples and API-shape tests. |
+| `lib.core.crypto` | `func constant_time_eq_u8(lhs: []u8, rhs: []u8) -> Bool` | `mem` | stable core | Equality helper for byte slices; scans equal-length inputs without early value mismatch exit. |
 | `lib.core.filesystem` | `func exists(path: String, io_cap: cap.io) -> Bool` | `io` | stable `v0.4.0` linux-x64 slice; `fs_exists` linux-x86/linux-x32 smokes plus scheduler composition | Host-backed existence check through `__tetra_fs_exists`; requires an explicit `cap.io` token and returns false for missing, embedded-NUL, invalid, too-long, or unsupported paths. On linux-x86 and linux-x32 this covers pure filesystem existence programs and single-spawn self-host scheduler composition; broader filesystem/syscall parity remains unpromoted. |
-| `lib.core.filesystem` | `func has_leading_slash(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; no host access. |
-| `lib.core.filesystem` | `func ends_with_slash(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; no host access. |
-| `lib.core.filesystem` | `func is_root(path: String) -> Bool` | none | stable `v0.3.0` core | Pure string-path utility; treats `/` as root. |
-| `lib.core.filesystem` | `func slash_count(path: String) -> Int` | none | stable `v0.3.0` core | Pure string-path utility; counts slash bytes. |
-| `lib.core.filesystem` | `func directory_depth(path: String) -> Int` | none | stable `v0.3.0` core | Pure string-path utility; counts non-empty path segments. |
-| `lib.core.io` | `func capability_io() -> cap.io` | `capability, io` | stable `v0.3.0` core | Unsafe capability wrapper; no host permission is granted by import alone. |
-| `lib.core.io` | `func mmio_read_i32(addr: ptr, io_cap: cap.io) -> Int` | `io, mmio` | stable `v0.3.0` core | Unsafe MMIO wrapper over caller-selected address and token. |
-| `lib.core.io` | `func mmio_write_i32(addr: ptr, value: Int, io_cap: cap.io) -> Int` | `io, mmio` | stable `v0.3.0` core | Unsafe MMIO wrapper over caller-selected address and token. |
+| `lib.core.filesystem` | `func has_leading_slash(path: String) -> Bool` | none | stable core | Pure string-path utility; no host access. |
+| `lib.core.filesystem` | `func ends_with_slash(path: String) -> Bool` | none | stable core | Pure string-path utility; no host access. |
+| `lib.core.filesystem` | `func is_root(path: String) -> Bool` | none | stable core | Pure string-path utility; treats `/` as root. |
+| `lib.core.filesystem` | `func slash_count(path: String) -> Int` | none | stable core | Pure string-path utility; counts slash bytes. |
+| `lib.core.filesystem` | `func directory_depth(path: String) -> Int` | none | stable core | Pure string-path utility; counts non-empty path segments. |
+| `lib.core.io` | `func capability_io() -> cap.io` | `capability, io` | stable core | Unsafe capability wrapper; no host permission is granted by import alone. |
+| `lib.core.io` | `func mmio_read_i32(addr: ptr, io_cap: cap.io) -> Int` | `io, mmio` | stable core | Unsafe MMIO wrapper over caller-selected address and token. |
+| `lib.core.io` | `func mmio_write_i32(addr: ptr, value: Int, io_cap: cap.io) -> Int` | `io, mmio` | stable core | Unsafe MMIO wrapper over caller-selected address and token. |
 | `lib.core.net` | `func socket_tcp4(io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Opens a real IPv4 TCP stream socket through the linux-x64 runtime and returns the fd or a negative errno-style syscall result. |
 | `lib.core.net` | `func bind_tcp4_loopback(fd: Int, port: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Binds a caller-owned fd to `127.0.0.1:port`; pass `0` to let the kernel choose an ephemeral port. Returns `-1` before the syscall for ports outside `0..65535`. |
 | `lib.core.net` | `func connect_tcp4_loopback(fd: Int, port: Int, io_cap: cap.io) -> Int` | `io` | stable `v0.4.0` linux-x64 slice | Connects a caller-owned fd to `127.0.0.1:port` through Linux `connect` and returns the syscall status. Returns `-1` before the syscall for ports outside `0..65535`. |
@@ -305,41 +305,41 @@ runtime, host, or security guarantee.
 | `lib.core.postgres` | `func read_i32_be(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a non-negative big-endian i32 field from a caller-owned byte buffer, or `-1` for negative starts, wrapped offsets, missing bytes, or high-bit values that cannot be represented as a non-negative `Int`. |
 | `lib.core.postgres` | `func read_i32_be_signed(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a PostgreSQL i32 length field, normalizing any negative signed value, negative start, wrapped offset, or missing byte to `-1`. |
 | `lib.core.postgres` | `func read_i16_be(src: []u8, start: Int) -> Int` | `mem` | stable `v0.4.0` core | Reads a big-endian i16 field from a caller-owned byte buffer, or `-1` for negative starts, wrapped offsets, or missing bytes. |
-| `lib.core.math` | `func add_i32(a: Int, b: Int) -> Int` | none | stable `v0.3.0` core | Pure integer addition helper. |
-| `lib.core.math` | `func min_i32(a: Int, b: Int) -> Int` | none | stable `v0.3.0` core | Pure integer minimum helper. |
-| `lib.core.math` | `func max_i32(a: Int, b: Int) -> Int` | none | stable `v0.3.0` core | Pure integer maximum helper. |
-| `lib.core.math` | `func clamp_i32(value: Int, lo: Int, hi: Int) -> Int` | none | stable `v0.3.0` core | Pure integer helper; assumes caller chooses sensible bounds. |
-| `lib.core.memory` | `func memset_u8(dst: ptr, v: UInt8, n: Int, mem: cap.mem) -> Int` | `mem` | stable `v0.3.0` core | Unsafe byte helper; no allocation, bounds validation, or permission grant. |
-| `lib.core.memory` | `func memcpy_u8(dst: ptr, src: ptr, n: Int, mem: cap.mem) -> Int` | `mem` | stable `v0.3.0` core | Unsafe byte helper; caller owns pointer validity and overlap assumptions. |
-| `lib.core.networking` | `func default_port_http() -> Int` | none | stable `v0.3.0` core | Standard HTTP port constant. |
-| `lib.core.networking` | `func default_port_https() -> Int` | none | stable `v0.3.0` core | Standard HTTPS port constant. |
-| `lib.core.networking` | `func clamp_port(port: Int) -> Int` | none | stable `v0.3.0` core | Deterministic port-range policy helper. |
-| `lib.core.networking` | `func is_valid_port(port: Int) -> Bool` | none | stable `v0.3.0` core | Port-range validation helper for endpoint configuration. |
-| `lib.core.networking` | `func choose_port(preferred: Int, fallback: Int) -> Int` | none | stable `v0.3.0` core | Endpoint configuration helper; `0` preferred port falls back. |
-| `lib.core.networking` | `func retry_backoff_ms(attempt: Int, base_ms: Int, max_ms: Int) -> Int` | none | stable `v0.3.0` core | Deterministic retry backoff policy helper; negative bases clamp to `0`, non-negative caps are honored before overflow, and uncapped overflow saturates to `2147483647`. |
-| `lib.core.serialization` | `func clamp_u8(value: Int) -> Int` | none | stable `v0.3.0` core | Pure packing helper; not a general serializer. |
-| `lib.core.serialization` | `func pack_u8_pair(high: Int, low: Int) -> Int` | none | stable `v0.3.0` core | Pure two-byte packing helper; not a wire-format guarantee. |
-| `lib.core.serialization` | `func unpack_u8_high(packed: Int) -> Int` | none | stable `v0.3.0` core | Pure unpack helper; negative packed input returns `0`. |
-| `lib.core.serialization` | `func unpack_u8_low(packed: Int) -> Int` | none | stable `v0.3.0` core | Pure unpack helper; negative packed input returns `0`. |
-| `lib.core.serialization` | `func checksum_u8(values: []u8) -> Int` | `mem` | stable `v0.3.0` core | Simple checksum helper; not authentication or encryption. |
-| `lib.core.slices` | `func sum_i32(values: []i32) -> Int` | `mem` | stable `v0.3.0` core | Slice scan helper for supported element type only. |
-| `lib.core.slices` | `func weighted_sum_i32(values: []i32) -> Int` | `mem` | stable `v0.3.0` core | Slice scan helper for supported element type only. |
-| `lib.core.slices` | `func sum_u8(values: []u8) -> Int` | `mem` | stable `v0.3.0` core | Slice scan helper for supported element type only. |
-| `lib.core.strings` | `func ascii_len(text: String) -> Int` | none | stable `v0.3.0` core | ASCII/byte-oriented helper; no Unicode normalization guarantee. |
-| `lib.core.strings` | `func ascii_sum(text: String) -> Int` | none | stable `v0.3.0` core | ASCII/byte-oriented helper; no Unicode normalization guarantee. |
-| `lib.core.strings` | `func is_empty(text: String) -> Bool` | none | stable `v0.3.0` core | ASCII/byte-oriented helper built from `ascii_len`. |
-| `lib.core.sync` | `func merge_status(lhs: Int, rhs: Int) -> Int` | none | stable `v0.3.0` core | Pure status helper; not a runtime synchronization primitive. |
-| `lib.core.sync` | `func all_ready(lhs: Bool, rhs: Bool) -> Bool` | none | stable `v0.3.0` core | Pure boolean helper; not a runtime synchronization primitive. |
-| `lib.core.sync` | `func spin_countdown(start: Int, ticks: Int) -> Int` | none | stable `v0.3.0` core | Pure countdown helper; no sleeping or scheduling behavior. |
-| `lib.core.sync` | `func barrier_target(workers: Int) -> Int` | none | stable `v0.3.0` core | Pure clamp helper; not a runtime barrier. |
-| `lib.core.testing` | `func assert_true(value: Bool) -> Int` | none | stable `v0.3.0` core | Status-code helper; `0` means pass and `1` means fail. |
-| `lib.core.testing` | `func assert_false(value: Bool) -> Int` | none | stable `v0.3.0` core | Status-code helper; `0` means pass and `1` means fail. |
-| `lib.core.testing` | `func assert_eq_i32(actual: Int, expected: Int) -> Int` | none | stable `v0.3.0` core | Status-code helper; `0` means pass and `1` means fail. |
-| `lib.core.testing` | `func combine(lhs: Int, rhs: Int) -> Int` | none | stable `v0.3.0` core | Status-code helper; returns first non-zero status. |
-| `lib.core.time` | `func millis_from_seconds(seconds: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; negative input clamps to `0` and positive overflow saturates to `Int` max. |
-| `lib.core.time` | `func seconds_from_millis(milliseconds: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; negative input clamps to `0`. |
-| `lib.core.time` | `func clamp_timeout_ms(value: Int, lo: Int, hi: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; assumes caller chooses sensible bounds. |
-| `lib.core.time` | `func add_duration_ms(base: Int, delta: Int) -> Int` | none | stable `v0.3.0` core | Pure duration arithmetic; adds `delta` to `base`, clamps a negative summed result to `0`, and saturates positive overflow to `Int` max. |
+| `lib.core.math` | `func add_i32(a: Int, b: Int) -> Int` | none | stable core | Pure integer addition helper. |
+| `lib.core.math` | `func min_i32(a: Int, b: Int) -> Int` | none | stable core | Pure integer minimum helper. |
+| `lib.core.math` | `func max_i32(a: Int, b: Int) -> Int` | none | stable core | Pure integer maximum helper. |
+| `lib.core.math` | `func clamp_i32(value: Int, lo: Int, hi: Int) -> Int` | none | stable core | Pure integer helper; assumes caller chooses sensible bounds. |
+| `lib.core.memory` | `func memset_u8(dst: ptr, v: UInt8, n: Int, mem: cap.mem) -> Int` | `mem` | stable core | Unsafe byte helper; no allocation, bounds validation, or permission grant. |
+| `lib.core.memory` | `func memcpy_u8(dst: ptr, src: ptr, n: Int, mem: cap.mem) -> Int` | `mem` | stable core | Unsafe byte helper; caller owns pointer validity and overlap assumptions. |
+| `lib.core.networking` | `func default_port_http() -> Int` | none | stable core | Standard HTTP port constant. |
+| `lib.core.networking` | `func default_port_https() -> Int` | none | stable core | Standard HTTPS port constant. |
+| `lib.core.networking` | `func clamp_port(port: Int) -> Int` | none | stable core | Deterministic port-range policy helper. |
+| `lib.core.networking` | `func is_valid_port(port: Int) -> Bool` | none | stable core | Port-range validation helper for endpoint configuration. |
+| `lib.core.networking` | `func choose_port(preferred: Int, fallback: Int) -> Int` | none | stable core | Endpoint configuration helper; `0` preferred port falls back. |
+| `lib.core.networking` | `func retry_backoff_ms(attempt: Int, base_ms: Int, max_ms: Int) -> Int` | none | stable core | Deterministic retry backoff policy helper; negative bases clamp to `0`, non-negative caps are honored before overflow, and uncapped overflow saturates to `2147483647`. |
+| `lib.core.serialization` | `func clamp_u8(value: Int) -> Int` | none | stable core | Pure packing helper; not a general serializer. |
+| `lib.core.serialization` | `func pack_u8_pair(high: Int, low: Int) -> Int` | none | stable core | Pure two-byte packing helper; not a wire-format guarantee. |
+| `lib.core.serialization` | `func unpack_u8_high(packed: Int) -> Int` | none | stable core | Pure unpack helper; negative packed input returns `0`. |
+| `lib.core.serialization` | `func unpack_u8_low(packed: Int) -> Int` | none | stable core | Pure unpack helper; negative packed input returns `0`. |
+| `lib.core.serialization` | `func checksum_u8(values: []u8) -> Int` | `mem` | stable core | Simple checksum helper; not authentication or encryption. |
+| `lib.core.slices` | `func sum_i32(values: []i32) -> Int` | `mem` | stable core | Slice scan helper for supported element type only. |
+| `lib.core.slices` | `func weighted_sum_i32(values: []i32) -> Int` | `mem` | stable core | Slice scan helper for supported element type only. |
+| `lib.core.slices` | `func sum_u8(values: []u8) -> Int` | `mem` | stable core | Slice scan helper for supported element type only. |
+| `lib.core.strings` | `func ascii_len(text: String) -> Int` | none | stable core | ASCII/byte-oriented helper; no Unicode normalization guarantee. |
+| `lib.core.strings` | `func ascii_sum(text: String) -> Int` | none | stable core | ASCII/byte-oriented helper; no Unicode normalization guarantee. |
+| `lib.core.strings` | `func is_empty(text: String) -> Bool` | none | stable core | ASCII/byte-oriented helper built from `ascii_len`. |
+| `lib.core.sync` | `func merge_status(lhs: Int, rhs: Int) -> Int` | none | stable core | Pure status helper; not a runtime synchronization primitive. |
+| `lib.core.sync` | `func all_ready(lhs: Bool, rhs: Bool) -> Bool` | none | stable core | Pure boolean helper; not a runtime synchronization primitive. |
+| `lib.core.sync` | `func spin_countdown(start: Int, ticks: Int) -> Int` | none | stable core | Pure countdown helper; no sleeping or scheduling behavior. |
+| `lib.core.sync` | `func barrier_target(workers: Int) -> Int` | none | stable core | Pure clamp helper; not a runtime barrier. |
+| `lib.core.testing` | `func assert_true(value: Bool) -> Int` | none | stable core | Status-code helper; `0` means pass and `1` means fail. |
+| `lib.core.testing` | `func assert_false(value: Bool) -> Int` | none | stable core | Status-code helper; `0` means pass and `1` means fail. |
+| `lib.core.testing` | `func assert_eq_i32(actual: Int, expected: Int) -> Int` | none | stable core | Status-code helper; `0` means pass and `1` means fail. |
+| `lib.core.testing` | `func combine(lhs: Int, rhs: Int) -> Int` | none | stable core | Status-code helper; returns first non-zero status. |
+| `lib.core.time` | `func millis_from_seconds(seconds: Int) -> Int` | none | stable core | Pure duration arithmetic; negative input clamps to `0` and positive overflow saturates to `Int` max. |
+| `lib.core.time` | `func seconds_from_millis(milliseconds: Int) -> Int` | none | stable core | Pure duration arithmetic; negative input clamps to `0`. |
+| `lib.core.time` | `func clamp_timeout_ms(value: Int, lo: Int, hi: Int) -> Int` | none | stable core | Pure duration arithmetic; assumes caller chooses sensible bounds. |
+| `lib.core.time` | `func add_duration_ms(base: Int, delta: Int) -> Int` | none | stable core | Pure duration arithmetic; adds `delta` to `base`, clamps a negative summed result to `0`, and saturates positive overflow to `Int` max. |
 
 ## `lib.core.math`
 

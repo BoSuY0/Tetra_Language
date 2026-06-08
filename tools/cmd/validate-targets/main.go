@@ -265,11 +265,17 @@ func validateMemoryCapabilityClaims(entry targetReportEntry) error {
 	if entry.BuildOnly && (entry.MemoryRun == "yes" || entry.MemoryClaimLevel == "production/host_runtime") {
 		return fmt.Errorf("target metadata[%s] runtime memory claim requires target runtime evidence, but target is build-only", entry.Triple)
 	}
-	if entry.MemoryRawDiagnostics == "yes" && !hasRawDiagnosticsEvidence(entry) {
-		return fmt.Errorf("target metadata[%s] raw diagnostics claim requires raw diagnostics evidence", entry.Triple)
-	}
 	if (entry.MemoryRegionLowering == "yes" || entry.MemoryRegionLowering == "yes/partial" || entry.MemoryRegionLowering == "partial") && !hasLoweredArtifactEvidence(entry) {
 		return fmt.Errorf("target metadata[%s] region lowering claim requires lowered artifact evidence", entry.Triple)
+	}
+	if (entry.MemoryRun == "yes" || entry.MemoryClaimLevel == "production/host_runtime") && !hasRuntimeMemoryClaimEvidence(entry) {
+		if entry.Triple == "linux-x64" {
+			return fmt.Errorf("target metadata[%s] production runtime memory claim requires linux-x64 runner/artifact evidence", entry.Triple)
+		}
+		return fmt.Errorf("target metadata[%s] runtime memory claim requires target-host/runner evidence", entry.Triple)
+	}
+	if entry.MemoryRawDiagnostics == "yes" && !hasRawDiagnosticsEvidence(entry) {
+		return fmt.Errorf("target metadata[%s] raw diagnostics claim requires raw diagnostics evidence", entry.Triple)
 	}
 	if requiresTargetABIForAlignment(entry.MemoryAlignmentSemantics) && !hasTargetSpecificABIEvidence(entry) {
 		return fmt.Errorf("target metadata[%s] alignment claim requires target-specific ABI evidence", entry.Triple)
@@ -298,11 +304,38 @@ func validateMemoryCapabilityClaims(entry targetReportEntry) error {
 	return nil
 }
 
-func hasRawDiagnosticsEvidence(entry targetReportEntry) bool {
+func hasRuntimeMemoryClaimEvidence(entry targetReportEntry) bool {
+	if entry.Triple == "linux-x64" {
+		return hasLinuxX64RuntimeMemoryEvidence(entry)
+	}
+	if !entry.RunSupported {
+		return false
+	}
+	switch entry.RunMode {
+	case "host_native":
+		return entry.RunnerProbeCommand != "" &&
+			entry.ReleaseGate != "" &&
+			len(entry.EvidenceArtifacts) > 0
+	case "wasi_runner", "web_runner":
+		return entry.RunRunner != "" &&
+			entry.RunnerProbeCommand != "" &&
+			entry.ReleaseGate != "" &&
+			len(entry.EvidenceArtifacts) > 0
+	default:
+		return false
+	}
+}
+
+func hasLinuxX64RuntimeMemoryEvidence(entry targetReportEntry) bool {
 	return entry.Triple == "linux-x64" &&
 		entry.RunSupported &&
 		entry.RuntimeStatus == "production" &&
-		containsString(entry.EvidenceArtifacts, entry.Triple+"-runner.json")
+		containsString(entry.EvidenceArtifacts, "linux-x64-abi.json") &&
+		containsString(entry.EvidenceArtifacts, "linux-x64-runner.json")
+}
+
+func hasRawDiagnosticsEvidence(entry targetReportEntry) bool {
+	return hasLinuxX64RuntimeMemoryEvidence(entry)
 }
 
 func hasLoweredArtifactEvidence(entry targetReportEntry) bool {

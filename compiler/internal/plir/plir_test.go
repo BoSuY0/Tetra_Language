@@ -146,6 +146,50 @@ uses alloc, capability, mem:
 	}
 }
 
+func TestFromCheckedProgramDoesNotClaimNoAliasAfterCallbackInoutBoundary(t *testing.T) {
+	checked := checkedProgram(t, `
+func touch(view: inout []i32) -> Int
+uses mem:
+    return view.len
+
+func sum_callback(view: inout []i32, cb: fn(inout []i32) -> Int uses mem) -> Int
+uses mem:
+    cb(view)
+    return view.len
+
+func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = make_i32(1)
+    xs[0] = 1
+    return sum_callback(xs, touch)
+`)
+
+	prog, err := FromCheckedProgram(checked)
+	if err != nil {
+		t.Fatalf("FromCheckedProgram: %v", err)
+	}
+	if err := VerifyProgram(prog); err != nil {
+		t.Fatalf("VerifyProgram: %v\n%s", err, FormatText(prog))
+	}
+	fn := findFunction(t, prog, "sum_callback")
+	if !hasFactForValue(fn, FactBorrowedMut, "param:view") {
+		t.Fatalf("sum_callback missing borrowed_mut for inout param: %#v", fn.Facts)
+	}
+	if hasFactForValue(fn, FactNoAlias, "param:view") {
+		t.Fatalf("callback inout boundary must kill no_alias for param:view:\n%s", FormatText(prog))
+	}
+	foundBoundaryNote := false
+	for _, op := range fn.Ops {
+		if op.Kind == OpCall && strings.Contains(op.Note, "alias_boundary:function_typed_inout") {
+			foundBoundaryNote = true
+			break
+		}
+	}
+	if !foundBoundaryNote {
+		t.Fatalf("callback inout call missing alias boundary note:\n%s", FormatText(prog))
+	}
+}
+
 func TestFromCheckedProgramTiesIslandAllocationFactsToIslandHandle(t *testing.T) {
 	checked := checkedProgram(t, `
 func main() -> Int
@@ -185,6 +229,7 @@ uses alloc, islands, mem:
 
 	var sawAllocOp bool
 	var sawAlignedFact bool
+	var sawIslandMemoryRefFact bool
 	for _, op := range fn.Ops {
 		if op.Kind == OpAllocIntent && containsString(op.Outputs, "alloc_intent:xs") {
 			sawAllocOp = true
@@ -197,12 +242,62 @@ uses alloc, islands, mem:
 		if fact.Kind == FactAligned && fact.ValueID == "alloc_intent:xs" && fact.Region == "island:isl" {
 			sawAlignedFact = true
 		}
+		if fact.ValueID == "alloc_intent:xs" && fact.IslandID == "island:isl" && fact.Epoch == 1 && fact.BaseID == "alloc_intent:xs" {
+			sawIslandMemoryRefFact = true
+		}
 	}
 	if !sawAllocOp {
 		t.Fatalf("missing alloc_intent operation for xs: %#v", fn.Ops)
 	}
 	if !sawAlignedFact {
 		t.Fatalf("missing island allocation alignment fact: %#v", fn.Facts)
+	}
+	if !sawIslandMemoryRefFact {
+		t.Fatalf("missing island memory ref identity on allocation facts: %#v", fn.Facts)
+	}
+}
+
+func TestFromCheckedProgramRecordsIslandResetEpochFact(t *testing.T) {
+	checked := checkedProgram(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        let next: island = core.island_reset(isl)
+        let xs: []u8 = core.island_make_u8(next, 1)
+        free(next)
+        return xs.len
+    }
+    return 0
+`)
+
+	prog, err := FromCheckedProgram(checked)
+	if err != nil {
+		t.Fatalf("FromCheckedProgram: %v", err)
+	}
+	if err := VerifyProgram(prog); err != nil {
+		t.Fatalf("VerifyProgram: %v\n%s", err, FormatText(prog))
+	}
+	fn := findFunction(t, prog, "main")
+	found := false
+	foundResetAllocation := false
+	for _, fact := range fn.Facts {
+		if fact.ValueID == "alloc_intent:xs" && fact.IslandID == "island:isl" && fact.Epoch == 2 && fact.BaseID == "alloc_intent:xs" {
+			foundResetAllocation = true
+		}
+		if fact.Kind != FactIslandEpochAdvanced {
+			continue
+		}
+		found = true
+		if fact.IslandID != "island:isl" || fact.Epoch != 2 || fact.BaseID == "" {
+			t.Fatalf("island reset fact = %+v, want island:isl epoch 2 with base_id\n%s", fact, FormatText(prog))
+		}
+	}
+	if !found {
+		t.Fatalf("main missing island_epoch_advanced fact:\n%s", FormatText(prog))
+	}
+	if !foundResetAllocation {
+		t.Fatalf("reset allocation xs missing island:isl epoch 2 identity:\n%s", FormatText(prog))
 	}
 }
 
@@ -272,6 +367,39 @@ func TestVerifyProgramRejectsFakeActorMovedFactClaims(t *testing.T) {
 	}
 }
 
+func TestVerifyFunctionRejectsModuleBoundaryBorrowedReturnWithoutRegionSummary(t *testing.T) {
+	err := VerifyFunction(Function{
+		Name:   "borrowView",
+		Module: "math",
+		Summary: &FunctionSummary{
+			Public:          true,
+			ParamNames:      []string{"xs"},
+			ParamTypes:      []string{"[]u8"},
+			ParamOwnership:  []string{"borrow"},
+			ReturnType:      "[]u8",
+			ReturnOwnership: "borrow",
+		},
+		Values: []Value{
+			{
+				ID:         "param:xs",
+				Kind:       ValueParam,
+				Type:       "[]u8",
+				Source:     "math.tetra:2:17",
+				Region:     "fn:borrowView",
+				Provenance: Provenance{Kind: ProvenanceParam, Root: "xs"},
+				Lifetime:   Lifetime{Birth: "entry", Death: "return", Owner: "xs"},
+				Borrow:     BorrowImm,
+				Escape:     EscapeReturn,
+			},
+		},
+		Ops:   []Operation{{ID: "return_xs", Kind: OpReturn, Source: "math.tetra:3:5", Inputs: []string{"xs"}}},
+		Facts: []Fact{{ID: "prov_xs", Kind: FactProvenanceKnown, ValueID: "param:xs", Source: "math.tetra:2:17", Reason: "parameter provenance"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "summary completeness") || !strings.Contains(err.Error(), "return_region_summary") {
+		t.Fatalf("VerifyFunction error = %v, want borrowed return summary completeness rejection", err)
+	}
+}
+
 func TestFromCheckedProgramRecordsWhileRangeCFGAndProofUse(t *testing.T) {
 	checked := checkedProgram(t, `
 func sum(xs: []i32) -> Int
@@ -328,6 +456,18 @@ uses alloc, mem:
 	}
 	if !containsString(fn.RangeFacts[0].Derivation, "non_negative") || !containsString(fn.RangeFacts[0].Derivation, "less_than_len") {
 		t.Fatalf("range derivation = %#v, want non_negative and less_than_len", fn.RangeFacts[0].Derivation)
+	}
+	if len(fn.ProofTerms) != 1 {
+		t.Fatalf("sum proof terms = %#v, want one typed proof term", fn.ProofTerms)
+	}
+	term := fn.ProofTerms[0]
+	if term.ID != guard.ID ||
+		term.Kind != "bounds_check" ||
+		term.SubjectBaseID != "xs" ||
+		term.IndexValueID != "local:i" ||
+		term.Operation != "index_load" ||
+		term.Range != "i in [0, xs.len)" {
+		t.Fatalf("proof term = %+v, guard = %+v", term, guard)
 	}
 }
 
@@ -1321,6 +1461,45 @@ uses alloc, capability, mem:
 	}
 }
 
+func TestFromCheckedProgramRecordsRawSliceElementWidthAndOverflowEvidence(t *testing.T) {
+	checked := checkedProgram(t, `
+func main() -> Int
+uses alloc, capability, mem:
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(64)
+        let bytes: []u8 = core.raw_slice_u8_from_parts(p, 8, mem)
+        let words: []u16 = core.raw_slice_u16_from_parts(p, 8, mem)
+        let ints: []i32 = core.raw_slice_i32_from_parts(p, 8, mem)
+        let flags: []bool = core.raw_slice_bool_from_parts(p, 8, mem)
+        let overflow: []i32 = core.raw_slice_i32_from_parts(p, 536870912, mem)
+        return bytes.len + words.len + ints.len + flags.len + overflow.len
+    return 0
+`)
+
+	prog, err := FromCheckedProgram(checked)
+	if err != nil {
+		t.Fatalf("FromCheckedProgram: %v", err)
+	}
+	if err := VerifyProgram(prog); err != nil {
+		t.Fatalf("VerifyProgram: %v\n%s", err, FormatText(prog))
+	}
+	fn := findPLIRFunction(t, prog, "main")
+	for _, tc := range []struct {
+		name        string
+		elemSize    string
+		lengthBytes string
+	}{
+		{name: "core.raw_slice_u8_from_parts", elemSize: "elem_size:1", lengthBytes: "length_bytes:8"},
+		{name: "core.raw_slice_u16_from_parts", elemSize: "elem_size:2", lengthBytes: "length_bytes:16"},
+		{name: "core.raw_slice_i32_from_parts", elemSize: "elem_size:4", lengthBytes: "length_bytes:32"},
+		{name: "core.raw_slice_bool_from_parts", elemSize: "elem_size:4", lengthBytes: "length_bytes:32"},
+	} {
+		assertUnsafeNoteContains(t, fn, tc.name, "raw_slice_bounds", "verified_allocation_root", tc.elemSize, tc.lengthBytes)
+	}
+	assertUnsafeNoteContains(t, fn, "overflow", "raw_slice_bounds", "rejected_length_overflow", "elem_size:4")
+}
+
 func TestFromCheckedProgramRecordsAllocBytesRawBoundsMetadata(t *testing.T) {
 	checked := checkedProgram(t, `
 func main() -> Int
@@ -1695,6 +1874,94 @@ uses mem:
 	} {
 		if !strings.Contains(dump, want) {
 			t.Fatalf("PLIR dump missing %q:\n%s", want, dump)
+		}
+	}
+}
+
+func TestFromCheckedProgramRecordsSliceViewByteWidthAndNormalBuildBoundsChecks(t *testing.T) {
+	checked := checkedProgram(t, `
+func main() -> Int
+uses alloc, mem:
+    var bytes: []u8 = make_u8(4)
+    var words: []u16 = make_u16(4)
+    var nums: []i32 = make_i32(4)
+    var flags: []bool = make_bool(4)
+    let b: []u8 = bytes.window(1, 2)
+    let w: []u16 = words.prefix(2)
+    let n: []i32 = nums.suffix(1)
+    let f: []bool = flags.window(0, 1)
+    let s: String = "abcdef".window(1, 3)
+    let sp: String = s.prefix(2)
+    return b.len + w.len + n.len + f.len + sp.len
+`)
+
+	prog, err := FromCheckedProgram(checked)
+	if err != nil {
+		t.Fatalf("FromCheckedProgram: %v", err)
+	}
+	if err := VerifyProgram(prog); err != nil {
+		t.Fatalf("VerifyProgram: %v\n%s", err, FormatText(prog))
+	}
+	fn := findPLIRFunction(t, prog, "main")
+	tests := []struct {
+		output string
+		want   []string
+	}{
+		{output: "view:b", want: []string{"core.slice_window_u8", "elem_width:1", "elem_shift:0", "bounds_check:normal_build"}},
+		{output: "view:w", want: []string{"core.slice_prefix_u16", "elem_width:2", "elem_shift:1", "bounds_check:normal_build"}},
+		{output: "view:n", want: []string{"core.slice_suffix_i32", "elem_width:4", "elem_shift:2", "bounds_check:normal_build"}},
+		{output: "view:f", want: []string{"core.slice_window_bool", "elem_width:4", "elem_shift:2", "bounds_check:normal_build"}},
+		{output: "view:s", want: []string{"core.string_window", "elem_width:1", "elem_shift:0", "bounds_check:normal_build"}},
+		{output: "view:sp", want: []string{"core.string_prefix", "elem_width:1", "elem_shift:0", "bounds_check:normal_build"}},
+	}
+	for _, tc := range tests {
+		op, ok := findOperationForOutput(fn, tc.output)
+		if !ok {
+			t.Fatalf("missing slice view operation for %s:\n%s", tc.output, FormatText(prog))
+		}
+		for _, want := range tc.want {
+			if !strings.Contains(op.Note, want) {
+				t.Fatalf("operation for %s note %q missing %q", tc.output, op.Note, want)
+			}
+		}
+	}
+}
+
+func TestFromCheckedProgramRecordsCopyIntoOverlapAndCapacityContract(t *testing.T) {
+	checked := checkedProgram(t, `
+func main() -> Int
+uses alloc, mem:
+    var xs: []u8 = make_u8(4)
+    let src: []u8 = xs.window(0, 3)
+    var dst: []u8 = xs.window(1, 3)
+    return src.copy_into(dst)
+`)
+
+	prog, err := FromCheckedProgram(checked)
+	if err != nil {
+		t.Fatalf("FromCheckedProgram: %v", err)
+	}
+	if err := VerifyProgram(prog); err != nil {
+		t.Fatalf("VerifyProgram: %v\n%s", err, FormatText(prog))
+	}
+	fn := findPLIRFunction(t, prog, "main")
+	op, ok := findOperationNoteContaining(fn, "core.slice_copy_into_u8")
+	if !ok {
+		t.Fatalf("missing copy_into operation:\n%s", FormatText(prog))
+	}
+	for _, want := range []string{
+		"source:src",
+		"destination:dst",
+		"dest_capacity_check:normal_build",
+		"overlap:known_overlap",
+	} {
+		if !strings.Contains(op.Note, want) {
+			t.Fatalf("copy_into note %q missing %q\n%s", op.Note, want, FormatText(prog))
+		}
+	}
+	for _, valueID := range []string{"view:src", "view:dst"} {
+		if hasFactForValue(fn, FactNoAlias, valueID) {
+			t.Fatalf("copy_into overlap must not create no_alias for %s:\n%s", valueID, FormatText(prog))
 		}
 	}
 }
@@ -2132,6 +2399,24 @@ func findPLIRValue(t *testing.T, fn Function, id string) Value {
 	}
 	t.Fatalf("missing PLIR value %s in %s: %#v", id, fn.Name, fn.Values)
 	return Value{}
+}
+
+func findOperationForOutput(fn Function, output string) (Operation, bool) {
+	for _, op := range fn.Ops {
+		if containsString(op.Outputs, output) {
+			return op, true
+		}
+	}
+	return Operation{}, false
+}
+
+func findOperationNoteContaining(fn Function, needle string) (Operation, bool) {
+	for _, op := range fn.Ops {
+		if strings.Contains(op.Note, needle) {
+			return op, true
+		}
+	}
+	return Operation{}, false
 }
 
 func assertUnsafeNoteContains(t *testing.T, fn Function, needles ...string) {

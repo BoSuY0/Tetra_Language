@@ -112,6 +112,7 @@ type regionState struct {
 	resourceParamIndex     map[int]int
 	resourceParamPath      map[int]string
 	borrowedParamRegion    map[int]string
+	awaitInvalidatedBorrow map[int]frontend.Position
 	nextExplicitBorrow     int
 	paramNames             []string
 	unknownVars            map[string]bool
@@ -204,6 +205,7 @@ func newRegionState(scopes *scopeInfo) *regionState {
 		resourceParamIndex:     make(map[int]int),
 		resourceParamPath:      make(map[int]string),
 		borrowedParamRegion:    make(map[int]string),
+		awaitInvalidatedBorrow: make(map[int]frontend.Position),
 		nextExplicitBorrow:     regionExplicitBorrowStart,
 		unknownConflicts:       make(map[string]regionConflict),
 		unknownVars:            make(map[string]bool),
@@ -372,6 +374,38 @@ func (s *regionState) ownedRegionSliceOwner(path string) (string, bool) {
 		return owner + path[len(probe):], true
 	}
 	return "", false
+}
+
+func (s *regionState) markOwnedRegionSlicesConsumedByOwner(owner string, pos frontend.Position) {
+	if s == nil || owner == "" {
+		return
+	}
+	for path, pathOwner := range s.ownedRegionSliceOwners {
+		if s.resourcePathsAlias(owner, pathOwner) {
+			s.markConsumedDirect(path, pos)
+		}
+	}
+}
+
+func (s *regionState) resourcePathsAlias(left string, right string) bool {
+	if s == nil || left == "" || right == "" {
+		return false
+	}
+	left = s.canonicalResourcePath(left)
+	right = s.canonicalResourcePath(right)
+	if left == right {
+		return true
+	}
+	leftID, leftOK := s.resourceID(left)
+	rightID, rightOK := s.resourceID(right)
+	return leftOK && rightOK && leftID == rightID
+}
+
+func (s *regionState) canonicalResourcePath(path string) string {
+	if source, ok := s.ownershipAliasSource(path); ok && source != "" {
+		return source
+	}
+	return path
 }
 
 func (s *regionState) borrowedPtrAliasOwner(name string) (string, bool) {
@@ -892,6 +926,45 @@ func (s *regionState) bindRegion(name string, regionID int) {
 	delete(s.unknownConflicts, name)
 }
 
+func (s *regionState) invalidateBorrowedRegionsAfterAwait(pos frontend.Position) {
+	if s == nil {
+		return
+	}
+	if s.awaitInvalidatedBorrow == nil {
+		s.awaitInvalidatedBorrow = make(map[int]frontend.Position)
+	}
+	for _, regionID := range s.regionVars {
+		if _, borrowed := s.borrowedParamOwner(regionID); !borrowed {
+			continue
+		}
+		if existing, exists := s.awaitInvalidatedBorrow[regionID]; exists {
+			s.awaitInvalidatedBorrow[regionID] = earliestPosition(existing, pos)
+			continue
+		}
+		s.awaitInvalidatedBorrow[regionID] = pos
+	}
+}
+
+func (s *regionState) checkBorrowedRegionAfterAwait(regionID int, name string, pos frontend.Position) error {
+	if s == nil || regionID == regionNone || regionID == regionUnknown {
+		return nil
+	}
+	if _, borrowed := s.borrowedParamOwner(regionID); !borrowed {
+		return nil
+	}
+	awaitAt, invalidated := s.awaitInvalidatedBorrow[regionID]
+	if !invalidated {
+		return nil
+	}
+	if name == "" {
+		name = "<borrow>"
+	}
+	if awaitAt.Line == 0 {
+		return lifetimeDiagnosticf(pos, "borrowed view '%s' cannot be used after await suspension", name)
+	}
+	return lifetimeDiagnosticf(pos, "borrowed view '%s' cannot be used after await suspension at %s", name, frontend.FormatPos(awaitAt))
+}
+
 func (s *regionState) setExprRegionTree(expr frontend.Expr, tree map[string]int) {
 	if s == nil || expr == nil {
 		return
@@ -1259,6 +1332,9 @@ func checkRegionUsable(regionID int, name string, pos frontend.Position, state *
 	}
 	if regionID == regionUnknown {
 		return fmt.Errorf("%s: ambiguous region for '%s'", frontend.FormatPos(pos), name)
+	}
+	if err := state.checkBorrowedRegionAfterAwait(regionID, name, pos); err != nil {
+		return err
 	}
 	if !state.isScopeActive(regionID) {
 		return lifetimeDiagnosticf(pos, "slice from scoped island is out of scope")

@@ -965,6 +965,67 @@ uses alloc, islands, mem:
 `, "cannot use freed resource 'isl'")
 }
 
+func TestIslandResetConsumesSourceToken(t *testing.T) {
+	testkit.RequireFileSemanticCheckErrorContains(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        let next: island = core.island_reset(isl)
+        free(isl)
+        free(next)
+    }
+    return 0
+`, "cannot use consumed value 'isl'")
+}
+
+func TestIslandResetRejectsAliasUseAfterSourceReset(t *testing.T) {
+	testkit.RequireFileSemanticCheckErrorContains(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        let alias: island = isl
+        let next: island = core.island_reset(isl)
+        let xs: []u8 = core.island_make_u8(alias, 1)
+        free(next)
+        return xs[0]
+    }
+    return 0
+`, "cannot use consumed value 'alias'")
+}
+
+func TestIslandResetInvalidatesPreviousSliceBorrow(t *testing.T) {
+	testkit.RequireFileSemanticCheckErrorContains(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        let old: []u8 = core.island_make_u8(isl, 1)
+        let next: island = core.island_reset(isl)
+        free(next)
+        return old[0]
+    }
+    return 0
+`, "cannot use consumed value 'old'")
+}
+
+func TestIslandResetReturnedTokenCanAllocateAndFree(t *testing.T) {
+	testkit.RequireFileSemanticCheckOK(t, `
+func main() -> Int
+uses alloc, islands, mem:
+    unsafe {
+        let isl: island = core.island_new(16)
+        let next: island = core.island_reset(isl)
+        let fresh: []u8 = core.island_make_u8(next, 1)
+        let value: Int = fresh[0]
+        free(next)
+        return value
+    }
+    return 0
+`)
+}
+
 func TestIslandFinalizationReportsMaybeFreedAfterMerge(t *testing.T) {
 	testkit.RequireFileCheckErrorContains(t, `
 func main() -> Int

@@ -10,10 +10,18 @@ func TestMemoryIdealV6ProjectsBoundsProofFacts(t *testing.T) {
 	graph := NewGraph("program")
 	err := AddBoundsProofFacts(graph, validation.ProofReport{
 		RemovedChecks: []validation.RemovedCheck{{
-			Function:  "sum",
-			Site:      3,
-			Kind:      "index_load_i32",
-			ProofID:   "proof:while:i:xs:1:1",
+			Function: "sum",
+			Site:     3,
+			Kind:     "index_load_i32",
+			ProofID:  "proof:while:i:xs:1:1",
+			ProofTerm: &validation.ProofTerm{
+				ID:            "proof:while:i:xs:1:1",
+				Kind:          "bounds_check",
+				SubjectBaseID: "xs",
+				IndexValueID:  "local:i",
+				Operation:     "index_load",
+				Range:         "i in [0, xs.len)",
+			},
 			FactsUsed: []string{"index_in_range", "len_stable"},
 		}},
 		LeftChecks: 1,
@@ -31,8 +39,14 @@ func TestMemoryIdealV6ProjectsBoundsProofFacts(t *testing.T) {
 		removed.CostClass != CostZeroCostProven ||
 		removed.ValidatorName != "bounds_proof_id_validator" ||
 		removed.ParentFactID == "" ||
-		removed.SourceStage != StageValidation {
-		t.Fatalf("removed bounds row = %+v, want validated zero-cost proof-id row with parent fact", removed)
+		removed.SourceStage != StageValidation ||
+		removed.ProofID != "proof:while:i:xs:1:1" ||
+		removed.ProofKind != "bounds_check" ||
+		removed.ProofSubjectBaseID != "xs" ||
+		removed.ProofIndexValueID != "local:i" ||
+		removed.ProofOperation != "index_load" ||
+		removed.ProofRange != "i in [0, xs.len)" {
+		t.Fatalf("removed bounds row = %+v, want validated zero-cost typed proof row with parent fact", removed)
 	}
 
 	retained, ok := reportRowByClaim(report, "bounds_check_retained_dynamic")
@@ -42,7 +56,8 @@ func TestMemoryIdealV6ProjectsBoundsProofFacts(t *testing.T) {
 	if retained.ClaimLevel != ClaimValidated ||
 		retained.CostClass != CostDynamicCheckRequired ||
 		!retained.NormalBuildCheck ||
-		retained.ValidatorName != "normal_build_bounds_check_validator" {
+		retained.ValidatorName != "normal_build_bounds_check_validator" ||
+		retained.ParentFactID == "" {
 		t.Fatalf("retained bounds row = %+v, want validated dynamic normal-build check", retained)
 	}
 }

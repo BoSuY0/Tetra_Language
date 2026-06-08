@@ -30,6 +30,7 @@ type Function struct {
 	Dominators  []DominatorRow   `json:"dominators,omitempty"`
 	ProofGuards []ProofGuard     `json:"proof_guards,omitempty"`
 	ProofUses   []ProofUse       `json:"proof_uses,omitempty"`
+	ProofTerms  []ProofTerm      `json:"proof_terms,omitempty"`
 	RangeFacts  []RangeFact      `json:"range_facts,omitempty"`
 }
 
@@ -38,6 +39,7 @@ type FunctionSummary struct {
 	Public                bool                            `json:"public,omitempty"`
 	Async                 bool                            `json:"async,omitempty"`
 	ParamNames            []string                        `json:"param_names,omitempty"`
+	ParamTypes            []string                        `json:"param_types,omitempty"`
 	ParamOwnership        []string                        `json:"param_ownership,omitempty"`
 	ReturnType            string                          `json:"return_type,omitempty"`
 	ReturnOwnership       string                          `json:"return_ownership,omitempty"`
@@ -211,6 +213,20 @@ type ProofUse struct {
 	Source  string `json:"source,omitempty"`
 }
 
+type ProofTerm struct {
+	ID            string   `json:"id"`
+	Kind          string   `json:"kind"`
+	SubjectBaseID string   `json:"subject_base_id,omitempty"`
+	IndexValueID  string   `json:"index_value_id,omitempty"`
+	Operation     string   `json:"operation,omitempty"`
+	Range         string   `json:"range,omitempty"`
+	IslandID      string   `json:"island_id,omitempty"`
+	Epoch         int      `json:"epoch,omitempty"`
+	BaseID        string   `json:"base_id,omitempty"`
+	Source        string   `json:"source,omitempty"`
+	FactsUsed     []string `json:"facts_used,omitempty"`
+}
+
 type RangeFact struct {
 	Value          string   `json:"value"`
 	Lower          Bound    `json:"lower"`
@@ -281,6 +297,7 @@ const (
 	FactNoActorSend
 	FactNoUnknownEscape
 	FactDerivedWindow
+	FactIslandEpochAdvanced
 )
 
 func (k FactKind) String() string {
@@ -325,6 +342,8 @@ func (k FactKind) String() string {
 		return "no_unknown_escape"
 	case FactDerivedWindow:
 		return "derived_window"
+	case FactIslandEpochAdvanced:
+		return "island_epoch_advanced"
 	default:
 		return fmt.Sprintf("fact_%d", int(k))
 	}
@@ -335,15 +354,18 @@ func (k FactKind) MarshalJSON() ([]byte, error) {
 }
 
 type Fact struct {
-	ID      string   `json:"id"`
-	Kind    FactKind `json:"kind"`
-	ValueID string   `json:"value_id,omitempty"`
-	Region  string   `json:"region,omitempty"`
-	Range   string   `json:"range,omitempty"`
-	ProofID string   `json:"proof_id,omitempty"`
-	Source  string   `json:"source,omitempty"`
-	Reason  string   `json:"reason,omitempty"`
-	Uses    []string `json:"uses,omitempty"`
+	ID       string   `json:"id"`
+	Kind     FactKind `json:"kind"`
+	ValueID  string   `json:"value_id,omitempty"`
+	IslandID string   `json:"island_id,omitempty"`
+	Epoch    int      `json:"epoch,omitempty"`
+	BaseID   string   `json:"base_id,omitempty"`
+	Region   string   `json:"region,omitempty"`
+	Range    string   `json:"range,omitempty"`
+	ProofID  string   `json:"proof_id,omitempty"`
+	Source   string   `json:"source,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+	Uses     []string `json:"uses,omitempty"`
 }
 
 func FromCheckedProgram(checked *semantics.CheckedProgram) (*Program, error) {
@@ -353,25 +375,27 @@ func FromCheckedProgram(checked *semantics.CheckedProgram) (*Program, error) {
 	out := &Program{Funcs: make([]Function, 0, len(checked.Funcs))}
 	for _, fn := range checked.Funcs {
 		l := &builder{
-			fn:                fn,
-			funcs:             checked.FuncSigs,
-			globals:           checked.GlobalsByModule[fn.Module],
-			types:             checked.Types,
-			values:            map[string]Value{},
-			valueSeq:          0,
-			factSeq:           0,
-			opSeq:             0,
-			blockIndex:        map[string]int{},
-			zeroLocals:        map[string]bool{},
-			constIntLocals:    map[string]int64{},
-			lenBoundLocals:    map[string]string{},
-			externalLocals:    map[string]bool{},
-			invalidLocals:     map[string]bool{},
-			rawExposedRoots:   map[string]bool{},
-			rawPointerRoots:   map[string]string{},
-			rawPointerBytes:   map[string]int64{},
-			rawPointerOffsets: map[string]int64{},
-			activeProof:       nil,
+			fn:                      fn,
+			funcs:                   checked.FuncSigs,
+			globals:                 checked.GlobalsByModule[fn.Module],
+			types:                   checked.Types,
+			values:                  map[string]Value{},
+			valueSeq:                0,
+			factSeq:                 0,
+			opSeq:                   0,
+			blockIndex:              map[string]int{},
+			zeroLocals:              map[string]bool{},
+			constIntLocals:          map[string]int64{},
+			lenBoundLocals:          map[string]string{},
+			externalLocals:          map[string]bool{},
+			invalidLocals:           map[string]bool{},
+			rawExposedRoots:         map[string]bool{},
+			noAliasInvalidatedRoots: map[string]string{},
+			islandTokens:            map[string]islandTokenState{},
+			rawPointerRoots:         map[string]string{},
+			rawPointerBytes:         map[string]int64{},
+			rawPointerOffsets:       map[string]int64{},
+			activeProof:             nil,
 		}
 		if err := l.build(); err != nil {
 			return nil, err
@@ -382,33 +406,42 @@ func FromCheckedProgram(checked *semantics.CheckedProgram) (*Program, error) {
 }
 
 type builder struct {
-	fn                semantics.CheckedFunc
-	funcs             map[string]semantics.FuncSig
-	globals           map[string]semantics.GlobalInfo
-	types             map[string]*semantics.TypeInfo
-	values            map[string]Value
-	valueSeq          int
-	factSeq           int
-	opSeq             int
-	blockSeq          int
-	blockIndex        map[string]int
-	current           string
-	ops               []Operation
-	facts             []Fact
-	blocks            []BasicBlock
-	proofGuards       []ProofGuard
-	proofUses         []ProofUse
-	rangeFacts        []RangeFact
-	activeProof       []rangeProof
-	zeroLocals        map[string]bool
-	constIntLocals    map[string]int64
-	lenBoundLocals    map[string]string
-	externalLocals    map[string]bool
-	invalidLocals     map[string]bool
-	rawExposedRoots   map[string]bool
-	rawPointerRoots   map[string]string
-	rawPointerBytes   map[string]int64
-	rawPointerOffsets map[string]int64
+	fn                      semantics.CheckedFunc
+	funcs                   map[string]semantics.FuncSig
+	globals                 map[string]semantics.GlobalInfo
+	types                   map[string]*semantics.TypeInfo
+	values                  map[string]Value
+	valueSeq                int
+	factSeq                 int
+	opSeq                   int
+	blockSeq                int
+	blockIndex              map[string]int
+	current                 string
+	ops                     []Operation
+	facts                   []Fact
+	blocks                  []BasicBlock
+	proofGuards             []ProofGuard
+	proofUses               []ProofUse
+	proofTerms              []ProofTerm
+	rangeFacts              []RangeFact
+	activeProof             []rangeProof
+	zeroLocals              map[string]bool
+	constIntLocals          map[string]int64
+	lenBoundLocals          map[string]string
+	externalLocals          map[string]bool
+	invalidLocals           map[string]bool
+	rawExposedRoots         map[string]bool
+	noAliasInvalidatedRoots map[string]string
+	islandTokens            map[string]islandTokenState
+	rawPointerRoots         map[string]string
+	rawPointerBytes         map[string]int64
+	rawPointerOffsets       map[string]int64
+}
+
+type islandTokenState struct {
+	IslandID string
+	Epoch    int
+	BaseID   string
 }
 
 func (b *builder) build() error {
@@ -454,6 +487,13 @@ func (b *builder) build() error {
 			Escape:     EscapeConservative,
 		}
 		b.addValue(value)
+		if info.TypeName == "island" {
+			b.rememberIslandToken(name, islandTokenState{
+				IslandID: "island:" + name,
+				Epoch:    1,
+				BaseID:   "token:" + name,
+			})
+		}
 		if isMemoryBackedType(info.TypeName) {
 			b.addFact(Fact{Kind: FactProvenanceKnown, ValueID: id, Reason: "checked parameter/local memory value"})
 			b.addFact(Fact{Kind: FactRegionAlive, ValueID: id, Region: value.Region, Reason: "function region is alive"})
@@ -487,6 +527,9 @@ func (b *builder) addExclusiveInoutNoAliasFacts() {
 			continue
 		}
 		if b.rawExposedRoots[param.Name] {
+			continue
+		}
+		if b.noAliasInvalidatedRoots[param.Name] != "" {
 			continue
 		}
 		if value.Kind != ValueParam || value.Borrow != BorrowMut || value.Provenance.Kind != ProvenanceParam {
@@ -562,6 +605,7 @@ func (b *builder) function() Function {
 		Blocks:      b.blocks,
 		ProofGuards: b.proofGuards,
 		ProofUses:   b.proofUses,
+		ProofTerms:  b.proofTerms,
 		RangeFacts:  b.rangeFacts,
 	}
 	b.attachProofUses(&fn)
@@ -582,6 +626,7 @@ func (b *builder) functionSummary() *FunctionSummary {
 		Public:                sig.Public,
 		Async:                 sig.Async,
 		ParamNames:            append([]string(nil), sig.ParamNames...),
+		ParamTypes:            append([]string(nil), sig.ParamTypes...),
 		ParamOwnership:        append([]string(nil), sig.ParamOwnership...),
 		ReturnType:            sig.ReturnType,
 		ReturnOwnership:       sig.ReturnOwnership,
@@ -866,6 +911,21 @@ func (b *builder) walkForRangeStmt(s *frontend.ForRangeStmt) {
 			UseKind: "bounds_check",
 			Source:  sourceString(s.At),
 		})
+		b.addBoundsProofTerm(rangeProof{
+			ID:             proofID,
+			IndexName:      s.IndexLocal,
+			IndexValueID:   indexID,
+			Base:           base,
+			Condition:      s.IndexLocal + " < " + base + ".len",
+			Source:         sourceString(s.At),
+			RangeText:      "0.." + base + ".len",
+			Lower:          plirBoundFromRangeBound(latticeRange.Lower),
+			Upper:          plirBoundFromRangeBound(latticeRange.Upper),
+			InclusiveLower: latticeRange.InclusiveLower,
+			InclusiveUpper: latticeRange.InclusiveUpper,
+			Reason:         "for collection loop index is dominated by index < iterable.len guard",
+			Derivation:     append([]string(nil), latticeRange.Derivation...),
+		})
 		b.rangeFacts = append(b.rangeFacts, RangeFact{
 			Value:          indexID,
 			Lower:          plirBoundFromRangeBound(latticeRange.Lower),
@@ -897,7 +957,17 @@ func (b *builder) walkExpr(expr frontend.Expr, targetName string) {
 		if builtin, ok := semantics.ResolveBuiltinAlias(name); ok {
 			name = builtin
 		}
-		b.invalidateActiveProofsForMutableCallArgs(e.Args, b.callParamOwnership(name))
+		ownership := b.callParamOwnership(name)
+		b.invalidateActiveProofsForMutableCallArgs(e.Args, ownership)
+		note := b.callSummaryNote(name)
+		if boundary := b.callAliasBoundaryKind(name); boundary != "" && callHasInoutArgument(e.Args, ownership) {
+			b.invalidateNoAliasForMutableCallArgs(e.Args, ownership, boundary)
+			note = appendOperationNote(note, "alias_boundary:"+boundary)
+		}
+		if b.callSummaryUnknown(name) {
+			b.invalidateNoAliasForCallInputs(e.Args, "unknown_external_call")
+			note = appendOperationNote(note, "alias_boundary:unknown_external_call")
+		}
 		if name != e.Name {
 			if b.recordBuiltinCall(name, e, targetName) {
 				return
@@ -909,7 +979,7 @@ func (b *builder) walkExpr(expr frontend.Expr, targetName string) {
 			Kind:   OpCall,
 			Source: sourceString(e.At),
 			Inputs: callInputs(e.Args),
-			Note:   b.callSummaryNote(name),
+			Note:   note,
 		})
 	case *frontend.BinaryExpr:
 		b.walkExpr(e.Left, "")
@@ -1054,9 +1124,12 @@ func (b *builder) recordBuiltinCall(name string, call *frontend.CallExpr, target
 		b.recordActorSendCall(name, call, targetName)
 		return true
 	}
+	if name == "core.island_reset" {
+		b.recordIslandResetCall(name, call, targetName)
+		return true
+	}
 	if sliceCopyIntoBuiltin(name) || stringCopyIntoBuiltin(name) {
-		op := b.addOperation(Operation{Kind: OpCall, Source: sourceString(call.At), Inputs: callInputs(call.Args), Note: name + " copies into caller-owned destination without allocation"})
-		b.addCopyLoopRangeProof(name, call, op)
+		b.recordCopyIntoCall(name, call)
 		return true
 	}
 	elem, method, ok := sliceViewElem(name)
@@ -1070,6 +1143,15 @@ func (b *builder) recordBuiltinCall(name string, call *frontend.CallExpr, target
 		return true
 	}
 	return false
+}
+
+func (b *builder) recordCopyIntoCall(name string, call *frontend.CallExpr) {
+	source := callArgPath(call, 0)
+	destination := callArgPath(call, 1)
+	overlap := b.copyIntoOverlapStatus(source, destination)
+	note := fmt.Sprintf("%s copies into caller-owned destination without allocation source:%s destination:%s dest_capacity_check:normal_build overlap:%s", name, source, destination, overlap)
+	op := b.addOperation(Operation{Kind: OpCall, Source: sourceString(call.At), Inputs: callInputs(call.Args), Note: note})
+	b.addCopyLoopRangeProof(name, call, op)
 }
 
 func (b *builder) recordActorSendCall(name string, call *frontend.CallExpr, targetName string) {
@@ -1087,6 +1169,100 @@ func (b *builder) recordActorSendCall(name string, call *frontend.CallExpr, targ
 		return
 	}
 	b.recordTypedActorMovedFacts(call.Args[1], call.At)
+}
+
+func (b *builder) recordIslandResetCall(name string, call *frontend.CallExpr, targetName string) {
+	inputs := callInputs(call.Args)
+	outputs := []string(nil)
+	if targetName != "" {
+		outputs = []string{valueID(ValueLocal, targetName)}
+	}
+	b.addOperation(Operation{
+		Kind:    OpCall,
+		Source:  sourceString(call.At),
+		Inputs:  inputs,
+		Outputs: outputs,
+		Note:    name + " advances island token epoch and consumes the source token",
+	})
+	if len(call.Args) == 0 {
+		return
+	}
+	source := callArgPath(call, 0)
+	if source == "" || source == "?" {
+		source = "island"
+	}
+	sourceToken := b.islandTokenForPath(source)
+	nextToken := sourceToken
+	nextToken.Epoch++
+	if nextToken.Epoch <= 1 {
+		nextToken.Epoch = 2
+	}
+	if targetName != "" {
+		b.rememberIslandToken(targetName, nextToken)
+	}
+	if sourceID, ok := b.localOrParamValueIDForExpr(call.Args[0]); ok {
+		b.addFact(Fact{
+			Kind:    FactMoved,
+			ValueID: sourceID,
+			Region:  sourceToken.IslandID,
+			Source:  name + " " + sourceString(call.At),
+			Reason:  "island reset consumes the source token",
+		})
+	}
+	b.addFact(Fact{
+		Kind:     FactIslandEpochAdvanced,
+		IslandID: sourceToken.IslandID,
+		Epoch:    nextToken.Epoch,
+		BaseID:   sourceToken.BaseID,
+		Source:   name + " " + sourceString(call.At),
+		Reason:   "island reset advances epoch and invalidates previous references",
+	})
+}
+
+func (b *builder) rememberIslandToken(name string, token islandTokenState) {
+	if name == "" || token.IslandID == "" {
+		return
+	}
+	if token.Epoch <= 0 {
+		token.Epoch = 1
+	}
+	if token.BaseID == "" {
+		token.BaseID = "token:" + islandTokenRoot(token.IslandID)
+	}
+	b.islandTokens[name] = token
+}
+
+func (b *builder) rememberIslandTokenAlias(name string, expr frontend.Expr) {
+	if name == "" {
+		return
+	}
+	path := exprPath(expr)
+	if path == "" {
+		return
+	}
+	token, ok := b.islandTokens[path]
+	if !ok {
+		return
+	}
+	b.rememberIslandToken(name, token)
+}
+
+func (b *builder) islandTokenForPath(path string) islandTokenState {
+	if token, ok := b.islandTokens[path]; ok && token.IslandID != "" {
+		return token
+	}
+	if path == "" || path == "?" {
+		path = "island"
+	}
+	return islandTokenState{
+		IslandID: "island:" + path,
+		Epoch:    1,
+		BaseID:   "token:" + path,
+	}
+}
+
+func islandTokenRoot(islandID string) string {
+	return strings.TrimPrefix(islandID, "island:")
 }
 
 func (b *builder) recordTypedActorMovedFacts(expr frontend.Expr, pos frontend.Position) {
@@ -1481,14 +1657,16 @@ func (b *builder) recordMakeSliceCall(name string, elem string, call *frontend.C
 	negativeGuardStatus := "reject_before_allocation"
 	overflowGuardStatus := "reject_before_allocation"
 	inputs := []string(nil)
+	islandFactToken := islandTokenState{}
 	if strings.HasPrefix(name, "core.island_make_") {
 		islandRoot := callArgPath(call, 0)
 		if islandRoot == "?" || islandRoot == "" {
 			islandRoot = "island"
 		}
+		islandFactToken = b.islandTokenForPath(islandRoot)
 		prov.Kind = ProvenanceIsland
-		prov.Root = islandRoot
-		region = "island:" + islandRoot
+		prov.Root = islandTokenRoot(islandFactToken.IslandID)
+		region = islandFactToken.IslandID
 		zeroGuardStatus = "valid_empty_no_metadata_access"
 		negativeGuardStatus = "reject_before_metadata_access"
 		overflowGuardStatus = "reject_before_metadata_access"
@@ -1529,11 +1707,26 @@ func (b *builder) recordMakeSliceCall(name string, elem string, call *frontend.C
 		note = "island_make<" + elem + "> length contract: zero valid, negative and overflow reject before island metadata access"
 	}
 	b.addOperation(Operation{Kind: OpAllocIntent, Source: sourceString(call.At), Inputs: inputs, Outputs: []string{id}, Note: note})
+	if prov.Kind == ProvenanceIsland {
+		b.addFact(b.islandAllocationFact(FactProvenanceKnown, id, islandFactToken, "", "compiler-known allocation intent"))
+		b.addFact(b.islandAllocationFact(FactLenStable, id, islandFactToken, "", "slice metadata is opaque in safe code"))
+		b.addFact(b.islandAllocationFact(FactRegionAlive, id, islandFactToken, value.Region, ""))
+		b.addFact(b.islandAllocationFact(FactAligned, id, islandFactToken, value.Region, "island region allocator returns 16-byte aligned payloads"))
+		return
+	}
 	b.addFact(Fact{Kind: FactProvenanceKnown, ValueID: id, Reason: "compiler-known allocation intent"})
 	b.addFact(Fact{Kind: FactLenStable, ValueID: id, Reason: "slice metadata is opaque in safe code"})
 	b.addFact(Fact{Kind: FactRegionAlive, ValueID: id, Region: value.Region})
-	if prov.Kind == ProvenanceIsland {
-		b.addFact(Fact{Kind: FactAligned, ValueID: id, Region: value.Region, Reason: "island region allocator returns 16-byte aligned payloads"})
+}
+
+func (b *builder) islandAllocationFact(kind FactKind, valueID string, token islandTokenState, region string, reason string) Fact {
+	return Fact{
+		Kind:     kind,
+		ValueID:  valueID,
+		IslandID: token.IslandID,
+		Epoch:    token.Epoch,
+		Region:   region,
+		Reason:   reason,
 	}
 }
 
@@ -1644,7 +1837,8 @@ func (b *builder) recordSliceViewCall(name string, valueType string, method stri
 		return
 	}
 	windowRange := b.sliceViewRange(method, source, call)
-	b.addOperation(Operation{Kind: OpSliceWindow, Source: sourceString(call.At), Inputs: callInputs(call.Args), Outputs: []string{id}, Note: name + " range " + windowRange})
+	width, shift := sliceViewElementLayout(valueType)
+	b.addOperation(Operation{Kind: OpSliceWindow, Source: sourceString(call.At), Inputs: callInputs(call.Args), Outputs: []string{id}, Note: fmt.Sprintf("%s range %s elem_width:%d elem_shift:%d bounds_check:normal_build", name, windowRange, width, shift)})
 	b.addFact(Fact{Kind: FactDerivedWindow, ValueID: id, Range: windowRange, Source: sourceString(call.At), Reason: "safe slice view range is checked before construction"})
 	b.addFact(Fact{Kind: FactRegionAlive, ValueID: id, Region: value.Region})
 	b.addFact(Fact{Kind: FactBorrowedImm, ValueID: id})
@@ -1781,6 +1975,21 @@ func (b *builder) addCopyLoopRangeProof(name string, call *frontend.CallExpr, op
 		UseKind: "bounds_check",
 		Source:  sourceString(call.At),
 	})
+	b.addBoundsProofTerm(rangeProof{
+		ID:             proofID,
+		IndexName:      indexName,
+		IndexValueID:   indexID,
+		Base:           source,
+		Condition:      indexName + " < " + source + ".len",
+		Source:         sourceString(call.At),
+		RangeText:      "0.." + source + ".len",
+		Lower:          Bound{Kind: BoundConst, Const: 0},
+		Upper:          Bound{Kind: BoundSymbol, Symbol: source + ".len"},
+		InclusiveLower: true,
+		InclusiveUpper: false,
+		Reason:         "copy loop range proof",
+		Derivation:     []string{"non_negative", "less_than_len"},
+	})
 	b.rangeFacts = append(b.rangeFacts, RangeFact{
 		Value:          indexID,
 		Lower:          Bound{Kind: BoundConst, Const: 0},
@@ -1904,6 +2113,9 @@ func (b *builder) derivedProvenance(source string) (Provenance, bool) {
 	if source == "" {
 		return Provenance{Kind: ProvenanceUnknown}, false
 	}
+	if strings.HasPrefix(source, "string:") {
+		return Provenance{Kind: ProvenanceLiteral, Root: source}, true
+	}
 	for _, kind := range []ValueKind{ValueAllocIntent, ValueView, ValueParam, ValueLocal} {
 		id := valueID(kind, source)
 		if value, ok := b.values[id]; ok {
@@ -2000,6 +2212,23 @@ func (b *builder) addFact(fact Fact) {
 	if fact.ID == "" {
 		fact.ID = fmt.Sprintf("f%d", b.factSeq)
 		b.factSeq++
+	}
+	if fact.ValueID != "" {
+		if value, ok := b.values[fact.ValueID]; ok && value.Provenance.Kind == ProvenanceIsland {
+			root := value.Provenance.Root
+			if root == "" {
+				root = "unknown"
+			}
+			if fact.IslandID == "" {
+				fact.IslandID = "island:" + root
+			}
+			if fact.Epoch == 0 {
+				fact.Epoch = 1
+			}
+			if fact.BaseID == "" {
+				fact.BaseID = value.ID
+			}
+		}
 	}
 	b.facts = append(b.facts, fact)
 }
@@ -2226,6 +2455,60 @@ func (b *builder) invalidateActiveProofsForMutableCallArgs(args []frontend.Expr,
 	}
 }
 
+func (b *builder) invalidateNoAliasForMutableCallArgs(args []frontend.Expr, ownership []string, reason string) {
+	if len(args) == 0 || len(ownership) == 0 {
+		return
+	}
+	for i, owner := range ownership {
+		if owner != "inout" {
+			continue
+		}
+		if i >= len(args) {
+			break
+		}
+		b.invalidateNoAliasForPath(exprPath(args[i]), reason)
+	}
+}
+
+func (b *builder) invalidateNoAliasForCallInputs(args []frontend.Expr, reason string) {
+	for _, arg := range args {
+		b.invalidateNoAliasForPath(exprPath(arg), reason)
+	}
+}
+
+func (b *builder) invalidateNoAliasForPath(path string, reason string) {
+	root := rootPath(path)
+	if root == "" {
+		return
+	}
+	b.noAliasInvalidatedRoots[root] = reason
+}
+
+func rootPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	if idx := strings.IndexByte(path, '.'); idx >= 0 {
+		return path[:idx]
+	}
+	return path
+}
+
+func callHasInoutArgument(args []frontend.Expr, ownership []string) bool {
+	if len(args) == 0 || len(ownership) == 0 {
+		return false
+	}
+	for i, owner := range ownership {
+		if i >= len(args) {
+			return false
+		}
+		if owner == "inout" && exprPath(args[i]) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *builder) callParamOwnership(name string) []string {
 	if name == "" {
 		return nil
@@ -2244,6 +2527,21 @@ func (b *builder) callParamOwnership(name string) []string {
 		}
 	}
 	return nil
+}
+
+func (b *builder) callAliasBoundaryKind(name string) string {
+	if name == "" {
+		return ""
+	}
+	if local, ok := b.fn.Locals[name]; ok && local.FunctionTypeValue {
+		return "function_typed_inout"
+	}
+	if b.globals != nil {
+		if global, ok := b.globals[name]; ok && global.FunctionTypeValue {
+			return "function_typed_inout"
+		}
+	}
+	return ""
 }
 
 func (b *builder) callSummaryNote(name string) string {
@@ -2277,6 +2575,19 @@ func (b *builder) callSummaryUnknown(name string) bool {
 		}
 	}
 	return true
+}
+
+func appendOperationNote(note string, part string) string {
+	if strings.TrimSpace(part) == "" {
+		return note
+	}
+	if strings.Contains(note, part) {
+		return note
+	}
+	if strings.TrimSpace(note) == "" {
+		return part
+	}
+	return note + " " + part
 }
 
 func proofPathMatchesMutation(proofPath string, mutatedPath string) bool {
@@ -2332,6 +2643,46 @@ func (b *builder) addRangeProof(proof rangeProof, truthBlock string, opID string
 		Reason:         proof.Reason,
 		Derivation:     append([]string(nil), proof.Derivation...),
 	})
+	b.addBoundsProofTerm(proof)
+}
+
+func (b *builder) addBoundsProofTerm(proof rangeProof) {
+	if proof.ID == "" {
+		return
+	}
+	for _, term := range b.proofTerms {
+		if term.ID == proof.ID {
+			return
+		}
+	}
+	term := ProofTerm{
+		ID:            proof.ID,
+		Kind:          "bounds_check",
+		SubjectBaseID: proof.Base,
+		IndexValueID:  proof.IndexValueID,
+		Operation:     "index_load",
+		Range:         proof.RangeText,
+		Source:        sourceStringFromProofSource(proof),
+		FactsUsed:     append([]string(nil), proof.Derivation...),
+	}
+	if ref, ok := b.proofMemoryRefForBase(proof.Base); ok {
+		term.IslandID = ref.IslandID
+		term.Epoch = ref.Epoch
+		term.BaseID = ref.BaseID
+	}
+	b.proofTerms = append(b.proofTerms, term)
+}
+
+func (b *builder) proofMemoryRefForBase(base string) (islandTokenState, bool) {
+	for _, id := range valueIDsForPath(base) {
+		for _, fact := range b.facts {
+			if fact.ValueID != id || fact.IslandID == "" || fact.Epoch <= 0 {
+				continue
+			}
+			return islandTokenState{IslandID: fact.IslandID, Epoch: fact.Epoch, BaseID: fact.BaseID}, true
+		}
+	}
+	return islandTokenState{}, false
 }
 
 func sourceStringFromProofSource(proof rangeProof) string {
@@ -2347,6 +2698,7 @@ func (b *builder) rememberAliasMetadata(name string, expr frontend.Expr) {
 	}
 	b.externalLocals[name] = b.exprHasExternalProvenance(expr)
 	b.invalidLocals[name] = b.exprIsInvalidView(expr)
+	b.rememberIslandTokenAlias(name, expr)
 	b.recordViewAlias(name, expr)
 	if b.invalidLocals[name] {
 		b.reclassifyMemoryBinding(name, Provenance{Kind: ProvenanceUnknown}, "alias source is invalid before construction")
@@ -2916,6 +3268,15 @@ func valueID(kind ValueKind, name string) string {
 	return string(kind) + ":" + name
 }
 
+func valueIDsForPath(path string) []string {
+	return []string{
+		valueID(ValueView, path),
+		valueID(ValueAllocIntent, path),
+		valueID(ValueLocal, path),
+		valueID(ValueParam, path),
+	}
+}
+
 func makeSliceElem(name string) (string, bool) {
 	switch name {
 	case "core.make_u8", "core.island_make_u8":
@@ -3153,6 +3514,91 @@ func parseDerivedWindowRange(text string) (derivedWindowRange, bool) {
 	return derivedWindowRange{base: base, start: lo, end: hi}, true
 }
 
+func (b *builder) copyIntoOverlapStatus(source string, destination string) string {
+	sourceRange, sourceRangeOK := b.derivedWindowRangeForSource(source)
+	destinationRange, destinationRangeOK := b.derivedWindowRangeForSource(destination)
+	if sourceRangeOK && destinationRangeOK {
+		sourceBase := normalizeOverlapRoot(sourceRange.base)
+		destinationBase := normalizeOverlapRoot(destinationRange.base)
+		if sourceBase == "" || destinationBase == "" {
+			return "unknown_conservative"
+		}
+		if sourceBase == destinationBase {
+			if overlap, ok := staticDerivedRangesOverlap(sourceRange, destinationRange); ok {
+				if overlap {
+					return "known_overlap"
+				}
+				return "known_disjoint"
+			}
+			return "unknown_conservative"
+		}
+		return "distinct_roots"
+	}
+	sourceRoot, sourceKnown := b.copyIntoKnownRoot(source)
+	destinationRoot, destinationKnown := b.copyIntoKnownRoot(destination)
+	if !sourceKnown || !destinationKnown || sourceRoot == "" || destinationRoot == "" {
+		return "unknown_conservative"
+	}
+	if sourceRoot == destinationRoot {
+		return "unknown_conservative"
+	}
+	return "distinct_roots"
+}
+
+func (b *builder) copyIntoKnownRoot(path string) (string, bool) {
+	provenance, known := b.derivedProvenance(path)
+	if !known {
+		return "", false
+	}
+	root := normalizeOverlapRoot(provenance.Root)
+	if root == "" {
+		root = normalizeOverlapRoot(path)
+	}
+	if root == "" || root == "?" || root == "expr" {
+		return "", false
+	}
+	return root, true
+}
+
+func staticDerivedRangesOverlap(source derivedWindowRange, destination derivedWindowRange) (bool, bool) {
+	sourceStart, ok := parseRangeConst(source.start)
+	if !ok {
+		return false, false
+	}
+	sourceEnd, ok := parseRangeConst(source.end)
+	if !ok {
+		return false, false
+	}
+	destinationStart, ok := parseRangeConst(destination.start)
+	if !ok {
+		return false, false
+	}
+	destinationEnd, ok := parseRangeConst(destination.end)
+	if !ok {
+		return false, false
+	}
+	return sourceStart < destinationEnd && destinationStart < sourceEnd, true
+}
+
+func parseRangeConst(text string) (int64, bool) {
+	value, err := strconv.ParseInt(strings.TrimSpace(text), 10, 64)
+	return value, err == nil
+}
+
+func normalizeOverlapRoot(root string) string {
+	root = strings.TrimSpace(root)
+	for strings.HasPrefix(root, "derived:") {
+		root = strings.TrimPrefix(root, "derived:")
+	}
+	for _, prefix := range []string{"param:", "local:", "view:", "alloc_intent:"} {
+		root = strings.TrimPrefix(root, prefix)
+	}
+	if dot := strings.Index(root, "."); dot > 0 {
+		root = root[:dot]
+	}
+	return root
+}
+
 func composeSliceViewRange(parent derivedWindowRange, method string, call *frontend.CallExpr) string {
 	switch method {
 	case "window":
@@ -3301,6 +3747,19 @@ func elementSize(elem string) int {
 	}
 }
 
+func sliceViewElementLayout(valueType string) (int, int) {
+	switch valueType {
+	case "str", "String", "[]u8":
+		return 1, 0
+	case "[]u16":
+		return 2, 1
+	case "[]i32", "[]bool":
+		return 4, 2
+	default:
+		return 0, 0
+	}
+}
+
 func allocationLengthArg(name string, call *frontend.CallExpr) frontend.Expr {
 	if call == nil {
 		return nil
@@ -3422,6 +3881,8 @@ func exprPath(expr frontend.Expr) string {
 		return base + "." + e.Field
 	case *frontend.NumberExpr:
 		return fmt.Sprintf("%d", e.Value)
+	case *frontend.StringLitExpr:
+		return stringLiteralPath(string(e.Value))
 	case *frontend.CallExpr:
 		return callResultPath(e)
 	case *frontend.UnaryExpr:
@@ -3449,6 +3910,28 @@ func exprPath(expr frontend.Expr) string {
 	default:
 		return ""
 	}
+}
+
+func stringLiteralPath(value string) string {
+	part := strings.NewReplacer(
+		" ", "_",
+		"\t", "_",
+		"\n", "_",
+		"\r", "_",
+		".", "_",
+		":", "_",
+		"/", "_",
+		"\\", "_",
+		"\"", "_",
+		"'", "_",
+	).Replace(value)
+	if part == "" {
+		part = "empty"
+	}
+	if len(part) > 32 {
+		part = part[:32]
+	}
+	return fmt.Sprintf("string:%d:%s", len(value), part)
 }
 
 func evalConstInt64(expr frontend.Expr) (int64, bool) {
@@ -3608,6 +4091,9 @@ func FormatText(prog *Program) string {
 			if fact.Range != "" {
 				fmt.Fprintf(&b, " range: %s", fact.Range)
 			}
+			if fact.IslandID != "" {
+				fmt.Fprintf(&b, " island: %s epoch: %d base: %s", fact.IslandID, fact.Epoch, fact.BaseID)
+			}
 			if fact.ProofID != "" {
 				fmt.Fprintf(&b, " proof: %s", fact.ProofID)
 			}
@@ -3643,6 +4129,13 @@ func FormatText(prog *Program) string {
 			fmt.Fprintf(&b, "  proof %s kind: %s block: %s guard: %s", guard.ID, guard.Kind, guard.Block, guard.Condition)
 			if guard.Reason != "" {
 				fmt.Fprintf(&b, " reason: %s", guard.Reason)
+			}
+			fmt.Fprintln(&b)
+		}
+		for _, term := range fn.ProofTerms {
+			fmt.Fprintf(&b, "  proof_term %s kind: %s subject: %s index: %s op: %s range: %s", term.ID, term.Kind, term.SubjectBaseID, term.IndexValueID, term.Operation, term.Range)
+			if term.IslandID != "" {
+				fmt.Fprintf(&b, " island: %s epoch: %d base: %s", term.IslandID, term.Epoch, term.BaseID)
 			}
 			fmt.Fprintln(&b)
 		}

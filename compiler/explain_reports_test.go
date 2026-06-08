@@ -5,11 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
 
 	compiler "tetra_language/compiler"
+	"tetra_language/compiler/internal/memoryfacts"
 )
 
 func TestBuildExplainReportsTruthProofAndAllocationArtifacts(t *testing.T) {
@@ -145,6 +147,123 @@ uses alloc, mem:
 			t.Fatalf("layout report missing %q:\n%s", want, layoutText)
 		}
 	}
+}
+
+func TestBuildMemoryReportMarksSliceViewDynamicBoundsChecks(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	outPath := filepath.Join(dir, "app")
+	src := `
+func main() -> Int
+uses alloc, mem:
+    var bytes: []u8 = make_u8(4)
+    var words: []u16 = make_u16(4)
+    var nums: []i32 = make_i32(4)
+    let b: []u8 = bytes.window(1, 2)
+    let w: []u16 = words.prefix(2)
+    let n: []i32 = nums.suffix(1)
+    let text: String = "abcdef".window(1, 3)
+    return b.len + w.len + n.len + text.len
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{
+		Jobs:             1,
+		EmitMemoryReport: true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+
+	raw, err := os.ReadFile(outPath + ".memory.json")
+	if err != nil {
+		t.Fatalf("read memory report: %v", err)
+	}
+	if err := memoryfacts.ValidateReportJSON(raw); err != nil {
+		t.Fatalf("ValidateReportJSON: %v\n%s", err, raw)
+	}
+	var report memoryfacts.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("parse memory report: %v", err)
+	}
+	var retained int
+	for _, row := range report.Rows {
+		if row.Claim != "bounds_check_retained_dynamic" {
+			continue
+		}
+		retained++
+		if row.ParentFactID == "" ||
+			row.CostClass != memoryfacts.CostDynamicCheckRequired ||
+			!row.NormalBuildCheck ||
+			row.ValidatorName != "safe_view_bounds_validator" ||
+			row.ValidatorStatus != memoryfacts.ValidatorPass ||
+			!strings.Contains(row.Reason, "elem_width:") ||
+			!strings.Contains(row.Reason, "elem_shift:") {
+			t.Fatalf("safe view retained-bounds row = %+v", row)
+		}
+	}
+	if retained < 4 {
+		t.Fatalf("bounds_check_retained_dynamic rows = %d, want at least 4:\n%+v", retained, report.Rows)
+	}
+}
+
+func TestBuildMemoryReportValidatesExplicitIslandHelperLowering(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	outPath := filepath.Join(dir, "app")
+	src := `
+func make_buf(isl: island, n: Int) -> []u8
+uses alloc, islands, mem:
+    var buf: []u8 = core.island_make_u8(isl, n)
+    return buf
+
+func main() -> Int
+uses alloc, islands, mem:
+    var result: Int = 0
+    island(64) as isl:
+        var out: []u8 = make_buf(isl, 4)
+        out[0] = 7
+        result = out[0]
+    return result
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{
+		Jobs:             1,
+		EmitMemoryReport: true,
+		EmitAllocReport:  true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt: %v", err)
+	}
+
+	raw, err := os.ReadFile(outPath + ".memory.json")
+	if err != nil {
+		t.Fatalf("read memory report: %v", err)
+	}
+	if err := memoryfacts.ValidateReportJSON(raw); err != nil {
+		t.Fatalf("ValidateReportJSON: %v\n%s", err, raw)
+	}
+	var report memoryfacts.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("parse memory report: %v", err)
+	}
+	for _, row := range report.Rows {
+		if row.ActualLoweringStorage == memoryfacts.StorageExplicitIsland &&
+			row.ClaimLevel == memoryfacts.ClaimValidated &&
+			row.LoweredArtifactID != "" {
+			return
+		}
+	}
+	t.Fatalf("missing validated ExplicitIsland memory row with lowered artifact: %+v", report.Rows)
 }
 
 func TestBuildExplainReportsMachineScalarBackendPath(t *testing.T) {
@@ -739,6 +858,45 @@ uses actors, alloc, capability, islands, mem, runtime:
 	}
 }
 
+func TestBuildReportsMemoryFactIDsAndSiteIDsStableAcrossRuns(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	src := `
+func borrowed(xs: borrow []u8) -> borrow []u8
+uses mem:
+    return xs.window(0, 1).borrow()
+
+func owned(xs: borrow []u8) -> []u8
+uses alloc, mem:
+    return xs.copy()
+
+func main() -> Int
+uses alloc, capability, mem:
+    var xs: []u8 = make_u8(2)
+    xs[0] = 3
+    let view: []u8 = borrowed(xs)
+    let copied: []u8 = owned(view)
+    unsafe:
+        let mem: cap.mem = core.cap_mem()
+        let p: ptr = core.alloc_bytes(8)
+        let _: UInt8 = core.store_u8(core.ptr_add(p, 1, mem), 7, mem)
+    return copied[0]
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	first := buildMemoryReportFactKeys(t, srcPath, filepath.Join(dir, "app-one"))
+	second := buildMemoryReportFactKeys(t, srcPath, filepath.Join(dir, "app-two"))
+	if !reflect.DeepEqual(first, second) {
+		t.Fatalf("memory report source_fact_id/site_id sequence changed across runs:\nfirst:  %+v\nsecond: %+v", first, second)
+	}
+}
+
 func TestReportFlagsDoNotChangeBorrowedReturnFailure(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")
@@ -773,6 +931,40 @@ uses alloc, mem:
 			t.Fatalf("option %d error = %v", i, err)
 		}
 	}
+}
+
+type memoryReportFactKey struct {
+	SourceFactID string
+	SiteID       string
+}
+
+func buildMemoryReportFactKeys(t *testing.T, srcPath string, outPath string) []memoryReportFactKey {
+	t.Helper()
+	if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, "linux-x64", compiler.BuildOptions{
+		Jobs:             1,
+		EmitMemoryReport: true,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt %s: %v", outPath, err)
+	}
+	raw, err := os.ReadFile(outPath + ".memory.json")
+	if err != nil {
+		t.Fatalf("read memory report %s: %v", outPath, err)
+	}
+	var report memoryfacts.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("parse memory report %s: %v", outPath, err)
+	}
+	keys := make([]memoryReportFactKey, 0, len(report.Rows))
+	for _, row := range report.Rows {
+		if row.SourceFactID == "" || row.SiteID == "" {
+			t.Fatalf("memory report row missing stable ids: %+v", row)
+		}
+		keys = append(keys, memoryReportFactKey{
+			SourceFactID: string(row.SourceFactID),
+			SiteID:       row.SiteID,
+		})
+	}
+	return keys
 }
 
 func TestBuildBoundsReportShowsWindowLoopCheckRemoval(t *testing.T) {
@@ -1694,6 +1886,88 @@ uses alloc, mem:
 		}
 	}
 	t.Fatalf("alloc report missing main/xs stack allocation: %+v", alloc.Functions)
+}
+
+func TestBuildAllocReportScopesStackStorageEvidencePerTarget(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "app.tetra")
+	src := `
+func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = make_i32(4)
+    xs[0] = 10
+    xs[1] = 11
+    xs[2] = 12
+    xs[3] = 9
+    return xs[0] + xs[1] + xs[2] + xs[3]
+`
+	if err := os.WriteFile(srcPath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	tests := []struct {
+		target         string
+		claimLevel     string
+		evidenceScope  string
+		wantStackLower bool
+	}{
+		{"linux-x64", "production/host_runtime", "host_runtime_verified", true},
+		{"macos-x64", "build_lower_only unless run", "build_lower_only_target_host_required", true},
+		{"windows-x64", "build_lower_only unless run", "build_lower_only_target_host_required", true},
+		{"wasm32-wasi", "artifact/runtime tiered", "artifact_runtime_tiered_safe_limited", false},
+		{"wasm32-web", "artifact/runtime tiered", "artifact_runtime_tiered_safe_limited", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.target, func(t *testing.T) {
+			outPath := filepath.Join(dir, strings.ReplaceAll(tt.target, "-", "_"))
+			if _, err := compiler.BuildFileWithStatsOpt(srcPath, outPath, tt.target, compiler.BuildOptions{
+				Jobs:            1,
+				EmitAllocReport: true,
+			}); err != nil {
+				t.Fatalf("BuildFileWithStatsOpt: %v", err)
+			}
+
+			var alloc struct {
+				Target                 string `json:"target"`
+				TargetMemoryClaimLevel string `json:"target_memory_claim_level"`
+				StorageEvidenceScope   string `json:"storage_evidence_scope"`
+				Summary                struct {
+					ActualLoweringStorageClasses map[string]int `json:"actual_lowering_storage_classes"`
+					RuntimePaths                 map[string]int `json:"runtime_paths"`
+				} `json:"summary"`
+			}
+			raw, err := os.ReadFile(outPath + ".alloc.json")
+			if err != nil {
+				t.Fatalf("read alloc report: %v", err)
+			}
+			if err := json.Unmarshal(raw, &alloc); err != nil {
+				t.Fatalf("parse alloc report: %v", err)
+			}
+			if alloc.Target != tt.target {
+				t.Fatalf("alloc target = %q, want %q", alloc.Target, tt.target)
+			}
+			if alloc.TargetMemoryClaimLevel != tt.claimLevel {
+				t.Fatalf("%s target_memory_claim_level = %q, want %q", tt.target, alloc.TargetMemoryClaimLevel, tt.claimLevel)
+			}
+			if alloc.StorageEvidenceScope != tt.evidenceScope {
+				t.Fatalf("%s storage_evidence_scope = %q, want %q", tt.target, alloc.StorageEvidenceScope, tt.evidenceScope)
+			}
+			stackLowered := alloc.Summary.ActualLoweringStorageClasses["Stack"] > 0 || alloc.Summary.RuntimePaths["stack_frame"] > 0
+			if stackLowered != tt.wantStackLower {
+				t.Fatalf("%s stack lowering evidence = %v from summary %+v, want %v", tt.target, stackLowered, alloc.Summary, tt.wantStackLower)
+			}
+			if tt.target != "linux-x64" && alloc.TargetMemoryClaimLevel == "production/host_runtime" {
+				t.Fatalf("%s inherited linux-x64 runtime production claim", tt.target)
+			}
+			if tt.target != "linux-x64" && alloc.StorageEvidenceScope == "host_runtime_verified" {
+				t.Fatalf("%s inherited linux-x64 host runtime evidence scope", tt.target)
+			}
+		})
+	}
 }
 
 func TestBuildAllocReportShowsFunctionTempRegionLoweredActualStorage(t *testing.T) {

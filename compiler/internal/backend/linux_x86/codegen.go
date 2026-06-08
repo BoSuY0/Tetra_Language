@@ -764,6 +764,10 @@ func emitFunc(e *emitter, fn ir.IRFunc, callPatches *[]callPatch, dataPatches *[
 			if err := emitIslandFree(e, pop, opt); err != nil {
 				return err
 			}
+		case ir.IRIslandReset:
+			if err := emitIslandReset(e, pop, push, opt); err != nil {
+				return err
+			}
 		case ir.IRIndexLoadI32, ir.IRIndexLoadU8, ir.IRIndexLoadU16,
 			ir.IRIndexLoadI32Unchecked, ir.IRIndexLoadU8Unchecked, ir.IRIndexLoadU16Unchecked:
 			if err := emitIndexLoad(e, instr.Kind, pop, push); err != nil {
@@ -1413,6 +1417,28 @@ func emitIslandFree(e *emitter, pop func(int) error, opt x64.CodegenOptions) err
 	e.movEcxFromEbxDisp(8)
 	e.movEaxImm32(91)
 	e.int80()
+	return nil
+}
+
+func emitIslandReset(e *emitter, pop func(int) error, push func(int), opt x64.CodegenOptions) error {
+	if err := pop(1); err != nil {
+		return err
+	}
+	e.popEbx()
+	if opt.IslandsDebug {
+		e.movEaxFromEbxDisp(12)
+		e.testEaxEax()
+		okAt := e.jzRel32()
+		emitExit(e, 2)
+		okOff := len(e.buf)
+		if err := e.patchRel32(okAt, okOff); err != nil {
+			return err
+		}
+	}
+	cfg := runtimeabi.RuntimeRegionAllocatorConfig(opt.IslandsDebug)
+	e.movMemEbxDispImm32(0, uint32(cfg.HeaderBytes))
+	e.pushEbx()
+	push(1)
 	return nil
 }
 

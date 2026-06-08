@@ -31,11 +31,13 @@ Use the tracked hello example as the first smoke input:
 
 ```sh
 ./tetra check examples/flow_hello.tetra
-./tetra run examples/flow_hello.tetra
+./tetra build --target linux-x64 -o app examples/flow_hello.tetra
 ```
 
-If you only need parser/semantic feedback, prefer `check`. Use `run` when you
-also want host execution.
+`check` and `build` are the normal user loop. `check` gives parser and semantic
+feedback without writing an artifact; `build` applies the same safety contract
+and emits the program. Use `run` as a convenience command when you want build
+plus host execution in one step.
 
 ## Daily Commands
 
@@ -73,8 +75,6 @@ tetra workspace add DemoApp --workspace ..
 tetra workspace check ..
 tetra check .
 tetra build .
-tetra run .
-tetra test .
 tetra project info --format=json .
 tetra doctor --format=json .
 ```
@@ -192,7 +192,6 @@ From that directory, this is enough:
 ```sh
 ./tetra check
 ./tetra build
-./tetra doc
 ```
 
 The path-to-module rule is strict inside each source root: `app.main` maps to

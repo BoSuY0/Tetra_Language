@@ -366,7 +366,7 @@ func Test_core_capability_smoke_examples_index_invariant(t *testing.T) {
 	}
 	index := string(rawIndex)
 	for _, want := range []string{
-		"| `examples/core_capability_smoke.tetra` | Current v0.3.0 core capability token acquisition smoke for `cap.mem` and `cap.io`. | native | exits 42 using only caller-owned heap memory and local MMIO storage; does not imply host permission grant |",
+		"| `examples/core_capability_smoke.tetra` | Current core capability token acquisition smoke for `cap.mem` and `cap.io`. | native | exits 42 using only caller-owned heap memory and local MMIO storage; does not imply host permission grant |",
 	} {
 		if !strings.Contains(index, want) {
 			t.Fatalf("examples index missing capability smoke row %q", want)

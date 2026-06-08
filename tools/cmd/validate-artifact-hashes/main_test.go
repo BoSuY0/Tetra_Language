@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -64,6 +65,27 @@ func TestArtifactHashManifestRejectsModifiedArtifact(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "sha256 mismatch") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestArtifactHashManifestRecordsSchemaVersionReports(t *testing.T) {
+	root := t.TempDir()
+	reportPath := filepath.Join(root, "memory-fuzz-tier1", "summary.json")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(reportPath, []byte(`{"schema_version":"tetra.memory-fuzz-short.summary.v1","tier":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := buildHashManifest(root, "artifact-hashes.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.Artifacts) != 1 {
+		t.Fatalf("artifacts = %d, want 1", len(manifest.Artifacts))
+	}
+	if got, want := manifest.Artifacts[0].Schema, "tetra.memory-fuzz-short.summary.v1"; got != want {
+		t.Fatalf("artifact schema = %q, want %q", got, want)
 	}
 }
 
@@ -168,5 +190,39 @@ func TestArtifactHashManifestRejectsTrailingJSONDocument(t *testing.T) {
 	err = validateHashManifest(manifestPath)
 	if err == nil || !strings.Contains(err.Error(), "manifest must contain a single JSON document") {
 		t.Fatalf("expected single-document failure, got %v", err)
+	}
+}
+
+func TestArtifactHashManifestRejectsSymlinkArtifact(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink test")
+	}
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret outside root\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secret.txt"), filepath.Join(root, "leak.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildHashManifest(root, "artifact-hashes.json"); err == nil || !strings.Contains(err.Error(), "symlink artifact") {
+		t.Fatalf("expected symlink artifact rejection, got %v", err)
+	}
+}
+
+func TestArtifactHashManifestRejectsSymlinkRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink test")
+	}
+	target := t.TempDir()
+	if err := os.WriteFile(filepath.Join(target, "summary.json"), []byte(`{"schema":"example"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "report-root-link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildHashManifest(link, "artifact-hashes.json"); err == nil || !strings.Contains(err.Error(), "symlink artifact root") {
+		t.Fatalf("expected symlink root rejection, got %v", err)
 	}
 }

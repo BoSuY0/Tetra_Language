@@ -31,8 +31,8 @@ are specified in:
 
 1. Declare only the effects a function needs.
 2. Keep unsafe or capability-bearing code narrow.
-3. Run `./tetra check <file>` and fix diagnostics before using `run` or
-   release smoke commands.
+3. Run `./tetra check <file>` and fix diagnostics before `build`; use `run`
+   or release smoke commands only when you need execution evidence.
 
 ## Allowed patterns
 

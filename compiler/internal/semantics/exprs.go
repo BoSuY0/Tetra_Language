@@ -174,6 +174,9 @@ func checkExprWithEffects(
 			if !state.isScopeActive(regionID) {
 				return "", regionNone, lifetimeDiagnosticf(e.At, "slice from scoped island is out of scope")
 			}
+			if err := state.checkBorrowedRegionAfterAwait(regionID, e.Name, e.At); err != nil {
+				return "", regionNone, err
+			}
 			return info.TypeName, regionID, nil
 		}
 		return info.TypeName, regionNone, nil
@@ -333,6 +336,7 @@ func checkExprWithEffects(
 		}
 		call, ok := e.X.(*frontend.CallExpr)
 		isTryAwait := false
+		awaitPos := e.At
 		if !ok {
 			if await, awaitOK := e.X.(*frontend.AwaitExpr); awaitOK {
 				if !state.async {
@@ -340,6 +344,7 @@ func checkExprWithEffects(
 				}
 				call, ok = await.X.(*frontend.CallExpr)
 				isTryAwait = ok
+				awaitPos = await.At
 			}
 		}
 		if !ok {
@@ -355,6 +360,9 @@ func checkExprWithEffects(
 		if isTryAwait {
 			state.allowAwaitDepth--
 			state.allowAwaitCall = nil
+			if err == nil {
+				state.invalidateBorrowedRegionsAfterAwait(awaitPos)
+			}
 		}
 		state.allowThrowDepth--
 		state.allowThrowCall = nil
@@ -378,6 +386,9 @@ func checkExprWithEffects(
 		tname, regionID, err := checkCallExprWithEffects(call, locals, globals, funcs, types, module, imports, state, effects, analysis)
 		state.allowAwaitDepth--
 		state.allowAwaitCall = nil
+		if err == nil {
+			state.invalidateBorrowedRegionsAfterAwait(e.At)
+		}
 		return tname, regionID, err
 	case *frontend.StructLitExpr:
 		resolved, err := resolveTypeName(&e.Type, module, imports)
@@ -1045,6 +1056,158 @@ func findOwnershipAlias(refs []ownershipArgRef, path string) (ownershipArgRef, b
 	return ownershipArgRef{}, false
 }
 
+func checkFunctionTypedCallArguments(
+	e *frontend.CallExpr,
+	locals map[string]LocalInfo,
+	globals map[string]GlobalInfo,
+	funcs map[string]FuncSig,
+	types map[string]*TypeInfo,
+	module string,
+	imports map[string]string,
+	state *regionState,
+	effects *effectContext,
+	analysis *functionAnalysisState,
+	paramTypes []string,
+	paramOwnerships []string,
+	valueCallPhrase string,
+) ([]int, error) {
+	consumeArgs := make([]string, len(e.Args))
+	consumeArgTypes := make([]string, len(e.Args))
+	consumeArgRefs := make([]ownershipArgRef, 0, len(e.Args))
+	borrowArgs := make([]ownershipArgRef, 0, len(e.Args))
+	inoutArgs := make([]ownershipArgRef, 0, len(e.Args))
+	argRegions := make([]int, len(e.Args))
+	for i, arg := range e.Args {
+		argType, argRegion, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
+		if err != nil {
+			return nil, err
+		}
+		argRegions[i] = argRegion
+		if !typesCompatibleWithNullPtr(paramTypes[i], argType, arg) {
+			return nil, fmt.Errorf("%s: type mismatch for %s arg %d", frontend.FormatPos(arg.Pos()), valueCallPhrase, i+1)
+		}
+		paramOwnership := ownershipAt(paramOwnerships, i)
+		if paramOwnership == "" {
+			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+				return nil, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, valueCallPhrase)
+			}
+			if argType == "ptr" {
+				if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+					return nil, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, valueCallPhrase)
+				}
+			}
+			if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+				if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+					return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed to non-borrow parameter %d of %s", borrowedName, i+1, valueCallPhrase)
+				}); err != nil {
+					return nil, err
+				}
+			}
+			if path, ok := canonicalOwnershipAccessPath(arg); ok {
+				if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if paramOwnership == "consume" {
+			name, err := consumeLocalArgumentName(arg, e.Name, true)
+			if err != nil {
+				return nil, err
+			}
+			if err := state.checkNoConsumedDescendants(name, arg.Pos()); err != nil {
+				return nil, err
+			}
+			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+				return nil, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, valueCallPhrase)
+			}
+			if argType == "ptr" {
+				if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+					return nil, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, valueCallPhrase)
+				}
+			}
+			if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+				if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+					return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be consumed by %s", borrowedName, valueCallPhrase)
+				}); err != nil {
+					return nil, err
+				}
+			}
+			path := name
+			if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+				return nil, ownershipDiagnosticf(arg.Pos(), "consumed argument '%s' aliases inout argument in %s (inout at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+			}
+			consumeArgs[i] = name
+			consumeArgTypes[i] = argType
+			consumeArgRefs = append(consumeArgRefs, ownershipArgRef{path: path, pos: arg.Pos()})
+		}
+		if paramOwnership == "borrow" {
+			path, ok := canonicalOwnershipAccessPath(arg)
+			if ok {
+				if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+					return nil, err
+				}
+				if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+					return nil, ownershipDiagnosticf(arg.Pos(), "borrowed argument '%s' aliases inout argument in %s (inout at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+				}
+				borrowArgs = append(borrowArgs, ownershipArgRef{path: path, pos: arg.Pos()})
+			}
+		}
+		if paramOwnership == "inout" {
+			path, ok := canonicalOwnershipAccessPath(arg)
+			if !ok {
+				return nil, ownershipDiagnosticf(arg.Pos(), "inout argument for %s must be a mutable local value", valueCallPhrase)
+			}
+			if borrowedName, borrowed := state.borrowedParamOwner(argRegion); borrowed {
+				return nil, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, valueCallPhrase)
+			}
+			if argType == "ptr" {
+				if borrowedName, borrowed := borrowedPtrOwnerFromExpr(arg, state, nil); borrowed {
+					return nil, ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, valueCallPhrase)
+				}
+			}
+			if argType != "ptr" && (typeMayContainRegion(argType, types) || typeMayContainPtr(argType, types)) {
+				if err := checkBorrowedEscape(arg, locals, globals, funcs, types, module, imports, state, effects, analysis, func(borrowedName string) error {
+					return ownershipDiagnosticf(arg.Pos(), "borrowed value derived from '%s' cannot be passed as inout to %s", borrowedName, valueCallPhrase)
+				}); err != nil {
+					return nil, err
+				}
+			}
+			if err := state.checkNoConsumedDescendants(path, arg.Pos()); err != nil {
+				return nil, err
+			}
+			targetInfo, _, err := resolveAssignTarget(arg, locals, globals, types)
+			if err != nil || !targetInfo.Mutable || targetInfo.Global {
+				return nil, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' for %s must be mutable", path, valueCallPhrase)
+			}
+			if first, exists := findOwnershipAlias(inoutArgs, path); exists {
+				return nil, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' used more than once in %s (first at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+			}
+			if first, exists := findOwnershipAlias(borrowArgs, path); exists {
+				return nil, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' aliases borrowed argument in %s (borrow at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+			}
+			if first, exists := findOwnershipAlias(consumeArgRefs, path); exists {
+				return nil, ownershipDiagnosticf(arg.Pos(), "inout argument '%s' aliases consumed argument in %s (consume at %s)", path, valueCallPhrase, frontend.FormatPos(first.pos))
+			}
+			inoutArgs = append(inoutArgs, ownershipArgRef{path: path, pos: arg.Pos()})
+		}
+	}
+	for i, name := range consumeArgs {
+		if name == "" {
+			continue
+		}
+		for j := 0; j < i; j++ {
+			if consumeArgs[j] == name {
+				return nil, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in %s", name, valueCallPhrase)
+			}
+			if resourceValuesAlias(consumeArgs[j], consumeArgTypes[j], name, consumeArgTypes[i], types, state) {
+				return nil, ownershipDiagnosticf(e.Args[i].Pos(), "value '%s' consumed more than once in %s", name, valueCallPhrase)
+			}
+		}
+		markConsumedResourceValue(name, consumeArgTypes[i], types, state, e.Args[i].Pos())
+	}
+	return argRegions, nil
+}
+
 // checkCallExprWithEffects intentionally keeps call validation in one ordered
 // path: resolve local/builtin/imported targets, enforce semantic clauses and
 // effects, validate async/throw context, then check arguments, ownership, and
@@ -1513,14 +1676,9 @@ func checkCallExprWithEffects(
 						return "", regionNone, err
 					}
 				}
-				for i, arg := range e.Args {
-					argType, _, err := checkExprWithEffects(arg, locals, globals, funcs, types, module, imports, state, effects, analysis)
-					if err != nil {
-						return "", regionNone, err
-					}
-					if !typesCompatibleWithNullPtr(local.FunctionParamTypes[i], argType, arg) {
-						return "", regionNone, fmt.Errorf("%s: type mismatch for %s arg %d", frontend.FormatPos(arg.Pos()), valueCallPhrase, i+1)
-					}
+				argRegions, err := checkFunctionTypedCallArguments(e, locals, globals, funcs, types, module, imports, state, effects, analysis, local.FunctionParamTypes, local.FunctionParamOwnership, valueCallPhrase)
+				if err != nil {
+					return "", regionNone, err
 				}
 				if err := effects.requireAll(e.At, local.FunctionEffects); err != nil {
 					return "", regionNone, err
@@ -1528,7 +1686,7 @@ func checkCallExprWithEffects(
 				if err := validateFunctionTypedThrowCall(local.FunctionThrowsType, e, state); err != nil {
 					return "", regionNone, err
 				}
-				return local.FunctionReturnType, regionNone, nil
+				return local.FunctionReturnType, functionTypedBorrowReturnRegion(local.FunctionReturnOwnership, local.FunctionParamOwnership, argRegions, state), nil
 			}
 		}
 		if err := appendClosureCaptureArgs(e, local); err != nil {
@@ -1895,6 +2053,9 @@ func checkCallExprWithEffects(
 			}
 		}
 		markConsumedResourceValue(name, consumeArgTypes[i], types, state, e.Args[i].Pos())
+		if resolved == "core.island_reset" {
+			state.markOwnedRegionSlicesConsumedByOwner(name, e.Args[i].Pos())
+		}
 	}
 	if handleArg, ok := surfaceHostABIHandleArgIndex(resolved); ok && handleArg < len(e.Args) {
 		if owner, ok := surfaceHandleOwnerPathExprWithAnalysis(e.Args[handleArg], locals, globals, types, analysis); ok {

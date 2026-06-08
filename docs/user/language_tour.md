@@ -1,6 +1,6 @@
 # Tetra Language Tour
 
-Status: user-facing tour for the current `v0.3.0` profile with future v1.0
+Status: user-facing tour for the current `v0.4.0` profile with future v1.0
 notes. This guide calls out planned or blocked areas instead of implying they
 are complete.
 
@@ -48,13 +48,13 @@ the release gate has evidence for it.
 
 ## Callable And Preview Boundaries
 
-Function types and the Level 0 callable MVP are current support. Callable Level 1
-remains experimental unless `docs/spec/current_supported_surface.md`,
-`docs/generated/manifest.json`, and `compiler/features.go` all mark a narrower
-slice as current.
+Function types, callable Level 1/Level 2, and selected safe first-class
+callable behavior are current only within the bounded scope described by
+`docs/spec/current_supported_surface.md`, `docs/generated/manifest.json`, and
+`compiler/features.go`. Anything outside that bounded scope remains future.
 
-For a compact map of promoted and deferred `v0.3.0` behavior, see
-`docs/user/v0_3_preview.md`.
+For a compact map of current and excluded `v0.4.0` behavior, see
+`docs/spec/current_supported_surface.md` and `docs/release-notes/v0_4_0.md`.
 
 ## Diagnostics
 

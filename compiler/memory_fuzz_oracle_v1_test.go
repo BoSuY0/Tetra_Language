@@ -3,6 +3,8 @@ package compiler
 import (
 	"strings"
 	"testing"
+
+	"tetra_language/compiler/memoryvocab"
 )
 
 func TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants(t *testing.T) {
@@ -65,6 +67,24 @@ func TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants(t *testing.T) 
 		if !memoryFuzzHasString(report.NonClaims, nonClaim) {
 			t.Fatalf("missing non-claim %q: %#v", nonClaim, report.NonClaims)
 		}
+	}
+}
+
+func TestMemoryFuzzOracleRejectsUnknownVocabularyStatus(t *testing.T) {
+	report, err := BuildMemoryFuzzOracleReport()
+	if err != nil {
+		t.Fatalf("BuildMemoryFuzzOracleReport: %v", err)
+	}
+	report.GeneratorSurfaces[0].Status = "looks_good_to_me"
+	err = ValidateMemoryFuzzOracleReport(report)
+	if err == nil {
+		t.Fatalf("expected unknown generator surface status to fail")
+	}
+	if !strings.Contains(err.Error(), "unknown generator surface status") || !strings.Contains(err.Error(), "looks_good_to_me") {
+		t.Fatalf("error = %v, want unknown status rejection", err)
+	}
+	if !memoryvocab.KnownMemoryFuzzStatus(memoryvocab.FuzzStatusCovered) {
+		t.Fatalf("shared memory vocabulary must include covered fuzz status")
 	}
 }
 
@@ -197,7 +217,7 @@ func TestMemoryFuzzOracleReportCoversV12ReleaseEvidence(t *testing.T) {
 		}
 	}
 
-	for _, kind := range []string{"compiler_crash_reproducer", "miscompile_reducer", "miscompile_reproducer"} {
+	for _, kind := range []string{"tier1_short_ci_smoke_summary_json", "compiler_crash_reproducer", "miscompile_reducer", "miscompile_reproducer"} {
 		if !memoryFuzzHasArtifactKind(report.Artifacts, kind) {
 			t.Fatalf("missing required artifact kind %q: %#v", kind, report.Artifacts)
 		}

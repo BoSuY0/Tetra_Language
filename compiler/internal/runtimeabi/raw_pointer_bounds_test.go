@@ -133,6 +133,30 @@ func TestRawSliceBoundsRejectsLengthArithmeticOverflow(t *testing.T) {
 	}
 }
 
+func TestRawSliceBoundsRejectsI32ByteLengthOverflow(t *testing.T) {
+	root, err := NewRawAllocationBounds("p", math.MaxInt64)
+	if err != nil {
+		t.Fatalf("NewRawAllocationBounds: %v", err)
+	}
+
+	rawSlice := RawSliceBoundsFromParts(root, 536870912, 4)
+	if rawSlice.Status != RawSliceBoundsRejectedLengthOverflow || rawSlice.VerifiedAllocationRoot {
+		t.Fatalf("raw slice i32 byte overflow = %+v, want rejected length overflow without verified root", rawSlice)
+	}
+}
+
+func TestRawSliceBoundsRejectsInvalidElementWidth(t *testing.T) {
+	root, err := NewRawAllocationBounds("p", 16)
+	if err != nil {
+		t.Fatalf("NewRawAllocationBounds: %v", err)
+	}
+
+	rawSlice := RawSliceBoundsFromParts(root, 4, 0)
+	if rawSlice.Status != RawSliceBoundsStatus("rejected_invalid_element_width") || rawSlice.VerifiedAllocationRoot {
+		t.Fatalf("raw slice invalid element width = %+v, want rejected_invalid_element_width without verified root", rawSlice)
+	}
+}
+
 func TestRawSliceBoundsRejectsNegativeLengthForVerifiedRoot(t *testing.T) {
 	root, err := NewRawAllocationBounds("p", 8)
 	if err != nil {

@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
+
+	"tetra_language/compiler/memoryvocab"
 )
 
 const ReportSchemaV1 = "tetra.memory-report.v1"
@@ -20,6 +23,9 @@ type ReportRow struct {
 	ProgramID             string          `json:"program_id,omitempty"`
 	FunctionID            string          `json:"function_id,omitempty"`
 	ValueID               string          `json:"value_id,omitempty"`
+	IslandID              string          `json:"island_id,omitempty"`
+	Epoch                 int             `json:"epoch,omitempty"`
+	BaseID                string          `json:"base_id,omitempty"`
 	SiteID                string          `json:"site_id,omitempty"`
 	SourceSpan            string          `json:"source_span,omitempty"`
 	SourceFactID          FactID          `json:"source_fact_id,omitempty"`
@@ -39,6 +45,12 @@ type ReportRow struct {
 	AllocationSiteID      string          `json:"allocation_site_id,omitempty"`
 	PlannedStorage        StorageClass    `json:"planned_storage,omitempty"`
 	ActualLoweringStorage StorageClass    `json:"actual_lowering_storage,omitempty"`
+	ProofID               string          `json:"proof_id,omitempty"`
+	ProofKind             string          `json:"proof_kind,omitempty"`
+	ProofSubjectBaseID    string          `json:"proof_subject_base_id,omitempty"`
+	ProofIndexValueID     string          `json:"proof_index_value_id,omitempty"`
+	ProofOperation        string          `json:"proof_operation,omitempty"`
+	ProofRange            string          `json:"proof_range,omitempty"`
 	ValidatorName         string          `json:"validator_name,omitempty"`
 	ValidatorStatus       ValidatorStatus `json:"validator_status,omitempty"`
 	CostClass             CostClass       `json:"cost_class,omitempty"`
@@ -54,6 +66,7 @@ func BuildReportFromGraph(graph *Graph) Report {
 	for _, fact := range graph.Facts() {
 		report.Rows = append(report.Rows, rowFromFact(fact))
 	}
+	sortReportRows(report.Rows)
 	return report
 }
 
@@ -84,6 +97,9 @@ func ValidateReport(report Report) error {
 	for i, row := range report.Rows {
 		issues = append(issues, validateReportRow(i, row)...)
 	}
+	if index, previous, current, ok := firstNonDeterministicReportRow(report.Rows); ok {
+		issues = append(issues, fmt.Sprintf("row %d: non-deterministic memory report row order: source_fact_id %q sorts before previous source_fact_id %q", index, current.SourceFactID, previous.SourceFactID))
+	}
 	seenFactIDs := map[FactID]int{}
 	for i, row := range report.Rows {
 		sourceFactID := FactID(strings.TrimSpace(string(row.SourceFactID)))
@@ -100,6 +116,50 @@ func ValidateReport(report Report) error {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func sortReportRows(rows []ReportRow) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		return compareReportRows(rows[i], rows[j]) < 0
+	})
+}
+
+func firstNonDeterministicReportRow(rows []ReportRow) (int, ReportRow, ReportRow, bool) {
+	for i := 1; i < len(rows); i++ {
+		if compareReportRows(rows[i-1], rows[i]) > 0 {
+			return i, rows[i-1], rows[i], true
+		}
+	}
+	return 0, ReportRow{}, ReportRow{}, false
+}
+
+func compareReportRows(a ReportRow, b ReportRow) int {
+	for _, pair := range []struct {
+		a string
+		b string
+	}{
+		{string(a.SourceFactID), string(b.SourceFactID)},
+		{a.ProgramID, b.ProgramID},
+		{a.FunctionID, b.FunctionID},
+		{a.IslandID, b.IslandID},
+		{fmt.Sprintf("%010d", a.Epoch), fmt.Sprintf("%010d", b.Epoch)},
+		{a.BaseID, b.BaseID},
+		{a.ProofID, b.ProofID},
+		{a.SiteID, b.SiteID},
+		{a.ValueID, b.ValueID},
+		{a.Claim, b.Claim},
+		{string(a.SourceStage), string(b.SourceStage)},
+		{string(a.ParentFactID), string(b.ParentFactID)},
+		{a.LoweredArtifactID, b.LoweredArtifactID},
+	} {
+		if pair.a < pair.b {
+			return -1
+		}
+		if pair.a > pair.b {
+			return 1
+		}
+	}
+	return 0
 }
 
 func ValidateReportProjection(graph *Graph, report Report) error {
@@ -162,6 +222,9 @@ func rowFromFact(fact Fact) ReportRow {
 		ProgramID:             fact.ProgramID,
 		FunctionID:            fact.FunctionID,
 		ValueID:               fact.ValueID,
+		IslandID:              fact.IslandID,
+		Epoch:                 fact.Epoch,
+		BaseID:                fact.BaseID,
 		SiteID:                fact.SiteID,
 		SourceSpan:            fact.SourceSpan,
 		SourceFactID:          fact.ID,
@@ -181,6 +244,12 @@ func rowFromFact(fact Fact) ReportRow {
 		AllocationSiteID:      fact.AllocationSiteID,
 		PlannedStorage:        fact.StoragePlan,
 		ActualLoweringStorage: fact.ActualLoweringStorage,
+		ProofID:               fact.ProofID,
+		ProofKind:             fact.ProofKind,
+		ProofSubjectBaseID:    fact.ProofSubjectBaseID,
+		ProofIndexValueID:     fact.ProofIndexValueID,
+		ProofOperation:        fact.ProofOperation,
+		ProofRange:            fact.ProofRange,
 		ValidatorName:         fact.ValidatorName,
 		ValidatorStatus:       status,
 		CostClass:             fact.CostClass,
@@ -201,6 +270,9 @@ func validateReportProjectionRow(index int, row ReportRow, expected ReportRow) [
 	issues = appendProjectionMismatch(issues, index, "program_id", row.ProgramID, expected.ProgramID)
 	issues = appendProjectionMismatch(issues, index, "function_id", row.FunctionID, expected.FunctionID)
 	issues = appendProjectionMismatch(issues, index, "value_id", row.ValueID, expected.ValueID)
+	issues = appendProjectionMismatch(issues, index, "island_id", row.IslandID, expected.IslandID)
+	issues = appendProjectionMismatch(issues, index, "epoch", row.Epoch, expected.Epoch)
+	issues = appendProjectionMismatch(issues, index, "base_id", row.BaseID, expected.BaseID)
 	issues = appendProjectionMismatch(issues, index, "site_id", row.SiteID, expected.SiteID)
 	issues = appendProjectionMismatch(issues, index, "source_span", row.SourceSpan, expected.SourceSpan)
 	issues = appendProjectionMismatch(issues, index, "source_fact_id", row.SourceFactID, expected.SourceFactID)
@@ -222,6 +294,12 @@ func validateReportProjectionRow(index int, row ReportRow, expected ReportRow) [
 	issues = appendProjectionMismatch(issues, index, "allocation_site_id", row.AllocationSiteID, expected.AllocationSiteID)
 	issues = appendProjectionMismatch(issues, index, "planned_storage", row.PlannedStorage, expected.PlannedStorage)
 	issues = appendProjectionMismatch(issues, index, "actual_lowering_storage", row.ActualLoweringStorage, expected.ActualLoweringStorage)
+	issues = appendProjectionMismatch(issues, index, "proof_id", row.ProofID, expected.ProofID)
+	issues = appendProjectionMismatch(issues, index, "proof_kind", row.ProofKind, expected.ProofKind)
+	issues = appendProjectionMismatch(issues, index, "proof_subject_base_id", row.ProofSubjectBaseID, expected.ProofSubjectBaseID)
+	issues = appendProjectionMismatch(issues, index, "proof_index_value_id", row.ProofIndexValueID, expected.ProofIndexValueID)
+	issues = appendProjectionMismatch(issues, index, "proof_operation", row.ProofOperation, expected.ProofOperation)
+	issues = appendProjectionMismatch(issues, index, "proof_range", row.ProofRange, expected.ProofRange)
 	issues = appendProjectionMismatch(issues, index, "validator_name", row.ValidatorName, expected.ValidatorName)
 	issues = appendProjectionMismatch(issues, index, "validator_status", row.ValidatorStatus, expected.ValidatorStatus)
 	issues = appendProjectionMismatch(issues, index, "cost_class", row.CostClass, expected.CostClass)
@@ -269,6 +347,8 @@ func validateReportRow(index int, row ReportRow) []string {
 	}
 	if strings.TrimSpace(row.Claim) == "" {
 		issues = append(issues, prefix+": claim is required")
+	} else if !knownReportClaim(row.Claim) {
+		issues = append(issues, fmt.Sprintf("%s: unknown memory report claim %q", prefix, row.Claim))
 	}
 	if !knownSourceStage(row.SourceStage) {
 		issues = append(issues, fmt.Sprintf("%s: unknown source_stage %q", prefix, row.SourceStage))
@@ -291,6 +371,21 @@ func validateReportRow(index int, row ReportRow) []string {
 	if !knownCostClass(row.CostClass) {
 		issues = append(issues, fmt.Sprintf("%s: unknown cost_class %q", prefix, row.CostClass))
 	}
+	if islandBackedReportRow(row) && row.Epoch <= 0 {
+		issues = append(issues, prefix+": island-backed row requires positive epoch")
+	}
+	if row.Epoch > 0 && strings.TrimSpace(row.IslandID) == "" {
+		issues = append(issues, prefix+": epoch requires island_id")
+	}
+	if strings.TrimSpace(row.IslandID) != "" && strings.TrimSpace(row.BaseID) == "" {
+		issues = append(issues, prefix+": island_id requires base_id")
+	}
+	if dynamicRawRuntimeCheckCostDisallowed(row.Claim, row.CostClass) {
+		issues = append(issues, fmt.Sprintf("%s: dynamic raw check claim %q must use %s, got %s", prefix, row.Claim, CostDynamicCheckRequired, row.CostClass))
+	}
+	if memoryvocab.ZeroCostProvenClaimDisallowed(row.Claim, string(row.CostClass), string(row.ClaimLevel), string(row.PlannedStorage), string(row.ActualLoweringStorage)) {
+		issues = append(issues, fmt.Sprintf("%s: zero_cost_proven requires validated compiler-owned proof for claim %q", prefix, row.Claim))
+	}
 	if row.CostClass == CostDynamicCheckRequired && !row.NormalBuildCheck {
 		issues = append(issues, prefix+": dynamic_check_required requires normal_build_check")
 	}
@@ -311,6 +406,14 @@ func validateReportRow(index int, row ReportRow) []string {
 	if row.ClaimLevel == ClaimValidated && strings.TrimSpace(row.ValidatorName) == "" {
 		issues = append(issues, prefix+": validated claim requires validator_name")
 	}
+	if row.ClaimLevel == ClaimValidated && boundsTypedProofClaim(row.Claim) {
+		if missing := missingTypedProofFields(row.ProofID, row.ProofKind, row.ProofSubjectBaseID, row.ProofIndexValueID, row.ProofOperation, row.ProofRange); len(missing) > 0 {
+			issues = append(issues, fmt.Sprintf("%s: validated bounds proof claim %q requires typed proof fields: %s", prefix, row.Claim, strings.Join(missing, ", ")))
+		}
+	}
+	if row.ClaimLevel == ClaimValidated && memoryvocab.IslandKernelClaimValidatorMismatch(row.Claim, row.ValidatorName) {
+		issues = append(issues, fmt.Sprintf("%s: validated island claim %q requires validator_name %q", prefix, row.Claim, memoryvocab.RequiredIslandKernelClaimValidator(row.Claim)))
+	}
 	if hasSafeProvenanceFromUnsafeUnknown(row.ProvenanceClass, row.UnsafeClass) {
 		issues = append(issues, fmt.Sprintf("%s: %s claim cannot be sourced from unsafe_unknown", prefix, row.ProvenanceClass))
 	}
@@ -319,6 +422,9 @@ func validateReportRow(index int, row ReportRow) []string {
 	}
 	if broadNoAliasClaim(row.Claim) {
 		issues = append(issues, fmt.Sprintf("%s: broad noalias claim %q is outside Memory Ideal v0", prefix, row.Claim))
+	}
+	if row.ClaimLevel == ClaimValidated && conservativeNoAliasBoundaryClaim(row.Claim) {
+		issues = append(issues, fmt.Sprintf("%s: conservative noalias boundary claim %q cannot be validated", prefix, row.Claim))
 	}
 	if claimRequiresParentFactID(row.Claim) && row.ParentFactID == "" {
 		issues = append(issues, fmt.Sprintf("%s: derived claim %q requires parent_fact_id", prefix, row.Claim))
@@ -332,8 +438,17 @@ func validateReportRow(index int, row ReportRow) []string {
 	if row.CostClass == CostDynamicCheckRequired && memoryOptimizationClaim(row.Claim, row.AliasState) && !row.NormalBuildCheck {
 		issues = append(issues, fmt.Sprintf("%s: dynamic_check_required optimization claim %q requires normal_build_check", prefix, row.Claim))
 	}
+	if bareBoundsCheckEliminatedClaim(row.Claim) {
+		issues = append(issues, fmt.Sprintf("%s: bounds_check_eliminated requires compiler-owned proof id; use bounds_check_removed_with_proof_id", prefix))
+	}
 	if unsafeVerifiedRootDisallowedClaim(row.ProvenanceClass, row.UnsafeClass, row.Claim) {
 		issues = append(issues, fmt.Sprintf("%s: unsafe_verified_root cannot claim %q without bounded raw metadata", prefix, row.Claim))
+	}
+	if unsafeCheckedDisallowedClaim(row.ProvenanceClass, row.UnsafeClass, row.Claim) {
+		issues = append(issues, fmt.Sprintf("%s: unsafe_checked cannot claim %q outside checked runtime/bounds evidence", prefix, row.Claim))
+	}
+	if capMemDisallowedProofClaim(row.Claim, row.ValidatorName, row.Reason) {
+		issues = append(issues, fmt.Sprintf("%s: cap.mem authorization cannot claim %q; cap.mem authorizes raw operations only and does not prove pointer validity, bounds, ownership, noalias, or safe provenance", prefix, row.Claim))
 	}
 	if hasUnsafeUnknownClass(row.ProvenanceClass, row.UnsafeClass) && row.ClaimLevel == ClaimValidated && unsafeUnknownTrustedStorage(row.PlannedStorage, row.ActualLoweringStorage) {
 		issues = append(issues, fmt.Sprintf("%s: unsafe_unknown cannot validate trusted storage lowering %q/%q", prefix, row.PlannedStorage, row.ActualLoweringStorage))
@@ -350,6 +465,9 @@ func validateReportRow(index int, row ReportRow) []string {
 	}
 	if row.ClaimLevel == ClaimValidated && validatedTrustedStorageHeapFallback(row.PlannedStorage, row.ActualLoweringStorage) {
 		issues = append(issues, fmt.Sprintf("%s: validated %s claim cannot lower as Heap", prefix, row.PlannedStorage))
+	}
+	if row.ClaimLevel == ClaimValidated && runtimeProofRequiredStorage(row.PlannedStorage, row.ActualLoweringStorage) {
+		issues = append(issues, fmt.Sprintf("%s: validated runtime boundary storage %q/%q requires production runtime proof", prefix, row.PlannedStorage, row.ActualLoweringStorage))
 	}
 	if trustedStorageHeapFallback(row.PlannedStorage, row.ActualLoweringStorage) && strings.TrimSpace(row.Reason) == "" {
 		issues = append(issues, prefix+": heap/conservative fallback requires reason")
@@ -372,10 +490,37 @@ func validateReportRowStorage(index int, row ReportRow) []string {
 	return issues
 }
 
+func islandBackedReportRow(row ReportRow) bool {
+	return strings.TrimSpace(row.IslandID) != "" || row.PlannedStorage == StorageExplicitIsland || row.ActualLoweringStorage == StorageExplicitIsland
+}
+
 func reportRowRequiresArtifact(row ReportRow) bool {
-	if row.PlannedStorage != "" || row.ActualLoweringStorage != "" {
-		return true
+	return memoryvocab.RowRequiresArtifact(string(row.PlannedStorage), string(row.ActualLoweringStorage), row.Claim)
+}
+
+func boundsTypedProofClaim(claim string) bool {
+	return claim == "bounds_proof_id" || claim == "bounds_check_removed_with_proof_id"
+}
+
+func missingTypedProofFields(proofID string, proofKind string, subjectBaseID string, indexValueID string, operation string, proofRange string) []string {
+	var missing []string
+	if strings.TrimSpace(proofID) == "" {
+		missing = append(missing, "proof_id")
 	}
-	claim := strings.ToLower(row.Claim)
-	return strings.Contains(claim, "lowering") || strings.Contains(claim, "storage")
+	if strings.TrimSpace(proofKind) == "" {
+		missing = append(missing, "proof_kind")
+	}
+	if strings.TrimSpace(subjectBaseID) == "" {
+		missing = append(missing, "proof_subject_base_id")
+	}
+	if strings.TrimSpace(indexValueID) == "" {
+		missing = append(missing, "proof_index_value_id")
+	}
+	if strings.TrimSpace(operation) == "" {
+		missing = append(missing, "proof_operation")
+	}
+	if strings.TrimSpace(proofRange) == "" {
+		missing = append(missing, "proof_range")
+	}
+	return missing
 }

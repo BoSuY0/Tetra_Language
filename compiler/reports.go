@@ -21,6 +21,7 @@ import (
 	"tetra_language/compiler/internal/semantics"
 	"tetra_language/compiler/internal/ssair"
 	"tetra_language/compiler/internal/validation"
+	ctarget "tetra_language/compiler/target"
 )
 
 type reportEnvelope struct {
@@ -100,9 +101,11 @@ type allocationDecision struct {
 
 type allocationPlanReport struct {
 	reportEnvelope
-	Summary   allocplan.ReportSummary  `json:"summary"`
-	Totals    allocplan.Totals         `json:"totals"`
-	Functions []allocplan.FunctionPlan `json:"functions,omitempty"`
+	TargetMemoryClaimLevel string                   `json:"target_memory_claim_level"`
+	StorageEvidenceScope   string                   `json:"storage_evidence_scope"`
+	Summary                allocplan.ReportSummary  `json:"summary"`
+	Totals                 allocplan.Totals         `json:"totals"`
+	Functions              []allocplan.FunctionPlan `json:"functions,omitempty"`
 }
 
 type backendReport struct {
@@ -366,7 +369,7 @@ func emitExplainReports(outputPath string, target string, checked *semantics.Che
 			return err
 		}
 		report := memoryfacts.BuildReportFromGraph(graph)
-		if err := memoryfacts.ValidateReport(report); err != nil {
+		if err := validateMemoryReportForEmission(graph, report); err != nil {
 			return err
 		}
 		if err := writeReport(outputPath+".memory.json", report); err != nil {
@@ -396,6 +399,13 @@ func emitExplainReports(outputPath string, target string, checked *semantics.Che
 		if err := os.WriteFile(outputPath+".explain.txt", []byte(formatExplainText(target, bounds, allocPlan, plirProg)), 0o644); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateMemoryReportForEmission(graph *memoryfacts.Graph, report memoryfacts.Report) error {
+	if err := memoryfacts.ValidateReportProjection(graph, report); err != nil {
+		return fmt.Errorf("validate memory report projection: %w", err)
 	}
 	return nil
 }
@@ -1817,23 +1827,38 @@ func formatReportBound(bound plir.Bound) string {
 }
 
 func wrapAllocationPlanReport(plan *allocplan.Plan, target string) allocationPlanReport {
+	claimLevel, evidenceScope, _ := allocationPlanTargetStorageScope(target)
 	if plan == nil {
 		return allocationPlanReport{
-			reportEnvelope: reportEnvelope{SchemaVersion: 2, Kind: "allocation_plan", Target: target},
-			Summary:        allocplan.Summarize(nil),
+			reportEnvelope:         reportEnvelope{SchemaVersion: 2, Kind: "allocation_plan", Target: target},
+			TargetMemoryClaimLevel: claimLevel,
+			StorageEvidenceScope:   evidenceScope,
+			Summary:                allocplan.Summarize(nil),
 		}
 	}
 	return allocationPlanReport{
-		reportEnvelope: reportEnvelope{SchemaVersion: 2, Kind: "allocation_plan", Target: target},
-		Summary:        allocplan.Summarize(plan),
-		Totals:         plan.Totals,
-		Functions:      plan.Functions,
+		reportEnvelope:         reportEnvelope{SchemaVersion: 2, Kind: "allocation_plan", Target: target},
+		TargetMemoryClaimLevel: claimLevel,
+		StorageEvidenceScope:   evidenceScope,
+		Summary:                allocplan.Summarize(plan),
+		Totals:                 plan.Totals,
+		Functions:              plan.Functions,
 	}
 }
 
 func validateAllocationPlanReport(plan *allocplan.Plan, report allocationPlanReport) error {
 	if report.SchemaVersion != 2 || report.Kind != "allocation_plan" {
 		return fmt.Errorf("allocation report mismatch: invalid envelope schema=%d kind=%q", report.SchemaVersion, report.Kind)
+	}
+	expectedClaimLevel, expectedEvidenceScope, err := allocationPlanTargetStorageScope(report.Target)
+	if err != nil {
+		return fmt.Errorf("allocation report mismatch: target memory scope: %w", err)
+	}
+	if report.TargetMemoryClaimLevel != expectedClaimLevel {
+		return fmt.Errorf("allocation report mismatch: target_memory_claim_level=%q want %q", report.TargetMemoryClaimLevel, expectedClaimLevel)
+	}
+	if report.StorageEvidenceScope != expectedEvidenceScope {
+		return fmt.Errorf("allocation report mismatch: storage_evidence_scope=%q want %q", report.StorageEvidenceScope, expectedEvidenceScope)
 	}
 	expectedSummary := allocplan.Summarize(plan)
 	if !reflect.DeepEqual(report.Summary, expectedSummary) {
@@ -1852,6 +1877,25 @@ func validateAllocationPlanReport(plan *allocplan.Plan, report allocationPlanRep
 		return fmt.Errorf("allocation report mismatch: functions do not match plan")
 	}
 	return nil
+}
+
+func allocationPlanTargetStorageScope(triple string) (string, string, error) {
+	tgt, err := ctarget.Parse(triple)
+	if err != nil {
+		return "", "", err
+	}
+	switch tgt.MemoryClaimLevel {
+	case "production/host_runtime":
+		return tgt.MemoryClaimLevel, "host_runtime_verified", nil
+	case "build_lower_only unless run":
+		return tgt.MemoryClaimLevel, "build_lower_only_target_host_required", nil
+	case "artifact/runtime tiered":
+		return tgt.MemoryClaimLevel, "artifact_runtime_tiered_safe_limited", nil
+	case "build_lower_only":
+		return tgt.MemoryClaimLevel, "build_lower_only", nil
+	default:
+		return tgt.MemoryClaimLevel, "target_capability_matrix", nil
+	}
 }
 
 func buildBoundsReport(prog *ir.IRProgram, checked *semantics.CheckedProgram, target string) boundsReport {

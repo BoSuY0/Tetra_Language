@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"tetra_language/compiler/memoryvocab"
 )
 
 const reportSchemaV1 = "tetra.memory-report.v1"
@@ -22,6 +24,9 @@ type memoryReportRow struct {
 	ProgramID             string `json:"program_id,omitempty"`
 	FunctionID            string `json:"function_id,omitempty"`
 	ValueID               string `json:"value_id,omitempty"`
+	IslandID              string `json:"island_id,omitempty"`
+	Epoch                 int    `json:"epoch,omitempty"`
+	BaseID                string `json:"base_id,omitempty"`
 	SiteID                string `json:"site_id,omitempty"`
 	SourceSpan            string `json:"source_span,omitempty"`
 	SourceFactID          string `json:"source_fact_id,omitempty"`
@@ -41,6 +46,12 @@ type memoryReportRow struct {
 	AllocationSiteID      string `json:"allocation_site_id,omitempty"`
 	PlannedStorage        string `json:"planned_storage,omitempty"`
 	ActualLoweringStorage string `json:"actual_lowering_storage,omitempty"`
+	ProofID               string `json:"proof_id,omitempty"`
+	ProofKind             string `json:"proof_kind,omitempty"`
+	ProofSubjectBaseID    string `json:"proof_subject_base_id,omitempty"`
+	ProofIndexValueID     string `json:"proof_index_value_id,omitempty"`
+	ProofOperation        string `json:"proof_operation,omitempty"`
+	ProofRange            string `json:"proof_range,omitempty"`
 	ValidatorName         string `json:"validator_name,omitempty"`
 	ValidatorStatus       string `json:"validator_status,omitempty"`
 	CostClass             string `json:"cost_class,omitempty"`
@@ -48,37 +59,263 @@ type memoryReportRow struct {
 	Reason                string `json:"reason,omitempty"`
 }
 
+type allocationPlanReport struct {
+	SchemaVersion int                        `json:"schema_version"`
+	Kind          string                     `json:"kind"`
+	Functions     []allocationReportFunction `json:"functions,omitempty"`
+}
+
+type allocationReportFunction struct {
+	Name        string                       `json:"name"`
+	Allocations []allocationReportAllocation `json:"allocations,omitempty"`
+}
+
+type allocationReportAllocation struct {
+	ID                    string `json:"id"`
+	SiteID                string `json:"site_id"`
+	Builtin               string `json:"builtin,omitempty"`
+	LengthStatus          string `json:"length_status,omitempty"`
+	ZeroGuardStatus       string `json:"zero_guard_status,omitempty"`
+	NegativeGuardStatus   string `json:"negative_guard_status,omitempty"`
+	OverflowGuardStatus   string `json:"overflow_guard_status,omitempty"`
+	PlannedStorage        string `json:"planned_storage"`
+	ActualLoweringStorage string `json:"actual_lowering_storage"`
+	ValidationStatus      string `json:"validation_status,omitempty"`
+	LoweringStatus        string `json:"lowering_status,omitempty"`
+	Reason                string `json:"reason,omitempty"`
+}
+
 func main() {
 	reportPath := flag.String("report", "", "path to tetra.memory-report.v1 JSON report")
+	allocReportPath := flag.String("alloc-report", "", "optional path to paired allocation report for lowered_artifact_id validation")
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
 		os.Exit(2)
 	}
-	if err := validateMemoryReport(*reportPath); err != nil {
+	if err := validateMemoryReportWithAllocReport(*reportPath, *allocReportPath); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func validateMemoryReport(path string) error {
-	raw, err := os.ReadFile(path)
+	return validateMemoryReportWithAllocReport(path, "")
+}
+
+func validateMemoryReportWithAllocReport(path string, allocReportPath string) error {
+	report, err := readMemoryReport(path)
 	if err != nil {
 		return err
+	}
+	if err := validateReport(report); err != nil {
+		return err
+	}
+	if strings.TrimSpace(allocReportPath) == "" {
+		return nil
+	}
+	allocReport, err := readAllocationReport(allocReportPath)
+	if err != nil {
+		return err
+	}
+	return validateLoweredArtifactsAgainstAllocationReport(report, allocReport)
+}
+
+func readMemoryReport(path string) (memoryReport, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return memoryReport{}, err
 	}
 	var report memoryReport
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&report); err != nil {
-		return err
+		return memoryReport{}, err
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		if err == nil {
-			return errors.New("trailing data after memory report JSON")
+			return memoryReport{}, errors.New("trailing data after memory report JSON")
 		}
-		return fmt.Errorf("trailing data after memory report JSON: %w", err)
+		return memoryReport{}, fmt.Errorf("trailing data after memory report JSON: %w", err)
 	}
-	return validateReport(report)
+	return report, nil
+}
+
+func readAllocationReport(path string) (allocationPlanReport, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return allocationPlanReport{}, err
+	}
+	var report allocationPlanReport
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	if err := decoder.Decode(&report); err != nil {
+		return allocationPlanReport{}, fmt.Errorf("parse allocation report: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return allocationPlanReport{}, errors.New("trailing data after allocation report JSON")
+		}
+		return allocationPlanReport{}, fmt.Errorf("trailing data after allocation report JSON: %w", err)
+	}
+	return report, nil
+}
+
+type allocationArtifact struct {
+	functionName string
+	allocation   allocationReportAllocation
+}
+
+func validateLoweredArtifactsAgainstAllocationReport(report memoryReport, allocReport allocationPlanReport) error {
+	var issues []string
+	if allocReport.SchemaVersion != 2 || allocReport.Kind != "allocation_plan" {
+		issues = append(issues, fmt.Sprintf("allocation report schema_version/kind = %d/%q, want 2/allocation_plan", allocReport.SchemaVersion, allocReport.Kind))
+	}
+	artifacts := map[string]allocationArtifact{}
+	for _, fn := range allocReport.Functions {
+		for _, alloc := range fn.Allocations {
+			if strings.TrimSpace(fn.Name) == "" || strings.TrimSpace(alloc.ID) == "" || strings.TrimSpace(alloc.ActualLoweringStorage) == "" {
+				continue
+			}
+			issues = append(issues, validateAllocationArtifactContract(fmt.Sprintf("allocation report %s/%s", fn.Name, alloc.ID), alloc)...)
+			id := fmt.Sprintf("ir:%s:%s:%s", fn.Name, alloc.ID, alloc.ActualLoweringStorage)
+			artifacts[id] = allocationArtifact{functionName: fn.Name, allocation: alloc}
+		}
+	}
+	for i, row := range report.Rows {
+		if !rowRequiresArtifact(row) || strings.TrimSpace(row.LoweredArtifactID) == "" {
+			continue
+		}
+		artifact, ok := artifacts[row.LoweredArtifactID]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("row %d: lowered_artifact_id %q is not present in allocation report", i, row.LoweredArtifactID))
+			continue
+		}
+		issues = append(issues, validateRowAgainstAllocationArtifact(i, row, artifact)...)
+	}
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateAllocationArtifactContract(prefix string, alloc allocationReportAllocation) []string {
+	var issues []string
+	builtin := strings.TrimSpace(alloc.Builtin)
+	lengthStatus := strings.TrimSpace(alloc.LengthStatus)
+	zeroGuard := strings.TrimSpace(alloc.ZeroGuardStatus)
+	negativeGuard := strings.TrimSpace(alloc.NegativeGuardStatus)
+	overflowGuard := strings.TrimSpace(alloc.OverflowGuardStatus)
+	if builtin == "" {
+		issues = append(issues, fmt.Sprintf("%s: builtin is required for allocation length contract evidence", prefix))
+	}
+	if lengthStatus == "" {
+		issues = append(issues, fmt.Sprintf("%s: length_status is required for allocation length contract evidence", prefix))
+	} else if !knownAllocationLengthStatus(lengthStatus) {
+		issues = append(issues, fmt.Sprintf("%s: unknown length_status %q", prefix, lengthStatus))
+	}
+	if zeroGuard == "" {
+		issues = append(issues, fmt.Sprintf("%s: zero_guard_status is required for allocation length contract evidence", prefix))
+	} else if !knownAllocationZeroGuard(zeroGuard) {
+		issues = append(issues, fmt.Sprintf("%s: unknown zero_guard_status %q", prefix, zeroGuard))
+	}
+	if negativeGuard == "" {
+		issues = append(issues, fmt.Sprintf("%s: negative_guard_status is required for allocation length contract evidence", prefix))
+	} else if !knownAllocationRejectGuard(negativeGuard) {
+		issues = append(issues, fmt.Sprintf("%s: unknown negative_guard_status %q", prefix, negativeGuard))
+	}
+	if overflowGuard == "" {
+		issues = append(issues, fmt.Sprintf("%s: overflow_guard_status is required for allocation length contract evidence", prefix))
+	} else if !knownAllocationRejectGuard(overflowGuard) {
+		issues = append(issues, fmt.Sprintf("%s: unknown overflow_guard_status %q", prefix, overflowGuard))
+	}
+	if builtin == "" || zeroGuard == "" || negativeGuard == "" || overflowGuard == "" {
+		return issues
+	}
+	wantZero, wantNegative, wantOverflow, ok := allocationGuardContractForBuiltin(builtin)
+	if !ok {
+		return issues
+	}
+	if zeroGuard != wantZero {
+		issues = append(issues, fmt.Sprintf("%s: builtin %q zero_guard_status %q does not match contract %q", prefix, builtin, zeroGuard, wantZero))
+	}
+	if negativeGuard != wantNegative {
+		issues = append(issues, fmt.Sprintf("%s: builtin %q negative_guard_status %q does not match contract %q", prefix, builtin, negativeGuard, wantNegative))
+	}
+	if overflowGuard != wantOverflow {
+		issues = append(issues, fmt.Sprintf("%s: builtin %q overflow_guard_status %q does not match contract %q", prefix, builtin, overflowGuard, wantOverflow))
+	}
+	return issues
+}
+
+func knownAllocationLengthStatus(status string) bool {
+	switch status {
+	case "runtime_guarded",
+		"valid_empty_allocation",
+		"normal_allocation",
+		"rejected_negative_length",
+		"rejected_byte_size_overflow",
+		"invalid_length_contract":
+		return true
+	default:
+		return false
+	}
+}
+
+func knownAllocationZeroGuard(status string) bool {
+	switch status {
+	case "invalid_precondition",
+		"valid_empty_no_allocator",
+		"valid_empty_no_metadata_access":
+		return true
+	default:
+		return false
+	}
+}
+
+func knownAllocationRejectGuard(status string) bool {
+	switch status {
+	case "reject_before_allocation", "reject_before_metadata_access":
+		return true
+	default:
+		return false
+	}
+}
+
+func allocationGuardContractForBuiltin(builtin string) (zero string, negative string, overflow string, ok bool) {
+	switch {
+	case builtin == "core.alloc_bytes":
+		return "invalid_precondition", "reject_before_allocation", "reject_before_allocation", true
+	case strings.HasPrefix(builtin, "core.island_make_"):
+		return "valid_empty_no_metadata_access", "reject_before_metadata_access", "reject_before_metadata_access", true
+	case strings.HasPrefix(builtin, "core.make_"),
+		strings.HasPrefix(builtin, "core.slice_copy_"),
+		builtin == "core.string_copy":
+		return "valid_empty_no_allocator", "reject_before_allocation", "reject_before_allocation", true
+	default:
+		return "", "", "", false
+	}
+}
+
+func validateRowAgainstAllocationArtifact(index int, row memoryReportRow, artifact allocationArtifact) []string {
+	prefix := fmt.Sprintf("row %d", index)
+	var issues []string
+	alloc := artifact.allocation
+	if row.FunctionID != "" && row.FunctionID != artifact.functionName {
+		issues = append(issues, fmt.Sprintf("%s: function_id %q does not match allocation report function %q for lowered_artifact_id %q", prefix, row.FunctionID, artifact.functionName, row.LoweredArtifactID))
+	}
+	if row.AllocationSiteID != "" && row.AllocationSiteID != alloc.ID {
+		issues = append(issues, fmt.Sprintf("%s: allocation_site_id %q does not match allocation report id %q for lowered_artifact_id %q", prefix, row.AllocationSiteID, alloc.ID, row.LoweredArtifactID))
+	}
+	if row.SiteID != "" && alloc.SiteID != "" && row.SiteID != alloc.SiteID {
+		issues = append(issues, fmt.Sprintf("%s: site_id %q does not match allocation report site_id %q for lowered_artifact_id %q", prefix, row.SiteID, alloc.SiteID, row.LoweredArtifactID))
+	}
+	if row.PlannedStorage != "" && row.PlannedStorage != alloc.PlannedStorage {
+		issues = append(issues, fmt.Sprintf("%s: planned_storage %q does not match allocation report planned_storage %q for lowered_artifact_id %q", prefix, row.PlannedStorage, alloc.PlannedStorage, row.LoweredArtifactID))
+	}
+	if row.ActualLoweringStorage != "" && row.ActualLoweringStorage != alloc.ActualLoweringStorage {
+		issues = append(issues, fmt.Sprintf("%s: actual_lowering_storage %q does not match allocation report actual_lowering_storage %q for lowered_artifact_id %q", prefix, row.ActualLoweringStorage, alloc.ActualLoweringStorage, row.LoweredArtifactID))
+	}
+	return issues
 }
 
 func validateReport(report memoryReport) error {
@@ -91,6 +328,9 @@ func validateReport(report memoryReport) error {
 	}
 	for i, row := range report.Rows {
 		issues = append(issues, validateRow(i, row)...)
+	}
+	if index, previous, current, ok := firstNonDeterministicReportRow(report.Rows); ok {
+		issues = append(issues, fmt.Sprintf("row %d: non-deterministic memory report row order: source_fact_id %q sorts before previous source_fact_id %q", index, current.SourceFactID, previous.SourceFactID))
 	}
 	seenFactIDs := map[string]int{}
 	for i, row := range report.Rows {
@@ -110,6 +350,40 @@ func validateReport(report memoryReport) error {
 	return nil
 }
 
+func firstNonDeterministicReportRow(rows []memoryReportRow) (int, memoryReportRow, memoryReportRow, bool) {
+	for i := 1; i < len(rows); i++ {
+		if compareMemoryReportRows(rows[i-1], rows[i]) > 0 {
+			return i, rows[i-1], rows[i], true
+		}
+	}
+	return 0, memoryReportRow{}, memoryReportRow{}, false
+}
+
+func compareMemoryReportRows(a memoryReportRow, b memoryReportRow) int {
+	for _, pair := range []struct {
+		a string
+		b string
+	}{
+		{a.SourceFactID, b.SourceFactID},
+		{a.ProgramID, b.ProgramID},
+		{a.FunctionID, b.FunctionID},
+		{a.SiteID, b.SiteID},
+		{a.ValueID, b.ValueID},
+		{a.Claim, b.Claim},
+		{a.SourceStage, b.SourceStage},
+		{a.ParentFactID, b.ParentFactID},
+		{a.LoweredArtifactID, b.LoweredArtifactID},
+	} {
+		if pair.a < pair.b {
+			return -1
+		}
+		if pair.a > pair.b {
+			return 1
+		}
+	}
+	return 0
+}
+
 func validateRow(index int, row memoryReportRow) []string {
 	prefix := fmt.Sprintf("row %d", index)
 	var issues []string
@@ -121,6 +395,8 @@ func validateRow(index int, row memoryReportRow) []string {
 	}
 	if strings.TrimSpace(row.Claim) == "" {
 		issues = append(issues, prefix+": claim is required")
+	} else if !knownReportClaim(row.Claim) {
+		issues = append(issues, fmt.Sprintf("%s: unknown memory report claim %q", prefix, row.Claim))
 	}
 	if !knownSourceStage(row.SourceStage) {
 		issues = append(issues, fmt.Sprintf("%s: unknown source_stage %q", prefix, row.SourceStage))
@@ -143,6 +419,21 @@ func validateRow(index int, row memoryReportRow) []string {
 	if !knownCostClass(row.CostClass) {
 		issues = append(issues, fmt.Sprintf("%s: unknown cost_class %q", prefix, row.CostClass))
 	}
+	if islandBackedReportRow(row) && row.Epoch <= 0 {
+		issues = append(issues, prefix+": island-backed row requires positive epoch")
+	}
+	if row.Epoch > 0 && strings.TrimSpace(row.IslandID) == "" {
+		issues = append(issues, prefix+": epoch requires island_id")
+	}
+	if strings.TrimSpace(row.IslandID) != "" && strings.TrimSpace(row.BaseID) == "" {
+		issues = append(issues, prefix+": island_id requires base_id")
+	}
+	if dynamicRawRuntimeCheckCostDisallowed(row.Claim, row.CostClass) {
+		issues = append(issues, fmt.Sprintf("%s: dynamic raw check claim %q must use dynamic_check_required, got %s", prefix, row.Claim, row.CostClass))
+	}
+	if memoryvocab.ZeroCostProvenClaimDisallowed(row.Claim, row.CostClass, row.ClaimLevel, row.PlannedStorage, row.ActualLoweringStorage) {
+		issues = append(issues, fmt.Sprintf("%s: zero_cost_proven requires validated compiler-owned proof for claim %q", prefix, row.Claim))
+	}
 	if row.CostClass == "dynamic_check_required" && !row.NormalBuildCheck {
 		issues = append(issues, prefix+": dynamic_check_required requires normal_build_check")
 	}
@@ -152,6 +443,14 @@ func validateRow(index int, row memoryReportRow) []string {
 	if row.ClaimLevel == "validated" && strings.TrimSpace(row.ValidatorName) == "" {
 		issues = append(issues, prefix+": validated claim requires validator_name")
 	}
+	if row.ClaimLevel == "validated" && boundsTypedProofClaim(row.Claim) {
+		if missing := missingTypedProofFields(row.ProofID, row.ProofKind, row.ProofSubjectBaseID, row.ProofIndexValueID, row.ProofOperation, row.ProofRange); len(missing) > 0 {
+			issues = append(issues, fmt.Sprintf("%s: validated bounds proof claim %q requires typed proof fields: %s", prefix, row.Claim, strings.Join(missing, ", ")))
+		}
+	}
+	if row.ClaimLevel == "validated" && memoryvocab.IslandKernelClaimValidatorMismatch(row.Claim, row.ValidatorName) {
+		issues = append(issues, fmt.Sprintf("%s: validated island claim %q requires validator_name %q", prefix, row.Claim, memoryvocab.RequiredIslandKernelClaimValidator(row.Claim)))
+	}
 	if safeProvenance(row.ProvenanceClass) && row.UnsafeClass == "unsafe_unknown" {
 		issues = append(issues, fmt.Sprintf("%s: %s claim cannot be sourced from unsafe_unknown", prefix, row.ProvenanceClass))
 	}
@@ -160,6 +459,9 @@ func validateRow(index int, row memoryReportRow) []string {
 	}
 	if broadNoAliasClaim(row.Claim) {
 		issues = append(issues, fmt.Sprintf("%s: broad noalias claim %q is outside Memory Ideal v0", prefix, row.Claim))
+	}
+	if row.ClaimLevel == "validated" && conservativeNoAliasBoundaryClaim(row.Claim) {
+		issues = append(issues, fmt.Sprintf("%s: conservative noalias boundary claim %q cannot be validated", prefix, row.Claim))
 	}
 	if claimRequiresParentFactID(row.Claim) && strings.TrimSpace(row.ParentFactID) == "" {
 		issues = append(issues, fmt.Sprintf("%s: derived claim %q requires parent_fact_id", prefix, row.Claim))
@@ -173,8 +475,17 @@ func validateRow(index int, row memoryReportRow) []string {
 	if row.CostClass == "dynamic_check_required" && memoryOptimizationClaim(row.Claim, row.AliasState) && !row.NormalBuildCheck {
 		issues = append(issues, fmt.Sprintf("%s: dynamic_check_required optimization claim %q requires normal_build_check", prefix, row.Claim))
 	}
+	if bareBoundsCheckEliminatedClaim(row.Claim) {
+		issues = append(issues, fmt.Sprintf("%s: bounds_check_eliminated requires compiler-owned proof id; use bounds_check_removed_with_proof_id", prefix))
+	}
 	if unsafeVerifiedRootDisallowedClaim(row.ProvenanceClass, row.UnsafeClass, row.Claim) {
 		issues = append(issues, fmt.Sprintf("%s: unsafe_verified_root cannot claim %q without bounded raw metadata", prefix, row.Claim))
+	}
+	if unsafeCheckedDisallowedClaim(row.ProvenanceClass, row.UnsafeClass, row.Claim) {
+		issues = append(issues, fmt.Sprintf("%s: unsafe_checked cannot claim %q outside checked runtime/bounds evidence", prefix, row.Claim))
+	}
+	if capMemDisallowedProofClaim(row.Claim, row.ValidatorName, row.Reason) {
+		issues = append(issues, fmt.Sprintf("%s: cap.mem authorization cannot claim %q; cap.mem authorizes raw operations only and does not prove pointer validity, bounds, ownership, noalias, or safe provenance", prefix, row.Claim))
 	}
 	if unsafeUnknownRow(row) && row.ClaimLevel == "validated" && unsafeUnknownTrustedStorage(row.PlannedStorage, row.ActualLoweringStorage) {
 		issues = append(issues, fmt.Sprintf("%s: unsafe_unknown cannot validate trusted storage lowering %q/%q", prefix, row.PlannedStorage, row.ActualLoweringStorage))
@@ -191,6 +502,9 @@ func validateRow(index int, row memoryReportRow) []string {
 	}
 	if row.ClaimLevel == "validated" && validatedTrustedStorageHeapFallback(row.PlannedStorage, row.ActualLoweringStorage) {
 		issues = append(issues, fmt.Sprintf("%s: validated %s claim cannot lower as Heap", prefix, row.PlannedStorage))
+	}
+	if row.ClaimLevel == "validated" && runtimeProofRequiredStorage(row.PlannedStorage, row.ActualLoweringStorage) {
+		issues = append(issues, fmt.Sprintf("%s: validated runtime boundary storage %q/%q requires production runtime proof", prefix, row.PlannedStorage, row.ActualLoweringStorage))
 	}
 	return issues
 }
@@ -210,192 +524,141 @@ func validateRowStorage(index int, row memoryReportRow) []string {
 	return issues
 }
 
-func knownSourceStage(value string) bool {
-	switch value {
-	case "semantics", "unsafe_gateway_lowering", "plir", "allocplan", "lowering", "validation":
-		return true
-	default:
-		return false
+func boundsTypedProofClaim(claim string) bool {
+	return claim == "bounds_proof_id" || claim == "bounds_check_removed_with_proof_id"
+}
+
+func missingTypedProofFields(proofID string, proofKind string, subjectBaseID string, indexValueID string, operation string, proofRange string) []string {
+	var missing []string
+	if strings.TrimSpace(proofID) == "" {
+		missing = append(missing, "proof_id")
 	}
+	if strings.TrimSpace(proofKind) == "" {
+		missing = append(missing, "proof_kind")
+	}
+	if strings.TrimSpace(subjectBaseID) == "" {
+		missing = append(missing, "proof_subject_base_id")
+	}
+	if strings.TrimSpace(indexValueID) == "" {
+		missing = append(missing, "proof_index_value_id")
+	}
+	if strings.TrimSpace(operation) == "" {
+		missing = append(missing, "proof_operation")
+	}
+	if strings.TrimSpace(proofRange) == "" {
+		missing = append(missing, "proof_range")
+	}
+	return missing
+}
+
+func knownSourceStage(value string) bool {
+	return memoryvocab.KnownSourceStage(value)
 }
 
 func knownProvenance(value string) bool {
-	switch value {
-	case "safe_known", "safe_borrowed", "safe_owned", "unsafe_unknown", "unsafe_checked", "unsafe_verified_root":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.KnownProvenanceClass(value)
 }
 
 func safeProvenance(value string) bool {
-	switch value {
-	case "safe_known", "safe_borrowed", "safe_owned":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.SafeProvenanceClass(value)
 }
 
 func unsafeUnknownRow(row memoryReportRow) bool {
-	return row.ProvenanceClass == "unsafe_unknown" || row.UnsafeClass == "unsafe_unknown"
+	return memoryvocab.UnsafeUnknownRow(row.ProvenanceClass, row.UnsafeClass)
 }
 
 func unsafeUnknownOptimizationClaim(claim string, aliasState string) bool {
-	claim = strings.ToLower(strings.TrimSpace(claim))
-	switch claim {
-	case "provenance_known", "no_alias", "index_in_range", "bounds_check_eliminated", "trusted_storage":
-		return true
-	case "safe_known", "safe_borrowed", "safe_owned":
-		return true
-	}
-	return aliasState == "unique" || aliasState == "mutable_exclusive"
+	return memoryvocab.UnsafeUnknownOptimizationClaim(claim, aliasState)
 }
 
 func memoryOptimizationClaim(claim string, aliasState string) bool {
-	if unsafeUnknownOptimizationClaim(claim, aliasState) {
-		return true
-	}
-	claim = strings.ToLower(strings.TrimSpace(claim))
-	return strings.Contains(claim, "eliminated") || strings.Contains(claim, "zero_cost")
+	return memoryvocab.MemoryOptimizationClaim(claim, aliasState)
+}
+
+func bareBoundsCheckEliminatedClaim(claim string) bool {
+	return memoryvocab.BareBoundsCheckEliminatedClaim(claim)
+}
+
+func dynamicRawRuntimeCheckCostDisallowed(claim string, costClass string) bool {
+	return memoryvocab.DynamicRawRuntimeCheckCostDisallowed(claim, costClass)
+}
+
+func unsafeCheckedDisallowedClaim(provenanceClass string, unsafeClass string, claim string) bool {
+	return memoryvocab.UnsafeCheckedDisallowedClaim(provenanceClass, unsafeClass, claim)
+}
+
+func capMemDisallowedProofClaim(claim string, validatorName string, reason string) bool {
+	return memoryvocab.CapMemDisallowedProofClaim(claim, validatorName, reason)
 }
 
 func broadNoAliasClaim(claim string) bool {
-	claim = strings.ToLower(strings.TrimSpace(claim))
-	return claim == "broad_noalias" || claim == "universal_noalias" || claim == "full_noalias_model"
+	return memoryvocab.BroadNoAliasClaim(claim)
+}
+
+func conservativeNoAliasBoundaryClaim(claim string) bool {
+	return memoryvocab.ConservativeNoAliasBoundaryClaim(claim)
 }
 
 func claimRequiresParentFactID(claim string) bool {
-	switch strings.ToLower(strings.TrimSpace(claim)) {
-	case "borrow_owner", "borrow_source_fact_id", "aggregate_contains_borrow",
-		"optional_contains_borrow", "enum_payload_contains_borrow",
-		"generic_wrapper_contains_borrow", "function_value_contains_borrow",
-		"callback_arg_contains_borrow", "callback_inout_conservative",
-		"interface_value_contains_borrow", "protocol_dispatch_borrow_conservative",
-		"protocol_dispatch_noalias_conservative",
-		"async_boundary_borrow_conservative", "task_boundary_borrow_rejected",
-		"actor_boundary_borrow_rejected", "boundary_noalias_conservative",
-		"unsafe_unknown_rejected_safe_facts",
-		"unsafe_verified_root_allocation_base",
-		"bounds_check_removed_with_proof_id",
-		"raw_bounds_runtime_check_normal_build",
-		"ffi_call_may_retain_borrow",
-		"ffi_noalias_invalidated_by_external_call",
-		"safe_wrapper_promotion_rejected_without_contract",
-		"external_pointer_provenance_rejected",
-		"copy_owned", "copy_source_fact_id",
-		"mutable_exclusive", "start_inout_exclusive", "end_inout_exclusive",
-		"no_alias_validated_narrow_unique_local",
-		"no_alias_validated_narrow_sequential_inout":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.ClaimRequiresParentFactID(claim)
 }
 
 func knownCostClass(value string) bool {
-	switch value {
-	case "zero_cost_proven", "dynamic_check_required", "instrumentation_only", "unsupported_rejected", "conservative_fallback":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.KnownCostClass(value)
+}
+
+func knownReportClaim(value string) bool {
+	return memoryvocab.KnownReportClaim(value)
 }
 
 func unsafeVerifiedRootDisallowedClaim(provenanceClass string, unsafeClass string, claim string) bool {
-	if provenanceClass != "unsafe_verified_root" && unsafeClass != "unsafe_verified_root" {
-		return false
-	}
-	switch strings.ToLower(strings.TrimSpace(claim)) {
-	case "allocation_base_metadata", "unsafe_verified_root_allocation_base":
-		return false
-	default:
-		return true
-	}
+	return memoryvocab.UnsafeVerifiedRootDisallowedClaim(provenanceClass, unsafeClass, claim)
 }
 
 func unsafeUnknownTrustedStorage(planned string, actual string) bool {
-	return trustedStorageForUnsafeUnknown(planned) || trustedStorageForUnsafeUnknown(actual)
+	return memoryvocab.UnsafeUnknownTrustedStorage(planned, actual)
 }
 
 func validatedTrustedStorageHeapFallback(planned string, actual string) bool {
-	if actual != "Heap" {
-		return false
-	}
-	switch planned {
-	case "Eliminated", "Register", "Stack", "Region", "ExplicitIsland",
-		"FunctionTempRegion", "TaskRegion", "ActorMoveRegion":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.ValidatedTrustedStorageHeapFallback(planned, actual)
+}
+
+func runtimeProofRequiredStorage(planned string, actual string) bool {
+	return memoryvocab.RuntimeProofRequiredStorage(planned, actual)
 }
 
 func trustedStorageForUnsafeUnknown(value string) bool {
-	switch value {
-	case "Eliminated", "Register", "Stack", "Region", "ExplicitIsland",
-		"FunctionTempRegion", "TaskRegion", "ActorMoveRegion":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.UnsafeUnknownTrustedStorage(value, "")
 }
 
 func knownStorage(value string) bool {
-	switch value {
-	case "UnknownConservative", "Eliminated", "Register", "Heap", "Stack", "Region",
-		"ExplicitIsland", "FunctionTempRegion", "TaskRegion", "ActorMoveRegion",
-		"LargeMmap", "External":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.KnownStorageClass(value)
 }
 
 func knownAliasState(value string) bool {
-	switch value {
-	case "", "unique", "shared_readonly", "mutable_exclusive", "maybe_alias", "unknown_alias", "invalidated_by_call":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.KnownAliasState(value)
 }
 
 func validatedNoAliasState(value string) bool {
-	return value == "unique" || value == "mutable_exclusive"
+	return memoryvocab.ValidatedNoAliasState(value)
 }
 
 func knownUnsafe(value string) bool {
-	switch value {
-	case "safe", "unsafe_unknown", "unsafe_checked", "unsafe_verified_root":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.KnownUnsafeClass(value)
 }
 
 func knownClaimLevel(value string) bool {
-	switch value {
-	case "validated", "evidence_only", "conservative", "rejected", "future":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.KnownClaimLevel(value)
 }
 
 func knownValidatorStatus(value string) bool {
-	switch value {
-	case "pass", "fail", "not_applicable", "not_run":
-		return true
-	default:
-		return false
-	}
+	return memoryvocab.KnownValidatorStatus(value)
+}
+
+func islandBackedReportRow(row memoryReportRow) bool {
+	return strings.TrimSpace(row.IslandID) != "" || row.PlannedStorage == memoryvocab.StorageExplicitIsland || row.ActualLoweringStorage == memoryvocab.StorageExplicitIsland
 }
 
 func rowRequiresArtifact(row memoryReportRow) bool {
-	if row.PlannedStorage != "" || row.ActualLoweringStorage != "" {
-		return true
-	}
-	claim := strings.ToLower(row.Claim)
-	return strings.Contains(claim, "lowering") || strings.Contains(claim, "storage")
+	return memoryvocab.RowRequiresArtifact(row.PlannedStorage, row.ActualLoweringStorage, row.Claim)
 }

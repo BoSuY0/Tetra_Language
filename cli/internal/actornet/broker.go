@@ -42,6 +42,7 @@ type Broker struct {
 	nodes  map[uint16]*nodeConn
 	report Report
 	closed bool
+	done   chan struct{}
 	wg     sync.WaitGroup
 
 	closeOnce sync.Once
@@ -66,6 +67,7 @@ func NewBroker(cfg Config) (*Broker, error) {
 		cfg:      cfg,
 		listener: listener,
 		nodes:    make(map[uint16]*nodeConn),
+		done:     make(chan struct{}),
 		report: Report{
 			Runtime:    "actornet",
 			Transport:  "loopback-tcp",
@@ -84,8 +86,11 @@ func (b *Broker) Serve(ctx context.Context) error {
 		ctx = context.Background()
 	}
 	go func() {
-		<-ctx.Done()
-		_ = b.Close()
+		select {
+		case <-ctx.Done():
+			_ = b.Close()
+		case <-b.done:
+		}
 	}()
 
 	for {
@@ -117,6 +122,9 @@ func (b *Broker) Close() error {
 			return
 		}
 		b.closed = true
+		if b.done != nil {
+			close(b.done)
+		}
 		conns := make([]net.Conn, 0, len(b.nodes))
 		for _, node := range b.nodes {
 			conns = append(conns, node.conn)

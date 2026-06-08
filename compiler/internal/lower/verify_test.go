@@ -787,6 +787,7 @@ func TestBudgetChargeModelIsExplicit(t *testing.T) {
 		ir.IRIslandMakeSliceU16:       1,
 		ir.IRIslandMakeSliceI32:       1,
 		ir.IRIslandFree:               1,
+		ir.IRIslandReset:              1,
 		ir.IRCapIO:                    1,
 		ir.IRCapMem:                   1,
 		ir.IRMemReadI32:               1,

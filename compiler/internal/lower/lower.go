@@ -107,6 +107,7 @@ var budgetChargeTable = []budgetCharge{
 	{kind: ir.IRIslandMakeSliceU16, cost: 1},
 	{kind: ir.IRIslandMakeSliceI32, cost: 1},
 	{kind: ir.IRIslandFree, cost: 1},
+	{kind: ir.IRIslandReset, cost: 1},
 	{kind: ir.IRCapIO, cost: 1},
 	{kind: ir.IRCapMem, cost: 1},
 	{kind: ir.IRMemReadI32, cost: 1},
@@ -4514,6 +4515,12 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			}
 			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Pos: e.At})
 			return 2, nil
+		case "core.island_reset":
+			if total != 1 {
+				return 0, fmt.Errorf("%s: island_reset expects 1 argument", frontend.FormatPos(e.At))
+			}
+			l.emit(ir.IRInstr{Kind: ir.IRIslandReset, Pos: e.At})
+			return 1, nil
 		case "core.mmio_read_i32":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: mmio_read_i32 expects 2 arguments", frontend.FormatPos(e.At))

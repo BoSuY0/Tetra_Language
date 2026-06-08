@@ -109,6 +109,99 @@ func TestMemoryReportRejectsUnknownCostClass(t *testing.T) {
 	}
 }
 
+func TestValidateMemoryReportRejectsConservativeZeroCost(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].Claim = "callback_inout_conservative"
+	report.Rows[0].ClaimLevel = ClaimConservative
+	report.Rows[0].ParentFactID = "fact:parent"
+	report.Rows[0].ProvenanceClass = ProvenanceUnsafeUnknown
+	report.Rows[0].UnsafeClass = UnsafeUnknown
+	report.Rows[0].LoweredArtifactID = ""
+	report.Rows[0].PlannedStorage = ""
+	report.Rows[0].ActualLoweringStorage = ""
+	report.Rows[0].ValidatorName = "callback_alias_conservative_validator"
+	report.Rows[0].ValidatorStatus = ValidatorNotApplicable
+	report.Rows[0].CostClass = CostZeroCostProven
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "zero_cost_proven") {
+		t.Fatalf("ValidateReport error = %v, want conservative zero-cost rejection", err)
+	}
+}
+
+func TestValidateMemoryReportRejectsUnvalidatedStorageLoweringZeroCost(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].SourceStage = StageAllocPlan
+	report.Rows[0].Claim = "storage_lowering"
+	report.Rows[0].ClaimLevel = ClaimEvidenceOnly
+	report.Rows[0].ProvenanceClass = ProvenanceSafeOwned
+	report.Rows[0].UnsafeClass = UnsafeSafe
+	report.Rows[0].PlannedStorage = StorageStack
+	report.Rows[0].ActualLoweringStorage = StorageStack
+	report.Rows[0].LoweredArtifactID = "ir:main:stack:Stack"
+	report.Rows[0].ValidatorName = ""
+	report.Rows[0].ValidatorStatus = ValidatorNotRun
+	report.Rows[0].CostClass = CostZeroCostProven
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "zero_cost_proven") {
+		t.Fatalf("ValidateReport error = %v, want storage zero-cost proof rejection", err)
+	}
+}
+
+func TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotions(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		claim      string
+		provenance ProvenanceClass
+		aliasState AliasState
+		want       string
+	}{
+		{name: "safe known", claim: "safe_known", provenance: ProvenanceSafeKnown, want: "unsafe_checked"},
+		{name: "provenance known", claim: "provenance_known", provenance: ProvenanceUnsafeChecked, want: "unsafe_checked"},
+		{name: "noalias", claim: "no_alias", provenance: ProvenanceUnsafeChecked, aliasState: AliasUnique, want: "unsafe_checked"},
+		{name: "bounds check elimination", claim: "bounds_check_eliminated", provenance: ProvenanceUnsafeChecked, want: "proof id"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report := validMemoryReport()
+			report.Rows[0].SourceStage = StagePLIR
+			report.Rows[0].Claim = tc.claim
+			report.Rows[0].ProvenanceClass = tc.provenance
+			report.Rows[0].UnsafeClass = UnsafeChecked
+			report.Rows[0].AliasState = tc.aliasState
+
+			err := ValidateReport(report)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ValidateReport error = %v, want %q rejection", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateMemoryReportRejectsDynamicRawOffsetZeroCostPromotion(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].FunctionID = "read_at"
+	report.Rows[0].ValueID = "q"
+	report.Rows[0].SiteID = "test.tetra:6:17"
+	report.Rows[0].LoweredArtifactID = ""
+	report.Rows[0].PlannedStorage = ""
+	report.Rows[0].ActualLoweringStorage = ""
+	report.Rows[0].SourceStage = StagePLIR
+	report.Rows[0].Claim = "derived_allocation_offset"
+	report.Rows[0].ClaimLevel = ClaimEvidenceOnly
+	report.Rows[0].ProvenanceClass = ProvenanceUnsafeChecked
+	report.Rows[0].UnsafeClass = UnsafeChecked
+	report.Rows[0].CostClass = CostZeroCostProven
+	report.Rows[0].ValidatorName = ""
+	report.Rows[0].ValidatorStatus = ValidatorNotRun
+	report.Rows[0].Reason = "core.ptr_add raw_pointer_bounds: checked_external_unknown base:p offset:n"
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "dynamic raw") || !strings.Contains(err.Error(), "zero_cost_proven") {
+		t.Fatalf("ValidateReport error = %v, want dynamic raw zero-cost rejection", err)
+	}
+}
+
 func TestMemoryReportRejectsDynamicOptimizationClaimWithoutNormalBuildCheck(t *testing.T) {
 	report := validMemoryReport()
 	report.Rows[0].Claim = "bounds_check_eliminated"
@@ -118,6 +211,31 @@ func TestMemoryReportRejectsDynamicOptimizationClaimWithoutNormalBuildCheck(t *t
 	err := ValidateReport(report)
 	if err == nil || !strings.Contains(err.Error(), "dynamic_check_required") || !strings.Contains(err.Error(), "normal_build_check") {
 		t.Fatalf("ValidateReport error = %v, want dynamic check rejection", err)
+	}
+}
+
+func TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].Claim = "bounds_check_eliminated"
+	report.Rows[0].CostClass = CostZeroCostProven
+	report.Rows[0].ParentFactID = ""
+	report.Rows[0].ValidatorName = "bounds_proof_id_validator"
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "proof id") {
+		t.Fatalf("ValidateReport error = %v, want proof id rejection", err)
+	}
+}
+
+func TestValidateMemoryReportRejectsValidatedBoundsProofWithoutTypedProofFields(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].Claim = "bounds_check_removed_with_proof_id"
+	report.Rows[0].ParentFactID = "fact:bounds:proof-guard"
+	report.Rows[0].ValidatorName = "bounds_proof_id_validator"
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "typed proof fields") || !strings.Contains(err.Error(), "proof_kind") {
+		t.Fatalf("ValidateReport error = %v, want typed proof field rejection", err)
 	}
 }
 
@@ -224,6 +342,23 @@ func TestValidateMemoryReportRejectsValidatedTrustedStorageHeapFallback(t *testi
 			err := ValidateReport(report)
 			if err == nil || !strings.Contains(err.Error(), "validated "+string(planned)+" claim cannot lower as Heap") {
 				t.Fatalf("ValidateReport error = %v, want trusted storage heap fallback rejection", err)
+			}
+		})
+	}
+}
+
+func TestValidateMemoryReportRejectsValidatedTaskActorRegionStorageWithoutRuntimeProof(t *testing.T) {
+	for _, storage := range []StorageClass{StorageTaskRegion, StorageActorMoveRegion} {
+		t.Run(string(storage), func(t *testing.T) {
+			report := validMemoryReport()
+			report.Rows[0].Claim = "storage_lowering"
+			report.Rows[0].PlannedStorage = storage
+			report.Rows[0].ActualLoweringStorage = storage
+			report.Rows[0].LoweredArtifactID = "ir:main:boundary:" + string(storage)
+
+			err := ValidateReport(report)
+			if err == nil || !strings.Contains(err.Error(), "runtime") {
+				t.Fatalf("ValidateReport error = %v, want runtime proof rejection", err)
 			}
 		})
 	}
@@ -416,6 +551,27 @@ func TestValidateMemoryReportAcceptsCallbackInoutConservativeProjection(t *testi
 	}
 }
 
+func TestValidateMemoryReportRejectsValidatedCallbackInoutConservativeProjection(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].Claim = "callback_inout_conservative"
+	report.Rows[0].ParentFactID = "fact:inout"
+	report.Rows[0].ProvenanceClass = ProvenanceUnsafeUnknown
+	report.Rows[0].UnsafeClass = UnsafeUnknown
+	report.Rows[0].AliasState = AliasInvalidatedByCall
+	report.Rows[0].CostClass = CostConservativeFallback
+	report.Rows[0].ClaimLevel = ClaimValidated
+	report.Rows[0].ValidatorName = "callback_alias_conservative_validator"
+	report.Rows[0].ValidatorStatus = ValidatorPass
+	report.Rows[0].LoweredArtifactID = ""
+	report.Rows[0].PlannedStorage = ""
+	report.Rows[0].ActualLoweringStorage = ""
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "conservative") {
+		t.Fatalf("ValidateReport error = %v, want conservative noalias boundary validation rejection", err)
+	}
+}
+
 func TestValidateMemoryReportRejectsDerivedBorrowRowWithoutParent(t *testing.T) {
 	report := validMemoryReport()
 	report.Rows[0].Claim = "aggregate_contains_borrow"
@@ -597,6 +753,14 @@ func TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent(t *testing.T) {
 			report.Rows[0].ValidatorName = "bounds_proof_id_validator"
 			report.Rows[0].ValidatorStatus = ValidatorPass
 			report.Rows[0].CostClass = CostZeroCostProven
+			if claim == "bounds_check_removed_with_proof_id" {
+				report.Rows[0].ProofID = "proof:while:i:xs:1:1"
+				report.Rows[0].ProofKind = "bounds_check"
+				report.Rows[0].ProofSubjectBaseID = "xs"
+				report.Rows[0].ProofIndexValueID = "local:i"
+				report.Rows[0].ProofOperation = "index_load"
+				report.Rows[0].ProofRange = "i in [0, xs.len)"
+			}
 			if claim == "raw_bounds_runtime_check_normal_build" {
 				report.Rows[0].SourceStage = StagePLIR
 				report.Rows[0].ProvenanceClass = ProvenanceUnsafeChecked
@@ -684,6 +848,7 @@ func TestValidateMemoryReportAcceptsMemoryIdealV5UnsafeContractRows(t *testing.T
 			},
 		},
 	}
+	sortReportRows(report.Rows)
 	if err := ValidateReport(report); err != nil {
 		t.Fatalf("ValidateReport v5 unsafe contract rows: %v", err)
 	}
@@ -700,12 +865,96 @@ func TestValidateMemoryReportRejectsCopyOwnedWithoutOwnedProvenance(t *testing.T
 	}
 }
 
+func TestValidateMemoryReportRejectsValidatedCapMemAsProof(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		claim      string
+		aliasState AliasState
+		want       string
+	}{
+		{name: "safe provenance", claim: "provenance_known", want: "cap.mem"},
+		{name: "noalias", claim: "no_alias", aliasState: AliasMutableExclusive, want: "cap.mem"},
+		{name: "bounds proof", claim: "index_in_range", want: "cap.mem"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report := validMemoryReport()
+			report.Rows[0].Claim = tc.claim
+			report.Rows[0].SourceStage = StagePLIR
+			report.Rows[0].ProvenanceClass = ProvenanceSafeKnown
+			report.Rows[0].UnsafeClass = UnsafeSafe
+			report.Rows[0].AliasState = tc.aliasState
+			report.Rows[0].ClaimLevel = ClaimValidated
+			report.Rows[0].ValidatorName = "cap_mem_authorization_validator"
+			report.Rows[0].ValidatorStatus = ValidatorPass
+			report.Rows[0].CostClass = CostZeroCostProven
+			report.Rows[0].Reason = "cap.mem authorized raw helper call"
+			report.Rows[0].LoweredArtifactID = ""
+			report.Rows[0].PlannedStorage = ""
+			report.Rows[0].ActualLoweringStorage = ""
+
+			err := ValidateReport(report)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ValidateReport error = %v, want %q rejection", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestValidateReportProjectionAcceptsBuildReportFromGraph(t *testing.T) {
 	graph := validProjectionGraph(t)
 	report := BuildReportFromGraph(graph)
 
 	if err := ValidateReportProjection(graph, report); err != nil {
 		t.Fatalf("ValidateReportProjection exact report: %v", err)
+	}
+}
+
+func TestBuildReportFromGraphUsesDeterministicSourceFactIDOrder(t *testing.T) {
+	graph := NewGraph("program")
+	for _, id := range []FactID{
+		"fact:projection:zeta",
+		"fact:projection:alpha",
+		"fact:projection:middle",
+	} {
+		if _, err := graph.AddFact(Fact{
+			ID:              id,
+			FunctionID:      "main",
+			SiteID:          strings.TrimPrefix(string(id), "fact:projection:"),
+			SourceStage:     StageSemantics,
+			ProvenanceClass: ProvenanceSafeBorrowed,
+			UnsafeClass:     UnsafeSafe,
+			BorrowState:     BorrowImmutable,
+			Claim:           "borrowed_imm",
+		}); err != nil {
+			t.Fatalf("AddFact %s: %v", id, err)
+		}
+	}
+
+	report := BuildReportFromGraph(graph)
+	got := reportSourceFactIDs(report)
+	want := []FactID{
+		"fact:projection:alpha",
+		"fact:projection:middle",
+		"fact:projection:zeta",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("source_fact_id order = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("source_fact_id order = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestValidateReportProjectionRejectsNonDeterministicRowOrder(t *testing.T) {
+	graph := validProjectionGraph(t)
+	report := BuildReportFromGraph(graph)
+	report.Rows[0], report.Rows[1] = report.Rows[1], report.Rows[0]
+
+	err := ValidateReportProjection(graph, report)
+	if err == nil || !strings.Contains(err.Error(), "deterministic") {
+		t.Fatalf("ValidateReportProjection error = %v, want deterministic row order rejection", err)
 	}
 }
 
@@ -758,6 +1007,43 @@ func TestValidateReportProjectionRejectsDroppedNormalBuildCheck(t *testing.T) {
 	}
 }
 
+func TestValidateReportProjectionRejectsAlteredIslandIdentity(t *testing.T) {
+	graph := islandProjectionGraph(t, ValidationPass)
+	report := BuildReportFromGraph(graph)
+	report.Rows[0].IslandID = "island:other"
+
+	err := ValidateReportProjection(graph, report)
+	if err == nil || !strings.Contains(err.Error(), "island_id") {
+		t.Fatalf("ValidateReportProjection error = %v, want island_id preservation rejection", err)
+	}
+}
+
+func TestValidateReportRejectsIslandBackedRowMissingEpoch(t *testing.T) {
+	report := validMemoryReport()
+	report.Rows[0].IslandID = "island:main:0"
+	report.Rows[0].BaseID = "alloc:main:0"
+	report.Rows[0].PlannedStorage = StorageExplicitIsland
+	report.Rows[0].ActualLoweringStorage = StorageExplicitIsland
+	report.Rows[0].CostClass = CostInstrumentationOnly
+
+	err := ValidateReport(report)
+	if err == nil || !strings.Contains(err.Error(), "epoch") {
+		t.Fatalf("ValidateReport error = %v, want missing epoch rejection", err)
+	}
+}
+
+func TestValidateReportProjectionRejectsValidatedStaleIslandEpoch(t *testing.T) {
+	graph := islandProjectionGraph(t, ValidationInvalidated)
+	report := BuildReportFromGraph(graph)
+	report.Rows[0].ClaimLevel = ClaimValidated
+	report.Rows[0].ValidatorStatus = ValidatorPass
+
+	err := ValidateReportProjection(graph, report)
+	if err == nil || !strings.Contains(err.Error(), "claim_level") {
+		t.Fatalf("ValidateReportProjection error = %v, want stale epoch validation rejection", err)
+	}
+}
+
 func validMemoryReport() Report {
 	return Report{
 		SchemaVersion: ReportSchemaV1,
@@ -768,7 +1054,7 @@ func validMemoryReport() Report {
 			SourceSpan:            "main.tetra:1:1",
 			SourceFactID:          "fact:safe",
 			SourceStage:           StageValidation,
-			Claim:                 "validated allocation metadata",
+			Claim:                 "allocation_base_metadata",
 			ClaimLevel:            ClaimValidated,
 			ProvenanceClass:       ProvenanceSafeKnown,
 			UnsafeClass:           UnsafeSafe,
@@ -805,11 +1091,46 @@ func validProjectionGraph(t *testing.T) *Graph {
 		SourceStage:      StageValidation,
 		ProvenanceClass:  ProvenanceSafeKnown,
 		UnsafeClass:      UnsafeSafe,
-		Claim:            "instrumented_memory_check",
+		Claim:            "normal_build_bounds_check_guard",
 		CostClass:        CostInstrumentationOnly,
 		NormalBuildCheck: true,
 	}); err != nil {
 		t.Fatalf("AddFact instrumented projection fixture: %v", err)
 	}
 	return graph
+}
+
+func islandProjectionGraph(t *testing.T, validation ValidationState) *Graph {
+	t.Helper()
+	graph := NewGraph("program")
+	if _, err := graph.AddFact(Fact{
+		ID:                    "fact:projection:island-epoch",
+		FunctionID:            "main",
+		SiteID:                "projection:island:1",
+		SourceStage:           StagePLIR,
+		ProvenanceClass:       ProvenanceSafeKnown,
+		UnsafeClass:           UnsafeSafe,
+		Claim:                 "island_epoch_validated",
+		IslandID:              "island:main:0",
+		Epoch:                 1,
+		BaseID:                "alloc:main:0",
+		StoragePlan:           StorageExplicitIsland,
+		ActualLoweringStorage: StorageExplicitIsland,
+		LoweredArtifactID:     "ir:main:island:0",
+		ValidationState:       validation,
+		ValidatorName:         "island_epoch_validator",
+		CostClass:             CostInstrumentationOnly,
+		Reason:                "fixture island identity fact",
+	}); err != nil {
+		t.Fatalf("AddFact island projection fixture: %v", err)
+	}
+	return graph
+}
+
+func reportSourceFactIDs(report Report) []FactID {
+	out := make([]FactID, 0, len(report.Rows))
+	for _, row := range report.Rows {
+		out = append(out, row.SourceFactID)
+	}
+	return out
 }

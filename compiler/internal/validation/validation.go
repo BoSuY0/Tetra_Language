@@ -38,11 +38,26 @@ type ProofReport struct {
 }
 
 type RemovedCheck struct {
-	Function  string   `json:"function"`
-	Site      int      `json:"site"`
-	Kind      string   `json:"kind"`
-	ProofID   string   `json:"proof_id"`
-	FactsUsed []string `json:"facts_used,omitempty"`
+	Function  string     `json:"function"`
+	Site      int        `json:"site"`
+	Kind      string     `json:"kind"`
+	ProofID   string     `json:"proof_id"`
+	ProofTerm *ProofTerm `json:"proof_term,omitempty"`
+	FactsUsed []string   `json:"facts_used,omitempty"`
+}
+
+type ProofTerm struct {
+	ID            string   `json:"id"`
+	Kind          string   `json:"kind"`
+	SubjectBaseID string   `json:"subject_base_id,omitempty"`
+	IndexValueID  string   `json:"index_value_id,omitempty"`
+	Operation     string   `json:"operation,omitempty"`
+	Range         string   `json:"range,omitempty"`
+	IslandID      string   `json:"island_id,omitempty"`
+	Epoch         int      `json:"epoch,omitempty"`
+	BaseID        string   `json:"base_id,omitempty"`
+	Source        string   `json:"source,omitempty"`
+	FactsUsed     []string `json:"facts_used,omitempty"`
 }
 
 type TranslationReport struct {
@@ -152,20 +167,49 @@ func CheckBoundsProofsWithPLIR(prog *ir.IRProgram, proofProg *plir.Program) (Pro
 		return report, fmt.Errorf("proof checker: PLIR proof verification failed: %w", err)
 	}
 	guards := map[string]map[string]bool{}
+	terms := map[string]map[string]plir.ProofTerm{}
 	for _, fn := range proofProg.Funcs {
 		if guards[fn.Name] == nil {
 			guards[fn.Name] = map[string]bool{}
 		}
+		if terms[fn.Name] == nil {
+			terms[fn.Name] = map[string]plir.ProofTerm{}
+		}
 		for _, guard := range fn.ProofGuards {
 			guards[fn.Name][guard.ID] = true
 		}
+		for _, term := range fn.ProofTerms {
+			terms[fn.Name][term.ID] = term
+		}
 	}
-	for _, removed := range report.RemovedChecks {
+	for i := range report.RemovedChecks {
+		removed := &report.RemovedChecks[i]
 		if !guards[removed.Function][removed.ProofID] {
 			return report, fmt.Errorf("proof checker: %s removed bounds check proof id %q not found in PLIR proof guards", removed.Function, removed.ProofID)
 		}
+		term, ok := terms[removed.Function][removed.ProofID]
+		if !ok {
+			return report, fmt.Errorf("proof checker: %s removed bounds check proof id %q has no typed proof term", removed.Function, removed.ProofID)
+		}
+		removed.ProofTerm = validationProofTermFromPLIR(term)
 	}
 	return report, nil
+}
+
+func validationProofTermFromPLIR(term plir.ProofTerm) *ProofTerm {
+	return &ProofTerm{
+		ID:            term.ID,
+		Kind:          term.Kind,
+		SubjectBaseID: term.SubjectBaseID,
+		IndexValueID:  term.IndexValueID,
+		Operation:     term.Operation,
+		Range:         term.Range,
+		IslandID:      term.IslandID,
+		Epoch:         term.Epoch,
+		BaseID:        term.BaseID,
+		Source:        term.Source,
+		FactsUsed:     append([]string(nil), term.FactsUsed...),
+	}
 }
 
 func ValidateAllocationPlan(plan *allocplan.Plan) error {
@@ -243,7 +287,13 @@ func ValidateAllocationLowering(plan *allocplan.Plan, prog *ir.IRProgram) error 
 				if expectedIsland[fn.Name] == nil {
 					expectedIsland[fn.Name] = map[string]islandExpectation{}
 				}
-				expectedIsland[fn.Name][alloc.ID] = islandExpectation{kind: kind, regionID: alloc.RegionID, lifetime: alloc.Lifetime}
+				expectedIsland[fn.Name][alloc.ID] = islandExpectation{
+					kind:                 kind,
+					regionID:             alloc.RegionID,
+					lifetime:             alloc.Lifetime,
+					handleParamSlotKnown: alloc.ExplicitIslandHandleParamSlotKnown,
+					handleParamSlot:      alloc.ExplicitIslandHandleParamSlot,
+				}
 				if islandAllocs[fn.Name] == nil {
 					islandAllocs[fn.Name] = map[string]bool{}
 				}
@@ -350,10 +400,18 @@ type stackEscapeState struct {
 	locals []string
 }
 
+type functionTempRegionResetState struct {
+	idx     int
+	entered bool
+	active  bool
+}
+
 type islandExpectation struct {
-	kind     ir.IRInstrKind
-	regionID string
-	lifetime string
+	kind                 ir.IRInstrKind
+	regionID             string
+	lifetime             string
+	handleParamSlotKnown bool
+	handleParamSlot      int
 }
 
 type islandLifetimeState struct {
@@ -364,7 +422,7 @@ type islandLifetimeState struct {
 }
 
 type islandReturnSummary struct {
-	retParamSlots []int
+	retTags []string
 }
 
 func validateStackAllocationsDoNotEscape(prog *ir.IRProgram, stackAllocs map[string]map[string]bool) error {
@@ -386,27 +444,87 @@ func validateFunctionTempRegionResets(prog *ir.IRProgram, regionAllocs map[strin
 		if len(tracked) == 0 {
 			continue
 		}
-		seenRegionAllocation := false
-		resetAfterLastAllocation := false
-		for i, instr := range fn.Instrs {
-			switch instr.Kind {
-			case ir.IRRegionMakeSliceU8, ir.IRRegionMakeSliceU16, ir.IRRegionMakeSliceI32:
-				if tracked[instr.Name] {
-					seenRegionAllocation = true
-					resetAfterLastAllocation = false
-				}
-			case ir.IRRegionReset:
-				if seenRegionAllocation {
-					resetAfterLastAllocation = true
-				}
-			case ir.IRReturn:
-				if seenRegionAllocation && !resetAfterLastAllocation {
-					return fmt.Errorf("allocation lowering validation: %s instruction %d function-temp region reset does not dominate return", fn.Name, i)
-				}
-			}
+		if err := validateFunctionTempRegionResetsInFunc(fn, tracked); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func validateFunctionTempRegionResetsInFunc(fn ir.IRFunc, tracked map[string]bool) error {
+	labels := map[int]int{}
+	for i, instr := range fn.Instrs {
+		if instr.Kind == ir.IRLabel {
+			labels[instr.Label] = i
+		}
+	}
+	work := []functionTempRegionResetState{{idx: 0}}
+	seen := map[functionTempRegionResetState]bool{}
+	for len(work) > 0 {
+		cur := work[len(work)-1]
+		work = work[:len(work)-1]
+		if cur.idx < 0 || cur.idx >= len(fn.Instrs) {
+			if cur.active {
+				return fmt.Errorf("allocation lowering validation: %s function-temp region reset does not dominate function exit", fn.Name)
+			}
+			continue
+		}
+		if seen[cur] {
+			continue
+		}
+		seen[cur] = true
+		next, err := stepFunctionTempRegionResetState(fn, cur, labels, tracked)
+		if err != nil {
+			return err
+		}
+		work = append(work, next...)
+	}
+	return nil
+}
+
+func stepFunctionTempRegionResetState(fn ir.IRFunc, cur functionTempRegionResetState, labels map[int]int, tracked map[string]bool) ([]functionTempRegionResetState, error) {
+	instr := fn.Instrs[cur.idx]
+	entered := cur.entered
+	active := cur.active
+	switch instr.Kind {
+	case ir.IRRegionEnter:
+		entered = true
+	case ir.IRRegionMakeSliceU8, ir.IRRegionMakeSliceU16, ir.IRRegionMakeSliceI32:
+		if tracked[instr.Name] {
+			if !entered {
+				return nil, fmt.Errorf("allocation lowering validation: %s instruction %d function-temp region enter does not dominate make for %q", fn.Name, cur.idx, instr.Name)
+			}
+			active = true
+		}
+	case ir.IRRegionReset:
+		active = false
+	case ir.IRReturn:
+		if active {
+			return nil, fmt.Errorf("allocation lowering validation: %s instruction %d function-temp region reset does not dominate return", fn.Name, cur.idx)
+		}
+		return nil, nil
+	}
+
+	next := functionTempRegionResetState{idx: cur.idx + 1, entered: entered, active: active}
+	switch instr.Kind {
+	case ir.IRJmp:
+		labelIdx, ok := labels[instr.Label]
+		if !ok {
+			return nil, fmt.Errorf("allocation lowering validation: %s instruction %d jumps to unknown label %d", fn.Name, cur.idx, instr.Label)
+		}
+		next.idx = labelIdx
+		return []functionTempRegionResetState{next}, nil
+	case ir.IRJmpIfZero:
+		labelIdx, ok := labels[instr.Label]
+		if !ok {
+			return nil, fmt.Errorf("allocation lowering validation: %s instruction %d jumps to unknown label %d", fn.Name, cur.idx, instr.Label)
+		}
+		branch := next
+		branch.idx = labelIdx
+		return []functionTempRegionResetState{next, branch}, nil
+	default:
+		return []functionTempRegionResetState{next}, nil
+	}
 }
 
 func validateExplicitIslandLifetimes(prog *ir.IRProgram, expected map[string]map[string]islandExpectation) error {
@@ -416,6 +534,10 @@ func validateExplicitIslandLifetimes(prog *ir.IRProgram, expected map[string]map
 		if len(tracked) == 0 {
 			continue
 		}
+		locals, err := initialExplicitIslandLifetimeLocals(fn, tracked)
+		if err != nil {
+			return err
+		}
 		labels := map[int]int{}
 		for i, instr := range fn.Instrs {
 			if instr.Kind == ir.IRLabel {
@@ -424,7 +546,7 @@ func validateExplicitIslandLifetimes(prog *ir.IRProgram, expected map[string]map
 		}
 		work := []islandLifetimeState{{
 			idx:    0,
-			locals: make([]string, fn.LocalSlots),
+			locals: locals,
 			freed:  map[string]bool{},
 		}}
 		seen := map[string]bool{}
@@ -449,6 +571,21 @@ func validateExplicitIslandLifetimes(prog *ir.IRProgram, expected map[string]map
 	return nil
 }
 
+func initialExplicitIslandLifetimeLocals(fn ir.IRFunc, tracked map[string]islandExpectation) ([]string, error) {
+	locals := make([]string, fn.LocalSlots)
+	for alloc, expectation := range tracked {
+		if !expectation.handleParamSlotKnown {
+			continue
+		}
+		slot := expectation.handleParamSlot
+		if slot < 0 || slot >= fn.ParamSlots || slot >= len(locals) {
+			return nil, fmt.Errorf("allocation lowering validation: %s allocation %q explicit island handle parameter slot %d is outside params=%d locals=%d", fn.Name, alloc, slot, fn.ParamSlots, fn.LocalSlots)
+		}
+		locals[slot] = islandParamTag(slot)
+	}
+	return locals, nil
+}
+
 func stepExplicitIslandLifetimeState(fn ir.IRFunc, cur islandLifetimeState, labels map[int]int, expected map[string]islandExpectation, summaries map[string]islandReturnSummary) ([]islandLifetimeState, error) {
 	instr := fn.Instrs[cur.idx]
 	stack := append([]string(nil), cur.stack...)
@@ -461,7 +598,7 @@ func stepExplicitIslandLifetimeState(fn ir.IRFunc, cur islandLifetimeState, labe
 
 	switch instr.Kind {
 	case ir.IRReturn:
-		if name := firstTrackedExplicitIslandSlice(stack, expected); name != "" {
+		if name := firstEscapingTrackedExplicitIslandSlice(stack, expected); name != "" {
 			return nil, fmt.Errorf("allocation lowering validation: %s instruction %d explicit island allocation %q escapes via return", fn.Name, cur.idx, name)
 		}
 		if tag := firstFreedIslandUse(stack, freed); tag != "" {
@@ -483,12 +620,27 @@ func stepExplicitIslandLifetimeState(fn ir.IRFunc, cur islandLifetimeState, labe
 		}
 		freed[tag] = true
 		stack = rest
+	case ir.IRIslandReset:
+		popped, rest := popStackTags(stack, pop)
+		tag := firstExplicitIslandHandleTag(popped)
+		if tag == "" {
+			stack = pushEmptyTags(rest, push)
+			break
+		}
+		if freed[tag] {
+			return nil, fmt.Errorf("allocation lowering validation: %s instruction %d explicit island reset after free for %s", fn.Name, cur.idx, tag)
+		}
+		freed[tag] = true
+		stack = append(rest, explicitIslandHandleTag(fn.Name, cur.idx))
 	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
 		popped, rest := popStackTags(stack, pop)
 		if _, ok := expected[instr.Name]; ok {
-			tag := firstExplicitIslandHandleTag(popped)
+			if tag := firstFreedIslandUse(popped, freed); tag != "" {
+				return nil, fmt.Errorf("allocation lowering validation: %s instruction %d explicit island allocation %q use after free via operands of %s", fn.Name, cur.idx, instr.Name, tag)
+			}
+			tag := explicitIslandMakeHandleOperandTag(popped)
 			if tag == "" {
-				return nil, fmt.Errorf("allocation lowering validation: %s instruction %d explicit island allocation %q has no active island handle", fn.Name, cur.idx, instr.Name)
+				return nil, fmt.Errorf("allocation lowering validation: %s instruction %d explicit island allocation %q has no active island handle operand", fn.Name, cur.idx, instr.Name)
 			}
 			if freed[tag] {
 				return nil, fmt.Errorf("allocation lowering validation: %s instruction %d explicit island allocation %q use after free for %s", fn.Name, cur.idx, instr.Name, tag)
@@ -583,7 +735,7 @@ func inferIslandReturnSummary(fn ir.IRFunc) (islandReturnSummary, bool) {
 	}
 	work := []stackEscapeState{{idx: 0, locals: locals}}
 	seen := map[string]bool{}
-	var merged []int
+	var merged []string
 	for len(work) > 0 {
 		cur := work[len(work)-1]
 		work = work[:len(work)-1]
@@ -608,10 +760,10 @@ func inferIslandReturnSummary(fn ir.IRFunc) (islandReturnSummary, bool) {
 	if merged == nil {
 		return islandReturnSummary{}, false
 	}
-	return islandReturnSummary{retParamSlots: merged}, true
+	return islandReturnSummary{retTags: merged}, true
 }
 
-func stepIslandReturnSummaryState(fn ir.IRFunc, cur stackEscapeState, labels map[int]int) ([]stackEscapeState, []int, bool) {
+func stepIslandReturnSummaryState(fn ir.IRFunc, cur stackEscapeState, labels map[int]int) ([]stackEscapeState, []string, bool) {
 	instr := fn.Instrs[cur.idx]
 	stack := append([]string(nil), cur.stack...)
 	locals := append([]string(nil), cur.locals...)
@@ -622,7 +774,14 @@ func stepIslandReturnSummaryState(fn ir.IRFunc, cur stackEscapeState, labels map
 
 	switch instr.Kind {
 	case ir.IRReturn:
-		return nil, islandReturnParamSources(stack, fn.ReturnSlots), true
+		return nil, islandReturnTags(stack, fn.ReturnSlots), true
+	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
+		popped, rest := popStackTags(stack, pop)
+		if tag := explicitIslandMakeHandleOperandTag(popped); strings.HasPrefix(tag, "island-param:") {
+			stack = append(rest, explicitIslandSliceTag(instr.Name, tag), "")
+		} else {
+			stack = pushEmptyTags(rest, push)
+		}
 	case ir.IRStoreLocal:
 		popped, rest := popStackTags(stack, pop)
 		stack = rest
@@ -654,28 +813,27 @@ func stepIslandReturnSummaryState(fn ir.IRFunc, cur stackEscapeState, labels map
 	}
 }
 
-func islandReturnParamSources(stack []string, slots int) []int {
-	sources := make([]int, slots)
-	for i := range sources {
-		sources[i] = -1
-	}
+func islandReturnTags(stack []string, slots int) []string {
+	tags := make([]string, slots)
 	if slots <= 0 || len(stack) < slots {
-		return sources
+		return tags
 	}
 	start := len(stack) - slots
 	for i := 0; i < slots; i++ {
-		sources[i] = islandParamSlot(stack[start+i])
+		if islandParamSlotFromValueTag(stack[start+i]) >= 0 {
+			tags[i] = stack[start+i]
+		}
 	}
-	return sources
+	return tags
 }
 
-func mergeIslandReturnSources(merged []int, ret []int) []int {
+func mergeIslandReturnSources(merged []string, ret []string) []string {
 	if merged == nil {
-		return append([]int(nil), ret...)
+		return append([]string(nil), ret...)
 	}
 	for i := range merged {
 		if i >= len(ret) || merged[i] != ret[i] {
-			merged[i] = -1
+			merged[i] = ""
 		}
 	}
 	return merged
@@ -688,16 +846,41 @@ func islandCallReturnTags(instr ir.IRInstr, popped []string, summaries map[strin
 		return tags
 	}
 	for i := range tags {
-		if i >= len(summary.retParamSlots) {
+		if i >= len(summary.retTags) {
 			continue
 		}
-		source := summary.retParamSlots[i]
-		if source < 0 || source >= instr.ArgSlots || source >= len(popped) {
-			continue
-		}
-		tags[i] = popped[len(popped)-1-source]
+		tags[i] = substituteIslandSummaryTag(summary.retTags[i], instr.ArgSlots, popped)
 	}
 	return tags
+}
+
+func substituteIslandSummaryTag(tag string, argSlots int, popped []string) string {
+	if tag == "" {
+		return ""
+	}
+	if slot := islandParamSlot(tag); slot >= 0 {
+		return islandCallArgTag(slot, argSlots, popped)
+	}
+	name, handleTag, ok := islandSliceTagParts(tag)
+	if !ok {
+		return ""
+	}
+	slot := islandParamSlot(handleTag)
+	if slot < 0 {
+		return ""
+	}
+	replacement := islandCallArgTag(slot, argSlots, popped)
+	if replacement == "" {
+		return ""
+	}
+	return explicitIslandSliceTag(name, replacement)
+}
+
+func islandCallArgTag(slot int, argSlots int, popped []string) string {
+	if slot < 0 || slot >= argSlots || slot >= len(popped) {
+		return ""
+	}
+	return popped[len(popped)-1-slot]
 }
 
 func islandParamTag(slot int) string {
@@ -718,11 +901,22 @@ func islandParamSlot(tag string) int {
 
 func firstIslandParamTag(tags []string) string {
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "island-param:") {
+		if islandParamSlotFromValueTag(tag) >= 0 {
 			return tag
 		}
 	}
 	return ""
+}
+
+func islandParamSlotFromValueTag(tag string) int {
+	if slot := islandParamSlot(tag); slot >= 0 {
+		return slot
+	}
+	_, handleTag, ok := islandSliceTagParts(tag)
+	if !ok {
+		return -1
+	}
+	return islandParamSlot(handleTag)
 }
 
 func explicitIslandHandleTag(function string, idx int) string {
@@ -735,16 +929,27 @@ func explicitIslandSliceTag(name string, islandTag string) string {
 
 func firstExplicitIslandHandleTag(tags []string) string {
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "island:") {
+		if strings.HasPrefix(tag, "island:") || strings.HasPrefix(tag, "island-param:") {
 			return tag
 		}
 	}
 	return ""
 }
 
+func explicitIslandMakeHandleOperandTag(popped []string) string {
+	if len(popped) < 2 {
+		return ""
+	}
+	tag := popped[1]
+	if strings.HasPrefix(tag, "island:") || strings.HasPrefix(tag, "island-param:") {
+		return tag
+	}
+	return ""
+}
+
 func firstExplicitIslandValueTag(tags []string) string {
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "island:") || strings.HasPrefix(tag, "island-slice:") {
+		if strings.HasPrefix(tag, "island:") || strings.HasPrefix(tag, "island-param:") || strings.HasPrefix(tag, "island-slice:") {
 			return tag
 		}
 	}
@@ -756,39 +961,50 @@ func firstFreedIslandUse(tags []string, freed map[string]bool) string {
 		if tag == "" {
 			continue
 		}
-		if strings.HasPrefix(tag, "island:") {
+		if strings.HasPrefix(tag, "island:") || strings.HasPrefix(tag, "island-param:") {
 			if freed[tag] {
 				return tag
 			}
 			continue
 		}
-		if strings.HasPrefix(tag, "island-slice:") {
-			if at := strings.LastIndex(tag, "@"); at >= 0 && at+1 < len(tag) {
-				islandTag := tag[at+1:]
-				if freed[islandTag] {
-					return tag
-				}
+		if _, islandTag, ok := islandSliceTagParts(tag); ok {
+			if freed[islandTag] {
+				return tag
 			}
 		}
 	}
 	return ""
 }
 
-func firstTrackedExplicitIslandSlice(tags []string, expected map[string]islandExpectation) string {
-	const prefix = "island-slice:"
+func firstEscapingTrackedExplicitIslandSlice(tags []string, expected map[string]islandExpectation) string {
 	for _, tag := range tags {
-		if !strings.HasPrefix(tag, prefix) {
+		name, handleTag, ok := islandSliceTagParts(tag)
+		if !ok {
 			continue
 		}
-		name := strings.TrimPrefix(tag, prefix)
-		if at := strings.LastIndex(name, "@"); at >= 0 {
-			name = name[:at]
+		expectation, ok := expected[name]
+		if !ok {
+			continue
 		}
-		if _, ok := expected[name]; ok {
-			return name
+		if expectation.handleParamSlotKnown && islandParamSlot(handleTag) == expectation.handleParamSlot {
+			continue
 		}
+		return name
 	}
 	return ""
+}
+
+func islandSliceTagParts(tag string) (name string, handleTag string, ok bool) {
+	const prefix = "island-slice:"
+	if !strings.HasPrefix(tag, prefix) {
+		return "", "", false
+	}
+	rest := strings.TrimPrefix(tag, prefix)
+	at := strings.LastIndex(rest, "@")
+	if at < 0 || at == 0 || at+1 >= len(rest) {
+		return "", "", false
+	}
+	return rest[:at], rest[at+1:], true
 }
 
 func cloneBoolMap(in map[string]bool) map[string]bool {
@@ -1086,6 +1302,8 @@ func validationStackEffect(instr ir.IRInstr) (pop int, push int, known bool) {
 		return 4, 0, true
 	case ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32:
 		return 2, 2, true
+	case ir.IRIslandReset:
+		return 1, 1, true
 	case ir.IRIslandFree:
 		return 1, 0, true
 	case ir.IRCapIO, ir.IRCapMem, ir.IRSymAddr:
@@ -1145,6 +1363,8 @@ func islandIRKindName(kind ir.IRInstrKind) string {
 		return "IRIslandMakeSliceU16"
 	case ir.IRIslandMakeSliceI32:
 		return "IRIslandMakeSliceI32"
+	case ir.IRIslandReset:
+		return "IRIslandReset"
 	default:
 		return fmt.Sprintf("ir.%d", kind)
 	}

@@ -53,43 +53,45 @@ type FunctionPlan struct {
 }
 
 type Allocation struct {
-	ID                     string                           `json:"id"`
-	SiteID                 string                           `json:"site_id"`
-	ValueID                string                           `json:"value_id"`
-	Source                 string                           `json:"source,omitempty"`
-	Builtin                string                           `json:"builtin,omitempty"`
-	ElementType            string                           `json:"element_type,omitempty"`
-	ElementSize            int                              `json:"element_size,omitempty"`
-	LengthExpr             string                           `json:"length_expr,omitempty"`
-	LengthStatus           LengthStatus                     `json:"length_status,omitempty"`
-	ZeroGuardStatus        string                           `json:"zero_guard_status,omitempty"`
-	NegativeGuardStatus    string                           `json:"negative_guard_status,omitempty"`
-	OverflowGuardStatus    string                           `json:"overflow_guard_status,omitempty"`
-	ByteSize               int                              `json:"byte_size,omitempty"`
-	Escape                 EscapeClass                      `json:"escape"`
-	Storage                StorageClass                     `json:"storage"`
-	PlannedStorage         StorageClass                     `json:"planned_storage"`
-	ActualLoweringStorage  StorageClass                     `json:"actual_lowering_storage"`
-	Reason                 string                           `json:"reason"`
-	ValidationStatus       string                           `json:"validation_status,omitempty"`
-	LoweringStatus         string                           `json:"lowering_status,omitempty"`
-	BackendStorage         StorageClass                     `json:"backend_storage,omitempty"`
-	BackendReason          string                           `json:"backend_reason,omitempty"`
-	RuntimePath            runtimeabi.AllocationRuntimePath `json:"runtime_path,omitempty"`
-	AllocatorClass         string                           `json:"allocator_class,omitempty"`
-	AllocatorScope         string                           `json:"allocator_scope,omitempty"`
-	AllocatorReusePolicy   string                           `json:"allocator_reuse_policy,omitempty"`
-	AllocatorChunkBytes    int                              `json:"allocator_chunk_bytes,omitempty"`
-	RawPointerBoundsStatus string                           `json:"raw_pointer_bounds_status,omitempty"`
-	RawPointerBaseID       string                           `json:"raw_pointer_base_id,omitempty"`
-	RawPointerBaseBytes    int64                            `json:"raw_pointer_base_bytes,omitempty"`
-	RawPointerOffsetBytes  int64                            `json:"raw_pointer_offset_bytes,omitempty"`
-	RawSlicePolicy         string                           `json:"raw_slice_policy,omitempty"`
-	BytesRequested         int                              `json:"bytes_requested"`
-	BytesReserved          int                              `json:"bytes_reserved"`
-	RegionID               string                           `json:"region_id,omitempty"`
-	Lifetime               string                           `json:"lifetime,omitempty"`
-	DebugMode              string                           `json:"debug_mode,omitempty"`
+	ID                                 string                           `json:"id"`
+	SiteID                             string                           `json:"site_id"`
+	ValueID                            string                           `json:"value_id"`
+	Source                             string                           `json:"source,omitempty"`
+	Builtin                            string                           `json:"builtin,omitempty"`
+	ElementType                        string                           `json:"element_type,omitempty"`
+	ElementSize                        int                              `json:"element_size,omitempty"`
+	LengthExpr                         string                           `json:"length_expr,omitempty"`
+	LengthStatus                       LengthStatus                     `json:"length_status,omitempty"`
+	ZeroGuardStatus                    string                           `json:"zero_guard_status,omitempty"`
+	NegativeGuardStatus                string                           `json:"negative_guard_status,omitempty"`
+	OverflowGuardStatus                string                           `json:"overflow_guard_status,omitempty"`
+	ByteSize                           int                              `json:"byte_size,omitempty"`
+	Escape                             EscapeClass                      `json:"escape"`
+	Storage                            StorageClass                     `json:"storage"`
+	PlannedStorage                     StorageClass                     `json:"planned_storage"`
+	ActualLoweringStorage              StorageClass                     `json:"actual_lowering_storage"`
+	Reason                             string                           `json:"reason"`
+	ValidationStatus                   string                           `json:"validation_status,omitempty"`
+	LoweringStatus                     string                           `json:"lowering_status,omitempty"`
+	BackendStorage                     StorageClass                     `json:"backend_storage,omitempty"`
+	BackendReason                      string                           `json:"backend_reason,omitempty"`
+	RuntimePath                        runtimeabi.AllocationRuntimePath `json:"runtime_path,omitempty"`
+	AllocatorClass                     string                           `json:"allocator_class,omitempty"`
+	AllocatorScope                     string                           `json:"allocator_scope,omitempty"`
+	AllocatorReusePolicy               string                           `json:"allocator_reuse_policy,omitempty"`
+	AllocatorChunkBytes                int                              `json:"allocator_chunk_bytes,omitempty"`
+	RawPointerBoundsStatus             string                           `json:"raw_pointer_bounds_status,omitempty"`
+	RawPointerBaseID                   string                           `json:"raw_pointer_base_id,omitempty"`
+	RawPointerBaseBytes                int64                            `json:"raw_pointer_base_bytes,omitempty"`
+	RawPointerOffsetBytes              int64                            `json:"raw_pointer_offset_bytes,omitempty"`
+	RawSlicePolicy                     string                           `json:"raw_slice_policy,omitempty"`
+	BytesRequested                     int                              `json:"bytes_requested"`
+	BytesReserved                      int                              `json:"bytes_reserved"`
+	RegionID                           string                           `json:"region_id,omitempty"`
+	Lifetime                           string                           `json:"lifetime,omitempty"`
+	DebugMode                          string                           `json:"debug_mode,omitempty"`
+	ExplicitIslandHandleParamSlotKnown bool                             `json:"-"`
+	ExplicitIslandHandleParamSlot      int                              `json:"-"`
 }
 
 type Totals struct {
@@ -264,6 +266,10 @@ func planAllocation(fn plir.Function, value plir.Value, opt Options) Allocation 
 	}
 	if actualStorage == StorageExplicitIsland {
 		applyRegionAllocatorEvidence(&alloc, value, byteSize)
+		if slot, ok := explicitIslandHandleParamSlot(fn, value); ok {
+			alloc.ExplicitIslandHandleParamSlotKnown = true
+			alloc.ExplicitIslandHandleParamSlot = slot
+		}
 	}
 	if storage == StorageFunctionTempRegion {
 		applyPlannedRegionAllocatorEvidence(&alloc, fn, byteSize)
@@ -377,6 +383,52 @@ func allocationLifetime(value plir.Value) string {
 		return "owner:" + value.Lifetime.Owner
 	}
 	return "function_scope"
+}
+
+func explicitIslandHandleParamSlot(fn plir.Function, value plir.Value) (int, bool) {
+	if value.Provenance.Kind != plir.ProvenanceIsland {
+		return 0, false
+	}
+	root := strings.TrimSpace(strings.TrimPrefix(value.Region, "island:"))
+	if root == "" || root == value.Region {
+		root = strings.TrimSpace(value.Provenance.Root)
+	}
+	if root == "" || root == "?" || root == "island" || strings.Contains(root, ".") {
+		return 0, false
+	}
+	if fn.Summary == nil {
+		return 0, false
+	}
+	slot := 0
+	for i, name := range fn.Summary.ParamNames {
+		typeName := ""
+		if i < len(fn.Summary.ParamTypes) {
+			typeName = fn.Summary.ParamTypes[i]
+		}
+		if name == root {
+			if typeName != "island" {
+				return 0, false
+			}
+			return slot, true
+		}
+		slot += paramTypeSlotCount(typeName)
+	}
+	return 0, false
+}
+
+func paramTypeSlotCount(typeName string) int {
+	switch {
+	case typeName == "":
+		return 1
+	case typeName == "str", typeName == "String":
+		return 2
+	case strings.HasPrefix(typeName, "[]"):
+		return 2
+	case strings.HasPrefix(typeName, "fn("), typeName == "fnptr":
+		return 9
+	default:
+		return 1
+	}
 }
 
 func applyRuntimeAllocatorEvidence(alloc *Allocation, byteSize int) {

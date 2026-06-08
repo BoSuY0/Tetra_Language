@@ -93,6 +93,14 @@ func validatePerformanceReport(raw []byte) error {
 	if strings.TrimSpace(report.ResidualRisk) == "" {
 		return fmt.Errorf("residual_risk is required")
 	}
+	for label, value := range map[string]string{
+		"threshold_decision": report.ThresholdDecision,
+		"residual_risk":      report.ResidualRisk,
+	} {
+		if phrase, ok := forbiddenPerformanceClaim(value); ok {
+			return fmt.Errorf("%s contains forbidden %s claim", label, phrase)
+		}
+	}
 	if len(report.Metrics) == 0 {
 		return fmt.Errorf("metrics must not be empty")
 	}
@@ -130,6 +138,14 @@ func validatePerformanceReport(raw []byte) error {
 		if strings.TrimSpace(metric.Threshold) == "" || strings.TrimSpace(metric.Decision) == "" {
 			return fmt.Errorf("metric %s missing threshold decision", metric.Name)
 		}
+		for label, value := range map[string]string{
+			"threshold": metric.Threshold,
+			"decision":  metric.Decision,
+		} {
+			if phrase, ok := forbiddenPerformanceClaim(value); ok {
+				return fmt.Errorf("metric %s %s contains forbidden %s claim", metric.Name, label, phrase)
+			}
+		}
 		if strings.Contains(metric.Name, "BinarySize") && metric.ArtifactBytes <= 0 {
 			return fmt.Errorf("metric %s must include positive artifact_bytes", metric.Name)
 		}
@@ -157,6 +173,61 @@ func validatePerformanceReport(raw []byte) error {
 		return fmt.Errorf("summary.metrics_sha256 = %q, want %q", report.Summary.MetricsSHA256, wantHash)
 	}
 	return nil
+}
+
+func forbiddenPerformanceClaim(text string) (string, bool) {
+	lower := strings.ToLower(text)
+	if explicitNonClaimContext(lower) {
+		return "", false
+	}
+	switch {
+	case strings.Contains(lower, "fastest language") || strings.Contains(lower, "fastest-language"):
+		return "fastest language", true
+	case strings.Contains(lower, "official benchmark") || strings.Contains(lower, "official techempower"):
+		return "official benchmark", true
+	case strings.Contains(lower, "target parity") || strings.Contains(lower, "target-parity"):
+		return "target parity", true
+	case strings.Contains(lower, "zero-cost performance") || strings.Contains(lower, "zero cost performance"):
+		return "zero-cost performance", true
+	default:
+		return "", false
+	}
+}
+
+func explicitNonClaimContext(lower string) bool {
+	for _, marker := range []string{
+		"does not claim",
+		"do not claim",
+		"does not prove",
+		"do not prove",
+		"does not promote",
+		"do not promote",
+		"must not use",
+		"not an official",
+		"not a fastest",
+		"not fastest",
+		"not target parity",
+		"not a benchmark",
+		"not a full",
+		"not full",
+		"not a runtime measurement",
+		"no official",
+		"no fastest",
+		"no target parity",
+		"no full",
+		"makes no",
+		"without an official",
+		"without official",
+		"forbid",
+		"forbidden",
+		"non-claim",
+		"nonclaim",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func metricsHash(metrics []performanceMetric) string {

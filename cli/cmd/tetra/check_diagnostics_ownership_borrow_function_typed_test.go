@@ -788,3 +788,62 @@ func main() -> Int:
 		})
 	}
 }
+
+func TestCheckCommandJSONDiagnosticsForCapturedFunctionTypedLocalOwnershipAliasCodes(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      string
+		wantText string
+	}{
+		{
+			name: "borrow-inout-alias",
+			src: `
+func main() -> Int:
+    var a: Int = 1
+    let bias: Int = 0
+    let cb: fn(borrow Int, inout Int) -> Int = fn(read: borrow Int, write: inout Int) -> Int:
+        write = write + read + bias
+        return write
+    return cb(a, a)
+`,
+			wantText: "inout argument 'a' aliases borrowed argument in function-typed callback 'cb'",
+		},
+		{
+			name: "consume-inout-alias",
+			src: `
+func main() -> Int:
+    var a: Int = 1
+    let bias: Int = 0
+    let cb: fn(consume Int, inout Int) -> Int = fn(taken: consume Int, write: inout Int) -> Int:
+        write = write + taken + bias
+        return write
+    return cb(a, a)
+`,
+			wantText: "inout argument 'a' aliases consumed argument in function-typed callback 'cb'",
+		},
+		{
+			name: "use-after-consume",
+			src: `
+func main() -> Int:
+    let value: Int = 1
+    let bias: Int = 0
+    let cb: fn(consume Int) -> Int = fn(taken: consume Int) -> Int:
+        return taken + bias
+    let moved: Int = cb(value)
+    return value + moved
+`,
+			wantText: "cannot use consumed value 'value'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			srcPath := filepath.Join(dir, "bad_captured_function_typed_local_"+tt.name+".tetra")
+			if err := os.WriteFile(srcPath, []byte(tt.src), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			assertCLIJSONOwnershipDiagnostic(t, srcPath, tt.wantText)
+		})
+	}
+}

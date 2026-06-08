@@ -181,10 +181,11 @@ vault` step that exercises:
 - publish/download
 - TetraHub beta publish/download
 
-The v0.3.0 release gate runs that coverage through its stabilization wrapper:
+The current release gate runs that coverage through its stabilization wrapper:
 
 ```sh
 env TETRA_TEST_ALL_RELEASE_VERSION="$release_version" bash scripts/ci/test-all.sh --stabilization --keep-going --report-dir "$artifacts_dir/test-all"
 ```
 
-That command is invoked by `bash scripts/release/v0_3_0/gate.sh`.
+That command is invoked by the active release gate named in
+`docs/spec/current_supported_surface.md`.

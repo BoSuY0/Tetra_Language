@@ -330,7 +330,7 @@ func updateKnownStackForOpaqueInstr(stack *[]knownStackValue, instr ir.IRInstr) 
 		clearKnownStack(stack)
 	case ir.IRCall, ir.IRWrite, ir.IRReturn, ir.IRAllocBytes, ir.IRRegionEnter, ir.IRRegionReset,
 		ir.IRIslandNew, ir.IRIslandMakeSliceU8, ir.IRIslandMakeSliceU16, ir.IRIslandMakeSliceI32,
-		ir.IRIslandFree, ir.IRCapIO, ir.IRCapMem, ir.IRMemReadI32, ir.IRMemWriteI32,
+		ir.IRIslandFree, ir.IRIslandReset, ir.IRCapIO, ir.IRCapMem, ir.IRMemReadI32, ir.IRMemWriteI32,
 		ir.IRMemReadU8, ir.IRMemWriteU8, ir.IRMemReadPtr, ir.IRMemWritePtr,
 		ir.IRMemWriteArchPtr, ir.IRMemReadI32Offset, ir.IRMemWriteI32Offset,
 		ir.IRMemReadU8Offset, ir.IRMemWriteU8Offset, ir.IRMemReadPtrOffset,

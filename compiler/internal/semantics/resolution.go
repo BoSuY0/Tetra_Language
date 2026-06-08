@@ -581,11 +581,11 @@ func rejectRepresentationMetadataAssignment(info *TypeInfo, field string, pos fr
 	if fieldKnown || isReservedRepresentationMetadataField(field) {
 		switch info.Kind {
 		case TypeArray:
-			return fmt.Errorf("%s: cannot assign to fixed-array internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
+			return fmt.Errorf("%s: cannot assign to fixed-array internals ('ptr'/'len'); assign elements via index instead; representation metadata field '%s' is not user-assignable in safe code", frontend.FormatPos(pos), field)
 		case TypeSlice:
-			return fmt.Errorf("%s: cannot assign to slice internals ('ptr'/'len'); assign elements via index instead", frontend.FormatPos(pos))
+			return fmt.Errorf("%s: cannot assign to slice internals ('ptr'/'len'); assign elements via index instead; representation metadata field '%s' is not user-assignable in safe code", frontend.FormatPos(pos), field)
 		case TypeStr:
-			return fmt.Errorf("%s: cannot assign to string internals ('ptr'/'len')", frontend.FormatPos(pos))
+			return fmt.Errorf("%s: cannot assign to string internals ('ptr'/'len'); representation metadata field '%s' is not user-assignable in safe code", frontend.FormatPos(pos), field)
 		}
 	}
 	return nil

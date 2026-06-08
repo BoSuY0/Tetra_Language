@@ -14,12 +14,15 @@ func FromPLIRAndAllocPlan(programID string, prog *plir.Program, plan *allocplan.
 		return nil, err
 	}
 	if prog != nil {
+		if err := validatePLIRFunctionSummaryCompleteness(prog); err != nil {
+			return nil, err
+		}
 		if err := addPLIRFacts(graph, prog); err != nil {
 			return nil, err
 		}
 	}
 	if plan != nil {
-		if err := addAllocPlanFacts(graph, plan); err != nil {
+		if err := addAllocPlanFacts(graph, plan, allocMemoryRefsFromPLIR(prog)); err != nil {
 			return nil, err
 		}
 	}
@@ -27,6 +30,15 @@ func FromPLIRAndAllocPlan(programID string, prog *plir.Program, plan *allocplan.
 		return nil, err
 	}
 	return graph, nil
+}
+
+func validatePLIRFunctionSummaryCompleteness(prog *plir.Program) error {
+	for _, fn := range prog.Funcs {
+		if err := plir.VerifyFunctionSummaryCompleteness(fn); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func addRepresentationMetadataFact(graph *Graph) error {
@@ -72,6 +84,9 @@ func addPLIRFacts(graph *Graph, prog *plir.Program) error {
 				ID:               FactID(fmt.Sprintf("plir:%s:%s", fn.Name, pf.ID)),
 				FunctionID:       fn.Name,
 				ValueID:          pf.ValueID,
+				IslandID:         islandIDForPLIRFact(pf, value),
+				Epoch:            epochForPLIRFact(pf, value),
+				BaseID:           baseIDForPLIRFact(pf, value),
 				SiteID:           nonEmpty(pf.Source, fmt.Sprintf("%s:%s", fn.Name, pf.ID)),
 				SourceSpan:       pf.Source,
 				TypeName:         value.Type,
@@ -118,6 +133,10 @@ func addPLIRFacts(graph *Graph, prog *plir.Program) error {
 				if err := addNoAliasMetadataFacts(graph, parent, value); err != nil {
 					return err
 				}
+			case plir.FactDerivedWindow:
+				if err := addSliceViewBoundsCheckFact(graph, parent, value, opsByOutput[pf.ValueID]); err != nil {
+					return err
+				}
 			}
 		}
 		if err := addFunctionSummaryFacts(graph, fn, values, factIDs); err != nil {
@@ -125,7 +144,7 @@ func addPLIRFacts(graph *Graph, prog *plir.Program) error {
 		}
 		for _, op := range fn.Ops {
 			if isCopyIntoOperation(op) {
-				if _, err := graph.AddFact(copyIntoDestinationFact(fn.Name, op, values)); err != nil {
+				if err := addCopyIntoFacts(graph, fn.Name, op, values); err != nil {
 					return err
 				}
 			}
@@ -310,6 +329,11 @@ func addDeclaredSummaryFacts(graph *Graph, fn plir.Function) error {
 			return err
 		}
 	}
+	if summaryRequiresCapMemAuthorization(summary) {
+		if _, err := graph.AddFact(functionSummaryFact(fn.Name, "cap_mem_authorization", "cap_mem_authorization_only", summarySite(fn), plir.Value{}, ProvenanceUnsafeChecked, UnsafeChecked, EscapeUnknown, AliasUnknown, "", "cap.mem authorizes raw operations only; it does not prove pointer validity, bounds, ownership, noalias, or safe provenance")); err != nil {
+			return err
+		}
+	}
 	if summary.TouchesMutableGlobals {
 		if _, err := graph.AddFact(functionSummaryFact(fn.Name, "touches_mutable_globals", "may_store_global", summarySite(fn), plir.Value{}, ProvenanceSafeKnown, UnsafeSafe, EscapeGlobal, AliasUnknown, "", "semantics summary records mutable global access")); err != nil {
 			return err
@@ -342,6 +366,9 @@ func addOperationSummaryFacts(graph *Graph, fn plir.Function, values map[string]
 					return err
 				}
 			}
+			if err := addNoAliasCallBoundaryFactsForOperation(graph, fn.Name, op, values, factIDs); err != nil {
+				return err
+			}
 			if isUnknownExternalCallOperation(op) {
 				if _, err := graph.AddFact(functionSummaryFact(fn.Name, op.ID, "unknown_external_call_conservative", op.Source, plir.Value{}, ProvenanceUnsafeUnknown, UnsafeUnknown, EscapeConservative, AliasUnknown, strings.Join(op.Inputs, ","), "callee summary is unknown, so memory/resource effects remain conservative")); err != nil {
 					return err
@@ -356,6 +383,41 @@ func addOperationSummaryFacts(graph *Graph, fn plir.Function, values map[string]
 		}
 	}
 	return addPointerRetentionFactsForValues(graph, fn, values)
+}
+
+func addNoAliasCallBoundaryFactsForOperation(graph *Graph, functionID string, op plir.Operation, values map[string]plir.Value, factIDs map[plirFactKey]FactID) error {
+	note := strings.ToLower(op.Note)
+	callbackBoundary := strings.Contains(note, "alias_boundary:function_typed_inout")
+	unknownExternalBoundary := strings.Contains(note, "alias_boundary:unknown_external_call") || isUnknownExternalCallOperation(op)
+	if !callbackBoundary && !unknownExternalBoundary {
+		return nil
+	}
+	for _, input := range op.Inputs {
+		value, ok := plirValueForPath(input, values)
+		if !ok {
+			continue
+		}
+		if callbackBoundary {
+			parentID := factIDs[plirFactKey{kind: plir.FactBorrowedMut, valueID: value.ID}]
+			if parentID != "" {
+				if err := addCallbackNoAliasInvalidationFact(graph, parentID, functionID, op, value); err != nil {
+					return err
+				}
+			}
+		}
+		if unknownExternalBoundary {
+			if factIDs[plirFactKey{kind: plir.FactNoAlias, valueID: value.ID}] != "" {
+				continue
+			}
+			parentID := factIDs[plirFactKey{kind: plir.FactBorrowedMut, valueID: value.ID}]
+			if parentID != "" {
+				if err := addFFINoAliasInvalidationFact(graph, parentID, functionID, op, value); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func addFFIExternalFactsForOperation(graph *Graph, functionID string, op plir.Operation, values map[string]plir.Value, factIDs map[plirFactKey]FactID) error {
@@ -459,6 +521,30 @@ func addFFICallMayRetainBorrowFact(graph *Graph, parentID FactID, functionID str
 		ValidatorName:   "ffi_lifetime_conservative_validator",
 		CostClass:       CostConservativeFallback,
 		Reason:          "Memory Ideal v7 keeps borrowed pointer passed to FFI conservative because external call may retain it",
+	})
+	return err
+}
+
+func addCallbackNoAliasInvalidationFact(graph *Graph, parentID FactID, functionID string, op plir.Operation, value plir.Value) error {
+	_, err := graph.DeriveFact(parentID, Fact{
+		ID:              aliasBoundaryDerivedFactID(parentID, op.ID, "callback_inout_conservative"),
+		FunctionID:      functionID,
+		ValueID:         value.ID,
+		SiteID:          nonEmpty(op.Source, value.Source, functionID+":callback"),
+		SourceSpan:      nonEmpty(op.Source, value.Source),
+		TypeName:        value.Type,
+		SourceStage:     StagePLIR,
+		ProvenanceClass: ProvenanceUnsafeUnknown,
+		UnsafeClass:     UnsafeUnknown,
+		RegionID:        value.Region,
+		OwnerID:         ownerForPLIRValue(value),
+		BorrowState:     borrowStateForPLIRValue(value),
+		EscapeState:     EscapeConservative,
+		AliasState:      AliasInvalidatedByCall,
+		Claim:           "callback_inout_conservative",
+		ValidatorName:   "callback_alias_conservative_validator",
+		CostClass:       CostConservativeFallback,
+		Reason:          "callback or reentrant inout boundary invalidates broad noalias evidence",
 	})
 	return err
 }
@@ -664,6 +750,23 @@ func summaryRequiresCapabilities(summary *plir.FunctionSummary) bool {
 		}
 	}
 	return false
+}
+
+func summaryRequiresCapMemAuthorization(summary *plir.FunctionSummary) bool {
+	if summary == nil {
+		return false
+	}
+	hasCapability := false
+	hasMem := false
+	for _, effect := range summary.Effects {
+		switch effect {
+		case "capability":
+			hasCapability = true
+		case "mem":
+			hasMem = true
+		}
+	}
+	return hasCapability && hasMem
 }
 
 func plirValueForPath(path string, values map[string]plir.Value) (plir.Value, bool) {
@@ -931,7 +1034,47 @@ func suppressRawVerifiedRootGenericFact(fact plir.Fact, value plir.Value) bool {
 	}
 }
 
-func addAllocPlanFacts(graph *Graph, plan *allocplan.Plan) error {
+type allocMemoryRef struct {
+	IslandID string
+	Epoch    int
+	BaseID   string
+}
+
+func allocMemoryRefsFromPLIR(prog *plir.Program) map[string]allocMemoryRef {
+	refs := map[string]allocMemoryRef{}
+	if prog == nil {
+		return refs
+	}
+	for _, fn := range prog.Funcs {
+		values := map[string]plir.Value{}
+		for _, value := range fn.Values {
+			values[value.ID] = value
+			if value.Provenance.Kind != plir.ProvenanceIsland {
+				continue
+			}
+			refs[allocMemoryRefKey(fn.Name, value.ID)] = allocMemoryRef{
+				IslandID: islandIDForPLIRFact(plir.Fact{}, value),
+				Epoch:    epochForPLIRFact(plir.Fact{}, value),
+				BaseID:   baseIDForPLIRFact(plir.Fact{}, value),
+			}
+		}
+		for _, fact := range fn.Facts {
+			value := values[fact.ValueID]
+			ref := allocMemoryRef{
+				IslandID: islandIDForPLIRFact(fact, value),
+				Epoch:    epochForPLIRFact(fact, value),
+				BaseID:   baseIDForPLIRFact(fact, value),
+			}
+			if ref.IslandID == "" {
+				continue
+			}
+			refs[allocMemoryRefKey(fn.Name, fact.ValueID)] = ref
+		}
+	}
+	return refs
+}
+
+func addAllocPlanFacts(graph *Graph, plan *allocplan.Plan, refs map[string]allocMemoryRef) error {
 	for _, fn := range plan.Functions {
 		for _, alloc := range fn.Allocations {
 			if alloc.RawPointerBoundsStatus == "" && alloc.PlannedStorage == "" && alloc.ActualLoweringStorage == "" {
@@ -953,10 +1096,22 @@ func addAllocPlanFacts(graph *Graph, plan *allocplan.Plan) error {
 			if claim == "" {
 				claim = "storage_lowering"
 			}
+			ref := allocPlanMemoryRef(fn.Name, alloc, refs)
+			loweredArtifactID := fmt.Sprintf("ir:%s:%s:%s", fn.Name, alloc.ID, alloc.ActualLoweringStorage)
+			validated := allocPlanValidationPasses(alloc)
+			validationState := ValidationNotRun
+			validatorName := ""
+			if validated {
+				validationState = ValidationPass
+				validatorName = "allocation_lowering_validator"
+			}
 			id, err := graph.AddFact(Fact{
 				ID:                    FactID(fmt.Sprintf("allocplan:%s:%s", fn.Name, alloc.ID)),
 				FunctionID:            fn.Name,
 				ValueID:               alloc.ValueID,
+				IslandID:              ref.IslandID,
+				Epoch:                 ref.Epoch,
+				BaseID:                ref.BaseID,
 				SiteID:                nonEmpty(alloc.SiteID, fmt.Sprintf("%s:%s", fn.Name, alloc.ID)),
 				SourceSpan:            alloc.Source,
 				SourceStage:           StageAllocPlan,
@@ -966,21 +1121,15 @@ func addAllocPlanFacts(graph *Graph, plan *allocplan.Plan) error {
 				AllocationSiteID:      alloc.ID,
 				StoragePlan:           StorageClass(alloc.PlannedStorage),
 				ActualLoweringStorage: StorageClass(alloc.ActualLoweringStorage),
+				ValidationState:       validationState,
 				Claim:                 claim,
+				LoweredArtifactID:     loweredArtifactID,
+				ValidatorName:         validatorName,
 				CostClass:             costClassForAllocFact(claim, alloc),
 				Reason:                alloc.Reason,
 			})
 			if err != nil {
 				return err
-			}
-			if err := graph.AttachLoweredArtifact(id, fmt.Sprintf("ir:%s:%s:%s", fn.Name, alloc.ID, alloc.ActualLoweringStorage)); err != nil {
-				return err
-			}
-			validated := allocPlanValidationPasses(alloc)
-			if validated {
-				if err := graph.MarkValidated(id, "allocation_lowering_validator"); err != nil {
-					return err
-				}
 			}
 			if validated && alloc.Builtin == "core.alloc_bytes" && claim == "allocation_base_metadata" {
 				if err := addUnsafeVerifiedRootAllocationBaseFact(graph, id, fn.Name, alloc); err != nil {
@@ -990,6 +1139,27 @@ func addAllocPlanFacts(graph *Graph, plan *allocplan.Plan) error {
 		}
 	}
 	return nil
+}
+
+func allocMemoryRefKey(functionName string, valueID string) string {
+	return functionName + "\x00" + valueID
+}
+
+func allocPlanMemoryRef(functionName string, alloc allocplan.Allocation, refs map[string]allocMemoryRef) allocMemoryRef {
+	if ref, ok := refs[allocMemoryRefKey(functionName, alloc.ValueID)]; ok && ref.IslandID != "" {
+		return ref
+	}
+	if alloc.PlannedStorage != allocplan.StorageExplicitIsland && alloc.ActualLoweringStorage != allocplan.StorageExplicitIsland {
+		return allocMemoryRef{}
+	}
+	if strings.TrimSpace(alloc.RegionID) == "" {
+		return allocMemoryRef{}
+	}
+	return allocMemoryRef{
+		IslandID: alloc.RegionID,
+		Epoch:    1,
+		BaseID:   nonEmpty(alloc.ValueID, alloc.ID),
+	}
 }
 
 func addUnsafeVerifiedRootAllocationBaseFact(graph *Graph, parentID FactID, functionID string, alloc allocplan.Allocation) error {
@@ -1005,6 +1175,7 @@ func addUnsafeVerifiedRootAllocationBaseFact(graph *Graph, parentID FactID, func
 		UnsafeClass:      UnsafeVerifiedRoot,
 		AllocationSiteID: alloc.ID,
 		Claim:            "unsafe_verified_root_allocation_base",
+		ValidationState:  ValidationPass,
 		ValidatorName:    "unsafe_verified_root_bounds_validator",
 		CostClass:        CostZeroCostProven,
 		Reason:           "Memory Ideal v5 accepts bounded core.alloc_bytes allocation-base metadata without safe-fact promotion",
@@ -1019,10 +1190,17 @@ func allocPlanValidationPasses(alloc allocplan.Allocation) bool {
 	if !strings.HasPrefix(alloc.ValidationStatus, "validated") {
 		return false
 	}
+	if allocPlanRuntimeProofRequiredStorage(alloc.PlannedStorage, alloc.ActualLoweringStorage) {
+		return false
+	}
 	if allocPlanTrustedStorageHeapFallback(alloc.PlannedStorage, alloc.ActualLoweringStorage) {
 		return false
 	}
 	return true
+}
+
+func allocPlanRuntimeProofRequiredStorage(planned allocplan.StorageClass, actual allocplan.StorageClass) bool {
+	return runtimeProofRequiredStorage(StorageClass(planned), StorageClass(actual))
 }
 
 func allocPlanTrustedStorageHeapFallback(planned allocplan.StorageClass, actual allocplan.StorageClass) bool {
@@ -1202,6 +1380,8 @@ func addBorrowAggregateV0Facts(graph *Graph, parent Fact, value plir.Value, op p
 			BorrowState:     parent.BorrowState,
 			EscapeState:     EscapeNoEscape,
 			Claim:           claim,
+			ValidationState: ValidationPass,
+			ValidatorName:   borrowWrapperValidatorName(claim),
 			CostClass:       CostZeroCostProven,
 			Reason:          fmt.Sprintf("Memory Ideal v10 validates pre-await local borrow for owner %q only with compiler-owned no-escape proof", owner),
 		})
@@ -1782,23 +1962,185 @@ func boundaryNoAliasConservativeContext(parent Fact, value plir.Value) bool {
 		strings.Contains(context, "send_typed")
 }
 
-func copyIntoDestinationFact(functionID string, op plir.Operation, values map[string]plir.Value) Fact {
+func addCopyIntoFacts(graph *Graph, functionID string, op plir.Operation, values map[string]plir.Value) error {
+	parentID, err := graph.AddFact(copyIntoOperationFact(functionID, op, values))
+	if err != nil {
+		return err
+	}
+	parent, ok := graph.Fact(parentID)
+	if !ok {
+		return fmt.Errorf("memoryfacts: copy_into operation fact %q was not recorded", parentID)
+	}
+	if strings.Contains(op.Note, "dest_capacity_check:normal_build") {
+		if err := addCopyIntoDestinationLengthCheckFact(graph, parent, op, values); err != nil {
+			return err
+		}
+	}
+	switch copyIntoOverlapStatusFromNote(op.Note) {
+	case "distinct_roots", "known_disjoint":
+		_, err = graph.DeriveFact(parent.ID, copyIntoDestinationFact(parent, op, values))
+	case "known_overlap":
+		err = addCopyIntoOverlapRejectedFact(graph, parent, op)
+	default:
+		err = addCopyIntoOverlapConservativeFact(graph, parent, op)
+	}
+	return err
+}
+
+func copyIntoOperationFact(functionID string, op plir.Operation, values map[string]plir.Value) Fact {
+	source := ownerFromOperationInput(op, 0)
 	destination := ownerFromOperationInput(op, 1)
-	valueID := valueIDForPath(destination, values)
+	destinationValueID := valueIDForPath(destination, values)
+	value := values[destinationValueID]
 	return Fact{
-		ID:              FactID(fmt.Sprintf("plir:%s:%s:copy_into_destination_fact_id", functionID, op.ID)),
+		ID:              FactID(fmt.Sprintf("plir:%s:%s:copy_into_operation", functionID, op.ID)),
 		FunctionID:      functionID,
-		ValueID:         nonEmpty(valueID, destination),
+		ValueID:         nonEmpty(destinationValueID, destination),
 		SiteID:          nonEmpty(op.Source, fmt.Sprintf("%s:%s", functionID, op.ID)),
 		SourceSpan:      op.Source,
+		TypeName:        value.Type,
+		SourceStage:     StagePLIR,
+		ProvenanceClass: ProvenanceSafeKnown,
+		UnsafeClass:     UnsafeSafe,
+		OwnerID:         destination,
+		EscapeState:     EscapeNoEscape,
+		Claim:           "copy_into_operation",
+		CostClass:       CostInstrumentationOnly,
+		Reason:          fmt.Sprintf("copy_into operation from %q into %q records destination capacity and overlap contract: %s", source, destination, op.Note),
+	}
+}
+
+func addCopyIntoDestinationLengthCheckFact(graph *Graph, parent Fact, op plir.Operation, values map[string]plir.Value) error {
+	destination := ownerFromOperationInput(op, 1)
+	destinationValueID := valueIDForPath(destination, values)
+	value := values[destinationValueID]
+	_, err := graph.DeriveFact(parent.ID, Fact{
+		ID:               derivedFactID(parent.ID, "copy_into_destination_length_check"),
+		FunctionID:       parent.FunctionID,
+		ValueID:          nonEmpty(destinationValueID, destination),
+		SiteID:           parent.SiteID,
+		SourceSpan:       parent.SourceSpan,
+		TypeName:         nonEmpty(value.Type, parent.TypeName),
+		SourceStage:      StagePLIR,
+		ProvenanceClass:  ProvenanceSafeKnown,
+		UnsafeClass:      UnsafeSafe,
+		OwnerID:          destination,
+		EscapeState:      parent.EscapeState,
+		Claim:            "copy_into_destination_length_check",
+		ValidationState:  ValidationPass,
+		ValidatorName:    "copy_into_destination_capacity_validator",
+		CostClass:        CostDynamicCheckRequired,
+		NormalBuildCheck: true,
+		Reason:           fmt.Sprintf("copy_into destination %q is sliced to source length in normal builds before the store loop", destination),
+	})
+	return err
+}
+
+func copyIntoDestinationFact(parent Fact, op plir.Operation, values map[string]plir.Value) Fact {
+	destination := ownerFromOperationInput(op, 1)
+	valueID := valueIDForPath(destination, values)
+	value := values[valueID]
+	return Fact{
+		ID:              derivedFactID(parent.ID, "copy_into_destination_fact_id"),
+		FunctionID:      parent.FunctionID,
+		ValueID:         nonEmpty(valueID, destination),
+		SiteID:          parent.SiteID,
+		SourceSpan:      parent.SourceSpan,
+		TypeName:        nonEmpty(value.Type, parent.TypeName),
 		SourceStage:     StagePLIR,
 		ProvenanceClass: ProvenanceSafeOwned,
 		UnsafeClass:     UnsafeSafe,
 		OwnerID:         destination,
 		EscapeState:     EscapeNoEscape,
 		Claim:           "copy_into_destination_fact_id",
-		Reason:          fmt.Sprintf("copy_into writes into caller-owned destination %q without fresh allocation after length proof/check", destination),
+		Reason:          fmt.Sprintf("copy_into writes into caller-owned destination %q only after parented length check and overlap status %q", destination, copyIntoOverlapStatusFromNote(op.Note)),
 	}
+}
+
+func addCopyIntoOverlapRejectedFact(graph *Graph, parent Fact, op plir.Operation) error {
+	_, err := graph.DeriveFact(parent.ID, Fact{
+		ID:              derivedFactID(parent.ID, "copy_into_overlap_rejected"),
+		FunctionID:      parent.FunctionID,
+		ValueID:         parent.ValueID,
+		SiteID:          parent.SiteID,
+		SourceSpan:      parent.SourceSpan,
+		TypeName:        parent.TypeName,
+		SourceStage:     StagePLIR,
+		ProvenanceClass: ProvenanceSafeKnown,
+		UnsafeClass:     UnsafeSafe,
+		OwnerID:         parent.OwnerID,
+		EscapeState:     parent.EscapeState,
+		AliasState:      AliasMaybe,
+		Claim:           "copy_into_overlap_rejected",
+		ValidationState: ValidationFail,
+		ValidatorName:   "copy_into_overlap_validator",
+		CostClass:       CostUnsupportedRejected,
+		Reason:          fmt.Sprintf("copy_into overlap status %q rejects zero-cost/noalias destination claim: %s", copyIntoOverlapStatusFromNote(op.Note), op.Note),
+	})
+	return err
+}
+
+func addCopyIntoOverlapConservativeFact(graph *Graph, parent Fact, op plir.Operation) error {
+	_, err := graph.DeriveFact(parent.ID, Fact{
+		ID:              derivedFactID(parent.ID, "copy_into_overlap_conservative"),
+		FunctionID:      parent.FunctionID,
+		ValueID:         parent.ValueID,
+		SiteID:          parent.SiteID,
+		SourceSpan:      parent.SourceSpan,
+		TypeName:        parent.TypeName,
+		SourceStage:     StagePLIR,
+		ProvenanceClass: ProvenanceUnsafeUnknown,
+		UnsafeClass:     UnsafeUnknown,
+		OwnerID:         parent.OwnerID,
+		EscapeState:     EscapeConservative,
+		AliasState:      AliasUnknownConservative,
+		Claim:           "copy_into_overlap_conservative",
+		CostClass:       CostConservativeFallback,
+		Reason:          fmt.Sprintf("copy_into overlap status %q remains conservative and cannot authorize zero-cost/noalias destination claim: %s", copyIntoOverlapStatusFromNote(op.Note), op.Note),
+	})
+	return err
+}
+
+func copyIntoOverlapStatusFromNote(note string) string {
+	note = strings.TrimSpace(note)
+	for _, field := range strings.Fields(note) {
+		if strings.HasPrefix(field, "overlap:") {
+			return strings.TrimSpace(strings.TrimPrefix(field, "overlap:"))
+		}
+	}
+	return "unknown_conservative"
+}
+
+func addSliceViewBoundsCheckFact(graph *Graph, parent Fact, value plir.Value, op plir.Operation) error {
+	if isUnsafeUnknown(parent) || op.Kind != plir.OpSliceWindow {
+		return nil
+	}
+	note := strings.TrimSpace(op.Note)
+	if !strings.Contains(note, "bounds_check:normal_build") {
+		return nil
+	}
+	_, err := graph.DeriveFact(parent.ID, Fact{
+		ID:               derivedFactID(parent.ID, "bounds_check_retained_dynamic"),
+		FunctionID:       parent.FunctionID,
+		ValueID:          parent.ValueID,
+		SiteID:           parent.SiteID,
+		SourceSpan:       parent.SourceSpan,
+		TypeName:         parent.TypeName,
+		SourceStage:      StagePLIR,
+		ProvenanceClass:  ProvenanceSafeBorrowed,
+		UnsafeClass:      UnsafeSafe,
+		RegionID:         parent.RegionID,
+		OwnerID:          parent.OwnerID,
+		BorrowState:      parent.BorrowState,
+		EscapeState:      parent.EscapeState,
+		Claim:            "bounds_check_retained_dynamic",
+		ValidationState:  ValidationPass,
+		ValidatorName:    "safe_view_bounds_validator",
+		CostClass:        CostDynamicCheckRequired,
+		NormalBuildCheck: true,
+		Reason:           fmt.Sprintf("safe view constructor retains dynamic bounds/length check in normal-build: %s", nonEmpty(note, value.ID)),
+	})
+	return err
 }
 
 func provenanceClassForPLIRFact(fact plir.Fact, value plir.Value) ProvenanceClass {
@@ -1895,6 +2237,40 @@ func ownerForPLIRValue(value plir.Value) string {
 	return normalizeOwnerID(nonEmpty(value.Provenance.Root, value.Lifetime.Owner))
 }
 
+func islandIDForPLIRFact(fact plir.Fact, value plir.Value) string {
+	if fact.IslandID != "" {
+		return fact.IslandID
+	}
+	if value.Provenance.Kind != plir.ProvenanceIsland {
+		return ""
+	}
+	root := value.Provenance.Root
+	if root == "" {
+		root = "unknown"
+	}
+	return "island:" + root
+}
+
+func epochForPLIRFact(fact plir.Fact, value plir.Value) int {
+	if fact.Epoch != 0 {
+		return fact.Epoch
+	}
+	if islandIDForPLIRFact(fact, value) != "" {
+		return 1
+	}
+	return 0
+}
+
+func baseIDForPLIRFact(fact plir.Fact, value plir.Value) string {
+	if fact.BaseID != "" {
+		return fact.BaseID
+	}
+	if islandIDForPLIRFact(fact, value) != "" {
+		return value.ID
+	}
+	return ""
+}
+
 func ownerFromOperationInput(op plir.Operation, index int) string {
 	if index < 0 || index >= len(op.Inputs) {
 		return ""
@@ -1986,6 +2362,10 @@ func derivedFactID(parentID FactID, suffix string) FactID {
 }
 
 func ffiDerivedFactID(parentID FactID, opID string, suffix string) FactID {
+	return FactID(fmt.Sprintf("%s:%s:%s", parentID, safeFactIDPart(opID), suffix))
+}
+
+func aliasBoundaryDerivedFactID(parentID FactID, opID string, suffix string) FactID {
 	return FactID(fmt.Sprintf("%s:%s:%s", parentID, safeFactIDPart(opID), suffix))
 }
 
@@ -2160,10 +2540,16 @@ func costClassForAllocFact(claim string, alloc allocplan.Allocation) CostClass {
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(claim)), "rejected_") {
 		return CostUnsupportedRejected
 	}
+	if allocPlanRuntimeProofRequiredStorage(alloc.PlannedStorage, alloc.ActualLoweringStorage) {
+		return CostConservativeFallback
+	}
 	if alloc.ActualLoweringStorage == allocplan.StorageHeap &&
 		alloc.PlannedStorage != "" &&
 		alloc.PlannedStorage != allocplan.StorageHeap {
 		return CostConservativeFallback
+	}
+	if !allocPlanValidationPasses(alloc) {
+		return CostInstrumentationOnly
 	}
 	if alloc.Builtin == "core.alloc_bytes" && claim == "allocation_base_metadata" {
 		return CostZeroCostProven

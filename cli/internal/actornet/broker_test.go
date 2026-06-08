@@ -1,6 +1,7 @@
 package actornet
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -166,6 +169,31 @@ func TestClosedConnectionErrorsIncludePeerReset(t *testing.T) {
 	}
 }
 
+func TestBrokerCloseWithoutCancelStopsServeWatcher(t *testing.T) {
+	broker, err := NewBroker(Config{Addr: "127.0.0.1:0"})
+	if err != nil {
+		t.Fatalf("NewBroker: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- broker.Serve(context.Background())
+	}()
+
+	waitForBrokerServeWatchers(t, 1)
+	if err := broker.Close(); err != nil {
+		t.Fatalf("broker close: %v", err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("broker serve: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("broker did not stop after Close without context cancellation")
+	}
+	waitForBrokerServeWatchers(t, 0)
+}
+
 func startTestBroker(t *testing.T, cfg Config) (*Broker, func()) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -196,6 +224,27 @@ func startTestBroker(t *testing.T, cfg Config) (*Broker, func()) {
 		})
 	}
 	return broker, stop
+}
+
+func waitForBrokerServeWatchers(t *testing.T, want int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if got := countBrokerServeWatchers(); got == want {
+			return
+		} else if time.Now().After(deadline) {
+			t.Fatalf("Broker.Serve watcher goroutines = %d, want %d", got, want)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func countBrokerServeWatchers() int {
+	var buf bytes.Buffer
+	if err := pprof.Lookup("goroutine").WriteTo(&buf, 2); err != nil {
+		return -1
+	}
+	return strings.Count(buf.String(), "tetra_language/cli/internal/actornet.(*Broker).Serve.func1")
 }
 
 func dialTestNode(t *testing.T, addr string) net.Conn {

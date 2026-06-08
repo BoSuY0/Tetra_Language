@@ -107,6 +107,144 @@ if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/validate-safety-readiness" ]
   fi
   exit 0
 fi
+if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/memory-fuzz-short" ]]; then
+  report_dir=""
+  shift 2
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --report-dir)
+        report_dir="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ -n "$report_dir" ]]; then
+    mkdir -p -- "$report_dir"
+    printf '{"schema_version":"tetra.memory-fuzz.oracle.v1","scope":"memory_production_core_v1_mpc15"}\n' >"$report_dir/memory-fuzz-oracle.json"
+    printf '# Memory Fuzz Short Summary\n\n- tier: Tier 1 short CI smoke\n- report: memory-fuzz-oracle.json\n' >"$report_dir/summary.md"
+    printf '{"schema_version":"tetra.memory-fuzz-short.summary.v1","kind":"tier1_short_ci_smoke","tier":"tier1_short_ci_smoke","status":"pass","artifacts":{"oracle_report":"memory-fuzz-oracle.json","summary_md":"summary.md","summary_json":"summary.json"},"commands":[{"name":"memory-fuzz-short","command":"go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir <artifact-dir>","status":"pass"},{"name":"validate-memory-fuzz-oracle","command":"go run ./tools/cmd/validate-memory-fuzz-oracle --report <artifact-dir>/memory-fuzz-oracle.json --artifact-dir <artifact-dir>","status":"pass"}]}\n' >"$report_dir/summary.json"
+  fi
+  exit 0
+fi
+if [[ "${1:-}" == "test" ]]; then
+  pkg="${2:-}"
+  shift 2 || true
+  list_mode=false
+  list_pattern=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -list)
+        list_mode=true
+        list_pattern="${2:-}"
+        shift 2 || true
+        ;;
+      -list=*)
+        list_mode=true
+        list_pattern="${1#-list=}"
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ "$list_mode" == true ]]; then
+    if [[ "${TETRA_FAKE_SKIP_UNSAFE_PROMOTION_LIST:-}" == "1" && "$list_pattern" == *Unsafe* ]]; then
+      exit 0
+    fi
+    if [[ "${TETRA_FAKE_SKIP_BOUNDS_PROOF_LIST:-}" == "1" && ( "$list_pattern" == *Bounds* || "$list_pattern" == *Proof* || "$list_pattern" == *Unchecked* ) ]]; then
+      exit 0
+    fi
+		if [[ "${TETRA_FAKE_SKIP_MEMORY_FUZZ_ORACLE_LIST:-}" == "1" && "$pkg" == "./tools/cmd/memory-fuzz-short" ]]; then
+			exit 0
+		fi
+		if [[ "${TETRA_FAKE_SKIP_HOST_LEAK_LIST:-}" == "1" && "$pkg" == "./cli/internal/actornet" ]]; then
+			exit 0
+		fi
+    case "$pkg" in
+      ./compiler/internal/memoryfacts)
+        printf '%s\n' \
+          TestMemoryFactsRejectsUnsafeUnknownToSafeKnown \
+          TestMemoryFactsRejectsDirectSafeBorrowedFromUnsafeUnknown \
+          TestMemoryFactsRejectsDirectSafeOwnedFromUnsafeUnknown \
+          TestMemoryFactsRejectsUnsafeUnknownNoAliasAndBoundsProofClaims \
+          TestMemoryFactsRejectsUnsafeCheckedGenericPromotions \
+          TestMemoryFactsRejectsUnsafeVerifiedRootGenericClaims \
+          TestMemoryFactsRejectsValidatedUnsafeUnknownTrustedStorage \
+          TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaims \
+          TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotions \
+          TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaims \
+          TestValidateMemoryReportRejectsValidatedUnsafeUnknownTrustedStorage \
+          TestMemoryIdealV6ProjectsBoundsProofFacts \
+          TestMemoryIdealV6ProjectsMissingProofRejection \
+          TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
+          TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID
+        ;;
+      ./tools/cmd/validate-memory-report)
+        printf '%s\n' \
+          TestValidateMemoryReportRejectsSafeKnownFromUnsafeUnknown \
+          TestValidateMemoryReportRejectsUnsafeUnknownOptimizationClaim \
+          TestValidateMemoryReportRejectsUnsafeCheckedGenericPromotion \
+          TestValidateMemoryReportRejectsUnsafeUnknownZeroCost \
+          TestValidateMemoryReportRejectsUnsafeVerifiedRootGenericClaim \
+          TestValidateMemoryReportRejectsUnsafeUnknownTrustedStorage \
+          TestValidateMemoryReportRejectsV6BoundsRowsWithoutParent \
+          TestValidateMemoryReportRejectsBareBoundsCheckEliminatedWithoutProofID
+        ;;
+      ./compiler)
+        printf '%s\n' \
+          TestMemoryFuzzOracleReportCoversMPC15CategoriesAndInvariants \
+          TestClassifyMemoryFuzzOracleObservation \
+          TestValidateMemoryFuzzOracleReportRejectsDrift \
+          TestMemoryFuzzOracleReportCoversV12ReleaseEvidence \
+          TestValidateMemoryFuzzOracleReportRejectsV12ReleaseEvidenceDrift \
+          TestBuildBoundsAndProofReportsShowWhileRangeReason
+        ;;
+      ./compiler/internal/validation)
+        printf '%s\n' \
+          TestCheckBoundsProofsRejectsRemovedCheckWithoutProofID \
+          TestCheckBoundsProofsWithPLIRRejectsUnknownLiveProof \
+          TestValidateTranslationRejectsMissingProofIDAfterTransform
+        ;;
+      ./compiler/internal/plir)
+        printf '%s\n' \
+          TestVerifierRejectsUnknownProofUse \
+          TestVerifierRejectsNonDominatingProofUse
+        ;;
+      ./compiler/internal/lower)
+        printf '%s\n' \
+          TestForSliceLoopUsesProofTaggedUncheckedIndexLoad \
+          TestWhileLessThanLenUsesProofTaggedUncheckedIndexLoad \
+          TestCopyLoopSourceLoadUsesProofTaggedUncheckedIndexLoad
+        ;;
+      ./tools/cmd/validate-memory-fuzz-oracle)
+        printf '%s\n' \
+          TestValidateMemoryFuzzOracleReportFileAcceptsCompilerReport \
+          TestValidateMemoryFuzzOracleReportFileAcceptsTier1ArtifactBundle \
+          TestValidateMemoryFuzzOracleReportFileRejectsInvalidReport \
+          TestValidateMemoryFuzzOracleReportFileRejectsMissingV12ReleaseEvidence \
+          TestValidateMemoryFuzzOracleReportFileRejectsMissingArtifactSummary \
+          TestValidateMemoryFuzzOracleReportFileRejectsMissingValidatorProvenance
+        ;;
+      ./tools/cmd/memory-fuzz-short)
+        printf '%s\n' \
+          TestRunMemoryFuzzShortWritesValidatedArtifacts \
+          TestRunMemoryFuzzShortRejectsUnsupportedTier \
+          TestRunMemoryFuzzShortRejectsStaleReportDir
+        ;;
+      ./cli/internal/actornet)
+        printf '%s\n' \
+          TestBrokerCloseWithoutCancelStopsServeWatcher \
+          TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport \
+          TestBrokerReportsNodeDownForMissingDestination
+        ;;
+    esac
+    exit 0
+  fi
+fi
 exit 0
 `
 	if err := os.WriteFile(filepath.Join(binDir, "go"), []byte(goScript), 0o755); err != nil {

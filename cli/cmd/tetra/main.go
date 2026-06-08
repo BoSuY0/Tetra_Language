@@ -987,5 +987,13 @@ func writeDiagnosticObject(w io.Writer, diag compiler.Diagnostic) {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: tetra <version|targets|features|formats|doctor|actor-net|project|workspace|new|check|build|run|smoke|fmt|test|doc|interface|clean|eco|lsp> [options]")
+	fmt.Fprintln(w, "usage: tetra <command> [options]")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "core workflow:")
+	fmt.Fprintln(w, "  check    validate source without emitting artifacts")
+	fmt.Fprintln(w, "  build    validate source and emit or link artifacts")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "tooling commands:")
+	fmt.Fprintln(w, "  version targets features formats doctor actor-net project workspace new")
+	fmt.Fprintln(w, "  run smoke fmt test doc interface clean eco lsp")
 }

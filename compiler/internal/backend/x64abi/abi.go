@@ -21,4 +21,5 @@ type ABI interface {
 	EmitIslandNew(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error
 	EmitIslandMakeSlice(e *x64.Emitter, kind ir.IRInstrKind, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error
 	EmitIslandFree(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error
+	EmitIslandReset(e *x64.Emitter, stackDepth *int, opt x64.CodegenOptions, importPatches *[]x64obj.ImportPatch) error
 }

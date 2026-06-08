@@ -142,6 +142,7 @@ func builtinFuncSigs(types map[string]*TypeInfo) (map[string]FuncSig, error) {
 		"core.island_make_u16":                  {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceU16.Name, ReturnSlots: sliceU16.SlotCount, ReturnRegionParam: 0},
 		"core.island_make_i32":                  {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceI32.Name, ReturnSlots: sliceI32.SlotCount, ReturnRegionParam: 0},
 		"core.island_make_bool":                 {ParamTypes: []string{"island", "i32"}, ParamSlots: 2, ReturnType: sliceBool.Name, ReturnSlots: sliceBool.SlotCount, ReturnRegionParam: 0},
+		"core.island_reset":                     {ParamTypes: []string{"island"}, ParamOwnership: []string{"consume"}, ParamSlots: 1, ReturnType: "island", ReturnSlots: islandInfo.SlotCount, ReturnRegionParam: regionNone},
 		"core.cap_io":                           {ParamTypes: nil, ParamSlots: 0, ReturnType: capIO.Name, ReturnSlots: capIO.SlotCount, ReturnRegionParam: regionNone},
 		"core.cap_mem":                          {ParamTypes: nil, ParamSlots: 0, ReturnType: capMem.Name, ReturnSlots: capMem.SlotCount, ReturnRegionParam: regionNone},
 		"core.load_i32":                         {ParamTypes: []string{"ptr", capMem.Name}, ParamSlots: 2, ReturnType: "i32", ReturnSlots: 1, ReturnRegionParam: regionNone},
@@ -452,7 +453,7 @@ func builtinNeedsUnsafe(name string, argRegions []int) bool {
 		return true
 	}
 	switch name {
-	case "core.alloc_bytes", "core.island_new", "core.cap_io", "core.cap_mem",
+	case "core.alloc_bytes", "core.island_new", "core.island_reset", "core.cap_io", "core.cap_mem",
 		"core.raw_slice_u8_from_parts", "core.raw_slice_u16_from_parts",
 		"core.raw_slice_i32_from_parts", "core.raw_slice_bool_from_parts",
 		"core.load_i32", "core.store_i32",
@@ -514,6 +515,8 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 		return "core.island_make_i32", true
 	case "island_make_bool":
 		return "core.island_make_bool", true
+	case "island_reset":
+		return "core.island_reset", true
 	case "load_ptr":
 		return "core.load_ptr", true
 	case "store_ptr":
@@ -631,7 +634,7 @@ func ResolveBuiltinAlias(name string) (string, bool) {
 	case "core.alloc_bytes", "core.make_u8", "core.make_u16", "core.make_i32", "core.make_bool",
 		"core.raw_slice_u8_from_parts", "core.raw_slice_u16_from_parts",
 		"core.raw_slice_i32_from_parts", "core.raw_slice_bool_from_parts",
-		"core.island_new", "core.island_make_u8", "core.island_make_u16", "core.island_make_i32", "core.island_make_bool",
+		"core.island_new", "core.island_make_u8", "core.island_make_u16", "core.island_make_i32", "core.island_make_bool", "core.island_reset",
 		"core.load_ptr", "core.store_ptr", "core.sym_addr", "core.ctx_switch",
 		"core.surface_open", "core.surface_close", "core.surface_poll_event_kind", "core.surface_poll_event_x",
 		"core.surface_poll_event_y", "core.surface_poll_event_button", "core.surface_poll_event_into", "core.surface_poll_event_text_len", "core.surface_poll_event_text_into",

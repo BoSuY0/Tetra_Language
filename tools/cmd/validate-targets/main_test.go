@@ -164,6 +164,31 @@ func TestValidateMemoryCapabilityClaimsRejectsInflatedRuntimeClaim(t *testing.T)
 	}
 }
 
+func TestValidateMemoryCapabilityClaimsRejectsProductionRuntimeClaimWithoutLinuxX64Evidence(t *testing.T) {
+	entry := validMemoryCapabilityTargetForTest("linux-x64")
+	entry.EvidenceArtifacts = []string{"linux-x64-abi.json"}
+
+	err := validateMemoryCapabilityClaims(entry)
+	if err == nil || !strings.Contains(err.Error(), "linux-x64 runner/artifact evidence") {
+		t.Fatalf("expected linux-x64 runner/artifact evidence rejection, got %v", err)
+	}
+}
+
+func TestValidateMemoryCapabilityClaimsRejectsHostRuntimeClaimWithoutTargetEvidence(t *testing.T) {
+	for _, triple := range []string{"windows-x64", "macos-x64", "wasm32-wasi", "wasm32-web"} {
+		t.Run(triple, func(t *testing.T) {
+			entry := validMemoryCapabilityTargetForTest(triple)
+			entry.MemoryRun = "yes"
+			entry.MemoryClaimLevel = "production/host_runtime"
+
+			err := validateMemoryCapabilityClaims(entry)
+			if err == nil || !strings.Contains(err.Error(), "target-host/runner evidence") {
+				t.Fatalf("expected target-host/runner evidence rejection, got %v", err)
+			}
+		})
+	}
+}
+
 func TestValidateMemoryCapabilityClaimsRejectsRawDiagnosticsWithoutEvidence(t *testing.T) {
 	entry := validMemoryCapabilityTargetForTest("linux-x86")
 	entry.MemoryRawDiagnostics = "yes"
@@ -232,6 +257,82 @@ func validMemoryCapabilityTargetForTest(triple string) targetReportEntry {
 			MemoryRegionLowering:     "partial",
 			MemoryAlignmentSemantics: "partial",
 			MemoryClaimLevel:         "build_lower_only",
+		}
+	case "windows-x64":
+		return targetReportEntry{
+			Triple:                   "windows-x64",
+			Status:                   "supported",
+			OS:                       "windows",
+			Arch:                     "x64",
+			ABI:                      "win64",
+			DataModel:                "llp64",
+			BuildOnly:                false,
+			RunMode:                  "host_native",
+			RunSupported:             false,
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "host-required",
+			MemoryRawDiagnostics:     "host-required",
+			MemoryRegionLowering:     "host-required",
+			MemoryAlignmentSemantics: "host-required",
+			MemoryClaimLevel:         "build_lower_only unless run",
+		}
+	case "macos-x64":
+		return targetReportEntry{
+			Triple:                   "macos-x64",
+			Status:                   "supported",
+			OS:                       "macos",
+			Arch:                     "x64",
+			ABI:                      "sysv",
+			DataModel:                "lp64",
+			BuildOnly:                false,
+			RunMode:                  "host_native",
+			RunSupported:             false,
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "host-required",
+			MemoryRawDiagnostics:     "host-required",
+			MemoryRegionLowering:     "host-required",
+			MemoryAlignmentSemantics: "host-required",
+			MemoryClaimLevel:         "build_lower_only unless run",
+		}
+	case "wasm32-wasi":
+		return targetReportEntry{
+			Triple:                   "wasm32-wasi",
+			Status:                   "supported",
+			OS:                       "wasi",
+			Arch:                     "wasm32",
+			ABI:                      "wasi",
+			DataModel:                "ilp32",
+			BuildOnly:                false,
+			RunMode:                  "wasi_runner",
+			RunSupported:             false,
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "runner-smoke if available",
+			MemoryRawDiagnostics:     "safe-only",
+			MemoryRegionLowering:     "limited",
+			MemoryAlignmentSemantics: "wasm rules",
+			MemoryClaimLevel:         "artifact/runtime tiered",
+		}
+	case "wasm32-web":
+		return targetReportEntry{
+			Triple:                   "wasm32-web",
+			Status:                   "supported",
+			OS:                       "web",
+			Arch:                     "wasm32",
+			ABI:                      "web",
+			DataModel:                "ilp32",
+			BuildOnly:                false,
+			RunMode:                  "web_runner",
+			RunSupported:             false,
+			MemoryBuild:              "yes",
+			MemoryLower:              "yes",
+			MemoryRun:                "browser-smoke if available",
+			MemoryRawDiagnostics:     "safe-only",
+			MemoryRegionLowering:     "limited",
+			MemoryAlignmentSemantics: "wasm rules",
+			MemoryClaimLevel:         "artifact/runtime tiered",
 		}
 	default:
 		panic("unsupported test target " + triple)

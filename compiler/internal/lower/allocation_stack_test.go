@@ -190,6 +190,54 @@ uses alloc, mem:
 	}
 }
 
+func TestLowerFunctionTempRegionCopyResetsBeforeBranchReturns(t *testing.T) {
+	prog := lowerFunctionTempRegionProgram(t, `
+func branchy(flag: Bool) -> Int
+uses alloc, mem:
+    let n: Int = 2
+    var xs: []u8 = make_u8(8)
+    xs[0] = 20
+    let copied: []u8 = xs.window(0, n).copy()
+    if flag:
+        return copied.len
+    return copied[0]
+
+func main() -> Int
+uses alloc, mem:
+    return branchy(true)
+`)
+	fn := findIRFunc(t, prog, "branchy")
+	if countInstrKind(fn, ir.IRRegionEnter) != 1 || countInstrKind(fn, ir.IRRegionMakeSliceU8) != 1 {
+		t.Fatalf("main missing function-temp region enter/make evidence: %#v", fn.Instrs)
+	}
+	assertRegionResetImmediatelyBeforeEveryReturn(t, fn)
+}
+
+func TestLowerFunctionTempRegionCopyResetsBeforeThrow(t *testing.T) {
+	prog := lowerFunctionTempRegionProgram(t, `
+enum E:
+    case bad
+
+func fail(flag: Bool) -> Int throws E
+uses alloc, mem:
+    let n: Int = 2
+    var xs: []u8 = make_u8(8)
+    xs[0] = 20
+    let copied: []u8 = xs.window(0, n).copy()
+    if flag:
+        throw E.bad
+    return copied.len
+
+func main() -> Int:
+    return 0
+`)
+	fn := findIRFunc(t, prog, "fail")
+	if countInstrKind(fn, ir.IRRegionEnter) != 1 || countInstrKind(fn, ir.IRRegionMakeSliceU8) != 1 {
+		t.Fatalf("fail missing function-temp region enter/make evidence: %#v", fn.Instrs)
+	}
+	assertRegionResetImmediatelyBeforeEveryReturn(t, fn)
+}
+
 func TestLowerExplicitIslandMakeSliceCarriesAllocationName(t *testing.T) {
 	prog := lowerStackAllocationProgram(t, `
 func main() -> Int
@@ -330,4 +378,24 @@ func firstInstrKind(fn ir.IRFunc, kind ir.IRInstrKind) int {
 		}
 	}
 	return -1
+}
+
+func assertRegionResetImmediatelyBeforeEveryReturn(t *testing.T, fn ir.IRFunc) {
+	t.Helper()
+	returns := 0
+	for i, instr := range fn.Instrs {
+		if instr.Kind != ir.IRReturn {
+			continue
+		}
+		returns++
+		if i == 0 || fn.Instrs[i-1].Kind != ir.IRRegionReset {
+			t.Fatalf("%s return at instruction %d is not immediately preceded by region reset: %#v", fn.Name, i, fn.Instrs)
+		}
+	}
+	if returns == 0 {
+		t.Fatalf("%s has no return instructions: %#v", fn.Name, fn.Instrs)
+	}
+	if got := countInstrKind(fn, ir.IRRegionReset); got != returns {
+		t.Fatalf("%s region reset count = %d, want one per return/throw exit (%d): %#v", fn.Name, got, returns, fn.Instrs)
+	}
 }

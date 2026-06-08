@@ -49,9 +49,12 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
 
 - Flow indentation syntax for the examples, standard library sources, runtime
   sources, and self-hosted runtime snippets covered by the release gate.
-- Local compiler and CLI workflows: `check`, `build`, `run`, `fmt`, `test`,
-  `doc`, `doctor`, `targets`, `features`, `formats`, `new`, `interface`,
-  `project`, `workspace`, `smoke`, `eco`, `clean`, `version`, and `lsp`.
+- Core user compiler workflow: `check` and `build`. `check` is the fast
+  no-artifact semantic pass; `build` uses the same language safety contract and
+  emits or links artifacts. Other commands are release-covered tooling around
+  that workflow, not optional safety levels: `run`, `fmt`, `test`, `doc`,
+  `doctor`, `targets`, `features`, `formats`, `new`, `interface`, `project`,
+  `workspace`, `smoke`, `eco`, `clean`, `version`, and `lsp`.
 - The current `lsp --stdio` surface is a minimal JSON-RPC `"2.0"` server for
   editor smoke coverage. It accepts request `id` values as JSON numbers or
   strings and echoes the same value and type in success or error responses.

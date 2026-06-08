@@ -95,43 +95,50 @@ type targetsReport struct {
 }
 
 type targetReportEntry struct {
-	Triple                  string   `json:"triple"`
-	Status                  string   `json:"status"`
-	OS                      string   `json:"os"`
-	Arch                    string   `json:"arch"`
-	ABI                     string   `json:"abi"`
-	DataModel               string   `json:"data_model"`
-	Format                  string   `json:"format"`
-	ExeExt                  string   `json:"exe_ext"`
-	BuildOnly               bool     `json:"build_only"`
-	RunMode                 string   `json:"run_mode"`
-	RunRunner               string   `json:"run_runner,omitempty"`
-	RunSupported            bool     `json:"run_supported"`
-	RunUnsupportedReason    string   `json:"run_unsupported_reason,omitempty"`
-	UIRuntimeContract       string   `json:"ui_runtime_contract,omitempty"`
-	UIRuntimeStatus         string   `json:"ui_runtime_status,omitempty"`
-	UIRuntimeEvidence       string   `json:"ui_runtime_evidence,omitempty"`
-	PointerWidthBits        int      `json:"pointer_width_bits"`
-	RegisterWidthBits       int      `json:"register_width_bits"`
-	NativeIntWidthBits      int      `json:"native_int_width_bits"`
-	Endian                  string   `json:"endian"`
-	StackAlignmentBytes     int      `json:"stack_alignment_bytes"`
-	MaxAtomicWidthBits      int      `json:"max_atomic_width_bits"`
-	AtomicWidthBits         []int    `json:"atomic_width_bits"`
-	AtomicPointerWidthBits  int      `json:"atomic_pointer_width_bits"`
-	UnsupportedReason       string   `json:"unsupported_reason,omitempty"`
-	RuntimeStatus           string   `json:"runtime_status,omitempty"`
-	StdlibStatus            string   `json:"stdlib_status,omitempty"`
-	FFIStatus               string   `json:"ffi_status,omitempty"`
-	RunnerProbeCommand      string   `json:"runner_probe_command,omitempty"`
-	ReleaseGate             string   `json:"release_gate,omitempty"`
-	EvidenceArtifacts       []string `json:"evidence_artifacts,omitempty"`
-	SyscallInstruction      string   `json:"syscall_instruction,omitempty"`
-	SyscallNumbering        string   `json:"syscall_numbering,omitempty"`
-	SyscallArgRegisters     []string `json:"syscall_arg_registers,omitempty"`
-	SyscallErrorRange       string   `json:"syscall_error_range,omitempty"`
-	SupportsDebugInfo       bool     `json:"supports_debug_info"`
-	SupportsReleaseOptimize bool     `json:"supports_release_optimize"`
+	Triple                   string   `json:"triple"`
+	Status                   string   `json:"status"`
+	OS                       string   `json:"os"`
+	Arch                     string   `json:"arch"`
+	ABI                      string   `json:"abi"`
+	DataModel                string   `json:"data_model"`
+	Format                   string   `json:"format"`
+	ExeExt                   string   `json:"exe_ext"`
+	BuildOnly                bool     `json:"build_only"`
+	RunMode                  string   `json:"run_mode"`
+	RunRunner                string   `json:"run_runner,omitempty"`
+	RunSupported             bool     `json:"run_supported"`
+	RunUnsupportedReason     string   `json:"run_unsupported_reason,omitempty"`
+	UIRuntimeContract        string   `json:"ui_runtime_contract,omitempty"`
+	UIRuntimeStatus          string   `json:"ui_runtime_status,omitempty"`
+	UIRuntimeEvidence        string   `json:"ui_runtime_evidence,omitempty"`
+	PointerWidthBits         int      `json:"pointer_width_bits"`
+	RegisterWidthBits        int      `json:"register_width_bits"`
+	NativeIntWidthBits       int      `json:"native_int_width_bits"`
+	Endian                   string   `json:"endian"`
+	StackAlignmentBytes      int      `json:"stack_alignment_bytes"`
+	MaxAtomicWidthBits       int      `json:"max_atomic_width_bits"`
+	AtomicWidthBits          []int    `json:"atomic_width_bits"`
+	AtomicPointerWidthBits   int      `json:"atomic_pointer_width_bits"`
+	UnsupportedReason        string   `json:"unsupported_reason,omitempty"`
+	RuntimeStatus            string   `json:"runtime_status,omitempty"`
+	StdlibStatus             string   `json:"stdlib_status,omitempty"`
+	FFIStatus                string   `json:"ffi_status,omitempty"`
+	MemoryBuild              string   `json:"memory_build"`
+	MemoryLower              string   `json:"memory_lower"`
+	MemoryRun                string   `json:"memory_run"`
+	MemoryRawDiagnostics     string   `json:"memory_raw_diagnostics"`
+	MemoryRegionLowering     string   `json:"memory_region_lowering"`
+	MemoryAlignmentSemantics string   `json:"memory_alignment_semantics"`
+	MemoryClaimLevel         string   `json:"memory_claim_level"`
+	RunnerProbeCommand       string   `json:"runner_probe_command,omitempty"`
+	ReleaseGate              string   `json:"release_gate,omitempty"`
+	EvidenceArtifacts        []string `json:"evidence_artifacts,omitempty"`
+	SyscallInstruction       string   `json:"syscall_instruction,omitempty"`
+	SyscallNumbering         string   `json:"syscall_numbering,omitempty"`
+	SyscallArgRegisters      []string `json:"syscall_arg_registers,omitempty"`
+	SyscallErrorRange        string   `json:"syscall_error_range,omitempty"`
+	SupportsDebugInfo        bool     `json:"supports_debug_info"`
+	SupportsReleaseOptimize  bool     `json:"supports_release_optimize"`
 }
 
 type testRunnerReport struct {
@@ -416,6 +423,7 @@ func validateLinuxTargetMetadata(entry targetReportEntry) []string {
 			maxAtomicBits: 64, atomicBits: []int{8, 16, 32, 64}, atomicPointerBits: 64,
 			debugInfo: true, releaseOptimize: true,
 		})
+		issues = append(issues, validateLinuxNativeMemoryCapabilityMetadata(entry)...)
 		issues = append(issues, validateLinuxNativePromotionMetadata(entry)...)
 		return append(issues, validateLinuxNativeSyscallMetadata(entry)...)
 	case "linux-x86":
@@ -425,6 +433,7 @@ func validateLinuxTargetMetadata(entry targetReportEntry) []string {
 			maxAtomicBits: 32, atomicBits: []int{8, 16, 32}, atomicPointerBits: 32,
 			debugInfo: false, releaseOptimize: false,
 		})
+		issues = append(issues, validateLinuxNativeMemoryCapabilityMetadata(entry)...)
 		issues = append(issues, validateLinuxNativePromotionMetadata(entry)...)
 		issues = append(issues, validateLinuxNativeSyscallMetadata(entry)...)
 		return append(issues, validateBuildOnlyLinuxReason(entry, "linux-x86")...)
@@ -435,12 +444,64 @@ func validateLinuxTargetMetadata(entry targetReportEntry) []string {
 			maxAtomicBits: 64, atomicBits: []int{8, 16, 32, 64}, atomicPointerBits: 32,
 			debugInfo: false, releaseOptimize: false,
 		})
+		issues = append(issues, validateLinuxNativeMemoryCapabilityMetadata(entry)...)
 		issues = append(issues, validateLinuxNativePromotionMetadata(entry)...)
 		issues = append(issues, validateLinuxNativeSyscallMetadata(entry)...)
 		return append(issues, validateBuildOnlyLinuxReason(entry, "linux-x32")...)
 	default:
 		return nil
 	}
+}
+
+type linuxNativeMemoryCapabilityExpectation struct {
+	build              string
+	lower              string
+	run                string
+	rawDiagnostics     string
+	regionLowering     string
+	alignmentSemantics string
+	claimLevel         string
+}
+
+func validateLinuxNativeMemoryCapabilityMetadata(entry targetReportEntry) []string {
+	want := map[string]linuxNativeMemoryCapabilityExpectation{
+		"linux-x64": {"yes", "yes", "yes", "yes", "yes/partial", "yes", "production/host_runtime"},
+		"linux-x86": {"yes", "yes", "no/host-dependent", "partial", "partial", "partial", "build_lower_only"},
+		"linux-x32": {"yes", "yes", "no/host-dependent", "partial", "partial", "special", "build_lower_only"},
+	}[entry.Triple]
+	var issues []string
+	if entry.BuildOnly && (entry.MemoryRun == "yes" || entry.MemoryClaimLevel == "production/host_runtime") {
+		issues = append(issues, fmt.Sprintf("%s runtime memory claim requires target runtime evidence, but target is build-only", entry.Triple))
+	}
+	if entry.Triple == "linux-x64" && (entry.MemoryRun == "yes" || entry.MemoryClaimLevel == "production/host_runtime") {
+		for _, artifact := range []string{"linux-x64-abi.json", "linux-x64-runner.json"} {
+			if !containsString(entry.EvidenceArtifacts, artifact) {
+				issues = append(issues, fmt.Sprintf("%s production runtime memory claim requires %s evidence", entry.Triple, artifact))
+			}
+		}
+	}
+	if entry.MemoryBuild != want.build {
+		issues = append(issues, fmt.Sprintf("%s memory_build = %q, want %q", entry.Triple, entry.MemoryBuild, want.build))
+	}
+	if entry.MemoryLower != want.lower {
+		issues = append(issues, fmt.Sprintf("%s memory_lower = %q, want %q", entry.Triple, entry.MemoryLower, want.lower))
+	}
+	if entry.MemoryRun != want.run {
+		issues = append(issues, fmt.Sprintf("%s memory_run = %q, want %q", entry.Triple, entry.MemoryRun, want.run))
+	}
+	if entry.MemoryRawDiagnostics != want.rawDiagnostics {
+		issues = append(issues, fmt.Sprintf("%s memory_raw_diagnostics = %q, want %q", entry.Triple, entry.MemoryRawDiagnostics, want.rawDiagnostics))
+	}
+	if entry.MemoryRegionLowering != want.regionLowering {
+		issues = append(issues, fmt.Sprintf("%s memory_region_lowering = %q, want %q", entry.Triple, entry.MemoryRegionLowering, want.regionLowering))
+	}
+	if entry.MemoryAlignmentSemantics != want.alignmentSemantics {
+		issues = append(issues, fmt.Sprintf("%s memory_alignment_semantics = %q, want %q", entry.Triple, entry.MemoryAlignmentSemantics, want.alignmentSemantics))
+	}
+	if entry.MemoryClaimLevel != want.claimLevel {
+		issues = append(issues, fmt.Sprintf("%s memory_claim_level = %q, want %q", entry.Triple, entry.MemoryClaimLevel, want.claimLevel))
+	}
+	return issues
 }
 
 func validateLinuxNativePromotionMetadata(entry targetReportEntry) []string {

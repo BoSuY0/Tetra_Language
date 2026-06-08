@@ -319,6 +319,102 @@ func TestVerifyMemoryProductionContractDocsRequiresMemoryCostModel(t *testing.T)
 	}
 }
 
+func TestVerifyMemoryProductionContractDocsRejectsFastestBenchmarkClaim(t *testing.T) {
+	dir := t.TempDir()
+	paths := memoryProductionContractDocPaths{
+		RuntimeABI:             filepath.Join(dir, "runtime_abi.md"),
+		Ownership:              filepath.Join(dir, "ownership_v1.md"),
+		Unsafe:                 filepath.Join(dir, "unsafe.md"),
+		Capabilities:           filepath.Join(dir, "capabilities.md"),
+		Stdlib:                 filepath.Join(dir, "stdlib.md"),
+		StdlibGuide:            filepath.Join(dir, "standard_library_guide.md"),
+		CoreMemory:             filepath.Join(dir, "memory.tetra"),
+		TargetCapabilityMatrix: filepath.Join(dir, "memory-target-capability-matrix.md"),
+		MemoryCostModel:        filepath.Join(dir, "memory_cost_model.md"),
+		MemoryFuzzOracle:       filepath.Join(dir, "memory-fuzz-oracle-v1.md"),
+		MemoryProductionFinal:  filepath.Join(dir, "memory-production-core-v1-final.md"),
+		MemoryProductionMap:    filepath.Join(dir, "memory-production-core-v1-artifact-map.md"),
+		MemoryProductionClaims: filepath.Join(dir, "memory-production-core-v1-nonclaims.md"),
+	}
+	for _, requirement := range memoryProductionContractRequirements(paths) {
+		body := strings.Join(requirement.Required, "\n")
+		if requirement.Path == paths.MemoryCostModel {
+			body += "\nTetra is the fastest language and this is an official benchmark result.\n"
+		}
+		if err := os.WriteFile(requirement.Path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err := verifyMemoryProductionContractDocs(paths)
+	if err == nil || !strings.Contains(err.Error(), "fastest language") || !strings.Contains(err.Error(), "official benchmark") {
+		t.Fatalf("expected fastest/official benchmark docs rejection, got %v", err)
+	}
+}
+
+func TestForbiddenPublicPerformanceClaimsAllowsWrappedNonClaimSentence(t *testing.T) {
+	cases := []string{
+		strings.Join([]string{
+			"The v1 generic collection surface does not claim a production",
+			"allocator-backed vector/map runtime, generic hashing/equality",
+			"protocols, resizing, collision handling, C++/Rust performance",
+			"parity, or an official benchmark result.",
+		}, "\n"),
+		"This does not promote a full source-level PostgreSQL driver API, measured speed comparison, official TechEmpower result, or P20 performance matrix.",
+		"It does not promote a production HTTP server, source-level cached-date API, cross-worker Date cache, `webrt.flush` scatter/gather integration, HTTP static-file sendfile path, zero-copy production file-serving, C++/Rust parity, P20 performance matrix, or official TechEmpower result.",
+		"The final audit must not use quick output as an official benchmark result or as target parity evidence.",
+		"It is not a runtime measurement, C++/Rust parity claim, or official benchmark result.",
+		"It is not a full source-level PostgreSQL driver API, external production database deployment, official TechEmpower result, production database benchmark, or measured speed comparison.",
+		"`MEM-FUZZ-012` makes no arbitrary unsafe safety claim, no full runtime/ABI/target parity proof, and no Memory 100% claim.",
+		`Memory evidence includes MemoryFactGraph evidence; no broad "Memory 100%" claim.`,
+		`<li>no broad memory-safety or <strong>"Memory 100%"</strong> claim;</li>`,
+	}
+
+	for _, text := range cases {
+		if claims := forbiddenPublicPerformanceClaims(text); len(claims) != 0 {
+			t.Fatalf("forbiddenPublicPerformanceClaims(%q) = %#v, want no claims", text, claims)
+		}
+	}
+}
+
+func TestForbiddenPublicPerformanceClaimsRejectsClaimAfterUnrelatedDoesNot(t *testing.T) {
+	text := strings.Join([]string{
+		"normal build does not run heavy validators at runtime",
+		"Tetra is the fastest language and this is an official benchmark result.",
+	}, "\n")
+
+	claims := forbiddenPublicPerformanceClaims(text)
+	if len(claims) == 0 || !strings.Contains(strings.Join(claims, ","), "fastest language") || !strings.Contains(strings.Join(claims, ","), "official benchmark") {
+		t.Fatalf("forbiddenPublicPerformanceClaims() = %#v, want fastest/official rejection", claims)
+	}
+}
+
+func TestForbiddenPublicPerformanceClaimsRejectsIslandKernelAndMemoryOverclaims(t *testing.T) {
+	text := strings.Join([]string{
+		"IslandKernel complete for production memory.",
+		"Tetra Memory 100% is now guaranteed.",
+		"The language is leak-free for all host tooling.",
+	}, "\n")
+
+	claims := strings.Join(forbiddenPublicPerformanceClaims(text), ",")
+	for _, want := range []string{"islandkernel complete", "memory 100%", "leak-free"} {
+		if !strings.Contains(claims, want) {
+			t.Fatalf("forbiddenPublicPerformanceClaims() = %q, missing %q", claims, want)
+		}
+	}
+}
+
+func TestForbiddenPublicPerformanceClaimsAllowsIslandKernelNonClaims(t *testing.T) {
+	text := strings.Join([]string{
+		"IslandKernel is not complete and remains model-only until validate-island-proof evidence exists.",
+		"This does not claim Memory 100%, leak-free host tooling, or arbitrary unsafe pointer safety.",
+	}, "\n")
+
+	if claims := forbiddenPublicPerformanceClaims(text); len(claims) != 0 {
+		t.Fatalf("forbiddenPublicPerformanceClaims() = %#v, want no claims", claims)
+	}
+}
+
 func TestVerifyMemoryProductionContractDocsRequiresMemoryFuzzOracle(t *testing.T) {
 	dir := t.TempDir()
 	paths := memoryProductionContractDocPaths{
@@ -571,6 +667,7 @@ func TestVerifyReleaseTruthDocsRejectsMisleadingCurrentReleaseLanguage(t *testin
 	body := strings.Join([]string{
 		"# Current Surface",
 		"",
+		"The current public profile is v0.3.0.",
 		"The current public baseline is v0.1.2.",
 		"The current release is v0.6.",
 		"Tetra is ready for v1.0.",
@@ -583,7 +680,32 @@ func TestVerifyReleaseTruthDocsRejectsMisleadingCurrentReleaseLanguage(t *testin
 	if err == nil {
 		t.Fatalf("expected misleading release language failure")
 	}
-	for _, want := range []string{"v0.1.2", "current.*v0.6", "ready for v1.0"} {
+	for _, want := range []string{"current.*v0.3", "v0.1.2", "current.*v0.6", "ready for v1.0"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected %q in error, got %v", want, err)
+		}
+	}
+}
+
+func TestVerifyReleaseTruthDocsRejectsPerformanceAndTargetParityClaims(t *testing.T) {
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "release_notes.md")
+	body := strings.Join([]string{
+		"# Release Notes",
+		"",
+		"Tetra is the fastest language in the official benchmark result.",
+		"The package also proves target parity for memory production.",
+		"The allocator has broad zero-cost performance across targets.",
+	}, "\n")
+	if err := os.WriteFile(doc, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := verifyReleaseTruthDocs([]string{doc})
+	if err == nil {
+		t.Fatalf("expected performance/target parity claim failure")
+	}
+	for _, want := range []string{"fastest language", "official benchmark", "target parity", "zero-cost performance"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("expected %q in error, got %v", want, err)
 		}

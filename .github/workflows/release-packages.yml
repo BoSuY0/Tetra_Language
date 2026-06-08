@@ -101,6 +101,13 @@ jobs:
           tar -xzf "$archive" -C "${{ steps.meta.outputs.out_dir }}/smoke"
           "${{ steps.meta.outputs.out_dir }}/smoke/tetra-${version}-linux-x64/bin/tetra" version
 
+      - name: Memory production release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64"
+          bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir "$report_dir"
+
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -111,6 +118,7 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/*.sha256
             ${{ steps.meta.outputs.out_dir }}/checksums.txt
             ${{ steps.meta.outputs.out_dir }}/tetra.rb
+            ${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64/**
 
       - name: Create or update GitHub Release
         shell: bash
@@ -135,6 +143,9 @@ jobs:
           \`\`\`
 
           This release publishes the current v0.4.0 local compiler/tooling profile. Linux x64 is the release binary baseline; other runtime target claims remain gated by project evidence.
+          Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `targets.json`, and `artifact-hashes.json` evidence.
+          Memory production evidence remains Linux-x64 scoped unless a target-specific runtime gate says otherwise.
+          No fastest-language, official benchmark, target parity, or broad zero-cost performance claim is made by these package notes.
           EOF
           if gh release view "$version" >/dev/null 2>&1; then
             gh release upload "$version" "$out_dir"/install.sh "$out_dir"/*.tar.gz "$out_dir"/*.sha256 "$out_dir"/checksums.txt "$out_dir"/tetra.rb --clobber

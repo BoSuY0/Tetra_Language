@@ -5,6 +5,10 @@ Status: user-facing quick reference. The normative command contract lives in
 
 Run commands from the repository root unless a project path is shown.
 
+The core user compiler workflow is intentionally small: use `check` for fast
+semantic feedback and `build` for artifacts. The other commands below are
+tooling around that workflow; they are not extra safety levels.
+
 ## Bootstrap And Version
 
 ```sh
@@ -20,11 +24,13 @@ bash scripts/dev/bootstrap.sh
 ```sh
 ./tetra check examples/flow_hello.tetra
 ./tetra build --target linux-x64 -o app examples/flow_hello.tetra
-./tetra run --target linux-x64 examples/flow_hello.tetra
 ```
 
-Use `check` for parser/semantic feedback, `build` for artifacts, and `run` for
-build plus host execution.
+Use `run` only when you want build plus host execution in one command:
+
+```sh
+./tetra run --target linux-x64 examples/flow_hello.tetra
+```
 
 ## Project Workflow
 
@@ -33,8 +39,6 @@ build plus host execution.
 ./tetra project sync --check DemoApp
 ./tetra check DemoApp
 ./tetra build DemoApp
-./tetra run DemoApp
-./tetra test DemoApp
 ```
 
 Project discovery prefers `Capsule.t4`. If no explicit input is given, the CLI

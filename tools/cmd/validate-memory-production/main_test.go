@@ -1,8 +1,12 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -144,6 +148,62 @@ func TestValidateMemoryProductionReportRejectsMissingFunctionTypedSliceAggregate
 	}
 }
 
+func TestValidateMemoryProductionReleaseManifestAcceptsFreshProvenance(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	if err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir); err != nil {
+		t.Fatalf("validateMemoryProductionReleaseManifest failed: %v", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsHashMismatchedArtifact(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	summaryPath := filepath.Join(reportDir, "memory-fuzz-tier1", "summary.json")
+	if err := os.WriteFile(summaryPath, []byte(`{"schema_version":"tetra.memory-fuzz-short.summary.v1","tier":1,"status":"tampered"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir)
+	if err == nil {
+		t.Fatalf("expected hash-mismatched release artifact to fail")
+	}
+	if !strings.Contains(err.Error(), "sha256 mismatch") || !strings.Contains(err.Error(), "memory-fuzz-tier1/summary.json") {
+		t.Fatalf("error = %v, want summary hash mismatch", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsMissingGeneratorCommand(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, func(manifest *memoryReleaseTestManifest) {
+		for i := range manifest.Artifacts {
+			if manifest.Artifacts[i].Kind == "memory_production_report" {
+				manifest.Artifacts[i].Command = ""
+			}
+		}
+	})
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir)
+	if err == nil {
+		t.Fatalf("expected missing generator command to fail")
+	}
+	if !strings.Contains(err.Error(), "memory_production_report command is required") {
+		t.Fatalf("error = %v, want generator command rejection", err)
+	}
+}
+
+func TestValidateMemoryProductionReleaseManifestRejectsMissingHashEntry(t *testing.T) {
+	reportDir, reportPath, manifestPath := writeMemoryProductionReleaseFixture(t, nil)
+	writeMemoryReleaseTestHashManifest(t, reportDir, []string{
+		"memory-production-linux-x64.json",
+		"memory-fuzz-tier1/memory-fuzz-oracle.json",
+		"memory-fuzz-tier1/summary.json",
+		"memory-release-manifest.json",
+	})
+	err := validateMemoryProductionReleaseManifest(reportPath, manifestPath, reportDir)
+	if err == nil {
+		t.Fatalf("expected missing hash manifest entry to fail")
+	}
+	if !strings.Contains(err.Error(), "missing hash manifest entry for targets.json") {
+		t.Fatalf("error = %v, want missing targets hash entry", err)
+	}
+}
+
 func validMemoryProductionReport() string {
 	return `{
   "schema": "tetra.memory.production.v1",
@@ -213,4 +273,153 @@ func validMemoryProductionReport() string {
     {"requirement":"release-gate entrypoint","artifact":"scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh","evidence":"entrypoint writes memory-production-linux-x64.json and runs memory-production-smoke plus validate-memory-production","result":"pass"}
   ]
 }`
+}
+
+type memoryReleaseTestManifest struct {
+	Schema       string                      `json:"schema"`
+	Target       string                      `json:"target"`
+	GitHead      string                      `json:"git_head"`
+	GeneratedAt  string                      `json:"generated_at"`
+	ReportDir    string                      `json:"report_dir"`
+	HashManifest string                      `json:"hash_manifest"`
+	Commands     []memoryReleaseTestCommand  `json:"commands"`
+	Artifacts    []memoryReleaseTestArtifact `json:"artifacts"`
+}
+
+type memoryReleaseTestCommand struct {
+	Name    string `json:"name"`
+	Command string `json:"command"`
+}
+
+type memoryReleaseTestArtifact struct {
+	Path    string `json:"path"`
+	Kind    string `json:"kind"`
+	Schema  string `json:"schema,omitempty"`
+	Target  string `json:"target"`
+	Command string `json:"command"`
+}
+
+type memoryReleaseTestHashManifest struct {
+	Schema    string                          `json:"schema"`
+	Root      string                          `json:"root"`
+	Artifacts []memoryReleaseTestHashArtifact `json:"artifacts"`
+}
+
+type memoryReleaseTestHashArtifact struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+	Schema string `json:"schema,omitempty"`
+}
+
+func writeMemoryProductionReleaseFixture(t *testing.T, mutate func(*memoryReleaseTestManifest)) (string, string, string) {
+	t.Helper()
+	reportDir := t.TempDir()
+	fuzzDir := filepath.Join(reportDir, "memory-fuzz-tier1")
+	if err := os.MkdirAll(fuzzDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	reportPath := filepath.Join(reportDir, "memory-production-linux-x64.json")
+	if err := os.WriteFile(reportPath, []byte(validMemoryProductionReport()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(reportDir, "targets.json"), []byte(`[
+  {"triple":"linux-x64","status":"supported","memory_claim_level":"production/host_runtime"}
+]`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fuzzDir, "memory-fuzz-oracle.json"), []byte(`{"schema_version":"tetra.memory-fuzz.oracle.v1","tier":1,"target":"linux-x64"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fuzzDir, "summary.json"), []byte(`{"schema_version":"tetra.memory-fuzz-short.summary.v1","tier":1,"status":"pass"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest := memoryReleaseTestManifest{
+		Schema:       "tetra.memory.release-manifest.v1",
+		Target:       "linux-x64",
+		GitHead:      "0123456789abcdef0123456789abcdef01234567",
+		GeneratedAt:  "2026-06-07T20:15:00Z",
+		ReportDir:    ".",
+		HashManifest: "artifact-hashes.json",
+		Commands: []memoryReleaseTestCommand{
+			{Name: "memory-production-smoke", Command: "go run ./tools/cmd/memory-production-smoke --report $report_path"},
+			{Name: "target-report", Command: "go run ./cli/cmd/tetra targets --format=json > $targets_path"},
+			{Name: "validate-targets", Command: "go run ./tools/cmd/validate-targets --report $targets_path"},
+			{Name: "memory-fuzz-short", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
+			{Name: "validate-memory-fuzz-oracle", Command: "go run ./tools/cmd/validate-memory-fuzz-oracle --report $memory_fuzz_dir/memory-fuzz-oracle.json --artifact-dir $memory_fuzz_dir"},
+			{Name: "artifact-hashes-write", Command: "go run ./tools/cmd/validate-artifact-hashes --write --root $report_dir --out $report_dir/artifact-hashes.json"},
+			{Name: "artifact-hashes-validate", Command: "go run ./tools/cmd/validate-artifact-hashes --manifest $report_dir/artifact-hashes.json"},
+		},
+		Artifacts: []memoryReleaseTestArtifact{
+			{Path: "memory-production-linux-x64.json", Kind: "memory_production_report", Schema: "tetra.memory.production.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-production-smoke --report $report_path"},
+			{Path: "targets.json", Kind: "target_report", Target: "linux-x64", Command: "go run ./cli/cmd/tetra targets --format=json > $targets_path"},
+			{Path: "memory-fuzz-tier1/memory-fuzz-oracle.json", Kind: "memory_fuzz_oracle_report", Schema: "tetra.memory-fuzz.oracle.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
+			{Path: "memory-fuzz-tier1/summary.json", Kind: "memory_fuzz_summary", Schema: "tetra.memory-fuzz-short.summary.v1", Target: "linux-x64", Command: "go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir $memory_fuzz_dir"},
+			{Path: "artifact-hashes.json", Kind: "artifact_hash_manifest", Schema: "tetra.release-artifact-hashes.v1alpha1", Target: "linux-x64", Command: "go run ./tools/cmd/validate-artifact-hashes --write --root $report_dir --out $report_dir/artifact-hashes.json"},
+		},
+	}
+	if mutate != nil {
+		mutate(&manifest)
+	}
+	manifestPath := filepath.Join(reportDir, "memory-release-manifest.json")
+	raw, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if err := os.WriteFile(manifestPath, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeMemoryReleaseTestHashManifest(t, reportDir, []string{
+		"memory-production-linux-x64.json",
+		"targets.json",
+		"memory-fuzz-tier1/memory-fuzz-oracle.json",
+		"memory-fuzz-tier1/summary.json",
+		"memory-release-manifest.json",
+	})
+	return reportDir, reportPath, manifestPath
+}
+
+func writeMemoryReleaseTestHashManifest(t *testing.T, root string, paths []string) {
+	t.Helper()
+	sort.Strings(paths)
+	manifest := memoryReleaseTestHashManifest{
+		Schema: "tetra.release-artifact-hashes.v1alpha1",
+		Root:   ".",
+	}
+	for _, rel := range paths {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(raw)
+		manifest.Artifacts = append(manifest.Artifacts, memoryReleaseTestHashArtifact{
+			Path:   rel,
+			SHA256: "sha256:" + hex.EncodeToString(sum[:]),
+			Size:   int64(len(raw)),
+			Schema: memoryReleaseTestJSONSchema(raw),
+		})
+	}
+	raw, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	if err := os.WriteFile(filepath.Join(root, "artifact-hashes.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func memoryReleaseTestJSONSchema(raw []byte) string {
+	var envelope struct {
+		Schema        string `json:"schema"`
+		SchemaVersion string `json:"schema_version"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return ""
+	}
+	if envelope.Schema != "" {
+		return envelope.Schema
+	}
+	return envelope.SchemaVersion
 }

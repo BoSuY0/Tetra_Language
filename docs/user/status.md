@@ -2,27 +2,29 @@
 
 Status: user-facing release status summary for the current branch.
 
-The current public profile is `v0.3.0`. Treat this page as a navigation layer;
+The current public profile is `v0.4.0`. Treat this page as a navigation layer;
 the release-truth documents remain `docs/spec/current_supported_surface.md` and
-`docs/spec/v0_3_scope.md`.
+`docs/spec/v0_4_scope.md`.
 
 ## Candidate Status
 
-The current branch has a packaged local `v0.3.0` candidate:
+The current branch carries `v0.4.0` release evidence:
 
-- `reports/release-v0.3.0-local-candidate/summary.md`
-- `reports/release-v0.3.0-local-candidate.tar.gz`
-- `reports/release-v0.3.0-local-candidate.tar.gz.sha256`
+- `reports/v0.4.0/features.json`
+- `reports/v0.4.0/targets.json`
+- `reports/v0.4.0/linux-host-smoke.json`
+- `reports/v0.4.0/release-gate-clean/summary.json`
 
-This candidate is verified for local Linux development and testing. For the
-current Linux-only objective, macOS and Windows runtime evidence are out of
-scope. It is still not a clean tag-ready release because the worktree is dirty
-and the cross-platform release gate remains intentionally blocked.
+The selected production objective is Linux x64. macOS, Windows, and WASM
+runtime claims remain bounded by the target evidence in
+`docs/spec/current_supported_surface.md`.
 
 ## Supported Today
 
-- Local compiler and CLI workflows: `check`, `build`, `run`, `fmt`, `test`,
-  `doc`, `doctor`, `targets`, `smoke`, `eco`, `clean`, and `version`.
+- Core user compiler workflow: `check` and `build`. Other commands remain
+  supported tooling around that workflow: `run`, `fmt`, `test`, `doc`,
+  `doctor`, `targets`, `features`, `formats`, `new`, `interface`, `project`,
+  `workspace`, `smoke`, `eco`, `clean`, `version`, and `lsp`.
 - Flow indentation syntax for release-covered examples, standard library,
   runtime sources, and self-host runtime snippets.
 - Native Linux build/run smoke plus macOS and Windows build-only cross-target
@@ -36,19 +38,19 @@ and the cross-platform release gate remains intentionally blocked.
 
 ## Preview Boundaries
 
-`docs/user/v0_3_preview.md` explains the promoted `v0.3.0` slices and the
-candidate areas that remain experimental, planned, or reporting-only.
+`docs/release-notes/v0_4_0.md` explains the selected `v0.4.0` production
+scope and the areas that remain excluded from current claims.
 
 ## Future Work
 
 `docs/spec/v1_scope.md` is the future major-release contract. It must not be
-read as current `v1.0.0` readiness while the branch remains on `v0.3.0`.
+read as current `v1.0.0` readiness while the branch remains on `v0.4.0`.
 
 ## Where To Go Next
 
 - Start here: `docs/user/getting_started.md`
 - Commands: `docs/user/cli_cheatsheet.md`
 - Current truth: `docs/spec/current_supported_surface.md`
-- v0.3 preview: `docs/user/v0_3_preview.md`
+- v0.4 release notes: `docs/release-notes/v0_4_0.md`
 - Examples: `docs/user/examples_index.md`
 - Troubleshooting: `docs/user/troubleshooting.md`

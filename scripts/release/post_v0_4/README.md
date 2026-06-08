@@ -37,5 +37,23 @@ the current source tree instead of a possibly stale local `./tetra` binary. Set
 default `GOCACHE` to repo-local `.cache/go-build-*` paths to avoid tmpfs-backed
 cache pressure during repeated ABI/validator runs.
 
+Release evidence directories must be fresh. Memory production gates refuse
+symlink, non-directory, or non-empty `--report-dir` values before running
+smokes, so stale JSON or hash manifests cannot be reused as same-run evidence.
+The Linux-x64 memory production gate also writes `targets.json` with
+`go run ./cli/cmd/tetra targets --format=json`, validates it with
+`go run ./tools/cmd/validate-targets --report`, and includes that target
+capability report in the same `artifact-hashes.json` manifest. It also writes
+a Tier 1 deterministic memory fuzz oracle bundle under `memory-fuzz-tier1/`
+with `go run ./tools/cmd/memory-fuzz-short --tier 1 --report-dir`, validates
+`memory-fuzz-oracle.json`, `summary.md`, `summary.json`, and command
+provenance with `go run ./tools/cmd/validate-memory-fuzz-oracle --artifact-dir`,
+and includes those fuzz artifacts in the same hash manifest. Tier 2 nightly
+seed triage and Tier 3 release-blocking focused fuzz remain scheduled/release
+policy boundaries, not exhaustive fuzz proof.
+Quick evidence is useful for local iteration only; it is not full,
+stabilization, nightly, or release proof unless the corresponding full gate and
+validators ran for that artifact set.
+
 Keep post-v0.4 production evidence behavior here. Do not add root-level
 compatibility wrappers under `scripts/`.
