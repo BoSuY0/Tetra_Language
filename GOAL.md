@@ -497,23 +497,22 @@ or blocked evidence, target scope, known non-goals, and goal usage after
   `GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-surface-p12-green go run -buildvcs=false ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json`,
   `git diff --check`, and `graphify update .` passed; Graphify rebuilt
   `22020` nodes and `68550` edges. Bridge: start `SURFPROD-P13`.
-- 2026-06-08: `SURFPROD-P13` final candidate evidence collected, but final
-  goal completion is blocked by one exact cleanliness check. Focused P13
-  failures were fixed without weakening validators: `compiler/formal_core_v1.go`
-  now models the P23 proof witness with `local:i` plus a typed `ProofTerm`,
+- 2026-06-08: `SURFPROD-P13` final candidate evidence is complete in the
+  scoped Surface v1 sense. Focused P13 failures were fixed without weakening
+  validators: `compiler/formal_core_v1.go` models the P23 proof witness with
+  `local:i` plus a typed `ProofTerm`,
   `reports/optimizer-core-coverage-v1/closure.md` provides the required P17.1
   closure artifact, and `scripts/release/surface/report-dir-guard.sh` has the
   portable strict shell header. Evidence passed:
   `go test -buildvcs=false ./compiler -run 'P23FormalCoreV1' -count=1`,
   `go test -buildvcs=false ./compiler/internal/opt -run TestOptimizerCoreCoverageDocsRecordP17Closure -count=1`,
   `go test -buildvcs=false ./tools/scriptstest -run TestShellScriptsUsePortableBashSafetyHeader -count=1`,
-  the fresh final Surface release/experimental/safe-view/API gates under
+  fresh final Surface release/experimental/safe-view/API gates under
   `reports/surface-ui-production-final/`, focused validator packages, broad
   `go test -buildvcs=false ./compiler/... ./cli/... ./tools/... -count=1`,
-  focused race regex, `bash scripts/ci/test.sh`, docs/manifest/hash validators,
-  `git diff --check`, manifest idempotence diff, and `graphify update .`
-  (`22080` nodes, `68654` edges). `reports/surface-ui-production-final/final-summary.md`
-  records artifacts, hashes, target scope, and non-goals. Blocker:
-  `git diff --exit-code -- docs/generated/manifest.json` is non-zero only for
-  the intended generated `core.island_reset` row; do not call `update_goal
-  complete` until this final exact check is resolved or explicitly accepted.
+  focused race regex with home-cache `GOTMPDIR`, `bash scripts/ci/test.sh`,
+  docs/manifest/hash validators, `git diff --check`, exact
+  `git diff --exit-code -- docs/generated/manifest.json`, and
+  `graphify update .`. `reports/surface-ui-production-final/final-summary.md`
+  records artifacts, hashes, target scope, and non-goals; supported targets
+  remain limited to `headless`, `linux-x64`, and `wasm32-web`.

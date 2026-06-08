@@ -73,21 +73,21 @@ goal-forge, goal-loop, and define-goal discipline.
 
 ## Latest Batch
 
-latest_completed: `SURFPROD-P12` docs/non-claims/user guide correction
-latest_attempted: `SURFPROD-P13` final production release candidate gate
+latest_completed: `SURFPROD-P13` final production release candidate gate
+latest_attempted: `SURFPROD-P13` same-commit closeout
 latest_evidence:
 fresh final Surface release, experimental regression, safe-view lifetime, and
 API stability gates under `reports/surface-ui-production-final/`;
-`GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-surface-prod-final go test -buildvcs=false ./compiler/... ./cli/... ./tools/... -count=1`;
-focused Surface/UI race gate;
-`GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-surface-prod-final bash scripts/ci/test.sh`;
+`GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-surface-prod-final2 go test -buildvcs=false ./compiler/... ./cli/... ./tools/... -count=1`;
+focused Surface/UI race gate with home-cache `GOTMPDIR`;
+`GOTELEMETRY=off GOCACHE=$(pwd)/.cache/go-build-surface-prod-final2 GOTMPDIR=${XDG_CACHE_HOME:-$HOME/.cache}/tetra-language/go-tmp-surface-prod-final2 bash scripts/ci/test.sh`;
 docs/manifest/hash validators;
 `git diff --check`;
-manifest idempotence diff;
+exact `git diff --exit-code -- docs/generated/manifest.json`;
 `graphify update .`.
-latest_caveat: exact `git diff --exit-code -- docs/generated/manifest.json`
-is non-zero because the tracked generated manifest changed with
-`core.island_reset`; final temp generation idempotence passed at
-`reports/surface-ui-production-final/generated-manifest-check/manifest.generated.json`.
-next_recommended: resolve or explicitly accept the generated-manifest
-cleanliness caveat; only then call `update_goal complete`.
+latest_caveat: none for scoped Surface v1; `/tmp` is still tmpfs-constrained,
+so broad Go evidence should keep using persistent `GOCACHE` and home-cache
+`GOTMPDIR`.
+completion_guard: after any tracker-only commit, rerun final same-commit report
+gates and cleanliness checks, write `reports/surface-ui-production-final/final-summary.md`,
+then call `update_goal complete` only when that fresh evidence is clean.

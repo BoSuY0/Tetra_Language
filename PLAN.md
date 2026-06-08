@@ -31,7 +31,7 @@ External plan: `/home/tetra/Downloads/surface-ui-production-implementation-plan.
 | `SURFPROD-P10` API stability/docs generation | done_narrow | API stability gate under `reports/surface-ui-production-p10/surface-api-stability-v1`; docs/manifest validators pass; manifest generation is idempotent and records `core.island_reset` |
 | `SURFPROD-P11` CI release-readiness integration | done_narrow | CI readiness and package publishing workflows run Surface gates without `continue-on-error`; package release uploads Surface reports before publish |
 | `SURFPROD-P12` docs/nonclaims/user guide correction | done_narrow | docs validator rejects Surface overclaims; user guide documents target scope, troubleshooting, starter-vs-release evidence, and release-supported examples |
-| `SURFPROD-P13` final production release candidate gate | blocked_on_manifest_cleanliness | release, experimental, safe-view, API, broad tests, race gate, CI, docs/manifest/hash validators, `git diff --check`, manifest idempotence, final summary, and Graphify update pass; exact `git diff --exit-code -- docs/generated/manifest.json` remains non-zero for the intended `core.island_reset` generated-manifest update |
+| `SURFPROD-P13` final production release candidate gate | done_final | release, experimental, safe-view, API, broad tests, race gate, CI, docs/manifest/hash validators, exact generated-manifest cleanliness, final summary, and Graphify update pass from a live repo |
 
 ## Current Iteration
 
@@ -103,17 +103,16 @@ External plan: `/home/tetra/Downloads/surface-ui-production-implementation-plan.
     wording, `surface_guide.md` documents display/browser blocked-report
     troubleshooting and starter-vs-release evidence, and examples index includes
     `surface_release_counter.tetra` with the release-supported examples.
-14. `SURFPROD-P13` final candidate evidence is collected but not fully
-    complete: focused P13 regressions for formal-core typed proof terms,
+14. `SURFPROD-P13` final candidate evidence is complete in the scoped Surface
+    v1 sense: focused P13 regressions for formal-core typed proof terms,
     optimizer closure artifact, and shell safety headers are fixed; final
     Surface release, experimental regression, safe-view lifetime, API
     stability, focused validator packages, broad compiler/cli/tools tests,
     focused race regex, CI script, docs/manifest/hash validators,
-    `git diff --check`, manifest idempotence, final summary, and Graphify
-    update all pass. The remaining blocker is the exact
-    `git diff --exit-code -- docs/generated/manifest.json` final check, which
-    is non-zero only because the tracked generated manifest intentionally adds
-    `core.island_reset`.
+    `git diff --check`, exact generated-manifest cleanliness check, final
+    summary, and Graphify update pass.
+    The generated-manifest cleanliness caveat was resolved by committing the
+    intended `core.island_reset` generated row and rerunning the exact check.
 
 ## Open Decisions
 
@@ -124,7 +123,6 @@ External plan: `/home/tetra/Downloads/surface-ui-production-implementation-plan.
   safe-view lifetime gate bounded and Surface-focused instead of coupling it to
   unrelated docs manifest verification. P10 closed the docs/manifest consistency
   gap with validator coverage and generated manifest idempotence evidence.
-- `SURFPROD-P13` cannot be marked complete without resolving how the generated
-  manifest cleanliness check should be handled in an uncommitted worktree. The
-  current manifest is generator-idempotent, but it differs from `HEAD` by the
-  planned `core.island_reset` row.
+- No open Surface v1 production-scope decision remains for P13. Broader
+  cross-platform UI parity, GPU/native widgets, DOM/React/user-JS app UI,
+  rich text, and full screen-reader/AT-SPI support remain post-v1 non-goals.

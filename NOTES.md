@@ -133,10 +133,9 @@
 - `SURFPROD-P13` collected final candidate evidence in the live repo: final
   Surface release, experimental regression, safe-view lifetime, API stability,
   broad tests, race Surface/UI selector, CI script, docs/manifest/hash
-  validators, `git diff --check`, manifest idempotence, and Graphify update all
-  pass. The remaining blocker is the exact
-  `git diff --exit-code -- docs/generated/manifest.json` check: the working
-  manifest intentionally includes generated `core.island_reset`, and a fresh
-  final generated copy matches it exactly. Without a commit or an explicit
-  acceptance of this generated-file cleanliness caveat, the goal should remain
-  active rather than complete.
+  validators, `git diff --check`, exact
+  `git diff --exit-code -- docs/generated/manifest.json`, and Graphify update
+  all pass. The generated-manifest caveat was resolved by committing the
+  intended `core.island_reset` generated row; final race/CI used a
+  home-cache `GOTMPDIR` because `/tmp` is tmpfs-constrained and a repo-local
+  `GOTMPDIR` makes `t.TempDir()` appear inside the git worktree.
