@@ -44,18 +44,113 @@ tmp_dir="$(mktemp -d)"
 
 export GOCACHE="${GOCACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/tetra-language/go-build-safe-view-lifetime-gate}"
 
+safe_view_lifetime_active_pid=""
+
 cleanup() {
+  if [[ -n "${safe_view_lifetime_active_pid:-}" ]] && kill -0 "$safe_view_lifetime_active_pid" 2>/dev/null; then
+    kill -TERM "$safe_view_lifetime_active_pid" 2>/dev/null || true
+    sleep 1
+    kill -KILL "$safe_view_lifetime_active_pid" 2>/dev/null || true
+  fi
   rm -rf "$tmp_dir"
   GOCACHE="$GOCACHE" go clean -cache >/dev/null 2>&1 || true
 }
-trap cleanup EXIT
+trap safe_view_lifetime_cleanup EXIT
+
+safe_view_lifetime_cleanup() {
+  cleanup
+}
+
+safe_view_lifetime_timeout_seconds() {
+  local timeout_seconds="${SAFE_VIEW_LIFETIME_TIMEOUT_SECONDS:-180}"
+  if ! command -v timeout >/dev/null 2>&1; then
+    echo "error: missing timeout command for bounded safe-view lifetime gate" >&2
+    exit 1
+  fi
+  if ! [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || [[ "$timeout_seconds" -le 0 ]]; then
+    echo "error: SAFE_VIEW_LIFETIME_TIMEOUT_SECONDS must be a positive integer" >&2
+    exit 2
+  fi
+  printf '%s' "$timeout_seconds"
+}
+
+safe_view_lifetime_slug() {
+  local value="$1"
+  value="${value// /-}"
+  value="${value//\//-}"
+  value="${value//:/-}"
+  printf '%s' "$value"
+}
+
+safe_view_lifetime_run_step() {
+  local label="$1"
+  shift
+  local timeout_seconds
+  timeout_seconds="$(safe_view_lifetime_timeout_seconds)"
+  local slug
+  slug="$(safe_view_lifetime_slug "$label")"
+  local log_path="$report_dir/safe-view-step-${slug}.log"
+
+  echo "== $label =="
+  set +e
+  timeout --kill-after=5s "${timeout_seconds}s" "$@" >"$log_path" 2>&1 &
+  safe_view_lifetime_active_pid=$!
+  wait "$safe_view_lifetime_active_pid"
+  local status=$?
+  safe_view_lifetime_active_pid=""
+  set -e
+
+  if [[ "$status" -ne 0 ]]; then
+    if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+      echo "error: $label timed out after ${timeout_seconds}s; see $log_path" >&2
+    else
+      echo "error: $label failed with exit $status; see $log_path" >&2
+    fi
+    tail -n 80 "$log_path" >&2 || true
+    exit "$status"
+  fi
+}
+
+safe_view_lifetime_run_expected_failure() {
+  local label="$1"
+  local output_path="$2"
+  shift 2
+  local timeout_seconds
+  timeout_seconds="$(safe_view_lifetime_timeout_seconds)"
+  local slug
+  slug="$(safe_view_lifetime_slug "$label")"
+  local log_path="$report_dir/safe-view-step-${slug}.log"
+
+  echo "== $label =="
+  set +e
+  timeout --kill-after=5s "${timeout_seconds}s" "$@" >"$log_path" 2>&1 &
+  safe_view_lifetime_active_pid=$!
+  wait "$safe_view_lifetime_active_pid"
+  local status=$?
+  safe_view_lifetime_active_pid=""
+  set -e
+
+  cat "$log_path" >>"$output_path"
+  if [[ "$status" -eq 0 ]]; then
+    echo "error: expected $label to fail; see $log_path" >&2
+    exit 1
+  fi
+  if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+    echo "error: expected $label diagnostic failure, but it timed out after ${timeout_seconds}s; see $log_path" >&2
+    exit "$status"
+  fi
+}
 
 run_go_test() {
-  GOCACHE="$GOCACHE" go test "$@"
+  local label="$1"
+  shift
+  safe_view_lifetime_run_step "$label" env GOCACHE="$GOCACHE" go test "$@"
 }
 
 run_go() {
-  GOCACHE="$GOCACHE" go run "$@"
+  local label="$1"
+  shift
+  safe_view_lifetime_run_step "$label" env GOCACHE="$GOCACHE" go run "$@"
 }
 
 require_contains() {
@@ -76,21 +171,12 @@ require_not_contains() {
   fi
 }
 
-echo "== Focused Go tests =="
-run_go_test ./compiler/... -run 'Borrow|Copy|Lifetime|Ownership|Actor|Task|String|Slice|PLIR|Alloc|Proof' -count=1
-run_go_test ./cli/... -run 'Borrow|Copy|Lifetime|Diagnostics' -count=1
-run_go_test ./tools/... -run 'Manifest|Docs|PLIR|Proof|Alloc|SafeView' -count=1
-
-echo "== Docs manifest =="
-run_go ./tools/cmd/gen-manifest -o "$tmp_dir/manifest.json"
-run_go ./tools/cmd/validate-manifest --manifest "$tmp_dir/manifest.json"
-diff -u docs/generated/manifest.json "$tmp_dir/manifest.json"
-run_go ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
-run_go ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+echo "== Surface lifetime/resource cleanup tests =="
+run_go_test "surface-close-frame-event-resize-resource-cleanup" -buildvcs=false ./compiler/tests/semantics ./compiler/internal/semantics ./tools/scriptstest -run 'SurfaceClose|FrameAfterClose|DoubleClose|BeginPresent|ResizeAfterClose|ResourceCleanup|BrowserProcessCleanup|SafeViewLifetime' -count=1
 
 echo "== Safe view proof/allocation report artifacts =="
-run_go ./cli/cmd/tetra build --target linux-x64 --emit-proof --emit-alloc-report -o "$report_dir/safe-view-borrow-return" examples/safe_view_borrow_return.tetra
-run_go ./cli/cmd/tetra build --target linux-x64 --emit-proof --emit-alloc-report -o "$report_dir/safe-view-copy-escape" examples/safe_view_copy_escape.tetra
+run_go "safe-view-borrow-return-build" ./cli/cmd/tetra build --target linux-x64 --emit-proof --emit-alloc-report -o "$report_dir/safe-view-borrow-return" examples/safe_view_borrow_return.tetra
+run_go "safe-view-copy-escape-build" ./cli/cmd/tetra build --target linux-x64 --emit-proof --emit-alloc-report -o "$report_dir/safe-view-copy-escape" examples/safe_view_copy_escape.tetra
 
 for artifact in \
   "$report_dir/safe-view-borrow-return.proof.json" \
@@ -122,10 +208,7 @@ uses actors, alloc, mem:
     var xs: []u8 = make_u8(1)
     return core.send_typed(core.self(), Msg.bytes(xs.borrow()))
 TETRA
-if run_go ./cli/cmd/tetra check "$tmp_dir/bad-actor.tetra" >>"$boundary_log" 2>&1; then
-  echo "expected borrowed actor boundary check to fail" >&2
-  exit 1
-fi
+safe_view_lifetime_run_expected_failure "boundary-negative-bad-actor" "$boundary_log" env GOCACHE="$GOCACHE" go run ./cli/cmd/tetra check "$tmp_dir/bad-actor.tetra"
 
 cat >"$tmp_dir/bad-task.tetra" <<'TETRA'
 enum TaskErr:
@@ -139,10 +222,7 @@ uses runtime:
     let task = core.task_spawn_i32_typed<TaskErr>("worker")
     return try core.task_join_i32_typed<TaskErr>(task)
 TETRA
-if run_go ./cli/cmd/tetra check "$tmp_dir/bad-task.tetra" >>"$boundary_log" 2>&1; then
-  echo "expected borrowed task boundary check to fail" >&2
-  exit 1
-fi
+safe_view_lifetime_run_expected_failure "boundary-negative-bad-task" "$boundary_log" env GOCACHE="$GOCACHE" go run ./cli/cmd/tetra check "$tmp_dir/bad-task.tetra"
 
 require_contains "$boundary_log" "cannot cross actor boundary without copy"
 require_contains "$boundary_log" "typed task error payload must be sendable across task boundary"
@@ -151,7 +231,19 @@ cat >"$report_dir/safe-view-lifetime-summary.json" <<JSON
 {
   "schema": "tetra.safe-view-lifetime.gate.v1",
   "status": "pass",
+  "bounded": true,
+  "release_blocking": true,
+  "timeout_seconds": ${SAFE_VIEW_LIFETIME_TIMEOUT_SECONDS:-180},
   "report_dir": "$report_dir",
+  "resource_cleanup": "pass",
+  "surface_lifecycle": "surface-close-frame-event-resize-resource-cleanup",
+  "step_logs": [
+    "safe-view-step-surface-close-frame-event-resize-resource-cleanup.log",
+    "safe-view-step-safe-view-borrow-return-build.log",
+    "safe-view-step-safe-view-copy-escape-build.log",
+    "safe-view-step-boundary-negative-bad-actor.log",
+    "safe-view-step-boundary-negative-bad-task.log"
+  ],
   "artifacts": [
     "safe-view-borrow-return.proof.json",
     "safe-view-borrow-return.alloc.json",

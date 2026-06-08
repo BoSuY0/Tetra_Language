@@ -42,7 +42,10 @@ func TestSurfaceReleaseNegativeFixturesRejectFakeClaims(t *testing.T) {
 		"platform_claim_without_probe.json",
 		"release_report_experimental_true.json",
 		"release_report_production_false.json",
+		"release_summary_missing_command_line.json",
+		"release_summary_missing_producer.json",
 		"release_summary_missing_unsupported_targets.json",
+		"release_summary_stale_git_head.json",
 		"screen_reader_claim_without_artifact.json",
 		"stale_artifact_hash.json",
 		"text_input_missing_composition_trace.json",
@@ -132,6 +135,18 @@ func TestSurfaceReleaseRejectsLegacySidecars(t *testing.T) {
 	requireReleaseNegativeFixture(t, "legacy_sidecars.json")
 }
 
+func TestSurfaceReleaseRejectsCopiedMissingProducerMetadata(t *testing.T) {
+	requireReleaseNegativeFixture(t, "release_summary_missing_producer.json")
+}
+
+func TestSurfaceReleaseRejectsStaleGitHead(t *testing.T) {
+	requireReleaseNegativeFixture(t, "release_summary_stale_git_head.json")
+}
+
+func TestSurfaceReleaseRejectsMissingCommandLine(t *testing.T) {
+	requireReleaseNegativeFixture(t, "release_summary_missing_command_line.json")
+}
+
 func requireReleaseNegativeFixture(t *testing.T, name string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "release_negative", name))
@@ -201,6 +216,12 @@ func mutateReleaseSummaryFixture(t *testing.T, mutation string) []byte {
 		report["production_claim"] = false
 	case "stale_artifact_hash":
 		report["artifact_hashes_validated"] = false
+	case "missing_producer":
+		delete(report, "producer")
+	case "stale_git_head":
+		report["git_head"] = "unknown"
+	case "missing_command_line":
+		delete(report, "command_line")
 	default:
 		t.Fatalf("unknown release summary mutation %q", mutation)
 	}

@@ -829,6 +829,54 @@ func TestVerifySurfaceReleaseDocsRequireUnsupportedTargetsAndReleaseGate(t *test
 	}
 }
 
+func TestSurfaceDocsOverclaimRejectsTmpEvidenceAsCurrentProof(t *testing.T) {
+	doc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Metadata-only accessibility is not production accessibility. DOM UI and user JavaScript app logic are outside the Surface model.\n\nbash scripts/release/surface/release-gate.sh --report-dir /tmp/tetra-surface-release-v1-current\n")
+	err := verifySurfaceReleaseDocs([]string{doc})
+	if err == nil {
+		t.Fatalf("expected Surface release docs to reject /tmp current evidence")
+	}
+	if !strings.Contains(err.Error(), "/tmp") {
+		t.Fatalf("error = %v, want /tmp rejection", err)
+	}
+}
+
+func TestSurfaceOverclaimRejectsGPUAndNativeWidgets(t *testing.T) {
+	doc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets. Metadata-only accessibility is not production accessibility. DOM UI and user JavaScript app logic are outside the Surface model.\n\nGPU rendering is production-supported for Surface v1. Platform-native widgets are release-ready.\n\nbash scripts/release/surface/release-gate.sh\n")
+	err := verifySurfaceReleaseDocs([]string{doc})
+	if err == nil {
+		t.Fatalf("expected Surface docs to reject GPU/native-widget overclaims")
+	}
+	for _, want := range []string{"GPU", "native widget"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected %q in error, got %v", want, err)
+		}
+	}
+}
+
+func TestUnsupportedSurfaceTargetsRejectsCrossPlatformProductionClaim(t *testing.T) {
+	doc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets.\n\nSurface is a production cross-platform UI runtime across macOS, Windows, linux, and wasm32-wasi.\n\nbash scripts/release/surface/release-gate.sh\n")
+	err := verifySurfaceReleaseDocs([]string{doc})
+	if err == nil {
+		t.Fatalf("expected Surface docs to reject cross-platform production overclaim")
+	}
+	if !strings.Contains(err.Error(), "cross-platform") {
+		t.Fatalf("expected cross-platform in error, got %v", err)
+	}
+}
+
+func TestSurfaceOverclaimRejectsRichTextScreenReaderDOMReactUserJS(t *testing.T) {
+	doc := writeSurfaceReleaseDoc(t, "Surface v1 scope is linux-x64 real-window and wasm32-web browser-canvas. macOS Surface, Windows Surface, and wasm32-wasi Surface UI are unsupported targets.\n\nRich text editing is production-supported. Full screen-reader support is release-ready. DOM UI is production-supported. React apps are current Surface apps. User JS app logic is allowed in Surface apps.\n\nbash scripts/release/surface/release-gate.sh\n")
+	err := verifySurfaceReleaseDocs([]string{doc})
+	if err == nil {
+		t.Fatalf("expected Surface docs to reject rich-text/screen-reader/DOM/React/user-JS overclaims")
+	}
+	for _, want := range []string{"rich text", "screen-reader", "DOM UI", "React", "user JS"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected %q in error, got %v", want, err)
+		}
+	}
+}
+
 func writeSurfaceReleaseDoc(t *testing.T, body string) string {
 	t.Helper()
 	doc := filepath.Join(t.TempDir(), "surface_v1.md")

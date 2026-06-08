@@ -18,6 +18,7 @@ for island IR paths rather than native island runtime semantics).
 | --- | --- | --- | --- |
 | `core.alloc_bytes` | always | `alloc`, `mem` | none |
 | `core.island_new` | always | `alloc`, `islands`, `mem` | none |
+| `core.island_reset` | always | `islands`, `mem` | island handle |
 | `core.island_make_u8` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |
 | `core.island_make_u16` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |
 | `core.island_make_i32` | conditional when the island is not a tracked scoped island | `alloc`, `islands`, `mem` | none |

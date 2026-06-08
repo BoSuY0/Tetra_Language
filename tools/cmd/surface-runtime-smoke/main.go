@@ -10,8 +10,7 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"net"
-	"net/http"
+	neturl "net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1186,6 +1185,9 @@ func collectWASM32WebBrowserCanvasProcessEvidence(sourcePath string, artifactDir
 		if !browserTraceHasNativeEvents(browserTrace, []string{"pointerup", "keydown", "resize", "beforeinput"}) {
 			return surfaceProcessEvidence{}, fmt.Errorf("wasm32-web release accessibility trace missing required native browser input events: %#v", browserTrace.BrowserEvents)
 		}
+		if err := validateBrowserAccessibilityTraceEvidence(browserTrace); err != nil {
+			return surfaceProcessEvidence{}, err
+		}
 		sidecarScan, err := scanLegacyUISidecarArtifacts(artifactDir, sidecarScanOptions{AllowCompilerOwnedWASMLoader: true})
 		if err != nil {
 			return surfaceProcessEvidence{}, err
@@ -1270,6 +1272,13 @@ func validateBrowserReleaseTraceEvidence(trace browserCanvasTrace) error {
 		!trace.BrowserComposition.Cancel {
 		return fmt.Errorf("wasm32-web release browser trace missing composition evidence: %#v", trace.BrowserComposition)
 	}
+	if err := validateBrowserAccessibilityTraceEvidence(trace); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateBrowserAccessibilityTraceEvidence(trace browserCanvasTrace) error {
 	if !trace.BrowserAccessibility.Snapshot ||
 		!trace.BrowserAccessibility.Mirror ||
 		!trace.BrowserAccessibility.CompilerOwned ||
@@ -1317,43 +1326,14 @@ func runBrowserCanvasTrace(root string, browserPath string, wasmPath string, sce
 	if err != nil {
 		return browserCanvasTrace{}, "", -1, fmt.Errorf("read browser canvas Surface host %s: %w", hostPath, err)
 	}
-	wasmBytes, err := os.ReadFile(wasmPath)
-	if err != nil {
-		return browserCanvasTrace{}, "", -1, fmt.Errorf("read browser canvas Surface wasm %s: %w", wasmPath, err)
+	if _, err := os.Stat(wasmPath); err != nil {
+		return browserCanvasTrace{}, "", -1, fmt.Errorf("stat browser canvas Surface wasm %s: %w", wasmPath, err)
 	}
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	runnerURL, cleanupRunner, err := browserCanvasRunnerFileURL(wasmPath, string(hostSource), scenarioName)
 	if err != nil {
-		return browserCanvasTrace{}, "", -1, fmt.Errorf("listen for browser canvas Surface runner: %w", err)
+		return browserCanvasTrace{}, "", -1, err
 	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/surface-browser-canvas-runner", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = io.WriteString(w, browserCanvasRunnerHTML(scenarioName))
-	})
-	mux.HandleFunc("/surface_browser_canvas_host.mjs", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-		_, _ = w.Write(hostSource)
-	})
-	mux.HandleFunc("/app.wasm", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/wasm")
-		_, _ = w.Write(wasmBytes)
-	})
-	server := &http.Server{Handler: mux}
-	serverErr := make(chan error, 1)
-	go func() {
-		err := server.Serve(listener)
-		if err == http.ErrServerClosed {
-			err = nil
-		}
-		serverErr <- err
-	}()
-	defer func() {
-		_ = server.Close()
-		<-serverErr
-	}()
-
-	url := fmt.Sprintf("http://%s/surface-browser-canvas-runner?scenario=%s", listener.Addr().String(), scenarioName)
+	defer cleanupRunner()
 	args := []string{
 		"--headless",
 		"--no-sandbox",
@@ -1361,11 +1341,14 @@ func runBrowserCanvasTrace(root string, browserPath string, wasmPath string, sce
 		"--disable-dev-shm-usage",
 		"--disable-crash-reporter",
 		"--disable-breakpad",
+		"--allow-file-access-from-files",
 		"--virtual-time-budget=12000",
 		"--dump-dom",
-		url,
+		runnerURL,
 	}
-	processPath := browserPath + " " + strings.Join(args, " ")
+	processArgs := append([]string{}, args[:len(args)-1]...)
+	processArgs = append(processArgs, fmt.Sprintf("<surface-browser-canvas-file-runner scenario=%s>", scenarioName))
+	processPath := browserPath + " " + strings.Join(processArgs, " ")
 	var lastTraceErr error
 	for attempt := 1; attempt <= 3; attempt++ {
 		cmd := exec.Command(browserPath, args...)
@@ -1397,33 +1380,99 @@ func runBrowserCanvasTrace(root string, browserPath string, wasmPath string, sce
 	return browserCanvasTrace{}, processPath, -1, fmt.Errorf("browser canvas Surface trace was not populated after retries: %w", lastTraceErr)
 }
 
-func browserCanvasRunnerHTML(scenarioName string) string {
+func browserCanvasRunnerDataURL(hostSource string, wasmBytes []byte, scenarioName string) (string, error) {
+	inlineHost, err := inlineBrowserCanvasHostSource(hostSource)
+	if err != nil {
+		return "", err
+	}
+	wasmURL := "data:application/wasm;base64," + base64.StdEncoding.EncodeToString(wasmBytes)
+	html := browserCanvasRunnerHTML(inlineHost, wasmURL, scenarioName)
+	return "data:text/html;base64," + base64.StdEncoding.EncodeToString([]byte(html)), nil
+}
+
+func browserCanvasRunnerFileURL(wasmPath string, hostSource string, scenarioName string) (string, func(), error) {
+	inlineHost, err := inlineBrowserCanvasHostSource(hostSource)
+	if err != nil {
+		return "", nil, err
+	}
+	absWASM, err := filepath.Abs(wasmPath)
+	if err != nil {
+		return "", nil, fmt.Errorf("resolve browser canvas wasm path %s: %w", wasmPath, err)
+	}
+	runnerDir := filepath.Dir(absWASM)
+	if strings.HasSuffix(filepath.Base(runnerDir), "-artifacts") {
+		runnerDir = filepath.Dir(runnerDir)
+	}
+	if err := os.MkdirAll(runnerDir, 0o755); err != nil {
+		return "", nil, fmt.Errorf("create browser canvas runner dir %s: %w", runnerDir, err)
+	}
+	runnerPath := filepath.Join(runnerDir, "surface-browser-canvas-runner-"+safeBrowserCanvasScenarioName(scenarioName)+".html")
+	html := browserCanvasRunnerHTML(inlineHost, fileURL(absWASM), scenarioName)
+	if err := os.WriteFile(runnerPath, []byte(html), 0o644); err != nil {
+		return "", nil, fmt.Errorf("write browser canvas runner %s: %w", runnerPath, err)
+	}
+	cleanup := func() {
+		_ = os.Remove(runnerPath)
+	}
+	return fileURL(runnerPath), cleanup, nil
+}
+
+func inlineBrowserCanvasHostSource(hostSource string) (string, error) {
+	inlineHost := strings.Replace(hostSource, "export async function runSurfaceBrowserCanvas", "async function runSurfaceBrowserCanvas", 1)
+	if inlineHost == hostSource {
+		return "", fmt.Errorf("browser canvas Surface host missing runSurfaceBrowserCanvas export")
+	}
+	return inlineHost, nil
+}
+
+func safeBrowserCanvasScenarioName(scenarioName string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(strings.TrimSpace(scenarioName)) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('-')
+		}
+	}
+	if b.Len() == 0 {
+		return "default"
+	}
+	return b.String()
+}
+
+func fileURL(path string) string {
+	return (&neturl.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+}
+
+func browserCanvasRunnerHTML(inlineHost string, wasmURL string, scenarioName string) string {
 	return fmt.Sprintf(`<!doctype html>
 <html>
   <head><style>html,body{margin:0}canvas{display:block}</style></head>
   <body>
     <canvas id="surface-canvas" width="320" height="200"></canvas>
     <pre id="surface-trace">pending</pre>
-    <script type="module">
-      import { runSurfaceBrowserCanvas } from './surface_browser_canvas_host.mjs';
+    <script>
+%s
       const target = document.getElementById('surface-trace');
-      try {
-        const trace = await runSurfaceBrowserCanvas({
-          wasmURL: new URL('./app.wasm', import.meta.url),
-          canvas: document.getElementById('surface-canvas'),
-          scenario: %q,
-        });
-        target.textContent = JSON.stringify(trace);
-      } catch (err) {
-        target.textContent = JSON.stringify({
-          schema: 'tetra.surface.browser-canvas-trace.v1',
-          error: String(err && err.stack ? err.stack : err),
-        });
-      }
+      (async () => {
+        try {
+          const trace = await runSurfaceBrowserCanvas({
+            wasmURL: %q,
+            canvas: document.getElementById('surface-canvas'),
+            scenario: %q,
+          });
+          target.textContent = JSON.stringify(trace);
+        } catch (err) {
+          target.textContent = JSON.stringify({
+            schema: 'tetra.surface.browser-canvas-trace.v1',
+            error: String(err && err.stack ? err.stack : err),
+          });
+        }
+      })();
     </script>
   </body>
 </html>
-`, scenarioName)
+`, inlineHost, wasmURL, scenarioName)
 }
 
 func extractBrowserCanvasTrace(dom string) (string, error) {
@@ -5800,7 +5849,16 @@ func hostEvidenceForMode(mode string) surface.HostEvidenceReport {
 			Composition:         true,
 			AccessibilityBridge: true,
 		}
-	case "linux-x64-real-window", "linux-x64-real-window-text-focus-input", "linux-x64-release-text-input", "linux-x64-release-toolkit", "linux-x64-release-accessibility", "linux-x64-real-window-component-tree", "linux-x64-real-window-component-tree-api", "linux-x64-real-window-minimal-toolkit", "linux-x64-real-window-toolkit-reuse", "linux-x64-real-window-accessibility-metadata":
+	case "linux-x64-release-accessibility":
+		return surface.HostEvidenceReport{
+			Level:               "linux-x64-real-window",
+			Backend:             "wayland-shm-rgba",
+			Framebuffer:         true,
+			RealWindow:          true,
+			NativeInput:         true,
+			AccessibilityBridge: true,
+		}
+	case "linux-x64-real-window", "linux-x64-real-window-text-focus-input", "linux-x64-release-text-input", "linux-x64-release-toolkit", "linux-x64-real-window-component-tree", "linux-x64-real-window-component-tree-api", "linux-x64-real-window-minimal-toolkit", "linux-x64-real-window-toolkit-reuse", "linux-x64-real-window-accessibility-metadata":
 		return surface.HostEvidenceReport{
 			Level:       "linux-x64-real-window",
 			Backend:     "wayland-shm-rgba",
@@ -5828,7 +5886,18 @@ func hostEvidenceForMode(mode string) surface.HostEvidenceReport {
 			BrowserAccessibilitySnapshot: true,
 			BrowserAccessibilityMirror:   true,
 		}
-	case "wasm32-web-browser-canvas", "wasm32-web-browser-canvas-text-focus-input", "wasm32-web-release-text-input", "wasm32-web-release-toolkit", "wasm32-web-release-accessibility", "wasm32-web-browser-canvas-component-tree", "wasm32-web-browser-canvas-component-tree-api", "wasm32-web-browser-canvas-minimal-toolkit", "wasm32-web-browser-canvas-toolkit-reuse", "wasm32-web-browser-canvas-accessibility-metadata":
+	case "wasm32-web-release-accessibility":
+		return surface.HostEvidenceReport{
+			Level:                        "wasm32-web-browser-canvas-input",
+			Backend:                      "browser-canvas-rgba",
+			Framebuffer:                  true,
+			NativeInput:                  true,
+			BrowserCanvas:                true,
+			BrowserInput:                 true,
+			BrowserAccessibilitySnapshot: true,
+			BrowserAccessibilityMirror:   true,
+		}
+	case "wasm32-web-browser-canvas", "wasm32-web-browser-canvas-text-focus-input", "wasm32-web-release-text-input", "wasm32-web-release-toolkit", "wasm32-web-browser-canvas-component-tree", "wasm32-web-browser-canvas-component-tree-api", "wasm32-web-browser-canvas-minimal-toolkit", "wasm32-web-browser-canvas-toolkit-reuse", "wasm32-web-browser-canvas-accessibility-metadata":
 		return surface.HostEvidenceReport{
 			Level:       "wasm32-web-browser-canvas-input",
 			Backend:     "browser-canvas-rgba",

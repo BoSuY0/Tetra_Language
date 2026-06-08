@@ -17,7 +17,7 @@ import (
 
 func main() {
 	reportPath := flag.String("report", "", "path to tetra.surface.runtime.v1 or Surface release JSON report")
-	release := flag.String("release", "", "optional strict release validation mode, currently surface-v1")
+	release := flag.String("release", "", "optional strict release validation mode")
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -43,7 +43,12 @@ func validateSurfaceRuntimeReportWithOptions(path string, opt surfaceRuntimeVali
 		return err
 	}
 	release := strings.TrimSpace(opt.Release)
-	if release != "" && release != "surface-v1" {
+	if release != "" &&
+		release != "surface-v1" &&
+		release != "headless" &&
+		release != "linux-x64-real-window" &&
+		release != "wasm32-web-browser" &&
+		release != "text-input" {
 		return fmt.Errorf("unsupported release %q", release)
 	}
 	schema, err := surfaceReportSchema(raw)
@@ -66,6 +71,18 @@ func validateSurfaceRuntimeReportWithOptions(path string, opt surfaceRuntimeVali
 	}
 	if release == "surface-v1" {
 		return validateSurfaceV1ReleaseEnvelope(schema, raw)
+	}
+	if release == "headless" {
+		return validateHeadlessReleaseEnvelope(schema, raw)
+	}
+	if release == "linux-x64-real-window" {
+		return validateLinuxX64RealWindowReleaseEnvelope(schema, raw)
+	}
+	if release == "wasm32-web-browser" {
+		return validateWASM32WebBrowserReleaseEnvelope(schema, raw)
+	}
+	if release == "text-input" {
+		return validateTextInputReleaseEnvelope(schema, raw)
 	}
 	return nil
 }
@@ -128,6 +145,188 @@ func validateSurfaceV1ReleaseEnvelope(schema string, raw []byte) error {
 	default:
 		return fmt.Errorf("release surface-v1 does not accept schema %q", schema)
 	}
+}
+
+func validateHeadlessReleaseEnvelope(schema string, raw []byte) error {
+	if schema != surface.SchemaV1 {
+		return fmt.Errorf("release headless schema is %q, want %q", schema, surface.SchemaV1)
+	}
+	var report surface.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return err
+	}
+	var issues []string
+	if report.Target != "headless" {
+		issues = append(issues, fmt.Sprintf("release headless target is %q, want headless", report.Target))
+	}
+	if report.Runtime != "surface-headless" {
+		issues = append(issues, fmt.Sprintf("release headless runtime is %q, want surface-headless", report.Runtime))
+	}
+	if report.HostEvidence.Level != "deterministic-headless" {
+		issues = append(issues, fmt.Sprintf("release headless host_evidence.level is %q, want deterministic-headless", report.HostEvidence.Level))
+	}
+	if report.HostEvidence.Backend != "software-rgba" {
+		issues = append(issues, fmt.Sprintf("release headless host_evidence.backend is %q, want software-rgba", report.HostEvidence.Backend))
+	}
+	if !report.HostEvidence.Framebuffer {
+		issues = append(issues, "release headless host_evidence.framebuffer must be true")
+	}
+	if report.HostEvidence.RealWindow || report.HostEvidence.NativeInput || report.HostEvidence.UserFacingPlatformWidgets {
+		issues = append(issues, "release headless must not claim real window, native input, or platform widgets")
+	}
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateLinuxX64RealWindowReleaseEnvelope(schema string, raw []byte) error {
+	if schema != surface.SchemaV1 {
+		return fmt.Errorf("release linux-x64-real-window schema is %q, want %q", schema, surface.SchemaV1)
+	}
+	var report surface.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return err
+	}
+	var issues []string
+	if report.Target != "linux-x64" {
+		issues = append(issues, fmt.Sprintf("release linux-x64-real-window target is %q, want linux-x64", report.Target))
+	}
+	if report.Runtime != "surface-linux-x64" {
+		issues = append(issues, fmt.Sprintf("release linux-x64-real-window runtime is %q, want surface-linux-x64", report.Runtime))
+	}
+	if report.HostEvidence.Level != "linux-x64-release-window-v1" {
+		issues = append(issues, fmt.Sprintf("release linux-x64-real-window host_evidence.level is %q, want linux-x64-release-window-v1", report.HostEvidence.Level))
+	}
+	if report.HostEvidence.Backend != "wayland-shm-rgba-release-v1" {
+		issues = append(issues, fmt.Sprintf("release linux-x64-real-window host_evidence.backend is %q, want wayland-shm-rgba-release-v1", report.HostEvidence.Backend))
+	}
+	for _, check := range []struct {
+		name string
+		ok   bool
+	}{
+		{name: "framebuffer", ok: report.HostEvidence.Framebuffer},
+		{name: "real_window", ok: report.HostEvidence.RealWindow},
+		{name: "native_input", ok: report.HostEvidence.NativeInput},
+		{name: "text_input", ok: report.HostEvidence.TextInput},
+		{name: "clipboard", ok: report.HostEvidence.Clipboard},
+		{name: "composition", ok: report.HostEvidence.Composition},
+		{name: "accessibility_bridge", ok: report.HostEvidence.AccessibilityBridge},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("release linux-x64-real-window host_evidence.%s must be true", check.name))
+		}
+	}
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateWASM32WebBrowserReleaseEnvelope(schema string, raw []byte) error {
+	if schema != surface.SchemaV1 {
+		return fmt.Errorf("release wasm32-web-browser schema is %q, want %q", schema, surface.SchemaV1)
+	}
+	var report surface.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return err
+	}
+	var issues []string
+	if report.Target != "wasm32-web" {
+		issues = append(issues, fmt.Sprintf("release wasm32-web-browser target is %q, want wasm32-web", report.Target))
+	}
+	if report.Runtime != "surface-wasm32-web" {
+		issues = append(issues, fmt.Sprintf("release wasm32-web-browser runtime is %q, want surface-wasm32-web", report.Runtime))
+	}
+	if !isSurfaceReleaseFormSource(report.Source) {
+		issues = append(issues, fmt.Sprintf("release wasm32-web-browser source is %q, want examples/surface_release_form.tetra", report.Source))
+	}
+	if report.HostEvidence.Level != "wasm32-web-browser-canvas-release-v1" {
+		issues = append(issues, fmt.Sprintf("release wasm32-web-browser host_evidence.level is %q, want wasm32-web-browser-canvas-release-v1", report.HostEvidence.Level))
+	}
+	if report.HostEvidence.Backend != "browser-canvas-rgba-accessible" {
+		issues = append(issues, fmt.Sprintf("release wasm32-web-browser host_evidence.backend is %q, want browser-canvas-rgba-accessible", report.HostEvidence.Backend))
+	}
+	for _, check := range []struct {
+		name string
+		ok   bool
+	}{
+		{name: "framebuffer", ok: report.HostEvidence.Framebuffer},
+		{name: "native_input", ok: report.HostEvidence.NativeInput},
+		{name: "browser_canvas", ok: report.HostEvidence.BrowserCanvas},
+		{name: "browser_input", ok: report.HostEvidence.BrowserInput},
+		{name: "browser_clipboard", ok: report.HostEvidence.BrowserClipboard},
+		{name: "browser_composition", ok: report.HostEvidence.BrowserComposition},
+		{name: "browser_accessibility_snapshot", ok: report.HostEvidence.BrowserAccessibilitySnapshot},
+		{name: "browser_accessibility_mirror", ok: report.HostEvidence.BrowserAccessibilityMirror},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("release wasm32-web-browser host_evidence.%s must be true", check.name))
+		}
+	}
+	if report.HostEvidence.RealWindow {
+		issues = append(issues, "release wasm32-web-browser must not claim OS real_window")
+	}
+	if report.HostEvidence.BrowserClipboardHarness != "deterministic-browser-clipboard-v1" {
+		issues = append(issues, fmt.Sprintf("release wasm32-web-browser browser_clipboard_harness is %q, want deterministic-browser-clipboard-v1", report.HostEvidence.BrowserClipboardHarness))
+	}
+	if !runtimeReportHasProcessNameAndPathMarkers(report.Processes, "app", "surface wasm32-web browser canvas component app", "chromium") &&
+		!runtimeReportHasProcessNameAndPathMarkers(report.Processes, "app", "surface wasm32-web browser canvas component app", "chrome") {
+		issues = append(issues, "release wasm32-web-browser requires Chromium-compatible browser app process evidence")
+	}
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateTextInputReleaseEnvelope(schema string, raw []byte) error {
+	if schema != surface.TextInputSchemaV1 {
+		return fmt.Errorf("release text-input schema is %q, want %q", schema, surface.TextInputSchemaV1)
+	}
+	var report surface.TextInputReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return err
+	}
+	var issues []string
+	if normalizeEvidencePath(report.Source) != "examples/surface_release_text_input.tetra" {
+		issues = append(issues, fmt.Sprintf("release text-input source is %q, want examples/surface_release_text_input.tetra", report.Source))
+	}
+	if report.Level != "production-text-input-v1" {
+		issues = append(issues, fmt.Sprintf("release text-input level is %q, want production-text-input-v1", report.Level))
+	}
+	if report.Experimental || !report.ProductionClaim {
+		issues = append(issues, "release text-input requires experimental=false and production_claim=true")
+	}
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func runtimeReportHasProcessNameAndPathMarkers(processes []surface.ProcessReport, kind string, nameMarker string, pathMarkers ...string) bool {
+	nameMarker = strings.ToLower(strings.TrimSpace(nameMarker))
+	for _, process := range processes {
+		if strings.TrimSpace(process.Kind) != kind {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(process.Name))
+		path := strings.ToLower(strings.TrimSpace(process.Path))
+		if nameMarker != "" && !strings.Contains(name, nameMarker) {
+			continue
+		}
+		ok := true
+		for _, marker := range pathMarkers {
+			if !strings.Contains(path, strings.ToLower(strings.TrimSpace(marker))) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 func validateSurfaceV1RuntimeReleaseReport(report surface.Report) error {
@@ -305,16 +504,84 @@ func validateSurfaceV1ReleaseToolkit(report surface.Report) []string {
 
 func validateSurfaceV1ReleaseAccessibilityTree(report surface.Report) []string {
 	var issues []string
-	if report.AccessibilityTree == nil {
+	tree := report.AccessibilityTree
+	if tree == nil {
 		return []string{"release surface-v1 runtime report requires platform accessibility bridge schema"}
 	}
-	if report.AccessibilityTree.AccessibilityLevel != "platform-bridge-v1" || !report.AccessibilityTree.ProductionClaim || report.AccessibilityTree.Experimental {
+	if tree.AccessibilityLevel != "platform-bridge-v1" || !tree.ProductionClaim || tree.Experimental {
 		issues = append(issues, "release surface-v1 accessibility_tree must be platform-bridge-v1 with production_claim=true and experimental=false")
 	}
-	if report.AccessibilityTree.ReleaseScope != surface.ReleaseScopeSurfaceV1LinuxWeb {
-		issues = append(issues, fmt.Sprintf("release surface-v1 accessibility_tree release_scope is %q, want %q", report.AccessibilityTree.ReleaseScope, surface.ReleaseScopeSurfaceV1LinuxWeb))
+	if tree.ReleaseScope != surface.ReleaseScopeSurfaceV1LinuxWeb {
+		issues = append(issues, fmt.Sprintf("release surface-v1 accessibility_tree release_scope is %q, want %q", tree.ReleaseScope, surface.ReleaseScopeSurfaceV1LinuxWeb))
+	}
+	if !tree.MetadataTree || !tree.PlatformExport {
+		issues = append(issues, "release surface-v1 accessibility_tree requires metadata_tree and platform_export")
+	}
+	switch report.Target {
+	case "headless":
+		if tree.PlatformHostIntegration || tree.LinuxPlatformProbe || strings.TrimSpace(tree.LinuxProbeArtifact) != "" || tree.BrowserAccessibilitySnap || tree.BrowserAccessibilityMirror {
+			issues = append(issues, "release surface-v1 headless accessibility must not claim linux platform probe or browser accessibility mirror")
+		}
+		if tree.PlatformBridge != "headless_accessibility_export_v1" {
+			issues = append(issues, fmt.Sprintf("release surface-v1 headless accessibility platform_bridge is %q, want headless_accessibility_export_v1", tree.PlatformBridge))
+		}
+		screenReaderEvidence, ok := accessibilityEvidenceString(tree.ScreenReaderEvidence)
+		if !ok || screenReaderEvidence != "headless_platform_tree_probe" {
+			issues = append(issues, fmt.Sprintf("release surface-v1 headless accessibility screen_reader_evidence is %q, want headless_platform_tree_probe", screenReaderEvidence))
+		}
+	case "linux-x64":
+		if !report.HostEvidence.AccessibilityBridge {
+			issues = append(issues, "release surface-v1 linux accessibility host_evidence.accessibility_bridge must be true")
+		}
+		if !tree.PlatformHostIntegration || tree.PlatformBridge != "linux_accessibility_host_bridge_v1" || !tree.LinuxPlatformProbe || strings.TrimSpace(tree.LinuxProbeArtifact) == "" {
+			issues = append(issues, "release surface-v1 linux accessibility requires linux platform probe bridge evidence")
+		}
+		screenReaderEvidence, ok := accessibilityEvidenceString(tree.ScreenReaderEvidence)
+		if !ok || screenReaderEvidence != "linux_accessibility_host_bridge_v1" {
+			issues = append(issues, fmt.Sprintf("release surface-v1 linux accessibility screen_reader_evidence is %q, want linux_accessibility_host_bridge_v1", screenReaderEvidence))
+		}
+		if !runtimeReportHasProcessNameAndPathMarkers(report.Processes, "runtime", "surface linux accessibility platform probe") {
+			issues = append(issues, "release surface-v1 linux accessibility requires surface linux accessibility platform probe process evidence")
+		}
+		if !runtimeReportHasArtifactKind(report.Artifacts, "linux-accessibility-platform-probe") {
+			issues = append(issues, "release surface-v1 linux accessibility requires linux-accessibility-platform-probe artifact")
+		}
+	case "wasm32-web":
+		if !report.HostEvidence.BrowserAccessibilitySnapshot || !report.HostEvidence.BrowserAccessibilityMirror {
+			issues = append(issues, "release surface-v1 browser accessibility requires host_evidence browser accessibility snapshot/mirror")
+		}
+		if !tree.PlatformHostIntegration || tree.PlatformBridge != "browser_accessibility_mirror_v1" || !tree.BrowserAccessibilitySnap || !tree.BrowserAccessibilityMirror {
+			issues = append(issues, "release surface-v1 browser accessibility requires browser accessibility snapshot/mirror evidence")
+		}
+		screenReaderEvidence, ok := accessibilityEvidenceString(tree.ScreenReaderEvidence)
+		if !ok || screenReaderEvidence != "browser_accessibility_snapshot_v1" {
+			issues = append(issues, fmt.Sprintf("release surface-v1 browser accessibility screen_reader_evidence is %q, want browser_accessibility_snapshot_v1", screenReaderEvidence))
+		}
+		if !runtimeReportHasProcessNameAndPathMarkers(report.Processes, "runtime", "surface wasm32-web browser canvas trace") {
+			issues = append(issues, "release surface-v1 browser accessibility requires browser canvas trace process evidence")
+		}
+		if !runtimeReportHasArtifactKind(report.Artifacts, "runner-trace") {
+			issues = append(issues, "release surface-v1 browser accessibility requires runner-trace artifact")
+		}
 	}
 	return issues
+}
+
+func accessibilityEvidenceString(value any) (string, bool) {
+	text, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+	return strings.TrimSpace(text), true
+}
+
+func runtimeReportHasArtifactKind(artifacts []surface.ArtifactReport, kind string) bool {
+	for _, artifact := range artifacts {
+		if strings.TrimSpace(artifact.Kind) == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func isSurfaceReleaseFormSource(source string) bool {
@@ -532,6 +799,11 @@ func validateRunnerTraceArtifact(path string, report surface.Report) error {
 				return err
 			}
 		}
+		if isSurfaceReleaseAccessibilitySource(report.Source) {
+			if err := validateBrowserAccessibilityRunnerTrace(trace); err != nil {
+				return err
+			}
+		}
 		for _, frame := range trace.Frames {
 			if frame.PixelsLen <= 0 {
 				return fmt.Errorf("browser canvas runner trace frame %d pixels_len must be positive", frame.Order)
@@ -598,6 +870,10 @@ func validateBrowserReleaseTrace(trace runnerTraceEnvelope) error {
 		!trace.BrowserComposition.Cancel {
 		return fmt.Errorf("browser release runner trace missing composition trace evidence")
 	}
+	return validateBrowserAccessibilityRunnerTrace(trace)
+}
+
+func validateBrowserAccessibilityRunnerTrace(trace runnerTraceEnvelope) error {
 	if !trace.BrowserAccessibility.Snapshot ||
 		!trace.BrowserAccessibility.Mirror ||
 		!trace.BrowserAccessibility.CompilerOwned ||

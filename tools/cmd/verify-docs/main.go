@@ -1197,6 +1197,9 @@ func verifySurfaceReleaseDocs(paths []string) error {
 		text := string(raw)
 		combined.WriteString(text)
 		combined.WriteByte('\n')
+		if strings.Contains(text, "/tmp/") {
+			errs = append(errs, fmt.Sprintf("%s: Surface release docs must not use /tmp paths as current release evidence", path))
+		}
 		for _, clause := range surfaceReleaseDocClauses(text) {
 			lower := strings.ToLower(clause)
 			if surfaceReleaseClauseSafe(lower) {
@@ -1210,11 +1213,37 @@ func verifySurfaceReleaseDocs(paths []string) error {
 				containsAnySubstring(lower, []string{"current", "release-ready", "production-supported", "production supported"}) {
 				errs = append(errs, fmt.Sprintf("%s: Windows Surface fake current claim: %q", path, strings.TrimSpace(clause)))
 			}
+			if strings.Contains(lower, "wasm32-wasi") && strings.Contains(lower, "surface") && surfaceReleaseClaimPromotes(lower) {
+				errs = append(errs, fmt.Sprintf("%s: wasm32-wasi Surface fake current claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if strings.Contains(lower, "cross-platform") && surfaceReleaseClaimPromotes(lower) {
+				errs = append(errs, fmt.Sprintf("%s: cross-platform Surface fake production claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if strings.Contains(lower, "gpu") && surfaceReleaseClaimPromotes(lower) {
+				errs = append(errs, fmt.Sprintf("%s: GPU Surface fake production claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if containsAnySubstring(lower, []string{"platform-native widget", "native widget", "platform widget"}) &&
+				surfaceReleaseClaimPromotes(lower) {
+				errs = append(errs, fmt.Sprintf("%s: native widget Surface fake production claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if strings.Contains(lower, "rich text") && surfaceReleaseClaimPromotes(lower) {
+				errs = append(errs, fmt.Sprintf("%s: rich text Surface fake production claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if containsAnySubstring(lower, []string{"screen-reader", "screen reader", "at-spi"}) &&
+				surfaceReleaseClaimPromotes(lower) {
+				errs = append(errs, fmt.Sprintf("%s: screen-reader Surface fake production claim: %q", path, strings.TrimSpace(clause)))
+			}
 			if strings.Contains(lower, "metadata-only") && strings.Contains(lower, "production accessibility") {
 				errs = append(errs, fmt.Sprintf("%s: metadata-only accessibility fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
+			if containsAnySubstring(lower, []string{"dom ui", "html ui"}) && surfaceReleaseClaimPromotes(lower) {
+				errs = append(errs, fmt.Sprintf("%s: DOM UI fake production claim: %q", path, strings.TrimSpace(clause)))
+			}
 			if strings.Contains(lower, "dom ui") && strings.Contains(lower, "surface model") {
 				errs = append(errs, fmt.Sprintf("%s: DOM UI fake Surface model claim: %q", path, strings.TrimSpace(clause)))
+			}
+			if strings.Contains(lower, "react") && surfaceReleaseClaimPromotes(lower) {
+				errs = append(errs, fmt.Sprintf("%s: React Surface fake production claim: %q", path, strings.TrimSpace(clause)))
 			}
 			if containsAnySubstring(lower, []string{"user js", "user javascript"}) &&
 				containsAnySubstring(lower, []string{"allowed", "may use", "can use"}) {
@@ -1247,6 +1276,17 @@ func surfaceReleaseClauseSafe(lower string) bool {
 	return containsAnySubstring(lower, []string{
 		" not ",
 		"not ",
+		"no ",
+		"non-goal",
+		"nonclaim",
+		"non-claim",
+		"future work",
+		"remain future",
+		"not claimed",
+		"not claim",
+		"without",
+		"must not",
+		"cannot",
 		"unsupported",
 		"outside",
 		"remain outside",
@@ -1257,6 +1297,19 @@ func surfaceReleaseClauseSafe(lower string) bool {
 		"forbids",
 		"rejected",
 		"invalid until",
+	})
+}
+
+func surfaceReleaseClaimPromotes(lower string) bool {
+	return containsAnySubstring(lower, []string{
+		"current",
+		"release-ready",
+		"release ready",
+		"production-supported",
+		"production supported",
+		"production support",
+		"production",
+		"supported",
 	})
 }
 

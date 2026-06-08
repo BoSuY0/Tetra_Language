@@ -137,6 +137,45 @@ func TestCIWorkflowIncludesSurfaceReleaseReadinessJob(t *testing.T) {
 	}
 }
 
+func TestSurfaceReleaseReadinessWorkflowRunsNonOptionalSurfaceGates(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"surface-release-readiness-linux:",
+		"bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
+		"bash scripts/release/surface/gate.sh --report-dir reports/surface-experimental-regression",
+		"bash scripts/release/safe-view-lifetime/gate.sh --report-dir reports/safe-view-lifetime",
+		"bash scripts/release/surface/api-stability-gate.sh --report-dir reports/surface-api-stability-v1",
+		"reports/surface-release-v1",
+		"reports/surface-experimental-regression",
+		"reports/safe-view-lifetime",
+		"reports/surface-api-stability-v1",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("ci workflow missing non-optional Surface release readiness detail %q", want)
+		}
+	}
+}
+
+func TestSurfaceReleaseGatesHaveNoContinueOnError(t *testing.T) {
+	for _, rel := range []string{
+		filepath.Join(".github", "workflows", "ci.yml"),
+		filepath.Join(".github", "workflows", "release-packages.yml"),
+	} {
+		raw, err := os.ReadFile(filepath.Join(repoRoot(t), rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		text := string(raw)
+		if strings.Contains(text, "continue-on-error: true") {
+			t.Fatalf("%s must not use continue-on-error for release gates", rel)
+		}
+	}
+}
+
 func TestCIWorkflowIncludesSupplyChainVulnerabilityScan(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
 	if err != nil {

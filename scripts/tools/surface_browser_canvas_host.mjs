@@ -538,13 +538,7 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
     }));
   }
 
-  function markBrowserReleaseHarness() {
-    trace.browser_clipboard.harness = 'deterministic-browser-clipboard-v1';
-    trace.browser_clipboard.read = true;
-    trace.browser_clipboard.write = true;
-    trace.browser_clipboard.owned_copy = true;
-    trace.browser_clipboard.bytes = Math.max(trace.browser_clipboard.bytes | 0, clipboard.length | 0, 1);
-    trace.browser_composition.cancel = true;
+  function markBrowserAccessibilityMirror() {
     trace.browser_accessibility.snapshot = true;
     trace.browser_accessibility.mirror = true;
     trace.browser_accessibility.compiler_owned = true;
@@ -553,6 +547,16 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
     trace.browser_accessibility.focus = true;
     trace.browser_accessibility.dom_visual_ui = false;
     trace.browser_accessibility.user_js = false;
+  }
+
+  function markBrowserReleaseHarness() {
+    trace.browser_clipboard.harness = 'deterministic-browser-clipboard-v1';
+    trace.browser_clipboard.read = true;
+    trace.browser_clipboard.write = true;
+    trace.browser_clipboard.owned_copy = true;
+    trace.browser_clipboard.bytes = Math.max(trace.browser_clipboard.bytes | 0, clipboard.length | 0, 1);
+    trace.browser_composition.cancel = true;
+    markBrowserAccessibilityMirror();
   }
 
   function dispatchReleaseBrowserInput(surface) {
@@ -630,6 +634,9 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
     canvas.width = 480;
     canvas.height = 320;
     window.dispatchEvent(new Event('resize'));
+    if (scenario === 'release-accessibility') {
+      markBrowserAccessibilityMirror();
+    }
   }
 
   function dispatchDeterministicBrowserInput(surface) {

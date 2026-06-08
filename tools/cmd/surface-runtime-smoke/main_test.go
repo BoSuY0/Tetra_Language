@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -1403,6 +1404,81 @@ HTML
 	}
 	if strings.TrimSpace(string(rawCount)) != "2" {
 		t.Fatalf("fake browser invocations = %q, want retry after pending trace", strings.TrimSpace(string(rawCount)))
+	}
+}
+
+func TestBrowserCanvasRunnerDataURLInlinesHostAndWASM(t *testing.T) {
+	url, err := browserCanvasRunnerDataURL("export async function runSurfaceBrowserCanvas() { return {schema:'ok'}; }\n", []byte{0, 97, 115, 109, 1, 0, 0, 0}, "counter")
+	if err != nil {
+		t.Fatalf("browserCanvasRunnerDataURL: %v", err)
+	}
+	const prefix = "data:text/html;base64,"
+	if !strings.HasPrefix(url, prefix) {
+		gotPrefix := url
+		if len(gotPrefix) > len(prefix) {
+			gotPrefix = gotPrefix[:len(prefix)]
+		}
+		t.Fatalf("runner URL prefix = %q, want %q", gotPrefix, prefix)
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(url, prefix))
+	if err != nil {
+		t.Fatalf("decode runner data URL: %v", err)
+	}
+	html := string(raw)
+	for _, want := range []string{
+		"async function runSurfaceBrowserCanvas()",
+		"data:application/wasm;base64,",
+		`scenario: "counter"`,
+		`id="surface-trace"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("runner HTML missing %q:\n%s", want, html)
+		}
+	}
+	for _, forbidden := range []string{"127.0.0.1", "localhost", "export async function runSurfaceBrowserCanvas"} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("runner HTML must not contain %q:\n%s", forbidden, html)
+		}
+	}
+}
+
+func TestBrowserCanvasRunnerFileURLAvoidsLocalhostAndCleansUp(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := filepath.Join(dir, "surface-artifacts")
+	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+		t.Fatalf("mkdir artifact dir: %v", err)
+	}
+	wasmPath := filepath.Join(artifactDir, "app.wasm")
+	if err := os.WriteFile(wasmPath, []byte{0, 97, 115, 109, 1, 0, 0, 0}, 0o644); err != nil {
+		t.Fatalf("write wasm: %v", err)
+	}
+	url, cleanup, err := browserCanvasRunnerFileURL(wasmPath, "export async function runSurfaceBrowserCanvas() { return {schema:'ok'}; }\n", "counter")
+	if err != nil {
+		t.Fatalf("browserCanvasRunnerFileURL: %v", err)
+	}
+	if cleanup == nil {
+		t.Fatalf("cleanup is nil")
+	}
+	if !strings.HasPrefix(url, "file://") {
+		t.Fatalf("runner URL = %q, want file:// URL", url)
+	}
+	if strings.Contains(url, "127.0.0.1") || strings.Contains(url, "localhost") {
+		t.Fatalf("runner URL must not use localhost: %q", url)
+	}
+	runnerPath := strings.TrimPrefix(url, "file://")
+	raw, err := os.ReadFile(runnerPath)
+	if err != nil {
+		t.Fatalf("read runner file: %v", err)
+	}
+	html := string(raw)
+	for _, want := range []string{"async function runSurfaceBrowserCanvas()", "file://", `scenario: "counter"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("runner HTML missing %q:\n%s", want, html)
+		}
+	}
+	cleanup()
+	if _, err := os.Stat(runnerPath); !os.IsNotExist(err) {
+		t.Fatalf("runner cleanup stat err = %v, want removed", err)
 	}
 }
 

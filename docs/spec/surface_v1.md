@@ -229,9 +229,9 @@ instead of manually assigning structural fields. Tetra code owns a
 `ComponentTree` plus stable `TreeNode` identities; reports still expose stable
 node IDs, kind names, parent IDs, child positions, bounds, focusability, and
 dispatch paths as evidence. Components remain ordinary Tetra structs such as
-`TextLabel`, `TextBox`, `Button`, `Column`, `Row`, and `TreeApp`; there are no
-compiler magic widgets, DOM widgets, platform widgets, or production toolkit
-claims.
+`TextLabel`, `TextBox`, `Button`, `Column`, `Row`, and `TreeApp`; no compiler
+magic widgets, no DOM widgets, no platform widgets, and no production toolkit
+claims are made.
 
 The strict `component_tree` report block uses schema
 `tetra.surface.component-tree.v1` inside the existing
@@ -289,10 +289,10 @@ The full block proves builder calls, `tree_validate` invariant checks,
 Column/Row layout helper use, focus helper traversal including
 `ResetButton -> TextBox`, helper-routed hit tests, and dispatch path helper
 output for TextBox, SubmitButton, and ResetButton. This hardening milestone is
-not a final trait-object ABI, witness-table dispatch, reactive tree, virtual
-DOM, production widget toolkit, full IME, clipboard, rich text, platform
-accessibility tree, GPU renderer, Windows/macOS Surface, or production Surface
-promotion.
+not a final trait-object ABI, not witness-table dispatch, not a reactive tree,
+not virtual DOM, not a production widget toolkit, not full IME, not clipboard,
+not rich text, not a platform accessibility tree, not a GPU renderer, not
+Windows/macOS Surface, and not production Surface promotion.
 
 The validator rejects missing or fake tree evidence, path claims that skip a
 parent container, unknown IDs, non-leaf click targets, child bounds outside a
@@ -357,9 +357,9 @@ backspace/delete, Tab focus cycling
 routed through focused root-to-leaf paths, Reset clearing the TextBox,
 StatusText updates, resize relayout, and changed frame checksums on headless,
 linux-x64 real-window, and wasm32-web browser-canvas targets. It remains
-experimental minimal widget evidence, not IME, clipboard, rich text, platform
-accessibility integration, a reactive UI framework, or production Surface
-toolkit support.
+experimental minimal widget evidence; no IME, no clipboard, no rich text, no
+platform accessibility integration, no reactive UI framework support, and no
+production Surface toolkit support are claimed.
 
 ## Toolkit Hardening + Reuse v1
 
@@ -479,12 +479,13 @@ wrong schemas, unknown roles, duplicate or unknown component IDs, bounds
 mismatches, missing labels, shuffled focus or reading order, multiple focused
 nodes, static-only snapshots, unchanged checksums, Node-only browser claims,
 DOM/ARIA or user-JS evidence, legacy `.ui.*` sidecars, platform accessibility
-host claims, screen-reader claims, and production accessibility claims.
+host claims, no screen-reader claims, and no production accessibility claims;
+those claims are rejected, not promoted.
 
 The evidence runs on headless, linux-x64 real-window, and wasm32-web
-browser-canvas/input targets. It remains experimental metadata evidence, not
-production accessibility support, not platform accessibility integration, not
-browser ARIA/DOM accessibility, and not screen-reader validation.
+browser-canvas/input targets. It remains experimental metadata evidence;
+production accessibility support, platform accessibility integration, browser
+ARIA/DOM accessibility, and screen-reader validation are not claimed.
 
 ## Evidence
 

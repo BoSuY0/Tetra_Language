@@ -1,4 +1,4 @@
-// Experimental minimal Surface widget helpers over lib.core.component.
+// Production-minimal scoped Surface widget helpers over lib.core.component.
 // Effects: none
 // ```tetra doctest
 // func widgets_doctest() -> Int:

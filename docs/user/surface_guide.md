@@ -60,8 +60,9 @@ metadata tree over the same toolkit. It imports `lib.core.accessibility` and
 TextBoxes, Save/Reset Buttons, and StatusText, and proves roles, label
 relationships, values, states, bounds, focus order, reading order, actions,
 status updates, snapshots, and resize-bound updates as metadata-only evidence.
-It is not platform accessibility host integration, DOM/ARIA accessibility,
-screen-reader validation, or production accessibility support.
+It is metadata-only evidence; no platform accessibility host integration,
+no DOM/ARIA accessibility, no screen-reader validation, and no production
+accessibility support are claimed.
 
 ## Target Order
 
@@ -77,6 +78,24 @@ targets for Surface v1. macOS, Windows, and wasm32-wasi UI production claims
 require real target-host evidence. Build-only or docs-only evidence does not
 promote Surface support.
 
+## Troubleshooting Release Evidence
+
+- Linux-x64 real-window release evidence requires a display host. Set
+  `WAYLAND_DISPLAY` or `DISPLAY` before running the release-window gates. If no
+  display host is available, the gate must write a blocked report instead of
+  promoting headless or memfd starter evidence.
+- Browser-canvas release evidence requires a Chromium-compatible browser and
+  working browser dependencies. If the browser cannot launch or canvas readback
+  cannot be collected, the gate must write a blocked report instead of promoting
+  Node-only starter evidence.
+- Keep current release evidence in fresh repo-local report directories such as
+  `reports/surface-ui-production-final/surface-release-v1`. Do not use host
+  temp directory paths, copied reports, non-empty report dirs, or stale report
+  dirs as current proof.
+- Starter evidence remains useful regression coverage: the linux memfd starter
+  and Node wasm loader are not linux-x64 real-window or wasm32-web
+  browser-canvas release proof.
+
 ## Release-Supported Surface App Shape
 
 Release-supported apps use ordinary Tetra structs plus `lib.core.component`,
@@ -87,7 +106,8 @@ only opens a surface, copies events/text into caller-owned buffers, reports
 time, handles clipboard/composition bridge calls, mirrors accessibility for
 supported targets, and presents RGBA frames.
 
-Use `examples/surface_release_form.tetra`,
+Use `examples/surface_release_counter.tetra`,
+`examples/surface_release_form.tetra`,
 `examples/surface_release_text_input.tetra`, and
 `examples/surface_release_accessibility.tetra` as the release-supported
 examples. Older `surface_toolkit_*` and `surface_accessibility_settings`
@@ -335,9 +355,9 @@ NameLabel/EmailLabel label relationships, NameTextBox to EmailTextBox to
 SaveButton to ResetButton focus order, reading order, edit/press/save/reset
 actions, status updates, metadata checksum changes, bounds checksum changes
 after 480x320 resize, and changed frame checksums. It is metadata-only
-accessibility evidence, not Linux AT-SPI, macOS AX, Windows UI Automation,
-browser DOM/ARIA accessibility, screen-reader validation, or production
-Surface accessibility.
+accessibility evidence; no Linux AT-SPI, no macOS AX, no Windows UI Automation,
+no browser DOM/ARIA accessibility, no screen-reader validation, and no
+production Surface accessibility are claimed.
 
 ## Using lib.core.widgets
 

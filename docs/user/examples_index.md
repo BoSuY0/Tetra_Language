@@ -22,6 +22,8 @@ before treating the rendering difference as drift.
 
 ## Release-Supported Surface Examples
 
+- `examples/surface_release_counter.tetra`: release counter/input evidence for
+  linux-x64 real-window and wasm32-web browser-canvas host validation.
 - `examples/surface_release_form.tetra`: production widget toolkit v1 form
   evidence for the bounded linux-x64/web Surface release scope.
 - `examples/surface_release_text_input.tetra`: text/input, clipboard, and

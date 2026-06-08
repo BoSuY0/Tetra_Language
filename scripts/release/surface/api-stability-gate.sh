@@ -88,6 +88,31 @@ for module in "${stable_modules[@]}"; do
   fi
 done
 
+public_api_summary="$report_dir/public-surface-api-summary.txt"
+{
+  echo "schema: tetra.surface.public-api-summary.v1"
+  echo "release_scope: surface-v1-linux-web"
+  echo "stable_modules:"
+  for module in "${stable_modules[@]}"; do
+    echo "- $module"
+  done
+  echo "supported_targets:"
+  echo "- headless release evidence target"
+  echo "- linux-x64 real-window"
+  echo "- wasm32-web browser-canvas"
+  echo "unsupported_targets:"
+  echo "- macos-x64"
+  echo "- windows-x64"
+  echo "- wasm32-wasi"
+  echo "nonclaims:"
+  echo "- GPU rendering"
+  echo "- platform-native widgets"
+  echo "- DOM/React/user-JS application UI"
+  echo "- dynamic trait-object widgets or witness-table component dispatch"
+  echo "- full rich text editor"
+  echo "- full AT-SPI/screen-reader support"
+} >"$public_api_summary"
+
 go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
 go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
 
@@ -106,6 +131,7 @@ cat >"$report_dir/surface-api-stability-summary.json" <<JSON
     "lib.core.style"
   ],
   "api_docs": "artifacts/tetra-docs.md",
+  "public_api_summary": "public-surface-api-summary.txt",
   "module_report": "stable-surface-modules.txt",
   "release_examples_import_experimental": false,
   "docs_manifest_validated": true

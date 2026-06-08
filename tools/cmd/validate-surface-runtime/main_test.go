@@ -96,6 +96,17 @@ func TestValidateSurfaceRuntimeReportAcceptsProductionTextInputSchema(t *testing
 	}
 }
 
+func TestTextInputReleaseValidatorAcceptsProductionTextInputReport(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := filepath.Join(dir, "surface-text-input.json")
+	if err := os.WriteFile(reportPath, validProductionTextInputReportJSON(t), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	if err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "text-input"}); err != nil {
+		t.Fatalf("validateSurfaceRuntimeReportWithOptions text-input failed: %v", err)
+	}
+}
+
 func TestValidateSurfaceRuntimeReportAcceptsReleaseSummarySchema(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "surface-release-summary.json")
@@ -105,6 +116,14 @@ func TestValidateSurfaceRuntimeReportAcceptsReleaseSummarySchema(t *testing.T) {
   "status": "current",
   "production_claim": true,
   "experimental": false,
+  "producer": "scripts/release/surface/release-gate.sh",
+  "git_head": "0123456789abcdef0123456789abcdef01234567",
+  "version": "tetra_language",
+  "git_dirty": false,
+  "host_os": "linux",
+  "host_arch": "amd64",
+  "generated_at_utc": "2026-06-08T16:00:00Z",
+  "command_line": "bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
   "supported_targets": ["headless", "linux-x64", "wasm32-web"],
   "runtime_targets": ["linux-x64", "wasm32-web"],
   "test_targets": ["headless"],
@@ -139,6 +158,92 @@ func TestValidateSurfaceRuntimeReportReleaseModeAcceptsReleaseSummary(t *testing
 	}
 	if err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "surface-v1"}); err != nil {
 		t.Fatalf("validateSurfaceRuntimeReportWithOptions failed: %v", err)
+	}
+}
+
+func TestHeadlessReleaseValidatorAcceptsHeadlessRuntimeReport(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	artifactPath, artifactSHA, artifactSize := writeSurfaceArtifactFixture(t, artifactDir)
+	tracePath, traceSHA, traceSize := writeSurfaceTraceFixture(t, artifactDir)
+	reportPath := filepath.Join(dir, "surface-headless-release.json")
+	raw := headlessReleaseRuntimeReportJSON(artifactPath, artifactSHA, artifactSize, tracePath, traceSHA, traceSize)
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	if err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "headless"}); err != nil {
+		t.Fatalf("validateSurfaceRuntimeReportWithOptions(headless) failed: %v\n%s", err, raw)
+	}
+}
+
+func TestHeadlessReleaseValidatorRejectsLinuxOrBrowserSubstitute(t *testing.T) {
+	dir := t.TempDir()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	artifactPath, artifactSHA, artifactSize := writeSurfaceArtifactFixture(t, artifactDir)
+	tracePath, traceSHA, traceSize := writeSurfaceTraceFixture(t, artifactDir)
+	reportPath := filepath.Join(dir, "surface-linux-x64.json")
+	raw := strings.Replace(
+		string(headlessReleaseRuntimeReportJSON(artifactPath, artifactSHA, artifactSize, tracePath, traceSHA, traceSize)),
+		`"target": "headless"`,
+		`"target": "linux-x64"`,
+		1,
+	)
+	raw = strings.Replace(raw, `"runtime": "surface-headless"`, `"runtime": "surface-linux-x64"`, 1)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err := validateSurfaceRuntimeReportWithOptions(reportPath, surfaceRuntimeValidationOptions{Release: "headless"})
+	if err == nil {
+		t.Fatalf("expected linux/browser substitute to fail headless release validation")
+	}
+	if !strings.Contains(err.Error(), "headless") {
+		t.Fatalf("error = %v, want headless diagnostic", err)
+	}
+}
+
+func TestBrowserReleaseRequiresChromium(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := writeWASM32WebBrowserReleaseRuntimeReport(t, dir)
+	raw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	var report map[string]any
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	processes := report["processes"].([]any)
+	for _, item := range processes {
+		process := item.(map[string]any)
+		if process["name"] == "surface wasm32-web browser canvas component app" {
+			process["path"] = "node scripts/tools/web_run_module.mjs surface-release-form.wasm"
+		}
+	}
+	raw, err = json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal report: %v", err)
+	}
+	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	err = validateWASM32WebBrowserReleaseEnvelope(surface.SchemaV1, raw)
+	if err == nil {
+		t.Fatalf("expected Node-only browser release substitute to fail")
+	}
+	if !strings.Contains(err.Error(), "Chromium-compatible browser") {
+		t.Fatalf("error = %v, want Chromium-compatible browser diagnostic", err)
+	}
+}
+
+func TestCanvasFrameInputTextAccessibility(t *testing.T) {
+	dir := t.TempDir()
+	reportPath := writeWASM32WebBrowserReleaseRuntimeReport(t, dir)
+	raw, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	if err := validateWASM32WebBrowserReleaseEnvelope(surface.SchemaV1, raw); err != nil {
+		t.Fatalf("validateWASM32WebBrowserReleaseEnvelope failed: %v", err)
 	}
 }
 
@@ -196,18 +301,39 @@ func TestValidateSurfaceRuntimeReportReleaseModeAcceptsReleaseEvidenceSlices(t *
 			name:   "wasm toolkit slice",
 			report: releaseToolkitSliceReportForTest("wasm32-web", surface.HostEvidenceReport{Level: "wasm32-web-browser-canvas-input", Backend: "browser-canvas-rgba", Framebuffer: true, NativeInput: true}),
 		},
-		{
-			name:   "linux accessibility slice",
-			report: releaseAccessibilitySliceReportForTest("linux-x64", surface.HostEvidenceReport{Level: "linux-x64-real-window", Backend: "wayland-shm-rgba", Framebuffer: true, RealWindow: true, NativeInput: true}),
-		},
-		{
-			name:   "wasm accessibility slice",
-			report: releaseAccessibilitySliceReportForTest("wasm32-web", surface.HostEvidenceReport{Level: "wasm32-web-browser-canvas-input", Backend: "browser-canvas-rgba", Framebuffer: true, NativeInput: true}),
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := validateSurfaceV1RuntimeReleaseReport(tc.report); err != nil {
 				t.Fatalf("validateSurfaceV1RuntimeReleaseReport failed: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateSurfaceRuntimeReportReleaseModeRejectsAccessibilityClaimsWithoutTargetEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		report surface.Report
+		want   string
+	}{
+		{
+			name:   "linux accessibility slice",
+			report: releaseAccessibilitySliceReportForTest("linux-x64", surface.HostEvidenceReport{Level: "linux-x64-real-window", Backend: "wayland-shm-rgba", Framebuffer: true, RealWindow: true, NativeInput: true}),
+			want:   "platform probe",
+		},
+		{
+			name:   "wasm accessibility slice",
+			report: releaseAccessibilitySliceReportForTest("wasm32-web", surface.HostEvidenceReport{Level: "wasm32-web-browser-canvas-input", Backend: "browser-canvas-rgba", Framebuffer: true, NativeInput: true}),
+			want:   "browser accessibility",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateSurfaceV1RuntimeReleaseReport(tc.report)
+			if err == nil {
+				t.Fatalf("expected incomplete accessibility release claim to fail")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
 			}
 		})
 	}
@@ -748,6 +874,93 @@ func writeBrowserCanvasTraceFixtureWithChecksums(t *testing.T, dir string, wasmP
 	return path, "sha256:" + hex.EncodeToString(sum[:]), int64(len(contents))
 }
 
+func writeWASM32WebBrowserReleaseRuntimeReport(t *testing.T, dir string) string {
+	t.Helper()
+	artifactDir := surfaceArtifactFixtureDir(t, dir)
+	wasmPath, wasmSHA, wasmSize := writeNamedSurfaceArtifactFixture(t, artifactDir, "surface-release-form.wasm", []byte("\x00asm\x01\x00\x00\x00surface browser release wasm fixture\n"), 0o755)
+	loaderPath, loaderSHA, loaderSize := writeNamedSurfaceArtifactFixture(t, artifactDir, "surface-release-form.mjs", []byte(`function createSurfaceHost(instanceRef) {
+  return { __tetra_surface_present_rgba() { return 0; } };
+}
+const imports = { tetra_surface_host_v1: createSurfaceHost({ instance: null }) };
+`), 0o644)
+	tracePath, traceSHA, traceSize := writeBrowserReleaseTraceFixture(t, artifactDir, wasmPath)
+	reportPath := filepath.Join(dir, "surface-wasm32-web-release-browser.json")
+	raw := string(validWASM32WebBrowserCanvasSurfaceRuntimeReportJSON(wasmPath, wasmSHA, wasmSize, loaderPath, loaderSHA, loaderSize, tracePath, traceSHA, traceSize))
+	raw = strings.Replace(raw, `"source": "examples/surface_browser_counter.tetra"`, `"source": "examples/surface_release_form.tetra"`, 1)
+	raw = strings.Replace(raw,
+		`"host_evidence": {"level":"wasm32-web-browser-canvas-input","backend":"browser-canvas-rgba","framebuffer":true,"real_window":false,"native_input":true,"user_facing_platform_widgets":false}`,
+		`"host_evidence": {"level":"wasm32-web-browser-canvas-release-v1","backend":"browser-canvas-rgba-accessible","framebuffer":true,"real_window":false,"native_input":true,"browser_canvas":true,"browser_input":true,"browser_clipboard":true,"browser_clipboard_harness":"deterministic-browser-clipboard-v1","browser_composition":true,"browser_accessibility_snapshot":true,"browser_accessibility_mirror":true,"user_facing_platform_widgets":false}`,
+		1,
+	)
+	raw = strings.Replace(raw, `examples/surface_browser_counter.tetra`, `examples/surface_release_form.tetra`, 1)
+	raw = strings.Replace(raw, `<surface-browser-canvas-runner> wasm=`, `<surface-browser-canvas-runner> scenario=release-browser wasm=`, 1)
+	if err := os.WriteFile(reportPath, []byte(raw), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	return reportPath
+}
+
+func writeBrowserReleaseTraceFixture(t *testing.T, dir string, wasmPath string) (string, string, int64) {
+	t.Helper()
+	path := filepath.Join(dir, "surface-runner-trace.json")
+	trace := runnerTraceEnvelope{
+		Schema: "tetra.surface.browser-canvas-trace.v1",
+		WASM:   wasmPath,
+		Canvas: runnerTraceCanvas{
+			Opened:   true,
+			Readback: true,
+			Width:    400,
+			Height:   240,
+		},
+		BrowserEvents: []runnerTraceEvent{
+			{NativeType: "pointerup", Kind: 5},
+			{NativeType: "keydown", Kind: 6},
+			{NativeType: "resize", Kind: 2},
+			{NativeType: "beforeinput", Kind: 8},
+			{NativeType: "compositionstart", Kind: 9},
+			{NativeType: "compositionupdate", Kind: 9},
+			{NativeType: "compositionend", Kind: 9},
+		},
+		BrowserClipboard: runnerTraceClipboard{
+			Harness:   "deterministic-browser-clipboard-v1",
+			Read:      true,
+			Write:     true,
+			OwnedCopy: true,
+			Bytes:     13,
+		},
+		BrowserComposition: runnerTraceComposition{
+			Start:  true,
+			Update: true,
+			Commit: true,
+			Cancel: true,
+		},
+		BrowserAccessibility: runnerTraceAccessibility{
+			Snapshot:      true,
+			Mirror:        true,
+			CompilerOwned: true,
+			Roles:         []string{"root", "textbox", "checkbox", "button", "status"},
+			Bounds:        true,
+			Focus:         true,
+		},
+		Frames: []runnerTraceFrame{
+			{Order: 1, Width: 320, Height: 200, Stride: 1280, PixelsLen: 256000, SourceChecksum: "1111111111111111111111111111111111111111111111111111111111111111", CanvasChecksum: "1111111111111111111111111111111111111111111111111111111111111111", Checksum: "1111111111111111111111111111111111111111111111111111111111111111", Presented: true},
+			{Order: 5, Width: 400, Height: 240, Stride: 1600, PixelsLen: 384000, SourceChecksum: "5555555555555555555555555555555555555555555555555555555555555555", CanvasChecksum: "5555555555555555555555555555555555555555555555555555555555555555", Checksum: "5555555555555555555555555555555555555555555555555555555555555555", Presented: true},
+		},
+	}
+	exit := 1
+	trace.AppExitCode = &exit
+	raw, err := json.Marshal(trace)
+	if err != nil {
+		t.Fatalf("marshal browser release trace fixture: %v", err)
+	}
+	contents := append(raw, '\n')
+	if err := os.WriteFile(path, contents, 0o644); err != nil {
+		t.Fatalf("write browser release trace fixture: %v", err)
+	}
+	sum := sha256.Sum256(contents)
+	return path, "sha256:" + hex.EncodeToString(sum[:]), int64(len(contents))
+}
+
 func validSurfaceRuntimeReportJSON(artifactPath string, artifactSHA string, artifactSize int64, tracePath string, traceSHA string, traceSize int64) []byte {
 	buildPath := "tetra build --target linux-x64 examples/surface_counter.tetra -o " + artifactPath
 	artifactScanRoot := filepath.Dir(artifactPath)
@@ -817,6 +1030,83 @@ func validSurfaceRuntimeReportJSON(artifactPath string, artifactSHA string, arti
 		"__ARTIFACT_SCAN_ROOT__", jsonString(artifactScanRoot),
 	).Replace(raw)
 	return []byte(raw)
+}
+
+func validProductionTextInputReportJSON(t *testing.T) []byte {
+	t.Helper()
+	intRef := func(v int) *int { return &v }
+	report := surface.TextInputReport{
+		Schema:             surface.TextInputSchemaV1,
+		Target:             "headless",
+		Source:             "examples/surface_release_text_input.tetra",
+		Level:              "production-text-input-v1",
+		Experimental:       false,
+		ProductionClaim:    true,
+		Storage:            "owned-utf8-byte-buffer",
+		UTF8Validation:     true,
+		Caret:              true,
+		Selection:          true,
+		Backspace:          true,
+		Delete:             true,
+		HomeEnd:            true,
+		ArrowLeftRight:     true,
+		CompositionEvents:  true,
+		CompositionCommit:  true,
+		CompositionCancel:  true,
+		ClipboardRead:      true,
+		ClipboardWrite:     true,
+		ClipboardHostABI:   true,
+		ClipboardOwnedCopy: true,
+		CompositionTrace: surface.CompositionTraceReport{
+			Start:  true,
+			Update: true,
+			Commit: true,
+			Cancel: true,
+		},
+		BorrowedViewStorage:     false,
+		SafeViewLifetimeChecked: true,
+		Processes: []surface.ProcessReport{
+			{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_release_text_input.tetra -o /tmp/surface-artifacts/surface-release-text-input", Ran: true, Pass: true, ExitCode: intRef(0)},
+			{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-release-text-input", Ran: true, Pass: true, ExitCode: intRef(1), ExpectedExitCode: intRef(1)},
+			{Name: "surface headless runtime", Kind: "runtime", Path: "tools/cmd/surface-runtime-smoke --mode headless-release-text-input", Ran: true, Pass: true, ExitCode: intRef(0)},
+		},
+		Artifacts: []surface.ArtifactReport{
+			{Kind: "component-app", Path: "/tmp/surface-artifacts/surface-release-text-input", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Size: 4096},
+			{Kind: "runner-trace", Path: "/tmp/surface-artifacts/surface-runner-trace.json", SHA256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Size: 2048},
+		},
+		ArtifactScan: surface.ArtifactScanReport{Root: "/tmp/surface-artifacts", FilesChecked: 2, ForbiddenPaths: []string{}, Pass: true},
+		Cases: []surface.CaseReport{
+			{Name: "host-provided pointer event dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host event buffer poll_event", Kind: "positive", Ran: true, Pass: true},
+			{Name: "pre/post event frame sequence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component hierarchy dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component text input scalar dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "host text payload buffer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component focus dispatch", Kind: "positive", Ran: true, Pass: true},
+			{Name: "component accessibility metadata", Kind: "positive", Ran: true, Pass: true},
+			{Name: "no legacy UI sidecar artifacts", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input ASCII insertion", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input UTF-8 insertion", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input caret home end arrows", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input selection replacement", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input backspace delete", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input clipboard owned copy transfer", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input composition start update", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input composition commit", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input composition cancel", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text input safe view lifetime checked", Kind: "positive", Ran: true, Pass: true},
+			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
+		},
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal text input report: %v", err)
+	}
+	return raw
+}
+
+func headlessReleaseRuntimeReportJSON(artifactPath string, artifactSHA string, artifactSize int64, tracePath string, traceSHA string, traceSize int64) []byte {
+	return validSurfaceRuntimeReportJSON(artifactPath, artifactSHA, artifactSize, tracePath, traceSHA, traceSize)
 }
 
 func validWASM32WebSurfaceRuntimeReportJSON(wasmPath string, wasmSHA string, wasmSize int64, loaderPath string, loaderSHA string, loaderSize int64, tracePath string, traceSHA string, traceSize int64) []byte {
@@ -951,6 +1241,14 @@ func validSurfaceRuntimeReleaseSummaryJSON() []byte {
   "status": "current",
   "production_claim": true,
   "experimental": false,
+  "producer": "scripts/release/surface/release-gate.sh",
+  "git_head": "0123456789abcdef0123456789abcdef01234567",
+  "version": "tetra_language",
+  "git_dirty": false,
+  "host_os": "linux",
+  "host_arch": "amd64",
+  "generated_at_utc": "2026-06-08T16:00:00Z",
+  "command_line": "bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
   "supported_targets": ["headless", "linux-x64", "wasm32-web"],
   "runtime_targets": ["linux-x64", "wasm32-web"],
   "test_targets": ["headless"],

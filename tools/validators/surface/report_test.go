@@ -97,6 +97,23 @@ func TestValidateSurfaceProductionToolkitRejectsMissingReleaseWidget(t *testing.
 	}
 }
 
+func TestValidateSurfaceProductionToolkitRejectsSingleExampleClaim(t *testing.T) {
+	raw := validHeadlessProductionToolkitSurfaceReportJSON(t, func(report map[string]any) {
+		toolkit := report["toolkit"].(map[string]any)
+		toolkit["example_count"] = 1
+		toolkit["sources"] = []any{"examples/surface_release_form.tetra"}
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected production toolkit single-example claim to fail")
+	}
+	for _, want := range []string{"production toolkit", "example_count"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want %q diagnostic", err, want)
+		}
+	}
+}
+
 func TestValidateSurfaceAccessibilityMetadataTreeReport(t *testing.T) {
 	raw := validHeadlessAccessibilityMetadataSurfaceReportJSON(t, nil)
 	if err := ValidateReport(raw); err != nil {
@@ -172,6 +189,128 @@ func TestValidateSurfaceReleaseSummaryRejectsFakePromotionClaims(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateSurfaceReleaseSummaryRejectsStaleProducerMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(map[string]any)
+		want   string
+	}{
+		{
+			name: "missing producer",
+			mutate: func(report map[string]any) {
+				delete(report, "producer")
+			},
+			want: "producer",
+		},
+		{
+			name: "stale git head",
+			mutate: func(report map[string]any) {
+				report["git_head"] = "unknown"
+			},
+			want: "git_head",
+		},
+		{
+			name: "missing command line",
+			mutate: func(report map[string]any) {
+				delete(report, "command_line")
+			},
+			want: "command_line",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var report map[string]any
+			if err := json.Unmarshal(validSurfaceReleaseSummaryJSON(), &report); err != nil {
+				t.Fatalf("decode release summary: %v", err)
+			}
+			tc.mutate(report)
+			raw, err := json.Marshal(report)
+			if err != nil {
+				t.Fatalf("marshal release summary: %v", err)
+			}
+			err = ValidateReleaseSummary(raw)
+			if err == nil {
+				t.Fatalf("expected stale producer metadata to fail")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q diagnostic", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestHeadlessReleaseRequiresBuiltBinary(t *testing.T) {
+	raw := strings.Replace(string(validHeadlessSurfaceReportJSON()), `    {"name":"tetra build","kind":"build","path":"tetra build --target linux-x64 examples/surface_counter.tetra -o /tmp/surface-artifacts/surface-counter","ran":true,"pass":true,"exit_code":0},
+`, ``, 1)
+	err := ValidateReport([]byte(raw))
+	if err == nil {
+		t.Fatalf("expected headless report without build process to fail")
+	}
+	if !strings.Contains(err.Error(), "build process") {
+		t.Fatalf("error = %v, want build process diagnostic", err)
+	}
+}
+
+func TestHeadlessRunnerTraceMatchesReport(t *testing.T) {
+	raw := mutateHeadlessSurfaceReport(t, func(report map[string]any) {
+		frames := report["frames"].([]any)
+		first := frames[0].(map[string]any)
+		second := frames[1].(map[string]any)
+		second["checksum"] = first["checksum"]
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected unchanged pre/post headless frame checksum evidence to fail")
+	}
+	if !strings.Contains(err.Error(), "pre/post") {
+		t.Fatalf("error = %v, want pre/post frame diagnostic", err)
+	}
+}
+
+func TestHeadlessRejectsMetadataOnlyFrame(t *testing.T) {
+	raw := mutateHeadlessSurfaceReport(t, func(report map[string]any) {
+		frames := report["frames"].([]any)
+		first := frames[0].(map[string]any)
+		first["checksum"] = ""
+	})
+	err := ValidateReport(raw)
+	if err == nil {
+		t.Fatalf("expected metadata-only headless frame to fail")
+	}
+	if !strings.Contains(err.Error(), "checksum") {
+		t.Fatalf("error = %v, want checksum diagnostic", err)
+	}
+}
+
+func TestHeadlessNoLegacySidecars(t *testing.T) {
+	raw := strings.Replace(string(validHeadlessSurfaceReportJSON()),
+		`    {"name":"no legacy UI sidecar artifacts","kind":"positive","ran":true,"pass":true},
+`,
+		``,
+		1,
+	)
+	err := ValidateReport([]byte(raw))
+	if err == nil {
+		t.Fatalf("expected missing no-legacy sidecar case to fail")
+	}
+	if !strings.Contains(err.Error(), "no legacy UI sidecar") {
+		t.Fatalf("error = %v, want no legacy sidecar diagnostic", err)
+	}
+}
+
+func mutateHeadlessSurfaceReport(t *testing.T, mutate func(map[string]any)) []byte {
+	t.Helper()
+	var report map[string]any
+	if err := json.Unmarshal(validHeadlessSurfaceReportJSON(), &report); err != nil {
+		t.Fatalf("decode headless report: %v", err)
+	}
+	mutate(report)
+	raw, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal headless report: %v", err)
+	}
+	return raw
 }
 
 func TestValidateSurfaceTextInputReportAcceptsProductionBaseline(t *testing.T) {
@@ -2172,6 +2311,14 @@ func validSurfaceReleaseSummaryJSON() []byte {
   "status": "current",
   "production_claim": true,
   "experimental": false,
+  "producer": "scripts/release/surface/release-gate.sh",
+  "git_head": "0123456789abcdef0123456789abcdef01234567",
+  "version": "tetra_language",
+  "git_dirty": false,
+  "host_os": "linux",
+  "host_arch": "amd64",
+  "generated_at_utc": "2026-06-08T16:00:00Z",
+  "command_line": "bash scripts/release/surface/release-gate.sh --report-dir reports/surface-release-v1",
   "supported_targets": ["headless", "linux-x64", "wasm32-web"],
   "runtime_targets": ["linux-x64", "wasm32-web"],
   "test_targets": ["headless"],
@@ -3298,6 +3445,7 @@ func validLinuxReleaseAccessibilitySurfaceReportJSON(t *testing.T, mutate func(m
 	report["host_evidence"].(map[string]any)["backend"] = "wayland-shm-rgba"
 	report["host_evidence"].(map[string]any)["real_window"] = true
 	report["host_evidence"].(map[string]any)["native_input"] = true
+	report["host_evidence"].(map[string]any)["accessibility_bridge"] = true
 	report["components"].([]any)[0].(map[string]any)["type"] = "examples.surface_release_accessibility.AccessibilitySettingsApp"
 	tree := report["accessibility_tree"].(map[string]any)
 	tree["accessibility_level"] = "platform-bridge-v1"

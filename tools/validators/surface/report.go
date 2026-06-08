@@ -47,6 +47,14 @@ type ReleaseSummaryReport struct {
 	Status                  string   `json:"status"`
 	ProductionClaim         bool     `json:"production_claim"`
 	Experimental            bool     `json:"experimental"`
+	Producer                string   `json:"producer"`
+	GitHead                 string   `json:"git_head"`
+	Version                 string   `json:"version"`
+	GitDirty                bool     `json:"git_dirty"`
+	HostOS                  string   `json:"host_os"`
+	HostArch                string   `json:"host_arch"`
+	GeneratedAtUTC          string   `json:"generated_at_utc"`
+	CommandLine             string   `json:"command_line"`
 	SupportedTargets        []string `json:"supported_targets"`
 	RuntimeTargets          []string `json:"runtime_targets"`
 	TestTargets             []string `json:"test_targets"`
@@ -557,6 +565,27 @@ func ValidateReleaseSummary(raw []byte) error {
 	if report.Experimental {
 		issues = append(issues, "experimental must be false for Surface v1 release summaries")
 	}
+	if report.Producer != "scripts/release/surface/release-gate.sh" {
+		issues = append(issues, fmt.Sprintf("producer is %q, want scripts/release/surface/release-gate.sh", report.Producer))
+	}
+	if !isGitHead(report.GitHead) {
+		issues = append(issues, "git_head must be a 40-character hex commit")
+	}
+	if strings.TrimSpace(report.Version) == "" {
+		issues = append(issues, "version is required")
+	}
+	if strings.TrimSpace(report.HostOS) == "" {
+		issues = append(issues, "host_os is required")
+	}
+	if strings.TrimSpace(report.HostArch) == "" {
+		issues = append(issues, "host_arch is required")
+	}
+	if strings.TrimSpace(report.GeneratedAtUTC) == "" || !strings.HasSuffix(report.GeneratedAtUTC, "Z") || !strings.Contains(report.GeneratedAtUTC, "T") {
+		issues = append(issues, "generated_at_utc must be an RFC3339 UTC timestamp")
+	}
+	if !strings.Contains(report.CommandLine, "scripts/release/surface/release-gate.sh") {
+		issues = append(issues, "command_line must include scripts/release/surface/release-gate.sh")
+	}
 	issues = append(issues, validateExactStringList("supported_targets", report.SupportedTargets, []string{"headless", "linux-x64", "wasm32-web"})...)
 	issues = append(issues, validateExactStringList("runtime_targets", report.RuntimeTargets, []string{"linux-x64", "wasm32-web"})...)
 	issues = append(issues, validateExactStringList("test_targets", report.TestTargets, []string{"headless"})...)
@@ -598,6 +627,19 @@ func ValidateReleaseSummary(raw []byte) error {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func isGitHead(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	for _, ch := range value {
+		if (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func ValidateTextInputReport(raw []byte) error {
@@ -2213,8 +2255,18 @@ func validateProductionToolkitEvidence(report Report) []string {
 	if !toolkit.NoMagicWidgets || !toolkit.NoPlatformWidgets || !toolkit.NoDOMUI || !toolkit.NoUserJS {
 		issues = append(issues, "production toolkit must prove no_magic_widgets, no_platform_widgets, no_dom_ui, and no_user_js")
 	}
-	if toolkit.ExampleCount < 1 || !contains(toolkit.Sources, "examples/surface_release_form.tetra") {
-		issues = append(issues, "production toolkit sources must include examples/surface_release_form.tetra")
+	requiredSources := []string{
+		"examples/surface_release_form.tetra",
+		"examples/surface_toolkit_form.tetra",
+		"examples/surface_toolkit_settings.tetra",
+	}
+	if toolkit.ExampleCount < len(requiredSources) {
+		issues = append(issues, fmt.Sprintf("production toolkit example_count = %d, want at least %d scoped examples", toolkit.ExampleCount, len(requiredSources)))
+	}
+	for _, source := range requiredSources {
+		if !contains(toolkit.Sources, source) {
+			issues = append(issues, fmt.Sprintf("production toolkit sources missing %s", source))
+		}
 	}
 	if toolkit.TextBoxCount < 2 || !toolkit.MultiTextBoxEvidence {
 		issues = append(issues, "production toolkit requires two TextBox widgets with multi_textbox_evidence")
@@ -2899,6 +2951,9 @@ func validateReleaseAccessibilityBridgeEvidence(report Report, tree *Accessibili
 		if report.HostEvidence.Level != "linux-x64-real-window" {
 			issues = append(issues, "accessibility_tree linux release evidence must use linux-x64 real-window host evidence")
 		}
+		if !report.HostEvidence.AccessibilityBridge {
+			issues = append(issues, "accessibility_tree linux release host_evidence.accessibility_bridge must be true")
+		}
 		if !tree.PlatformHostIntegration {
 			issues = append(issues, "accessibility_tree platform_host_integration must be true for linux platform-bridge-v1")
 		}
@@ -2924,15 +2979,36 @@ func validateReleaseAccessibilityBridgeEvidence(report Report, tree *Accessibili
 		if !isBrowserCanvasHostEvidenceLevel(report.HostEvidence.Level) {
 			issues = append(issues, "accessibility_tree browser release evidence must be browser-canvas input, not Node-only wasm32-web evidence")
 		}
+		if !report.HostEvidence.BrowserAccessibilitySnapshot {
+			issues = append(issues, "accessibility_tree browser release host_evidence.browser_accessibility_snapshot must be true")
+		}
+		if !report.HostEvidence.BrowserAccessibilityMirror {
+			issues = append(issues, "accessibility_tree browser release host_evidence.browser_accessibility_mirror must be true")
+		}
+		if tree.PlatformBridge != "browser_accessibility_mirror_v1" {
+			issues = append(issues, fmt.Sprintf("accessibility_tree platform_bridge is %q, want browser_accessibility_mirror_v1", tree.PlatformBridge))
+		}
 		if !tree.BrowserAccessibilitySnap {
 			issues = append(issues, "accessibility_tree browser_accessibility_snapshot must be true for browser platform-bridge-v1")
 		}
 		if !tree.BrowserAccessibilityMirror {
 			issues = append(issues, "accessibility_tree browser_accessibility_mirror must be true for browser platform-bridge-v1")
 		}
+		if screenReaderEvidence != "browser_accessibility_snapshot_v1" {
+			issues = append(issues, fmt.Sprintf("accessibility_tree screen_reader_evidence is %q, want browser_accessibility_snapshot_v1", screenReaderEvidence))
+		}
+		if !hasRuntimeProcessName(report.Processes, "surface wasm32-web browser canvas trace") {
+			issues = append(issues, "accessibility_tree browser release requires browser canvas trace process evidence")
+		}
+		if !artifactKindContains(report.Artifacts, "runner-trace") {
+			issues = append(issues, "accessibility_tree browser release requires runner-trace artifact")
+		}
 	case "headless":
 		if tree.PlatformBridge == "" {
 			issues = append(issues, "accessibility_tree platform_bridge is required for headless platform-bridge-v1")
+		}
+		if tree.PlatformHostIntegration || tree.LinuxPlatformProbe || strings.TrimSpace(tree.LinuxProbeArtifact) != "" || tree.BrowserAccessibilitySnap || tree.BrowserAccessibilityMirror {
+			issues = append(issues, "accessibility_tree headless platform bridge must not claim linux platform probe or browser accessibility mirror")
 		}
 	default:
 		issues = append(issues, fmt.Sprintf("accessibility_tree release target %q is unsupported", report.Target))

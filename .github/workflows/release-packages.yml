@@ -108,6 +108,34 @@ jobs:
           report_dir="${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64"
           bash scripts/release/post_v0_4/memory-production-linux-x64-smoke.sh --report-dir "$report_dir"
 
+      - name: Surface release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-release-v1"
+          bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"
+
+      - name: Surface experimental regression gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"
+          bash scripts/release/surface/gate.sh --report-dir "$report_dir"
+
+      - name: Safe view lifetime gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/safe-view-lifetime"
+          bash scripts/release/safe-view-lifetime/gate.sh --report-dir "$report_dir"
+
+      - name: Surface API stability gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1"
+          bash scripts/release/surface/api-stability-gate.sh --report-dir "$report_dir"
+
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -119,6 +147,10 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/checksums.txt
             ${{ steps.meta.outputs.out_dir }}/tetra.rb
             ${{ steps.meta.outputs.out_dir }}/memory-production-linux-x64/**
+            ${{ steps.meta.outputs.out_dir }}/surface-release-v1/**
+            ${{ steps.meta.outputs.out_dir }}/surface-experimental-regression/**
+            ${{ steps.meta.outputs.out_dir }}/safe-view-lifetime/**
+            ${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1/**
 
       - name: Create or update GitHub Release
         shell: bash
@@ -145,6 +177,8 @@ jobs:
           This release publishes the current v0.4.0 local compiler/tooling profile. Linux x64 is the release binary baseline; other runtime target claims remain gated by project evidence.
           Package publishing for this workflow runs the Linux-x64 memory production release gate and uploads its `memory-production-linux-x64.json`, `targets.json`, and `artifact-hashes.json` evidence.
           Memory production evidence remains Linux-x64 scoped unless a target-specific runtime gate says otherwise.
+          Surface v1 release evidence runs the Surface release gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.
+          Surface v1 package notes are scoped to headless, linux-x64 real-window, and wasm32-web browser-canvas evidence; macOS, Windows, wasm32-wasi, GPU rendering, platform-native widgets, DOM/React/user-JS app UI, rich text editor, and full screen-reader support are not claimed.
           No fastest-language, official benchmark, target parity, or broad zero-cost performance claim is made by these package notes.
           EOF
           if gh release view "$version" >/dev/null 2>&1; then

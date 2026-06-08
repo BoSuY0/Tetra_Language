@@ -3,7 +3,8 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
-report_dir="$repo_root/reports/surface-release-v1"
+report_dir="reports/surface-release-v1"
+original_args=("$@")
 
 usage() {
   cat <<'USAGE'
@@ -42,12 +43,37 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$repo_root"
+source "$script_dir/report-dir-guard.sh"
 if [[ -z "${GOCACHE:-}" ]]; then
   export GOCACHE="$repo_root/.cache/go-build-surface-release"
 fi
 mkdir -p "$GOCACHE"
-mkdir -p "$report_dir"
-report_dir="$(cd "$report_dir" && pwd)"
+report_dir="$(surface_release_require_fresh_report_dir "$report_dir" "$repo_root" "surface_release_gate:")"
+
+format_command() {
+  local formatted=""
+  local quoted=""
+  local arg
+  for arg in "$@"; do
+    printf -v quoted "%q" "$arg"
+    if [[ -z "$formatted" ]]; then
+      formatted="$quoted"
+    else
+      formatted+=" $quoted"
+    fi
+  done
+  printf "%s" "$formatted"
+}
+
+json_string() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '"%s"' "$value"
+}
 
 bash scripts/release/surface/surface-headless-release-smoke.sh --report-dir "$report_dir"
 bash scripts/release/surface/surface-headless-release-text-input-smoke.sh --report-dir "$report_dir"
@@ -63,13 +89,36 @@ bash scripts/release/surface/surface-wasm32-web-release-toolkit-smoke.sh --repor
 bash scripts/release/surface/surface-wasm32-web-release-accessibility-smoke.sh --report-dir "$report_dir"
 
 summary_path="$report_dir/surface-release-summary.json"
-cat > "$summary_path" <<'JSON'
+git_head="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+git_dirty=false
+if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null || [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+  git_dirty=true
+fi
+version="$(go list -m 2>/dev/null || echo tetra_language)"
+host_os="$(go env GOOS 2>/dev/null || uname -s)"
+host_arch="$(go env GOARCH 2>/dev/null || uname -m)"
+generated_at_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+formatted_args="$(format_command "${original_args[@]}")"
+command_line="bash scripts/release/surface/release-gate.sh"
+if [[ -n "$formatted_args" ]]; then
+  command_line+=" $formatted_args"
+fi
+
+cat > "$summary_path" <<JSON
 {
   "schema": "tetra.surface.release.v1",
   "release_scope": "surface-v1-linux-web",
   "status": "current",
   "production_claim": true,
   "experimental": false,
+  "producer": "scripts/release/surface/release-gate.sh",
+  "git_head": $(json_string "$git_head"),
+  "version": $(json_string "$version"),
+  "git_dirty": $git_dirty,
+  "host_os": $(json_string "$host_os"),
+  "host_arch": $(json_string "$host_arch"),
+  "generated_at_utc": $(json_string "$generated_at_utc"),
+  "command_line": $(json_string "$command_line"),
   "supported_targets": [
     "headless",
     "linux-x64",

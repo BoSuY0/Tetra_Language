@@ -3708,6 +3708,21 @@
       "unsafe_policy": "always"
     },
     {
+      "name": "core.island_reset",
+      "aliases": [
+        "island_reset"
+      ],
+      "param_types": [
+        "island"
+      ],
+      "return_type": "island",
+      "effects": [
+        "islands",
+        "mem"
+      ],
+      "unsafe_policy": "always"
+    },
+    {
       "name": "core.load_i32",
       "param_types": [
         "ptr",

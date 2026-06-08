@@ -690,6 +690,36 @@ uses alloc, capability, mem:
 	}
 }
 
+func TestTextInsertBytesSourceLoopUsesProofTaggedUncheckedLoad(t *testing.T) {
+	prog := lowerProofProgram(t, `
+func insert_shape(buf: inout []u8, idx: Int, bytes: []u8) -> Int
+uses mem:
+    var i: Int = 0
+    while i < bytes.len:
+        buf[idx + i] = bytes[i]
+        i = i + 1
+    return i
+
+func main() -> Int
+uses alloc, mem:
+    var buf: []u8 = make_u8(4)
+    var bytes: []u8 = make_u8(2)
+    bytes[0] = 79
+    bytes[1] = 75
+    return insert_shape(buf, 0, bytes)
+`)
+	fn := findIRFunc(t, prog, "insert_shape")
+	if countInstrKind(fn, ir.IRIndexLoadU8) != 0 {
+		t.Fatalf("insert_bytes source loop should not keep checked bytes[i] load: %#v", fn.Instrs)
+	}
+	if got := firstProofID(fn, ir.IRIndexLoadU8Unchecked); !strings.HasPrefix(got, "proof:while:") {
+		t.Fatalf("insert_bytes source loop proof id = %q, want proof:while prefix; instrs=%#v", got, fn.Instrs)
+	}
+	if countInstrKind(fn, ir.IRIndexStoreU8) != 1 {
+		t.Fatalf("insert_bytes destination store should remain one checked buf[idx+i] store: %#v", fn.Instrs)
+	}
+}
+
 func TestRawSliceFromPartsLowersElementSizeShift(t *testing.T) {
 	prog := lowerProofProgram(t, `
 func main() -> Int

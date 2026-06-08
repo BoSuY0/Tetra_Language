@@ -46,7 +46,7 @@ report_dir="$(cd "$report_dir" && pwd)"
 report_path="$report_dir/surface-headless-release-text-input.json"
 
 go run ./tools/cmd/surface-runtime-smoke --mode headless-release-text-input --source examples/surface_release_text_input.tetra --report "$report_path"
-go run ./tools/cmd/validate-surface-runtime --report "$report_path" --release surface-v1
+go run ./tools/cmd/validate-surface-runtime --report "$report_path" --release text-input
 go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
 go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
 

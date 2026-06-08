@@ -70,6 +70,20 @@ func TestValidateWASMImportsAcceptsTargetAllowlists(t *testing.T) {
 	}
 }
 
+func TestWasmImportsValidateBrowserReleaseSurfaceHostABI(t *testing.T) {
+	err := validateWASMImports(buildWASMModule([]wasmImport{
+		{Module: "tetra_web_v1", Name: "console_log"},
+		{Module: "tetra_surface_host_v1", Name: "__tetra_surface_open"},
+		{Module: "tetra_surface_host_v1", Name: "__tetra_surface_present_rgba"},
+		{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_event_text_into"},
+		{Module: "tetra_surface_host_v1", Name: "__tetra_surface_clipboard_write_text"},
+		{Module: "tetra_surface_host_v1", Name: "__tetra_surface_poll_composition_into"},
+	}), "wasm32-web")
+	if err != nil {
+		t.Fatalf("validateWASMImports browser release host ABI: %v", err)
+	}
+}
+
 func TestValidateWASMImportsRejectsExtraImports(t *testing.T) {
 	tests := []struct {
 		name    string

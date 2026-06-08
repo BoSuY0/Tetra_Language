@@ -23,8 +23,8 @@ func TestReleaseSurfaceSmokeScriptsUseStrictReleaseValidation(t *testing.T) {
 			t.Fatalf("read Surface release script %s: %v", script, err)
 		}
 		text := string(raw)
-		if strings.Contains(text, "validate-surface-runtime") && !strings.Contains(text, "--release surface-v1") {
-			t.Fatalf("Surface release script %s validates runtime reports without --release surface-v1", script)
+		if strings.Contains(text, "validate-surface-runtime") && !strings.Contains(text, "--release ") {
+			t.Fatalf("Surface release script %s validates runtime reports without a strict --release selector", script)
 		}
 		if strings.Contains(text, `--report ""`) {
 			t.Fatalf("Surface release script %s has empty --report argument", script)
@@ -56,6 +56,8 @@ func TestReleaseSurfaceAPIStabilityGateDocumentsStableAPIChecks(t *testing.T) {
 		"go run ./tools/cmd/validate-api-docs --docs",
 		"go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json",
 		"go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json",
+		"public-surface-api-summary.txt",
+		`"public_api_summary": "public-surface-api-summary.txt"`,
 		"surface-api-stability-summary.json",
 	} {
 		if !strings.Contains(text, want) {
@@ -972,6 +974,16 @@ func TestReleaseSurfaceFinalReleaseGateRunsCurrentSurfaceV1Evidence(t *testing.T
 		"surface-wasm32-web-release-accessibility.json",
 		"surface-release-summary.json",
 		"artifact-hashes.json",
+		"source \"$script_dir/report-dir-guard.sh\"",
+		"surface_release_require_fresh_report_dir \"$report_dir\" \"$repo_root\" \"surface_release_gate:\"",
+		"\"git_head\":",
+		"\"git_dirty\":",
+		"\"host_os\":",
+		"\"host_arch\":",
+		"\"producer\": \"scripts/release/surface/release-gate.sh\"",
+		"\"generated_at_utc\":",
+		"\"command_line\":",
+		"\"version\":",
 		"go run ./tools/cmd/validate-surface-runtime --report \"$report_dir/surface-release-summary.json\" --release surface-v1",
 		"go run ./tools/cmd/validate-artifact-hashes --write --root \"$report_dir\" --out \"$report_dir/artifact-hashes.json\"",
 		"go run ./tools/cmd/validate-artifact-hashes --manifest \"$report_dir/artifact-hashes.json\"",

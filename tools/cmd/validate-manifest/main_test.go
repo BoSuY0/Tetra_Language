@@ -148,6 +148,35 @@ func TestValidateFeaturesRequiresMemoryProductionFinalAuditDocs(t *testing.T) {
 	}
 }
 
+func TestManifestSurfaceRequiresCurrentAndUnsupportedSurfaceRows(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("../../../docs/generated/manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Features []featureManifest `json:"features"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	filtered := manifest.Features[:0]
+	for _, feature := range manifest.Features {
+		if feature.ID == "ui.surface-windows-x64" {
+			continue
+		}
+		filtered = append(filtered, feature)
+	}
+	manifest.Features = filtered
+
+	err = validateFeatures(manifest.Features)
+	if err == nil {
+		t.Fatalf("expected missing Surface unsupported target row failure")
+	}
+	if !strings.Contains(err.Error(), "ui.surface-windows-x64") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateFeaturesRejectsFutureStatusPromotionWithoutRegistryUpdate(t *testing.T) {
 	features := []featureManifest{
 		{ID: "cli.core", Name: "CLI", Status: "current", Since: "v0.2.0", Scope: "core CLI", Stability: "supported", Docs: []string{"docs/spec/current_supported_surface.md"}},

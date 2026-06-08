@@ -44,6 +44,54 @@ func TestReleasePackagesWorkflowRunsMemoryProductionGateBeforePublishing(t *test
 	}
 }
 
+func TestReleasePackagesRunsSurfaceGateBeforePublishing(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
+	if err != nil {
+		t.Fatalf("read release-packages workflow: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		"name: Surface release gate",
+		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-release-v1"`,
+		`bash scripts/release/surface/release-gate.sh --report-dir "$report_dir"`,
+		"name: Surface experimental regression gate",
+		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-experimental-regression"`,
+		`bash scripts/release/surface/gate.sh --report-dir "$report_dir"`,
+		"name: Safe view lifetime gate",
+		`report_dir="${{ steps.meta.outputs.out_dir }}/safe-view-lifetime"`,
+		`bash scripts/release/safe-view-lifetime/gate.sh --report-dir "$report_dir"`,
+		"name: Surface API stability gate",
+		`report_dir="${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1"`,
+		`bash scripts/release/surface/api-stability-gate.sh --report-dir "$report_dir"`,
+		`${{ steps.meta.outputs.out_dir }}/surface-release-v1/**`,
+		`${{ steps.meta.outputs.out_dir }}/surface-experimental-regression/**`,
+		`${{ steps.meta.outputs.out_dir }}/safe-view-lifetime/**`,
+		`${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1/**`,
+		"Surface v1 release evidence runs the Surface release gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("release-packages workflow missing Surface gate detail %q", want)
+		}
+	}
+
+	gateIdx := strings.Index(text, "name: Surface release gate")
+	for _, publishStep := range []string{
+		"name: Upload package artifacts",
+		"name: Create or update GitHub Release",
+		"name: Build container image",
+		"name: Publish GHCR image",
+		"name: Update Homebrew tap",
+	} {
+		publishIdx := strings.Index(text, publishStep)
+		if publishIdx < 0 {
+			t.Fatalf("release-packages workflow missing publish step %q", publishStep)
+		}
+		if gateIdx < 0 || gateIdx > publishIdx {
+			t.Fatalf("Surface release gate must run before %q", publishStep)
+		}
+	}
+}
+
 func TestReleasePackagesWorkflowReleaseNotesDeclarePerformanceNonClaims(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "release-packages.yml"))
 	if err != nil {

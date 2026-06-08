@@ -588,6 +588,9 @@ func validateFeatures(features []featureManifest) error {
 	if err := validateFeatureTruthBoundaries(featureByID); err != nil {
 		return err
 	}
+	if err := validateSurfaceFeatureRows(featureByID); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -682,6 +685,72 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 		for _, want := range required {
 			if !strings.Contains(haystack, want) {
 				return fmt.Errorf("feature %s missing truth-boundary phrase %q", id, want)
+			}
+		}
+		for _, doc := range docChecks[id] {
+			if !containsString(feature.Docs, doc) {
+				return fmt.Errorf("feature %s missing doc reference %s", id, doc)
+			}
+		}
+	}
+	return nil
+}
+
+func validateSurfaceFeatureRows(features map[string]featureManifest) error {
+	if _, ok := features["ui.surface-core"]; !ok {
+		return nil
+	}
+	requiredStatus := map[string]string{
+		"ui.surface-core":             "current",
+		"ui.surface-headless":         "current",
+		"ui.surface-linux-x64":        "current",
+		"ui.surface-web-wasm":         "current",
+		"ui.surface-component-model":  "current",
+		"ui.surface-toolkit-v1":       "current",
+		"ui.surface-text-input-v1":    "current",
+		"ui.surface-accessibility-v1": "current",
+		"ui.surface-macos-x64":        "unsupported",
+		"ui.surface-windows-x64":      "unsupported",
+		"ui.surface-wasm32-wasi":      "unsupported",
+	}
+	docChecks := map[string][]string{
+		"ui.surface-core":             {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-headless":         {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-linux-x64":        {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-web-wasm":         {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-component-model":  {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-toolkit-v1":       {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
+		"ui.surface-text-input-v1":    {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
+		"ui.surface-accessibility-v1": {"docs/spec/surface_v1.md", "docs/user/surface_guide.md", "docs/user/examples_index.md"},
+		"ui.surface-macos-x64":        {"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-windows-x64":      {"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
+		"ui.surface-wasm32-wasi":      {"docs/spec/surface_v1.md", "docs/release/surface_v1_release_contract.md"},
+	}
+	phraseChecks := map[string][]string{
+		"ui.surface-core":             {"surface-v1-linux-web", "headless, linux-x64 real-window, and wasm32-web browser-canvas", "unsupported or future work"},
+		"ui.surface-headless":         {"release evidence target", "not as an end-user platform claim"},
+		"ui.surface-linux-x64":        {"linux-x64-release-window-v1", "no GTK, Qt, platform widget, metadata sidecar playback, macOS, or Windows production claim"},
+		"ui.surface-web-wasm":         {"wasm32-web-browser-canvas-release-v1", "DOM UI", "Node-only evidence"},
+		"ui.surface-component-model":  {"component-tree-api release subset", "dynamic trait-object", "witness-table"},
+		"ui.surface-toolkit-v1":       {"production-widgets-v1", "no magical widgets, platform widgets, DOM UI, user JS"},
+		"ui.surface-text-input-v1":    {"production-text-input-v1", "rich text"},
+		"ui.surface-accessibility-v1": {"platform-bridge-v1", "screen-reader claims"},
+		"ui.surface-macos-x64":        {"unsupported for Surface v1", "no production target evidence"},
+		"ui.surface-windows-x64":      {"unsupported for Surface v1", "no production target evidence"},
+		"ui.surface-wasm32-wasi":      {"unsupported for Surface v1", "no production target evidence"},
+	}
+	for id, wantStatus := range requiredStatus {
+		feature, ok := features[id]
+		if !ok {
+			return fmt.Errorf("features missing %s", id)
+		}
+		if feature.Status != wantStatus {
+			return fmt.Errorf("feature %s status = %s, want %s", id, feature.Status, wantStatus)
+		}
+		haystack := feature.Scope + " " + feature.Stability
+		for _, want := range phraseChecks[id] {
+			if !strings.Contains(haystack, want) {
+				return fmt.Errorf("feature %s missing Surface scope phrase %q", id, want)
 			}
 		}
 		for _, doc := range docChecks[id] {

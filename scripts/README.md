@@ -3,6 +3,7 @@
 Script entrypoints are grouped by purpose:
 
 - `scripts/ci`: CI-facing test and verification wrappers
+- `scripts/analysis`: evidence collection and audit helpers that are not release gates
 - `scripts/dev`: local developer workflow entrypoints
 - `scripts/release`: versioned release gate, security, and smoke wrappers
 - `scripts/tools`: implementation helpers used by scripts

@@ -43,13 +43,13 @@ surface. New release-supported Surface apps should use ordinary Tetra structs,
 
 ```sh
 bash scripts/release/surface/release-gate.sh \
-  --report-dir /tmp/tetra-surface-release-v1-current
+  --report-dir reports/surface-ui-production-final/surface-release-v1
 
 bash scripts/release/surface/gate.sh \
-  --report-dir /tmp/tetra-surface-experimental-regression-current
+  --report-dir reports/surface-ui-production-final/surface-experimental-regression
 
 bash scripts/release/safe-view-lifetime/gate.sh \
-  --report-dir /tmp/tetra-safe-view-lifetime-surface-release-current
+  --report-dir reports/surface-ui-production-final/safe-view-lifetime
 ```
 
 The release gate is the source of truth for the final current claim. Reports

@@ -163,9 +163,10 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   experimental, unsupported, planned, and post-v1 decisions. This is
   evidence/report coverage only: it does not claim a full v1 language
   guarantee, runtime generic values, trait objects, runtime protocol values,
-  a macro/metaprogramming system, full structured concurrency,
-  cross-platform production UI runtime, distributed EcoNet, proof-carrying
-  capsules, performance, runtime behavior change, or safe-semantics change.
+  a macro/metaprogramming system, or full structured concurrency.
+  No cross-platform production UI runtime is claimed. Distributed EcoNet,
+  proof-carrying capsules, performance, runtime behavior change, and
+  safe-semantics change are also not claimed.
 - Local Eco package lifecycle validation for verify, lock generation/validation
   through `--lock` workflows, pack/unpack, vault, stable local publish
   metadata, beta publish metadata, target-aware downloads, and stable/beta
@@ -1294,7 +1295,7 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   Full dynamic trait-object child lists, full IME/String text editing,
   clipboard/rich text, platform accessibility integration, screen-reader
   validation, production widget toolkit claims, production accessibility
-  claims, and witness-table dispatch remain future work. The
+  claims, and witness-table dispatch are not claimed and remain future work. The
   headless starter gate
   `scripts/release/surface/surface-headless-smoke.sh` now emits
   `tetra.surface.runtime.v1` evidence with deterministic pre/post

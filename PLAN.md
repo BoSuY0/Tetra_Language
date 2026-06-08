@@ -1,109 +1,130 @@
-# Tetra Memory + IslandKernel Production Plan Tracker
+# Tetra Surface/UI Production Plan Tracker
 
-External plan: `/home/tetra/Downloads/tetra-memory-islands-production-plan.md`
+External plan: `/home/tetra/Downloads/surface-ui-production-implementation-plan.md`
 
 ## Current Strategy
 
-1. Treat current code/tests/validators as authoritative; the external plan's
-   dump-era observations must be rechecked against this live worktree.
-2. Preserve the completed memory-production baseline from
-   `.workflow/memory-production-ready-v1/final-report.md`; do not redo closed
-   `MEM-D04`, `MEM-E02`, `MEM-E05`, `MEM-F02`, `MEM-F04`, or `MEM-G04` unless
-   current evidence contradicts them.
-3. Close P0 blockers first: host broker lifecycle leak, IslandKernel skeleton,
-   IslandID/Epoch facts, linear token semantics, independent proof verifier,
-   and leak/soak gate.
-4. Keep docs conservative until code/test/validator/release evidence exists.
+1. Treat the external plan as the scope source, but recheck every observation
+   against this live repo with `.git`.
+2. Reset top-level goal-loop state from the old Memory/IslandKernel contract to
+   `SURFPROD-P00..P13`.
+3. Start with `SURFPROD-P00` truth audit script because current evidence is
+   mixed and target-host blockers must be recorded honestly before code/gate
+   fixes.
+4. Work packet-by-packet with RED/GREEN evidence; do not promote starter or
+   blocked evidence to production release evidence.
 
 ## Packet Matrix
 
 | Packet | Status | Acceptance Evidence |
 | --- | --- | --- |
-| `MEM-ISLAND-P00` truth audit | pending | live inventory, audit doc/script, focused core/validator gates |
-| `MEM-ISLAND-P01` vocabulary/claim contract | done | island claim vocab, docs overclaim RED/GREEN, report validator island proof gate, real docs/manifest validators |
-| `MEM-ISLAND-P02` IslandKernel skeleton | done | `go test ./compiler/internal/islandkernel -count=1`; pure API only, no compiler integration yet |
-| `MEM-ISLAND-P03` IslandID/Epoch facts | done | memoryfacts/plir/report schema fields, projection mutation tests, CLI schema guard |
-| `MEM-ISLAND-P04` linear IslandToken | done_narrow | `core.island_reset` RED/GREEN, stale token/slice semantics, PLIR epoch advancement, validation/backend/report projection sweeps |
-| `MEM-ISLAND-P05` typed proof IR | done_narrow | BCE `ProofTerm` RED/GREEN, PLIR/validation typed proof mismatch rejection, memoryfacts/report typed proof projection, focused P05 gates |
-| `MEM-ISLAND-P06` storage/lowering truth | pending | planned/actual/report/proof storage gates |
-| `MEM-ISLAND-P07` ExternalUnsafeIsland quarantine | pending | unsafe/external promotion rejection gates |
-| `MEM-ISLAND-P08` actor/task/request island boundaries | pending | borrowed boundary rejection and moved-owned transfer gates |
-| `MEM-ISLAND-P09` runtime island allocator metadata | pending | runtimeabi/compiler runtime island metadata tests |
-| `MEM-ISLAND-P10` debug/sanitize mode | pending | sanitizer trap fixtures and smoke rows |
-| `MEM-ISLAND-P11` independent island verifier | pending | `validate-island-proof` CLI and validator fixtures |
-| `MEM-ISLAND-P12` adversarial proof fuzzing | pending | proof mutation oracle and short fuzz artifacts |
-| `MEM-ISLAND-P13` host Go leak audit/tests | done_narrow | close-without-cancel RED/GREEN, focused/race actornet gates, quick host leak blocker summary |
-| `MEM-ISLAND-P15` benchmarks/CI gates | pending | script/workflow static tests and leak/bench schema |
-| `MEM-ISLAND-P16` release gate/artifact attestation | pending | linux-x64 release smoke requires island/leak artifacts and hashes |
-| `MEM-ISLAND-P17` docs correction | pending | docs/manifest overclaim gates |
-| `MEM-ISLAND-P18` final production audit | pending | no unresolved P0/P1 and full final gate stack |
+| `SURFPROD-P00` truth audit script and baseline report | done_narrow | `bash -n scripts/analysis/surface-ui-truth-audit.sh`; `go test -buildvcs=false ./tools/scriptstest -run 'SurfaceUITruthAudit|AnalysisScript' -count=1`; baseline `reports/surface-ui-production-audit/p00-baseline/truth-summary.md` |
+| `SURFPROD-P01` Surface release gate hardening | done_narrow | report-dir guard rejects stale/symlink/traversal/absolute/root/non-directory before sub-gates; release summary metadata contract covered by `SurfaceReleaseGate` script tests |
+| `SURFPROD-P02` validator fake-evidence rejection | done_narrow | release summary now requires producer/git/version/host/generated/command metadata; stale/copy negative fixtures reject missing producer, stale git head, and missing command line |
+| `SURFPROD-P03` headless runtime evidence hardening | done_narrow | headless release smoke under `reports/surface-ui-production-p03/headless-release`, `--release headless` validation, artifact hash manifest validation |
+| `SURFPROD-P04` linux-x64 real-window/input lifecycle | done_narrow | no-display fake-root blocked report test; linux release-window smoke under `reports/surface-ui-production-p04/linux-window`; `--release linux-x64-real-window` validation |
+| `SURFPROD-P05` wasm32-web browser-canvas/input | done_narrow | bounded browser smoke under `reports/surface-ui-production-p05/browser`; file-backed Chromium runner avoids localhost hang/argv overflow; `--release wasm32-web-browser`, wasm imports, and artifact hashes validate |
+| `SURFPROD-P06` text/input/clipboard/IME examples | done_narrow | text release example builds/runs; strict `--release text-input` validation; `insert_bytes` source loop proof regression guards proof validation |
+| `SURFPROD-P07` component tree/layout/toolkit | done_narrow | toolkit/component runtime report under `reports/surface-ui-production-p07/headless-toolkit`; validator rejects single-example production toolkit claim; scoped production-minimal widget comment |
+| `SURFPROD-P08` accessibility metadata/bridge scope | done_narrow | headless/linux/wasm accessibility reports under `reports/surface-ui-production-p08/`; validator/CLI reject target-specific accessibility overclaims without platform probe or browser mirror artifacts |
+| `SURFPROD-P09` safe-view lifetime/resource cleanup | done_narrow | bounded safe-view gate under `reports/surface-ui-production-p09/safe-view-lifetime`; linux cleanup report under `reports/surface-ui-production-p09/linux-window-cleanup`; race Surface/SafeView regex passed |
+| `SURFPROD-P10` API stability/docs generation | done_narrow | API stability gate under `reports/surface-ui-production-p10/surface-api-stability-v1`; docs/manifest validators pass; manifest generation is idempotent and records `core.island_reset` |
+| `SURFPROD-P11` CI release-readiness integration | done_narrow | CI readiness and package publishing workflows run Surface gates without `continue-on-error`; package release uploads Surface reports before publish |
+| `SURFPROD-P12` docs/nonclaims/user guide correction | done_narrow | docs validator rejects Surface overclaims; user guide documents target scope, troubleshooting, starter-vs-release evidence, and release-supported examples |
+| `SURFPROD-P13` final production release candidate gate | blocked_on_manifest_cleanliness | release, experimental, safe-view, API, broad tests, race gate, CI, docs/manifest/hash validators, `git diff --check`, manifest idempotence, final summary, and Graphify update pass; exact `git diff --exit-code -- docs/generated/manifest.json` remains non-zero for the intended `core.island_reset` generated-manifest update |
 
 ## Current Iteration
 
-1. Establish new goal/tracker state for IslandKernel plan. Done: `GOAL.md`,
-   `PLAN.md`, `ATTEMPTS.md`, `NOTES.md`, and `CONTROL.md` now describe
-   `MEM-ISLAND-P00..P18`; previous memory-production evidence remains anchored
-   in `.workflow/memory-production-ready-v1/final-report.md`.
-2. Live P0 audit. Done: `compiler/internal/islandkernel`,
-   `tools/cmd/validate-island-proof`, and `tools/validators/islandproof` were
-   missing then; `go.sum` contains `go.uber.org/goleak` but `go.mod` does not
-   require it, so P13 used a local pprof-stack regression without a dependency
-   change.
-3. First implementation packet. Done narrow: `MEM-ISLAND-P13` fixed
-   `Broker.Close()` without context cancellation, added the required regression
-   and wired `host leak blocker suite` into quick `test-all`; fresh evidence is
-   in `reports/memory-islands-production/test-all-quick-p13-20260608_091350Z/`.
-4. `MEM-ISLAND-P02` IslandKernel skeleton. Done: new isolated package exposes
-   pure decisions for all section 9.2 questions with table-driven tests; no
-   compiler integration or production proof claim yet. Evidence:
-   `go test ./compiler/internal/islandkernel -count=1`, focused
-   islandkernel/memorymodel run, `git diff --check`, and `graphify update .`
-   with `21866 nodes`, `68112 edges`, `1203 communities`.
-5. `MEM-ISLAND-P01` claim vocabulary/docs overclaim guard. Done: shared
-   vocabulary now registers `island_kernel_model_only`,
-   `island_epoch_validated`, `island_sanitize_runtime_checked`, and
-   `island_proof_verified`; memory report validation rejects validated island
-   proof claims unless `validator_name` is `validate-island-proof`; docs
-   validation rejects `Memory 100%`, `IslandKernel complete`, leak-free, and
-   arbitrary unsafe pointer-safety wording outside explicit nonclaim context.
-   Evidence includes RED/GREEN focused tests, real `verify-docs --manifest`,
-   `validate-manifest`, `git diff --check`, and `graphify update .` with
-   `21876 nodes`, `68139 edges`, `1198 communities`.
-6. `MEM-ISLAND-P03` IslandID/Epoch facts. Done: `Fact`, `ReportRow`, PLIR
-   `Fact`, and standalone `validate-memory-report` rows now carry
-   `island_id`, `epoch`, and `base_id`; projection rejects `island_id`
-   mutation, island-backed rows without positive epoch, and reports that
-   rewrite invalidated/stale epoch facts as validated; PLIR island allocation
-   facts and `FromPLIRAndAllocPlan` preserve memory-ref identity. Evidence:
-   RED/GREEN schema, CLI, PLIR, and PLIR→memoryfacts tests; focused package
-   sweep; combined P01-P03 sweep; `git diff --check`; `graphify update .` with
-   `21888 nodes`, `68174 edges`, `1189 communities`.
-7. `MEM-ISLAND-P04` linear IslandToken/free/reset semantics. Done narrow:
-   `core.island_reset` is now a consuming builtin with alias/effects metadata,
-   lowering emits `IRIslandReset`, validation treats reset as epoch/lifetime
-   invalidation, PLIR records `island_epoch_advanced` and carries reset epoch
-   onto later island allocations, and linux/x64 plus wasm build-only backends
-   handle the IR instruction. Evidence includes RED/GREEN reset tests,
-   memoryfacts vocabulary/projection coverage, focused package sweeps,
-   `git diff --check`, and `graphify update .` with `21910 nodes`,
-   `68253 edges`, `1202 communities`. P10/P11/P16 still own sanitizer traps,
-   independent proof validation, and release attestation.
-8. `MEM-ISLAND-P05` typed proof IR. Done narrow: BCE proof IDs now carry
-   compiler-owned `ProofTerm` metadata with subject base, index value,
-   operation, range, optional island epoch/base, and derivation source; PLIR
-   verifier rejects missing/mismatched typed bounds proof terms; validation
-   propagates the typed term into `ProofReport`; memoryfacts and
-   `validate-memory-report` project and require structured typed proof fields
-   for validated bounds-proof rows. Evidence: P05 RED compile/mismatch tests,
-   focused package sweeps over PLIR/lower/validation/memoryfacts/report
-   validator, compiler report sweep, `git diff --check`, and `graphify update
-   .` with `21934 nodes`, `68314 edges`, `1191 communities`. Remaining P05
-   broad scope: noalias, storage, and island-move proof terms/invalidation
-   rules; continue through P06-P08/P11 rather than claiming full proof IR.
-9. Next packet. Pending: start `MEM-ISLAND-P06` storage/lowering truth while
-   keeping noalias/storage/island-move typed proof completion explicit.
+1. `SURFPROD-P00` done as a narrow truth-audit packet. The baseline report
+   honestly records `production_ready_claim: false`, `12 PASS`, `1 BLOCKED`,
+   and `1 FAIL` at git head `3e489e567edc6ab7e537594313a9719a473aea38`.
+2. `SURFPROD-P01` done as a narrow release-gate hardening slice: invalid
+   report dirs now fail before sub-gates, and the release summary path records
+   same-run metadata fields. A full fresh release-gate pass is still deferred
+   until later runtime/browser packets close target blockers.
+3. `SURFPROD-P02` done as a narrow validator hardening slice: release summaries
+   now reject copied/stale producer metadata and valid fixtures include same-run
+   metadata. Existing fake claim fixtures still pass the full validator package
+   sweep.
+4. `SURFPROD-P03` done as a narrow headless release evidence slice: the
+   headless release smoke writes built binary and runner-trace artifacts under
+   `reports/surface-ui-production-p03/headless-release`, validates with
+   `--release headless`, and validates artifact hashes.
+5. `SURFPROD-P04` done as a narrow linux release-window slice on this host:
+   no-display fake-root execution writes a blocked report, and the live host
+   produced validated `linux-x64-release-window-v1` evidence under
+   `reports/surface-ui-production-p04/linux-window`.
+6. `SURFPROD-P05` done as a narrow wasm32-web browser release slice: the
+   browser smoke has timeout/cleanup, uses a file-backed runner instead of a
+   localhost mini-server, rejects Node-only release substitution, validates wasm
+   imports, and writes hash-validated browser-canvas release evidence under
+   `reports/surface-ui-production-p05/browser`.
+7. `SURFPROD-P06` done as a narrow text/input/clipboard/IME slice: the
+   release text-input example builds, the canonical headless text-input report
+   validates with `--release text-input`, validators still require UTF-8,
+   clipboard owned-copy, composition, and safe-view evidence, and
+   `compiler/internal/lower` now has an `insert_bytes` loop-shape regression
+   for the proof-tagged `bytes[i]` source load.
+8. `SURFPROD-P07` done as a narrow component tree/toolkit slice: production
+   toolkit evidence is canonical under
+   `reports/surface-ui-production-p07/headless-toolkit`, validator coverage now
+   rejects single-example production toolkit claims, and `lib/core/widgets.tetra`
+   is labelled as production-minimal scoped rather than broad experimental UI
+   framework parity.
+9. `SURFPROD-P08` done as a narrow accessibility scope slice: headless
+   accessibility keeps only `headless_platform_tree_probe`, linux accessibility
+   requires `accessibility_bridge=true` plus `linux-accessibility-platform-probe`
+   artifact/process evidence, and wasm accessibility requires browser
+   snapshot/mirror host flags plus runner-trace payload evidence. Full
+   screen-reader/AT-SPI support remains a non-goal.
+10. `SURFPROD-P09` done as a narrow safe-view/resource cleanup slice:
+    `scripts/release/safe-view-lifetime/gate.sh` now runs bounded per-step
+    Surface lifetime/resource cleanup checks with logs and summary markers, the
+    linux release-window script has timeout/cleanup process guards, browser and
+    linux cleanup contracts are covered by script tests, and live evidence
+    exists under `reports/surface-ui-production-p09/`.
+11. `SURFPROD-P10` done as a narrow API stability/docs generation slice:
+    Surface docs now reject `/tmp` current release evidence, generated manifest
+    validation requires current/unsupported Surface feature rows, API stability
+    gate writes a public Surface API summary, `docs/spec/unsafe.md` lists
+    `core.island_reset`, and generated manifest output is idempotent. The exact
+    `git diff --exit-code -- docs/generated/manifest.json` command remains
+    non-zero only because this packet updates the tracked generated manifest
+    with `core.island_reset`; a fresh temp generation diff is clean.
+12. `SURFPROD-P11` done as a narrow CI/package release-readiness slice:
+    exact-name workflow tests now cover Surface readiness, package Surface gates,
+    and no `continue-on-error`; `release-packages.yml` runs Surface release,
+    experimental regression, safe-view lifetime, and API stability gates before
+    any package upload/GitHub release/container/Homebrew publishing path and
+    uploads those report dirs.
+13. `SURFPROD-P12` done as a narrow docs/nonclaims slice: `verify-docs`
+    rejects GPU/native-widget/rich-text/screen-reader/DOM/React/user-JS/
+    cross-platform Surface overclaims, Surface docs use line-local nonclaim
+    wording, `surface_guide.md` documents display/browser blocked-report
+    troubleshooting and starter-vs-release evidence, and examples index includes
+    `surface_release_counter.tetra` with the release-supported examples.
+14. `SURFPROD-P13` final candidate evidence is collected but not fully
+    complete: focused P13 regressions for formal-core typed proof terms,
+    optimizer closure artifact, and shell safety headers are fixed; final
+    Surface release, experimental regression, safe-view lifetime, API
+    stability, focused validator packages, broad compiler/cli/tools tests,
+    focused race regex, CI script, docs/manifest/hash validators,
+    `git diff --check`, manifest idempotence, final summary, and Graphify
+    update all pass. The remaining blocker is the exact
+    `git diff --exit-code -- docs/generated/manifest.json` final check, which
+    is non-zero only because the tracked generated manifest intentionally adds
+    `core.island_reset`.
 
 ## Open Decisions
 
-- None for the current batch. `MEM-ISLAND-P14` is outside repository scope under
-  the active user objective.
+- Linux real-window production evidence may require target host infrastructure.
+  Browser-canvas release evidence is now proven on this host through Chromium
+  file-runner evidence rather than localhost mini-server evidence.
+- The P00 safe-view blocker is closed for Surface P09 scope by making the
+  safe-view lifetime gate bounded and Surface-focused instead of coupling it to
+  unrelated docs manifest verification. P10 closed the docs/manifest consistency
+  gap with validator coverage and generated manifest idempotence evidence.
+- `SURFPROD-P13` cannot be marked complete without resolving how the generated
+  manifest cleanliness check should be handled in an uncommitted worktree. The
+  current manifest is generator-idempotent, but it differs from `HEAD` by the
+  planned `core.island_reset` row.

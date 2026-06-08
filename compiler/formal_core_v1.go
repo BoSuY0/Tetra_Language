@@ -586,16 +586,28 @@ func buildP23FormalCoreRawPointerWitness() (FormalCoreV1Witness, error) {
 func p23FormalCoreProofPLIR(proofID string) *plir.Program {
 	return &plir.Program{Funcs: []plir.Function{{
 		Name: "main",
-		Values: []plir.Value{{
-			ID:         "param:xs",
-			Kind:       plir.ValueParam,
-			Type:       "[]i32",
-			Region:     "fn:main",
-			Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "xs"},
-			Lifetime:   plir.Lifetime{Birth: "entry", Death: "return", Owner: "xs"},
-			Borrow:     plir.BorrowImm,
-			Escape:     plir.EscapeNoEscape,
-		}},
+		Values: []plir.Value{
+			{
+				ID:         "param:xs",
+				Kind:       plir.ValueParam,
+				Type:       "[]i32",
+				Region:     "fn:main",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceParam, Root: "xs"},
+				Lifetime:   plir.Lifetime{Birth: "entry", Death: "return", Owner: "xs"},
+				Borrow:     plir.BorrowImm,
+				Escape:     plir.EscapeNoEscape,
+			},
+			{
+				ID:         "local:i",
+				Kind:       plir.ValueLocal,
+				Type:       "i32",
+				Region:     "fn:main",
+				Provenance: plir.Provenance{Kind: plir.ProvenanceStack, Root: "i"},
+				Lifetime:   plir.Lifetime{Birth: "entry", Death: "return", Owner: "i"},
+				Borrow:     plir.BorrowNone,
+				Escape:     plir.EscapeNoEscape,
+			},
+		},
 		Blocks: []plir.BasicBlock{
 			{ID: "entry", Kind: "entry", Entry: true, Succs: []string{"body"}},
 			{ID: "body", Kind: "while_body", Preds: []string{"entry"}, Ops: []string{"op0"}, Exit: true},
@@ -606,7 +618,7 @@ func p23FormalCoreProofPLIR(proofID string) *plir.Program {
 		Facts: []plir.Fact{
 			{ID: "known", Kind: plir.FactProvenanceKnown, ValueID: "param:xs"},
 			{ID: "len", Kind: plir.FactLenStable, ValueID: "param:xs"},
-			{ID: "range", Kind: plir.FactIndexInRange, ValueID: "param:xs", Range: "0..xs.len", ProofID: proofID, Source: "formal-core:1:1"},
+			{ID: "range", Kind: plir.FactIndexInRange, ValueID: "local:i", Range: "0..xs.len", ProofID: proofID, Source: "formal-core:1:1"},
 		},
 		ProofGuards: []plir.ProofGuard{{
 			ID:        proofID,
@@ -622,6 +634,16 @@ func p23FormalCoreProofPLIR(proofID string) *plir.Program {
 			OpID:    "op0",
 			UseKind: "bounds_check",
 			Source:  "formal-core:1:1",
+		}},
+		ProofTerms: []plir.ProofTerm{{
+			ID:            proofID,
+			Kind:          "bounds_check",
+			SubjectBaseID: "xs",
+			IndexValueID:  "local:i",
+			Operation:     "index_load",
+			Range:         "0..xs.len",
+			Source:        "formal-core:1:1",
+			FactsUsed:     []string{"range"},
 		}},
 	}}}
 }
