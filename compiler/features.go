@@ -551,8 +551,8 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "Cross-platform UI runtime promotion gate",
 			Status:    FeatureStatusExperimental,
 			Since:     "v0.4.0",
-			Scope:     "tetra.ui.platform.v1 full-platform UI runtime promotion gate for Linux, Windows, macOS, and Web evidence; Windows/macOS require real target-host UI runtime reports before they can count as production UI runtime targets",
-			Stability: "not production until scripts/release/full_platform/ui-runtime-gate.sh passes with Linux, Windows, macOS, and Web runtime-backed reports plus artifact hashes; blocked, build-only, metadata-only, runtime-less, docs-only, sidecar-only, fake/mock/placeholder, and startup_failure reports are blockers rather than runtime proof",
+			Scope:     "tetra.ui.platform-runtime.v1 full-platform UI runtime promotion gate for Linux, Windows, macOS, and Web evidence; Windows/macOS require real Windows/macOS target-host reports before they can count as production UI runtime targets",
+			Stability: "not production until the full-platform UI runtime promotion gate passes with real Windows/macOS target-host reports and rejects metadata-only, runtime-less, build-only, sidecar-only, fake/mock/placeholder, and startup_failure evidence as blockers rather than platform runtime proof",
 			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/ui_v1.md", "docs/user/wasm_ui_guide.md"},
 		},
 	}

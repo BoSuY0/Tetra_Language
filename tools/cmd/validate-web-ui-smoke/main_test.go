@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const validWebUIRuntimeTrace = "window/root mount:ok;layout:ok;text:ok;button:ok;input:ok;list:ok;panel:ok;focus:ok;change:ok;select:ok;click:ok;timer:ok;async command:ok;redraw/update:ok;error recovery:ok;main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch"
+const validWebUIRuntimeTrace = "window-mount:ok;root-mount:ok;layout:ok;text:ok;button:ok;input:ok;list:ok;panel:ok;focus:ok;input-event:ok;change:ok;select:ok;click:ok;timer:ok;async-command:ok;redraw-update:ok;error-recovery:ok;main-exit:ok;stdout:ok;nonzero-exit:ok;failure-propagation:ok;repeated-instantiation:ok;ui-event-dispatch:web-command-dispatch"
 
 func TestValidateWebUISmokeReportAcceptsPass(t *testing.T) {
 	uiBundlePath, uiModulePath := writeWebUISidecarArtifacts(t)
@@ -247,7 +247,7 @@ func TestValidateWebUISmokeReportRejectsPassWithoutFullPlatformRuntimeMarkers(t 
 		UIModulePath:       uiModulePath,
 	}
 	err := validateWebUISmokeReport(report)
-	if err == nil || !strings.Contains(err.Error(), "window/root mount") {
+	if err == nil || !strings.Contains(err.Error(), "window-mount:ok") {
 		t.Fatalf("expected full-platform runtime marker rejection, got %v", err)
 	}
 }

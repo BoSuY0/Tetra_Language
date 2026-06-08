@@ -1,25 +1,101 @@
-# Full-Platform UI Runtime Gate
+# scripts/release/full_platform
 
-This directory contains the post-v0.4 full-platform UI runtime promotion gate.
+Release evidence for the full-platform UI runtime promotion wave.
 
-The stable platform runtime evidence contract is `tetra.ui.platform.v1`.
-Linux-x64 keeps its existing `tetra.ui.desktop-runtime.v1` production report,
-while Windows and macOS must provide target-host `tetra.ui.platform.v1`
-reports collected on real Windows/macOS runners. Web evidence remains the
-browser-backed `tetra.web-ui-smoke.v1alpha1` report with real WASM
-instantiation, DOM mount, UI metadata load, event dispatch, state/render
-changes, and runtime trace markers.
+This directory is intentionally separate from `v0_4_0` and `post_v0_4`
+Linux-only evidence. The gate here requires fresh reports for Linux, Windows,
+macOS, and Web in one report directory. Windows and macOS reports only count as
+production evidence when they were produced by a real target-host runtime runner;
+blocked, build-only, metadata-only, sidecar-only, placeholder, or runtime-less
+reports are rejected by the validators.
 
-`windows-ui-runtime-smoke.sh` and `macos-ui-runtime-smoke.sh` accept
-`--evidence <path>` for reports produced by target-host runners. Without that
-evidence on a non-target host, they write explicit blocked reports and fail.
-Target-host reports must include a fresh RFC3339 `generated_at` timestamp.
-Blocked, stale, build-only, metadata-only, runtime-less, sidecar-only,
-fake/mock/placeholder, docs-only, or `startup_failure` reports do not count as
-production runtime evidence.
+CI fan-in:
 
-Run the full gate with:
+- Run `go run ./tools/cmd/platform-ui-runtime-smoke --target windows-x64
+  --report windows-ui-runtime.json` on a real Windows amd64 runner.
+- Run `go run ./tools/cmd/platform-ui-runtime-smoke --target macos-x64
+  --report macos-ui-runtime.json` on a real macOS amd64 runner.
+- Pass those reports into the Linux aggregation gate with
+  `TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json` and
+  `TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json`.
 
-```sh
-bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime
-```
+Manual target-host evidence:
+
+- To prepare a request bundle with the exact commit, version, and target-host
+  commands, run `bash scripts/release/full_platform/target-host-evidence-request.sh
+  --out-dir reports/full-platform-ui-runtime/target-host-request`. The bundle is
+  validated by `go run ./tools/cmd/validate-target-host-evidence-request` but is
+  not runtime evidence; it is only a handoff for collecting real Windows/macOS
+  reports from the same Git commit.
+- Check out the same Git commit on a real Windows amd64 host and run
+  `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
+  --target windows-x64 --report windows-ui-runtime.json --expected-version
+  v0.4.0 --expected-git-head <commit-sha>`.
+  On Windows hosts without Bash, run
+  `pwsh -File scripts/release/full_platform/windows-ui-runtime-smoke.ps1
+  -Report windows-ui-runtime.json -ExpectedVersion v0.4.0 -ExpectedGitHead
+  <commit-sha>`.
+- Check out the same Git commit on a real macOS amd64 host and run
+  `bash scripts/release/full_platform/target-host-ui-runtime-smoke.sh
+  --target macos-x64 --report macos-ui-runtime.json --expected-version
+  v0.4.0 --expected-git-head <commit-sha>`.
+- Copy those JSON reports to the Linux aggregation host and run
+  `TETRA_WINDOWS_UI_RUNTIME_REPORT=/path/windows-ui-runtime.json
+  TETRA_MACOS_UI_RUNTIME_REPORT=/path/macos-ui-runtime.json
+  bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir
+  reports/full-platform-ui-runtime`.
+- A GitHub Actions `startup_failure` with zero jobs is an infrastructure or
+  account/repository availability blocker. It does not relax the evidence
+  contract: use a working CI runner, self-hosted target-host runner, or manual
+  target-host reports produced from the same Git commit.
+- Before relying on GitHub-hosted Windows/macOS fan-in, run
+  `bash scripts/release/full_platform/actions-availability-preflight.sh
+  --repo OWNER/REPO --branch BRANCH --report
+  reports/full-platform-ui-runtime/actions-availability.json`, then
+  `go run ./tools/cmd/validate-actions-availability --report
+  reports/full-platform-ui-runtime/actions-availability.json`. This preflight
+  must prove a job-backed successful Actions run with logs. This is not runtime evidence;
+  zero jobs, missing logs, `startup_failure`, `BuildFailed`, or unavailable
+  billing visibility remain CI availability blockers before target-host reports
+  can be gathered through Actions. The report also records `expected_git_head`,
+  `run_selection`, and the active workflow registry so stale or deleted workflow
+  records can be separated from the currently active `ci` workflow and from the
+  current Git HEAD.
+- To record that blocker as diagnostic only evidence, run
+  `bash scripts/release/full_platform/github-actions-startup-diagnostic.sh
+  --repo OWNER/REPO --branch BRANCH --canary-branch codex/actions-canary --report
+  reports/full-platform-ui-runtime/github-actions-startup-blocker.json`, then
+  `go run ./tools/cmd/validate-actions-startup-blocker --report
+  reports/full-platform-ui-runtime/github-actions-startup-blocker.json`.
+  This report records repository Actions permissions, self-hosted runner count,
+  `billing_actions_status`, the latest branch startup failures, and a minimal
+  canary workflow startup failure when provided. It proves only that CI did not
+  start jobs; it never replaces Windows/macOS runtime reports. If
+  `billing_actions_status` is `unavailable_missing_user_scope`, refresh the
+  GitHub CLI token with `gh auth refresh -h github.com -s user` before checking
+  whether private-repository Actions minutes or billing availability are the
+  actual account-level blocker.
+
+The wrappers copy those reports into the fresh report directory and re-run the
+strict validators before the cross-platform gate accepts them. The validators
+also require the report `version` and `git_head` to match the source checkout
+used by the aggregation gate, so stale target-host evidence is rejected. The
+target-host reports must include runtime trace markers for process spawn,
+an OS-backed platform window API probe, platform widget tree construction,
+platform event dispatch, platform timer/redraw work, window create/show/close,
+widget tree load, layout, event dispatch, state updates, async commands,
+timers, redraw, and error recovery.
+
+The repository workflow `.github/workflows/full-platform-ui-runtime.yml`
+automates that contract for GitHub Actions: `windows-2025` produces the
+`windows-x64` report, `macos-15-intel` produces the `macos-x64` report, and an
+`ubuntu-24.04` aggregation job downloads those reports and runs
+`scripts/release/full_platform/ui-runtime-gate.sh`. The local Linux aggregation
+gate remains intentionally strict: without target-host reports from those real
+runner jobs, Windows and macOS stay blocked and cannot count as production
+runtime evidence.
+
+The target-host child probe uses real platform APIs: Win32 `user32.dll` controls
+and messages on Windows and an AppKit window/control probe compiled with
+`swiftc` on macOS. If those APIs are unavailable on the runner, the platform
+report stays non-production and the validator rejects it.

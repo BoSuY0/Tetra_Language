@@ -4,62 +4,26 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/full-platform-ui-runtime"
-evidence_path="${TETRA_MACOS_UI_RUNTIME_EVIDENCE:-}"
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/release/full_platform/macos-ui-runtime-smoke.sh [--report-dir DIR] [--evidence PATH]
+Usage: bash scripts/release/full_platform/macos-ui-runtime-smoke.sh [--report-dir DIR]
 
-Copies and validates a macOS target-host tetra.ui.platform.v1 runtime report.
-On non-macOS hosts without --evidence it writes a blocked report and exits
-non-zero; build-only, metadata-only, runtime-less, fake/mock/placeholder, and
-startup_failure evidence never counts as production UI runtime evidence.
+Writes the macOS platform UI runtime smoke report. The report is only a
+production pass on a real macOS target-host runner with runtime-backed UI
+evidence; unsupported hosts write a blocked report and fail.
 USAGE
-}
-
-host_triple() {
-  local kernel
-  local machine
-  kernel="$(uname -s 2>/dev/null || printf unknown)"
-  machine="$(uname -m 2>/dev/null || printf unknown)"
-  case "${kernel}:${machine}" in
-    Linux:x86_64|Linux:amd64)
-      printf 'linux-x64'
-      ;;
-    Linux:i386|Linux:i686)
-      printf 'linux-x86'
-      ;;
-    Darwin:x86_64|Darwin:amd64)
-      printf 'macos-x64'
-      ;;
-    Darwin:arm64|Darwin:aarch64)
-      printf 'macos-arm64'
-      ;;
-    MINGW*:x86_64|MINGW*:amd64|MSYS*:x86_64|MSYS*:amd64|CYGWIN*:x86_64|CYGWIN*:amd64)
-      printf 'windows-x64'
-      ;;
-    *)
-      printf 'unknown-%s-%s' "$kernel" "$machine" | tr '[:upper:]' '[:lower:]'
-      ;;
-  esac
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --report-dir)
-      report_dir="${2:-}"
-      if [[ -z "$report_dir" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "error: --report-dir requires a value" >&2
+        usage >&2
         exit 2
       fi
-      shift 2
-      ;;
-    --evidence)
-      evidence_path="${2:-}"
-      if [[ -z "$evidence_path" ]]; then
-        echo "error: --evidence requires a value" >&2
-        exit 2
-      fi
+      report_dir="$2"
       shift 2
       ;;
     -h|--help)
@@ -77,41 +41,21 @@ done
 cd "$repo_root"
 mkdir -p "$report_dir"
 report_path="$report_dir/macos-ui-runtime.json"
+external_report="${TETRA_MACOS_UI_RUNTIME_REPORT:-}"
+expected_version="$("./tetra" version 2>/dev/null || go run ./cli/cmd/tetra version)"
+expected_git_head="$(git rev-parse HEAD)"
 
-if [[ -n "$evidence_path" ]]; then
-  cp -- "$evidence_path" "$report_path"
-  go run ./tools/cmd/validate-macos-ui-runtime --report "$report_path"
-  go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
-  go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
-  echo "macOS UI runtime target-host report: $report_path"
+if [[ -n "$external_report" ]]; then
+  if [[ ! -f "$external_report" ]]; then
+    echo "error: TETRA_MACOS_UI_RUNTIME_REPORT does not name a readable file: $external_report" >&2
+    exit 2
+  fi
+  cp -- "$external_report" "$report_path"
+  go run ./tools/cmd/validate-macos-ui-runtime --report "$report_path" --expected-version "$expected_version" --expected-git-head "$expected_git_head"
+  echo "macOS platform UI runtime report imported from TETRA_MACOS_UI_RUNTIME_REPORT: $report_path"
   exit 0
 fi
 
-host_triple="$(host_triple)"
-generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-cat >"$report_path" <<JSON
-{
-  "schema": "tetra.ui.platform.v1",
-  "generated_at": "${generated_at}",
-  "status": "blocked",
-  "target": "macos-x64",
-  "host": "${host_triple}",
-  "platform": "macos",
-  "runtime": "platform-ui-macos-x64",
-  "ui_schema": "tetra.ui.v1",
-  "evidence_kind": "target-host-runtime",
-  "source": "scripts/release/full_platform/macos-ui-runtime-smoke.sh",
-  "blocker": "cannot collect production UI runtime evidence on this host; provide a macOS target-host runtime report via --evidence",
-  "processes": [],
-  "contracts": [],
-  "widgets": [],
-  "events": [],
-  "cases": []
-}
-JSON
-
-go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
-go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
-echo "macOS UI runtime blocked report: $report_path" >&2
-echo "cannot collect production UI runtime evidence on this host" >&2
-exit 1
+go run ./tools/cmd/platform-ui-runtime-smoke \
+  --target macos-x64 \
+  --report "$report_path"

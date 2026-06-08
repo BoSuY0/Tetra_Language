@@ -4,34 +4,50 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
+	"os/exec"
+	"strings"
 
-	"tetra_language/tools/validators/uiplatform"
+	"tetra_language/compiler"
+	"tetra_language/tools/validators/platformui"
 )
 
 func main() {
-	reportPath := flag.String("report", "", "path to tetra.ui.platform.v1 Windows UI runtime report")
+	reportPath := flag.String("report", "", "path to Windows UI runtime report")
+	expectedVersion := flag.String("expected-version", compiler.Version(), "expected compiler/runtime version")
+	expectedGitHead := flag.String("expected-git-head", "", "expected git HEAD; defaults to current repository HEAD")
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
 		os.Exit(2)
 	}
-	if err := validateWindowsUIRuntimeReport(*reportPath); err != nil {
+	if strings.TrimSpace(*expectedGitHead) == "" {
+		head, err := currentGitHead()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: could not determine expected git head: %v\n", err)
+			os.Exit(2)
+		}
+		*expectedGitHead = head
+	}
+	raw, err := os.ReadFile(*reportPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := platformui.ValidateReportWithOptions(raw, platformui.ValidateOptions{
+		ExpectedTarget:  "windows-x64",
+		ExpectedVersion: *expectedVersion,
+		ExpectedGitHead: *expectedGitHead,
+	}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func validateWindowsUIRuntimeReport(path string) error {
-	raw, err := os.ReadFile(path)
+func currentGitHead() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	out, err := cmd.Output()
 	if err != nil {
-		return err
+		return "", err
 	}
-	return uiplatform.ValidateReport(raw, uiplatform.Options{
-		Target:  "windows-x64",
-		Host:    "windows-x64",
-		Runtime: "platform-ui-windows-x64",
-		Now:     time.Now().UTC(),
-		MaxAge:  uiplatform.DefaultMaxEvidenceAge,
-	})
+	return strings.TrimSpace(string(out)), nil
 }

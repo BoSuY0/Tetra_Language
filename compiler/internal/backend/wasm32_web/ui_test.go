@@ -48,6 +48,12 @@ func TestUIModuleIncludesSchemaGuardAndRuntimeDispatch(t *testing.T) {
 		`select.setAttribute("data-tetra-kind", "list");`,
 		`select.addEventListener("select", dispatch);`,
 		`select.addEventListener("change", dispatch);`,
+		`host.setAttribute("data-tetra-widget", "panel");`,
+		`input.setAttribute("data-tetra-widget", "input");`,
+		`select.setAttribute("data-tetra-widget", "list");`,
+		`host.setAttribute("data-tetra-timer", "tick");`,
+		`host.setAttribute("data-tetra-async", "complete");`,
+		`host.setAttribute("data-tetra-redraw-count", String(redrawCount));`,
 		`button.addEventListener("click"`,
 		`new URL("app.ui.json", import.meta.url)`,
 	} {

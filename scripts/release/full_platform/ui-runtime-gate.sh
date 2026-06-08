@@ -4,26 +4,41 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
 report_dir="$repo_root/reports/full-platform-ui-runtime"
+failures=0
+failed_steps=()
 
 usage() {
   cat <<'USAGE'
 Usage: bash scripts/release/full_platform/ui-runtime-gate.sh [--report-dir DIR]
 
-Runs the full-platform UI runtime promotion gate. This gate is intentionally
-strict: Windows and macOS must provide real target-host runtime reports, not
-build-only, metadata-only, runtime-less, fake/mock/placeholder, startup_failure,
-or remote-blocked evidence.
+Runs the full-platform UI runtime production gate for Linux, Windows, macOS,
+and Web. This gate fails unless every platform has fresh runtime-backed
+evidence and artifact hashes validate.
+
+For CI fan-in, set TETRA_WINDOWS_UI_RUNTIME_REPORT and
+TETRA_MACOS_UI_RUNTIME_REPORT to validated target-host reports produced on real
+Windows and macOS runners.
+
+For diagnostic-only GitHub Actions startup blockers, set
+TETRA_ACTIONS_STARTUP_BLOCKER_REPORT to a report validated by
+tools/cmd/validate-actions-startup-blocker. This never replaces Windows/macOS
+runtime evidence.
+
+The gate also writes a diagnostic-only target-host request bundle under the
+report directory. It is a validated handoff for collecting Windows/macOS
+reports, not runtime evidence.
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --report-dir)
-      report_dir="${2:-}"
-      if [[ -z "$report_dir" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "error: --report-dir requires a value" >&2
+        usage >&2
         exit 2
       fi
+      report_dir="$2"
       shift 2
       ;;
     -h|--help)
@@ -40,93 +55,153 @@ done
 
 cd "$repo_root"
 
-require_fresh_report_dir() {
-  if [[ -d "$report_dir" ]] && find "$report_dir" -mindepth 1 -maxdepth 1 | grep -q .; then
-    echo "full-platform UI runtime gate: --report-dir requires a fresh empty report directory: $report_dir" >&2
-    exit 2
+tmp_dir=""
+cleanup() {
+  if [[ -n "$tmp_dir" ]]; then
+    rm -rf "$tmp_dir"
   fi
 }
+trap cleanup EXIT
 
-require_fresh_report_dir
-mkdir -p "$report_dir"
+actions_startup_blocker_report="${TETRA_ACTIONS_STARTUP_BLOCKER_REPORT:-}"
+actions_startup_blocker_report_snapshot=""
+if [[ -n "$actions_startup_blocker_report" && -f "$actions_startup_blocker_report" ]]; then
+  tmp_dir="$(mktemp -d)"
+  actions_startup_blocker_report_snapshot="$tmp_dir/github-actions-startup-blocker.json"
+  cp -- "$actions_startup_blocker_report" "$actions_startup_blocker_report_snapshot"
+fi
 
-failures=()
-
-record_failure() {
-  local name="$1"
-  local code="$2"
-  failures+=("${name} (exit ${code})")
-  echo "full-platform UI runtime gate: ${name} failed with exit ${code}" >&2
+prepare_report_dir() {
+  mkdir -p "$report_dir"
+  rm -f "$report_dir/native-ui-linux-x64.json"
+  rm -f "$report_dir/native-ui-runtime-linux-x64.integration.json"
+  rm -f "$report_dir/ui-production-runtime-linux-x64.json"
+  rm -f "$report_dir/windows-ui-runtime.json"
+  rm -f "$report_dir/macos-ui-runtime.json"
+  rm -f "$report_dir/web-smoke.json"
+  rm -f "$report_dir/web-smoke.dom.html"
+  rm -f "$report_dir/web-smoke.chromium.err"
+  rm -f "$report_dir/web-smoke.ui.json"
+  rm -f "$report_dir/web-smoke.ui.web.mjs"
+  rm -f "$report_dir/github-actions-startup-blocker.json"
+  rm -f "$report_dir/artifact-hashes.json"
+  rm -f "$report_dir/full-platform-ui-runtime-gate.json"
+  rm -rf "$report_dir/target-host-request"
 }
 
-run_required_step() {
+run_step() {
   local name="$1"
   shift
-  set +e
-  "$@"
-  local code=$?
-  set -e
-  if [[ "$code" -ne 0 ]]; then
-    record_failure "$name" "$code"
+  echo "==> ${name}"
+  if "$@"; then
+    echo "ok: ${name}"
+  else
+    local code=$?
+    echo "FAIL: ${name} (exit ${code})" >&2
+    failures=$((failures + 1))
+    failed_steps+=("${name}:${code}")
   fi
 }
 
-go test ./compiler/... ./cli/... ./tools/... -count=1
-go run ./tools/cmd/gen-manifest -o docs/generated/manifest.json
-go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
-go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
-./tetra targets --format=json >"$report_dir/targets.json"
-go run ./tools/cmd/validate-targets --report "$report_dir/targets.json"
+write_gate_report() {
+  local status="pass"
+  if [[ "$failures" -ne 0 ]]; then
+    status="fail"
+  fi
+  {
+    printf '{\n'
+    printf '  "schema": "tetra.full-platform-ui-runtime.gate.v1",\n'
+    printf '  "artifact": "tetra.release.full_platform.ui_runtime.production-gate.v1",\n'
+    printf '  "status": "%s",\n' "$status"
+    printf '  "report_dir": "%s",\n' "$report_dir"
+    printf '  "failed_steps": ['
+    local first="true"
+    local step
+    for step in "${failed_steps[@]}"; do
+      if [[ "$first" == "true" ]]; then
+        first="false"
+      else
+        printf ', '
+      fi
+      printf '"%s"' "$step"
+    done
+    printf ']\n'
+    printf '}\n'
+  } >"$report_dir/full-platform-ui-runtime-gate.json"
+}
 
-run_required_step "native UI linux-x64 smoke" bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh --report-dir "$report_dir"
-run_required_step "native UI linux-x64 validator" go run ./tools/cmd/validate-native-ui-runtime --report "$report_dir/native-ui-linux-x64.json"
+prepare_report_dir
 
-run_required_step "UI production runtime linux-x64 smoke" bash scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh --report-dir "$report_dir"
-run_required_step "UI production runtime linux-x64 validator" go run ./tools/cmd/validate-ui-production-runtime --report "$report_dir/ui-production-runtime-linux-x64.json"
+run_step baseline-tests go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step manifest-gen go run ./tools/cmd/gen-manifest -o docs/generated/manifest.json
+run_step docs-verify go run ./tools/cmd/verify-docs --manifest docs/generated/manifest.json
+run_step manifest-validate go run ./tools/cmd/validate-manifest --manifest docs/generated/manifest.json
+run_step targets-validate go run ./tools/cmd/validate-targets
 
-run_required_step "windows UI runtime smoke" bash scripts/release/full_platform/windows-ui-runtime-smoke.sh --report-dir "$report_dir"
-run_required_step "windows UI runtime validator" go run ./tools/cmd/validate-windows-ui-runtime --report "$report_dir/windows-ui-runtime.json"
+run_step linux-native-ui-smoke bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh --report-dir "$report_dir"
+run_step linux-native-ui-validate go run ./tools/cmd/validate-native-ui-runtime --report "$report_dir/native-ui-linux-x64.json"
+run_step linux-ui-production-smoke bash scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh --report-dir "$report_dir"
+run_step linux-ui-production-validate go run ./tools/cmd/validate-ui-production-runtime --report "$report_dir/ui-production-runtime-linux-x64.json"
 
-run_required_step "macOS UI runtime smoke" bash scripts/release/full_platform/macos-ui-runtime-smoke.sh --report-dir "$report_dir"
-run_required_step "macOS UI runtime validator" go run ./tools/cmd/validate-macos-ui-runtime --report "$report_dir/macos-ui-runtime.json"
+run_step target-host-evidence-request-generate bash scripts/release/full_platform/target-host-evidence-request.sh --out-dir "$report_dir/target-host-request"
+run_step target-host-evidence-request-validate go run ./tools/cmd/validate-target-host-evidence-request --report "$report_dir/target-host-request/target-host-evidence-request.json"
 
-run_required_step "web UI runtime smoke" bash scripts/release/v1_0/web-smoke.sh --report "$report_dir/web-smoke.json"
-run_required_step "web UI runtime validator" go run ./tools/cmd/validate-web-ui-smoke --report "$report_dir/web-smoke.json"
+run_step windows-ui-runtime-smoke bash scripts/release/full_platform/windows-ui-runtime-smoke.sh --report-dir "$report_dir"
+run_step windows-ui-runtime-validate go run ./tools/cmd/validate-windows-ui-runtime --report "$report_dir/windows-ui-runtime.json"
+run_step macos-ui-runtime-smoke bash scripts/release/full_platform/macos-ui-runtime-smoke.sh --report-dir "$report_dir"
+run_step macos-ui-runtime-validate go run ./tools/cmd/validate-macos-ui-runtime --report "$report_dir/macos-ui-runtime.json"
 
-run_required_step "cross-platform UI runtime validator" go run ./tools/cmd/validate-cross-platform-ui-runtime \
+run_step web-ui-smoke bash scripts/release/v1_0/web-smoke.sh --report "$report_dir/web-smoke.json"
+run_step web-ui-validate go run ./tools/cmd/validate-web-ui-smoke --report "$report_dir/web-smoke.json"
+
+run_step cross-platform-ui-validate go run ./tools/cmd/validate-cross-platform-ui-runtime \
   --linux "$report_dir/ui-production-runtime-linux-x64.json" \
   --windows "$report_dir/windows-ui-runtime.json" \
   --macos "$report_dir/macos-ui-runtime.json" \
   --web "$report_dir/web-smoke.json"
 
-run_required_step "artifact hash manifest write" go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
-run_required_step "artifact hash manifest validate" go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
+if [[ -n "$actions_startup_blocker_report" ]]; then
+  actions_startup_blocker_import_source="$actions_startup_blocker_report"
+  if [[ -n "$actions_startup_blocker_report_snapshot" ]]; then
+    actions_startup_blocker_import_source="$actions_startup_blocker_report_snapshot"
+  fi
+  run_step actions-startup-blocker-import cp -- "$actions_startup_blocker_import_source" "$report_dir/github-actions-startup-blocker.json"
+  run_step actions-startup-blocker-validate go run ./tools/cmd/validate-actions-startup-blocker --report "$report_dir/github-actions-startup-blocker.json"
+fi
 
-if [[ "${#failures[@]}" -ne 0 ]]; then
-  echo "full-platform UI runtime gate failed:" >&2
-  for failure in "${failures[@]}"; do
-    echo " - ${failure}" >&2
-  done
+write_gate_report
+
+echo "==> artifact-hashes-write"
+if go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"; then
+  echo "ok: artifact-hashes-write"
+else
+  code=$?
+  echo "FAIL: artifact-hashes-write (exit ${code})" >&2
+  failures=$((failures + 1))
+  failed_steps+=("artifact-hashes-write:${code}")
+  write_gate_report
+  go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
+fi
+
+echo "==> artifact-hashes-validate"
+if go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"; then
+  echo "ok: artifact-hashes-validate"
+else
+  code=$?
+  echo "FAIL: artifact-hashes-validate (exit ${code})" >&2
+  failures=$((failures + 1))
+  failed_steps+=("artifact-hashes-validate:${code}")
+  write_gate_report
+  go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
+  go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
+fi
+
+if [[ "$failures" -ne 0 ]]; then
+  echo "full-platform UI runtime gate failed with ${failures} failed step(s)" >&2
+  printf 'failed steps: %s\n' "${failed_steps[*]}" >&2
   exit 1
 fi
 
-cat >"$report_dir/full-platform-ui-runtime-gate.json" <<'JSON'
-{
-  "schema": "tetra.ui.full-platform-runtime-gate.v1",
-  "status": "pass",
-  "contract": "tetra.ui.platform.v1"
-}
-JSON
-
-run_required_step "final artifact hash manifest write" go run ./tools/cmd/validate-artifact-hashes --write --root "$report_dir" --out "$report_dir/artifact-hashes.json"
-run_required_step "final artifact hash manifest validate" go run ./tools/cmd/validate-artifact-hashes --manifest "$report_dir/artifact-hashes.json"
-
-if [[ "${#failures[@]}" -ne 0 ]]; then
-  echo "full-platform UI runtime gate failed:" >&2
-  for failure in "${failures[@]}"; do
-    echo " - ${failure}" >&2
-  done
-  exit 1
-fi
-
-echo "Full-platform UI runtime gate report directory: $report_dir"
+echo "full-platform UI runtime gate report dir: $report_dir"
+echo "required artifact: tetra.release.full_platform.ui_runtime.production-gate.v1"
+echo "artifact hashes: $report_dir/artifact-hashes.json"

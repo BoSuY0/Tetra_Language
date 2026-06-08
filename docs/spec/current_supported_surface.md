@@ -1410,15 +1410,18 @@ green `scripts/release/v0_4_0/gate.sh` report and matching handoff evidence.
   separate `ui.native-runtime` release artifact and does not promote
   macOS/Windows native UI claims.
 - Cross-platform UI runtime promotion is tracked by `ui.platform-runtime` and
-  the `tetra.ui.platform.v1` evidence contract. Target metadata records
-  `ui_runtime_status`: `linux-x64` and `wasm32-web` are production-backed by
-  their current runtime smokes, `windows-x64` and `macos-x64` require real
-  target-host reports before production claims, and `wasm32-wasi` plus
-  build-only Linux x86/x32 targets are unsupported for UI event-dispatch
-  runtime behavior. The full gate at
-  `scripts/release/full_platform/ui-runtime-gate.sh` rejects blocked,
-  build-only, metadata-only, runtime-less, docs-only, sidecar-only,
-  synthetic-only, and `startup_failure` evidence.
+  the separate `tetra.ui.platform-runtime.v1` evidence contract. Target
+  metadata records `ui_runtime_status`: `linux-x64` and `wasm32-web` are
+  production-backed by their current runtime smokes, `windows-x64` and
+  `macos-x64` require real target-host reports before production claims, and
+  `wasm32-wasi` plus build-only Linux x86/x32 targets are unsupported for UI
+  event-dispatch runtime behavior. The full gate at
+  `scripts/release/full_platform/ui-runtime-gate.sh` may import real
+  Windows/macOS target-host reports through `TETRA_WINDOWS_UI_RUNTIME_REPORT`
+  and `TETRA_MACOS_UI_RUNTIME_REPORT`; blocked reports from a Linux host,
+  build-only artifacts, metadata-only bundles, native-shell sidecars,
+  fake/mock/placeholder reports, runtime-less reports, and `startup_failure`
+  diagnostics are explicit blockers rather than production evidence.
 - Build-only Linux x86/x32 target metadata uses `run_mode: "host_probed"`:
   `run_supported` is true only when the current host can execute that exact
   ABI (`i386` compatibility for x86, Linux x32 ABI support for x32), and

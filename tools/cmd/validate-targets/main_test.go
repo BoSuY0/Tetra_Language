@@ -1,9 +1,33 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
+
+func TestReadTargetsReportDefaultsToTargetsCommand(t *testing.T) {
+	raw, err := readTargetsReport("")
+	if err != nil {
+		t.Fatalf("read default targets report: %v", err)
+	}
+	if err := validateTargetsReport(raw); err != nil {
+		t.Fatalf("validate default targets report: %v", err)
+	}
+}
+
+func TestReadTargetsReportReportsTargetsCommandFailure(t *testing.T) {
+	old := runTargetsCommand
+	runTargetsCommand = func() ([]byte, error) {
+		return []byte("runner failed"), errors.New("exit 127")
+	}
+	defer func() { runTargetsCommand = old }()
+
+	_, err := readTargetsReport("")
+	if err == nil || !strings.Contains(err.Error(), "runner failed") || !strings.Contains(err.Error(), "exit 127") {
+		t.Fatalf("unexpected default targets command error: %v", err)
+	}
+}
 
 func TestValidateTargetsReportAcceptsExpectedShape(t *testing.T) {
 	raw := []byte(`{

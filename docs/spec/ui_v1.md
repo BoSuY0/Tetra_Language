@@ -77,11 +77,15 @@ When a build contains a view:
 ## Backend Status
 
 `wasm32-web` is the browser command-dispatch preview backend. The generated web
-module reads the UI JSON bundle, mounts a simple DOM representation before
-running `tetra_main`, dispatches supported DOM events to lowered command
-operations, and refreshes scalar state bindings. The current lowered scalar
-operation set includes direct state assignment plus integer increment and
-decrement patterns of the form `state.field = state.field +/- <integer>`.
+module reads the UI JSON bundle, mounts a deterministic DOM representation
+before running `tetra_main`, dispatches supported DOM events to lowered command
+operations, and refreshes scalar state bindings. The mounted runtime includes a
+panel root, text/binding nodes, event buttons, an input control bound to the
+first mutable state field, and a list/select control used by the production
+smoke to exercise focus, input, change, select, click, timer, async, redraw, and
+error-recovery paths. The current lowered scalar operation set includes direct
+state assignment plus integer increment and decrement patterns of the form
+`state.field = state.field +/- <integer>`.
 The same integer delta operations are emitted for supported `+=` and `-=`
 compound assignments.
 String, boolean, and integer-like assignments are hydrated as scalar runtime
@@ -91,10 +95,12 @@ The web preview also mirrors supported style and accessibility metadata into
 DOM preview attributes such as `data-tetra-style-*`,
 `data-tetra-accessibility-*`, `role`, and `aria-label`; full styling/layout
 engines and platform accessibility API integration remain outside this surface.
-Passing web UI smoke evidence must carry the runtime trace marker
-`ui-event-dispatch:web-command-dispatch` plus the full-platform runtime markers
-for window/root mount, layout, text, button, input, list, panel, focus, change,
-select, click, timer, async command, redraw/update, and error recovery.
+Passing production web UI smoke evidence must carry runtime trace markers for
+`window-mount:ok`, `root-mount:ok`, layout, text, button, input, list, panel,
+focus, input-event, change, select, click, timer, async-command,
+redraw-update, error-recovery, and the command-dispatch boundary
+`ui-event-dispatch:web-command-dispatch`. A browser report that only proves
+WASM instantiation or metadata mounting is not full web UI runtime evidence.
 
 Native shell UI is a deterministic text-mode command-dispatch preview backend.
 It renders the same validated state/view metadata into a sidecar, hydrates
@@ -144,8 +150,8 @@ host-native reports and are not promoted by the Linux-x64 report.
 
 ## Full-Platform Promotion Contract
 
-The post-v0.4 promotion gate uses `tetra.ui.platform.v1` for target-host
-Windows/macOS runtime evidence and preserves `tetra.ui.v1` as the
+The post-v0.4 promotion gate uses the separate
+`tetra.ui.platform-runtime.v1` contract and preserves `tetra.ui.v1` as the
 compiler-to-runtime metadata contract. Linux-x64 continues to use the stricter
 `tetra.ui.desktop-runtime.v1` production report, and wasm32-web continues to
 use browser-backed `tetra.web-ui-smoke.v1alpha1` evidence.
@@ -163,9 +169,13 @@ The full-platform gate is
 `scripts/release/full_platform/ui-runtime-gate.sh`. It must reject missing,
 blocked, stale, build-only, metadata-only, runtime-less, docs-only,
 sidecar-only, fake/mock/placeholder, or `startup_failure` evidence.
-Target-host `tetra.ui.platform.v1` reports include an RFC3339 `generated_at`
-timestamp so validators can reject stale evidence instead of reusing old
-Windows/macOS runtime reports.
+Target-host `tetra.ui.platform-runtime.v1` reports include an RFC3339
+`generated_at` timestamp so validators can reject stale evidence instead of
+reusing old Windows/macOS runtime reports. Linux aggregation jobs can import
+reports produced on real Windows/macOS runners with
+`TETRA_WINDOWS_UI_RUNTIME_REPORT` and `TETRA_MACOS_UI_RUNTIME_REPORT`;
+imported reports are copied into the fresh report directory and validated
+before the cross-platform gate uses them.
 
 `wasm32-wasi` in this wave remains non-UI runtime: it may compile UI metadata
 for artifact inspection, but it does not ship web/native UI preview sidecars
@@ -206,7 +216,8 @@ commands that must back the promotion.
 
 ## Post-v1
 
-GTK/Qt/OS widget toolkit backends, macOS/Windows native UI runtime reports,
-richer event payloads, broad input/change/focus behavior, full styling/layout
-systems, and accessibility integration with platform APIs remain post-v1 unless
-promoted by a reviewed scope update.
+GTK/Qt/OS widget toolkit backends, passing macOS/Windows target-host native UI
+runtime reports, richer event payloads beyond the current web smoke controls,
+full styling/layout systems, and accessibility integration with platform APIs
+remain post-v1 unless promoted by a reviewed scope update and a passing
+full-platform gate.

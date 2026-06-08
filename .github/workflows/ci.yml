@@ -1,7 +1,6 @@
 name: ci
 
 on:
-  push:
   workflow_dispatch:
 
 permissions:
@@ -315,6 +314,98 @@ jobs:
           go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_local_report.json
           go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_single_query_matrix_local_report.json
           go run ./tools/cmd/validate-techempower-report --report docs/benchmarks/techempower_scram_endpoint_matrix_local_report.json
+
+  full-platform-ui-runtime-target-host:
+    if: github.event_name != 'schedule'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            target: windows-x64
+            report: windows-ui-runtime.json
+          - os: macos-15-intel
+            target: macos-x64
+            report: macos-ui-runtime.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Build CLI
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Windows) tetra_bin="$RUNNER_TEMP/tetra.exe" ;;
+            *) tetra_bin="$RUNNER_TEMP/tetra" ;;
+          esac
+          go build -o "$tetra_bin" ./cli/cmd/tetra
+          "$tetra_bin" version
+
+      - name: Target-host UI runtime smoke
+        shell: bash
+        run: go run ./tools/cmd/platform-ui-runtime-smoke --target "${{ matrix.target }}" --report "${{ matrix.report }}"
+
+      - name: Validate target-host UI runtime report
+        shell: bash
+        run: |
+          expected_version="$(go run ./cli/cmd/tetra version)"
+          expected_git_head="$(git rev-parse HEAD)"
+          case "${{ matrix.target }}" in
+            windows-x64)
+              go run ./tools/cmd/validate-windows-ui-runtime --report windows-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
+              ;;
+            macos-x64)
+              go run ./tools/cmd/validate-macos-ui-runtime --report macos-ui-runtime.json --expected-version "$expected_version" --expected-git-head "$expected_git_head"
+              ;;
+            *)
+              echo "unexpected target ${{ matrix.target }}" >&2
+              exit 2
+              ;;
+          esac
+
+      - name: Upload target-host UI runtime report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-full-platform-ui-runtime-${{ github.sha }}-${{ matrix.target }}
+          path: ${{ matrix.report }}
+
+  full-platform-ui-runtime-gate-linux:
+    if: github.event_name != 'schedule'
+    needs: full-platform-ui-runtime-target-host
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      TETRA_WINDOWS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-windows-x64/windows-ui-runtime.json
+      TETRA_MACOS_UI_RUNTIME_REPORT: reports/full-platform-ui-runtime-targets/tetra-full-platform-ui-runtime-${{ github.sha }}-macos-x64/macos-ui-runtime.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.20.x"
+
+      - name: Download target-host UI runtime reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tetra-full-platform-ui-runtime-${{ github.sha }}-*
+          path: reports/full-platform-ui-runtime-targets
+
+      - name: Full-platform UI runtime gate
+        shell: bash
+        run: bash scripts/release/full_platform/ui-runtime-gate.sh --report-dir reports/full-platform-ui-runtime
+
+      - name: Upload full-platform UI runtime gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetra-full-platform-ui-runtime-${{ github.sha }}-gate
+          path: reports/full-platform-ui-runtime
 
   coverage-linux:
     if: github.event_name != 'schedule'

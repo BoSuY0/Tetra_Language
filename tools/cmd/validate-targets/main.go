@@ -65,29 +65,53 @@ type targetReportEntry struct {
 	SupportsReleaseOptimize  bool     `json:"supports_release_optimize"`
 }
 
+var runTargetsCommand = func() ([]byte, error) {
+	root, err := gitRoot()
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command("go", "run", "./cli/cmd/tetra", "targets", "--format=json")
+	cmd.Dir = root
+	return cmd.CombinedOutput()
+}
+
+func gitRoot() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	root := strings.TrimSpace(string(out))
+	if root == "" {
+		return "", fmt.Errorf("empty git root")
+	}
+	return root, nil
+}
+
 func main() {
 	var path string
 	flag.StringVar(&path, "report", "", "path to tetra targets --format=json output")
 	flag.Parse()
-	var raw []byte
-	var err error
-	if path == "" {
-		raw, err = exec.Command("./tetra", "targets", "--format=json").Output()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to run ./tetra targets --format=json: %v\n", err)
-			os.Exit(1)
-		}
-	} else {
-		raw, err = os.ReadFile(path)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+	raw, err := readTargetsReport(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	if err := validateTargetsReport(raw); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func readTargetsReport(path string) ([]byte, error) {
+	if path != "" {
+		return os.ReadFile(path)
+	}
+	raw, err := runTargetsCommand()
+	if err != nil {
+		return nil, fmt.Errorf("go run ./cli/cmd/tetra targets --format=json failed: %w: %s", err, strings.TrimSpace(string(raw)))
+	}
+	return raw, nil
 }
 
 func validateTargetsReport(raw []byte) error {

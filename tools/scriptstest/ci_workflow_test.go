@@ -268,10 +268,12 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		"tetra-v0.4.0-${{ github.sha }}-test-all-quick-linux",
 		"tetra-v0.4.0-${{ github.sha }}-test-all-stabilization-linux",
 		"tetra-v0.4.0-${{ github.sha }}-release-readiness-linux",
+		"tetra-surface-release-v1-${{ github.sha }}",
+		"tetra-full-platform-ui-runtime-${{ github.sha }}-${{ matrix.target }}",
+		"tetra-full-platform-ui-runtime-${{ github.sha }}-gate",
 		"tetra-v0.4.0-${{ github.sha }}-coverage-linux",
 		"tetra-v0.4.0-${{ github.sha }}-fuzz-short-linux",
 		"tetra-v0.4.0-${{ github.sha }}-fuzz-nightly-linux",
-		"tetra-surface-release-v1-${{ github.sha }}",
 	}
 	if len(names) != len(want) {
 		t.Fatalf("ci workflow upload-artifact names = %v, want %v", names, want)
@@ -282,14 +284,13 @@ func TestCIWorkflowArtifactNamesAreReleaseAware(t *testing.T) {
 		}
 	}
 	for _, name := range names {
-		wantParts := []string{"v0.4.0", "${{ github.sha }}"}
-		if name == "tetra-surface-release-v1-${{ github.sha }}" {
-			wantParts = []string{"surface-release-v1", "${{ github.sha }}"}
+		if !strings.Contains(name, "${{ github.sha }}") {
+			t.Fatalf("ci workflow artifact name %q missing git SHA metadata", name)
 		}
-		for _, wantPart := range wantParts {
-			if !strings.Contains(name, wantPart) {
-				t.Fatalf("ci workflow artifact name %q missing release-aware metadata %q", name, wantPart)
-			}
+		if !strings.Contains(name, "v0.4.0") &&
+			!strings.Contains(name, "surface-release-v1") &&
+			!strings.Contains(name, "full-platform-ui-runtime") {
+			t.Fatalf("ci workflow artifact name %q missing release-aware scope", name)
 		}
 	}
 }
