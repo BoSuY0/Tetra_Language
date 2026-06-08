@@ -1,6 +1,7 @@
 name: ci
 
 on:
+  push:
   workflow_dispatch:
 
 permissions:
@@ -11,6 +12,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prove actions can start
+        shell: bash
+        run: echo "actions-canary-ok"
+
   lint-workflows-and-shell-linux:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
