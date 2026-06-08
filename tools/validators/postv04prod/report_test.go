@@ -309,7 +309,7 @@ func validUIReport() uiprod.Report {
 		Target:   "linux-x64",
 		Host:     "linux-x64",
 		Runtime:  "desktop-ui-linux-x64",
-		UISchema: "tetra.ui.v1",
+		UISchema: "tetra.ui.v0.4.0",
 		Source:   "tools/cmd/ui-production-runtime-smoke",
 		Processes: []uiprod.ProcessReport{
 			{Name: "tetra build", Kind: "build", Path: "/tmp/tetra", Ran: true, Pass: true, ExitCode: &exitZero},
@@ -374,7 +374,7 @@ func validUIReport() uiprod.Report {
 		Audit: []uiprod.AuditReport{
 			{Requirement: "Linux-x64 desktop UI runtime", Artifact: "tools/cmd/ui-production-runtime-smoke", Evidence: "build app desktop runtime native runtime and stress processes ran", Result: "pass"},
 			{Requirement: "window lifecycle", Artifact: "examples/ui_desktop_runtime_smoke.tetra", Evidence: "window lifecycle case is required", Result: "pass"},
-			{Requirement: "layout system", Artifact: "compiler/internal/lower/ui.go; docs/spec/ui_v1.md", Evidence: "layout measure/place and panel nesting are required", Result: "pass"},
+			{Requirement: "layout system", Artifact: "compiler/internal/lower/ui.go; docs/spec/ui_v0.4.0.md", Evidence: "layout measure/place and panel nesting are required", Result: "pass"},
 			{Requirement: "buttons/text/input/lists/panels widgets", Artifact: "examples/ui_desktop_runtime_smoke.tetra", Evidence: "widget tree includes required widgets", Result: "pass"},
 			{Requirement: "state binding", Artifact: "tools/validators/uiprod", Evidence: "state binding update plus input focus/change widget update evidence are required", Result: "pass"},
 			{Requirement: "event loop and redraw/update model", Artifact: "tools/cmd/ui-production-runtime-smoke", Evidence: "focus input change select click timer and redraw lifecycle cases are required", Result: "pass"},
@@ -397,7 +397,7 @@ func validNativeUIReport() nativeui.Report {
 		Target:   "linux-x64",
 		Host:     "linux-x64",
 		Runtime:  "native-ui-linux-x64",
-		UISchema: "tetra.ui.v1",
+		UISchema: "tetra.ui.v0.4.0",
 		Source:   "examples/ui_native_shell_smoke.tetra",
 		Processes: []nativeui.ProcessReport{
 			{Name: "tetra build native UI", Kind: "build", Path: "tetra build --target linux-x64", Ran: true, Pass: true, ExitCode: &exitZero},

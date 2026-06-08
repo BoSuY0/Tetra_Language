@@ -334,7 +334,7 @@ func Test_release_v1_0_web_smokeValidateWASMImportsFailureWritesStructuredFailRe
 	writeReleaseV10FakeBrowser(t, root, "google-chrome")
 	if err := os.WriteFile(filepath.Join(root, "bin", "go"), []byte(`#!/bin/sh
 if [ "${1:-}" = "run" ] && [ "${2:-}" = "./tools/cmd/validate-wasm-imports" ]; then
-  echo "validate-wasm-imports: disallowed import tetra_web_v1.fetch" >&2
+  echo "validate-wasm-imports: disallowed import tetra_web_v0.4.0.fetch" >&2
   exit 1
 fi
 exit 0
@@ -396,8 +396,8 @@ if [ "${1:-}" = "build" ]; then
   printf '%s\n' "export async function runTetra() { return 0; } export async function instantiateTetra() { return { instance: { exports: { tetra_main() {} } } }; }" > "$out.mjs"
   case "$out" in
     *web_smoke)
-      printf '%s\n' '{"schema":"tetra.ui.v1","views":[]}' > "$out.ui.json"
-      printf '%s\n' "export async function mountTetraUI() { return { schema: 'tetra.ui.v1', views: [] }; }" > "$out.ui.web.mjs"
+      printf '%s\n' '{"schema":"tetra.ui.v0.4.0","views":[]}' > "$out.ui.json"
+      printf '%s\n' "export async function mountTetraUI() { return { schema: 'tetra.ui.v0.4.0', views: [] }; }" > "$out.ui.web.mjs"
       ;;
   esac
   exit 0

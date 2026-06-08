@@ -73,6 +73,9 @@ func TestTargetMetadataCheck(t *testing.T) {
 			if name == "node" {
 				return "/usr/bin/node", nil
 			}
+			if name == "chromium" {
+				return "/usr/bin/chromium", nil
+			}
 			return "", exec.ErrNotFound
 		})
 		defer restore()
@@ -117,7 +120,7 @@ func TestTargetMetadataCheck(t *testing.T) {
 		}
 		web := targetReportEntryForTest(t, buildTargetReportEntries(), "wasm32-web")
 		if web.BuildOnly || web.RunMode != "web_runner" || web.RunSupported ||
-			(!strings.Contains(web.RunUnsupportedReason, "runner unavailable") && !strings.Contains(web.RunUnsupportedReason, "missing web runtime runner")) {
+			!strings.Contains(web.RunUnsupportedReason, "browser runner unavailable") {
 			t.Fatalf("wasm32-web target metadata without runner = %#v", web)
 		}
 	})

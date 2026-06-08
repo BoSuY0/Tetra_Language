@@ -39,7 +39,7 @@ func validUIProductionRuntimeReport() string {
   "target": "linux-x64",
   "host": "linux-x64",
   "runtime": "desktop-ui-linux-x64",
-  "ui_schema": "tetra.ui.v1",
+  "ui_schema": "tetra.ui.v0.4.0",
   "source": "tools/cmd/ui-production-runtime-smoke",
   "processes": [
     {"name":"tetra build","kind":"build","path":"/tmp/tetra","ran":true,"pass":true,"exit_code":0},
@@ -104,14 +104,14 @@ func validUIProductionRuntimeReport() string {
   "audit": [
     {"requirement":"Linux-x64 desktop UI runtime","artifact":"tools/cmd/ui-production-runtime-smoke; compiler/internal/backend/native_shell","evidence":"build, app, desktop runtime, native runtime, stress, and compiler-emitted UI bundle load evidence ran on linux-x64","result":"pass"},
     {"requirement":"window lifecycle","artifact":"examples/ui_desktop_runtime_smoke.tetra","evidence":"window create, show, close, and teardown cases are required","result":"pass"},
-    {"requirement":"layout system","artifact":"compiler/internal/lower/ui.go; docs/spec/ui_v1.md","evidence":"layout measure/place and panel nesting cases are required","result":"pass"},
+    {"requirement":"layout system","artifact":"compiler/internal/lower/ui.go; docs/spec/ui_v0.4.0.md","evidence":"layout measure/place and panel nesting cases are required","result":"pass"},
     {"requirement":"buttons/text/input/lists/panels widgets","artifact":"examples/ui_desktop_runtime_smoke.tetra","evidence":"widget tree must include button, text, input, list, and panel widgets","result":"pass"},
     {"requirement":"state binding","artifact":"tools/validators/uiprod","evidence":"state binding update plus input focus/change widget update evidence are required","result":"pass"},
     {"requirement":"event loop and redraw/update model","artifact":"tools/cmd/ui-production-runtime-smoke","evidence":"focus, input, change, select, click, timer, and redraw/update lifecycle cases are required","result":"pass"},
     {"requirement":"async commands and timers","artifact":"tools/cmd/ui-production-runtime-smoke","evidence":"async UI command completion, timer tick event evidence, and timer scheduled redraw cases are required","result":"pass"},
     {"requirement":"error/crash handling","artifact":"tools/validators/uiprod","evidence":"invalid widget diagnostic, command failure recovery, and crash error handling cases are required","result":"pass"},
     {"requirement":"real examples and dogfood applications","artifact":"examples/ui_desktop_runtime_smoke.tetra; examples/ui_native_shell_smoke.tetra","evidence":"dogfood application smoke, compiler-emitted UI bundle/runtime trace load, and native runtime integration cases are required","result":"pass"},
-    {"requirement":"compiler-emitted UI bundle/native-shell trace load evidence","artifact":"examples/ui_desktop_runtime_smoke.tetra; <output>.ui.json; <output>.ui.shell.json","evidence":"UI production smoke loads compiler-emitted tetra.ui.v1 and tetra.ui.native-shell.v1 artifacts before accepting runtime evidence","result":"pass"},
+    {"requirement":"compiler-emitted UI bundle/native-shell trace load evidence","artifact":"examples/ui_desktop_runtime_smoke.tetra; <output>.ui.json; <output>.ui.shell.json","evidence":"UI production smoke loads compiler-emitted tetra.ui.v0.4.0 and tetra.ui.native-shell.v1 artifacts before accepting runtime evidence","result":"pass"},
     {"requirement":"sidecar-driven native UI runtime integration","artifact":"tools/cmd/native-ui-runtime-smoke; tools/cmd/validate-native-ui-runtime; native-ui-runtime-linux-x64.integration.json","evidence":"UI production smoke runs the sidecar-driven native UI runtime and validates tetra.ui.native-runtime.v1 consistency before accepting the release gate","result":"pass"},
     {"requirement":"stable UI diagnostics","artifact":"tools/cmd/ui-production-runtime-smoke; tools/validators/uiprod","evidence":"negative UI cases require stable expected_error evidence for invalid widget diagnostics, command failure recovery, and crash error handling","result":"pass"},
     {"requirement":"release-gate entrypoint rejecting runtime-less evidence","artifact":"scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh","evidence":"validator rejects metadata-only, runtime-less, fake, mock, placeholder, docs-only, and build-only evidence and requires compiler UI bundle plus native runtime integration evidence","result":"pass"}

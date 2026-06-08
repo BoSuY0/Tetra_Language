@@ -207,7 +207,7 @@ func validateNativeRuntimeSidecarConsistency(path string) error {
 	if err := dec.Decode(&report); err != nil {
 		return err
 	}
-	if report.Target != "linux-x64" || report.Host != "linux-x64" || report.Runtime != "native-ui-linux-x64" || report.UISchema != "tetra.ui.v1" {
+	if report.Target != "linux-x64" || report.Host != "linux-x64" || report.Runtime != "native-ui-linux-x64" || report.UISchema != nativeui.UIBundleSchema {
 		return fmt.Errorf("native runtime sidecar is inconsistent with linux-x64 desktop UI evidence")
 	}
 	if len(report.Widgets) == 0 || len(report.Events) == 0 || len(report.Cases) == 0 {
@@ -283,8 +283,8 @@ func validateCompilerUIBundleArtifacts(appPath string) error {
 	if err := readJSONFile(bundlePath, &bundle); err != nil {
 		return fmt.Errorf("load compiler UI bundle %s: %w", bundlePath, err)
 	}
-	if bundle.Schema != "tetra.ui.v1" {
-		return fmt.Errorf("compiler UI bundle schema = %q, want tetra.ui.v1", bundle.Schema)
+	if bundle.Schema != uiprod.UIBundleSchema {
+		return fmt.Errorf("compiler UI bundle schema = %q, want %s", bundle.Schema, uiprod.UIBundleSchema)
 	}
 	if !bundleHasDogfoodSurface(bundle) {
 		return fmt.Errorf("compiler UI bundle missing DesktopState/DesktopView dogfood bindings, events, or commands")
@@ -297,8 +297,8 @@ func validateCompilerUIBundleArtifacts(appPath string) error {
 	if trace.Schema != "tetra.ui.native-shell.v1" {
 		return fmt.Errorf("native shell trace schema = %q, want tetra.ui.native-shell.v1", trace.Schema)
 	}
-	if trace.UISchema != "tetra.ui.v1" {
-		return fmt.Errorf("native shell trace ui_schema = %q, want tetra.ui.v1", trace.UISchema)
+	if trace.UISchema != uiprod.UIBundleSchema {
+		return fmt.Errorf("native shell trace ui_schema = %q, want %s", trace.UISchema, uiprod.UIBundleSchema)
 	}
 	if trace.Runtime != "native shell command dispatch" {
 		return fmt.Errorf("native shell trace runtime = %q, want native shell command dispatch", trace.Runtime)
@@ -701,7 +701,7 @@ func buildReport(source string, processes []uiprod.ProcessReport, widgets []uipr
 		Target:    "linux-x64",
 		Host:      "linux-x64",
 		Runtime:   "desktop-ui-linux-x64",
-		UISchema:  "tetra.ui.v1",
+		UISchema:  uiprod.UIBundleSchema,
 		Source:    source,
 		Processes: processes,
 		Contracts: []uiprod.ContractReport{
@@ -722,14 +722,14 @@ func buildReport(source string, processes []uiprod.ProcessReport, widgets []uipr
 		Audit: []uiprod.AuditReport{
 			{Requirement: "Linux-x64 desktop UI runtime", Artifact: "tools/cmd/ui-production-runtime-smoke; compiler/internal/backend/native_shell", Evidence: "build, app, desktop runtime, native runtime, stress, and compiler-emitted UI bundle load evidence ran on linux-x64", Result: "pass"},
 			{Requirement: "window lifecycle", Artifact: "examples/ui_desktop_runtime_smoke.tetra", Evidence: "window create, show, close, and teardown cases are required", Result: "pass"},
-			{Requirement: "layout system", Artifact: "compiler/internal/lower/ui.go; docs/spec/ui_v1.md", Evidence: "layout measure/place and panel nesting cases are required", Result: "pass"},
+			{Requirement: "layout system", Artifact: "compiler/internal/lower/ui.go; docs/spec/ui_v0.4.0.md", Evidence: "layout measure/place and panel nesting cases are required", Result: "pass"},
 			{Requirement: "buttons/text/input/lists/panels widgets", Artifact: "examples/ui_desktop_runtime_smoke.tetra", Evidence: "widget tree must include button, text, input, list, and panel widgets", Result: "pass"},
 			{Requirement: "state binding", Artifact: "tools/validators/uiprod", Evidence: "state binding update plus input focus/change widget update evidence are required", Result: "pass"},
 			{Requirement: "event loop and redraw/update model", Artifact: "tools/cmd/ui-production-runtime-smoke", Evidence: "focus, input, change, select, click, timer, and redraw/update lifecycle cases are required", Result: "pass"},
 			{Requirement: "async commands and timers", Artifact: "tools/cmd/ui-production-runtime-smoke", Evidence: "async UI command completion, timer tick event evidence, and timer scheduled redraw cases are required", Result: "pass"},
 			{Requirement: "error/crash handling", Artifact: "tools/validators/uiprod", Evidence: "invalid widget diagnostic, command failure recovery, and crash error handling cases are required", Result: "pass"},
 			{Requirement: "real examples and dogfood applications", Artifact: "examples/ui_desktop_runtime_smoke.tetra; examples/ui_native_shell_smoke.tetra", Evidence: "dogfood application smoke, compiler-emitted UI bundle/runtime trace load, and native runtime integration cases are required", Result: "pass"},
-			{Requirement: "compiler-emitted UI bundle/native-shell trace load evidence", Artifact: "examples/ui_desktop_runtime_smoke.tetra; <output>.ui.json; <output>.ui.shell.json", Evidence: "UI production smoke loads compiler-emitted tetra.ui.v1 and tetra.ui.native-shell.v1 artifacts before accepting runtime evidence", Result: "pass"},
+			{Requirement: "compiler-emitted UI bundle/native-shell trace load evidence", Artifact: "examples/ui_desktop_runtime_smoke.tetra; <output>.ui.json; <output>.ui.shell.json", Evidence: "UI production smoke loads compiler-emitted tetra.ui.v0.4.0 and tetra.ui.native-shell.v1 artifacts before accepting runtime evidence", Result: "pass"},
 			{Requirement: "sidecar-driven native UI runtime integration", Artifact: "tools/cmd/native-ui-runtime-smoke; tools/cmd/validate-native-ui-runtime; native-ui-runtime-linux-x64.integration.json", Evidence: "UI production smoke runs the sidecar-driven native UI runtime and validates tetra.ui.native-runtime.v1 consistency before accepting the release gate", Result: "pass"},
 			{Requirement: "stable UI diagnostics", Artifact: "tools/cmd/ui-production-runtime-smoke; tools/validators/uiprod", Evidence: "negative UI cases require stable expected_error evidence for invalid widget diagnostics, command failure recovery, and crash error handling", Result: "pass"},
 			{Requirement: "release-gate entrypoint rejecting runtime-less evidence", Artifact: "scripts/release/post_v0_4/ui-production-runtime-linux-x64-smoke.sh", Evidence: "validator rejects metadata-only, runtime-less, fake, mock, placeholder, docs-only, and build-only evidence and requires compiler UI bundle plus native runtime integration evidence", Result: "pass"},

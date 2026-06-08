@@ -378,9 +378,9 @@ report records that runner.
 
 The web backend emits a deterministic WebAssembly module plus a JavaScript loader contract:
 
-- Imports from `tetra_web_v1`: `console_log(ptr, len)` and `panic(code, ptr, len)`.
+- Imports from `tetra_web_v0.4.0`: `console_log(ptr, len)` and `panic(code, ptr, len)`.
 - Exports: `memory` and `tetra_main`.
-- The loader fetches the `.wasm` module relative to `import.meta.url`, wires `tetra_web_v1`, and exposes
+- The loader fetches the `.wasm` module relative to `import.meta.url`, wires `tetra_web_v0.4.0`, and exposes
   `instantiateTetra()` plus `runTetra()`.
 - Unsupported native runtime instructions are rejected at link/codegen time with an explicit `wasm backend` diagnostic.
 

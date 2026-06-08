@@ -93,7 +93,7 @@ const (
 	actorTransportSchemaV1          = "tetra.actors.transport.v1"
 	nativeUIRuntimeDecision         = "ui.native-runtime"
 	nativeUISidecarSchemaV1         = "tetra.ui.native-shell.v1"
-	uiBundleSchemaV1                = "tetra.ui.v1"
+	uiBundleSchemaV1                = "tetra.ui.v0.4.0"
 )
 
 func main() {
@@ -559,7 +559,7 @@ func hasNativeUIRuntimeDocsEvidence(values []string) bool {
 		if normalized == "docs/spec/current_supported_surface.md" {
 			hasSurface = true
 		}
-		if normalized == "docs/spec/ui_v1.md" || normalized == "docs/user/wasm_ui_guide.md" || strings.Contains(normalized, "ui") {
+		if normalized == "docs/spec/ui_v0.4.0.md" || normalized == "docs/user/wasm_ui_guide.md" || strings.Contains(normalized, "ui") {
 			hasUIDocs = true
 		}
 	}
@@ -629,7 +629,7 @@ func hasNativeUISidecarOrMetadataEvidence(evidence decisionEvidence) bool {
 				raw, err := readFileFromRepoRoot(normalized)
 				if err == nil {
 					lower := strings.ToLower(string(raw))
-					if strings.Contains(lower, nativeUISidecarSchemaV1) || strings.Contains(lower, `"schema":"tetra.ui.v1"`) || strings.Contains(lower, `"schema": "tetra.ui.v1"`) || strings.Contains(lower, "wasm32-web") {
+					if strings.Contains(lower, nativeUISidecarSchemaV1) || strings.Contains(lower, `"schema":"tetra.ui.v0.4.0"`) || strings.Contains(lower, `"schema": "tetra.ui.v0.4.0"`) || strings.Contains(lower, "wasm32-web") {
 						return true
 					}
 				}

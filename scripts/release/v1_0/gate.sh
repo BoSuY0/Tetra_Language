@@ -313,6 +313,28 @@ check_web_runtime_smoke() {
   go run ./tools/cmd/validate-web-ui-smoke --report "$artifacts_dir/web-ui-smoke.json"
 }
 
+check_backend_summary() {
+  local summary="$artifacts_dir/backend-summary.md"
+  local commit
+  local version
+  commit="$(git rev-parse HEAD)"
+  version="$(./tetra version)"
+  cat >"$summary" <<SUMMARY
+# Tetra $release_version Backend Summary
+
+- commit: \`$commit\`
+- version: \`$version\`
+- report_dir: \`$report_dir\`
+- native target reports: \`artifacts/host-smoke.json\`, \`artifacts/linux-smoke.json\`, \`artifacts/macos-smoke.json\`, \`artifacts/windows-smoke.json\`
+- WASM artifact/import reports: \`artifacts/wasm32-wasi-artifact-smoke.json\`, \`artifacts/wasm32-web-artifact-smoke.json\`
+- WASI runtime report: \`artifacts/wasi-smoke.json\`
+- Web UI runtime report: \`artifacts/web-ui-smoke.json\`
+- UI/native boundary: Linux-x64 desktop GUI production evidence is covered by the post-v0.4 WASM/UI/GUI gate; v1 target-matrix evidence does not claim cross-platform native widget runtime.
+- residual backend risks: None recorded by the gate; update \`artifacts/known_issues.md\` before release if review finds an accepted backend risk.
+SUMMARY
+  test -s "$summary"
+}
+
 check_api_diff() {
   bash scripts/release/v1_0/api-diff.sh --report-dir "$artifacts_dir/api-diff" --baseline docs/baselines/api-diff-baseline.v1alpha1.json --enforce no-change
 }
@@ -320,12 +342,14 @@ check_api_diff() {
 check_performance_regression_artifact() {
   local src="docs/generated/v1_0/performance-regression.json"
   local dst="$artifacts_dir/performance-regression.json"
+  local current_head
   if [[ ! -f "$src" ]]; then
     echo "release/v1_0/gate: missing performance artifact $src" >&2
     return 1
   fi
   cp -- "$src" "$dst"
-  go run ./tools/cmd/validate-performance-report --report "$dst"
+  current_head="$(git rev-parse --short HEAD)"
+  go run ./tools/cmd/validate-performance-report --report "$dst" --stamp-git-head "$current_head"
 }
 
 check_binary_size_thresholds() {
@@ -337,10 +361,71 @@ check_repro_build() {
 }
 
 check_security_review_signoff() {
-  local signoff_path="${TETRA_SECURITY_REVIEW_SIGNOFF:-$artifacts_dir/security-review.md}"
+  local signoff_path="${TETRA_SECURITY_REVIEW_SIGNOFF:-}"
+  if [[ -z "$signoff_path" ]]; then
+    cat >"$artifacts_dir/security-review.md" <<EOF
+# $release_version Security Review Signoff
+
+Decision: blocked
+Reason: missing TETRA_SECURITY_REVIEW_SIGNOFF for the exact $release_version candidate.
+Report directory: $report_dir
+Generated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+Create a signoff with:
+
+\`\`\`sh
+bash scripts/release/v1_0/security-review.sh --write-template <security-review.md>
+\`\`\`
+
+This artifact is a blocked placeholder so the release archive can preserve the
+missing-signoff evidence. It is not release approval.
+EOF
+    echo "release/v1_0/gate: missing TETRA_SECURITY_REVIEW_SIGNOFF=<security-review.md>" >&2
+    return 1
+  fi
   signoff_path="$(normalize_relative_dash_leading_path "$signoff_path")"
   bash scripts/release/v1_0/security-review.sh --signoff "$signoff_path"
   cp -- "$signoff_path" "$artifacts_dir/security-review.md"
+}
+
+write_security_review_detached_hash() {
+  local review_path="$artifacts_dir/security-review.md"
+  local detached_hash_path="$artifacts_dir/security-review.md.sha256"
+  local review_hash
+  if [[ ! -f "$review_path" ]]; then
+    echo "release/v1_0/gate: cannot hash missing security review: $review_path" >&2
+    return 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    review_hash="$(sha256sum "$review_path" | awk '{print $1}')"
+  else
+    review_hash="$(shasum -a 256 "$review_path" | awk '{print $1}')"
+  fi
+  printf '%s  artifacts/security-review.md\n' "$review_hash" >"$detached_hash_path"
+}
+
+check_handoff_signoff_lint() {
+  local review_path="$artifacts_dir/security-review.md"
+  local lint_output
+  if [[ ! -f "$review_path" ]]; then
+    echo "release/v1_0/gate: missing security review for handoff/signoff lint: $review_path" >&2
+    return 1
+  fi
+  if ! command -v rg >/dev/null 2>&1; then
+    echo "release/v1_0/gate: rg is required for handoff/signoff lint" >&2
+    return 1
+  fi
+  if lint_output="$(rg -n 'TODO|TBD|<[A-Za-z0-9_ ./:-]+>' docs/release/v1_0_final_handoff.md "$review_path" 2>&1)"; then
+    printf '%s\n' "$lint_output" >&2
+    echo "release/v1_0/gate: handoff/signoff lint found unresolved placeholders" >&2
+    return 1
+  fi
+  local rc="$?"
+  if [[ "$rc" -eq 1 ]]; then
+    return 0
+  fi
+  printf '%s\n' "$lint_output" >&2
+  return "$rc"
 }
 
 check_release_state() {
@@ -391,7 +476,11 @@ check_artifact_hash_manifest() {
 }
 
 echo "release/v1_0/gate: bootstrapping local binaries before v1 version preflight" >&2
-bash scripts/dev/bootstrap.sh >&2
+run_step "bootstrap tetra binaries" bash scripts/dev/bootstrap.sh
+if [[ "$failed_count" -gt 0 ]]; then
+  write_summary "blocked"
+  exit 1
+fi
 
 version="$(./tetra version 2>/dev/null || true)"
 if [[ "$version" != "$release_version" ]]; then
@@ -410,8 +499,8 @@ echo "report_dir: $report_dir"
 run_step "version preflight ($release_version required)" check_release_version
 run_step "short alias version parity" check_short_alias_version
 capture_generated_artifact_state "$generated_state_before"
-run_step "go test packages" go test ./compiler/... ./cli/... ./tools/... -count=1
-run_step "full stabilization wrapper" env TETRA_TEST_ALL_RELEASE_VERSION="$release_version" TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0.test-all-summary.v1" bash scripts/ci/test-all.sh --full --keep-going --report-dir "$artifacts_dir/test-all"
+run_step "go test packages" env -u TETRA_SECURITY_REVIEW_SIGNOFF -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "full stabilization wrapper" env -u TETRA_SECURITY_REVIEW_SIGNOFF TETRA_TEST_ALL_RELEASE_VERSION="$release_version" TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1" bash scripts/ci/test-all.sh --full --keep-going --report-dir "$artifacts_dir/test-all"
 run_step "flow-only source scan" go run ./tools/cmd/validate-flow-only examples lib __rt compiler/selfhostrt
 run_step "targets report validation" sh -c './tetra targets --format=json >"$1" && go run ./tools/cmd/validate-targets --report "$1"' sh "$artifacts_dir/targets.json"
 run_step "doctor report validation" sh -c './tetra doctor --format=json >"$1" && go run ./tools/cmd/validate-doctor --report "$1"' sh "$artifacts_dir/doctor.json"
@@ -433,7 +522,10 @@ run_step "Web artifact/import smoke" sh -c './tetra smoke --target wasm32-web --
 
 run_step "WASI runner smoke" check_wasi_runner_smoke
 run_step "Web runtime browser smoke" check_web_runtime_smoke
+run_step "backend summary artifact" check_backend_summary
 run_step "security review signoff" check_security_review_signoff
+run_step "security review detached hash" write_security_review_detached_hash
+run_step "handoff signoff lint" check_handoff_signoff_lint
 run_step "API diff gate" check_api_diff
 run_step "performance regression evidence" check_performance_regression_artifact
 run_step "binary size thresholds" check_binary_size_thresholds
@@ -445,7 +537,9 @@ run_step "release state audit" check_release_state
 
 if [[ "$failed_count" -gt 0 ]]; then
   write_summary "blocked"
+  check_artifact_hash_manifest || true
   check_release_state || true
+  check_artifact_hash_manifest || true
   echo >&2
   echo "release/v1_0/gate: blocked: $failed_count step(s) failed" >&2
   echo "summary: $summary_md" >&2
@@ -454,12 +548,32 @@ if [[ "$failed_count" -gt 0 ]]; then
 fi
 
 write_summary "pass"
+if ! check_artifact_hash_manifest; then
+  rc="$?"
+  failed_count=$((failed_count + 1))
+  write_summary "blocked"
+  echo "release/v1_0/gate: blocked: final pre-release-state artifact hash refresh failed with exit $rc" >&2
+  echo "summary: $summary_md" >&2
+  echo "json: $summary_json" >&2
+  exit 1
+fi
 if ! check_release_state; then
   rc="$?"
   failed_count=$((failed_count + 1))
   write_summary "blocked"
+  check_artifact_hash_manifest || true
   check_release_state || true
   echo "release/v1_0/gate: blocked: final release-state refresh failed with exit $rc" >&2
+  echo "summary: $summary_md" >&2
+  echo "json: $summary_json" >&2
+  exit 1
+fi
+if ! check_artifact_hash_manifest; then
+  rc="$?"
+  failed_count=$((failed_count + 1))
+  write_summary "blocked"
+  check_release_state || true
+  echo "release/v1_0/gate: blocked: final artifact hash refresh failed with exit $rc" >&2
   echo "summary: $summary_md" >&2
   echo "json: $summary_json" >&2
   exit 1

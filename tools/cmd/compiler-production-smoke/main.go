@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"tetra_language/compiler"
 	"tetra_language/tools/validators/compilerprod"
 )
 
@@ -96,11 +97,12 @@ func runSmoke(ctx context.Context, opt smokeOptions) error {
 
 func (r *smokeRunner) runVersion(ctx context.Context) error {
 	res := runCommand(ctx, 10*time.Second, r.tetraPath, "version")
-	if res.err != nil || strings.TrimSpace(res.output) != "v0.4.0" {
-		r.cases = append(r.cases, failedCase("version reports v0.4.0", "positive", "", fmt.Sprintf("exit=%d output=%s", res.exitCode, res.output)))
-		return fmt.Errorf("compiler version check failed: exit=%d output=%s", res.exitCode, res.output)
+	expected := compiler.Version()
+	if res.err != nil || strings.TrimSpace(res.output) != expected {
+		r.cases = append(r.cases, failedCase(compilerprod.VersionCaseName, "positive", "", fmt.Sprintf("want=%s exit=%d output=%s", expected, res.exitCode, res.output)))
+		return fmt.Errorf("compiler version check failed: want=%s exit=%d output=%s", expected, res.exitCode, res.output)
 	}
-	r.cases = append(r.cases, compilerprod.CaseReport{Name: "version reports v0.4.0", Kind: "positive", Ran: true, Pass: true})
+	r.cases = append(r.cases, compilerprod.CaseReport{Name: compilerprod.VersionCaseName, Kind: "positive", Ran: true, Pass: true})
 	return nil
 }
 
@@ -157,7 +159,7 @@ func (r *smokeRunner) runCompileMatrix(ctx context.Context) error {
 		return err
 	}
 	loaderRaw, err := os.ReadFile(strings.TrimSuffix(webOut, ".wasm") + ".mjs")
-	if err != nil || !strings.Contains(string(loaderRaw), "tetra_web_v1") {
+	if err != nil || !strings.Contains(string(loaderRaw), "tetra_web_v0.4.0") {
 		r.cases = append(r.cases, failedCase("wasm32-web module and loader emission", "positive", "", fmt.Sprintf("web loader invalid: %v", err)))
 		return fmt.Errorf("wasm32-web loader invalid: %w", err)
 	}

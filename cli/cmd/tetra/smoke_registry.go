@@ -136,5 +136,32 @@ func smokeCasesForTarget(islandsDebug bool, tgt ctarget.Target) []smokeCase {
 	if tgt.Triple == "wasm32-web" {
 		return smokeRegistryCases(smokeSourceSetWasmBuildOnly)
 	}
-	return smokeCases(islandsDebug)
+	cases := smokeCases(islandsDebug)
+	switch tgt.Triple {
+	case "macos-x64", "windows-x64":
+		for i := range cases {
+			if cases[i].name == "core_filesystem_smoke" {
+				cases[i].expectedDiagnostic = "filesystem runtime not supported on " + tgt.Triple
+			}
+			if smokeCaseUsesSurfaceRuntime(cases[i].name) {
+				cases[i].expectedDiagnostic = "surface runtime not supported on " + tgt.Triple
+			}
+		}
+	}
+	return cases
+}
+
+func smokeCaseUsesSurfaceRuntime(name string) bool {
+	switch name {
+	case "core_component_smoke",
+		"surface_counter",
+		"surface_text_input",
+		"surface_migration_ui_web_smoke",
+		"surface_migration_ui_native_shell_smoke",
+		"surface_migration_dogfood_web_ui",
+		"surface_migration_tetra_control_center":
+		return true
+	default:
+		return false
+	}
 }

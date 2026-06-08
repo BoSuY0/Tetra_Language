@@ -37,10 +37,42 @@ func TestRunCommandJSONDiagnosticsForWASMWebRuntimeUnsupported(t *testing.T) {
 	defer restore()
 
 	diag := runCLIJSONDiagnostic(t, []string{"run", "--diagnostics=json", "--target", "wasm32-web", srcPath}, 1)
-	for _, want := range []string{"cannot run target wasm32-web", "missing web runtime runner"} {
+	for _, want := range []string{"cannot run target wasm32-web", "browser runner unavailable"} {
 		if !strings.Contains(diag.Message, want) {
 			t.Fatalf("diagnostic missing %q: %#v", want, diag)
 		}
+	}
+}
+
+func TestRunCommandUsesBrowserRunnerForWASMWeb(t *testing.T) {
+	requireLocalTCPBind(t)
+
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "main.tetra")
+	if err := os.WriteFile(srcPath, []byte("func main() -> Int:\n    return 7\n"), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	browser := filepath.Join(dir, "fake-chromium")
+	if err := os.WriteFile(browser, []byte(`#!/bin/sh
+printf '<html><body><pre id="result">exit:7</pre></body></html>\n'
+`), 0o755); err != nil {
+		t.Fatalf("write fake browser: %v", err)
+	}
+	restore := stubLookPath(func(name string) (string, error) {
+		if name == "chromium" {
+			return browser, nil
+		}
+		return "", exec.ErrNotFound
+	})
+	defer restore()
+
+	var stdout, stderr bytes.Buffer
+	code := runCLI([]string{"run", "--target", "wasm32-web", srcPath}, &stdout, &stderr)
+	if code != 7 {
+		t.Fatalf("run exit code = %d, stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("run stderr = %q", stderr.String())
 	}
 }
 

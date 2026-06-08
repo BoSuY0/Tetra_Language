@@ -66,7 +66,7 @@ func TestLinkObjectWASIImportExportShape(t *testing.T) {
 	if got := imports["wasi_snapshot_preview1"]; !stringSetHas(got, "fd_write") || !stringSetHas(got, "proc_exit") {
 		t.Fatalf("WASI imports = %#v", imports)
 	}
-	if _, ok := imports["tetra_web_v1"]; ok {
+	if _, ok := imports["tetra_web_v0.4.0"]; ok {
 		t.Fatalf("WASI module imported web host namespace: %#v", imports)
 	}
 

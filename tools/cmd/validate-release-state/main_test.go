@@ -926,7 +926,7 @@ func TestReleaseStateRejectsStaleV1GeneratedEvidenceMetadata(t *testing.T) {
 	reportDir := "/tmp/tetra-v1_0-gate"
 	gitHead := "abcdef0"
 	files := releaseStateV1FreshFiles(reportDir, "v1.0.0", gitHead)
-	files["docs/generated/v1_0/host-smoke.json"] = []byte(`{
+	files[reportDir+"/artifacts/host-smoke.json"] = []byte(`{
   "timestamp": "2026-04-30T12:00:00Z",
   "target": "linux-x64",
   "version": "v0.1.1",
@@ -999,6 +999,86 @@ func TestReleaseStateAcceptsFreshV1GeneratedEvidenceMetadata(t *testing.T) {
 	})
 	if report.Status != "pass" {
 		t.Fatalf("status = %q issues=%v", report.Status, report.Issues)
+	}
+}
+
+func TestReleaseStateV1ReportDirAuditsFreshArchiveInsteadOfDocsGenerated(t *testing.T) {
+	reportDir := "/tmp/tetra-v1_0-gate"
+	version := "v1.0.0"
+	gitHead := "abcdef0"
+	files := releaseStateV1FreshReportDirFiles(reportDir, version, gitHead)
+	readFile := func(path string) ([]byte, error) {
+		raw, ok := files[path]
+		if !ok {
+			return nil, errNotExist(path)
+		}
+		return raw, nil
+	}
+	statFile := func(path string) (fileInfo, error) {
+		raw, ok := files[path]
+		if !ok {
+			return nil, errNotExist(path)
+		}
+		return fakeFileInfo{size: int64(len(raw))}, nil
+	}
+	report := buildReleaseStateReport(releaseStateInputs{
+		Branch:          "main",
+		Version:         version,
+		ExpectedVersion: version,
+		ReportDir:       reportDir,
+		GitHead:         gitHead,
+		GitStatus:       nil,
+		ReadFile:        readFile,
+		StatFile:        statFile,
+		Freshness:       []freshnessCheck{{Name: "docs/generated/manifest.json", Status: "pass"}},
+	})
+	if report.Status != "pass" {
+		t.Fatalf("status = %q issues=%v", report.Status, report.Issues)
+	}
+	for _, check := range report.GeneratedArtifacts.Required {
+		if strings.HasPrefix(check.Path, "docs/generated/v1_0/") {
+			t.Fatalf("v1 report-dir audit should not require checked-in generated artifact %s", check.Path)
+		}
+	}
+}
+
+func TestReleaseStateRejectsMissingV1BackendSummary(t *testing.T) {
+	reportDir := "/tmp/tetra-v1_0-gate"
+	version := "v1.0.0"
+	gitHead := "abcdef0"
+	files := releaseStateV1FreshFiles(reportDir, version, gitHead)
+	delete(files, reportDir+"/artifacts/backend-summary.md")
+	readFile := func(path string) ([]byte, error) {
+		raw, ok := files[path]
+		if !ok {
+			return nil, errNotExist(path)
+		}
+		return raw, nil
+	}
+	statFile := func(path string) (fileInfo, error) {
+		raw, ok := files[path]
+		if !ok {
+			return nil, errNotExist(path)
+		}
+		return fakeFileInfo{size: int64(len(raw))}, nil
+	}
+	report := buildReleaseStateReport(releaseStateInputs{
+		Branch:          "main",
+		Version:         version,
+		ExpectedVersion: version,
+		ReportDir:       reportDir,
+		GitHead:         gitHead,
+		GitStatus:       nil,
+		ReadFile:        readFile,
+		StatFile:        statFile,
+		Freshness:       []freshnessCheck{{Name: "docs/generated/manifest.json", Status: "pass"}},
+	})
+	if report.Status != "fail" {
+		t.Fatalf("status = %q, want fail", report.Status)
+	}
+	got := strings.Join(report.Issues, "\n")
+	if !strings.Contains(got, "missing required release artifact: "+reportDir+"/artifacts/backend-summary.md") {
+		t.Fatalf("issues did not require backend summary artifact: %v", report.Issues)
 	}
 }
 
@@ -1135,6 +1215,9 @@ func releaseStateV1FreshFiles(reportDir string, version string, gitHead string) 
 	for _, path := range requiredReleaseArtifacts {
 		files[path] = []byte("{}")
 	}
+	for path, raw := range releaseStateV1FreshReportDirFiles(reportDir, version, gitHead) {
+		files[path] = raw
+	}
 	for _, path := range []string{
 		"docs/generated/v1_0/host-smoke.json",
 		"docs/generated/v1_0/linux-smoke.json",
@@ -1160,6 +1243,36 @@ func releaseStateV1FreshFiles(reportDir string, version string, gitHead string) 
 	files["docs/generated/v1_0/test-all/summary.json"] = []byte(`{"started_at":"2026-04-30T12:00:00Z","ended_at":"2026-04-30T12:01:00Z"}`)
 	files["docs/generated/v1_0/release_gate_summary.json"] = releaseSummaryJSON(version, expectedReleaseArtifact(version), expectedReleaseGateCommand(version), reportDir, 32, 0, "pass")
 	files[reportDir+"/summary.json"] = releaseSummaryJSON(version, expectedReleaseArtifact(version), expectedReleaseGateCommand(version), reportDir, 32, 0, "pass")
+	addSecurityReviewEvidenceFiles(files, reportDir, version, gitHead)
+	return files
+}
+
+func releaseStateV1FreshReportDirFiles(reportDir string, version string, gitHead string) map[string][]byte {
+	files := map[string][]byte{}
+	for _, path := range v1ReportDirRequiredArtifacts(reportDir) {
+		files[path] = []byte("{}")
+	}
+	for _, path := range []string{
+		reportDir + "/artifacts/host-smoke.json",
+		reportDir + "/artifacts/linux-smoke.json",
+		reportDir + "/artifacts/macos-smoke.json",
+		reportDir + "/artifacts/windows-smoke.json",
+		reportDir + "/artifacts/wasm32-wasi-artifact-smoke.json",
+		reportDir + "/artifacts/wasm32-web-artifact-smoke.json",
+		reportDir + "/artifacts/wasi-smoke.artifact.json",
+		reportDir + "/artifacts/wasi-smoke.json",
+		reportDir + "/artifacts/test-all/host-smoke.json",
+	} {
+		files[path] = []byte(`{"timestamp":"2026-04-30T12:00:00Z","version":"` + version + `","git_head":"` + gitHead + `","cases":[]}`)
+	}
+	files[reportDir+"/artifacts/manifest.json"] = []byte(`{"compiler_version":"` + version + `"}`)
+	files[reportDir+"/artifacts/binary-size-thresholds.json"] = []byte(`{"schema":"tetra.binary-size-thresholds.v1alpha1","compiler_version":"` + version + `"}`)
+	files[reportDir+"/artifacts/reproducible-build.json"] = []byte(`{"schema":"tetra.reproducible-build-proof.v1alpha1","compiler_version":"` + version + `"}`)
+	files[reportDir+"/artifacts/performance-regression.json"] = []byte(`{"schema":"tetra.performance-regression.v1","git_head":"` + gitHead + `"}`)
+	files[reportDir+"/artifacts/api-diff/api-diff.json"] = []byte(`{"schema":"tetra.api.diff.v1alpha1"}`)
+	files[reportDir+"/artifacts/web-ui-smoke.json"] = []byte(`{"schema":"tetra.web-ui-smoke.v1alpha1","generated_at":"2026-04-30T12:00:00Z"}`)
+	files[reportDir+"/summary.json"] = releaseSummaryJSON(version, expectedReleaseArtifact(version), expectedReleaseGateCommand(version), reportDir, 33, 0, "pass")
+	files[reportDir+"/artifacts/test-all/summary.json"] = []byte(`{"started_at":"2026-04-30T12:00:00Z","ended_at":"2026-04-30T12:01:00Z"}`)
 	addSecurityReviewEvidenceFiles(files, reportDir, version, gitHead)
 	return files
 }

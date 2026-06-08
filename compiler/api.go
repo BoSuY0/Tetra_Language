@@ -25,6 +25,7 @@ type IRProgram = ir.IRProgram
 type IRFunc = ir.IRFunc
 type PLIRProgram = plir.Program
 type UILoweredBundle = lower.UILoweredBundle
+type UIToolkitBundle = lower.UIToolkitBundle
 
 type Object = tobj.Object
 type Symbol = tobj.Symbol
@@ -110,6 +111,10 @@ func LowerModules(checked *CheckedProgram) (map[string][]IRFunc, error) {
 
 func LowerUI(checked *CheckedProgram) (*UILoweredBundle, error) {
 	return lower.LowerUI(checked)
+}
+
+func LowerUIToolkit(bundle *UILoweredBundle) (*UIToolkitBundle, error) {
+	return lower.LowerUIToolkit(bundle)
 }
 
 func VerifyIRProgram(prog *IRProgram) error {

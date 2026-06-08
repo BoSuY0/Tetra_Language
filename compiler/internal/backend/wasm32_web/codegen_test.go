@@ -64,7 +64,7 @@ func TestLinkObjectWebImportExportShape(t *testing.T) {
 	}
 
 	imports := wasmImports(t, mod)
-	if got := imports["tetra_web_v1"]; !stringSetHas(got, "console_log") || !stringSetHas(got, "panic") {
+	if got := imports["tetra_web_v0.4.0"]; !stringSetHas(got, "console_log") || !stringSetHas(got, "panic") {
 		t.Fatalf("web imports = %#v", imports)
 	}
 	if _, ok := imports["wasi_snapshot_preview1"]; ok {
@@ -1011,7 +1011,7 @@ func TestLinkObjectWebSupportsIslandInstructionsInBuildOnlyMode(t *testing.T) {
 
 func TestLoaderModuleIncludesRuntimeNamespaceAndEntry(t *testing.T) {
 	loader := string(LoaderModule("app.wasm"))
-	if !bytes.Contains([]byte(loader), []byte("tetra_web_v1")) {
+	if !bytes.Contains([]byte(loader), []byte("tetra_web_v0.4.0")) {
 		t.Fatalf("loader missing runtime namespace:\n%s", loader)
 	}
 	if !bytes.Contains([]byte(loader), []byte("tetra_main")) {

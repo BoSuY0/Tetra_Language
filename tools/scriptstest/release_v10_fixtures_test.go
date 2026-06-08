@@ -15,6 +15,7 @@ func releaseV10GateFakeRepo(t *testing.T) string {
 		"bin",
 		"docs/baselines",
 		"docs/generated/v1_0",
+		"docs/release",
 		"examples",
 		"scripts",
 		"scripts/ci",
@@ -41,6 +42,9 @@ func releaseV10GateFakeRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "docs", "baselines", "api-diff-baseline.v1alpha1.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "release", "v1_0_final_handoff.md"), []byte("# Tetra v1.0 Final Handoff\n\nStatus: ready for lint fixture.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "security-review.md"), []byte("# Security Review\n"), 0o644); err != nil {
@@ -107,7 +111,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 mkdir -p "$(dirname "$report")"
-printf '{"status":"pass","ui_schema":"tetra.ui.v1","cases":[]}\n' >"$report"
+printf '{"status":"pass","ui_schema":"tetra.ui.v0.4.0","cases":[]}\n' >"$report"
 `)
 	writeScript("scripts/release/v1_0/api-diff.sh", `#!/usr/bin/env bash
 set -euo pipefail
@@ -290,8 +294,13 @@ if [[ "${1:-}" == "run" ]]; then
       ;;
     ./tools/cmd/validate-artifact-hashes)
       out=""
+      root=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
+          --root)
+            root="$2"
+            shift 2
+            ;;
           --out)
             out="$2"
             shift 2
@@ -302,8 +311,28 @@ if [[ "${1:-}" == "run" ]]; then
         esac
       done
       if [[ -n "$out" ]]; then
+        if [[ -z "$root" ]]; then
+          root="$(dirname "$out")"
+        fi
         mkdir -p "$(dirname "$out")"
-        printf '{"schema":"tetra.release-artifact-hashes.v1alpha1","root":".","artifacts":[{"path":"known_issues.md","sha256":"sha256:0000000000000000000000000000000000000000000000000000000000000000","size":0}]}\n' >"$out"
+        {
+          printf '{"schema":"tetra.release-artifact-hashes.v1alpha1","root":".","artifacts":['
+          first="true"
+          while IFS= read -r file; do
+            rel="${file#"$root"/}"
+            if [[ "$rel" == "artifact-hashes.json" ]]; then
+              continue
+            fi
+            if [[ "$first" == "true" ]]; then
+              first="false"
+            else
+              printf ','
+            fi
+            size="$(wc -c <"$file" | tr -d ' ')"
+            printf '{"path":"%s","sha256":"sha256:0000000000000000000000000000000000000000000000000000000000000000","size":%s}' "$rel" "$size"
+          done < <(find "$root" -type f | sort)
+          printf ']}\n'
+        } >"$out"
       fi
       ;;
   esac
@@ -416,7 +445,7 @@ case "$cmd" in
     fi
     printf 'wasm:%s\n' "$src" >"$out"
     if [[ "$src" == "examples/ui_web_smoke.tetra" ]]; then
-      printf '{"schema":"tetra.ui.v1"}\n' >"$out.ui.json"
+      printf '{"schema":"tetra.ui.v0.4.0"}\n' >"$out.ui.json"
     fi
     ;;
   *)

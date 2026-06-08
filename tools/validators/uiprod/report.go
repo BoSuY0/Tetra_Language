@@ -10,6 +10,7 @@ import (
 )
 
 const SchemaV1 = "tetra.ui.desktop-runtime.v1"
+const UIBundleSchema = "tetra.ui.v0.4.0"
 
 type Report struct {
 	Schema    string           `json:"schema"`
@@ -127,8 +128,8 @@ func ValidateReport(raw []byte) error {
 	if report.Runtime != "desktop-ui-linux-x64" {
 		issues = append(issues, fmt.Sprintf("runtime is %q, want desktop-ui-linux-x64", report.Runtime))
 	}
-	if report.UISchema != "tetra.ui.v1" {
-		issues = append(issues, fmt.Sprintf("ui_schema is %q, want tetra.ui.v1", report.UISchema))
+	if report.UISchema != UIBundleSchema {
+		issues = append(issues, fmt.Sprintf("ui_schema is %q, want %s", report.UISchema, UIBundleSchema))
 	}
 	if strings.TrimSpace(report.Source) == "" {
 		issues = append(issues, "source is required")

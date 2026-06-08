@@ -44,6 +44,7 @@ type performanceSummary struct {
 
 func main() {
 	reportPath := flag.String("report", "", "path to performance regression JSON report")
+	stampGitHead := flag.String("stamp-git-head", "", "rewrite git_head before validation")
 	flag.Parse()
 	if *reportPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --report is required")
@@ -54,10 +55,36 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if strings.TrimSpace(*stampGitHead) != "" {
+		raw, err = stampPerformanceReportGitHead(raw, *stampGitHead)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := os.WriteFile(*reportPath, append(raw, '\n'), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 	if err := validatePerformanceReport(raw); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func stampPerformanceReportGitHead(raw []byte, gitHead string) ([]byte, error) {
+	gitHead = strings.TrimSpace(gitHead)
+	if gitHead == "" {
+		return nil, fmt.Errorf("stamp git_head is required")
+	}
+	var report performanceReport
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&report); err != nil {
+		return nil, err
+	}
+	report.GitHead = gitHead
+	return json.MarshalIndent(report, "", "  ")
 }
 
 func validatePerformanceReport(raw []byte) error {

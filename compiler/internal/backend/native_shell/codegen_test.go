@@ -10,7 +10,7 @@ import (
 
 func TestRenderIncludesStateAndViewMetadata(t *testing.T) {
 	bundle := &lower.UILoweredBundle{
-		Schema: "tetra.ui.v1",
+		Schema: "tetra.ui.v0.4.0",
 		States: []lower.UILoweredState{
 			{
 				Name:   "ShellState",
@@ -59,7 +59,7 @@ func TestRenderIncludesStateAndViewMetadata(t *testing.T) {
 
 func TestRenderDispatchesStateSubtractOperations(t *testing.T) {
 	bundle := &lower.UILoweredBundle{
-		Schema: "tetra.ui.v1",
+		Schema: "tetra.ui.v0.4.0",
 		States: []lower.UILoweredState{
 			{
 				Name:   "ShellState",
@@ -99,7 +99,7 @@ func TestRenderDispatchesStateSubtractOperations(t *testing.T) {
 
 func TestRenderDispatchesStringStateSetWithoutLiteralQuotes(t *testing.T) {
 	bundle := &lower.UILoweredBundle{
-		Schema: "tetra.ui.v1",
+		Schema: "tetra.ui.v0.4.0",
 		States: []lower.UILoweredState{
 			{
 				Name:   "ShellState",
@@ -139,7 +139,7 @@ func TestRenderDispatchesStringStateSetWithoutLiteralQuotes(t *testing.T) {
 
 func TestRenderDispatchesStateSetFromSameStateField(t *testing.T) {
 	bundle := &lower.UILoweredBundle{
-		Schema: "tetra.ui.v1",
+		Schema: "tetra.ui.v0.4.0",
 		States: []lower.UILoweredState{
 			{
 				Name:   "ShellState",
@@ -180,7 +180,7 @@ func TestRenderDispatchesStateSetFromSameStateField(t *testing.T) {
 
 func TestRenderDispatchesCommandOperationsInOrder(t *testing.T) {
 	bundle := &lower.UILoweredBundle{
-		Schema: "tetra.ui.v1",
+		Schema: "tetra.ui.v0.4.0",
 		States: []lower.UILoweredState{
 			{
 				Name:   "ShellState",
@@ -227,7 +227,7 @@ func TestRenderDispatchesCommandOperationsInOrder(t *testing.T) {
 
 func TestRenderJSONIncludesDispatchTrace(t *testing.T) {
 	bundle := &lower.UILoweredBundle{
-		Schema: "tetra.ui.v1",
+		Schema: "tetra.ui.v0.4.0",
 		States: []lower.UILoweredState{
 			{
 				Name:   "ShellState",
@@ -278,7 +278,7 @@ func TestRenderJSONIncludesDispatchTrace(t *testing.T) {
 	if err := json.Unmarshal(RenderJSON(bundle), &report); err != nil {
 		t.Fatalf("RenderJSON produced invalid JSON: %v\n%s", err, RenderJSON(bundle))
 	}
-	if report.Schema != "tetra.ui.native-shell.v1" || report.UISchema != "tetra.ui.v1" || report.Runtime != "native shell command dispatch" {
+	if report.Schema != "tetra.ui.native-shell.v1" || report.UISchema != "tetra.ui.v0.4.0" || report.Runtime != "native shell command dispatch" {
 		t.Fatalf("report header = %#v", report)
 	}
 	if len(report.Views) != 1 || len(report.Views[0].Events) != 1 {
@@ -299,7 +299,7 @@ func TestRenderJSONIncludesDispatchTrace(t *testing.T) {
 
 func TestRenderJSONIncludesNativeWidgetTree(t *testing.T) {
 	bundle := &lower.UILoweredBundle{
-		Schema: "tetra.ui.v1",
+		Schema: "tetra.ui.v0.4.0",
 		States: []lower.UILoweredState{
 			{
 				Name:   "ShellState",

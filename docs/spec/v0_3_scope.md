@@ -1,6 +1,6 @@
 # Tetra v0.3.0 Next-Cycle Scope
 
-Status: current scope contract for the `v0.3.0` minor line.
+Status: historical scope contract for the `v0.3.0` minor line.
 
 The current release truth stays in `docs/spec/current_supported_surface.md`.
 This document records the promoted v0.3 slices and the candidates that remain

@@ -1,7 +1,8 @@
 # v0.3.0 Release Gate Checklist
 
-Status: active release-gate checklist for the current `v0.3.0` release line. The
-current public profile is `v0.3.0`; tagging still requires a fresh passing gate
+Status: historical release-gate checklist for the `v0.3.0` release line. The
+active release profile has moved past this version; retagging this historical line
+would still require a fresh passing gate
 report in the same branch state.
 
 Canonical scope: `docs/spec/v0_3_scope.md`.

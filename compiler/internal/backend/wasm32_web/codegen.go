@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	wasmPageSize  = 65536
-	wasmHeapAlign = 16
-	dataBase      = uint32(0x1000)
+	wasmPageSize    = 65536
+	wasmHeapAlign   = 16
+	dataBase        = uint32(0x1000)
+	webImportModule = "tetra_web_v0.4.0"
 )
 
 type Function struct {
@@ -47,8 +48,8 @@ type wasmImportSpec struct {
 
 func wasmImportsForObject(funcs []Function) []wasmImportSpec {
 	imports := []wasmImportSpec{
-		{Module: "tetra_web_v1", Name: "console_log", ParamSlots: 2, ReturnSlots: 0},
-		{Module: "tetra_web_v1", Name: "panic", ParamSlots: 3, ReturnSlots: 0},
+		{Module: webImportModule, Name: "console_log", ParamSlots: 2, ReturnSlots: 0},
+		{Module: webImportModule, Name: "panic", ParamSlots: 3, ReturnSlots: 0},
 	}
 	usedSurface := make(map[string]struct{})
 	for _, fn := range funcs {
@@ -349,7 +350,7 @@ func LoaderModule(wasmFileName string) []byte {
 		"function memoryView(instance) {",
 		"  const memory = instance.exports.memory;",
 		"  if (!(memory instanceof WebAssembly.Memory)) {",
-		"    throw new Error(\"tetra_web_v1: missing exported memory\");",
+		"    throw new Error(\"" + webImportModule + ": missing exported memory\");",
 		"  }",
 		"  return new Uint8Array(memory.buffer);",
 		"}",
@@ -498,11 +499,11 @@ func LoaderModule(wasmFileName string) []byte {
 		"",
 		"function createImports(instanceRef) {",
 		"  return {",
-		"    tetra_web_v1: {",
+		"    \"" + webImportModule + "\": {",
 		"      console_log(ptr, len) {",
 		"        const instance = instanceRef.instance;",
 		"        if (!instance) {",
-		"          throw new Error(\"tetra_web_v1: instance is not ready\");",
+		"          throw new Error(\"" + webImportModule + ": instance is not ready\");",
 		"        }",
 		"        console.log(readUTF8(instance, ptr | 0, len | 0));",
 		"      },",
@@ -522,7 +523,7 @@ func LoaderModule(wasmFileName string) []byte {
 		"export async function instantiateTetra(moduleURL = TETRA_WASM_URL) {",
 		"  const response = await fetch(moduleURL);",
 		"  if (!response.ok) {",
-		"    throw new Error(\"tetra_web_v1: fetch failed: \" + response.status);",
+		"    throw new Error(\"" + webImportModule + ": fetch failed: \" + response.status);",
 		"  }",
 		"  const bytes = await response.arrayBuffer();",
 		"  const instanceRef = { instance: null };",
@@ -535,7 +536,7 @@ func LoaderModule(wasmFileName string) []byte {
 		"  const { instance } = await instantiateTetra(moduleURL);",
 		"  const tetraMain = instance.exports.tetra_main;",
 		"  if (typeof tetraMain !== \"function\") {",
-		"    throw new Error(\"tetra_web_v1: missing tetra_main export\");",
+		"    throw new Error(\"" + webImportModule + ": missing tetra_main export\");",
 		"  }",
 		"  return tetraMain() | 0;",
 		"}",

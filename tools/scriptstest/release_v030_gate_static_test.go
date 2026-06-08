@@ -59,7 +59,8 @@ func TestReleaseV030ChecklistIsNonClaimingAndVersionScoped(t *testing.T) {
 		"git status --porcelain --untracked-files=all",
 		"validates both host-gated reports before archiving either runtime evidence artifact",
 		"`go test packages` step clears release input environment variables",
-		"current public",
+		"historical release-gate checklist",
+		"active release profile has moved past this version",
 		"v1.0.0",
 	} {
 		if !strings.Contains(text, want) {

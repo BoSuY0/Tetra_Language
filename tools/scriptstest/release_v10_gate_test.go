@@ -1,7 +1,9 @@
 package scriptstest
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,18 +24,26 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 		`release_version="v1.0.0"`,
 		`release_artifact="tetra.release.v1_0.gate-report.v1"`,
 		`bash scripts/dev/bootstrap.sh`,
+		`run_step "bootstrap tetra binaries" bash scripts/dev/bootstrap.sh`,
+		`run_step "go test packages" env -u TETRA_SECURITY_REVIEW_SIGNOFF -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT go test ./compiler/... ./cli/... ./tools/... -count=1`,
+		`run_step "full stabilization wrapper" env -u TETRA_SECURITY_REVIEW_SIGNOFF TETRA_TEST_ALL_RELEASE_VERSION="$release_version" TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1" bash scripts/ci/test-all.sh --full --keep-going --report-dir "$artifacts_dir/test-all"`,
 		`if [[ "$version" != "$release_version" ]]`,
 		`expected ./tetra version to be $release_version`,
 		`release_gate_command="bash scripts/release/v1_0/gate.sh"`,
+		`TETRA_TEST_ALL_RELEASE_ARTIFACT="tetra.release.v1_0_0.test-all-summary.v1"`,
 		`run_step "WASI runner smoke" check_wasi_runner_smoke`,
 		`run_step "Web runtime browser smoke" check_web_runtime_smoke`,
+		`run_step "security review detached hash" write_security_review_detached_hash`,
+		`run_step "handoff signoff lint" check_handoff_signoff_lint`,
 		`run_step "WASI artifact/import smoke"`,
 		`go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$1"`,
 		`run_step "Web artifact/import smoke"`,
 		`run_step "build-only smoke linux-x64"`,
 		`run_step "build-only smoke macos-x64"`,
 		`run_step "build-only smoke windows-x64"`,
+		`run_step "backend summary artifact" check_backend_summary`,
 		`run_step "API diff gate" check_api_diff`,
+		`go run ./tools/cmd/validate-performance-report --report "$dst" --stamp-git-head "$current_head"`,
 		`run_step "reproducible build proof" check_repro_build`,
 		`run_step "release state audit" check_release_state`,
 	} {
@@ -70,9 +80,15 @@ func TestReleaseV10GateUsesRealV1Boundary(t *testing.T) {
 	if artifactIdx == -1 || releaseStateIdx == -1 || artifactIdx > releaseStateIdx {
 		t.Fatalf("v1.0 release gate must build artifact hash manifest before release-state audit")
 	}
-	if !strings.Contains(text, `write_summary "pass"
-if ! check_release_state; then`) {
-		t.Fatalf("v1.0 release gate must final-refresh release-state after pass summary")
+	for _, want := range []string{
+		`write_summary "pass"
+if ! check_artifact_hash_manifest; then`,
+		`if ! check_release_state; then`,
+		`release/v1_0/gate: blocked: final artifact hash refresh failed`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("v1.0 release gate final refresh sequence missing %q", want)
+		}
 	}
 }
 
@@ -129,6 +145,7 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
+		"bootstrap tetra binaries",
 		"WASI runner smoke",
 		"Web runtime browser smoke",
 		"WASI artifact/import smoke",
@@ -136,6 +153,8 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 		"build-only smoke linux-x64",
 		"build-only smoke macos-x64",
 		"build-only smoke windows-x64",
+		"backend summary artifact",
+		"handoff signoff lint",
 		"API diff gate",
 		"reproducible build proof",
 		"release state audit",
@@ -145,8 +164,10 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 		}
 	}
 	for _, artifact := range []string{
+		"logs/01-bootstrap-tetra-binaries.log",
 		"artifacts/wasi-smoke.json",
 		"artifacts/web-ui-smoke.json",
+		"artifacts/backend-summary.md",
 		"artifacts/api-diff/api-diff.json",
 		"artifacts/reproducible-build.json",
 	} {
@@ -176,6 +197,28 @@ func TestReleaseV10GateRunsDedicatedV1Workflow(t *testing.T) {
 	}
 	if releaseState.LastGateEvidence.FailedCount != 0 {
 		t.Fatalf("release-state failed_count = %d, want 0", releaseState.LastGateEvidence.FailedCount)
+	}
+
+	hashRaw, err := os.ReadFile(filepath.Join(reportDir, "artifacts", "artifact-hashes.json"))
+	if err != nil {
+		t.Fatalf("read v1.0 artifact hash manifest: %v", err)
+	}
+	var hashManifest struct {
+		Artifacts []struct {
+			Path string `json:"path"`
+		} `json:"artifacts"`
+	}
+	if err := json.Unmarshal(hashRaw, &hashManifest); err != nil {
+		t.Fatalf("decode v1.0 artifact hash manifest: %v\n%s", err, hashRaw)
+	}
+	hashed := map[string]bool{}
+	for _, artifact := range hashManifest.Artifacts {
+		hashed[artifact.Path] = true
+	}
+	for _, want := range []string{"release-state.json", "release-state.txt"} {
+		if !hashed[want] {
+			t.Fatalf("artifact-hashes.json must include %s after final release-state refresh:\n%s", want, hashRaw)
+		}
 	}
 }
 
@@ -335,6 +378,81 @@ func TestReleaseV10GateAcceptsDashPrefixedSecuritySignoff(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(reportDir, "artifacts", "security-review.md")); err != nil {
 		t.Fatalf("security review artifact was not archived from dash-prefixed source: %v\n%s", err, out)
+	}
+	reviewRaw, err := os.ReadFile(filepath.Join(reportDir, "artifacts", "security-review.md"))
+	if err != nil {
+		t.Fatalf("read archived security review: %v", err)
+	}
+	hashRaw, err := os.ReadFile(filepath.Join(reportDir, "artifacts", "security-review.md.sha256"))
+	if err != nil {
+		t.Fatalf("security review detached hash was not archived: %v\n%s", err, out)
+	}
+	wantHash := fmt.Sprintf("%x  artifacts/security-review.md\n", sha256.Sum256(reviewRaw))
+	if string(hashRaw) != wantHash {
+		t.Fatalf("security review detached hash = %q, want %q", string(hashRaw), wantHash)
+	}
+}
+
+func TestReleaseV10GateWritesBlockedSecurityArtifactWhenSignoffMissing(t *testing.T) {
+	root := releaseV10GateFakeRepo(t)
+	reportDir := filepath.Join(root, "report")
+
+	cmd := exec.Command("bash", "scripts/release/v1_0/gate.sh", "--report-dir", reportDir)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(),
+		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("v1.0 gate should block when security signoff is missing\n%s", out)
+	}
+	if !strings.Contains(string(out), "release/v1_0/gate: missing TETRA_SECURITY_REVIEW_SIGNOFF=<security-review.md>") {
+		t.Fatalf("missing signoff output did not explain the blocker:\n%s", out)
+	}
+	reviewPath := filepath.Join(reportDir, "artifacts", "security-review.md")
+	reviewRaw, err := os.ReadFile(reviewPath)
+	if err != nil {
+		t.Fatalf("blocked security review artifact was not written: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"Decision: blocked",
+		"Reason: missing TETRA_SECURITY_REVIEW_SIGNOFF for the exact v1.0.0 candidate.",
+		"bash scripts/release/v1_0/security-review.sh --write-template <security-review.md>",
+	} {
+		if !strings.Contains(string(reviewRaw), want) {
+			t.Fatalf("blocked security review artifact missing %q:\n%s", want, reviewRaw)
+		}
+	}
+	hashRaw, err := os.ReadFile(filepath.Join(reportDir, "artifacts", "security-review.md.sha256"))
+	if err != nil {
+		t.Fatalf("blocked security review detached hash was not written: %v\n%s", err, out)
+	}
+	wantHash := fmt.Sprintf("%x  artifacts/security-review.md\n", sha256.Sum256(reviewRaw))
+	if string(hashRaw) != wantHash {
+		t.Fatalf("blocked security review detached hash = %q, want %q", string(hashRaw), wantHash)
+	}
+}
+
+func TestReleaseV10GateRejectsSecuritySignoffPlaceholders(t *testing.T) {
+	root := releaseV10GateFakeRepo(t)
+	reportDir := filepath.Join(root, "report")
+	signoffPath := filepath.Join(root, "security-review.md")
+	if err := os.WriteFile(signoffPath, []byte("# Security Review\n\nDecision: approved\nEvidence: <fill-me>\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command("bash", "scripts/release/v1_0/gate.sh", "--report-dir", reportDir)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(),
+		"PATH="+filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TETRA_SECURITY_REVIEW_SIGNOFF="+signoffPath,
+	)
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("v1.0 gate should reject placeholder security signoff\n%s", out)
+	}
+	if !strings.Contains(string(out), "handoff/signoff lint found unresolved placeholders") {
+		t.Fatalf("placeholder signoff output did not explain lint blocker:\n%s", out)
 	}
 }
 

@@ -14,6 +14,8 @@ type UILoweredBundle struct {
 	Views  []UILoweredView  `json:"views"`
 }
 
+const UIBundleSchema = "tetra.ui.v0.4.0"
+
 type UILoweredState struct {
 	Name   string                `json:"name"`
 	Module string                `json:"module"`
@@ -82,7 +84,7 @@ func LowerUI(checked *semantics.CheckedProgram) (*UILoweredBundle, error) {
 		return nil, nil
 	}
 	out := &UILoweredBundle{
-		Schema: "tetra.ui.v1",
+		Schema: UIBundleSchema,
 		States: make([]UILoweredState, 0, len(checked.UIStates)),
 		Views:  make([]UILoweredView, 0, len(checked.UIViews)),
 	}

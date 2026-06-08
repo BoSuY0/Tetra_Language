@@ -38,7 +38,7 @@ func main() -> Int:
 	if bundle == nil {
 		t.Fatalf("bundle = nil")
 	}
-	if bundle.Schema != "tetra.ui.v1" {
+	if bundle.Schema != "tetra.ui.v0.4.0" {
 		t.Fatalf("schema = %q", bundle.Schema)
 	}
 	if len(bundle.States) != 1 || len(bundle.Views) != 1 {

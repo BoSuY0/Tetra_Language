@@ -45,7 +45,7 @@ the full v1 target matrix.
 | Task runtime MVP | Required for local typed task handles | Spawn/join/group builtins are typed, `uses runtime` gated, documented, and covered by bounded stress | `go test ./compiler/... -run 'Task|Runtime|Async|Stress' -count=1` | runtime agent |
 | Actors runtime MVP | Required for local actor runtime on supported native targets | Tagged messages, runtime selection, self-host/builtin parity, ownership checks, and target build matrix are tested; Linux-x64 distributed actors are covered by the `actors.distributed-runtime` v0.4.0 production slice, while non-Linux-x64 distributed actor targets and broader structured-concurrency guarantees remain outside this MVP | `go test ./compiler/... -run 'Actor|Actors|Runtime|Ownership' -count=1` | runtime agent |
 | Runtime ABI and TOBJ linking | Required | Reserved `__tetra_*` symbols, TOBJ target metadata, runtime override, repeated link objects, and mismatch diagnostics are tested | `go test ./compiler/... -run 'Runtime|ABI|Object|Link' -count=1` | runtime agent |
-| UI syntax and accessibility metadata | Required as metadata UI surface | `docs/spec/ui_v1.md`, UI parser/semantic/lowering tests, native shell sidecar smoke, and web browser smoke evidence | `go test ./compiler/... -run 'UI|View|State|Style|Accessibility|NativeShell' -count=1`; `bash scripts/release/v1_0/web-smoke.sh`; `./tetra smoke --target linux-x64 --run=false` | UI agent |
+| UI syntax and accessibility metadata | Required as metadata UI surface | `docs/spec/ui_v0.4.0.md`, UI parser/semantic/lowering tests, native shell sidecar smoke, and web browser smoke evidence | `go test ./compiler/... -run 'UI|View|State|Style|Accessibility|NativeShell' -count=1`; `bash scripts/release/v1_0/web-smoke.sh`; `./tetra smoke --target linux-x64 --run=false` | UI agent |
 
 ## Mandatory Tooling, CLI, LSP, Docs, And Eco Scope
 
@@ -118,7 +118,7 @@ notes, and security review when applicable.
   collecting it from non-matching Linux hosts.
 - Cross-platform native widget rendering, platform accessibility integration,
   and runtime UI event dispatch/layout beyond the Linux-x64 post-v0.4 desktop
-  runtime evidence and the UI v1 metadata artifacts in `docs/spec/ui_v1.md`.
+  runtime evidence and the UI v0.4.0 metadata artifacts in `docs/spec/ui_v0.4.0.md`.
 - Any feature still labeled `planned`, `beta`, `deferred-post-v1`, or
   `blocked-by-prerequisite` in the release checklist.
 

@@ -803,14 +803,14 @@ if [[ "$json_only" != true ]]; then
   printf 'report_dir: %s\n\n' "$report_dir"
 fi
 
-run_step "go test all packages" go test ./compiler/... ./cli/... ./tools/... -count=1
+run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF go test ./compiler/... ./cli/... ./tools/... -count=1
 run_step "unsafe promotion blocker suite" check_unsafe_promotion_blockers
 run_step "bounds proof blocker suite" check_bounds_proof_blockers
 run_step "memory fuzz oracle artifact gate" check_memory_fuzz_oracle_gate
 run_step "host leak blocker suite" check_host_leak_blockers
 
 if [[ "$mode" == "full" || "$mode" == "stabilization" ]]; then
-  run_step "repo test script" bash scripts/ci/test.sh
+  run_step "repo test script" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF bash scripts/ci/test.sh
 fi
 
 run_step "bootstrap" bash scripts/dev/bootstrap.sh

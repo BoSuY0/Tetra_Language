@@ -534,6 +534,7 @@ func validateFeatures(features []featureManifest) error {
 		"safety.production-core":                  "current",
 		"language.callable-level2":                "current",
 		"ui.metadata-v1":                          "current",
+		"ui.toolkit-core":                         "current",
 		"wasm.runtime-execution":                  "current",
 		"language.full-v1-guarantees":             "planned",
 		"eco.distributed-network":                 "post-v1",
@@ -664,6 +665,22 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 			"calling protocol requirements through generic bounds",
 			"dynamic dispatch remain unsupported",
 		},
+		"ui.toolkit-core": {
+			"production platform-independent UI Toolkit Core contract",
+			"tetra.ui.toolkit.v1",
+			"widget model",
+			"layout model",
+			"accessibility model",
+			"event dispatch",
+			"state binding/update",
+			"runtime trace artifacts",
+			"metadata-only",
+			"runtime-less",
+			"native-shell sidecar-only",
+			"web-only",
+			"GTK/Qt/OS platform backend production",
+			"full cross-platform UI",
+		},
 	}
 	docChecks := map[string][]string{
 		"language.generics-mvp":                   {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v1_scope.md"},
@@ -675,6 +692,7 @@ func validateFeatureTruthBoundaries(features map[string]featureManifest) error {
 		"safety.production-core":                  {"docs/spec/current_supported_surface.md", "docs/spec/ownership_v1.md", "docs/spec/effects_capabilities_privacy_v1.md", "docs/design/memory_cost_model.md", "docs/audits/memory-fuzz-oracle-v1.md", "docs/audits/memory-production-core-v1-final.md", "docs/audits/memory-production-core-v1-artifact-map.md", "docs/audits/memory-production-core-v1-nonclaims.md", "docs/audits/memory-ideal-vslice-v0-baseline.md", "docs/audits/memory-ideal-vslice-v0-correlation.md", "docs/audits/memory-ideal-vslice-v0-final.md", "docs/audits/memory-ideal-vslice-v1-correlation.md", "docs/audits/memory-ideal-vslice-v1-final.md", "docs/audits/memory-ideal-vslice-v2-correlation.md", "docs/audits/memory-ideal-vslice-v2-final.md", "docs/audits/memory-ideal-vslice-v3-correlation.md", "docs/audits/memory-ideal-vslice-v3-final.md"},
 		"language.enum-payload-match":             {"docs/spec/current_supported_surface.md", "docs/spec/flow_syntax_v1.md", "docs/spec/v0_3_scope.md"},
 		"language.protocol-bound-generics-static": {"docs/spec/current_supported_surface.md", "docs/spec/v0_3_scope.md", "docs/spec/flow_syntax_v1.md"},
+		"ui.toolkit-core":                         {"docs/spec/current_supported_surface.md", "docs/spec/ui_toolkit_core.md", "docs/spec/ui_v0.4.0.md"},
 	}
 	for id, required := range checks {
 		feature, ok := features[id]

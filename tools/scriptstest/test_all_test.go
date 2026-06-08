@@ -1052,9 +1052,13 @@ func TestTestAllTopLevelGoTestBypassesCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read test_all: %v", err)
 	}
-	want := `run_step "go test all packages" go test ./compiler/... ./cli/... ./tools/... -count=1`
+	want := `run_step "go test all packages" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF go test ./compiler/... ./cli/... ./tools/... -count=1`
 	if !strings.Contains(string(raw), want) {
 		t.Fatalf("test_all top-level go test should bypass cache with %q", want)
+	}
+	wantRepo := `run_step "repo test script" env -u TETRA_TEST_ALL_RELEASE_VERSION -u TETRA_TEST_ALL_RELEASE_ARTIFACT -u TETRA_SECURITY_REVIEW_SIGNOFF bash scripts/ci/test.sh`
+	if !strings.Contains(string(raw), wantRepo) {
+		t.Fatalf("test_all repo script should clear release signoff env with %q", wantRepo)
 	}
 }
 
@@ -1314,6 +1318,23 @@ func TestSmokeSourceSetsUseUnifiedRegistry(t *testing.T) {
 			if strings.Contains(text, forbidden) {
 				t.Fatalf("%s still hard-codes smoke source %q", rel, forbidden)
 			}
+		}
+	}
+}
+
+func TestTestAllWASMSchemaChecksUseArtifactSmokeReports(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "scripts", "ci", "test-all.sh"))
+	if err != nil {
+		t.Fatalf("read test-all.sh: %v", err)
+	}
+	text := string(raw)
+	for _, want := range []string{
+		`local report="$report_dir/$target-artifact-smoke.json"`,
+		`go run ./tools/cmd/validate-wasi-smoke-report --mode artifact --report "$report"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("test-all WASM schema check missing %q", want)
 		}
 	}
 }

@@ -73,8 +73,8 @@ v1 gate summary cites the same command as a passing gate step.
 - [ ] `./tetra smoke --target linux-x64 --run=true --report <report-dir>/artifacts/host-smoke.json`
 - [ ] `./tetra smoke --target macos-x64 --run=false --report <report-dir>/artifacts/macos-smoke.json`
 - [ ] `./tetra smoke --target windows-x64 --run=false --report <report-dir>/artifacts/windows-smoke.json`
-- [ ] `./tetra smoke --target wasm32-wasi --run=false --report <report-dir>/artifacts/wasm32-wasi-smoke.json`
-- [ ] `./tetra smoke --target wasm32-web --run=false --report <report-dir>/artifacts/wasm32-web-smoke.json`
+- [ ] `./tetra smoke --target wasm32-wasi --run=false --report <report-dir>/artifacts/wasm32-wasi-artifact-smoke.json`
+- [ ] `./tetra smoke --target wasm32-web --run=false --report <report-dir>/artifacts/wasm32-web-artifact-smoke.json`
 - [ ] `bash scripts/release/v1_0/wasi-smoke.sh --report <report-dir>/artifacts/wasi-smoke.json`
 - [ ] `bash scripts/release/v1_0/web-smoke.sh --report <report-dir>/artifacts/web-ui-smoke.json`
 - [ ] `bash scripts/release/v1_0/security-review.sh --signoff <report-dir>/artifacts/security-review.md`
@@ -98,6 +98,7 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 - [ ] `<report-dir>/artifacts/artifact-hashes.json`
 - [ ] `<report-dir>/artifacts/known_issues.md`
 - [ ] `<report-dir>/artifacts/security-review.md`
+- [ ] `<report-dir>/artifacts/security-review.md.sha256`
 - [ ] `<report-dir>/artifacts/reproducible-build.json`
 - [ ] `<report-dir>/artifacts/binary-size-thresholds.json`
 - [ ] `<report-dir>/artifacts/performance-regression.json`
@@ -109,10 +110,12 @@ The final handoff must cite concrete paths under one fresh `<report-dir>`.
 - [ ] `<report-dir>/artifacts/linux-smoke.json`
 - [ ] `<report-dir>/artifacts/macos-smoke.json`
 - [ ] `<report-dir>/artifacts/windows-smoke.json`
-- [ ] `<report-dir>/artifacts/wasm32-wasi-smoke.json`
-- [ ] `<report-dir>/artifacts/wasm32-web-smoke.json`
+- [ ] `<report-dir>/artifacts/wasm32-wasi-artifact-smoke.json`
+- [ ] `<report-dir>/artifacts/wasm32-web-artifact-smoke.json`
+- [ ] `<report-dir>/artifacts/wasi-smoke.artifact.json`
 - [ ] `<report-dir>/artifacts/wasi-smoke.json`
 - [ ] `<report-dir>/artifacts/web-ui-smoke.json`
+- [ ] `<report-dir>/artifacts/backend-summary.md`
 - [ ] `<report-dir>/artifacts/api-diff/api-docs.md`
 - [ ] `<report-dir>/artifacts/api-diff/api-diff.json`
 - [ ] `<report-dir>/artifacts/tetra-docs.md`

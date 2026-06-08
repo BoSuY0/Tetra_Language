@@ -250,17 +250,24 @@ func (b *Broker) routeFrame(frame actorwire.Frame) error {
 		}
 		return fmt.Errorf("actornet: destination node %d unavailable", frame.DestNodeID)
 	}
+	b.report.RoutedFrames++
 	b.mu.Unlock()
 	if err := dest.write(frame); err != nil {
+		b.rollbackRoutedFrame()
 		if b.handleClosedRouteWrite(frame.DestNodeID, dest.conn, err, true) {
 			return nil
 		}
 		return err
 	}
-	b.mu.Lock()
-	b.report.RoutedFrames++
-	b.mu.Unlock()
 	return nil
+}
+
+func (b *Broker) rollbackRoutedFrame() {
+	b.mu.Lock()
+	if b.report.RoutedFrames > 0 {
+		b.report.RoutedFrames--
+	}
+	b.mu.Unlock()
 }
 
 func (b *Broker) handleClosedRouteWrite(nodeID uint16, conn net.Conn, err error, countDrop bool) bool {

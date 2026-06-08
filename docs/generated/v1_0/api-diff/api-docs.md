@@ -1,6 +1,20 @@
 # Tetra API Docs
 
-<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:40f6fcd0c427f7d88a52ef4e5cad9cb6afa266efda0b3905c7c0cd6f09a8fb8a","module_count":72,"entry_count":199} -->
+<!-- tetra-api-metadata: {"schema":"tetra.api.v1alpha1","api_hash":"sha256:4f36009e9450d9b077878d165c3ceda83d75923408a8fead580f7a57b140aee3","module_count":91,"entry_count":290} -->
+
+## examples/actor_sleep_pingpong.tetra
+
+### Functions
+
+- `func delayed_pong() -> i32 uses actors, runtime`
+- `func main() -> i32 uses actors, runtime`
+
+## examples/actors_decl_spawn.tetra
+
+### Functions
+
+- `func Ponger.run() -> i32 uses actors`
+- `func main() -> i32 uses actors`
 
 ## examples/actors_pingpong.tetra
 
@@ -91,6 +105,12 @@
 - `async func core_async_probe() -> i32`
 - `func main() -> i32`
 
+## examples.core_capability_smoke
+
+### Functions
+
+- `func main() -> i32 uses alloc, capability, io, mem, mmio`
+
 ## examples.core_collections_smoke
 
 ### Functions
@@ -107,7 +127,13 @@
 
 ### Functions
 
-- `func main() -> i32`
+- `func main() -> i32 uses capability, io`
+
+## examples.core_http_smoke
+
+### Functions
+
+- `func main() -> i32 uses alloc, mem`
 
 ## examples.core_io_smoke
 
@@ -115,11 +141,23 @@
 
 - `func main() -> i32 uses alloc, capability, io, mem, mmio`
 
+## examples.core_json_smoke
+
+### Functions
+
+- `func main() -> i32 uses alloc, mem`
+
 ## examples.core_math_smoke
 
 ### Functions
 
 - `func main() -> i32`
+
+## examples.core_memory_negative_length_smoke
+
+### Functions
+
+- `func main() -> i32 uses alloc, capability, mem`
 
 ## examples.core_memory_smoke
 
@@ -127,11 +165,46 @@
 
 - `func main() -> i32 uses alloc, capability, mem`
 
+## examples.core_net_smoke
+
+### Functions
+
+- `func main() -> i32 uses alloc, capability, io, mem`
+
 ## examples.core_networking_smoke
 
 ### Functions
 
 - `func main() -> i32`
+
+## examples.core_postgres_prepared_smoke
+
+### Functions
+
+- `func check_parse() -> i32 uses alloc, mem`
+- `func check_bind() -> i32 uses alloc, mem`
+- `func check_bind_two_params() -> i32 uses alloc, mem`
+- `func check_describe_execute_sync() -> i32 uses alloc, mem`
+- `func main() -> i32 uses alloc, mem`
+
+## examples.core_postgres_result_smoke
+
+### Functions
+
+- `func write_world_row_description(dst: inout []u8) -> i32 uses mem`
+- `func write_column(dst: inout []u8, start: i32, name: str, type_oid: i32) -> i32 uses mem`
+- `func write_world_data_row(dst: inout []u8) -> i32 uses mem`
+- `func check_row_description() -> i32 uses alloc, mem`
+- `func check_data_row() -> i32 uses alloc, mem`
+- `func check_command_and_ready() -> i32 uses alloc, mem`
+- `func check_typed_frame_header() -> i32 uses alloc, mem`
+- `func main() -> i32 uses alloc, mem`
+
+## examples.core_postgres_smoke
+
+### Functions
+
+- `func main() -> i32 uses alloc, mem`
 
 ## examples.core_serialization_smoke
 
@@ -193,6 +266,14 @@
 - `func trampoline() -> i32 uses capability, control, mem, runtime`
 - `func main() -> i32 uses alloc, capability, control, link, mem, runtime`
 
+## examples/deadline_aware_waits_smoke.tetra
+
+### Functions
+
+- `func delayed_sender() -> i32 uses actors, runtime`
+- `func delayed_task() -> i32 uses runtime`
+- `func main() -> i32 uses actors, runtime`
+
 ## examples/effects_actors_smoke.tetra
 
 ### Functions
@@ -235,6 +316,21 @@
 
 ### Functions
 
+- `func main() -> i32`
+
+## examples/enum_payload_smoke.tetra
+
+### Enums
+
+- `CounterMsg`: inc, reset
+- `DecodeError`: invalid, eof
+
+### Functions
+
+- `func decode(flag: bool) -> CounterMsg`
+- `func error_code(err: DecodeError) -> i32`
+- `func bonus(msg: CounterMsg) -> i32`
+- `func handle(msg: CounterMsg) -> i32`
 - `func main() -> i32`
 
 ## examples.experimental_math_smoke
@@ -314,6 +410,7 @@
 - `func bump(x: inout i32) -> i32`
 - `func take(x: consume i32) -> i32`
 - `func maybe(flag: bool) -> i32?`
+- `func unwrap_match(value: i32?) -> i32`
 - `func read(flag: bool) -> i32 throws ReadError`
 - `async func async_answer() -> i32`
 - `func read_caller(flag: bool) -> i32 throws ReadError`
@@ -333,6 +430,7 @@
 
 ### Functions
 
+- `func greeting() -> str`
 - `func main() -> i32 uses io`
 
 ## examples/flow_islands_smoke.tetra
@@ -384,6 +482,17 @@
 - `func id<T>(x: T) -> T`
 - `func main() -> i32`
 
+## examples/generic_struct_smoke.tetra
+
+### Structs
+
+- `Box`
+  - `value: T`
+
+### Functions
+
+- `func main() -> i32`
+
 ## examples/globals_smoke.tetra
 
 ### Globals
@@ -407,6 +516,7 @@
 
 ### Functions
 
+- `func alias(isl: island) -> island`
 - `func main() -> i32 uses alloc, capability, islands, mem`
 
 ## examples/islands_hello.tetra
@@ -475,67 +585,38 @@
 
 ## examples/ownership_smoke.tetra
 
+### Structs
+
+- `Pair`
+  - `left: i32`
+  - `right: i32`
+
+### Enums
+
+- `PairMsg`: both, empty
+
+### Protocols
+
+- `protocol Sink`
+  - `func sink(self: consume Pair) -> i32`
+
+### Implementations
+
+- `impl Pair: Sink`
+
 ### Functions
 
 - `func add_one(x: borrow i32) -> i32`
 - `func take(x: consume i32) -> i32`
 - `func bump(x: inout i32) -> i32`
+- `func optional_ptr_score(value: borrow ptr?) -> i32`
+- `func enum_score() -> i32`
 - `func main() -> i32`
 
-## examples/projects/dogfood_actor_task/src/main.tetra
+### Extensions
 
-### Functions
-
-- `func worker() -> i32`
-- `func echo() -> i32 uses actors`
-- `func main() -> i32 uses actors, runtime`
-
-## examples.projects.dogfood_cli.src.main
-
-### Functions
-
-- `func status_code() -> i32`
-- `func main() -> i32 uses io`
-
-### Tests
-
-- `cli status code`
-
-## examples/projects/dogfood_wasi/src/main.tetra
-
-### Functions
-
-- `func main() -> i32 uses io`
-
-## examples/projects/dogfood_web_ui/src/main.tetra
-
-### States
-
-- `state TodoState`
-  - `var count: i32`
-  - `val title: str`
-
-### Views
-
-- `view TodoView(state: TodoState)`
-  - `bind countValue: i32`
-  - `bind titleText: str`
-  - `event click -> increment`
-  - `command increment`
-  - `style width: i32`
-  - `style theme: str`
-  - `accessibility role: str`
-  - `accessibility label: str`
-
-### Functions
-
-- `func main() -> i32`
-
-## examples/projects/eco_dogfood/src/main.tetra
-
-### Functions
-
-- `func main() -> i32 uses io`
+- `Pair`
+  - `func Pair.sink(self: consume Pair) -> i32`
 
 ## examples/protocol_impl_smoke.tetra
 
@@ -587,11 +668,45 @@
 - `func worker() -> i32`
 - `func main() -> i32 uses runtime`
 
+## examples/task_group_cancel_smoke.tetra
+
+### Functions
+
+- `func worker() -> i32 uses runtime`
+- `func main() -> i32 uses runtime`
+
+## examples/task_group_lifecycle_smoke.tetra
+
+### Functions
+
+- `func worker() -> i32 uses runtime`
+- `func main() -> i32 uses runtime`
+
+## examples/task_join_wait_smoke.tetra
+
+### Functions
+
+- `func worker() -> i32 uses runtime`
+- `func main() -> i32 uses runtime`
+
+## examples/task_sleep_deadline_smoke.tetra
+
+### Functions
+
+- `func worker() -> i32 uses runtime`
+- `func main() -> i32 uses runtime`
+
 ## examples/task_smoke.tetra
 
 ### Functions
 
 - `func worker() -> i32`
+- `func main() -> i32 uses runtime`
+
+## examples/time_sleep_smoke.tetra
+
+### Functions
+
 - `func main() -> i32 uses runtime`
 
 ## examples/tooling_tests.tetra
@@ -612,13 +727,46 @@
 - `func caller() -> i32 throws ReadError`
 - `func main() -> i32`
 
+## examples/ui_desktop_runtime_smoke.tetra
+
+### States
+
+- `state DesktopState`
+  - `var saves: i32`
+  - `var title: str`
+  - `var name: str`
+  - `var selected: str`
+
+### Views
+
+- `view DesktopView(state: DesktopState)`
+  - `bind titleText: str`
+  - `bind nameText: str`
+  - `bind selectedText: str`
+  - `event rename -> rename`
+  - `event select -> selectSecond`
+  - `event save -> save`
+  - `command rename`
+  - `command selectSecond`
+  - `command save`
+  - `style width: i32`
+  - `style height: i32`
+  - `accessibility role: str`
+  - `accessibility description: str`
+
+### Functions
+
+- `func main() -> i32`
+
 ## examples/ui_native_shell_smoke.tetra
 
 ### States
 
 - `state ShellState`
   - `var toggles: i32`
-  - `val label: str`
+  - `var label: str`
+  - `var source: i32`
+  - `var textSource: str`
 
 ### Views
 
@@ -626,7 +774,17 @@
   - `bind toggles: i32`
   - `bind labelText: str`
   - `event submit -> toggle`
+  - `event reset -> decrement`
+  - `event rename -> rename`
+  - `event copy -> copy`
+  - `event copyAfterToggle -> copyAfterToggle`
+  - `event compound -> compound`
   - `command toggle`
+  - `command decrement`
+  - `command rename`
+  - `command copy`
+  - `command copyAfterToggle`
+  - `command compound`
   - `style width: i32`
   - `style accent: str`
   - `accessibility role: str`
@@ -664,5 +822,63 @@
 
 ### Functions
 
+- `func main() -> i32`
+
+## examples/wait_composition_smoke.tetra
+
+### Functions
+
+- `func worker() -> i32 uses actors, runtime`
+- `func main() -> i32 uses actors, runtime`
+
+## examples/wasm_globals_smoke.tetra
+
+### Globals
+
+- `val greeting: str`
+- `var title: str`
+- `const base: i32`
+
+### Functions
+
+- `func main() -> i32`
+
+## examples.wasm_multi_return_2_smoke
+
+### Structs
+
+- `Pair`
+  - `left: i32`
+  - `right: i32`
+
+### Functions
+
+- `func make_pair() -> Pair`
+- `func main() -> i32`
+
+## examples.wasm_multi_return_3_smoke
+
+### Enums
+
+- `Packet`: data, empty
+
+### Functions
+
+- `func make_packet() -> Packet`
+- `func main() -> i32`
+
+## examples.wasm_multi_return_4_smoke
+
+### Structs
+
+- `Quad`
+  - `a: i32`
+  - `b: i32`
+  - `c: i32`
+  - `d: i32`
+
+### Functions
+
+- `func make_quad() -> Quad`
 - `func main() -> i32`
 

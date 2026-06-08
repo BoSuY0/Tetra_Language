@@ -105,7 +105,7 @@ func TestBuildCommandWASMTargetWritesWasmModule(t *testing.T) {
 				t.Fatalf("read web loader: %v", err)
 			}
 			loader := string(loaderRaw)
-			if !strings.Contains(loader, "tetra_web_v1") || !strings.Contains(loader, "tetra_main") {
+			if !strings.Contains(loader, "tetra_web_v0.4.0") || !strings.Contains(loader, "tetra_main") {
 				t.Fatalf("unexpected web loader content:\n%s", loader)
 			}
 		}

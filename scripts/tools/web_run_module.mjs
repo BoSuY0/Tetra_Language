@@ -38,7 +38,7 @@ const surfaceTrace = {
 function memoryView() {
   const memory = instanceRef && instanceRef.exports && instanceRef.exports.memory;
   if (!(memory instanceof WebAssembly.Memory)) {
-    throw new Error('tetra_web_v1: missing exported memory');
+    throw new Error('tetra_web_v0.4.0: missing exported memory');
   }
   return new Uint8Array(memory.buffer);
 }
@@ -203,7 +203,7 @@ function createSurfaceHost() {
 try {
   const bytes = fs.readFileSync(wasmPath);
   const result = await WebAssembly.instantiate(bytes, {
-    tetra_web_v1: {
+    "tetra_web_v0.4.0": {
       console_log(ptr, len) {
         process.stdout.write(readUTF8(ptr | 0, len | 0));
       },

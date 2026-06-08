@@ -54,7 +54,7 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
   function memoryView() {
     const memory = instanceRef?.exports?.memory;
     if (!(memory instanceof WebAssembly.Memory)) {
-      throw new Error('tetra_web_v1: missing exported memory');
+      throw new Error('tetra_web_v0.4.0: missing exported memory');
     }
     return new Uint8Array(memory.buffer);
   }
@@ -859,7 +859,7 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
 
   const bytes = await (await fetch(wasmURL)).arrayBuffer();
   const result = await WebAssembly.instantiate(bytes, {
-    tetra_web_v1: {
+    "tetra_web_v0.4.0": {
       console_log() {},
       panic(code, ptr, len) {
         const message = instanceRef ? readUTF8(ptr | 0, len | 0) : 'panic';
@@ -871,7 +871,7 @@ export async function runSurfaceBrowserCanvas({ wasmURL, canvas, scenario = 'cou
   instanceRef = result.instance;
   const tetraMain = instanceRef.exports.tetra_main;
   if (typeof tetraMain !== 'function') {
-    throw new Error('tetra_web_v1: missing tetra_main export');
+    throw new Error('tetra_web_v0.4.0: missing tetra_main export');
   }
   trace.app_exit_code = (tetraMain() | 0) & 0xff;
   return trace;

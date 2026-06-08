@@ -129,7 +129,7 @@ func TestValidateReadinessAcceptsLinuxOnlyNoEcoNetScope(t *testing.T) {
 		"docs/spec/stdlib.md",
 		"docs/spec/stdlib_naming_versioning.md",
 		"docs/user/standard_library_guide.md",
-		"docs/spec/ui_v1.md",
+		"docs/spec/ui_v0.4.0.md",
 		"docs/user/wasm_ui_guide.md",
 		"reports/v0.4.0/features.json",
 		"reports/v0.4.0/native-ui-linux-x64.json",
@@ -176,8 +176,8 @@ func TestValidateReadinessAcceptsLinuxOnlyNoEcoNetScope(t *testing.T) {
     {"kind":"feature","id":"language.full-first-class-callables","decision":"implement","evidence":{"implementation":["compiler/internal/lower/lower.go"],"tests":["go test ./compiler -run FullCallable -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/v1_feature_status.md"],"release_gate_evidence":["reports/v0.4.0/features.json"]}},
     {"kind":"feature","id":"language.lifetime-ssa","decision":"implement","evidence":{"implementation":["compiler/internal/semantics/region.go"],"tests":["go test ./compiler -run Lifetime -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ownership_v1.md"],"release_gate_evidence":["reports/v0.4.0/features.json"]}},
     {"kind":"feature","id":"stdlib.experimental-mirrors","decision":"implement","evidence":{"implementation":["lib/experimental/math.tetra"],"tests":["go test ./compiler -run Experimental -count=1"],"docs":["docs/spec/stdlib.md","docs/spec/stdlib_naming_versioning.md","docs/user/standard_library_guide.md"],"release_gate_evidence":["reports/v0.4.0/features.json"]}},
-    {"kind":"feature","id":"ui.metadata-v1","decision":"implement","evidence":{"implementation":["compiler/internal/backend/native_shell/codegen.go"],"tests":["go test ./compiler -run UI -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v1.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-linux-x64.json"]}},
-    {"kind":"feature","id":"ui.native-runtime","decision":"implement","evidence":{"implementation":["tools/cmd/native-ui-runtime-smoke/main.go","tools/validators/nativeui/report.go"],"tests":["go test ./tools/cmd/native-ui-runtime-smoke -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v1.md","docs/user/wasm_ui_guide.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-linux-x64.json"]}},
+    {"kind":"feature","id":"ui.metadata-v1","decision":"implement","evidence":{"implementation":["compiler/internal/backend/native_shell/codegen.go"],"tests":["go test ./compiler -run UI -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v0.4.0.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-linux-x64.json"]}},
+    {"kind":"feature","id":"ui.native-runtime","decision":"implement","evidence":{"implementation":["tools/cmd/native-ui-runtime-smoke/main.go","tools/validators/nativeui/report.go"],"tests":["go test ./tools/cmd/native-ui-runtime-smoke -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v0.4.0.md","docs/user/wasm_ui_guide.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-linux-x64.json"]}},
     {"kind":"feature","id":"language.full-v1-guarantees","decision":"exclude-from-v0.4.0-prod"},
     {"kind":"feature","id":"eco.distributed-network","decision":"exclude-from-v0.4.0-prod"},
     {"kind":"feature","id":"wasm.runtime-execution","decision":"exclude-from-v0.4.0-prod"},
@@ -329,10 +329,10 @@ func TestValidateReadinessRejectsNativeUISidecarOnlyEvidence(t *testing.T) {
 		"compiler/internal/backend/native_shell/codegen.go",
 		"tools/cmd/validate-native-ui-smoke/main.go",
 		"docs/spec/current_supported_surface.md",
-		"docs/spec/ui_v1.md",
+		"docs/spec/ui_v0.4.0.md",
 		"reports/v0.4.0/native-ui-sidecar.json",
 	)
-	writeReadinessEvidenceFile(t, "reports/v0.4.0/native-ui-sidecar.json", []byte(`{"schema":"tetra.ui.native-shell.v1","ui_schema":"tetra.ui.v1","runtime":"native shell command dispatch"}`+"\n"))
+	writeReadinessEvidenceFile(t, "reports/v0.4.0/native-ui-sidecar.json", []byte(`{"schema":"tetra.ui.native-shell.v1","ui_schema":"tetra.ui.v0.4.0","runtime":"native shell command dispatch"}`+"\n"))
 
 	err := validateReadiness(readinessInputs{
 		ExpectedVersion: "v0.4.0",
@@ -353,7 +353,7 @@ func TestValidateReadinessRejectsNativeUISidecarOnlyEvidence(t *testing.T) {
   "release_version": "v0.4.0",
   "status": "full-production-scope-selected",
   "decisions": [
-    {"kind":"feature","id":"ui.native-runtime","decision":"implement","evidence":{"implementation":["compiler/internal/backend/native_shell/codegen.go"],"tests":["go test ./tools/cmd/validate-native-ui-smoke -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v1.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-sidecar.json"]}}
+    {"kind":"feature","id":"ui.native-runtime","decision":"implement","evidence":{"implementation":["compiler/internal/backend/native_shell/codegen.go"],"tests":["go test ./tools/cmd/validate-native-ui-smoke -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v0.4.0.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-sidecar.json"]}}
   ]
 }`),
 	})
@@ -377,7 +377,7 @@ func TestValidateReadinessAcceptsNativeUIRuntimeEvidenceShape(t *testing.T) {
 		"tools/cmd/native-ui-runtime-smoke/main.go",
 		"tools/validators/nativeui/report.go",
 		"docs/spec/current_supported_surface.md",
-		"docs/spec/ui_v1.md",
+		"docs/spec/ui_v0.4.0.md",
 		"reports/v0.4.0/native-ui-linux-x64.json",
 	)
 	writeReadinessEvidenceFile(t, "tools/cmd/native-ui-runtime-smoke/main.go", []byte("func runRuntimeScenario() {}\nconst runtime = \"native-ui-linux-x64\"\n"))
@@ -403,7 +403,7 @@ func TestValidateReadinessAcceptsNativeUIRuntimeEvidenceShape(t *testing.T) {
   "release_version": "v0.4.0",
   "status": "full-production-scope-selected",
   "decisions": [
-    {"kind":"feature","id":"ui.native-runtime","decision":"implement","evidence":{"implementation":["tools/cmd/native-ui-runtime-smoke/main.go","tools/validators/nativeui/report.go"],"tests":["go test ./tools/cmd/native-ui-runtime-smoke ./tools/validators/nativeui -count=1","bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v1.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-linux-x64.json"]}}
+    {"kind":"feature","id":"ui.native-runtime","decision":"implement","evidence":{"implementation":["tools/cmd/native-ui-runtime-smoke/main.go","tools/validators/nativeui/report.go"],"tests":["go test ./tools/cmd/native-ui-runtime-smoke ./tools/validators/nativeui -count=1","bash scripts/release/v0_4_0/native-ui-linux-x64-smoke.sh"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v0.4.0.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-linux-x64.json"]}}
   ]
 }`),
 	})
@@ -417,7 +417,7 @@ func TestValidateReadinessRejectsNativeUIRuntimeThinReport(t *testing.T) {
 		"tools/cmd/native-ui-runtime-smoke/main.go",
 		"tools/validators/nativeui/report.go",
 		"docs/spec/current_supported_surface.md",
-		"docs/spec/ui_v1.md",
+		"docs/spec/ui_v0.4.0.md",
 		"reports/v0.4.0/native-ui-linux-x64.json",
 	)
 	writeReadinessEvidenceFile(t, "reports/v0.4.0/native-ui-linux-x64.json", []byte(`{"schema":"tetra.ui.native-runtime.v1","status":"pass","runtime":"native-ui-linux-x64"}`+"\n"))
@@ -441,7 +441,7 @@ func TestValidateReadinessRejectsNativeUIRuntimeThinReport(t *testing.T) {
   "release_version": "v0.4.0",
   "status": "full-production-scope-selected",
   "decisions": [
-    {"kind":"feature","id":"ui.native-runtime","decision":"implement","evidence":{"implementation":["tools/cmd/native-ui-runtime-smoke/main.go","tools/validators/nativeui/report.go"],"tests":["go test ./tools/cmd/native-ui-runtime-smoke ./tools/validators/nativeui -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v1.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-linux-x64.json"]}}
+    {"kind":"feature","id":"ui.native-runtime","decision":"implement","evidence":{"implementation":["tools/cmd/native-ui-runtime-smoke/main.go","tools/validators/nativeui/report.go"],"tests":["go test ./tools/cmd/native-ui-runtime-smoke ./tools/validators/nativeui -count=1"],"docs":["docs/spec/current_supported_surface.md","docs/spec/ui_v0.4.0.md"],"release_gate_evidence":["reports/v0.4.0/native-ui-linux-x64.json"]}}
   ]
 }`),
 	})
@@ -909,7 +909,7 @@ func readinessNativeUIRuntimeJSON() []byte {
 		"target":    "linux-x64",
 		"host":      "linux-x64",
 		"runtime":   "native-ui-linux-x64",
-		"ui_schema": "tetra.ui.v1",
+		"ui_schema": "tetra.ui.v0.4.0",
 		"source":    "examples/ui_native_shell_smoke.tetra",
 		"processes": []map[string]any{
 			{"name": "tetra build", "kind": "build", "path": "/tmp/tetra", "ran": true, "pass": true, "exit_code": 0},

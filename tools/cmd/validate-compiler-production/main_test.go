@@ -72,7 +72,7 @@ func validCompilerReport() compilerprod.Report {
 		},
 		Cases: []compilerprod.CaseReport{
 			{Name: "fresh CLI compiler build", Kind: "positive", Ran: true, Pass: true},
-			{Name: "version reports v0.4.0", Kind: "positive", Ran: true, Pass: true},
+			{Name: compilerprod.VersionCaseName, Kind: "positive", Ran: true, Pass: true},
 			{Name: "linux-x64 native compile and run", Kind: "positive", Ran: true, Pass: true},
 			{Name: "linux-x64 object emission", Kind: "positive", Ran: true, Pass: true},
 			{Name: "interface-only compile", Kind: "positive", Ran: true, Pass: true},
