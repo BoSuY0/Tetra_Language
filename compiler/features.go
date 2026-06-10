@@ -107,7 +107,7 @@ func FeatureRegistry() []FeatureInfo {
 			Name:      "RAM Contract Compiler reports",
 			Status:    FeatureStatusCurrent,
 			Since:     "v0.4.0",
-			Scope:     "RAM Contract Compiler report evidence for linux-x64 build outputs with tetra.ram-contract-report.v1, tetra.memory-grade-report.v1, tetra.proof-store-summary.v1, tetra.validation-pipeline-coverage.v1, heap-blockers.json, copy-blockers.json, ram-contract-fuzz-oracle.json, --emit-ram-contract-report, --fail-if-heap, --fail-if-copy, --fail-if-unbounded, --memory-budget, --ram-contract, TETRA4100 diagnostics, validate-ram-contract-report, validate-memory-grade-report, validate-proof-store-summary, validate-validation-pipeline-coverage, validate-heap-blockers, validate-copy-blockers, validate-ram-contract-fuzz-oracle, validate-ram-contract-release, and scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh evidence",
+			Scope:     "RAM Contract Compiler report evidence for linux-x64 build outputs with tetra.ram-contract-report.v1, tetra.memory-grade-report.v1, tetra.proof-store-summary.v1, tetra.validation-pipeline-coverage.v1, heap-blockers.json, copy-blockers.json, fuzz/ram-contract-fuzz-oracle.json, artifact-hashes.json, ram-contract-release-manifest.json, --emit-ram-contract-report, --fail-if-heap, --fail-if-copy, --fail-if-unbounded, --memory-budget, --ram-contract, TETRA4100 diagnostics, validate-ram-contract-report, validate-memory-grade-report, validate-proof-store-summary, validate-validation-pipeline-coverage, validate-heap-blockers, validate-copy-blockers, validate-ram-contract-fuzz-oracle, validate-ram-contract-release, cross-file heap/copy/grade release validation, and scripts/release/post_v0_4/ram-contract-linux-x64-smoke.sh evidence",
 			Stability: "current report/gate contract only; no zero heap for all programs claim, no zero-copy for all programs claim, no full formal proof claim, no all-target RAM parity claim, no production object memory claim, no production persistent memory claim, no runtime behavior change, no performance claim, and no safe-program semantics change is claimed",
 			Docs: []string{
 				"docs/design/ram_contract_compiler.md",
@@ -115,6 +115,7 @@ func FeatureRegistry() []FeatureInfo {
 				"docs/user/ram_contracts.md",
 				"docs/audits/ram-contract-compiler-readiness.md",
 				"docs/audits/ram-contract-compiler-handoff.md",
+				"docs/audits/raw-contract-implementation-verification-report.md",
 			},
 		},
 		{
@@ -419,7 +420,7 @@ func FeatureRegistry() []FeatureInfo {
 			ID:        "ui.surface-morph-capsule",
 			Name:      "Tetra Surface Morph Capsule",
 			Status:    FeatureStatusExperimental,
-			Scope:     "experimental Morph Capsule authoring layer over the Surface Block System; `lib.core.morph` defines scoped capsule tokens, materials, affordances, state lenses, motion presets, and recipes that expand into Block evidence for `examples/surface_morph_command_palette.tetra`; `tetra.surface.morph.gate.v1` records deterministic headless same-commit Morph reports plus artifact hashes",
+			Scope:     "experimental Morph Capsule authoring layer over the Surface Block System; `lib.core.morph` defines scoped capsule tokens, materials, affordances, state lenses, motion presets, and a recipe layer that expands into Block graph evidence for `examples/surface_morph_command_palette.tetra`; `tetra.surface.morph.gate.v1` records deterministic headless same-commit Morph reports plus artifact hashes",
 			Stability: "experimental evidence layer and not Surface v1 production support; Morph does not add core widget primitives, platform widgets, CSS cascade, DOM app logic, React/Electron runtime, GPU renderer, or cross-target desktop replacement support",
 			Docs:      []string{"docs/spec/surface_morph.md", "docs/spec/current_supported_surface.md", "docs/user/surface_guide.md", "docs/user/examples_index.md", "docs/user/standard_library_guide.md", "docs/release/surface_v1_release_contract.md", "docs/release/surface_v1_release_notes.md"},
 		},

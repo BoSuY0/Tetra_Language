@@ -98,6 +98,32 @@ if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/memory-fuzz-short" ]]; then
   fi
   exit 0
 fi
+if [[ "${1:-}" == "run" && "${2:-}" == "./tools/cmd/ram-contract-fuzz-short" ]]; then
+  report_dir=""
+  shift 2
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --report-dir)
+        report_dir="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ -n "$report_dir" ]]; then
+    mkdir -p -- "$report_dir"
+    printf '{"schema_version":"tetra.ram-contract-fuzz-oracle.v1","observations":[],"summary":{"mutations":0,"rejected":0},"non_claims":["not a full formal proof"]}\n' >"$report_dir/ram-contract-fuzz-oracle.json"
+    printf '{"schema_version":"tetra.ram-contract-report.v1","rows":[]}\n' >"$report_dir/ram-contract-report.json"
+    printf '{"schema_version":"tetra.memory-grade-report.v1"}\n' >"$report_dir/memory-grade-report.json"
+    printf '{"schema_version":"tetra.proof-store-summary.v1","proofs":[],"summary":{"proof_count":0,"proven":0,"conservative":0,"rejected":0,"unknown":0},"non_claims":["no full formal proof claim"]}\n' >"$report_dir/proof-store-summary.json"
+    printf '{"schema_version":"tetra.validation-pipeline-coverage.v1","entries":[]}\n' >"$report_dir/validation-pipeline-coverage.json"
+    printf '{"schema_version":"tetra.ram-blockers.v1","kind":"heap","rows":[]}\n' >"$report_dir/heap-blockers.json"
+    printf '{"schema_version":"tetra.ram-blockers.v1","kind":"copy","rows":[]}\n' >"$report_dir/copy-blockers.json"
+  fi
+  exit 0
+fi
 if [[ "${1:-}" == "test" ]]; then
   pkg="${2:-}"
   shift 2 || true
@@ -142,6 +168,18 @@ if [[ "${1:-}" == "test" ]]; then
         ;;
       ./tools/cmd/memory-fuzz-short)
         printf '%s\n' TestRunMemoryFuzzShortWritesValidatedArtifacts TestRunMemoryFuzzShortRejectsUnsupportedTier TestRunMemoryFuzzShortRejectsStaleReportDir
+        ;;
+      ./tools/cmd/ram-contract-fuzz-short)
+        printf '%s\n' TestRunRAMContractFuzzShortWritesValidatedArtifacts TestRunRAMContractFuzzShortRejectsStaleReportDir
+        ;;
+      ./tools/cmd/validate-ram-contract-fuzz-oracle)
+        printf '%s\n' TestValidateRAMContractFuzzOracleAcceptsArtifactBundle TestValidateRAMContractFuzzOracleRejectsMissingReport
+        ;;
+      ./tools/cmd/validate-ram-contract-report)
+        printf '%s\n' TestValidateRAMContractReportFileAcceptsCompilerReport TestValidateRAMContractReportRejectsMissingBlocker
+        ;;
+      ./compiler/internal/ramcontract)
+        printf '%s\n' TestRAMContractFromAllocPlanTracksRowsAndBlockers TestRAMContractRejectsMissingBlockerExplanation TestRAMContractEnforcementFailsForHeap
         ;;
       ./cli/internal/actornet)
         printf '%s\n' TestBrokerCloseWithoutCancelStopsServeWatcher TestBrokerRoutesFramesBetweenLoopbackNodesAndWritesReport TestBrokerReportsNodeDownForMissingDestination
@@ -226,7 +264,7 @@ esac
 	if err := json.Unmarshal(out, &summary); err != nil {
 		t.Fatalf("summary JSON: %v\n%s", err, string(out))
 	}
-	if summary.Status != "fail" || len(summary.Steps) != 17 {
+	if summary.Status != "fail" || len(summary.Steps) != 18 {
 		t.Fatalf("summary = %#v", summary)
 	}
 	if summary.Steps[0].Name != "go test all packages" || summary.Steps[0].Status != "fail" {
@@ -241,8 +279,11 @@ esac
 	if summary.Steps[3].Name != "memory fuzz oracle artifact gate" || summary.Steps[3].Status != "pass" {
 		t.Fatalf("memory fuzz oracle gate step = %#v", summary.Steps[3])
 	}
-	if summary.Steps[4].Name != "host leak blocker suite" || summary.Steps[4].Status != "pass" {
-		t.Fatalf("host leak blocker step = %#v", summary.Steps[4])
+	if summary.Steps[4].Name != "RAM contract fuzz oracle artifact gate" || summary.Steps[4].Status != "pass" {
+		t.Fatalf("RAM contract fuzz oracle gate step = %#v", summary.Steps[4])
+	}
+	if summary.Steps[5].Name != "host leak blocker suite" || summary.Steps[5].Status != "pass" {
+		t.Fatalf("host leak blocker step = %#v", summary.Steps[5])
 	}
 	if summary.Steps[len(summary.Steps)-1].Name != "host smoke linux-x64" || summary.Steps[len(summary.Steps)-1].Status != "pass" {
 		t.Fatalf("last step = %#v", summary.Steps[len(summary.Steps)-1])

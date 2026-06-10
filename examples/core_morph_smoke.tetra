@@ -1,0 +1,12 @@
+// Core lib.core.morph Morph Capsule smoke.
+module examples.core_morph_smoke
+
+import lib.core.block as block
+import lib.core.morph as morph
+
+func main() -> Int:
+    let recipe: morph.Recipe = morph.recipe_control_action()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(7))
+    if morph.capsule_self_check() && morph.recipe_expands_to_block(recipe) && morph.expansion_valid(expansion):
+        return 42
+    return 1

@@ -1220,6 +1220,59 @@ func TestBuildCoreCollectionsSmoke(t *testing.T) {
 	}
 }
 
+func TestBuildCoreCollectionsGenericCacheKeyIncludesMonomorphizedFuncs(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	tmp := t.TempDir()
+	entry := filepath.Join(tmp, filepath.FromSlash("app/main.tetra"))
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.tetra": `module app.main
+import lib.core.collections as collections
+
+func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = core.make_i32(1)
+    xs[0] = 42
+    return collections.len_i32(xs)
+`,
+	})
+	opt := BuildOptions{
+		ProjectRoot:     tmp,
+		DependencyRoots: []ModuleRoot{{Root: projectRoot(t)}},
+	}
+	if _, err := BuildFileWithStatsOpt(entry, filepath.Join(tmp, "plain"), "linux-x64", opt); err != nil {
+		t.Fatalf("plain collections build: %v", err)
+	}
+
+	writeTestFiles(t, tmp, map[string]string{
+		"app/main.tetra": `module app.main
+import lib.core.collections as collections
+
+func main() -> Int
+uses alloc, mem:
+    var xs: []i32 = core.make_i32(1)
+    xs[0] = 42
+    let vec: collections.Vec<Int> = collections.vec_from_slice(xs)
+    if collections.vec_len(vec) == 1:
+        return 42
+    return 0
+`,
+	})
+	outPath := filepath.Join(tmp, "generic")
+	if _, err := BuildFileWithStatsOpt(entry, outPath, "linux-x64", opt); err != nil {
+		t.Fatalf("generic collections build after plain cache entry: %v", err)
+	}
+	if err := verifyELF(outPath); err != nil {
+		t.Fatalf("verify ELF: %v", err)
+	}
+	_, exitCode := runBinary(t, outPath)
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
 func TestBuildCoreSerializationSmoke(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")

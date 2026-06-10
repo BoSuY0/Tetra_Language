@@ -1235,6 +1235,36 @@ func TestVerifyRAMContractCompilerDocsRejectsForbiddenClaim(t *testing.T) {
 	}
 }
 
+func TestVerifyRAMContractCompilerDocsRejectsUnsupportedValidatorFlag(t *testing.T) {
+	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody()+"\ngo run ./tools/cmd/validate-ram-contract-release --report reports/ram-contract-release\n")
+	err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()})
+	if err == nil {
+		t.Fatalf("expected unsupported RAM contract validator flag failure")
+	}
+	if !strings.Contains(err.Error(), "validate-ram-contract-release --report") {
+		t.Fatalf("expected unsupported flag in error, got %v", err)
+	}
+}
+
+func TestVerifyRAMContractCompilerDocsRejectsStaleReadinessHead(t *testing.T) {
+	if _, ok := currentGitHeadForDocs(); !ok {
+		t.Skip("git head unavailable")
+	}
+	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
+	stale := "0000000000000000000000000000000000000000"
+	body := validRAMContractDocsBody() + "\nGit head: " + stale + "\n"
+	if err := os.WriteFile(paths.Readiness, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()})
+	if err == nil {
+		t.Fatalf("expected stale readiness git head failure")
+	}
+	if !strings.Contains(err.Error(), "stale readiness git head "+stale) {
+		t.Fatalf("expected stale head in error, got %v", err)
+	}
+}
+
 func TestVerifyRAMContractCompilerDocsAcceptsScopedEvidence(t *testing.T) {
 	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody())
 	if err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()}); err != nil {

@@ -143,6 +143,16 @@ type BlockerRow struct {
 
 var fullGitHeadRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
+var requiredPipelineEntrypoints = []string{
+	"BuildFileWithStatsOpt",
+	"buildObjectFileWithStatsOpt",
+	"buildLibraryObjectWithStatsOpt",
+	"InterfaceOnly",
+	"wasm32-wasi-build",
+	"wasm32-web-build",
+	"explain-report-path",
+}
+
 func ReadStrictJSONFile(path string, out any) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -240,6 +250,42 @@ func ValidateProofStoreSummaryFile(path string) error {
 	if report.Summary.ProofCount != len(report.Proofs) {
 		issues = append(issues, "proof_count must match proofs length")
 	}
+	seen := map[string]bool{}
+	counts := map[string]int{}
+	for i, proof := range report.Proofs {
+		if strings.TrimSpace(proof.ProofID) == "" {
+			issues = append(issues, fmt.Sprintf("proof %d: proof_id is required", i))
+			continue
+		}
+		if seen[proof.ProofID] {
+			issues = append(issues, fmt.Sprintf("proof %d: duplicate proof_id %q", i, proof.ProofID))
+		}
+		seen[proof.ProofID] = true
+		if strings.TrimSpace(proof.Kind) == "" || strings.TrimSpace(proof.Subject) == "" || strings.TrimSpace(proof.StableHash) == "" {
+			issues = append(issues, fmt.Sprintf("proof %s: kind, subject, and stable_hash are required", proof.ProofID))
+		}
+		switch proof.Status {
+		case "proven", "conservative", "rejected", "unknown":
+			counts[proof.Status]++
+		default:
+			issues = append(issues, fmt.Sprintf("proof %s: unknown status %q", proof.ProofID, proof.Status))
+		}
+		if proof.Status == "proven" && (strings.Contains(strings.ToLower(proof.Kind), "unsafe_unknown") || strings.Contains(strings.ToLower(proof.Subject), "unsafe_unknown")) {
+			issues = append(issues, fmt.Sprintf("proof %s: unsafe_unknown cannot be promoted to proven", proof.ProofID))
+		}
+	}
+	if report.Summary.Proven != counts["proven"] {
+		issues = append(issues, fmt.Sprintf("proven count is %d, want %d", report.Summary.Proven, counts["proven"]))
+	}
+	if report.Summary.Conservative != counts["conservative"] {
+		issues = append(issues, fmt.Sprintf("conservative count is %d, want %d", report.Summary.Conservative, counts["conservative"]))
+	}
+	if report.Summary.Rejected != counts["rejected"] {
+		issues = append(issues, fmt.Sprintf("rejected count is %d, want %d", report.Summary.Rejected, counts["rejected"]))
+	}
+	if report.Summary.Unknown != counts["unknown"] {
+		issues = append(issues, fmt.Sprintf("unknown count is %d, want %d", report.Summary.Unknown, counts["unknown"]))
+	}
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
@@ -259,22 +305,37 @@ func ValidatePipelineCoverageFile(path string) error {
 	if len(report.Entries) == 0 {
 		issues = append(issues, "entries are required")
 	}
+	seenEntrypoints := map[string]bool{}
 	for i, entry := range report.Entries {
 		if strings.TrimSpace(entry.Entrypoint) == "" {
 			issues = append(issues, fmt.Sprintf("entry %d missing entrypoint", i))
 		}
+		if seenEntrypoints[entry.Entrypoint] {
+			issues = append(issues, fmt.Sprintf("entry %d duplicate entrypoint %q", i, entry.Entrypoint))
+		}
+		seenEntrypoints[entry.Entrypoint] = true
 		switch entry.Status {
 		case "validated_by_pipeline":
 			if len(entry.Validators) == 0 {
 				issues = append(issues, fmt.Sprintf("entry %d validated_by_pipeline requires validators", i))
 			}
+			if strings.TrimSpace(entry.ArtifactPath) == "" {
+				issues = append(issues, fmt.Sprintf("entry %d validated_by_pipeline requires artifact_path", i))
+			}
 		case "formal_exemption_with_reason":
 			if strings.TrimSpace(entry.Exemption) == "" {
 				issues = append(issues, fmt.Sprintf("entry %d missing exemption reason", i))
+			} else if !meaningfulPipelineExemption(entry.Exemption) {
+				issues = append(issues, fmt.Sprintf("entry %d exemption reason is not specific enough", i))
 			}
 		case "not_artifact_producing", "legacy_untrusted_path_blocked":
 		default:
 			issues = append(issues, fmt.Sprintf("entry %d unknown status %q", i, entry.Status))
+		}
+	}
+	for _, required := range requiredPipelineEntrypoints {
+		if !seenEntrypoints[required] {
+			issues = append(issues, fmt.Sprintf("missing required pipeline entrypoint %s", required))
 		}
 	}
 	issues = append(issues, validateNonClaims(report.NonClaims)...)
@@ -282,6 +343,19 @@ func ValidatePipelineCoverageFile(path string) error {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func meaningfulPipelineExemption(reason string) bool {
+	reason = strings.TrimSpace(strings.ToLower(reason))
+	if len(reason) < 24 {
+		return false
+	}
+	switch reason {
+	case "todo", "tbd", "n/a", "none":
+		return false
+	default:
+		return true
+	}
 }
 
 func ValidateBlockerReportFile(path string, kind string) error {
@@ -340,8 +414,16 @@ func validateRow(i int, row Row, proofs map[string]ProofSummary) []string {
 	if isCopy(row.Intent) && row.CopyReason == "" {
 		issues = append(issues, prefix+": copy row requires copy_reason")
 	}
-	if trusted(row.Placement) && row.ValidationStatus == "validated" && len(row.ProofIDs) == 0 {
-		issues = append(issues, prefix+": proof_ids are required for validated trusted placement")
+	if trusted(row.Placement) {
+		if row.EscapeStatus != "no_escape" {
+			issues = append(issues, fmt.Sprintf("%s: trusted placement %q requires no_escape escape_status, got %q", prefix, row.Placement, row.EscapeStatus))
+		}
+		if row.ValidationStatus != "validated" {
+			issues = append(issues, fmt.Sprintf("%s: trusted placement %q requires validated no-escape proof, got validation_status %q", prefix, row.Placement, row.ValidationStatus))
+		}
+		if len(row.ProofIDs) == 0 {
+			issues = append(issues, prefix+": proof_ids are required for validated trusted placement")
+		}
 	}
 	for _, proofID := range row.ProofIDs {
 		proof, ok := proofs[proofID]
@@ -352,6 +434,30 @@ func validateRow(i int, row Row, proofs map[string]ProofSummary) []string {
 		if proof.Status == "rejected" || proof.Status == "unknown" {
 			issues = append(issues, fmt.Sprintf("%s: proof_id %q has unusable status %s", prefix, proofID, proof.Status))
 		}
+		if trusted(row.Placement) && proof.Status != "proven" {
+			issues = append(issues, fmt.Sprintf("%s: trusted placement proof_id %q must be proven, got %s", prefix, proofID, proof.Status))
+		}
+		issues = append(issues, validateScopedPlacementProof(prefix, row, proofID, proof)...)
+	}
+	return issues
+}
+
+func validateScopedPlacementProof(prefix string, row Row, proofID string, proof ProofSummary) []string {
+	var issues []string
+	wantKind := ""
+	switch row.Placement {
+	case "region":
+		wantKind = "region_lifetime_placement"
+	case "island":
+		wantKind = "island_lifetime_placement"
+	default:
+		return issues
+	}
+	if proof.Kind != wantKind {
+		issues = append(issues, fmt.Sprintf("%s: %s placement proof_id %q must be scoped proof kind %q, got %q", prefix, row.Placement, proofID, wantKind, proof.Kind))
+	}
+	if row.Lifetime == "" || !strings.Contains(proof.Subject, row.Lifetime) {
+		issues = append(issues, fmt.Sprintf("%s: %s placement proof_id %q must bind lifetime %q in proof subject", prefix, row.Placement, proofID, row.Lifetime))
 	}
 	return issues
 }
@@ -447,7 +553,7 @@ func knownPlacement(placement string) bool {
 
 func trusted(placement string) bool {
 	switch placement {
-	case "eliminated", "register", "stack", "static", "interned", "island", "region":
+	case "register", "stack", "static", "interned", "island", "region":
 		return true
 	default:
 		return false
@@ -462,15 +568,78 @@ func isCopy(intent string) bool {
 	return strings.HasPrefix(intent, "copy")
 }
 
-func validateNonClaims(nonClaims []string) []string {
+func ValidateNonClaims(nonClaims []string) []string {
 	if len(nonClaims) == 0 {
 		return []string{"non_claims are required"}
 	}
 	var issues []string
 	for i, claim := range nonClaims {
-		if strings.TrimSpace(claim) == "" {
+		trimmed := strings.TrimSpace(claim)
+		if trimmed == "" {
 			issues = append(issues, fmt.Sprintf("non_claim %d is empty", i))
+		}
+		if forbiddenClaimWithoutNegation(trimmed) {
+			issues = append(issues, fmt.Sprintf("non_claim %d contains forbidden broad claim: %q", i, claim))
 		}
 	}
 	return issues
+}
+
+func validateNonClaims(nonClaims []string) []string {
+	return ValidateNonClaims(nonClaims)
+}
+
+func forbiddenClaimWithoutNegation(text string) bool {
+	lower := strings.ToLower(text)
+	for _, phrase := range []string{
+		"memory 100%",
+		"full formal proof",
+		"official benchmark",
+		"fastest language",
+		"fastest-language",
+		"faster than c",
+		"faster than rust",
+		"faster-than-c",
+		"faster-than-rust",
+		"c/rust parity",
+		"broad zero-cost performance",
+		"zero heap for all programs",
+		"zero-copy for all programs",
+		"all-target ram parity",
+		"full target parity",
+		"production actor runtime",
+		"production object memory",
+		"production persistent memory",
+		"arbitrary unsafe external pointer safety",
+	} {
+		idx := strings.Index(lower, phrase)
+		if idx < 0 {
+			continue
+		}
+		prefix := strings.TrimSpace(lower[:idx])
+		if negatedClaimPrefix(prefix) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func negatedClaimPrefix(prefix string) bool {
+	for _, allowed := range []string{
+		"no",
+		"not",
+		"not a",
+		"not an",
+		"without",
+		"does not claim",
+		"do not claim",
+		"nonclaim",
+		"non-claim",
+	} {
+		if strings.HasSuffix(prefix, allowed) || strings.Contains(prefix, allowed+" ") {
+			return true
+		}
+	}
+	return false
 }

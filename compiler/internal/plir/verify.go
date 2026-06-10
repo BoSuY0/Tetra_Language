@@ -669,19 +669,31 @@ func summaryReturnIsBorrowed(value Value) bool {
 
 func memoryBearingSummaryType(typeName string) bool {
 	typeName = strings.TrimSpace(typeName)
+	baseName := summaryTypeBaseName(typeName)
 	return typeName == "ptr" ||
 		typeName == "String" ||
 		typeName == "island" ||
 		strings.HasPrefix(typeName, "[]") ||
-		strings.Contains(strings.ToLower(typeName), "resource")
+		strings.Contains(strings.ToLower(baseName), "resource")
 }
 
 func borrowedRegionSummaryType(typeName string) bool {
 	typeName = strings.TrimSpace(typeName)
+	baseName := summaryTypeBaseName(typeName)
 	return typeName == "String" ||
-		typeName == "island" ||
 		strings.HasPrefix(typeName, "[]") ||
-		strings.Contains(strings.ToLower(typeName), "resource")
+		strings.Contains(strings.ToLower(baseName), "resource")
+}
+
+func summaryTypeBaseName(typeName string) string {
+	typeName = strings.TrimSpace(typeName)
+	if generic := strings.Index(typeName, "<"); generic >= 0 {
+		typeName = typeName[:generic]
+	}
+	if dot := strings.LastIndex(typeName, "."); dot >= 0 {
+		typeName = typeName[dot+1:]
+	}
+	return typeName
 }
 
 func isTaskSummaryOperation(op Operation) bool {

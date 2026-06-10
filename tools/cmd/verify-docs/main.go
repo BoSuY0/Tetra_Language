@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -323,6 +324,14 @@ func verifyRAMContractCompilerDocs(paths ramContractCompilerDocPaths, features [
 		for _, claim := range forbiddenRAMContractClaims(text) {
 			errs = append(errs, fmt.Sprintf("%s: forbidden RAM contract claim %q", requirement.Path, claim))
 		}
+		for _, flag := range unsupportedRAMContractValidatorFlags(text) {
+			errs = append(errs, fmt.Sprintf("%s: unsupported RAM contract validator flag %q", requirement.Path, flag))
+		}
+		if requirement.Name == "readiness audit" {
+			if head, ok := staleRAMContractReadinessGitHead(text); ok {
+				errs = append(errs, fmt.Sprintf("%s: stale readiness git head %s", requirement.Path, head))
+			}
+		}
 	}
 	if err := verifyRAMContractManifestFeature(features); err != nil {
 		errs = append(errs, err.Error())
@@ -331,6 +340,49 @@ func verifyRAMContractCompilerDocs(paths ramContractCompilerDocPaths, features [
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+func unsupportedRAMContractValidatorFlags(text string) []string {
+	var flags []string
+	for _, needle := range []string{
+		"validate-ram-contract-release --report ",
+		"validate-ram-contract-release --report=",
+	} {
+		if strings.Contains(text, needle) {
+			flags = append(flags, "validate-ram-contract-release --report")
+			break
+		}
+	}
+	return flags
+}
+
+var ramContractReadinessGitHeadPattern = regexp.MustCompile(`(?m)^Git head:\s*([0-9a-f]{40})\s*$`)
+
+func staleRAMContractReadinessGitHead(text string) (string, bool) {
+	match := ramContractReadinessGitHeadPattern.FindStringSubmatch(text)
+	if len(match) != 2 {
+		return "", false
+	}
+	current, ok := currentGitHeadForDocs()
+	if !ok {
+		return "", false
+	}
+	if match[1] != current {
+		return match[1], true
+	}
+	return "", false
+}
+
+func currentGitHeadForDocs() (string, bool) {
+	out, err := exec.Command("git", "rev-parse", "--verify", "HEAD").Output()
+	if err != nil {
+		return "", false
+	}
+	head := strings.TrimSpace(string(out))
+	if len(head) != 40 {
+		return "", false
+	}
+	return head, true
 }
 
 func verifyRAMContractManifestFeature(features []featureManifest) error {
@@ -413,6 +465,15 @@ func forbiddenRAMContractClaims(text string) []string {
 			absolute := searchFrom + index
 			clause := clauseAround(lower, absolute, len(phrase), 260)
 			sentence := sentenceAround(lower, absolute, len(phrase), 320)
+			if ramContractPhraseAllowedAsExactNonClaim(phrase, clause) {
+				searchFrom = absolute + len(phrase)
+				continue
+			}
+			if explicitRAMContractPromotionContext(clause) && !explicitNonClaimContext(clause) {
+				claims = append(claims, phrase)
+				searchFrom = absolute + len(phrase)
+				continue
+			}
 			if !explicitNonClaimContext(clause) && !explicitNonClaimContext(sentence) {
 				claims = append(claims, phrase)
 			}
@@ -421,6 +482,37 @@ func forbiddenRAMContractClaims(text string) []string {
 	}
 	sort.Strings(claims)
 	return compactStrings(claims)
+}
+
+func explicitRAMContractPromotionContext(lower string) bool {
+	normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(lower)
+	for _, marker := range []string{
+		"proves",
+		"prove",
+		"guarantees",
+		"guarantee",
+		"supports",
+		"support",
+		"delivers",
+		"deliver",
+	} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func ramContractPhraseAllowedAsExactNonClaim(phrase string, contexts ...string) bool {
+	normalizedPhrase := strings.ReplaceAll(phrase, " ", "-")
+	for _, context := range contexts {
+		normalized := strings.NewReplacer(`"`, "", "`", "", "'", "").Replace(context)
+		normalized = strings.ReplaceAll(normalized, " ", "-")
+		if strings.Contains(normalized, "no-"+normalizedPhrase+"-claim") {
+			return true
+		}
+	}
+	return false
 }
 
 func verifyWASMBackendPlan(path string, plannedTargets []string) error {
