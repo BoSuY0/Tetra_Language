@@ -71,6 +71,9 @@ Verification: `cd compiler && go test ./... -count=1`.
 - `protocol_trait_object_decision_test.go`: P22.2 protocol/trait-object
   decision report validation uses package-private static conformance and
   lowering witnesses.
+- `ram_contract_build_test.go`: RAM contract build coverage validates
+  package-private native build planning and report wiring before a public
+  command owns that integration evidence.
 - `reports_internal_test.go`: allocation report-vs-plan validation is a
   package-private compiler report contract.
 - `runtime_hardening_v1_test.go`: P24.1 runtime-hardening report validation

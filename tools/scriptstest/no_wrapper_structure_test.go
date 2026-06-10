@@ -164,6 +164,7 @@ func TestNoWrapperCompilerRootTestsAreDocumentedExceptions(t *testing.T) {
 		"net_runtime_test.go":                    true,
 		"plir_api_test.go":                       true,
 		"protocol_trait_object_decision_test.go": true,
+		"ram_contract_build_test.go":             true,
 		"reports_internal_test.go":               true,
 		"runtime_hardening_v1_test.go":           true,
 		"runtime_override_test.go":               true,
