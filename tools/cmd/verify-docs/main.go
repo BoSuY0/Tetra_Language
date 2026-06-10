@@ -1771,6 +1771,7 @@ func verifyActorRuntimeFoundationManifestFeature(features []featureManifest) err
 		"formal race proof",
 		"docs/design/actor_region_transfer.md",
 		"docs/audits/actor-runtime-production-boundary-v1.md",
+		"docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md",
 		"docs/checklists/actors_linux_smoke.md",
 		"docs/checklists/actors_platform_smoke.md",
 	} {

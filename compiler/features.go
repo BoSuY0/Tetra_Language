@@ -575,7 +575,7 @@ func FeatureRegistry() []FeatureInfo {
 			Since:     "v0.4.0",
 			Scope:     "production Linux-x64 distributed actor runtime path with actornet loopback TCP broker, distributed node identity, remote actor handles, network mailbox send/receive for i32, tagged, and typed frames, missing-node failure/status propagation, compatibility with existing task cancel/join handles, and scoped actor runtime foundation gate evidence through tetra.actor.production_foundation.v1",
 			Stability: "current Linux-x64 runtime/lowering slice with executable tetra.actors.distributed-runtime.v1 smoke evidence, tetra.actor.production_foundation.v1 gate evidence from actor-runtime-foundation-linux-x64-gate.sh, and strict validator rejection for transport-only or fake reports; non-Linux-x64 targets, non-Linux distributed runtime, distributed zero-copy transfer, cluster membership, reconnect/retry production, formal race proof, multi-threaded scheduling, and broader structured-concurrency guarantees remain outside this claim",
-			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/actors.md", "docs/user/async_actors_guide.md", "docs/design/actor_region_transfer.md", "docs/audits/actor-runtime-production-boundary-v1.md", "docs/checklists/actors_linux_smoke.md", "docs/checklists/actors_platform_smoke.md"},
+			Docs:      []string{"docs/spec/current_supported_surface.md", "docs/spec/actors.md", "docs/user/async_actors_guide.md", "docs/design/actor_region_transfer.md", "docs/audits/actor-runtime-production-boundary-v1.md", "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md", "docs/checklists/actors_linux_smoke.md", "docs/checklists/actors_platform_smoke.md"},
 		},
 		{
 			ID:        "ui.native-runtime",

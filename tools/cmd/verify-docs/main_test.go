@@ -1204,6 +1204,19 @@ func TestVerifyActorRuntimeFoundationDocsRejectsStaleManifestFeature(t *testing.
 	}
 }
 
+func TestVerifyActorRuntimeFoundationDocsRejectsMissingPostScopeLedger(t *testing.T) {
+	doc := writeActorRuntimeFoundationDoc(t, validActorRuntimeFoundationDocBody())
+	features := validActorRuntimeFoundationFeatures()
+	features[0].Docs = filterStrings(features[0].Docs, "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md")
+	err := verifyActorRuntimeFoundationDocs([]string{doc}, features)
+	if err == nil {
+		t.Fatalf("expected actor foundation docs to reject missing post-scope blocker ledger")
+	}
+	if !strings.Contains(err.Error(), "docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md") {
+		t.Fatalf("expected post-scope blocker ledger path in error, got %v", err)
+	}
+}
+
 func TestVerifyActorRuntimeFoundationDocsAcceptsScopedGateEvidence(t *testing.T) {
 	doc := writeActorRuntimeFoundationDoc(t, validActorRuntimeFoundationDocBody())
 	if err := verifyActorRuntimeFoundationDocs([]string{doc}, validActorRuntimeFoundationFeatures()); err != nil {
@@ -1400,6 +1413,16 @@ func writeActorRuntimeFoundationDoc(t *testing.T, body string) string {
 	return doc
 }
 
+func filterStrings(in []string, drop string) []string {
+	out := make([]string, 0, len(in))
+	for _, value := range in {
+		if value != drop {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
 func validActorRuntimeFoundationDocBody() string {
 	return strings.Join([]string{
 		"Actor runtime foundation scoped release truth",
@@ -1434,6 +1457,7 @@ func validActorRuntimeFoundationFeatures() []featureManifest {
 				"docs/user/async_actors_guide.md",
 				"docs/design/actor_region_transfer.md",
 				"docs/audits/actor-runtime-production-boundary-v1.md",
+				"docs/plans/2026-06-10-actor-runtime-post-scope-blockers.md",
 				"docs/checklists/actors_linux_smoke.md",
 				"docs/checklists/actors_platform_smoke.md",
 			},
