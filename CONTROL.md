@@ -7,16 +7,23 @@
 ## Active Packet
 
 None. `ACTOR-P17` final same-commit actor production foundation gate is closed
-for local scoped evidence.
+for local scoped evidence, and `ACTOR-RC100-P18` local `act` proof is closed for
+candidate commit `2482fc72805730b665f18c1be398aad7fcdb839b`.
 
 ## Next Actions
 
-1. Keep final audit and tracker files aligned if new evidence is added.
-2. Do not claim release-candidate, clean-checkout proof, remote CI proof,
-   package publication, or `PROD_READY_PROVEN` unless those checks are actually
-   run and recorded.
-3. If preparing a PR/commit later, preserve unrelated dirty worktree changes and
-   rerun the final verification commands after the commit boundary is clear.
+1. Resolve the GitHub Actions account billing lock.
+2. Rerun real GitHub-hosted `ci.yml` on branch
+   `actor-rc100-p12-expanded-clean` after the lock is cleared, confirm the run
+   head SHA, download the actor foundation artifact, and rerun artifact
+   validators locally. Latest blocked run: `27287513207` for commit
+   `2482fc72805730b665f18c1be398aad7fcdb839b`.
+3. Run and record release-package proof for the same candidate before any
+   `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC`, release-candidate,
+   clean-checkout proof, package publication, or `PROD_READY_PROVEN` claim.
+4. Keep Linux x64 as the only P18 platform with OK local evidence until other
+   platforms are actually tested.
+5. Keep final audit and tracker files aligned if new evidence is added.
 
 ## Stop Conditions
 

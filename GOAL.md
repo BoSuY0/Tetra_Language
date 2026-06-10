@@ -282,3 +282,21 @@ acceptance item is proven by current evidence.
   Verdict: `PROD_STABLE_SCOPED`; release-candidate and `PROD_READY_PROVEN` are
   not claimed because the worktree is dirty and remote CI/package publication
   were not run in this session.
+- 2026-06-10: `ACTOR-RC100-P18` local GitHub Actions emulation completed for
+  candidate commit `2482fc72805730b665f18c1be398aad7fcdb839b`. Evidence:
+  `reports/actor-foundation-prod-ready-scoped-rc-100/P18-act-local/summary.md`,
+  `act-clean-2482fc7-summary.tsv`,
+  `act-clean-2482fc7.log`,
+  `act-clean-2482fc7-artifact-expected-status.tsv`,
+  `act-clean-2482fc7-validate-artifact-hashes.log`,
+  `act-clean-2482fc7-validate-actor-runtime-foundation.log`, and
+  `broad-2482fc7-status.tsv`. Local `act` job
+  `actor-runtime-foundation-linux` passed from a fresh clone; the unzipped
+  artifact validates and includes
+  `parallel-production-linux-x64/parallelrt-evidence.raw.json`. Verdict:
+  `LOCAL_ACT_GREEN_REMOTE_BLOCKED`; `ACTOR_FOUNDATION_PROD_READY_SCOPED_RC_100_PERC`
+  remains `NOT_CLAIMED`. Remote GitHub Actions run `27287513207` was dispatched
+  for the same commit and failed before job steps because GitHub reported the
+  account is locked due to a billing issue; package/release evidence also has
+  not run. Platform note: Linux x64 local actor foundation evidence is OK;
+  other platforms were not tested in P18 and remain nonclaims.
