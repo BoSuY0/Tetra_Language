@@ -107,6 +107,36 @@ func TestValidateReportDirCrossChecksSubreportsAndArtifactHashes(t *testing.T) {
 	}
 }
 
+func TestValidateReportDirRejectsDistributedSubreportGitHeadMismatch(t *testing.T) {
+	dir := t.TempDir()
+	writeActorFoundationFixtureDir(t, dir)
+	writeFile(t, filepath.Join(dir, "distributed-actors-linux-x64", "distributed-actors-linux-x64.json"), strings.ReplaceAll(validDistributedActorSubreport, testGitHead, strings.Repeat("a", 40)))
+
+	err := ValidateReportDir(dir, Options{CurrentGitHead: testGitHead})
+	if err == nil {
+		t.Fatalf("expected distributed subreport git_head mismatch")
+	}
+	if !strings.Contains(err.Error(), "distributed actor git_head") {
+		t.Fatalf("error = %v, want distributed actor git_head mismatch", err)
+	}
+}
+
+func TestValidateReportDirRejectsMissingSubreportHashManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeActorFoundationFixtureDir(t, dir)
+	if err := os.Remove(filepath.Join(dir, "distributed-actors-linux-x64", "artifact-hashes.json")); err != nil {
+		t.Fatal(err)
+	}
+
+	err := ValidateReportDir(dir, Options{CurrentGitHead: testGitHead})
+	if err == nil {
+		t.Fatalf("expected missing distributed subreport hash manifest")
+	}
+	if !strings.Contains(err.Error(), "artifact-hashes.json") {
+		t.Fatalf("error = %v, want artifact-hashes.json missing manifest", err)
+	}
+}
+
 func validActorFoundationReport(t *testing.T) []byte {
 	t.Helper()
 	return validActorFoundationReportFrom(t, func(*Report) {})
