@@ -626,16 +626,38 @@ func TestVerifyFeatureRegistryAcceptsRequiredStatuses(t *testing.T) {
 			ID:        "ui.surface-block-system",
 			Name:      "Tetra Surface Block System",
 			Status:    "experimental",
-			Scope:     "Block-first Surface architecture with Block as the core Surface primitive, widgets as recipes/compatibility, `tetra.surface.block-system.gate.v1` gate reports, and `block_system.memory_budget` evidence under reports/surface-block/p18-budget",
-			Stability: "experimental implementation track with same-commit target evidence for headless, linux-x64 real-window, and wasm32-web browser-canvas; not production support and no production Block claim",
+			Scope:     "Block-first Surface architecture with Block as the core Surface primitive, widgets as recipes/compatibility, `tetra.surface.block-system.gate.v1` gate reports, `tetra.surface.ipc-lifecycle-report.v1` at `surface-ipc-lifecycle-v1`, `validate-surface-ipc-report`, `tetra.surface.crash-report.v1` at `surface-crash-diagnostics-v1`, `validate-surface-crash-report`, `tetra.surface.i18n-report.v1` at `surface-i18n-l10n-v1`, `validate-surface-i18n-report`, locale resources, stable string IDs, `tetra.surface.perf-report.v1` at `surface-performance-memory-v1`, `validate-surface-perf-report`, baseline environment capture, bounded cache evidence, `tetra.surface.migration-report.v1` at `surface-widget-block-migration-v1`, `validate-surface-migration-report`, compatibility layer, widget-to-Block/Morph recipe mappings, existing Surface v1 widget examples still passing, `tetra.surface.example-suite-report.v1` at `surface-production-example-suite-v1`, `validate-surface-example-suite`, ten realistic Surface app shapes, Block/Morph-only production examples, headless/linux-x64/wasm32-web target coverage, and `block_system.memory_budget` evidence under reports/surface-block/p18-budget",
+			Stability: "experimental implementation track with Surface handle/frame/event actor transfer rejection, background UI mutation without dispatcher rejection, Electron main/renderer parity nonclaim, crash swallowed as pass rejection, secret leak rejection, automatic crash recovery nonclaim, Electron crash reporter compatibility nonclaim, silent fallback rejection, full bidi shaping nonclaim, full ICU/CLDR nonclaim, unsupported faster-than-Electron claim rejection, zero memory overhead claim rejection, cross-platform desktop performance parity nonclaim, widgets core final architecture claim rejection, breaking Surface v1 examples without migration rejection, screenshot-only examples rejection, React/Electron/DOM runtime example rejection, widgets where Block/Morph required rejection, and same-commit target evidence for headless, linux-x64 real-window, and wasm32-web browser-canvas; not production support and no production Block claim",
 			Docs: []string{
 				"docs/spec/current_supported_surface.md",
 				"docs/spec/surface_v1.md",
+				"docs/spec/surface_ipc_lifecycle.md",
+				"docs/spec/surface_crash_diagnostics.md",
+				"docs/spec/surface_i18n.md",
+				"docs/spec/surface_performance.md",
+				"docs/spec/surface_migration.md",
+				"docs/spec/surface_examples.md",
 				"docs/user/surface_guide.md",
 				"docs/user/examples_index.md",
 				"docs/release/surface_v1_release_contract.md",
 				"docs/release/surface_v1_release_notes.md",
 				"docs/release/surface_v1_release_audit.md",
+			},
+		},
+		{
+			ID:        "ui.surface-production-platform",
+			Name:      "Tetra Surface production platform contract",
+			Status:    "planned",
+			Scope:     "planned PROD_STABLE_SCOPED_LINUX_WEB_APP_UI contract for surface-prod-scoped-linux-web with tetra.surface.prod-claim.v1 and tetra.surface.prod-gate-report.v1 evidence at surface-production-ci-release-gate-v1 from prod-gate.sh, validate-surface-release-state --scope PROD_STABLE_SCOPED_LINUX_WEB_APP_UI, surface-production-final/** artifact upload, release-packages.yml CI wiring, linux-x64 and wasm32-web production target tiering, and windows-x64/macos-x64 beta target boundaries",
+			Stability: "not a broad Electron replacement; promotion requires no continue-on-error production gate, missing production CI job rejection, skipped production target counted as pass rejection, missing artifact hash manifest rejection, tetra.surface.prod-audit.v1, surface-prod-final-same-commit-audit-v1, validate-surface-prod-audit, docs/release/surface_prod_release_audit.md, PROD_STABLE_SCOPED/NEAR_READY_WITH_BLOCKERS/BETA_ONLY/EXPERIMENTAL_ONLY/FAIL, clean checkout rejection, report from different git head rejection, missing unsupported-target nonclaims rejection, public claim generated from audit result, tetra.surface.electron-comparison-report.v1, surface-electron-comparison-method-v1, surface-electron-comparison, validate-surface-electron-comparison-report, docs/benchmarks/surface_vs_electron.md, competitive with Electron in the supported scope, official benchmark claim rejection, cherry-picked hardware rejection, missing variance rejection, unfair app shape rejection, missing environment rejection, and single-smoke faster-than-Electron claim rejection",
+			Docs: []string{
+				"docs/spec/surface_production_platform.md",
+				"docs/spec/surface_ci_release_gates.md",
+				"docs/spec/current_supported_surface.md",
+				"docs/release/surface_v1_release_contract.md",
+				"docs/release/surface_v1_release_notes.md",
+				"docs/release/surface_prod_release_audit.md",
+				"docs/benchmarks/surface_vs_electron.md",
 			},
 		},
 		{ID: "ui.surface-macos-x64", Name: "macOS Surface host", Status: "unsupported", Scope: "not in Surface v1", Stability: "no release evidence", Docs: []string{"docs/spec/surface_v1.md"}},
@@ -1225,7 +1247,7 @@ func TestVerifyRAMContractCompilerDocsRejectsIncompleteDocs(t *testing.T) {
 }
 
 func TestVerifyRAMContractCompilerDocsRejectsForbiddenClaim(t *testing.T) {
-	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody()+"\nRAM Contract Compiler proves zero heap for all programs.\n")
+	paths := writeRAMContractDocsSet(t, validRAMContractDocsBody()+".\nRAM Contract Compiler proves zero heap for all programs.\n")
 	err := verifyRAMContractCompilerDocs(paths, []featureManifest{validVerifyDocsRAMContractFeature()})
 	if err == nil {
 		t.Fatalf("expected RAM contract docs forbidden claim failure")

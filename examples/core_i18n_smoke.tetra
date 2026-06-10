@@ -1,0 +1,20 @@
+// Smoke for lib.core.i18n scoped locale hooks.
+module examples.core_i18n_smoke
+
+import lib.core.i18n as i18n
+
+func main() -> Int:
+    let locale: i18n.Locale = i18n.locale_ar_eg()
+    let id: i18n.StringID = i18n.string_id(1, 10)
+    let resource: i18n.LocaleResource = i18n.locale_resource(locale, 5, 4103, true, true)
+    let formats: i18n.FormatPolicy = i18n.format_policy(true, true, true, false)
+    let policy: i18n.LocalizationPolicy = i18n.localization_policy(3, true, true, false, false, i18n.direction_rtl(), false)
+    let text_len: Int = i18n.localized_text_len(resource, id, 12)
+    if i18n.locale_valid(locale) &&
+       i18n.string_id_valid(id) &&
+       i18n.locale_resource_valid(resource) &&
+       i18n.format_policy_valid(formats) &&
+       i18n.localization_policy_valid(policy) &&
+       text_len > 0:
+        return 0
+    return 1

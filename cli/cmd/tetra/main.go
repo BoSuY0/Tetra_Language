@@ -96,6 +96,8 @@ func runCLI(args []string, stdout io.Writer, stderr io.Writer) int {
 		return runRun(args[1:], stdout, stderr)
 	case "smoke":
 		return runSmoke(args[1:], stdout, stderr)
+	case "surface":
+		return runSurface(args[1:], stdout, stderr)
 	case "fmt":
 		return runFmt(args[1:], stdout, stderr)
 	case "test":
@@ -1056,5 +1058,5 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "tooling commands:")
 	fmt.Fprintln(w, "  version targets features formats doctor actor-net project workspace new")
-	fmt.Fprintln(w, "  run smoke fmt test doc interface clean eco lsp")
+	fmt.Fprintln(w, "  run smoke surface fmt test doc interface clean eco lsp")
 }

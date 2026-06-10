@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"tetra_language/tools/validators/surface"
 )
 
 func TestValidateSurfaceReleaseStateAcceptsCurrentLinuxWebScope(t *testing.T) {
@@ -112,6 +114,102 @@ func TestValidateSurfaceReleaseStateRejectsMissingMorphReport(t *testing.T) {
 	}
 }
 
+func TestValidateSurfaceReleaseStateAcceptsProdScopeWithProdGateReport(t *testing.T) {
+	dir := t.TempDir()
+	writeSurfaceReleaseStateFixture(t, dir)
+	writeSurfaceProdGateFixture(t, dir, validSurfaceProdGateReportJSON())
+	manifestPath := filepath.Join(dir, "manifest.json")
+	if err := os.WriteFile(manifestPath, []byte(surfaceReleaseStateManifestJSON()), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	err := validateSurfaceReleaseState(surfaceReleaseStateOptions{
+		ReportDir:      dir,
+		ExpectedStatus: "current",
+		Scope:          "PROD_STABLE_SCOPED_LINUX_WEB_APP_UI",
+		ManifestPath:   manifestPath,
+	})
+	if err != nil {
+		t.Fatalf("validateSurfaceReleaseState prod scope failed: %v", err)
+	}
+}
+
+func TestValidateSurfaceReleaseStateRequiresProdGateReportForProdClaim(t *testing.T) {
+	dir := t.TempDir()
+	writeSurfaceReleaseStateFixture(t, dir)
+	manifestPath := filepath.Join(dir, "manifest.json")
+	if err := os.WriteFile(manifestPath, []byte(surfaceReleaseStateManifestJSON()), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	err := validateSurfaceReleaseState(surfaceReleaseStateOptions{
+		ReportDir:      dir,
+		ExpectedStatus: "current",
+		Scope:          "PROD_STABLE_SCOPED_LINUX_WEB_APP_UI",
+		ManifestPath:   manifestPath,
+	})
+	if err == nil {
+		t.Fatalf("expected missing prod gate report to fail")
+	}
+	if !strings.Contains(err.Error(), "surface-prod-gate-report.json") {
+		t.Fatalf("error = %v, want missing prod gate report diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceReleaseStateRejectsSkippedTargetCountedAsPass(t *testing.T) {
+	dir := t.TempDir()
+	writeSurfaceReleaseStateFixture(t, dir)
+	raw := strings.Replace(validSurfaceProdGateReportJSON(),
+		`{"target":"linux-x64","tier":"prod","ran":true,"pass":true,"skipped":false}`,
+		`{"target":"linux-x64","tier":"prod","ran":true,"pass":true,"skipped":true}`,
+		1)
+	writeSurfaceProdGateFixture(t, dir, raw)
+	manifestPath := filepath.Join(dir, "manifest.json")
+	if err := os.WriteFile(manifestPath, []byte(surfaceReleaseStateManifestJSON()), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	err := validateSurfaceReleaseState(surfaceReleaseStateOptions{
+		ReportDir:      dir,
+		ExpectedStatus: "current",
+		Scope:          "PROD_STABLE_SCOPED_LINUX_WEB_APP_UI",
+		ManifestPath:   manifestPath,
+	})
+	if err == nil {
+		t.Fatalf("expected skipped target counted as pass to fail")
+	}
+	if !strings.Contains(err.Error(), "skipped target") {
+		t.Fatalf("error = %v, want skipped target diagnostic", err)
+	}
+}
+
+func TestValidateSurfaceReleaseStateRejectsMissingProdArtifactHashManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeSurfaceReleaseStateFixture(t, dir)
+	raw := strings.Replace(validSurfaceProdGateReportJSON(),
+		`"artifact_hash_manifest":"surface-release-v1/artifact-hashes.json"`,
+		`"artifact_hash_manifest":""`,
+		1)
+	writeSurfaceProdGateFixture(t, dir, raw)
+	manifestPath := filepath.Join(dir, "manifest.json")
+	if err := os.WriteFile(manifestPath, []byte(surfaceReleaseStateManifestJSON()), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	err := validateSurfaceReleaseState(surfaceReleaseStateOptions{
+		ReportDir:      dir,
+		ExpectedStatus: "current",
+		Scope:          "PROD_STABLE_SCOPED_LINUX_WEB_APP_UI",
+		ManifestPath:   manifestPath,
+	})
+	if err == nil {
+		t.Fatalf("expected missing prod artifact hash manifest to fail")
+	}
+	if !strings.Contains(err.Error(), "artifact hash manifest") {
+		t.Fatalf("error = %v, want artifact hash diagnostic", err)
+	}
+}
+
 func surfaceReleaseStateManifestJSON() string {
 	return `{
   "surface_release": {
@@ -125,6 +223,9 @@ func surfaceReleaseStateManifestJSON() string {
   ],
   "features": [
     {"id":"ui.surface-core","status":"current"},
+    {"id":"ui.surface-block-system","status":"experimental"},
+    {"id":"ui.surface-morph-capsule","status":"experimental"},
+    {"id":"ui.surface-gpu","status":"experimental"},
     {"id":"ui.surface-headless","status":"current"},
     {"id":"ui.surface-linux-x64","status":"current"},
     {"id":"ui.surface-web-wasm","status":"current"},
@@ -132,13 +233,71 @@ func surfaceReleaseStateManifestJSON() string {
     {"id":"ui.surface-toolkit-v1","status":"current"},
     {"id":"ui.surface-text-input-v1","status":"current"},
     {"id":"ui.surface-accessibility-v1","status":"current"},
-    {"id":"ui.surface-morph-capsule","status":"current"},
     {"id":"ui.surface-macos-x64","status":"unsupported"},
     {"id":"ui.surface-windows-x64","status":"unsupported"},
     {"id":"ui.surface-wasm32-wasi","status":"unsupported"}
   ]
 }
 `
+}
+
+func writeSurfaceProdGateFixture(t *testing.T, dir string, raw string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "surface-prod-gate-report.json"), []byte(raw+"\n"), 0o644); err != nil {
+		t.Fatalf("write surface-prod-gate-report.json: %v", err)
+	}
+}
+
+func validSurfaceProdGateReportJSON() string {
+	return `{
+  "schema":"tetra.surface.prod-gate-report.v1",
+  "status":"pass",
+  "level":"surface-production-ci-release-gate-v1",
+  "scope":"PROD_STABLE_SCOPED_LINUX_WEB_APP_UI",
+  "release_scope":"surface-v1-linux-web",
+  "producer":"scripts/release/surface/prod-gate.sh",
+  "git_head":"0123456789abcdef0123456789abcdef01234567",
+  "same_commit":true,
+  "ci_jobs":[
+    {"workflow":".github/workflows/release-packages.yml","job":"release-packages","required":true,"continue_on_error":false,"command":"bash scripts/release/surface/prod-gate.sh","artifact_upload":"surface-production-final"}
+  ],
+  "gates":[
+    {"name":"surface-release","report_dir":"surface-release-v1","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-release-v1/artifact-hashes.json"},
+    {"name":"block-system","report_dir":"surface-release-v1/block-system","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-release-v1/artifact-hashes.json"},
+    {"name":"morph","report_dir":"surface-release-v1/morph","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-release-v1/artifact-hashes.json"},
+    {"name":"visual","report_dir":"surface-visual-regression","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-visual-regression/artifact-hashes.json"},
+    {"name":"package","report_dir":"surface-package-distribution","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-package-distribution/artifact-hashes.json"},
+    {"name":"security","report_dir":"surface-security-sandbox","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-security-sandbox/artifact-hashes.json"},
+    {"name":"ipc-lifecycle","report_dir":"surface-ipc-lifecycle","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-ipc-lifecycle/artifact-hashes.json"},
+    {"name":"crash-diagnostics","report_dir":"surface-crash-diagnostics","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-crash-diagnostics/artifact-hashes.json"},
+    {"name":"i18n-localization","report_dir":"surface-i18n-localization","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-i18n-localization/artifact-hashes.json"},
+    {"name":"performance-memory","report_dir":"surface-performance-memory","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-performance-memory/artifact-hashes.json"},
+    {"name":"widget-migration","report_dir":"surface-widget-migration","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-widget-migration/artifact-hashes.json"},
+    {"name":"example-suite","report_dir":"surface-example-suite","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-example-suite/artifact-hashes.json"},
+    {"name":"api-stability","report_dir":"surface-api-stability-v1","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-api-stability-v1/artifact-hashes.json"},
+    {"name":"electron-comparison","report_dir":"surface-electron-comparison","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-electron-comparison/artifact-hashes.json"},
+    {"name":"prod-claim","report_dir":"surface-prod-claim","ran":true,"pass":true,"skipped":false,"artifact_hash_manifest":"surface-prod-claim/artifact-hashes.json"}
+  ],
+  "targets":[
+    {"target":"linux-x64","tier":"prod","ran":true,"pass":true,"skipped":false},
+    {"target":"wasm32-web","tier":"prod","ran":true,"pass":true,"skipped":false},
+    {"target":"windows-x64","tier":"beta","ran":false,"pass":false,"skipped":true},
+    {"target":"macos-x64","tier":"beta","ran":false,"pass":false,"skipped":true}
+  ],
+  "artifact_hashes_validated":true,
+  "negative_guards":{
+    "missing_job_rejected":true,
+    "continue_on_error_rejected":true,
+    "skipped_target_as_pass_rejected":true,
+    "missing_artifact_hash_manifest_rejected":true
+  },
+  "cases":[
+    {"name":"release-packages production gate job required","kind":"positive","ran":true,"pass":true},
+    {"name":"no continue-on-error production jobs","kind":"negative","ran":true,"pass":true},
+    {"name":"skipped target counted as pass rejected","kind":"negative","ran":true,"pass":true},
+    {"name":"artifact hash manifest missing rejected","kind":"negative","ran":true,"pass":true}
+  ]
+}`
 }
 
 func writeSurfaceReleaseStateFixture(t *testing.T, dir string) {
@@ -235,6 +394,80 @@ func writeSurfaceReleaseStateFixture(t *testing.T, dir string) {
   "composition_trace": {"start":true,"update":true,"commit":true,"cancel":true},
   "borrowed_view_storage": false,
   "safe_view_lifetime_checked": true,
+  "text_pipeline": {
+    "schema": "tetra.surface.text-pipeline.v1",
+    "level": "scoped-latin-utf8-text-pipeline-v1",
+    "engine": "deterministic-tetra-text-shaper",
+    "platform_widget_text_controls": false,
+    "font_manifest": [
+      {"id":"tetra-ui-regular","family":"Tetra UI","style":"normal","weight":400,"source":"embedded:tetra-ui-regular","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","bytes":32768},
+      {"id":"noto-sans-fallback","family":"Noto Sans","style":"normal","weight":400,"source":"system:fontconfig/noto-sans","sha256":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","bytes":65536}
+    ],
+    "font_fallbacks": [
+      {"id":"release-fallback","requested_family":"Tetra UI","resolved_family":"Noto Sans","chain":["Tetra UI","Noto Sans","monospace"],"missing_glyphs":0,"coverage":"latin-plus-basic-utf8-smoke"}
+    ],
+    "glyph_runs": [
+      {"id":"latin-run","font_family":"Tetra UI","script":"Latin","direction":"ltr","shaping":"tier1-latin-simple","text_len":5,"byte_start":0,"byte_end":5,"scalar_start":0,"scalar_end":5,"glyph_count":5,"glyph_ids":[36,69,70,32,71],"advances":[8,8,8,4,8],"clusters":[0,1,2,3,4],"baseline":14,"checksum":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+      {"id":"fallback-run","font_family":"Noto Sans","script":"Common","direction":"ltr","shaping":"tier1-fallback-simple","text_len":1,"byte_start":5,"byte_end":7,"scalar_start":5,"scalar_end":6,"glyph_count":1,"glyph_ids":[9731],"advances":[9],"clusters":[5],"baseline":14,"checksum":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+    ],
+    "glyph_caches": [
+      {"id":"release-glyph-cache","strategy":"bounded-lru","budget_bytes":65536,"used_bytes":8192,"entry_count":24,"eviction":"lru","bounded":true}
+    ],
+    "cache_budget_bytes": 65536,
+    "glyph_cache_budget_bytes": 65536,
+    "glyph_cache_used_bytes": 8192,
+    "bounded_caches": true,
+    "cache_eviction": "lru",
+    "unicode_boundaries": {
+      "utf8_storage": true,
+      "scalar_boundaries": true,
+      "cluster_boundaries": true,
+      "latin_tier": true,
+      "combining_marks": false,
+      "bidi": false,
+      "unsupported_scripts": ["Arabic","Devanagari","Thai"],
+      "boundary_cases": ["ASCII insertion","UTF-8 scalar insertion","cluster caret clamp"]
+    },
+    "shaping_scope": {
+      "tier": "tier1-latin-utf8",
+      "supported_scripts": ["Latin","Common"],
+      "unsupported_scripts": ["Arabic","Devanagari","Thai"],
+      "engine_decision": "deterministic embedded shaper until HarfBuzz-class evidence exists",
+      "full_unicode_editor_semantics": false,
+      "bidi": false,
+      "combining_marks": false,
+      "system_library_integration": "not required for Tier 1; future HarfBuzz-class gate",
+      "platform_widgets": false
+    },
+    "measurements": [
+      {"id":"release-label-measure","block_id":1,"text_len":18,"font_family":"Tetra UI","font_weight":400,"font_size":14,"line_height":18,"max_width":120,"measured":{"w":108,"h":18},"line_count":1,"wrap":"none","overflow":"clip","ellipsis":false,"ellipsized_text_len":18,"align":"start","quality":"deterministic-metrics-v1","checksum":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+      {"id":"release-ellipsis-measure","block_id":2,"text_len":32,"font_family":"Tetra UI","font_weight":400,"font_size":14,"line_height":18,"max_width":96,"measured":{"w":96,"h":36},"line_count":2,"wrap":"word","overflow":"ellipsis","ellipsis":true,"ellipsized_text_len":20,"align":"start","quality":"deterministic-metrics-v1","checksum":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}
+    ],
+    "measurement_consistency": {
+      "same_input_same_metrics": true,
+      "target_independent_baseline": true,
+      "max_delta_px": 0,
+      "cases": ["latin measurement repeat","fallback measurement repeat","ellipsis measurement repeat"]
+    },
+    "layout": {"wrap":true,"ellipsis":true,"alignment":["start","center","end"],"baseline":true,"line_height":true},
+    "caret_rects": [{"x":32,"y":64,"w":2,"h":18}],
+    "selection_rects": [{"x":32,"y":64,"w":18,"h":18}],
+    "ime_composition_spans": [
+      {"kind":"composition","byte_start":0,"byte_end":3,"scalar_start":0,"scalar_end":3,"rect":{"x":32,"y":64,"w":24,"h":18}}
+    ],
+    "nonclaims": [
+      "full Unicode editor semantics",
+      "bidi production shaping",
+      "complex script shaping without HarfBuzz-class evidence",
+      "platform widget text controls"
+    ],
+    "negative_guards": {
+      "full_unicode_editor_without_tests_rejected": true,
+      "missing_font_fallback_rejected": true,
+      "unbounded_glyph_cache_rejected": true,
+      "platform_widget_text_controls_rejected": true
+    }
+  },
   "processes": [
     {"name":"tetra build","kind":"build","path":"tetra build --target linux-x64 examples/surface_release_text_input.tetra -o /tmp/surface-artifacts/surface-release-text-input","ran":true,"pass":true,"exit_code":0},
     {"name":"surface component app","kind":"app","path":"/tmp/surface-artifacts/surface-release-text-input","ran":true,"pass":true,"exit_code":1,"expected_exit_code":1},
@@ -271,6 +504,7 @@ func writeSurfaceReleaseStateFixture(t *testing.T, dir string) {
 		"surface-wasm32-web-release-browser.json": `{"schema":"tetra.surface.runtime.v1","status":"pass","target":"wasm32-web","host_evidence":{"level":"wasm32-web-browser-canvas-release-v1","backend":"browser-canvas-rgba-accessible","framebuffer":true,"browser_canvas":true,"browser_input":true,"browser_clipboard":true,"browser_clipboard_harness":"deterministic-browser-clipboard-v1","browser_composition":true,"browser_accessibility_snapshot":true,"browser_accessibility_mirror":true,"user_facing_platform_widgets":false},"source":"examples/surface_release_form.tetra"}`,
 		"surface-linux-x64-release-window.json":   `{"schema":"tetra.surface.runtime.v1","status":"pass","target":"linux-x64","host_evidence":{"level":"linux-x64-release-window-v1","backend":"wayland-shm-rgba-release-v1","framebuffer":true,"real_window":true,"native_input":true,"text_input":true,"clipboard":true,"composition":true,"accessibility_bridge":true,"user_facing_platform_widgets":false},"source":"examples/surface_release_form.tetra"}`,
 	}
+	files["surface-headless-release-text-input.json"] = string(surfaceReleaseStateTextInputReportJSON(t, files["surface-headless-release-text-input.json"]))
 	for name, raw := range files {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755); err != nil {
 			t.Fatalf("mkdir for %s: %v", name, err)
@@ -280,6 +514,112 @@ func writeSurfaceReleaseStateFixture(t *testing.T, dir string) {
 		}
 	}
 	writeSurfaceReleaseArtifactHashes(t, dir, files)
+}
+
+func surfaceReleaseStateTextInputReportJSON(t *testing.T, raw string) []byte {
+	t.Helper()
+	var report surface.TextInputReport
+	if err := json.Unmarshal([]byte(raw), &report); err != nil {
+		t.Fatalf("decode text input fixture: %v", err)
+	}
+	report.TextEditing = surfaceReleaseStateTextEditingReport(report.Target)
+	report.Cases = append(report.Cases,
+		surface.CaseReport{Name: "release text editing target IME trace", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "release text editing clipboard owned copies", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "release text editing undo unit boundaries", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "release text editing validation diagnostics", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "release text editing rich text nonclaim", Kind: "positive", Ran: true, Pass: true},
+	)
+	out, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal text input fixture: %v", err)
+	}
+	return out
+}
+
+func surfaceReleaseStateTextEditingReport(target string) surface.TextEditingReport {
+	return surface.TextEditingReport{
+		Schema:   surface.TextEditingSchemaV1,
+		Level:    "production-editing-basics-v1",
+		Target:   target,
+		Producer: "tools/cmd/surface-runtime-smoke",
+		EditableBlocks: []surface.EditableTextBlockReport{
+			{ID: "ReleaseTextBox", Kind: "TextBox", Storage: "owned-utf8-byte-buffer", FormsSafe: true, CommandPaletteSearchSafe: true, MaxBytes: 1024, UTF8Validation: true},
+		},
+		EditOperations: []surface.TextEditOperationReport{
+			{Order: 1, Action: "insert_text", Target: "ReleaseTextBox", BeforeTextLen: 0, AfterTextLen: 3, BeforeCaret: 0, AfterCaret: 3, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 0}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 3, Focus: 3}, UndoUnitID: "insert-ada", Checksum: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+			{Order: 2, Action: "move_caret_left", Target: "ReleaseTextBox", BeforeTextLen: 3, AfterTextLen: 3, BeforeCaret: 3, AfterCaret: 2, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 3, Focus: 3}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 2, Focus: 2}, UndoUnitID: "navigation-left", Checksum: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+			{Order: 3, Action: "replace_selection", Target: "ReleaseTextBox", BeforeTextLen: 5, AfterTextLen: 4, BeforeCaret: 1, AfterCaret: 2, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 1, Focus: 4}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 2, Focus: 2}, UndoUnitID: "replace-selection", Checksum: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+			{Order: 4, Action: "composition_commit", Target: "ReleaseTextBox", BeforeTextLen: 4, AfterTextLen: 5, BeforeCaret: 4, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 4, Focus: 4}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 5, Focus: 5}, UndoUnitID: "ime-commit", Checksum: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+			{Order: 5, Action: "clipboard_write", Target: "ReleaseTextBox", BeforeTextLen: 5, AfterTextLen: 5, BeforeCaret: 5, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 5}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 0, Focus: 5}, UndoUnitID: "clipboard-copy", Checksum: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+			{Order: 6, Action: "clipboard_read", Target: "ReleaseTextBox", BeforeTextLen: 0, AfterTextLen: 5, BeforeCaret: 0, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 0}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 5, Focus: 5}, UndoUnitID: "clipboard-paste", Checksum: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+		},
+		SelectionModel: surface.TextSelectionModelReport{
+			CaretMovement:        []string{"left", "right", "home", "end"},
+			SelectionReplacement: true,
+			ScalarBoundaryClamp:  true,
+			CaretRects:           []surface.RectReport{{X: 32, Y: 64, W: 2, H: 18}},
+			SelectionRects:       []surface.RectReport{{X: 32, Y: 64, W: 24, H: 18}},
+		},
+		IMETraces: []surface.TextIMETraceReport{
+			{
+				Target:     target,
+				Start:      true,
+				Update:     true,
+				Commit:     true,
+				Cancel:     true,
+				EventCount: 4,
+				CompositionSpan: surface.TextCompositionSpanReport{
+					Kind:        "composition",
+					ByteStart:   0,
+					ByteEnd:     3,
+					ScalarStart: 0,
+					ScalarEnd:   3,
+					Rect:        surface.RectReport{X: 32, Y: 64, W: 24, H: 18},
+				},
+				CommittedTextOwnedCopy: true,
+			},
+		},
+		ClipboardTransfers: []surface.TextClipboardTransferReport{
+			{Direction: "write", HostABI: "__tetra_surface_clipboard_write_text", Bytes: 5, UTF8Valid: true, OwnedCopy: true, BorrowedView: false, Checksum: "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
+			{Direction: "read", HostABI: "__tetra_surface_clipboard_read_text_into", Bytes: 5, UTF8Valid: true, OwnedCopy: true, BorrowedView: false, Checksum: "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+		},
+		UndoUnits: []surface.TextUndoUnitReport{
+			{ID: "insert-ada", OperationOrders: []int{1}, Boundary: "text-input-operation", Reversible: true, Coalesced: false},
+			{ID: "navigation-left", OperationOrders: []int{2}, Boundary: "caret-navigation", Reversible: true, Coalesced: false},
+			{ID: "replace-selection", OperationOrders: []int{3}, Boundary: "selection-replacement", Reversible: true, Coalesced: false},
+			{ID: "ime-commit", OperationOrders: []int{4}, Boundary: "composition-commit", Reversible: true, Coalesced: false},
+			{ID: "clipboard-copy", OperationOrders: []int{5}, Boundary: "clipboard-copy", Reversible: true, Coalesced: false},
+			{ID: "clipboard-paste", OperationOrders: []int{6}, Boundary: "clipboard-paste", Reversible: true, Coalesced: false},
+		},
+		ValidationDiagnostics: []surface.TextEditingDiagnosticReport{
+			{Name: "invalid UTF-8 rejected", Ran: true, Pass: true},
+			{Name: "borrowed text buffer rejected at host boundary", Ran: true, Pass: true},
+			{Name: "IME claim without target trace rejected", Ran: true, Pass: true},
+			{Name: "rich text claim rejected", Ran: true, Pass: true},
+		},
+		HostBoundary: surface.TextEditingHostBoundaryReport{
+			CopySafe:                      true,
+			ClipboardOwnedCopy:            true,
+			CompositionOwnedCopy:          true,
+			BorrowedTextBufferCrossesHost: false,
+		},
+		FormsSafe:                true,
+		CommandPaletteSearchSafe: true,
+		RichText:                 false,
+		NonClaims: []string{
+			"rich text",
+			"full editor-grade text semantics",
+			"native platform text controls",
+		},
+		NegativeGuards: surface.TextEditingNegativeGuardsReport{
+			IMEWithoutTargetTraceRejected: true,
+			BorrowedTextBufferRejected:    true,
+			RichTextClaimRejected:         true,
+			UnsafeClipboardAliasRejected:  true,
+			InvalidUTF8Rejected:           true,
+		},
+	}
 }
 
 func writeSurfaceReleaseArtifactHashes(t *testing.T, dir string, files map[string]string) {

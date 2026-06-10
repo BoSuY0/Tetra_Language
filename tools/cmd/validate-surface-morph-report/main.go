@@ -59,6 +59,9 @@ func validateSurfaceMorphReportWithOptions(path string, options morphReportValid
 	if report.Morph.Schema != "tetra.surface.morph.v1" {
 		return fmt.Errorf("morph schema is %q, want tetra.surface.morph.v1", report.Morph.Schema)
 	}
+	if err := surface.ValidateMorphStyleTokenBoundary(report.Morph); err != nil {
+		return err
+	}
 	if report.BlockSystem == nil {
 		return fmt.Errorf("surface Morph report requires block_system evidence")
 	}

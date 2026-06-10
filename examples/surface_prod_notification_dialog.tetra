@@ -1,0 +1,42 @@
+// Production Surface example shape: notification_dialog.
+module examples.surface_prod_notification_dialog
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func production_example_shape() -> Int:
+    return 3308
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 420, h: 280)
+    let dialog_rect: surface.Rect = surface.Rect(x: 42, y: 42, w: 336, h: 160)
+    let action_rect: surface.Rect = surface.Rect(x: 70, y: 150, w: 128, h: 40)
+    var tree: block.BlockTree = block.tree_init(5)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 19), root_rect)
+    let dialog: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, dialog_rect, 16), dialog_rect)
+    let action: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(3, 2, action_rect, 8, 9801, true), action_rect)
+    let recipe: morph.Recipe = morph.recipe_overlay_dialog()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(2))
+    let event: block.EventSpec = block.event_click(block.action_primary())
+    let state: block.StateSelector = block.state_selector_focused()
+    let motion: block.MotionSpec = block.motion_transition(180, 0, block.motion_ease_standard(), true, true, true, 0, 8, 100)
+    let dialog_cap: surface.ShellCapability = surface.shell_capability(surface.shell_cap_dialog(), true, true, true)
+    let notification_cap: surface.ShellCapability = surface.shell_capability(surface.shell_cap_notification(), true, true, true)
+    if root == 1 && dialog == 2 && action == 3 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.click_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_duration(motion) == 180 &&
+       block.accessibility_focusable_has_name(block.accessibility_button(8)) &&
+       surface.shell_capability_valid(dialog_cap) &&
+       surface.shell_capability_valid(notification_cap) &&
+       performance_budget_ok(3, 1):
+        return 0
+    return 1

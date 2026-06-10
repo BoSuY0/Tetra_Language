@@ -273,6 +273,9 @@ func TestBlockLayoutScenarioProducesLayoutConstraintEvidence(t *testing.T) {
 	if len(report.LayoutConstraints) < 4 || len(report.LayoutPasses) < 8 || len(report.LayoutScrolls) == 0 {
 		t.Fatalf("layout evidence = constraints %#v passes %#v scrolls %#v, want constraint resolver evidence", report.LayoutConstraints, report.LayoutPasses, report.LayoutScrolls)
 	}
+	if report.LayoutEngine == nil || report.LayoutEngine.Schema != surface.LayoutEngineSchemaV1 || report.LayoutEngine.Target != "headless" {
+		t.Fatalf("layout_engine = %#v, want production layout engine evidence for headless target", report.LayoutEngine)
+	}
 	if !caseNamesContain(scenario.Cases, "block layout grid dock overlay scroll") || !caseNamesContain(scenario.Cases, "block layout resize constraints") {
 		t.Fatalf("scenario cases = %#v, want grid/dock/overlay/scroll and resize evidence", scenario.Cases)
 	}
@@ -354,12 +357,23 @@ func TestBlockMotionScenarioProducesTransitionEvidence(t *testing.T) {
 	if len(report.MotionFrames) < 4 {
 		t.Fatalf("motion frames = %#v, want deterministic transition and reduced-motion evidence", report.MotionFrames)
 	}
+	if report.AnimationScheduler == nil {
+		t.Fatalf("animation scheduler evidence is missing")
+	}
+	if report.AnimationScheduler.FrameCount != len(report.MotionFrames) || report.AnimationScheduler.MaxFrameDeltaMS != 60 {
+		t.Fatalf("animation scheduler = %#v, want frame-count and timing evidence tied to motion frames", report.AnimationScheduler)
+	}
+	if len(report.AnimationScheduler.TargetSmoke) != 1 || report.AnimationScheduler.TargetSmoke[0].Target != "headless" || !report.AnimationScheduler.TargetSmoke[0].Pass {
+		t.Fatalf("animation scheduler target smoke = %#v, want passing headless smoke evidence", report.AnimationScheduler.TargetSmoke)
+	}
 	last := report.MotionFrames[len(report.MotionFrames)-1]
 	if !last.ReducedMotion || last.Scheduled || !last.Settled {
 		t.Fatalf("last motion frame = %#v, want reduced motion settled without scheduling", last)
 	}
-	if !caseNamesContain(scenario.Cases, "block motion opacity color transform frames") || !caseNamesContain(scenario.Cases, "block motion completion stops scheduling") {
-		t.Fatalf("scenario cases = %#v, want transition and completion evidence", scenario.Cases)
+	if !caseNamesContain(scenario.Cases, "block motion opacity color transform frames") ||
+		!caseNamesContain(scenario.Cases, "block motion completion stops scheduling") ||
+		!caseNamesContain(scenario.Cases, "block motion frame scheduler timeline") {
+		t.Fatalf("scenario cases = %#v, want transition, completion, and scheduler evidence", scenario.Cases)
 	}
 }
 
@@ -380,8 +394,11 @@ func TestBlockAssetScenarioProducesLocalAssetEvidence(t *testing.T) {
 	if err := surface.ValidateReport(raw); err != nil {
 		t.Fatalf("ValidateReport failed: %v\n%s", err, raw)
 	}
-	if report.BlockAssetManifest == nil || len(report.BlockAssetManifest.Assets) < 3 {
-		t.Fatalf("asset manifest = %#v, want font/icon/image asset hashes", report.BlockAssetManifest)
+	if report.BlockAssetManifest == nil || len(report.BlockAssetManifest.Assets) < 4 || report.BlockAssetManifest.VectorCount != 1 {
+		t.Fatalf("asset manifest = %#v, want font/icon/image/vector asset hashes", report.BlockAssetManifest)
+	}
+	if report.AssetPipeline == nil || report.AssetPipeline.Level != "production-asset-pipeline-v1" || report.AssetPipeline.VectorCount != 1 {
+		t.Fatalf("asset pipeline = %#v, want production asset pipeline vector evidence", report.AssetPipeline)
 	}
 	if report.BlockAssetNetworkFetchAllowed {
 		t.Fatalf("network fetch allowed, want local/embedded-only asset evidence")
@@ -392,10 +409,13 @@ func TestBlockAssetScenarioProducesLocalAssetEvidence(t *testing.T) {
 	if len(report.BlockAssetDiagnostics) == 0 {
 		t.Fatalf("asset diagnostics = %#v, want missing asset fallback and network rejection evidence", report.BlockAssetDiagnostics)
 	}
-	for _, want := range []string{"block asset icon tint evidence", "block asset image scale evidence", "block asset network url rejected"} {
+	for _, want := range []string{"block asset icon tint evidence", "block asset image scale evidence", "block asset vector safe decode", "block asset unsafe SVG rejected", "block asset remote font rejected", "block asset network url rejected"} {
 		if !caseNamesContain(scenario.Cases, want) {
 			t.Fatalf("scenario cases = %#v, want %q", scenario.Cases, want)
 		}
+	}
+	if !blockAssetCommandPresent(report.BlockAssetRenderCommands, "render_vector") {
+		t.Fatalf("asset render commands = %#v, want render_vector command", report.BlockAssetRenderCommands)
 	}
 	if len(scenario.Frames) < 2 || scenario.Frames[0].Checksum == scenario.Frames[1].Checksum {
 		t.Fatalf("asset scenario frames = %#v, want asset-driven checksum change", scenario.Frames)
@@ -465,6 +485,45 @@ func TestBlockSystemScenarioProducesHeadlessGoldenChecksumEvidence(t *testing.T)
 	if report.BlockSystem.Schema != "tetra.surface.block-system.v1" || report.BlockSystem.QualityLevel != "deterministic-headless-block-system-v1" {
 		t.Fatalf("block_system = %#v, want deterministic headless Block system schema", report.BlockSystem)
 	}
+	if report.AppModel == nil {
+		t.Fatalf("app_model is nil, want production app model evidence")
+	}
+	if report.AppModel.Schema != surface.AppModelSchemaV1 || report.AppModel.Level != "production-app-model-v1" || report.AppModel.Target != "headless" {
+		t.Fatalf("app_model = %#v, want production schema and headless target", report.AppModel)
+	}
+	if len(report.AppModel.StateStores) < 4 || len(report.AppModel.Commands) < 8 || len(report.AppModel.EventTraces) < 6 {
+		t.Fatalf("app_model = %#v, want state stores, typed commands, and event traces", report.AppModel)
+	}
+	if !report.AppModel.ReactRuntimeAbsent || !report.AppModel.ReactHooksAbsent || !report.AppModel.DisabledDispatchRejected || !report.AppModel.UnfocusedTextRejected {
+		t.Fatalf("app_model guards = %#v, want React absent and fake-dispatch rejection guards", report.AppModel)
+	}
+	if report.KeyboardUX == nil {
+		t.Fatalf("keyboard_ux is nil, want production keyboard UX evidence")
+	}
+	if report.KeyboardUX.Schema != surface.KeyboardUXSchemaV1 || report.KeyboardUX.Level != "production-keyboard-ux-v1" || report.KeyboardUX.Target != "headless" {
+		t.Fatalf("keyboard_ux = %#v, want production schema and headless target", report.KeyboardUX)
+	}
+	if len(report.KeyboardUX.FocusOrder) < 2 || len(report.KeyboardUX.KeyBindings) < 8 || len(report.KeyboardUX.KeyboardScripts) < 4 {
+		t.Fatalf("keyboard_ux = %#v, want focus order, key bindings, and keyboard scripts", report.KeyboardUX)
+	}
+	if !report.KeyboardUX.FocusableNameRejected || !report.KeyboardUX.OverlayFocusLeakRejected || !report.KeyboardUX.ShortcutConflictRejected || !report.KeyboardUX.UndoWithoutStackRejected {
+		t.Fatalf("keyboard_ux guards = %#v, want fake keyboard UX claim rejection guards", report.KeyboardUX)
+	}
+	if report.AppShell == nil {
+		t.Fatalf("app_shell is nil, want production app shell host ABI evidence")
+	}
+	if report.AppShell.Schema != surface.AppShellSchemaV1 || report.AppShell.Level != "production-app-shell-host-abi-v1" || report.AppShell.Target != "headless" {
+		t.Fatalf("app_shell = %#v, want production schema and headless target", report.AppShell)
+	}
+	if len(report.AppShell.Windows) == 0 || len(report.AppShell.Lifecycle) < 5 || len(report.AppShell.Menus) < 2 || len(report.AppShell.Dialogs) < 2 {
+		t.Fatalf("app_shell = %#v, want windows, lifecycle, menus, and dialogs evidence", report.AppShell)
+	}
+	if len(report.AppShell.Notifications) == 0 || len(report.AppShell.TrayItems) == 0 || len(report.AppShell.Cursors) < 3 || len(report.AppShell.DragDrop) < 2 || len(report.AppShell.Permissions) < 3 {
+		t.Fatalf("app_shell = %#v, want notifications, tray, cursors, drag/drop, and permissions evidence", report.AppShell)
+	}
+	if !report.AppShell.NegativeGuards.MissingMenuHostTraceRejected || !report.AppShell.NegativeGuards.NotificationWithoutHostReportRejected || !report.AppShell.NegativeGuards.UnsupportedFeatureSilentNoopRejected {
+		t.Fatalf("app_shell guards = %#v, want fake shell claim rejection guards", report.AppShell.NegativeGuards)
+	}
 	if len(report.BlockSystem.Frames) != len(report.Frames) {
 		t.Fatalf("block_system frames = %d, report frames = %d", len(report.BlockSystem.Frames), len(report.Frames))
 	}
@@ -487,6 +546,22 @@ func TestBlockSystemScenarioProducesHeadlessGoldenChecksumEvidence(t *testing.T)
 		"block system missing paint evidence rejected",
 		"block system missing layout evidence rejected",
 		"block system missing accessibility evidence rejected",
+		"app model owned state stores",
+		"app model typed commands",
+		"app model Block event trace",
+		"app model disabled dispatch rejected",
+		"app model unfocused text rejected",
+		"app model no React runtime",
+		"keyboard ux focus order",
+		"keyboard ux focus trap",
+		"keyboard ux roving focus",
+		"keyboard ux activation",
+		"keyboard ux shortcut conflict rejected",
+		"keyboard ux undo redo",
+		"keyboard ux command palette script",
+		"keyboard ux settings script",
+		"keyboard ux editor script",
+		"keyboard ux accessible names",
 	} {
 		if !caseNamesContain(scenario.Cases, want) {
 			t.Fatalf("scenario cases = %#v, want %q", scenario.Cases, want)
@@ -525,11 +600,36 @@ func TestMorphScenarioProducesHeadlessCapsuleEvidence(t *testing.T) {
 	if report.Morph.Schema != "tetra.surface.morph.v1" || report.Morph.QualityLevel != "deterministic-headless-morph-capsule-v1" {
 		t.Fatalf("morph = %#v, want Morph v1 deterministic headless capsule evidence", report.Morph)
 	}
+	if report.Morph.Authoring == nil || report.Morph.Authoring.Level != "production-recipe-authoring-v1" {
+		t.Fatalf("morph authoring = %#v, want production recipe authoring evidence", report.Morph.Authoring)
+	}
+	if got := len(report.Morph.Recipes); got != 11 {
+		t.Fatalf("len(morph.recipes) = %d, want 11 stable recipe families", got)
+	}
+	if got := len(report.Morph.RecipeExpansions); got != 11 {
+		t.Fatalf("len(morph.recipe_expansions) = %d, want 11 reported expansions", got)
+	}
+	for _, recipe := range report.Morph.Recipes {
+		if len(recipe.State) == 0 || len(recipe.Accessibility) == 0 {
+			t.Fatalf("recipe %#v missing state/a11y declarations", recipe)
+		}
+	}
 	if report.BlockSystem == nil || report.BlockSystem.Source != source || report.BlockGraph.Source != source {
 		t.Fatalf("Block evidence sources = block_system %#v block_graph %#v, want Morph source %s", report.BlockSystem, report.BlockGraph, source)
 	}
 	if !caseNamesContain(report.Cases, "morph recipes expand to Block graph") {
 		t.Fatalf("cases = %#v, want Morph recipe expansion evidence", report.Cases)
+	}
+	for _, want := range []string{
+		"morph production recipe family library",
+		"morph recipe state and a11y declarations",
+		"morph hidden app state recipe rejected",
+		"morph platform widget recipe output rejected",
+		"morph unreported recipe expansion rejected",
+	} {
+		if !caseNamesContain(report.Cases, want) {
+			t.Fatalf("cases = %#v, want %q", report.Cases, want)
+		}
 	}
 }
 
@@ -1324,6 +1424,15 @@ func TestReleaseBrowserModeProducesBrowserCanvasReleaseEvidence(t *testing.T) {
 		!report.HostEvidence.BrowserAccessibilityMirror {
 		t.Fatalf("host evidence = %#v, want strict browser release evidence", report.HostEvidence)
 	}
+	if report.BrowserCanvasTarget == nil ||
+		report.BrowserCanvasTarget.Schema != surface.BrowserCanvasTargetSchemaV1 ||
+		report.BrowserCanvasTarget.Level != "wasm32-web-first-class-browser-canvas-target-v1" ||
+		!report.BrowserCanvasTarget.CompilerOwnedBoot ||
+		report.BrowserCanvasTarget.UserJSAppLogic ||
+		report.BrowserCanvasTarget.DOMUI ||
+		report.BrowserCanvasTarget.FrameChecksumCount < 2 {
+		t.Fatalf("browser_canvas_target = %#v, want first-class browser-canvas target evidence", report.BrowserCanvasTarget)
+	}
 	if err := surface.ValidateReport(raw); err != nil {
 		t.Fatalf("ValidateReport failed for release browser: %v\n%s", err, raw)
 	}
@@ -1344,6 +1453,9 @@ func TestLinuxX64ReleaseWindowModeProducesReleaseEvidence(t *testing.T) {
 	if scenario.AccessibilityTree == nil {
 		t.Fatalf("scenario.AccessibilityTree is nil, want linux release accessibility bridge evidence")
 	}
+	if scenario.LinuxHostAdapter == nil {
+		t.Fatalf("scenario.LinuxHostAdapter is nil, want linux production host adapter evidence")
+	}
 	for _, want := range []string{
 		"linux release window v1 schema",
 		"linux release real window presented frame",
@@ -1352,6 +1464,10 @@ func TestLinuxX64ReleaseWindowModeProducesReleaseEvidence(t *testing.T) {
 		"linux release composition harness",
 		"linux release accessibility bridge probe",
 		"linux release forbids memfd starter promotion",
+		"linux production host adapter target-host trace",
+		"linux production app shell adapter",
+		"linux production packaging scope",
+		"linux production blocked display not pass",
 	} {
 		if !caseNamesContain(scenario.Cases, want) {
 			t.Fatalf("cases = %#v, want %q", scenario.Cases, want)
@@ -1386,6 +1502,20 @@ func TestLinuxX64ReleaseWindowModeProducesReleaseEvidence(t *testing.T) {
 		!report.HostEvidence.Composition ||
 		!report.HostEvidence.AccessibilityBridge {
 		t.Fatalf("host evidence = %#v, want strict linux release window evidence", report.HostEvidence)
+	}
+	if report.LinuxHostAdapter == nil ||
+		report.LinuxHostAdapter.Schema != surface.LinuxHostAdapterSchemaV1 ||
+		report.LinuxHostAdapter.Level != "linux-x64-production-host-adapter-v1" ||
+		report.LinuxHostAdapter.AppShellABI != surface.AppShellSchemaV1 ||
+		!report.LinuxHostAdapter.RealWindow ||
+		!report.LinuxHostAdapter.NativeInput ||
+		!report.LinuxHostAdapter.TextInput ||
+		!report.LinuxHostAdapter.IME ||
+		!report.LinuxHostAdapter.Clipboard ||
+		!report.LinuxHostAdapter.AccessibilityBridge ||
+		report.LinuxHostAdapter.Packaging.Scope != "linux-x64-unpacked-binary-v1" ||
+		!report.LinuxHostAdapter.NegativeGuards.BlockedDisplayPassRejected {
+		t.Fatalf("linux host adapter = %#v, want strict linux production host adapter evidence", report.LinuxHostAdapter)
 	}
 	if err := surface.ValidateReport(raw); err != nil {
 		t.Fatalf("ValidateReport failed for release window: %v\n%s", err, raw)
@@ -1438,14 +1568,50 @@ func TestReleaseAccessibilityModesProducePlatformBridgeEvidence(t *testing.T) {
 			if err != nil {
 				t.Fatalf("marshal release accessibility report: %v", err)
 			}
-			var envelope struct {
-				Target string `json:"target"`
-			}
-			if err := json.Unmarshal(raw, &envelope); err != nil {
+			var report surface.Report
+			if err := json.Unmarshal(raw, &report); err != nil {
 				t.Fatalf("decode release accessibility report: %v", err)
 			}
-			if envelope.Target != tc.wantTarget {
-				t.Fatalf("target = %q, want %q", envelope.Target, tc.wantTarget)
+			if report.Target != tc.wantTarget {
+				t.Fatalf("target = %q, want %q", report.Target, tc.wantTarget)
+			}
+			target := report.AccessibilityTarget
+			if target == nil {
+				t.Fatalf("accessibility_target is nil, want production accessibility target evidence")
+			}
+			if target.Schema != surface.AccessibilityTargetSchemaV1 ||
+				target.Level != "production-accessibility-target-v1" ||
+				target.Target != tc.wantTarget ||
+				target.Runtime != report.Runtime ||
+				target.ReleaseScope != "surface-v1-linux-web" ||
+				target.TreeSchema != tree.Schema ||
+				target.PlatformBridge != tree.PlatformBridge ||
+				target.FullScreenReaderClaim {
+				t.Fatalf("accessibility_target = %#v, want target-bound production accessibility evidence", target)
+			}
+			if target.RoleCount != len(tree.RolesPresent) ||
+				target.NamedNodeCount != len(tree.Nodes) ||
+				target.StateNodeCount != len(tree.Nodes) ||
+				target.RelationshipCount != len(tree.Relationships) ||
+				target.ActionCount != len(tree.Actions) ||
+				target.FocusOrderCount != len(tree.FocusOrder) ||
+				target.ReadingOrderCount != len(tree.ReadingOrder) ||
+				target.SnapshotCount != len(tree.Snapshots) {
+				t.Fatalf("accessibility_target counts = %#v, want counts derived from accessibility_tree", target)
+			}
+			switch tc.wantTarget {
+			case "linux-x64":
+				if target.Inspector != "linux-accessibility-platform-probe-v1" || !target.HostBridge || target.BrowserSnapshot || target.BrowserMirror {
+					t.Fatalf("linux accessibility_target = %#v, want linux host bridge inspector only", target)
+				}
+			case "wasm32-web":
+				if target.Inspector != "browser-accessibility-snapshot-mirror-v1" || !target.HostBridge || !target.BrowserSnapshot || !target.BrowserMirror {
+					t.Fatalf("web accessibility_target = %#v, want browser snapshot mirror evidence", target)
+				}
+			case "headless":
+				if target.Inspector != "deterministic-accessibility-tree-inspector-v1" || target.HostBridge || target.BrowserSnapshot || target.BrowserMirror {
+					t.Fatalf("headless accessibility_target = %#v, want deterministic inspector without host bridge", target)
+				}
 			}
 			if err := surface.ValidateReport(raw); err != nil {
 				t.Fatalf("ValidateReport failed for %s: %v\n%s", tc.mode, err, raw)
@@ -1747,6 +1913,11 @@ func releaseTextInputTestCases() []surface.CaseReport {
 		{Name: "release text input composition commit", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input composition cancel", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input safe view lifetime checked", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing target IME trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing clipboard owned copies", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing undo unit boundaries", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing validation diagnostics", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing rich text nonclaim", Kind: "positive", Ran: true, Pass: true},
 		{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 	}
 }
@@ -2162,6 +2333,15 @@ func TestSurfaceRuntimeSmokeRejectsMissingSource(t *testing.T) {
 func caseNamesContain(cases []surface.CaseReport, want string) bool {
 	for _, c := range cases {
 		if strings.Contains(c.Name, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func blockAssetCommandPresent(commands []surface.BlockAssetRenderCommandReport, want string) bool {
+	for _, command := range commands {
+		if command.Command == want {
 			return true
 		}
 	}

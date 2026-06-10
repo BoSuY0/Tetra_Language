@@ -14,75 +14,97 @@ const (
 	SchemaV1                      = "tetra.surface.runtime.v1"
 	ReleaseSchemaV1               = "tetra.surface.release.v1"
 	TextInputSchemaV1             = "tetra.surface.text-input.v1"
+	TextPipelineSchemaV1          = "tetra.surface.text-pipeline.v1"
+	TextEditingSchemaV1           = "tetra.surface.text-editing.v1"
+	LayoutEngineSchemaV1          = "tetra.surface.layout-engine.v1"
+	AppModelSchemaV1              = "tetra.surface.app-model.v1"
+	KeyboardUXSchemaV1            = "tetra.surface.keyboard-ux.v1"
+	AppShellSchemaV1              = "tetra.surface.app-shell.v1"
+	LinuxHostAdapterSchemaV1      = "tetra.surface.linux-host-adapter.v1"
+	BrowserCanvasTargetSchemaV1   = "tetra.surface.browser-canvas-target.v1"
+	AccessibilityTargetSchemaV1   = "tetra.surface.accessibility-target.v1"
+	AssetPipelineSchemaV1         = "tetra.surface.asset-pipeline.v1"
+	AnimationSchedulerSchemaV1    = "tetra.surface.animation-scheduler.v1"
 	ReleaseScopeSurfaceV1LinuxWeb = "surface-v1-linux-web"
 )
 
 type Report struct {
-	Schema                          string                          `json:"schema"`
-	Status                          string                          `json:"status"`
-	Target                          string                          `json:"target"`
-	Host                            string                          `json:"host"`
-	Runtime                         string                          `json:"runtime"`
-	SurfaceSchema                   string                          `json:"surface_schema"`
-	HostABI                         string                          `json:"host_abi"`
-	HostEvidence                    HostEvidenceReport              `json:"host_evidence"`
-	Source                          string                          `json:"source"`
-	Processes                       []ProcessReport                 `json:"processes"`
-	Artifacts                       []ArtifactReport                `json:"artifacts"`
-	ArtifactScan                    ArtifactScanReport              `json:"artifact_scan"`
-	Components                      []ComponentReport               `json:"components"`
-	ComponentTree                   *ComponentTreeReport            `json:"component_tree,omitempty"`
-	ComponentTreeAPI                *ComponentTreeAPIReport         `json:"component_tree_api,omitempty"`
-	BlockGraph                      *BlockGraphReport               `json:"block_graph,omitempty"`
-	PaintLayers                     []PaintLayerReport              `json:"paint_layers,omitempty"`
-	PaintCommands                   []PaintCommandReport            `json:"paint_commands,omitempty"`
-	VisualFeatures                  []string                        `json:"visual_features,omitempty"`
-	PaintQualityLevel               string                          `json:"paint_quality_level,omitempty"`
-	PaintCacheBudgetBytes           int                             `json:"paint_cache_budget_bytes,omitempty"`
-	PaintUnsupportedBlur            bool                            `json:"paint_unsupported_blur,omitempty"`
-	TextMeasurements                []TextMeasurementReport         `json:"text_measurements,omitempty"`
-	FontFallbacks                   []FontFallbackReport            `json:"font_fallbacks,omitempty"`
-	GlyphCaches                     []GlyphCacheReport              `json:"glyph_caches,omitempty"`
-	TextRenderCommands              []TextRenderCommandReport       `json:"text_render_commands,omitempty"`
-	TextQualityLevel                string                          `json:"text_quality_level,omitempty"`
-	TextCacheBudgetBytes            int                             `json:"text_cache_budget_bytes,omitempty"`
-	LayoutConstraints               []BlockLayoutConstraintReport   `json:"layout_constraints,omitempty"`
-	LayoutPasses                    []BlockLayoutPassReport         `json:"layout_passes,omitempty"`
-	LayoutScrolls                   []BlockLayoutScrollReport       `json:"layout_scrolls,omitempty"`
-	LayoutFeatures                  []string                        `json:"layout_features,omitempty"`
-	LayoutQualityLevel              string                          `json:"layout_quality_level,omitempty"`
-	LayoutUnsupportedCSSFlexbox     bool                            `json:"layout_unsupported_css_flexbox,omitempty"`
-	BlockEventRoutes                []BlockEventRouteReport         `json:"block_event_routes,omitempty"`
-	BlockFocusTransitions           []BlockFocusTransitionReport    `json:"block_focus_transitions,omitempty"`
-	BlockEventKinds                 []string                        `json:"block_event_kinds,omitempty"`
-	BlockEventPolicy                string                          `json:"block_event_policy,omitempty"`
-	BlockEventQualityLevel          string                          `json:"block_event_quality_level,omitempty"`
-	BlockEventUnsupportedDragDrop   bool                            `json:"block_event_unsupported_drag_drop,omitempty"`
-	BlockStateSelectors             []BlockStateSelectorReport      `json:"block_state_selectors,omitempty"`
-	BlockStateResolutions           []BlockStateResolutionReport    `json:"block_state_resolutions,omitempty"`
-	BlockStateResolverOrder         []string                        `json:"block_state_resolver_order,omitempty"`
-	BlockStateQualityLevel          string                          `json:"block_state_quality_level,omitempty"`
-	BlockStateUnsupportedCSSPseudos bool                            `json:"block_state_unsupported_css_pseudos,omitempty"`
-	MotionFrames                    []MotionFrameReport             `json:"motion_frames,omitempty"`
-	MotionQualityLevel              string                          `json:"motion_quality_level,omitempty"`
-	MotionClock                     string                          `json:"motion_clock,omitempty"`
-	MotionFrameBudget               int                             `json:"motion_frame_budget,omitempty"`
-	MotionUnsupportedCSSAnimations  bool                            `json:"motion_unsupported_css_animations,omitempty"`
-	BlockAssetManifest              *BlockAssetManifestReport       `json:"block_asset_manifest,omitempty"`
-	BlockAssetCache                 BlockAssetCacheReport           `json:"block_asset_cache,omitempty"`
-	BlockAssetDiagnostics           []BlockAssetDiagnosticReport    `json:"block_asset_diagnostics,omitempty"`
-	BlockAssetRenderCommands        []BlockAssetRenderCommandReport `json:"block_asset_render_commands,omitempty"`
-	BlockAssetQualityLevel          string                          `json:"block_asset_quality_level,omitempty"`
-	BlockAssetNetworkFetchAllowed   bool                            `json:"block_asset_network_fetch_allowed,omitempty"`
-	BlockAccessibilityTree          *BlockAccessibilityTreeReport   `json:"block_accessibility_tree,omitempty"`
-	BlockSystem                     *BlockSystemReport              `json:"block_system,omitempty"`
-	Morph                           *MorphReport                    `json:"morph,omitempty"`
-	Toolkit                         *ToolkitReport                  `json:"toolkit,omitempty"`
-	AccessibilityTree               *AccessibilityTreeReport        `json:"accessibility_tree,omitempty"`
-	Events                          []EventReport                   `json:"events"`
-	Frames                          []FrameReport                   `json:"frames"`
-	StateTransitions                []StateTransitionReport         `json:"state_transitions"`
-	Cases                           []CaseReport                    `json:"cases"`
+	Schema                          string                            `json:"schema"`
+	Status                          string                            `json:"status"`
+	Target                          string                            `json:"target"`
+	Host                            string                            `json:"host"`
+	Runtime                         string                            `json:"runtime"`
+	SurfaceSchema                   string                            `json:"surface_schema"`
+	HostABI                         string                            `json:"host_abi"`
+	HostEvidence                    HostEvidenceReport                `json:"host_evidence"`
+	Source                          string                            `json:"source"`
+	Processes                       []ProcessReport                   `json:"processes"`
+	Artifacts                       []ArtifactReport                  `json:"artifacts"`
+	ArtifactScan                    ArtifactScanReport                `json:"artifact_scan"`
+	Components                      []ComponentReport                 `json:"components"`
+	ComponentTree                   *ComponentTreeReport              `json:"component_tree,omitempty"`
+	ComponentTreeAPI                *ComponentTreeAPIReport           `json:"component_tree_api,omitempty"`
+	BlockGraph                      *BlockGraphReport                 `json:"block_graph,omitempty"`
+	RendererScene                   *RendererSceneReport              `json:"renderer_scene,omitempty"`
+	SoftwareRenderer                *SoftwareRendererReport           `json:"software_renderer,omitempty"`
+	PaintLayers                     []PaintLayerReport                `json:"paint_layers,omitempty"`
+	PaintCommands                   []PaintCommandReport              `json:"paint_commands,omitempty"`
+	VisualFeatures                  []string                          `json:"visual_features,omitempty"`
+	PaintQualityLevel               string                            `json:"paint_quality_level,omitempty"`
+	PaintCacheBudgetBytes           int                               `json:"paint_cache_budget_bytes,omitempty"`
+	PaintUnsupportedBlur            bool                              `json:"paint_unsupported_blur,omitempty"`
+	TextMeasurements                []TextMeasurementReport           `json:"text_measurements,omitempty"`
+	FontFallbacks                   []FontFallbackReport              `json:"font_fallbacks,omitempty"`
+	GlyphCaches                     []GlyphCacheReport                `json:"glyph_caches,omitempty"`
+	TextRenderCommands              []TextRenderCommandReport         `json:"text_render_commands,omitempty"`
+	TextQualityLevel                string                            `json:"text_quality_level,omitempty"`
+	TextCacheBudgetBytes            int                               `json:"text_cache_budget_bytes,omitempty"`
+	LayoutConstraints               []BlockLayoutConstraintReport     `json:"layout_constraints,omitempty"`
+	LayoutPasses                    []BlockLayoutPassReport           `json:"layout_passes,omitempty"`
+	LayoutScrolls                   []BlockLayoutScrollReport         `json:"layout_scrolls,omitempty"`
+	LayoutFeatures                  []string                          `json:"layout_features,omitempty"`
+	LayoutQualityLevel              string                            `json:"layout_quality_level,omitempty"`
+	LayoutUnsupportedCSSFlexbox     bool                              `json:"layout_unsupported_css_flexbox,omitempty"`
+	LayoutEngine                    *BlockLayoutEngineReport          `json:"layout_engine,omitempty"`
+	BlockEventRoutes                []BlockEventRouteReport           `json:"block_event_routes,omitempty"`
+	BlockFocusTransitions           []BlockFocusTransitionReport      `json:"block_focus_transitions,omitempty"`
+	BlockEventKinds                 []string                          `json:"block_event_kinds,omitempty"`
+	BlockEventPolicy                string                            `json:"block_event_policy,omitempty"`
+	BlockEventQualityLevel          string                            `json:"block_event_quality_level,omitempty"`
+	BlockEventUnsupportedDragDrop   bool                              `json:"block_event_unsupported_drag_drop,omitempty"`
+	BlockStateSelectors             []BlockStateSelectorReport        `json:"block_state_selectors,omitempty"`
+	BlockStateResolutions           []BlockStateResolutionReport      `json:"block_state_resolutions,omitempty"`
+	BlockStateResolverOrder         []string                          `json:"block_state_resolver_order,omitempty"`
+	BlockStateQualityLevel          string                            `json:"block_state_quality_level,omitempty"`
+	BlockStateUnsupportedCSSPseudos bool                              `json:"block_state_unsupported_css_pseudos,omitempty"`
+	AppModel                        *SurfaceAppModelReport            `json:"app_model,omitempty"`
+	KeyboardUX                      *SurfaceKeyboardUXReport          `json:"keyboard_ux,omitempty"`
+	AppShell                        *SurfaceAppShellReport            `json:"app_shell,omitempty"`
+	LinuxHostAdapter                *SurfaceLinuxHostAdapterReport    `json:"linux_host_adapter,omitempty"`
+	BrowserCanvasTarget             *SurfaceBrowserCanvasTargetReport `json:"browser_canvas_target,omitempty"`
+	AccessibilityTarget             *SurfaceAccessibilityTargetReport `json:"accessibility_target,omitempty"`
+	AssetPipeline                   *SurfaceAssetPipelineReport       `json:"asset_pipeline,omitempty"`
+	AnimationScheduler              *SurfaceAnimationSchedulerReport  `json:"animation_scheduler,omitempty"`
+	MotionFrames                    []MotionFrameReport               `json:"motion_frames,omitempty"`
+	MotionQualityLevel              string                            `json:"motion_quality_level,omitempty"`
+	MotionClock                     string                            `json:"motion_clock,omitempty"`
+	MotionFrameBudget               int                               `json:"motion_frame_budget,omitempty"`
+	MotionUnsupportedCSSAnimations  bool                              `json:"motion_unsupported_css_animations,omitempty"`
+	BlockAssetManifest              *BlockAssetManifestReport         `json:"block_asset_manifest,omitempty"`
+	BlockAssetCache                 BlockAssetCacheReport             `json:"block_asset_cache,omitempty"`
+	BlockAssetDiagnostics           []BlockAssetDiagnosticReport      `json:"block_asset_diagnostics,omitempty"`
+	BlockAssetRenderCommands        []BlockAssetRenderCommandReport   `json:"block_asset_render_commands,omitempty"`
+	BlockAssetQualityLevel          string                            `json:"block_asset_quality_level,omitempty"`
+	BlockAssetNetworkFetchAllowed   bool                              `json:"block_asset_network_fetch_allowed,omitempty"`
+	BlockAccessibilityTree          *BlockAccessibilityTreeReport     `json:"block_accessibility_tree,omitempty"`
+	BlockSystem                     *BlockSystemReport                `json:"block_system,omitempty"`
+	Morph                           *MorphReport                      `json:"morph,omitempty"`
+	Toolkit                         *ToolkitReport                    `json:"toolkit,omitempty"`
+	AccessibilityTree               *AccessibilityTreeReport          `json:"accessibility_tree,omitempty"`
+	Events                          []EventReport                     `json:"events"`
+	Frames                          []FrameReport                     `json:"frames"`
+	StateTransitions                []StateTransitionReport           `json:"state_transitions"`
+	Cases                           []CaseReport                      `json:"cases"`
 }
 
 type ReleaseSummaryReport struct {
@@ -147,6 +169,8 @@ type TextInputReport struct {
 	CompositionTrace        CompositionTraceReport `json:"composition_trace"`
 	BorrowedViewStorage     bool                   `json:"borrowed_view_storage"`
 	SafeViewLifetimeChecked bool                   `json:"safe_view_lifetime_checked"`
+	TextPipeline            TextPipelineReport     `json:"text_pipeline"`
+	TextEditing             TextEditingReport      `json:"text_editing"`
 	Processes               []ProcessReport        `json:"processes"`
 	Artifacts               []ArtifactReport       `json:"artifacts"`
 	ArtifactScan            ArtifactScanReport     `json:"artifact_scan"`
@@ -158,6 +182,222 @@ type CompositionTraceReport struct {
 	Update bool `json:"update"`
 	Commit bool `json:"commit"`
 	Cancel bool `json:"cancel"`
+}
+
+type TextPipelineReport struct {
+	Schema                     string                           `json:"schema"`
+	Level                      string                           `json:"level"`
+	Engine                     string                           `json:"engine"`
+	PlatformWidgetTextControls bool                             `json:"platform_widget_text_controls"`
+	FontManifest               []TextPipelineFontReport         `json:"font_manifest"`
+	FontFallbacks              []FontFallbackReport             `json:"font_fallbacks"`
+	GlyphRuns                  []TextGlyphRunReport             `json:"glyph_runs"`
+	GlyphCaches                []GlyphCacheReport               `json:"glyph_caches"`
+	CacheBudgetBytes           int                              `json:"cache_budget_bytes"`
+	GlyphCacheBudgetBytes      int                              `json:"glyph_cache_budget_bytes"`
+	GlyphCacheUsedBytes        int                              `json:"glyph_cache_used_bytes"`
+	BoundedCaches              bool                             `json:"bounded_caches"`
+	CacheEviction              string                           `json:"cache_eviction"`
+	UnicodeBoundaries          TextUnicodeBoundaryReport        `json:"unicode_boundaries"`
+	ShapingScope               TextShapingScopeReport           `json:"shaping_scope"`
+	Measurements               []TextMeasurementReport          `json:"measurements"`
+	MeasurementConsistency     TextMeasurementConsistencyReport `json:"measurement_consistency"`
+	Layout                     TextPipelineLayoutReport         `json:"layout"`
+	CaretRects                 []RectReport                     `json:"caret_rects"`
+	SelectionRects             []RectReport                     `json:"selection_rects"`
+	IMECompositionSpans        []TextCompositionSpanReport      `json:"ime_composition_spans"`
+	NonClaims                  []string                         `json:"nonclaims"`
+	NegativeGuards             TextPipelineNegativeGuardsReport `json:"negative_guards"`
+}
+
+type TextPipelineFontReport struct {
+	ID     string `json:"id"`
+	Family string `json:"family"`
+	Style  string `json:"style"`
+	Weight int    `json:"weight"`
+	Source string `json:"source"`
+	SHA256 string `json:"sha256"`
+	Bytes  int    `json:"bytes"`
+}
+
+type TextGlyphRunReport struct {
+	ID          string `json:"id"`
+	FontFamily  string `json:"font_family"`
+	Script      string `json:"script"`
+	Direction   string `json:"direction"`
+	Shaping     string `json:"shaping"`
+	TextLen     int    `json:"text_len"`
+	ByteStart   int    `json:"byte_start"`
+	ByteEnd     int    `json:"byte_end"`
+	ScalarStart int    `json:"scalar_start"`
+	ScalarEnd   int    `json:"scalar_end"`
+	GlyphCount  int    `json:"glyph_count"`
+	GlyphIDs    []int  `json:"glyph_ids"`
+	Advances    []int  `json:"advances"`
+	Clusters    []int  `json:"clusters"`
+	Baseline    int    `json:"baseline"`
+	Checksum    string `json:"checksum"`
+}
+
+type TextUnicodeBoundaryReport struct {
+	UTF8Storage        bool     `json:"utf8_storage"`
+	ScalarBoundaries   bool     `json:"scalar_boundaries"`
+	ClusterBoundaries  bool     `json:"cluster_boundaries"`
+	LatinTier          bool     `json:"latin_tier"`
+	CombiningMarks     bool     `json:"combining_marks"`
+	Bidi               bool     `json:"bidi"`
+	UnsupportedScripts []string `json:"unsupported_scripts"`
+	BoundaryCases      []string `json:"boundary_cases"`
+}
+
+type TextShapingScopeReport struct {
+	Tier                       string   `json:"tier"`
+	SupportedScripts           []string `json:"supported_scripts"`
+	UnsupportedScripts         []string `json:"unsupported_scripts"`
+	EngineDecision             string   `json:"engine_decision"`
+	FullUnicodeEditorSemantics bool     `json:"full_unicode_editor_semantics"`
+	Bidi                       bool     `json:"bidi"`
+	CombiningMarks             bool     `json:"combining_marks"`
+	SystemLibraryIntegration   string   `json:"system_library_integration"`
+	PlatformWidgets            bool     `json:"platform_widgets"`
+}
+
+type TextMeasurementConsistencyReport struct {
+	SameInputSameMetrics      bool     `json:"same_input_same_metrics"`
+	TargetIndependentBaseline bool     `json:"target_independent_baseline"`
+	MaxDeltaPX                int      `json:"max_delta_px"`
+	Cases                     []string `json:"cases"`
+}
+
+type TextPipelineLayoutReport struct {
+	Wrap       bool     `json:"wrap"`
+	Ellipsis   bool     `json:"ellipsis"`
+	Alignment  []string `json:"alignment"`
+	Baseline   bool     `json:"baseline"`
+	LineHeight bool     `json:"line_height"`
+}
+
+type TextCompositionSpanReport struct {
+	Kind        string     `json:"kind"`
+	ByteStart   int        `json:"byte_start"`
+	ByteEnd     int        `json:"byte_end"`
+	ScalarStart int        `json:"scalar_start"`
+	ScalarEnd   int        `json:"scalar_end"`
+	Rect        RectReport `json:"rect"`
+}
+
+type TextPipelineNegativeGuardsReport struct {
+	FullUnicodeEditorWithoutTestsRejected bool `json:"full_unicode_editor_without_tests_rejected"`
+	MissingFontFallbackRejected           bool `json:"missing_font_fallback_rejected"`
+	UnboundedGlyphCacheRejected           bool `json:"unbounded_glyph_cache_rejected"`
+	PlatformWidgetTextControlsRejected    bool `json:"platform_widget_text_controls_rejected"`
+}
+
+type TextEditingReport struct {
+	Schema                   string                          `json:"schema"`
+	Level                    string                          `json:"level"`
+	Target                   string                          `json:"target"`
+	Producer                 string                          `json:"producer"`
+	EditableBlocks           []EditableTextBlockReport       `json:"editable_blocks"`
+	EditOperations           []TextEditOperationReport       `json:"edit_operations"`
+	SelectionModel           TextSelectionModelReport        `json:"selection_model"`
+	IMETraces                []TextIMETraceReport            `json:"ime_traces"`
+	ClipboardTransfers       []TextClipboardTransferReport   `json:"clipboard_transfers"`
+	UndoUnits                []TextUndoUnitReport            `json:"undo_units"`
+	ValidationDiagnostics    []TextEditingDiagnosticReport   `json:"validation_diagnostics"`
+	HostBoundary             TextEditingHostBoundaryReport   `json:"host_boundary"`
+	FormsSafe                bool                            `json:"forms_safe"`
+	CommandPaletteSearchSafe bool                            `json:"command_palette_search_safe"`
+	RichText                 bool                            `json:"rich_text"`
+	NonClaims                []string                        `json:"nonclaims"`
+	NegativeGuards           TextEditingNegativeGuardsReport `json:"negative_guards"`
+}
+
+type EditableTextBlockReport struct {
+	ID                       string `json:"id"`
+	Kind                     string `json:"kind"`
+	Storage                  string `json:"storage"`
+	FormsSafe                bool   `json:"forms_safe"`
+	CommandPaletteSearchSafe bool   `json:"command_palette_search_safe"`
+	MaxBytes                 int    `json:"max_bytes"`
+	UTF8Validation           bool   `json:"utf8_validation"`
+}
+
+type TextEditOperationReport struct {
+	Order           int                      `json:"order"`
+	Action          string                   `json:"action"`
+	Target          string                   `json:"target"`
+	BeforeTextLen   int                      `json:"before_text_len"`
+	AfterTextLen    int                      `json:"after_text_len"`
+	BeforeCaret     int                      `json:"before_caret"`
+	AfterCaret      int                      `json:"after_caret"`
+	SelectionBefore TextSelectionRangeReport `json:"selection_before"`
+	SelectionAfter  TextSelectionRangeReport `json:"selection_after"`
+	UndoUnitID      string                   `json:"undo_unit_id"`
+	Checksum        string                   `json:"checksum"`
+}
+
+type TextSelectionRangeReport struct {
+	Anchor int `json:"anchor"`
+	Focus  int `json:"focus"`
+}
+
+type TextSelectionModelReport struct {
+	CaretMovement        []string     `json:"caret_movement"`
+	SelectionReplacement bool         `json:"selection_replacement"`
+	ScalarBoundaryClamp  bool         `json:"scalar_boundary_clamp"`
+	CaretRects           []RectReport `json:"caret_rects"`
+	SelectionRects       []RectReport `json:"selection_rects"`
+}
+
+type TextIMETraceReport struct {
+	Target                 string                    `json:"target"`
+	Start                  bool                      `json:"start"`
+	Update                 bool                      `json:"update"`
+	Commit                 bool                      `json:"commit"`
+	Cancel                 bool                      `json:"cancel"`
+	EventCount             int                       `json:"event_count"`
+	CompositionSpan        TextCompositionSpanReport `json:"composition_span"`
+	CommittedTextOwnedCopy bool                      `json:"committed_text_owned_copy"`
+}
+
+type TextClipboardTransferReport struct {
+	Direction    string `json:"direction"`
+	HostABI      string `json:"host_abi"`
+	Bytes        int    `json:"bytes"`
+	UTF8Valid    bool   `json:"utf8_valid"`
+	OwnedCopy    bool   `json:"owned_copy"`
+	BorrowedView bool   `json:"borrowed_view"`
+	Checksum     string `json:"checksum"`
+}
+
+type TextUndoUnitReport struct {
+	ID              string `json:"id"`
+	OperationOrders []int  `json:"operation_orders"`
+	Boundary        string `json:"boundary"`
+	Reversible      bool   `json:"reversible"`
+	Coalesced       bool   `json:"coalesced"`
+}
+
+type TextEditingDiagnosticReport struct {
+	Name string `json:"name"`
+	Ran  bool   `json:"ran"`
+	Pass bool   `json:"pass"`
+}
+
+type TextEditingHostBoundaryReport struct {
+	CopySafe                      bool `json:"copy_safe"`
+	ClipboardOwnedCopy            bool `json:"clipboard_owned_copy"`
+	CompositionOwnedCopy          bool `json:"composition_owned_copy"`
+	BorrowedTextBufferCrossesHost bool `json:"borrowed_text_buffer_crosses_host"`
+}
+
+type TextEditingNegativeGuardsReport struct {
+	IMEWithoutTargetTraceRejected bool `json:"ime_without_target_trace_rejected"`
+	BorrowedTextBufferRejected    bool `json:"borrowed_text_buffer_rejected"`
+	RichTextClaimRejected         bool `json:"rich_text_claim_rejected"`
+	UnsafeClipboardAliasRejected  bool `json:"unsafe_clipboard_alias_rejected"`
+	InvalidUTF8Rejected           bool `json:"invalid_utf8_rejected"`
 }
 
 type ProcessReport struct {
@@ -326,6 +566,8 @@ type BlockGraphReport struct {
 	Schema             string                       `json:"schema"`
 	APILevel           string                       `json:"api_level"`
 	Source             string                       `json:"source"`
+	ABI                *BlockGraphABIReport         `json:"abi,omitempty"`
+	ResolvedScene      *BlockResolvedSceneReport    `json:"resolved_scene,omitempty"`
 	ManualBookkeeping  bool                         `json:"manual_bookkeeping"`
 	Builder            BlockGraphBuilderReport      `json:"builder"`
 	Invariants         BlockGraphInvariantReport    `json:"invariants"`
@@ -339,6 +581,35 @@ type BlockGraphReport struct {
 	AccessibilityOrder []int                        `json:"accessibility_order"`
 	HitTests           []BlockGraphPathReport       `json:"hit_tests"`
 	DispatchPaths      []BlockGraphPathReport       `json:"dispatch_paths"`
+}
+
+type BlockGraphABIReport struct {
+	Schema            string   `json:"schema"`
+	Version           string   `json:"version"`
+	BlockType         string   `json:"block_type"`
+	TreeType          string   `json:"tree_type"`
+	PropsType         string   `json:"props_type"`
+	ResolvedBlockType string   `json:"resolved_block_type"`
+	ResolvedSceneType string   `json:"resolved_scene_type"`
+	StableFields      []string `json:"stable_fields"`
+	Compatibility     []string `json:"compatibility"`
+}
+
+type BlockResolvedSceneReport struct {
+	Schema                   string `json:"schema"`
+	SourceGraphSchema        string `json:"source_graph_schema"`
+	RootID                   int    `json:"root_id"`
+	NodeOrder                []int  `json:"node_order"`
+	LayoutOrder              []int  `json:"layout_order"`
+	DrawOrder                []int  `json:"draw_order"`
+	HitTestOrder             []int  `json:"hit_test_order"`
+	FocusOrder               []int  `json:"focus_order"`
+	AccessibilityOrder       []int  `json:"accessibility_order"`
+	TreeOrderStable          bool   `json:"tree_order_stable"`
+	DrawOrderStable          bool   `json:"draw_order_stable"`
+	HitTestOrderStable       bool   `json:"hit_test_order_stable"`
+	FocusOrderStable         bool   `json:"focus_order_stable"`
+	AccessibilityOrderStable bool   `json:"accessibility_order_stable"`
 }
 
 type BlockGraphBuilderReport struct {
@@ -410,6 +681,92 @@ type PaintCommandReport struct {
 	Radius   int        `json:"radius,omitempty"`
 	Quality  string     `json:"quality"`
 	Checksum string     `json:"checksum"`
+}
+
+type RendererSceneReport struct {
+	Schema              string                            `json:"schema"`
+	Version             string                            `json:"version"`
+	Source              string                            `json:"source"`
+	Renderer            string                            `json:"renderer"`
+	ResolvedSceneSchema string                            `json:"resolved_scene_schema"`
+	PaintCommandSchema  string                            `json:"paint_command_schema"`
+	Deterministic       bool                              `json:"deterministic"`
+	CommandCount        int                               `json:"command_count"`
+	CommandOrder        []string                          `json:"command_order"`
+	CommandHash         string                            `json:"command_hash"`
+	Commands            []RendererPaintCommandReport      `json:"commands"`
+	UnsupportedVisuals  []RendererUnsupportedVisualReport `json:"unsupported_visuals"`
+}
+
+type RendererPaintCommandReport struct {
+	Order             int        `json:"order"`
+	Command           string     `json:"command"`
+	Source            string     `json:"source"`
+	LayerID           string     `json:"layer_id,omitempty"`
+	AssetID           string     `json:"asset_id,omitempty"`
+	TextMeasurementID string     `json:"text_measurement_id,omitempty"`
+	BlockID           int        `json:"block_id"`
+	Rect              RectReport `json:"rect"`
+	Clip              RectReport `json:"clip"`
+	Radius            int        `json:"radius,omitempty"`
+	Transform         string     `json:"transform,omitempty"`
+	Quality           string     `json:"quality"`
+	Checksum          string     `json:"checksum"`
+}
+
+type RendererUnsupportedVisualReport struct {
+	Feature  string `json:"feature"`
+	Rejected bool   `json:"rejected"`
+	Reason   string `json:"reason"`
+}
+
+type SoftwareRendererReport struct {
+	Schema              string                               `json:"schema"`
+	QualityLevel        string                               `json:"quality_level"`
+	Source              string                               `json:"source"`
+	Target              string                               `json:"target"`
+	Backend             string                               `json:"backend"`
+	PixelFormat         string                               `json:"pixel_format"`
+	AlphaBlendMode      string                               `json:"alpha_blend_mode"`
+	ClipMode            string                               `json:"clip_mode"`
+	RasterDeterministic bool                                 `json:"raster_deterministic"`
+	GoldenExport        bool                                 `json:"golden_export"`
+	ResizeScaleDPI      bool                                 `json:"resize_scale_dpi"`
+	NoUseAfterPresent   bool                                 `json:"no_use_after_present"`
+	NoFrameAlias        bool                                 `json:"no_frame_alias"`
+	FeatureSummary      []string                             `json:"feature_summary"`
+	Frames              []SoftwareRendererFrameReport        `json:"frames"`
+	NegativeGuards      SoftwareRendererNegativeGuardsReport `json:"negative_guards"`
+}
+
+type SoftwareRendererFrameReport struct {
+	Order                   int    `json:"order"`
+	Width                   int    `json:"width"`
+	Height                  int    `json:"height"`
+	Stride                  int    `json:"stride"`
+	Scale                   int    `json:"scale"`
+	DPI                     int    `json:"dpi"`
+	PixelChecksum           string `json:"pixel_checksum"`
+	RepeatChecksum          string `json:"repeat_checksum"`
+	GoldenChecksum          string `json:"golden_checksum"`
+	GoldenArtifact          string `json:"golden_artifact"`
+	AlphaChecksum           string `json:"alpha_checksum"`
+	ClipChecksum            string `json:"clip_checksum"`
+	Presented               bool   `json:"presented"`
+	UseAfterPresentRejected bool   `json:"use_after_present_rejected"`
+	AliasViolationRejected  bool   `json:"alias_violation_rejected"`
+}
+
+type SoftwareRendererNegativeGuardsReport struct {
+	MetadataOnlyFrameRejected        bool `json:"metadata_only_frame_rejected"`
+	UnchangedChecksumRejected        bool `json:"unchanged_checksum_rejected"`
+	MissingGoldenRejected            bool `json:"missing_golden_rejected"`
+	MissingAlphaRejected             bool `json:"missing_alpha_rejected"`
+	MissingClipRejected              bool `json:"missing_clip_rejected"`
+	MissingDPIRejected               bool `json:"missing_dpi_rejected"`
+	UseAfterPresentRejected          bool `json:"use_after_present_rejected"`
+	FrameAliasRejected               bool `json:"frame_alias_rejected"`
+	NodeOnlyBrowserPromotionRejected bool `json:"node_only_browser_promotion_rejected"`
 }
 
 type TextMeasurementReport struct {
@@ -507,6 +864,81 @@ type BlockLayoutScrollReport struct {
 	Checksum   string     `json:"checksum"`
 }
 
+type BlockLayoutEngineReport struct {
+	Schema                string                                `json:"schema"`
+	Level                 string                                `json:"level"`
+	Producer              string                                `json:"producer"`
+	Target                string                                `json:"target"`
+	Quality               string                                `json:"quality"`
+	CSSFlexboxGridParity  bool                                  `json:"css_flexbox_grid_parity"`
+	PlatformWidgetLayout  bool                                  `json:"platform_widget_layout"`
+	Modes                 []string                              `json:"modes"`
+	ResponsiveProfiles    []string                              `json:"responsive_profiles"`
+	ConstraintFeatures    []string                              `json:"constraint_features"`
+	MinMaxConstraints     bool                                  `json:"min_max_constraints"`
+	FitFillFixed          bool                                  `json:"fit_fill_fixed"`
+	DensityIndependent    bool                                  `json:"density_independent"`
+	StableUnderResize     bool                                  `json:"stable_under_resize"`
+	LayoutCacheKeyedByDPI bool                                  `json:"layout_cache_keyed_by_dpi"`
+	Density               BlockLayoutDensityReport              `json:"density"`
+	OverflowRules         BlockLayoutOverflowRulesReport        `json:"overflow_rules"`
+	Invalidations         []BlockLayoutInvalidationReport       `json:"invalidations"`
+	CacheBudget           BlockLayoutCacheBudgetReport          `json:"cache_budget"`
+	NegativeGuards        BlockLayoutEngineNegativeGuardsReport `json:"negative_guards"`
+	NonClaims             []string                              `json:"nonclaims"`
+}
+
+type BlockLayoutDensityReport struct {
+	Schema            string   `json:"schema"`
+	Scale             int      `json:"scale"`
+	DPI               int      `json:"dpi"`
+	DevicePixelRatio  int      `json:"device_pixel_ratio"`
+	SnapToPixelGrid   bool     `json:"snap_to_pixel_grid"`
+	TargetIndependent bool     `json:"target_independent"`
+	Cases             []string `json:"cases"`
+}
+
+type BlockLayoutOverflowRulesReport struct {
+	Explicit                   bool  `json:"explicit"`
+	ClipRequired               bool  `json:"clip_required"`
+	ScrollBoundsChecked        bool  `json:"scroll_bounds_checked"`
+	AccidentalHidden           bool  `json:"accidental_hidden"`
+	HiddenRequiresExplicitClip bool  `json:"hidden_requires_explicit_clip"`
+	VisibleOverflowPreserved   bool  `json:"visible_overflow_preserved"`
+	ClippedBlockIDs            []int `json:"clipped_block_ids"`
+}
+
+type BlockLayoutInvalidationReport struct {
+	Cause                   string   `json:"cause"`
+	DirtyRoot               string   `json:"dirty_root"`
+	AffectedModes           []string `json:"affected_modes"`
+	BeforeChecksum          string   `json:"before_checksum"`
+	AfterChecksum           string   `json:"after_checksum"`
+	CacheEntriesReused      int      `json:"cache_entries_reused"`
+	CacheEntriesInvalidated int      `json:"cache_entries_invalidated"`
+	FullTreeRelayout        bool     `json:"full_tree_relayout"`
+}
+
+type BlockLayoutCacheBudgetReport struct {
+	Schema                 string `json:"schema"`
+	Strategy               string `json:"strategy"`
+	BudgetBytes            int    `json:"budget_bytes"`
+	UsedBytes              int    `json:"used_bytes"`
+	EntryCount             int    `json:"entry_count"`
+	MaxEntries             int    `json:"max_entries"`
+	Bounded                bool   `json:"bounded"`
+	Eviction               string `json:"eviction"`
+	UnboundedCacheRejected bool   `json:"unbounded_cache_rejected"`
+}
+
+type BlockLayoutEngineNegativeGuardsReport struct {
+	CSSFlexboxGridParityRejected     bool `json:"css_flexbox_grid_parity_rejected"`
+	AccidentalOverflowHiddenRejected bool `json:"accidental_overflow_hidden_rejected"`
+	UnboundedLayoutCacheRejected     bool `json:"unbounded_layout_cache_rejected"`
+	MissingDPIDensityRejected        bool `json:"missing_dpi_density_rejected"`
+	InvalidInvalidationRejected      bool `json:"invalid_invalidation_rejected"`
+}
+
 type BlockEventRouteReport struct {
 	Order          int    `json:"order"`
 	Kind           string `json:"kind"`
@@ -563,6 +995,602 @@ type BlockStateResolutionReport struct {
 	Applied      bool   `json:"applied"`
 }
 
+type SurfaceAppModelReport struct {
+	Schema                     string                    `json:"schema"`
+	Level                      string                    `json:"level"`
+	Target                     string                    `json:"target"`
+	StateStoreLevel            string                    `json:"state_store_level"`
+	CommandPolicy              string                    `json:"command_policy"`
+	EventRoutingPolicy         string                    `json:"event_routing_policy"`
+	AsyncCommandPolicy         string                    `json:"async_command_policy"`
+	NavigationFocusPolicy      string                    `json:"navigation_focus_policy"`
+	ShortcutScopePolicy        string                    `json:"shortcut_scope_policy"`
+	ErrorPropagationPolicy     string                    `json:"error_propagation_policy"`
+	RedrawSchedulingPolicy     string                    `json:"redraw_scheduling_policy"`
+	ActorTaskBoundary          string                    `json:"actor_task_boundary"`
+	AppSurfaces                []string                  `json:"app_surfaces"`
+	StateStores                []AppStateStoreReport     `json:"state_stores"`
+	Commands                   []AppCommandReport        `json:"commands"`
+	EventTraces                []AppEventTraceReport     `json:"event_traces"`
+	AsyncCommands              []AppAsyncCommandReport   `json:"async_commands"`
+	NavigationSteps            []AppNavigationStepReport `json:"navigation_steps"`
+	ShortcutScopes             []AppShortcutScopeReport  `json:"shortcut_scopes"`
+	ErrorReports               []AppErrorReport          `json:"error_reports"`
+	RedrawRequests             []AppRedrawRequestReport  `json:"redraw_requests"`
+	ReactRuntimeAbsent         bool                      `json:"react_runtime_absent"`
+	ReactHooksAbsent           bool                      `json:"react_hooks_absent"`
+	DOMEventsAbsent            bool                      `json:"dom_events_absent"`
+	UserJSAbsent               bool                      `json:"user_js_absent"`
+	MissingEventTraceRejected  bool                      `json:"missing_event_trace_rejected"`
+	DisabledDispatchRejected   bool                      `json:"disabled_dispatch_rejected"`
+	UnfocusedTextRejected      bool                      `json:"unfocused_text_rejected"`
+	UnsafeTaskBoundaryRejected bool                      `json:"unsafe_task_boundary_rejected"`
+	ReactRuntimeClaimRejected  bool                      `json:"react_runtime_claim_rejected"`
+	NonClaims                  []string                  `json:"nonclaims"`
+}
+
+type AppStateStoreReport struct {
+	ID               string   `json:"id"`
+	Owner            string   `json:"owner"`
+	Scope            string   `json:"scope"`
+	Fields           []string `json:"fields"`
+	ComputedBindings []string `json:"computed_bindings,omitempty"`
+	Invalidates      []string `json:"invalidates,omitempty"`
+	SnapshotBefore   string   `json:"snapshot_before"`
+	SnapshotAfter    string   `json:"snapshot_after"`
+	ReactState       bool     `json:"react_state"`
+}
+
+type AppCommandReport struct {
+	ID             string   `json:"id"`
+	Kind           string   `json:"kind"`
+	Source         string   `json:"source"`
+	Target         string   `json:"target"`
+	StoreID        string   `json:"store_id"`
+	EventTraceID   string   `json:"event_trace_id"`
+	Mutates        []string `json:"mutates,omitempty"`
+	RequestsRedraw bool     `json:"requests_redraw"`
+	ErrorPath      string   `json:"error_path,omitempty"`
+	Async          bool     `json:"async"`
+	SafeBoundary   bool     `json:"safe_boundary"`
+	ReactHook      bool     `json:"react_hook"`
+}
+
+type AppEventTraceReport struct {
+	Order        int    `json:"order"`
+	ID           string `json:"id"`
+	EventKind    string `json:"event_kind"`
+	TargetBlock  string `json:"target_block"`
+	CommandID    string `json:"command_id"`
+	StoreID      string `json:"store_id"`
+	DispatchPath []int  `json:"dispatch_path"`
+	StateBefore  string `json:"state_before"`
+	StateAfter   string `json:"state_after"`
+	Delivered    bool   `json:"delivered"`
+	Rejected     bool   `json:"rejected"`
+	RejectReason string `json:"reject_reason,omitempty"`
+	FocusedBlock string `json:"focused_block,omitempty"`
+	TextLen      int    `json:"text_len,omitempty"`
+}
+
+type AppAsyncCommandReport struct {
+	ID              string `json:"id"`
+	CommandID       string `json:"command_id"`
+	Policy          string `json:"policy"`
+	Boundary        string `json:"boundary"`
+	Started         bool   `json:"started"`
+	Completed       bool   `json:"completed"`
+	Cancelled       bool   `json:"cancelled,omitempty"`
+	ErrorPropagated bool   `json:"error_propagated"`
+	SafeBoundary    bool   `json:"safe_boundary"`
+}
+
+type AppNavigationStepReport struct {
+	Order        int    `json:"order"`
+	Kind         string `json:"kind"`
+	Before       string `json:"before"`
+	After        string `json:"after"`
+	FocusScope   string `json:"focus_scope"`
+	FocusTrap    bool   `json:"focus_trap,omitempty"`
+	GraphDerived bool   `json:"graph_derived"`
+}
+
+type AppShortcutScopeReport struct {
+	ID        string   `json:"id"`
+	Scope     string   `json:"scope"`
+	Commands  []string `json:"commands"`
+	FocusOnly bool     `json:"focus_only"`
+}
+
+type AppErrorReport struct {
+	CommandID  string `json:"command_id"`
+	Code       string `json:"code"`
+	Propagated bool   `json:"propagated"`
+	Handled    bool   `json:"handled"`
+	StoreID    string `json:"store_id"`
+}
+
+type AppRedrawRequestReport struct {
+	Order          int    `json:"order"`
+	Cause          string `json:"cause"`
+	StoreID        string `json:"store_id"`
+	Invalidation   string `json:"invalidation"`
+	FrameBefore    int    `json:"frame_before"`
+	FrameAfter     int    `json:"frame_after"`
+	BeforeChecksum string `json:"before_checksum"`
+	AfterChecksum  string `json:"after_checksum"`
+}
+
+type SurfaceKeyboardUXReport struct {
+	Schema                    string                           `json:"schema"`
+	Level                     string                           `json:"level"`
+	Target                    string                           `json:"target"`
+	FocusOrderPolicy          string                           `json:"focus_order_policy"`
+	FocusTrapPolicy           string                           `json:"focus_trap_policy"`
+	RovingFocusPolicy         string                           `json:"roving_focus_policy"`
+	KeyboardActivationPolicy  string                           `json:"keyboard_activation_policy"`
+	ShortcutConflictPolicy    string                           `json:"shortcut_conflict_policy"`
+	UndoRedoPolicy            string                           `json:"undo_redo_policy"`
+	Surfaces                  []string                         `json:"surfaces"`
+	FocusOrder                []KeyboardFocusNodeReport        `json:"focus_order"`
+	FocusTransitions          []KeyboardFocusTransitionReport  `json:"focus_transitions"`
+	FocusTraps                []KeyboardFocusTrapReport        `json:"focus_traps"`
+	RovingFocusGroups         []KeyboardRovingFocusGroupReport `json:"roving_focus_groups"`
+	KeyBindings               []KeyboardBindingReport          `json:"key_bindings"`
+	ShortcutConflicts         []KeyboardShortcutConflictReport `json:"shortcut_conflicts"`
+	UndoRedoStacks            []KeyboardUndoRedoStackReport    `json:"undo_redo_stacks"`
+	KeyboardScripts           []KeyboardScriptReport           `json:"keyboard_scripts"`
+	FocusableNameRejected     bool                             `json:"focusable_name_rejected"`
+	OverlayFocusLeakRejected  bool                             `json:"overlay_focus_leak_rejected"`
+	ShortcutConflictRejected  bool                             `json:"shortcut_conflict_rejected"`
+	PointerOnlyActionRejected bool                             `json:"pointer_only_action_rejected"`
+	UnknownShortcutRejected   bool                             `json:"unknown_shortcut_rejected"`
+	UndoWithoutStackRejected  bool                             `json:"undo_without_stack_rejected"`
+	NonClaims                 []string                         `json:"nonclaims"`
+}
+
+type KeyboardFocusNodeReport struct {
+	Order             int    `json:"order"`
+	BlockID           int    `json:"block_id"`
+	Name              string `json:"name"`
+	Role              string `json:"role"`
+	Scope             string `json:"scope"`
+	AccessibleName    string `json:"accessible_name"`
+	LabelledBy        string `json:"labelled_by,omitempty"`
+	KeyboardReachable bool   `json:"keyboard_reachable"`
+}
+
+type KeyboardFocusTransitionReport struct {
+	Order        int    `json:"order"`
+	Key          string `json:"key"`
+	Before       int    `json:"before"`
+	After        int    `json:"after"`
+	Scope        string `json:"scope"`
+	Direction    string `json:"direction"`
+	Wrapped      bool   `json:"wrapped,omitempty"`
+	GraphDerived bool   `json:"graph_derived"`
+}
+
+type KeyboardFocusTrapReport struct {
+	ID           string `json:"id"`
+	Scope        string `json:"scope"`
+	OverlayBlock int    `json:"overlay_block"`
+	EntryBlock   int    `json:"entry_block"`
+	FirstBlock   int    `json:"first_block"`
+	LastBlock    int    `json:"last_block"`
+	RestoreBlock int    `json:"restore_block"`
+	LeakRejected bool   `json:"leak_rejected"`
+	EscapeCloses bool   `json:"escape_closes"`
+}
+
+type KeyboardRovingFocusGroupReport struct {
+	ID            string `json:"id"`
+	Scope         string `json:"scope"`
+	ActiveBlock   int    `json:"active_block"`
+	Items         []int  `json:"items"`
+	ArrowKeys     bool   `json:"arrow_keys"`
+	HomeEnd       bool   `json:"home_end"`
+	Wrap          bool   `json:"wrap"`
+	ConflictScope string `json:"conflict_scope"`
+}
+
+type KeyboardBindingReport struct {
+	ID        string `json:"id"`
+	Key       string `json:"key"`
+	Scope     string `json:"scope"`
+	CommandID string `json:"command_id"`
+	BlockID   int    `json:"block_id"`
+	Source    string `json:"source"`
+	Delivered bool   `json:"delivered"`
+}
+
+type KeyboardShortcutConflictReport struct {
+	Key        string   `json:"key"`
+	Scope      string   `json:"scope"`
+	CommandIDs []string `json:"command_ids"`
+	Diagnosed  bool     `json:"diagnosed"`
+	Rejected   bool     `json:"rejected"`
+	Message    string   `json:"message"`
+}
+
+type KeyboardUndoRedoStackReport struct {
+	ID             string   `json:"id"`
+	Scope          string   `json:"scope"`
+	StoreID        string   `json:"store_id"`
+	UndoCommandID  string   `json:"undo_command_id"`
+	RedoCommandID  string   `json:"redo_command_id"`
+	Units          []string `json:"units"`
+	Before         string   `json:"before"`
+	AfterUndo      string   `json:"after_undo"`
+	AfterRedo      string   `json:"after_redo"`
+	Bounded        bool     `json:"bounded"`
+	KeyboardDriven bool     `json:"keyboard_driven"`
+}
+
+type KeyboardScriptReport struct {
+	ID           string   `json:"id"`
+	Surface      string   `json:"surface"`
+	Steps        []string `json:"steps"`
+	KeyboardOnly bool     `json:"keyboard_only"`
+	FinalFocus   string   `json:"final_focus"`
+	Pass         bool     `json:"pass"`
+}
+
+type SurfaceAppShellReport struct {
+	Schema         string                       `json:"schema"`
+	Level          string                       `json:"level"`
+	Target         string                       `json:"target"`
+	HostABI        string                       `json:"host_abi"`
+	ShellPolicy    string                       `json:"shell_policy"`
+	Capabilities   []AppShellCapabilityReport   `json:"capabilities"`
+	HostReports    []AppShellHostReport         `json:"host_reports"`
+	Windows        []AppShellWindowReport       `json:"windows"`
+	Lifecycle      []AppShellLifecycleReport    `json:"lifecycle"`
+	Menus          []AppShellMenuReport         `json:"menus"`
+	Dialogs        []AppShellDialogReport       `json:"dialogs"`
+	TrayItems      []AppShellTrayReport         `json:"tray_items"`
+	Notifications  []AppShellNotificationReport `json:"notifications"`
+	Cursors        []AppShellCursorReport       `json:"cursors"`
+	DragDrop       []AppShellDragDropReport     `json:"drag_drop"`
+	Permissions    []AppShellPermissionReport   `json:"permissions"`
+	OpenRequests   []AppShellOpenRequestReport  `json:"open_requests"`
+	DPI            []AppShellDPIReport          `json:"dpi"`
+	Diagnostics    []AppShellDiagnosticReport   `json:"diagnostics"`
+	NegativeGuards AppShellNegativeGuardsReport `json:"negative_guards"`
+	NonClaims      []string                     `json:"nonclaims"`
+}
+
+type AppShellCapabilityReport struct {
+	Kind               string `json:"kind"`
+	Supported          bool   `json:"supported"`
+	HostTraceRequired  bool   `json:"host_trace_required"`
+	DiagnosticRequired bool   `json:"diagnostic_required"`
+}
+
+type AppShellHostReport struct {
+	ID           string `json:"id"`
+	Kind         string `json:"kind"`
+	Target       string `json:"target"`
+	TraceID      string `json:"trace_id"`
+	Action       string `json:"action"`
+	Delivered    bool   `json:"delivered"`
+	Rejected     bool   `json:"rejected,omitempty"`
+	DiagnosticID string `json:"diagnostic_id,omitempty"`
+	TimestampMS  int    `json:"timestamp_ms"`
+}
+
+type AppShellWindowReport struct {
+	ID            string `json:"id"`
+	Title         string `json:"title"`
+	Width         int    `json:"width"`
+	Height        int    `json:"height"`
+	MinWidth      int    `json:"min_width"`
+	MinHeight     int    `json:"min_height"`
+	Visible       bool   `json:"visible"`
+	Focused       bool   `json:"focused"`
+	Resizable     bool   `json:"resizable"`
+	Fullscreen    bool   `json:"fullscreen"`
+	DPIAware      bool   `json:"dpi_aware"`
+	HostReportID  string `json:"host_report_id"`
+	ActionTraceID string `json:"action_trace_id"`
+}
+
+type AppShellLifecycleReport struct {
+	Order         int    `json:"order"`
+	Kind          string `json:"kind"`
+	Delivered     bool   `json:"delivered"`
+	HostReportID  string `json:"host_report_id"`
+	ActionTraceID string `json:"action_trace_id"`
+}
+
+type AppShellMenuReport struct {
+	ID            string   `json:"id"`
+	Kind          string   `json:"kind"`
+	Items         []string `json:"items"`
+	TargetBlock   string   `json:"target_block"`
+	CommandID     string   `json:"command_id"`
+	Delivered     bool     `json:"delivered"`
+	HostReportID  string   `json:"host_report_id"`
+	ActionTraceID string   `json:"action_trace_id"`
+}
+
+type AppShellDialogReport struct {
+	ID            string `json:"id"`
+	Kind          string `json:"kind"`
+	Title         string `json:"title"`
+	Result        string `json:"result"`
+	Cancelled     bool   `json:"cancelled"`
+	Delivered     bool   `json:"delivered"`
+	HostReportID  string `json:"host_report_id"`
+	ActionTraceID string `json:"action_trace_id"`
+}
+
+type AppShellTrayReport struct {
+	ID            string `json:"id"`
+	MenuID        string `json:"menu_id"`
+	Tooltip       string `json:"tooltip"`
+	ClickAction   string `json:"click_action"`
+	Delivered     bool   `json:"delivered"`
+	HostReportID  string `json:"host_report_id"`
+	ActionTraceID string `json:"action_trace_id"`
+}
+
+type AppShellNotificationReport struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Body         string `json:"body"`
+	PermissionID string `json:"permission_id"`
+	Delivered    bool   `json:"delivered"`
+	HostReportID string `json:"host_report_id"`
+}
+
+type AppShellCursorReport struct {
+	Kind         string `json:"kind"`
+	TargetBlock  string `json:"target_block"`
+	Applied      bool   `json:"applied"`
+	HostReportID string `json:"host_report_id"`
+}
+
+type AppShellDragDropReport struct {
+	ID            string `json:"id"`
+	Kind          string `json:"kind"`
+	SourceBlock   string `json:"source_block"`
+	TargetBlock   string `json:"target_block"`
+	MIME          string `json:"mime"`
+	Delivered     bool   `json:"delivered"`
+	HostReportID  string `json:"host_report_id"`
+	ActionTraceID string `json:"action_trace_id"`
+}
+
+type AppShellPermissionReport struct {
+	ID           string `json:"id"`
+	Kind         string `json:"kind"`
+	Mode         string `json:"mode"`
+	Granted      bool   `json:"granted"`
+	Rejected     bool   `json:"rejected,omitempty"`
+	DiagnosticID string `json:"diagnostic_id,omitempty"`
+}
+
+type AppShellOpenRequestReport struct {
+	ID           string `json:"id"`
+	Kind         string `json:"kind"`
+	Target       string `json:"target"`
+	Delivered    bool   `json:"delivered"`
+	HostReportID string `json:"host_report_id"`
+}
+
+type AppShellDPIReport struct {
+	ID           string `json:"id"`
+	ScaleMille   int    `json:"scale_mille"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	HostReportID string `json:"host_report_id"`
+}
+
+type AppShellDiagnosticReport struct {
+	ID          string `json:"id"`
+	Capability  string `json:"capability"`
+	Code        string `json:"code"`
+	Message     string `json:"message"`
+	Unsupported bool   `json:"unsupported"`
+	Rejected    bool   `json:"rejected"`
+	SilentNoop  bool   `json:"silent_noop"`
+	Target      string `json:"target"`
+}
+
+type AppShellNegativeGuardsReport struct {
+	MissingMenuHostTraceRejected          bool `json:"missing_menu_host_trace_rejected"`
+	NotificationWithoutHostReportRejected bool `json:"notification_without_host_report_rejected"`
+	UnsupportedFeatureSilentNoopRejected  bool `json:"unsupported_feature_silent_noop_rejected"`
+	WindowWithoutLifecycleRejected        bool `json:"window_without_lifecycle_rejected"`
+	PermissionWithoutDiagnosticRejected   bool `json:"permission_without_diagnostic_rejected"`
+	PlatformWidgetShellRejected           bool `json:"platform_widget_shell_rejected"`
+}
+
+type SurfaceLinuxHostAdapterReport struct {
+	Schema              string                               `json:"schema"`
+	Level               string                               `json:"level"`
+	Target              string                               `json:"target"`
+	Runtime             string                               `json:"runtime"`
+	HostABI             string                               `json:"host_abi"`
+	AppShellABI         string                               `json:"app_shell_abi"`
+	Backend             string                               `json:"backend"`
+	DisplayProtocol     string                               `json:"display_protocol"`
+	WindowSystem        string                               `json:"window_system"`
+	TargetHostTrace     string                               `json:"target_host_trace"`
+	RealWindow          bool                                 `json:"real_window"`
+	Framebuffer         bool                                 `json:"framebuffer"`
+	NativeInput         bool                                 `json:"native_input"`
+	TextInput           bool                                 `json:"text_input"`
+	IME                 bool                                 `json:"ime"`
+	Clipboard           bool                                 `json:"clipboard"`
+	Composition         bool                                 `json:"composition"`
+	AccessibilityBridge bool                                 `json:"accessibility_bridge"`
+	AppShell            bool                                 `json:"app_shell"`
+	Packaging           LinuxHostAdapterPackagingReport      `json:"packaging"`
+	Traces              []LinuxHostAdapterTraceReport        `json:"traces"`
+	Diagnostics         []LinuxHostAdapterDiagnosticReport   `json:"diagnostics"`
+	NegativeGuards      LinuxHostAdapterNegativeGuardsReport `json:"negative_guards"`
+	NonClaims           []string                             `json:"nonclaims"`
+}
+
+type LinuxHostAdapterPackagingReport struct {
+	Scope          string `json:"scope"`
+	ArtifactKind   string `json:"artifact_kind"`
+	ArtifactPath   string `json:"artifact_path"`
+	UnpackedBinary bool   `json:"unpacked_binary"`
+	Installable    bool   `json:"installable"`
+	Signed         bool   `json:"signed"`
+	AutoUpdate     bool   `json:"auto_update"`
+	FullPackaging  bool   `json:"full_packaging"`
+}
+
+type LinuxHostAdapterTraceReport struct {
+	ID         string `json:"id"`
+	Kind       string `json:"kind"`
+	Target     string `json:"target"`
+	Artifact   string `json:"artifact"`
+	Delivered  bool   `json:"delivered"`
+	TargetHost bool   `json:"target_host"`
+}
+
+type LinuxHostAdapterDiagnosticReport struct {
+	ID       string `json:"id"`
+	Kind     string `json:"kind"`
+	Message  string `json:"message"`
+	Rejected bool   `json:"rejected"`
+}
+
+type LinuxHostAdapterNegativeGuardsReport struct {
+	HeadlessPromotionRejected      bool `json:"headless_promotion_rejected"`
+	BlockedDisplayPassRejected     bool `json:"blocked_display_pass_rejected"`
+	OldRealWindowPromotionRejected bool `json:"old_real_window_promotion_rejected"`
+	MissingAppShellRejected        bool `json:"missing_app_shell_rejected"`
+	MissingPackagingScopeRejected  bool `json:"missing_packaging_scope_rejected"`
+	MissingTargetHostTraceRejected bool `json:"missing_target_host_trace_rejected"`
+}
+
+type SurfaceBrowserCanvasTargetReport struct {
+	Schema                string                                  `json:"schema"`
+	Level                 string                                  `json:"level"`
+	Target                string                                  `json:"target"`
+	Runtime               string                                  `json:"runtime"`
+	HostABI               string                                  `json:"host_abi"`
+	Backend               string                                  `json:"backend"`
+	TraceSchema           string                                  `json:"trace_schema"`
+	CompilerOwnedBoot     bool                                    `json:"compiler_owned_boot"`
+	CompilerOwnedLoader   bool                                    `json:"compiler_owned_loader"`
+	UserJSAppLogic        bool                                    `json:"user_js_app_logic"`
+	DOMUI                 bool                                    `json:"dom_ui"`
+	ReactRuntime          bool                                    `json:"react_runtime"`
+	BrowserCanvas         bool                                    `json:"browser_canvas"`
+	BrowserInput          bool                                    `json:"browser_input"`
+	BrowserClipboard      bool                                    `json:"browser_clipboard"`
+	BrowserComposition    bool                                    `json:"browser_composition"`
+	AccessibilitySnapshot bool                                    `json:"accessibility_snapshot"`
+	AccessibilityMirror   bool                                    `json:"accessibility_mirror"`
+	FrameChecksumCount    int                                     `json:"frame_checksum_count"`
+	EventKinds            []string                                `json:"event_kinds"`
+	ArtifactKinds         []string                                `json:"artifact_kinds"`
+	NegativeGuards        BrowserCanvasTargetNegativeGuardsReport `json:"negative_guards"`
+	NonClaims             []string                                `json:"nonclaims"`
+}
+
+type BrowserCanvasTargetNegativeGuardsReport struct {
+	NodeOnlyRejected              bool `json:"node_only_rejected"`
+	DOMSnapshotRendererRejected   bool `json:"dom_snapshot_renderer_rejected"`
+	UserJSCommandDispatchRejected bool `json:"user_js_command_dispatch_rejected"`
+	MetadataSidecarRejected       bool `json:"metadata_sidecar_rejected"`
+	LegacySidecarRejected         bool `json:"legacy_sidecar_rejected"`
+	ReactRuntimeRejected          bool `json:"react_runtime_rejected"`
+}
+
+type SurfaceAccessibilityTargetReport struct {
+	Schema                string                                  `json:"schema"`
+	Level                 string                                  `json:"level"`
+	Target                string                                  `json:"target"`
+	Runtime               string                                  `json:"runtime"`
+	ReleaseScope          string                                  `json:"release_scope"`
+	TreeSchema            string                                  `json:"tree_schema"`
+	PlatformBridge        string                                  `json:"platform_bridge"`
+	Inspector             string                                  `json:"inspector"`
+	ScreenReaderEvidence  string                                  `json:"screen_reader_evidence"`
+	MetadataTree          bool                                    `json:"metadata_tree"`
+	PlatformExport        bool                                    `json:"platform_export"`
+	HostBridge            bool                                    `json:"host_bridge"`
+	BrowserSnapshot       bool                                    `json:"browser_snapshot"`
+	BrowserMirror         bool                                    `json:"browser_mirror"`
+	FullScreenReaderClaim bool                                    `json:"full_screen_reader_claim"`
+	RoleCount             int                                     `json:"role_count"`
+	NamedNodeCount        int                                     `json:"named_node_count"`
+	StateNodeCount        int                                     `json:"state_node_count"`
+	RelationshipCount     int                                     `json:"relationship_count"`
+	ActionCount           int                                     `json:"action_count"`
+	FocusOrderCount       int                                     `json:"focus_order_count"`
+	ReadingOrderCount     int                                     `json:"reading_order_count"`
+	SnapshotCount         int                                     `json:"snapshot_count"`
+	NegativeGuards        AccessibilityTargetNegativeGuardsReport `json:"negative_guards"`
+	NonClaims             []string                                `json:"nonclaims"`
+}
+
+type AccessibilityTargetNegativeGuardsReport struct {
+	FocusableUnnamedRejected             bool `json:"focusable_unnamed_rejected"`
+	ARIADOMDesktopBridgeRejected         bool `json:"aria_dom_desktop_bridge_rejected"`
+	FullATSPIWithoutScreenReaderRejected bool `json:"full_atspi_without_screen_reader_rejected"`
+	MetadataPlatformOverclaimRejected    bool `json:"metadata_platform_overclaim_rejected"`
+	ShuffledFocusOrderRejected           bool `json:"shuffled_focus_order_rejected"`
+	ShuffledReadingOrderRejected         bool `json:"shuffled_reading_order_rejected"`
+}
+
+type SurfaceAssetPipelineReport struct {
+	Schema                    string                            `json:"schema"`
+	Level                     string                            `json:"level"`
+	Source                    string                            `json:"source"`
+	ReleaseScope              string                            `json:"release_scope"`
+	ManifestSchema            string                            `json:"manifest_schema"`
+	ManifestHash              string                            `json:"manifest_hash"`
+	HashAlgorithm             string                            `json:"hash_algorithm"`
+	LocalOnly                 bool                              `json:"local_only"`
+	NetworkFetchAllowed       bool                              `json:"network_fetch_allowed"`
+	FontCount                 int                               `json:"font_count"`
+	IconCount                 int                               `json:"icon_count"`
+	ImageCount                int                               `json:"image_count"`
+	VectorCount               int                               `json:"vector_count"`
+	AssetCount                int                               `json:"asset_count"`
+	DecoderPolicy             string                            `json:"decoder_policy"`
+	FontDecoder               string                            `json:"font_decoder"`
+	IconDecoder               string                            `json:"icon_decoder"`
+	ImageDecoder              string                            `json:"image_decoder"`
+	VectorDecoder             string                            `json:"vector_decoder"`
+	FontHashesVerified        bool                              `json:"font_hashes_verified"`
+	IconTintPipeline          bool                              `json:"icon_tint_pipeline"`
+	ImageBoundsChecked        bool                              `json:"image_bounds_checked"`
+	RasterDecodeBoundsChecked bool                              `json:"raster_decode_bounds_checked"`
+	VectorSanitized           bool                              `json:"vector_sanitized"`
+	SVGScriptRejected         bool                              `json:"svg_script_rejected"`
+	SVGExternalRefRejected    bool                              `json:"svg_external_ref_rejected"`
+	CacheStrategy             string                            `json:"cache_strategy"`
+	CacheBudgetBytes          int                               `json:"cache_budget_bytes"`
+	CacheUsedBytes            int                               `json:"cache_used_bytes"`
+	CacheEntryCount           int                               `json:"cache_entry_count"`
+	CacheBounded              bool                              `json:"cache_bounded"`
+	RenderCommandCount        int                               `json:"render_command_count"`
+	DiagnosticCount           int                               `json:"diagnostic_count"`
+	NegativeGuards            AssetPipelineNegativeGuardsReport `json:"negative_guards"`
+	NonClaims                 []string                          `json:"nonclaims"`
+}
+
+type AssetPipelineNegativeGuardsReport struct {
+	MissingHashRejected          bool `json:"missing_hash_rejected"`
+	RemoteFontRejected           bool `json:"remote_font_rejected"`
+	NetworkFetchRejected         bool `json:"network_fetch_rejected"`
+	UnboundedCacheRejected       bool `json:"unbounded_cache_rejected"`
+	MissingAssetFallbackRequired bool `json:"missing_asset_fallback_required"`
+	UnsafeSVGRejected            bool `json:"unsafe_svg_rejected"`
+	OversizedRasterRejected      bool `json:"oversized_raster_rejected"`
+	DecoderWithoutHashRejected   bool `json:"decoder_without_hash_rejected"`
+}
+
 type MotionFrameReport struct {
 	Order         int    `json:"order"`
 	BlockID       int    `json:"block_id"`
@@ -583,6 +1611,59 @@ type MotionFrameReport struct {
 	Checksum      string `json:"checksum"`
 }
 
+type SurfaceAnimationSchedulerReport struct {
+	Schema                     string                                 `json:"schema"`
+	Level                      string                                 `json:"level"`
+	Source                     string                                 `json:"source"`
+	ReleaseScope               string                                 `json:"release_scope"`
+	MotionQualityLevel         string                                 `json:"motion_quality_level"`
+	MotionClock                string                                 `json:"motion_clock"`
+	SchedulerPolicy            string                                 `json:"scheduler_policy"`
+	TimelinePolicy             string                                 `json:"timeline_policy"`
+	InvalidationPolicy         string                                 `json:"invalidation_policy"`
+	LifecyclePolicy            string                                 `json:"lifecycle_policy"`
+	ReducedMotionPolicy        string                                 `json:"reduced_motion_policy"`
+	FrameCount                 int                                    `json:"frame_count"`
+	FrameBudget                int                                    `json:"frame_budget"`
+	ScheduledFrameCount        int                                    `json:"scheduled_frame_count"`
+	SettledFrameCount          int                                    `json:"settled_frame_count"`
+	ReducedMotionFrameCount    int                                    `json:"reduced_motion_frame_count"`
+	TargetFrameIntervalMS      int                                    `json:"target_frame_interval_ms"`
+	MaxFrameDeltaMS            int                                    `json:"max_frame_delta_ms"`
+	JitterBudgetMS             int                                    `json:"jitter_budget_ms"`
+	TransitionProperties       []string                               `json:"transition_properties"`
+	DeterministicTimeline      bool                                   `json:"deterministic_timeline"`
+	FrameTimingEvidence        bool                                   `json:"frame_timing_evidence"`
+	InvalidationEvidence       bool                                   `json:"invalidation_evidence"`
+	LifecycleEvidence          bool                                   `json:"lifecycle_evidence"`
+	ReducedMotionEvidence      bool                                   `json:"reduced_motion_evidence"`
+	VisualDeltaEvidence        bool                                   `json:"visual_delta_evidence"`
+	CSSAnimationParityRejected bool                                   `json:"css_animation_parity_rejected"`
+	HiddenLoopRejected         bool                                   `json:"hidden_loop_rejected"`
+	TargetSmoke                []AnimationSchedulerTargetSmokeReport  `json:"target_smoke"`
+	NegativeGuards             AnimationSchedulerNegativeGuardsReport `json:"negative_guards"`
+	NonClaims                  []string                               `json:"nonclaims"`
+}
+
+type AnimationSchedulerTargetSmokeReport struct {
+	Target               string `json:"target"`
+	Runtime              string `json:"runtime"`
+	FrameCount           int    `json:"frame_count"`
+	FrameTimingEvidence  bool   `json:"frame_timing_evidence"`
+	VisualDeltaEvidence  bool   `json:"visual_delta_evidence"`
+	ArtifactHashEvidence bool   `json:"artifact_hash_evidence"`
+	Pass                 bool   `json:"pass"`
+}
+
+type AnimationSchedulerNegativeGuardsReport struct {
+	CSSAnimationParityRejected bool `json:"css_animation_parity_rejected"`
+	HiddenLoopRejected         bool `json:"hidden_loop_rejected"`
+	MissingReducedMotion       bool `json:"missing_reduced_motion_rejected"`
+	MissingFrameTiming         bool `json:"missing_frame_timing_rejected"`
+	UnboundedFrameSchedule     bool `json:"unbounded_frame_schedule_rejected"`
+	UnchangedVisualFrame       bool `json:"unchanged_visual_frame_rejected"`
+}
+
 type BlockAssetManifestReport struct {
 	Schema        string             `json:"schema"`
 	Source        string             `json:"source"`
@@ -593,6 +1674,7 @@ type BlockAssetManifestReport struct {
 	FontCount     int                `json:"font_count"`
 	IconCount     int                `json:"icon_count"`
 	ImageCount    int                `json:"image_count"`
+	VectorCount   int                `json:"vector_count,omitempty"`
 	EmbeddedCount int                `json:"embedded_count"`
 	RemoteCount   int                `json:"remote_count"`
 	Assets        []BlockAssetReport `json:"assets"`
@@ -937,6 +2019,8 @@ type MorphReport struct {
 	TokenGraphHash   string                             `json:"token_graph_hash"`
 	Capsule          MorphCapsuleReport                 `json:"capsule"`
 	TokenGraph       *MorphTokenGraphReport             `json:"token_graph,omitempty"`
+	StyleGraph       *MorphStyleGraphReport             `json:"style_graph,omitempty"`
+	Authoring        *MorphAuthoringReport              `json:"authoring,omitempty"`
 	Materials        []MorphMaterialReport              `json:"materials,omitempty"`
 	LayoutModes      []string                           `json:"layout_modes,omitempty"`
 	TypographyRoles  []string                           `json:"typography_roles,omitempty"`
@@ -974,6 +2058,49 @@ type MorphTokenGraphReport struct {
 	RawLiteralsInAppCode       bool               `json:"raw_literals_in_app_code"`
 	UnresolvedFallbackRejected bool               `json:"unresolved_fallback_rejected"`
 	FallbackToRandomDefault    bool               `json:"fallback_to_random_default"`
+}
+
+type MorphStyleGraphReport struct {
+	Schema                         string   `json:"schema"`
+	Namespace                      string   `json:"namespace"`
+	Version                        string   `json:"version"`
+	CSSReplacementLevel            string   `json:"css_replacement_level"`
+	VocabularyFrozen               bool     `json:"vocabulary_frozen"`
+	TokenCategories                []string `json:"token_categories"`
+	MaterialSlots                  []string `json:"material_slots"`
+	AffordanceRoles                []string `json:"affordance_roles"`
+	RecipeOutputs                  []string `json:"recipe_outputs"`
+	StateSelectors                 []string `json:"state_selectors"`
+	MotionProperties               []string `json:"motion_properties"`
+	OverrideOrder                  []string `json:"override_order"`
+	ConflictDiagnostics            []string `json:"conflict_diagnostics"`
+	ImportAllowlist                []string `json:"import_allowlist"`
+	CSSCascadeImportsRejected      bool     `json:"css_cascade_imports_rejected"`
+	DOMRuntimeImportsRejected      bool     `json:"dom_runtime_imports_rejected"`
+	ReactRuntimeImportsRejected    bool     `json:"react_runtime_imports_rejected"`
+	ElectronRuntimeImportsRejected bool     `json:"electron_runtime_imports_rejected"`
+	SelectorEngineAbsent           bool     `json:"selector_engine_absent"`
+	NoSpecificityScoring           bool     `json:"no_specificity_scoring"`
+	GlobalStyleLeakRejected        bool     `json:"global_style_leak_rejected"`
+	SpecificityAmbiguityRejected   bool     `json:"specificity_ambiguity_rejected"`
+	RawCSSRuntimeImportRejected    bool     `json:"raw_css_runtime_import_rejected"`
+}
+
+type MorphAuthoringReport struct {
+	Schema                   string   `json:"schema"`
+	Level                    string   `json:"level"`
+	RecipeCount              int      `json:"recipe_count"`
+	PolishedRecipeCount      int      `json:"polished_recipe_count"`
+	MaxAuthorFields          int      `json:"max_author_fields"`
+	RawBlockFieldCount       int      `json:"raw_block_field_count"`
+	Raw80FieldBlocksRejected bool     `json:"raw_80_field_blocks_rejected"`
+	RecipesRequired          bool     `json:"recipes_required"`
+	DirectBlockPropEditing   bool     `json:"direct_block_prop_editing"`
+	RecipeFirstAuthoring     bool     `json:"recipe_first_authoring"`
+	DesignerTokenInputs      bool     `json:"designer_token_inputs"`
+	GeneratedBlockPropsOnly  bool     `json:"generated_block_props_only"`
+	RawLiteralStylesRejected bool     `json:"raw_literal_styles_rejected"`
+	NonClaims                []string `json:"nonclaims"`
 }
 
 type MorphTokenReport struct {
@@ -1032,9 +2159,12 @@ type MorphMotionPresetReport struct {
 
 type MorphRecipeReport struct {
 	Name                   string   `json:"name"`
+	Family                 string   `json:"family,omitempty"`
 	Output                 string   `json:"output"`
 	Slots                  []string `json:"slots"`
 	Inputs                 []string `json:"inputs"`
+	State                  []string `json:"state,omitempty"`
+	Accessibility          []string `json:"a11y,omitempty"`
 	ExpandsToBlockGraph    bool     `json:"expands_to_block_graph"`
 	HiddenAppState         bool     `json:"hidden_app_state"`
 	PlatformWidgets        bool     `json:"platform_widgets"`
@@ -1215,20 +2345,29 @@ func ValidateReport(raw []byte) error {
 	issues = append(issues, validateBlockGraphEvidence(report)...)
 	issues = append(issues, validateBlockCorePrimitiveEvidence(report)...)
 	issues = append(issues, validateBlockPaintEvidence(report)...)
+	issues = append(issues, validateSoftwareRendererEvidence(report)...)
 	issues = append(issues, validateBlockTextEvidence(report)...)
 	issues = append(issues, validateBlockLayoutEvidence(report)...)
 	issues = append(issues, validateBlockEventFocusEvidence(report)...)
 	issues = append(issues, validateBlockStateEvidence(report)...)
+	issues = append(issues, validateSurfaceAppModelEvidence(report)...)
+	issues = append(issues, validateSurfaceKeyboardUXEvidence(report)...)
+	issues = append(issues, validateSurfaceAppShellEvidence(report)...)
 	issues = append(issues, validateBlockMotionEvidence(report)...)
+	issues = append(issues, validateAnimationSchedulerEvidence(report)...)
 	issues = append(issues, validateBlockAssetEvidence(report)...)
+	issues = append(issues, validateAssetPipelineEvidence(report)...)
 	issues = append(issues, validateBlockAccessibilityEvidence(report)...)
 	issues = append(issues, validateBlockSystemEvidence(report)...)
 	issues = append(issues, validateMorphEvidence(report)...)
 	issues = append(issues, validateProductionToolkitEvidence(report)...)
 	issues = append(issues, validateBrowserReleaseEvidence(report)...)
+	issues = append(issues, validateBrowserCanvasTargetEvidence(report)...)
+	issues = append(issues, validateLinuxHostAdapterEvidence(report)...)
 	issues = append(issues, validateLinuxReleaseWindowEvidence(report)...)
 	issues = append(issues, validateMinimalToolkitEvidence(report)...)
 	issues = append(issues, validateAccessibilityTreeEvidence(report)...)
+	issues = append(issues, validateAccessibilityTargetEvidence(report)...)
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
@@ -1416,6 +2555,8 @@ func ValidateTextInputReport(raw []byte) error {
 	if report.BorrowedViewStorage {
 		issues = append(issues, "borrowed_view_storage must be false")
 	}
+	issues = append(issues, validateTextPipelineEvidence(report.TextPipeline)...)
+	issues = append(issues, validateTextEditingEvidence(report.TextEditing, report.Target, report.Cases)...)
 	issues = append(issues, validateProcesses(report.Source, report.Processes)...)
 	issues = append(issues, validateArtifacts(report.Target, report.Artifacts, report.Processes)...)
 	issues = append(issues, validateArtifactScan(report.ArtifactScan, report.Artifacts)...)
@@ -1431,6 +2572,11 @@ func ValidateTextInputReport(raw []byte) error {
 		"release text input composition commit",
 		"release text input composition cancel",
 		"release text input safe view lifetime checked",
+		"release text editing target IME trace",
+		"release text editing clipboard owned copies",
+		"release text editing undo unit boundaries",
+		"release text editing validation diagnostics",
+		"release text editing rich text nonclaim",
 	} {
 		if !caseNameContains(report.Cases, required) {
 			issues = append(issues, fmt.Sprintf("text-input report requires %s evidence", required))
@@ -1440,6 +2586,834 @@ func ValidateTextInputReport(raw []byte) error {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateTextPipelineEvidence(pipeline TextPipelineReport) []string {
+	if strings.TrimSpace(pipeline.Schema) == "" {
+		return []string{"text_pipeline evidence is required"}
+	}
+
+	var issues []string
+	if pipeline.Schema != TextPipelineSchemaV1 {
+		issues = append(issues, fmt.Sprintf("text_pipeline.schema is %q, want %q", pipeline.Schema, TextPipelineSchemaV1))
+	}
+	if pipeline.Level != "scoped-latin-utf8-text-pipeline-v1" {
+		issues = append(issues, fmt.Sprintf("text_pipeline.level is %q, want scoped-latin-utf8-text-pipeline-v1", pipeline.Level))
+	}
+	if strings.TrimSpace(pipeline.Engine) == "" {
+		issues = append(issues, "text_pipeline.engine is required")
+	}
+	if pipeline.PlatformWidgetTextControls {
+		issues = append(issues, "text_pipeline must not use platform widget text controls")
+	}
+
+	issues = append(issues, validateTextPipelineFontManifest(pipeline.FontManifest)...)
+	issues = append(issues, validateTextPipelineFallbacks(pipeline.FontFallbacks)...)
+	issues = append(issues, validateTextPipelineGlyphRuns(pipeline.GlyphRuns, pipeline.FontFallbacks)...)
+	issues = append(issues, validateTextPipelineCaches(pipeline)...)
+	issues = append(issues, validateTextPipelineUnicodeBoundaries(pipeline.UnicodeBoundaries)...)
+	issues = append(issues, validateTextPipelineShapingScope(pipeline.ShapingScope)...)
+	issues = append(issues, validateTextPipelineMeasurements(pipeline.Measurements)...)
+	issues = append(issues, validateTextPipelineMeasurementConsistency(pipeline.MeasurementConsistency)...)
+	issues = append(issues, validateTextPipelineLayout(pipeline.Layout)...)
+	issues = append(issues, validateTextPipelineRects("text_pipeline.caret_rects", pipeline.CaretRects)...)
+	issues = append(issues, validateTextPipelineRects("text_pipeline.selection_rects", pipeline.SelectionRects)...)
+	issues = append(issues, validateTextPipelineIMESpans(pipeline.IMECompositionSpans)...)
+	issues = append(issues, validateTextPipelineNonClaims(pipeline.NonClaims, pipeline.ShapingScope, pipeline.UnicodeBoundaries)...)
+	issues = append(issues, validateTextPipelineNegativeGuards(pipeline.NegativeGuards)...)
+	return issues
+}
+
+func validateTextPipelineFontManifest(fonts []TextPipelineFontReport) []string {
+	var issues []string
+	if len(fonts) < 2 {
+		return []string{"text_pipeline font manifest must include primary and fallback font hashes"}
+	}
+	ids := map[string]bool{}
+	for _, font := range fonts {
+		if strings.TrimSpace(font.ID) == "" {
+			issues = append(issues, "text_pipeline font manifest id is required")
+		} else if ids[font.ID] {
+			issues = append(issues, fmt.Sprintf("text_pipeline font manifest duplicate id %q", font.ID))
+		}
+		ids[font.ID] = true
+		if strings.TrimSpace(font.Family) == "" || strings.TrimSpace(font.Source) == "" {
+			issues = append(issues, "text_pipeline font manifest family and source are required")
+		}
+		if font.Weight <= 0 || font.Bytes <= 0 {
+			issues = append(issues, fmt.Sprintf("text_pipeline font %q weight and bytes must be positive", font.ID))
+		}
+		if !validChecksumLike(font.SHA256) {
+			issues = append(issues, fmt.Sprintf("text_pipeline font %q requires sha256 hash evidence", font.ID))
+		}
+	}
+	return issues
+}
+
+func validateTextPipelineFallbacks(fallbacks []FontFallbackReport) []string {
+	var issues []string
+	if len(fallbacks) == 0 {
+		return []string{"text_pipeline font fallback evidence is required"}
+	}
+	for _, fallback := range fallbacks {
+		if strings.TrimSpace(fallback.ID) == "" {
+			issues = append(issues, "text_pipeline font fallback id is required")
+		}
+		if strings.TrimSpace(fallback.RequestedFamily) == "" || strings.TrimSpace(fallback.ResolvedFamily) == "" {
+			issues = append(issues, "text_pipeline font fallback requested_family and resolved_family are required")
+		}
+		if len(fallback.Chain) < 2 {
+			issues = append(issues, "text_pipeline font fallback chain must include requested and fallback families")
+		}
+		if fallback.MissingGlyphs != 0 {
+			issues = append(issues, fmt.Sprintf("text_pipeline font fallback %q missing_glyphs = %d, want 0 for scoped smoke", fallback.ID, fallback.MissingGlyphs))
+		}
+		if strings.TrimSpace(fallback.Coverage) == "" {
+			issues = append(issues, "text_pipeline font fallback coverage is required")
+		}
+	}
+	return issues
+}
+
+func validateTextPipelineGlyphRuns(runs []TextGlyphRunReport, fallbacks []FontFallbackReport) []string {
+	var issues []string
+	if len(runs) == 0 {
+		return []string{"text_pipeline glyph runs are required"}
+	}
+	fallbackFamilies := map[string]bool{}
+	for _, fallback := range fallbacks {
+		if strings.TrimSpace(fallback.ResolvedFamily) != "" {
+			fallbackFamilies[fallback.ResolvedFamily] = true
+		}
+	}
+	ids := map[string]bool{}
+	hasLatin := false
+	hasFallback := false
+	for _, run := range runs {
+		if strings.TrimSpace(run.ID) == "" {
+			issues = append(issues, "text_pipeline glyph run id is required")
+		} else if ids[run.ID] {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph run duplicate id %q", run.ID))
+		}
+		ids[run.ID] = true
+		if strings.TrimSpace(run.FontFamily) == "" || strings.TrimSpace(run.Script) == "" || strings.TrimSpace(run.Direction) == "" || strings.TrimSpace(run.Shaping) == "" {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph run %q requires font_family, script, direction, and shaping", run.ID))
+		}
+		if normalizeTextToken(run.Script) == "latin" {
+			hasLatin = true
+		}
+		if fallbackFamilies[run.FontFamily] {
+			hasFallback = true
+		}
+		if normalizeTextToken(run.Direction) != "ltr" {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph run %q direction is %q, want ltr for Tier 1", run.ID, run.Direction))
+		}
+		if run.TextLen <= 0 || run.ByteEnd <= run.ByteStart || run.ScalarEnd <= run.ScalarStart || run.GlyphCount <= 0 {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph run %q has invalid text/scalar/glyph ranges", run.ID))
+		}
+		if len(run.GlyphIDs) != run.GlyphCount || len(run.Advances) != run.GlyphCount || len(run.Clusters) != run.GlyphCount {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph run %q glyph_ids, advances, and clusters must match glyph_count", run.ID))
+		}
+		if run.Baseline <= 0 {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph run %q baseline must be positive", run.ID))
+		}
+		if !validChecksumLike(run.Checksum) {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph run %q checksum must be sha256 evidence", run.ID))
+		}
+	}
+	if !hasLatin {
+		issues = append(issues, "text_pipeline glyph runs require Latin shaping evidence")
+	}
+	if !hasFallback {
+		issues = append(issues, "text_pipeline glyph runs require fallback font evidence")
+	}
+	return issues
+}
+
+func validateTextPipelineCaches(pipeline TextPipelineReport) []string {
+	var issues []string
+	if pipeline.CacheBudgetBytes <= 0 || pipeline.CacheBudgetBytes > 1024*1024 {
+		issues = append(issues, fmt.Sprintf("text_pipeline cache_budget_bytes = %d, want 1..1048576", pipeline.CacheBudgetBytes))
+	}
+	if pipeline.GlyphCacheBudgetBytes <= 0 || pipeline.GlyphCacheBudgetBytes > pipeline.CacheBudgetBytes {
+		issues = append(issues, "text_pipeline glyph_cache_budget_bytes must be within cache_budget_bytes")
+	}
+	if pipeline.GlyphCacheUsedBytes < 0 || pipeline.GlyphCacheUsedBytes > pipeline.GlyphCacheBudgetBytes {
+		issues = append(issues, "text_pipeline glyph_cache_used_bytes must be within glyph_cache_budget_bytes")
+	}
+	if !pipeline.BoundedCaches {
+		issues = append(issues, "text_pipeline bounded_caches must be true")
+	}
+	if strings.TrimSpace(pipeline.CacheEviction) == "" {
+		issues = append(issues, "text_pipeline cache_eviction is required")
+	}
+	if len(pipeline.GlyphCaches) == 0 {
+		issues = append(issues, "text_pipeline glyph cache evidence is required")
+	}
+	totalUsed := 0
+	totalBudget := 0
+	for _, cache := range pipeline.GlyphCaches {
+		totalUsed += cache.UsedBytes
+		totalBudget += cache.BudgetBytes
+		if strings.TrimSpace(cache.ID) == "" {
+			issues = append(issues, "text_pipeline glyph cache id is required")
+		}
+		if !cache.Bounded {
+			issues = append(issues, "text_pipeline glyph cache must be bounded")
+		}
+		if cache.BudgetBytes <= 0 || cache.BudgetBytes > pipeline.GlyphCacheBudgetBytes {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph cache %q budget outside glyph cache budget", cache.ID))
+		}
+		if cache.UsedBytes < 0 || cache.UsedBytes > cache.BudgetBytes {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph cache %q used bytes outside budget", cache.ID))
+		}
+		if cache.EntryCount <= 0 {
+			issues = append(issues, fmt.Sprintf("text_pipeline glyph cache %q entry_count must be positive", cache.ID))
+		}
+		if strings.TrimSpace(cache.Strategy) == "" || strings.TrimSpace(cache.Eviction) == "" {
+			issues = append(issues, "text_pipeline glyph cache strategy and eviction are required")
+		}
+	}
+	if totalUsed != pipeline.GlyphCacheUsedBytes {
+		issues = append(issues, fmt.Sprintf("text_pipeline glyph_cache_used_bytes = %d, want glyph cache total %d", pipeline.GlyphCacheUsedBytes, totalUsed))
+	}
+	if totalBudget > pipeline.GlyphCacheBudgetBytes {
+		issues = append(issues, "text_pipeline glyph cache budgets exceed glyph_cache_budget_bytes")
+	}
+	return issues
+}
+
+func validateTextPipelineUnicodeBoundaries(boundaries TextUnicodeBoundaryReport) []string {
+	var issues []string
+	for _, check := range []struct {
+		field string
+		ok    bool
+	}{
+		{"utf8_storage", boundaries.UTF8Storage},
+		{"scalar_boundaries", boundaries.ScalarBoundaries},
+		{"cluster_boundaries", boundaries.ClusterBoundaries},
+		{"latin_tier", boundaries.LatinTier},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("text_pipeline unicode_boundaries.%s must be true", check.field))
+		}
+	}
+	if boundaries.CombiningMarks {
+		issues = append(issues, "text_pipeline combining marks need Tier 2 shaping evidence")
+	}
+	if boundaries.Bidi {
+		issues = append(issues, "text_pipeline bidi needs Tier 2 shaping evidence")
+	}
+	if len(boundaries.UnsupportedScripts) == 0 {
+		issues = append(issues, "text_pipeline unsupported scripts must be listed")
+	}
+	for _, want := range []string{"ASCII", "UTF-8 scalar", "cluster"} {
+		if !stringListContainsSubstring(boundaries.BoundaryCases, want) {
+			issues = append(issues, fmt.Sprintf("text_pipeline unicode boundary cases require %s evidence", want))
+		}
+	}
+	return issues
+}
+
+func validateTextPipelineShapingScope(scope TextShapingScopeReport) []string {
+	var issues []string
+	if scope.Tier != "tier1-latin-utf8" {
+		issues = append(issues, fmt.Sprintf("text_pipeline shaping_scope tier is %q, want tier1-latin-utf8", scope.Tier))
+	}
+	for _, script := range []string{"Latin", "Common"} {
+		if !stringListContainsExactFold(scope.SupportedScripts, script) {
+			issues = append(issues, fmt.Sprintf("text_pipeline shaping_scope supported_scripts missing %s", script))
+		}
+	}
+	if len(scope.UnsupportedScripts) == 0 {
+		issues = append(issues, "text_pipeline shaping_scope unsupported scripts are required")
+	}
+	if strings.TrimSpace(scope.EngineDecision) == "" || !strings.Contains(strings.ToLower(scope.EngineDecision), "harfbuzz") {
+		issues = append(issues, "text_pipeline shaping_scope engine_decision must describe HarfBuzz-class future evidence")
+	}
+	if scope.FullUnicodeEditorSemantics {
+		issues = append(issues, "text_pipeline full Unicode editor semantics require Tier 3 tests and are unsupported")
+	}
+	if scope.Bidi {
+		issues = append(issues, "text_pipeline bidi shaping requires Tier 2 evidence")
+	}
+	if scope.CombiningMarks {
+		issues = append(issues, "text_pipeline combining marks require Tier 2 evidence")
+	}
+	if strings.TrimSpace(scope.SystemLibraryIntegration) == "" {
+		issues = append(issues, "text_pipeline shaping_scope system_library_integration decision is required")
+	}
+	if scope.PlatformWidgets {
+		issues = append(issues, "text_pipeline shaping_scope must not use platform widgets")
+	}
+	return issues
+}
+
+func validateTextPipelineMeasurements(measurements []TextMeasurementReport) []string {
+	var issues []string
+	if len(measurements) == 0 {
+		return []string{"text_pipeline measurement evidence is required"}
+	}
+	ids := map[string]bool{}
+	hasWrapEllipsis := false
+	for _, measurement := range measurements {
+		if strings.TrimSpace(measurement.ID) == "" {
+			issues = append(issues, "text_pipeline measurement id is required")
+		} else if ids[measurement.ID] {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement duplicate id %q", measurement.ID))
+		}
+		ids[measurement.ID] = true
+		if measurement.TextLen <= 0 || measurement.FontSize <= 0 || measurement.LineHeight <= 0 || measurement.FontWeight <= 0 {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement %q text and font metrics must be positive", measurement.ID))
+		}
+		if strings.TrimSpace(measurement.FontFamily) == "" {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement %q font_family is required", measurement.ID))
+		}
+		if measurement.MaxWidth <= 0 || measurement.Measured.W <= 0 || measurement.Measured.H <= 0 || measurement.LineCount <= 0 {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement %q dimensions must be positive", measurement.ID))
+		}
+		if measurement.Measured.W > measurement.MaxWidth {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement %q width exceeds max_width", measurement.ID))
+		}
+		if strings.TrimSpace(measurement.Quality) == "" || !validChecksumLike(measurement.Checksum) {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement %q quality and checksum evidence are required", measurement.ID))
+		}
+		wrap := normalizeTextToken(measurement.Wrap)
+		overflow := normalizeTextToken(measurement.Overflow)
+		align := normalizeTextToken(measurement.Align)
+		if wrap != "none" && wrap != "word" && wrap != "char" {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement %q wrap is %q, want none, word, or char", measurement.ID, measurement.Wrap))
+		}
+		if overflow != "clip" && overflow != "ellipsis" {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement %q overflow is %q, want clip or ellipsis", measurement.ID, measurement.Overflow))
+		}
+		if align != "start" && align != "center" && align != "end" {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement %q align is %q, want start, center, or end", measurement.ID, measurement.Align))
+		}
+		if measurement.Ellipsis || overflow == "ellipsis" {
+			if measurement.EllipsizedTextLen <= 0 || measurement.EllipsizedTextLen >= measurement.TextLen {
+				issues = append(issues, fmt.Sprintf("text_pipeline measurement %q ellipsis requires ellipsized_text_len between 1 and text_len-1", measurement.ID))
+			}
+		}
+		if (wrap == "word" || wrap == "char") && overflow == "ellipsis" && measurement.Ellipsis {
+			hasWrapEllipsis = true
+		}
+	}
+	if !hasWrapEllipsis {
+		issues = append(issues, "text_pipeline measurement evidence requires wrap and ellipsis")
+	}
+	return issues
+}
+
+func validateTextPipelineMeasurementConsistency(consistency TextMeasurementConsistencyReport) []string {
+	var issues []string
+	if !consistency.SameInputSameMetrics {
+		issues = append(issues, "text_pipeline measurement_consistency.same_input_same_metrics must be true")
+	}
+	if !consistency.TargetIndependentBaseline {
+		issues = append(issues, "text_pipeline measurement_consistency.target_independent_baseline must be true")
+	}
+	if consistency.MaxDeltaPX != 0 {
+		issues = append(issues, fmt.Sprintf("text_pipeline measurement_consistency.max_delta_px = %d, want 0", consistency.MaxDeltaPX))
+	}
+	for _, want := range []string{"latin", "fallback", "ellipsis"} {
+		if !stringListContainsSubstring(consistency.Cases, want) {
+			issues = append(issues, fmt.Sprintf("text_pipeline measurement_consistency cases require %s evidence", want))
+		}
+	}
+	return issues
+}
+
+func validateTextPipelineLayout(layout TextPipelineLayoutReport) []string {
+	var issues []string
+	for _, check := range []struct {
+		name string
+		ok   bool
+	}{
+		{"wrap", layout.Wrap},
+		{"ellipsis", layout.Ellipsis},
+		{"baseline", layout.Baseline},
+		{"line_height", layout.LineHeight},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("text_pipeline layout.%s must be true", check.name))
+		}
+	}
+	for _, align := range []string{"start", "center", "end"} {
+		if !stringListContainsExactFold(layout.Alignment, align) {
+			issues = append(issues, fmt.Sprintf("text_pipeline layout alignment missing %s", align))
+		}
+	}
+	return issues
+}
+
+func validateTextPipelineRects(field string, rects []RectReport) []string {
+	if len(rects) == 0 {
+		return []string{fmt.Sprintf("%s evidence is required", field)}
+	}
+	var issues []string
+	for i, rect := range rects {
+		if rect.W <= 0 || rect.H <= 0 {
+			issues = append(issues, fmt.Sprintf("%s[%d] dimensions must be positive", field, i))
+		}
+	}
+	return issues
+}
+
+func validateTextPipelineIMESpans(spans []TextCompositionSpanReport) []string {
+	if len(spans) == 0 {
+		return []string{"text_pipeline IME composition span evidence is required"}
+	}
+	var issues []string
+	for i, span := range spans {
+		if strings.TrimSpace(span.Kind) == "" {
+			issues = append(issues, fmt.Sprintf("text_pipeline ime_composition_spans[%d] kind is required", i))
+		}
+		if span.ByteEnd <= span.ByteStart || span.ScalarEnd <= span.ScalarStart {
+			issues = append(issues, fmt.Sprintf("text_pipeline ime_composition_spans[%d] ranges must be positive", i))
+		}
+		if span.Rect.W <= 0 || span.Rect.H <= 0 {
+			issues = append(issues, fmt.Sprintf("text_pipeline ime_composition_spans[%d] rect dimensions must be positive", i))
+		}
+	}
+	return issues
+}
+
+func validateTextPipelineNonClaims(nonClaims []string, scope TextShapingScopeReport, boundaries TextUnicodeBoundaryReport) []string {
+	var issues []string
+	if len(nonClaims) == 0 {
+		return []string{"text_pipeline nonclaims are required"}
+	}
+	for _, want := range []string{
+		"full Unicode editor semantics",
+		"bidi",
+		"complex script",
+		"platform widget text controls",
+	} {
+		if !stringListContainsSubstring(nonClaims, want) {
+			issues = append(issues, fmt.Sprintf("text_pipeline nonclaims missing %s", want))
+		}
+	}
+	if len(scope.UnsupportedScripts) == 0 || len(boundaries.UnsupportedScripts) == 0 {
+		issues = append(issues, "text_pipeline unsupported scripts nonclaims are required")
+	}
+	return issues
+}
+
+func validateTextPipelineNegativeGuards(guards TextPipelineNegativeGuardsReport) []string {
+	var missing []string
+	if !guards.FullUnicodeEditorWithoutTestsRejected {
+		missing = append(missing, "full_unicode_editor_without_tests_rejected")
+	}
+	if !guards.MissingFontFallbackRejected {
+		missing = append(missing, "missing_font_fallback_rejected")
+	}
+	if !guards.UnboundedGlyphCacheRejected {
+		missing = append(missing, "unbounded_glyph_cache_rejected")
+	}
+	if !guards.PlatformWidgetTextControlsRejected {
+		missing = append(missing, "platform_widget_text_controls_rejected")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return []string{fmt.Sprintf("text_pipeline negative_guards missing %s", strings.Join(missing, ", "))}
+}
+
+func validateTextEditingEvidence(editing TextEditingReport, target string, cases []CaseReport) []string {
+	if strings.TrimSpace(editing.Schema) == "" {
+		return []string{"text_editing evidence is required"}
+	}
+
+	var issues []string
+	if editing.Schema != TextEditingSchemaV1 {
+		issues = append(issues, fmt.Sprintf("text_editing.schema is %q, want %q", editing.Schema, TextEditingSchemaV1))
+	}
+	if editing.Level != "production-editing-basics-v1" {
+		issues = append(issues, fmt.Sprintf("text_editing.level is %q, want production-editing-basics-v1", editing.Level))
+	}
+	if editing.Target != target {
+		issues = append(issues, fmt.Sprintf("text_editing.target is %q, want report target %q", editing.Target, target))
+	}
+	if strings.TrimSpace(editing.Producer) == "" {
+		issues = append(issues, "text_editing.producer is required")
+	}
+	if !editing.FormsSafe {
+		issues = append(issues, "text_editing.forms_safe must be true")
+	}
+	if !editing.CommandPaletteSearchSafe {
+		issues = append(issues, "text_editing.command_palette_search_safe must be true")
+	}
+	if editing.RichText {
+		issues = append(issues, "text_editing rich text claims are unsupported in production-editing-basics-v1")
+	}
+
+	blockIDs, blockIssues := validateEditableTextBlocks(editing.EditableBlocks)
+	issues = append(issues, blockIssues...)
+	operationUndoIDs, operationIssues := validateTextEditOperations(editing.EditOperations, blockIDs)
+	issues = append(issues, operationIssues...)
+	issues = append(issues, validateTextEditingSelectionModel(editing.SelectionModel)...)
+	issues = append(issues, validateTextEditingIMETraces(editing.IMETraces, target)...)
+	issues = append(issues, validateTextEditingClipboardTransfers(editing.ClipboardTransfers)...)
+	issues = append(issues, validateTextEditingUndoUnits(editing.UndoUnits, operationUndoIDs)...)
+	issues = append(issues, validateTextEditingDiagnostics(editing.ValidationDiagnostics)...)
+	issues = append(issues, validateTextEditingHostBoundary(editing.HostBoundary)...)
+	issues = append(issues, validateTextEditingNonClaims(editing.NonClaims)...)
+	issues = append(issues, validateTextEditingNegativeGuards(editing.NegativeGuards)...)
+	for _, required := range []string{
+		"release text editing target IME trace",
+		"release text editing clipboard owned copies",
+		"release text editing undo unit boundaries",
+		"release text editing validation diagnostics",
+		"release text editing rich text nonclaim",
+	} {
+		if !caseNameContains(cases, required) {
+			issues = append(issues, fmt.Sprintf("text_editing report requires %s evidence", required))
+		}
+	}
+	return issues
+}
+
+func validateEditableTextBlocks(blocks []EditableTextBlockReport) (map[string]bool, []string) {
+	if len(blocks) == 0 {
+		return nil, []string{"text_editing editable_blocks evidence is required"}
+	}
+	ids := map[string]bool{}
+	var issues []string
+	for _, block := range blocks {
+		if strings.TrimSpace(block.ID) == "" {
+			issues = append(issues, "text_editing editable block id is required")
+		} else if ids[block.ID] {
+			issues = append(issues, fmt.Sprintf("text_editing editable block duplicate id %q", block.ID))
+		}
+		ids[block.ID] = true
+		if strings.TrimSpace(block.Kind) == "" {
+			issues = append(issues, fmt.Sprintf("text_editing editable block %q kind is required", block.ID))
+		}
+		if block.Storage != "owned-utf8-byte-buffer" {
+			issues = append(issues, fmt.Sprintf("text_editing editable block %q storage is %q, want owned-utf8-byte-buffer", block.ID, block.Storage))
+		}
+		if !block.FormsSafe {
+			issues = append(issues, fmt.Sprintf("text_editing editable block %q forms_safe must be true", block.ID))
+		}
+		if !block.CommandPaletteSearchSafe {
+			issues = append(issues, fmt.Sprintf("text_editing editable block %q command_palette_search_safe must be true", block.ID))
+		}
+		if block.MaxBytes <= 0 {
+			issues = append(issues, fmt.Sprintf("text_editing editable block %q max_bytes must be positive", block.ID))
+		}
+		if !block.UTF8Validation {
+			issues = append(issues, fmt.Sprintf("text_editing editable block %q utf8_validation must be true", block.ID))
+		}
+	}
+	return ids, issues
+}
+
+func validateTextEditOperations(operations []TextEditOperationReport, blockIDs map[string]bool) ([]string, []string) {
+	if len(operations) == 0 {
+		return nil, []string{"text_editing edit_operations evidence is required"}
+	}
+	requiredActions := map[string]bool{
+		"insert_text":        false,
+		"move_caret_left":    false,
+		"replace_selection":  false,
+		"composition_commit": false,
+		"clipboard_write":    false,
+		"clipboard_read":     false,
+	}
+	orders := map[int]bool{}
+	var undoIDs []string
+	var issues []string
+	for _, operation := range operations {
+		if operation.Order <= 0 {
+			issues = append(issues, "text_editing edit operation order must be positive")
+		} else if orders[operation.Order] {
+			issues = append(issues, fmt.Sprintf("text_editing edit operation duplicate order %d", operation.Order))
+		}
+		orders[operation.Order] = true
+		if _, ok := requiredActions[operation.Action]; ok {
+			requiredActions[operation.Action] = true
+		}
+		if strings.TrimSpace(operation.Action) == "" {
+			issues = append(issues, "text_editing edit operation action is required")
+		}
+		if strings.TrimSpace(operation.Target) == "" || !blockIDs[operation.Target] {
+			issues = append(issues, fmt.Sprintf("text_editing edit operation %d targets unknown editable block %q", operation.Order, operation.Target))
+		}
+		if operation.BeforeTextLen < 0 || operation.AfterTextLen < 0 {
+			issues = append(issues, fmt.Sprintf("text_editing edit operation %d text lengths must be non-negative", operation.Order))
+		}
+		if operation.BeforeCaret < 0 || operation.BeforeCaret > operation.BeforeTextLen || operation.AfterCaret < 0 || operation.AfterCaret > operation.AfterTextLen {
+			issues = append(issues, fmt.Sprintf("text_editing edit operation %d caret positions must remain inside text bounds", operation.Order))
+		}
+		if !validTextSelectionRange(operation.SelectionBefore, operation.BeforeTextLen) || !validTextSelectionRange(operation.SelectionAfter, operation.AfterTextLen) {
+			issues = append(issues, fmt.Sprintf("text_editing edit operation %d selection ranges must remain inside text bounds", operation.Order))
+		}
+		if strings.TrimSpace(operation.UndoUnitID) == "" {
+			issues = append(issues, fmt.Sprintf("text_editing edit operation %d undo unit id is required", operation.Order))
+		} else {
+			undoIDs = append(undoIDs, operation.UndoUnitID)
+		}
+		if !validChecksumLike(operation.Checksum) {
+			issues = append(issues, fmt.Sprintf("text_editing edit operation %d checksum must be sha256 evidence", operation.Order))
+		}
+	}
+	for action, seen := range requiredActions {
+		if !seen {
+			issues = append(issues, fmt.Sprintf("text_editing edit_operations missing %s evidence", action))
+		}
+	}
+	return undoIDs, issues
+}
+
+func validTextSelectionRange(selection TextSelectionRangeReport, textLen int) bool {
+	if selection.Anchor < 0 || selection.Focus < 0 {
+		return false
+	}
+	return selection.Anchor <= textLen && selection.Focus <= textLen
+}
+
+func validateTextEditingSelectionModel(model TextSelectionModelReport) []string {
+	var issues []string
+	for _, movement := range []string{"left", "right", "home", "end"} {
+		if !stringListContainsExactFold(model.CaretMovement, movement) {
+			issues = append(issues, fmt.Sprintf("text_editing selection_model caret_movement missing %s", movement))
+		}
+	}
+	if !model.SelectionReplacement {
+		issues = append(issues, "text_editing selection_model.selection_replacement must be true")
+	}
+	if !model.ScalarBoundaryClamp {
+		issues = append(issues, "text_editing selection_model.scalar_boundary_clamp must be true")
+	}
+	issues = append(issues, validateTextPipelineRects("text_editing selection_model.caret_rects", model.CaretRects)...)
+	issues = append(issues, validateTextPipelineRects("text_editing selection_model.selection_rects", model.SelectionRects)...)
+	return issues
+}
+
+func validateTextEditingIMETraces(traces []TextIMETraceReport, target string) []string {
+	if len(traces) == 0 {
+		return []string{"text_editing IME target trace is required"}
+	}
+	var issues []string
+	seenTargetTrace := false
+	for i, trace := range traces {
+		if trace.Target == target {
+			seenTargetTrace = true
+		}
+		for _, check := range []struct {
+			name string
+			ok   bool
+		}{
+			{"start", trace.Start},
+			{"update", trace.Update},
+			{"commit", trace.Commit},
+			{"cancel", trace.Cancel},
+			{"committed_text_owned_copy", trace.CommittedTextOwnedCopy},
+		} {
+			if !check.ok {
+				issues = append(issues, fmt.Sprintf("text_editing IME trace[%d].%s must be true", i, check.name))
+			}
+		}
+		if trace.EventCount < 4 {
+			issues = append(issues, fmt.Sprintf("text_editing IME trace[%d] event_count must include start/update/commit/cancel", i))
+		}
+		if trace.CompositionSpan.ByteEnd <= trace.CompositionSpan.ByteStart || trace.CompositionSpan.ScalarEnd <= trace.CompositionSpan.ScalarStart {
+			issues = append(issues, fmt.Sprintf("text_editing IME trace[%d] composition_span ranges must be positive", i))
+		}
+		if trace.CompositionSpan.Rect.W <= 0 || trace.CompositionSpan.Rect.H <= 0 {
+			issues = append(issues, fmt.Sprintf("text_editing IME trace[%d] composition_span rect dimensions must be positive", i))
+		}
+	}
+	if !seenTargetTrace {
+		issues = append(issues, fmt.Sprintf("text_editing IME target trace is required for %s", target))
+	}
+	return issues
+}
+
+func validateTextEditingClipboardTransfers(transfers []TextClipboardTransferReport) []string {
+	if len(transfers) == 0 {
+		return []string{"text_editing clipboard transfer evidence is required"}
+	}
+	wantABI := map[string]string{
+		"write": "__tetra_surface_clipboard_write_text",
+		"read":  "__tetra_surface_clipboard_read_text_into",
+	}
+	seen := map[string]bool{}
+	var issues []string
+	for i, transfer := range transfers {
+		direction := strings.TrimSpace(transfer.Direction)
+		want, ok := wantABI[direction]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("text_editing clipboard transfer[%d] direction is %q, want write or read", i, transfer.Direction))
+		} else {
+			seen[direction] = true
+			if transfer.HostABI != want {
+				issues = append(issues, fmt.Sprintf("text_editing clipboard transfer[%d] host_abi is %q, want %q", i, transfer.HostABI, want))
+			}
+		}
+		if transfer.Bytes <= 0 {
+			issues = append(issues, fmt.Sprintf("text_editing clipboard transfer[%d] bytes must be positive", i))
+		}
+		if !transfer.UTF8Valid {
+			issues = append(issues, fmt.Sprintf("text_editing clipboard transfer[%d] utf8_valid must be true", i))
+		}
+		if !transfer.OwnedCopy || transfer.BorrowedView {
+			issues = append(issues, fmt.Sprintf("text_editing clipboard transfer[%d] must use owned copy and no borrowed view", i))
+		}
+		if !validChecksumLike(transfer.Checksum) {
+			issues = append(issues, fmt.Sprintf("text_editing clipboard transfer[%d] checksum must be sha256 evidence", i))
+		}
+	}
+	for direction := range wantABI {
+		if !seen[direction] {
+			issues = append(issues, fmt.Sprintf("text_editing clipboard transfer evidence missing %s", direction))
+		}
+	}
+	return issues
+}
+
+func validateTextEditingUndoUnits(units []TextUndoUnitReport, operationUndoIDs []string) []string {
+	if len(units) == 0 {
+		return []string{"text_editing undo unit boundaries are required"}
+	}
+	ids := map[string]bool{}
+	var issues []string
+	for _, unit := range units {
+		if strings.TrimSpace(unit.ID) == "" {
+			issues = append(issues, "text_editing undo unit id is required")
+		} else if ids[unit.ID] {
+			issues = append(issues, fmt.Sprintf("text_editing undo unit duplicate id %q", unit.ID))
+		}
+		ids[unit.ID] = true
+		if len(unit.OperationOrders) == 0 {
+			issues = append(issues, fmt.Sprintf("text_editing undo unit %q operation_orders are required", unit.ID))
+		}
+		for _, order := range unit.OperationOrders {
+			if order <= 0 {
+				issues = append(issues, fmt.Sprintf("text_editing undo unit %q operation order must be positive", unit.ID))
+			}
+		}
+		if strings.TrimSpace(unit.Boundary) == "" {
+			issues = append(issues, fmt.Sprintf("text_editing undo unit %q boundary is required", unit.ID))
+		}
+		if !unit.Reversible {
+			issues = append(issues, fmt.Sprintf("text_editing undo unit %q must be reversible", unit.ID))
+		}
+	}
+	for _, undoID := range operationUndoIDs {
+		if !ids[undoID] {
+			issues = append(issues, fmt.Sprintf("text_editing undo unit %q referenced by edit operation is missing", undoID))
+		}
+	}
+	return issues
+}
+
+func validateTextEditingDiagnostics(diagnostics []TextEditingDiagnosticReport) []string {
+	if len(diagnostics) == 0 {
+		return []string{"text_editing validation diagnostics are required"}
+	}
+	var issues []string
+	for i, diagnostic := range diagnostics {
+		if strings.TrimSpace(diagnostic.Name) == "" {
+			issues = append(issues, fmt.Sprintf("text_editing validation diagnostic[%d] name is required", i))
+		}
+		if !diagnostic.Ran || !diagnostic.Pass {
+			issues = append(issues, fmt.Sprintf("text_editing validation diagnostic %q must run and pass", diagnostic.Name))
+		}
+	}
+	for _, want := range []string{"invalid UTF-8", "borrowed text buffer", "IME claim", "rich text"} {
+		if !diagnosticNameContains(diagnostics, want) {
+			issues = append(issues, fmt.Sprintf("text_editing validation diagnostics missing %s", want))
+		}
+	}
+	return issues
+}
+
+func diagnosticNameContains(diagnostics []TextEditingDiagnosticReport, want string) bool {
+	want = strings.ToLower(want)
+	for _, diagnostic := range diagnostics {
+		if strings.Contains(strings.ToLower(diagnostic.Name), want) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateTextEditingHostBoundary(boundary TextEditingHostBoundaryReport) []string {
+	var issues []string
+	if !boundary.CopySafe {
+		issues = append(issues, "text_editing host_boundary.copy_safe must be true")
+	}
+	if !boundary.ClipboardOwnedCopy {
+		issues = append(issues, "text_editing host_boundary.clipboard_owned_copy must be true")
+	}
+	if !boundary.CompositionOwnedCopy {
+		issues = append(issues, "text_editing host_boundary.composition_owned_copy must be true")
+	}
+	if boundary.BorrowedTextBufferCrossesHost {
+		issues = append(issues, "text_editing borrowed text buffer must not cross host boundary")
+	}
+	return issues
+}
+
+func validateTextEditingNonClaims(nonClaims []string) []string {
+	if len(nonClaims) == 0 {
+		return []string{"text_editing nonclaims are required"}
+	}
+	var issues []string
+	for _, want := range []string{
+		"rich text",
+		"full editor-grade text semantics",
+		"native platform text controls",
+	} {
+		if !stringListContainsSubstring(nonClaims, want) {
+			issues = append(issues, fmt.Sprintf("text_editing nonclaims missing %s", want))
+		}
+	}
+	return issues
+}
+
+func validateTextEditingNegativeGuards(guards TextEditingNegativeGuardsReport) []string {
+	var missing []string
+	if !guards.IMEWithoutTargetTraceRejected {
+		missing = append(missing, "ime_without_target_trace_rejected")
+	}
+	if !guards.BorrowedTextBufferRejected {
+		missing = append(missing, "borrowed_text_buffer_rejected")
+	}
+	if !guards.RichTextClaimRejected {
+		missing = append(missing, "rich_text_claim_rejected")
+	}
+	if !guards.UnsafeClipboardAliasRejected {
+		missing = append(missing, "unsafe_clipboard_alias_rejected")
+	}
+	if !guards.InvalidUTF8Rejected {
+		missing = append(missing, "invalid_utf8_rejected")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return []string{fmt.Sprintf("text_editing negative_guards missing %s", strings.Join(missing, ", "))}
+}
+
+func stringListContainsExactFold(values []string, want string) bool {
+	for _, value := range values {
+		if strings.EqualFold(strings.TrimSpace(value), want) {
+			return true
+		}
+	}
+	return false
+}
+
+func stringListContainsSubstring(values []string, want string) bool {
+	want = strings.ToLower(want)
+	for _, value := range values {
+		if strings.Contains(strings.ToLower(value), want) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateExactStringList(field string, got []string, want []string) []string {
@@ -3233,6 +5207,269 @@ func validateBrowserReleaseEvidence(report Report) []string {
 	return issues
 }
 
+func validateBrowserCanvasTargetEvidence(report Report) []string {
+	if !isBrowserReleaseReport(report) {
+		return nil
+	}
+	if report.BrowserCanvasTarget == nil {
+		return []string{"browser_canvas_target evidence is required for wasm32-web browser-canvas release reports"}
+	}
+	target := report.BrowserCanvasTarget
+	var issues []string
+	if target.Schema != BrowserCanvasTargetSchemaV1 {
+		issues = append(issues, fmt.Sprintf("browser_canvas_target schema is %q, want %s", target.Schema, BrowserCanvasTargetSchemaV1))
+	}
+	if target.Level != "wasm32-web-first-class-browser-canvas-target-v1" {
+		issues = append(issues, fmt.Sprintf("browser_canvas_target level is %q, want wasm32-web-first-class-browser-canvas-target-v1", target.Level))
+	}
+	if target.Target != "wasm32-web" || report.Target != "wasm32-web" {
+		issues = append(issues, fmt.Sprintf("browser_canvas_target target/report target are %q/%q, want wasm32-web", target.Target, report.Target))
+	}
+	if target.Runtime != "surface-wasm32-web" || report.Runtime != "surface-wasm32-web" {
+		issues = append(issues, fmt.Sprintf("browser_canvas_target runtime/report runtime are %q/%q, want surface-wasm32-web", target.Runtime, report.Runtime))
+	}
+	if target.HostABI != "tetra.surface.host-abi.v1" || report.HostABI != "tetra.surface.host-abi.v1" {
+		issues = append(issues, "browser_canvas_target requires tetra.surface.host-abi.v1")
+	}
+	if target.Backend != "browser-canvas-rgba-accessible" || report.HostEvidence.Backend != "browser-canvas-rgba-accessible" {
+		issues = append(issues, "browser_canvas_target requires browser-canvas-rgba-accessible backend evidence")
+	}
+	if target.TraceSchema != "tetra.surface.browser-canvas-trace.v1" {
+		issues = append(issues, fmt.Sprintf("browser_canvas_target trace_schema is %q, want tetra.surface.browser-canvas-trace.v1", target.TraceSchema))
+	}
+	if !target.CompilerOwnedBoot || !target.CompilerOwnedLoader {
+		issues = append(issues, "browser_canvas_target requires compiler-owned boot and loader evidence")
+	}
+	if target.UserJSAppLogic {
+		issues = append(issues, "browser_canvas_target must not include user JS app logic")
+	}
+	if target.DOMUI {
+		issues = append(issues, "browser_canvas_target must not include DOM UI renderer evidence")
+	}
+	if target.ReactRuntime {
+		issues = append(issues, "browser_canvas_target must not include React runtime evidence")
+	}
+	for _, check := range []struct {
+		name string
+		ok   bool
+	}{
+		{name: "browser_canvas", ok: target.BrowserCanvas && report.HostEvidence.BrowserCanvas},
+		{name: "browser_input", ok: target.BrowserInput && report.HostEvidence.BrowserInput},
+		{name: "browser_clipboard", ok: target.BrowserClipboard && report.HostEvidence.BrowserClipboard},
+		{name: "browser_composition", ok: target.BrowserComposition && report.HostEvidence.BrowserComposition},
+		{name: "accessibility_snapshot", ok: target.AccessibilitySnapshot && report.HostEvidence.BrowserAccessibilitySnapshot},
+		{name: "accessibility_mirror", ok: target.AccessibilityMirror && report.HostEvidence.BrowserAccessibilityMirror},
+	} {
+		if !check.ok {
+			issues = append(issues, fmt.Sprintf("browser_canvas_target requires %s evidence", check.name))
+		}
+	}
+	frameChecksums := countPresentedFrameChecksums(report.Frames)
+	if target.FrameChecksumCount < 2 || target.FrameChecksumCount > frameChecksums {
+		issues = append(issues, fmt.Sprintf("browser_canvas_target frame_checksum_count is %d, want 2..%d", target.FrameChecksumCount, frameChecksums))
+	}
+	for _, kind := range []string{"mouse_up", "key_down", "resize", "text_input"} {
+		if !stringSliceContainsFold(target.EventKinds, kind) || !eventKindContains(report.Events, kind) {
+			issues = append(issues, fmt.Sprintf("browser_canvas_target requires %s event evidence", kind))
+		}
+	}
+	for _, kind := range []string{"component-app", "compiler-owned-loader", "runner-trace"} {
+		if !stringSliceContainsFold(target.ArtifactKinds, kind) || !artifactKindContains(report.Artifacts, kind) {
+			issues = append(issues, fmt.Sprintf("browser_canvas_target requires %s artifact evidence", kind))
+		}
+	}
+	issues = append(issues, validateBrowserCanvasTargetNegativeGuards(target.NegativeGuards)...)
+	for _, required := range []string{
+		"DOM snapshot renderer",
+		"user script command dispatch",
+		"React runtime",
+		"node runtime substitution",
+		"metadata sidecar",
+		"legacy sidecar",
+	} {
+		if !stringSliceContainsFold(target.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("browser_canvas_target nonclaims missing %q", required))
+		}
+	}
+	return issues
+}
+
+func validateBrowserCanvasTargetNegativeGuards(guards BrowserCanvasTargetNegativeGuardsReport) []string {
+	var issues []string
+	if !guards.NodeOnlyRejected {
+		issues = append(issues, "browser_canvas_target must reject Node-only evidence")
+	}
+	if !guards.DOMSnapshotRendererRejected {
+		issues = append(issues, "browser_canvas_target must reject DOM snapshot counted as Surface renderer")
+	}
+	if !guards.UserJSCommandDispatchRejected {
+		issues = append(issues, "browser_canvas_target must reject user JS command dispatch as Tetra app logic")
+	}
+	if !guards.MetadataSidecarRejected {
+		issues = append(issues, "browser_canvas_target must reject metadata-only sidecars")
+	}
+	if !guards.LegacySidecarRejected {
+		issues = append(issues, "browser_canvas_target must reject legacy sidecars")
+	}
+	if !guards.ReactRuntimeRejected {
+		issues = append(issues, "browser_canvas_target must reject React runtime evidence")
+	}
+	return issues
+}
+
+func validateLinuxHostAdapterEvidence(report Report) []string {
+	if !isLinuxReleaseWindowReport(report) {
+		return nil
+	}
+	if report.LinuxHostAdapter == nil {
+		return []string{"linux_host_adapter evidence is required for linux-x64 release-window production reports"}
+	}
+
+	adapter := report.LinuxHostAdapter
+	var issues []string
+	if adapter.Schema != LinuxHostAdapterSchemaV1 {
+		issues = append(issues, fmt.Sprintf("linux_host_adapter schema is %q, want %s", adapter.Schema, LinuxHostAdapterSchemaV1))
+	}
+	if adapter.Level != "linux-x64-production-host-adapter-v1" {
+		issues = append(issues, fmt.Sprintf("linux_host_adapter level is %q, want linux-x64-production-host-adapter-v1", adapter.Level))
+	}
+	if adapter.Target != "linux-x64" || report.Target != "linux-x64" {
+		issues = append(issues, fmt.Sprintf("linux_host_adapter target/report target are %q/%q, want linux-x64", adapter.Target, report.Target))
+	}
+	if adapter.Runtime != "surface-linux-x64" || report.Runtime != "surface-linux-x64" {
+		issues = append(issues, fmt.Sprintf("linux_host_adapter runtime/report runtime are %q/%q, want surface-linux-x64", adapter.Runtime, report.Runtime))
+	}
+	if adapter.HostABI != "tetra.surface.host-abi.v1" || report.HostABI != "tetra.surface.host-abi.v1" {
+		issues = append(issues, "linux_host_adapter requires tetra.surface.host-abi.v1")
+	}
+	if adapter.AppShellABI != AppShellSchemaV1 {
+		issues = append(issues, fmt.Sprintf("linux_host_adapter app_shell_abi is %q, want %s", adapter.AppShellABI, AppShellSchemaV1))
+	}
+	if adapter.Backend != "wayland-shm-rgba-release-v1" || report.HostEvidence.Backend != "wayland-shm-rgba-release-v1" {
+		issues = append(issues, "linux_host_adapter requires wayland-shm-rgba-release-v1 backend evidence")
+	}
+	if adapter.DisplayProtocol != "wayland" || adapter.WindowSystem != "wayland-shm-rgba" {
+		issues = append(issues, fmt.Sprintf("linux_host_adapter display/window system are %q/%q, want wayland/wayland-shm-rgba", adapter.DisplayProtocol, adapter.WindowSystem))
+	}
+	if strings.TrimSpace(adapter.TargetHostTrace) == "" {
+		issues = append(issues, "linux_host_adapter requires target_host_trace")
+	}
+	if !adapter.RealWindow || !report.HostEvidence.RealWindow {
+		issues = append(issues, "linux_host_adapter requires real_window target-host evidence")
+	}
+	if !adapter.Framebuffer || !report.HostEvidence.Framebuffer {
+		issues = append(issues, "linux_host_adapter requires framebuffer evidence")
+	}
+	if !adapter.NativeInput || !report.HostEvidence.NativeInput {
+		issues = append(issues, "linux_host_adapter requires native_input evidence")
+	}
+	if !adapter.TextInput || !report.HostEvidence.TextInput {
+		issues = append(issues, "linux_host_adapter requires text_input evidence")
+	}
+	if !adapter.IME {
+		issues = append(issues, "linux_host_adapter requires IME composition evidence")
+	}
+	if !adapter.Clipboard || !report.HostEvidence.Clipboard {
+		issues = append(issues, "linux_host_adapter requires clipboard evidence")
+	}
+	if !adapter.Composition || !report.HostEvidence.Composition {
+		issues = append(issues, "linux_host_adapter requires composition evidence")
+	}
+	if !adapter.AccessibilityBridge || !report.HostEvidence.AccessibilityBridge {
+		issues = append(issues, "linux_host_adapter requires accessibility_bridge evidence")
+	}
+	if !adapter.AppShell {
+		issues = append(issues, "linux_host_adapter requires app_shell evidence")
+	}
+
+	packaging := adapter.Packaging
+	if packaging.Scope != "linux-x64-unpacked-binary-v1" || strings.TrimSpace(packaging.ArtifactKind) == "" || strings.TrimSpace(packaging.ArtifactPath) == "" {
+		issues = append(issues, "linux_host_adapter requires linux-x64-unpacked-binary-v1 packaging scope with artifact kind and path")
+	}
+	if !packaging.UnpackedBinary || packaging.Installable || packaging.Signed || packaging.AutoUpdate || packaging.FullPackaging {
+		issues = append(issues, "linux_host_adapter packaging scope must be explicit unpacked binary only")
+	}
+	if packaging.ArtifactKind != "" && !artifactKindContains(report.Artifacts, packaging.ArtifactKind) {
+		issues = append(issues, fmt.Sprintf("linux_host_adapter packaging artifact kind %q missing from artifacts", packaging.ArtifactKind))
+	}
+
+	traceKinds := map[string]LinuxHostAdapterTraceReport{}
+	for _, trace := range adapter.Traces {
+		kind := normalizeStateToken(trace.Kind)
+		if strings.TrimSpace(trace.ID) == "" {
+			issues = append(issues, "linux_host_adapter traces require ids")
+		}
+		if trace.Target != "linux-x64" {
+			issues = append(issues, fmt.Sprintf("linux_host_adapter trace %q target is %q, want linux-x64", trace.ID, trace.Target))
+		}
+		if !trace.Delivered || !trace.TargetHost || strings.TrimSpace(trace.Artifact) == "" {
+			issues = append(issues, fmt.Sprintf("linux_host_adapter trace %q requires delivered target-host artifact", trace.ID))
+		}
+		traceKinds[kind] = trace
+	}
+	for _, required := range []string{"real_window", "framebuffer", "native_input", "text_input", "ime", "clipboard", "composition", "accessibility_bridge", "app_shell", "packaging_scope"} {
+		if _, ok := traceKinds[required]; !ok {
+			issues = append(issues, fmt.Sprintf("linux_host_adapter requires %s target-host trace", required))
+		}
+	}
+
+	diagnostics := map[string]LinuxHostAdapterDiagnosticReport{}
+	for _, diagnostic := range adapter.Diagnostics {
+		diagnostics[normalizeStateToken(diagnostic.Kind)] = diagnostic
+	}
+	for _, required := range []string{"blocked_display_not_pass", "headless_promotion_rejected", "old_real_window_promotion_rejected"} {
+		diagnostic, ok := diagnostics[required]
+		if !ok || !diagnostic.Rejected {
+			issues = append(issues, fmt.Sprintf("linux_host_adapter requires rejected diagnostic %s", required))
+		}
+	}
+
+	guards := adapter.NegativeGuards
+	if !guards.HeadlessPromotionRejected {
+		issues = append(issues, "linux_host_adapter headless promotion must be rejected")
+	}
+	if !guards.BlockedDisplayPassRejected {
+		issues = append(issues, "linux_host_adapter blocked display pass must be rejected")
+	}
+	if !guards.OldRealWindowPromotionRejected {
+		issues = append(issues, "linux_host_adapter old real-window promotion must be rejected")
+	}
+	if !guards.MissingAppShellRejected {
+		issues = append(issues, "linux_host_adapter missing app-shell evidence must be rejected")
+	}
+	if !guards.MissingPackagingScopeRejected {
+		issues = append(issues, "linux_host_adapter missing packaging scope must be rejected")
+	}
+	if !guards.MissingTargetHostTraceRejected {
+		issues = append(issues, "linux_host_adapter missing target-host trace must be rejected")
+	}
+
+	for _, required := range []string{
+		"linux production host adapter target-host trace",
+		"linux production app shell adapter",
+		"linux production packaging scope",
+		"linux production blocked display not pass",
+		"linux production offscreen promotion rejected",
+		"linux production old real-window promotion rejected",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("linux_host_adapter report requires %s evidence", required))
+		}
+	}
+	for _, required := range []string{
+		"offscreen-only production",
+		"blocked display pass",
+		"full installer packaging",
+		"signed packages",
+		"auto-update",
+	} {
+		if !containsTextFold(adapter.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("linux_host_adapter nonclaims missing %q", required))
+		}
+	}
+	return issues
+}
+
 func validateLinuxReleaseWindowEvidence(report Report) []string {
 	if !isLinuxReleaseWindowReport(report) {
 		return nil
@@ -3719,6 +5956,165 @@ func validateReleaseAccessibilityBridgeEvidence(report Report, tree *Accessibili
 		issues = append(issues, fmt.Sprintf("accessibility_tree release target %q is unsupported", report.Target))
 	}
 	return issues
+}
+
+func validateAccessibilityTargetEvidence(report Report) []string {
+	if !isSurfaceReleaseAccessibilitySource(report.Source) {
+		return nil
+	}
+	if report.AccessibilityTree == nil || report.AccessibilityTree.AccessibilityLevel != "platform-bridge-v1" {
+		return nil
+	}
+	if report.AccessibilityTarget == nil {
+		return []string{"accessibility_target evidence is required for release accessibility platform-bridge reports"}
+	}
+	target := report.AccessibilityTarget
+	tree := report.AccessibilityTree
+	var issues []string
+	if target.Schema != AccessibilityTargetSchemaV1 {
+		issues = append(issues, fmt.Sprintf("accessibility_target schema is %q, want %s", target.Schema, AccessibilityTargetSchemaV1))
+	}
+	if target.Level != "production-accessibility-target-v1" {
+		issues = append(issues, fmt.Sprintf("accessibility_target level is %q, want production-accessibility-target-v1", target.Level))
+	}
+	if target.Target != report.Target {
+		issues = append(issues, fmt.Sprintf("accessibility_target target is %q, want report target %q", target.Target, report.Target))
+	}
+	if target.Runtime != report.Runtime {
+		issues = append(issues, fmt.Sprintf("accessibility_target runtime is %q, want report runtime %q", target.Runtime, report.Runtime))
+	}
+	if target.ReleaseScope != ReleaseScopeSurfaceV1LinuxWeb || tree.ReleaseScope != ReleaseScopeSurfaceV1LinuxWeb {
+		issues = append(issues, "accessibility_target requires surface-v1-linux-web release scope")
+	}
+	if target.TreeSchema != "tetra.surface.accessibility-tree.v1" || tree.Schema != "tetra.surface.accessibility-tree.v1" {
+		issues = append(issues, "accessibility_target requires tetra.surface.accessibility-tree.v1 tree schema")
+	}
+	if target.PlatformBridge != tree.PlatformBridge {
+		issues = append(issues, fmt.Sprintf("accessibility_target platform_bridge is %q, want tree platform_bridge %q", target.PlatformBridge, tree.PlatformBridge))
+	}
+	screenReaderEvidence, _ := screenReaderEvidenceString(tree.ScreenReaderEvidence)
+	if target.ScreenReaderEvidence != screenReaderEvidence {
+		issues = append(issues, fmt.Sprintf("accessibility_target screen_reader_evidence is %q, want %q", target.ScreenReaderEvidence, screenReaderEvidence))
+	}
+	if !target.MetadataTree || !tree.MetadataTree {
+		issues = append(issues, "accessibility_target requires metadata_tree evidence")
+	}
+	if !target.PlatformExport || !tree.PlatformExport {
+		issues = append(issues, "accessibility_target requires platform_export evidence")
+	}
+	if target.FullScreenReaderClaim {
+		issues = append(issues, "accessibility_target must not claim full screen-reader parity")
+	}
+	if target.RoleCount != len(tree.RolesPresent) {
+		issues = append(issues, fmt.Sprintf("accessibility_target role_count = %d, want %d", target.RoleCount, len(tree.RolesPresent)))
+	}
+	if target.NamedNodeCount != countNamedAccessibilityNodes(tree.Nodes) {
+		issues = append(issues, fmt.Sprintf("accessibility_target named_node_count = %d, want %d", target.NamedNodeCount, countNamedAccessibilityNodes(tree.Nodes)))
+	}
+	if target.StateNodeCount != countStatefulAccessibilityNodes(tree.Nodes) {
+		issues = append(issues, fmt.Sprintf("accessibility_target state_node_count = %d, want %d", target.StateNodeCount, countStatefulAccessibilityNodes(tree.Nodes)))
+	}
+	if target.RelationshipCount != len(tree.Relationships) {
+		issues = append(issues, fmt.Sprintf("accessibility_target relationship_count = %d, want %d", target.RelationshipCount, len(tree.Relationships)))
+	}
+	if target.ActionCount != len(tree.Actions) {
+		issues = append(issues, fmt.Sprintf("accessibility_target action_count = %d, want %d", target.ActionCount, len(tree.Actions)))
+	}
+	if target.FocusOrderCount != len(tree.FocusOrder) {
+		issues = append(issues, fmt.Sprintf("accessibility_target focus_order_count = %d, want %d", target.FocusOrderCount, len(tree.FocusOrder)))
+	}
+	if target.ReadingOrderCount != len(tree.ReadingOrder) {
+		issues = append(issues, fmt.Sprintf("accessibility_target reading_order_count = %d, want %d", target.ReadingOrderCount, len(tree.ReadingOrder)))
+	}
+	if target.SnapshotCount != len(tree.Snapshots) {
+		issues = append(issues, fmt.Sprintf("accessibility_target snapshot_count = %d, want %d", target.SnapshotCount, len(tree.Snapshots)))
+	}
+	switch report.Target {
+	case "linux-x64":
+		if !target.HostBridge {
+			issues = append(issues, "accessibility_target linux-x64 requires host_bridge")
+		}
+		if target.Inspector != "linux-accessibility-platform-probe-v1" {
+			issues = append(issues, fmt.Sprintf("accessibility_target inspector is %q, want linux-accessibility-platform-probe-v1", target.Inspector))
+		}
+		if target.PlatformBridge != "linux_accessibility_host_bridge_v1" {
+			issues = append(issues, "accessibility_target linux-x64 requires linux_accessibility_host_bridge_v1")
+		}
+	case "wasm32-web":
+		if !target.HostBridge || !target.BrowserSnapshot || !target.BrowserMirror {
+			issues = append(issues, "accessibility_target wasm32-web requires host bridge, browser snapshot, and browser mirror")
+		}
+		if target.Inspector != "browser-accessibility-snapshot-mirror-v1" {
+			issues = append(issues, fmt.Sprintf("accessibility_target inspector is %q, want browser-accessibility-snapshot-mirror-v1", target.Inspector))
+		}
+	case "headless":
+		if target.HostBridge || target.BrowserSnapshot || target.BrowserMirror {
+			issues = append(issues, "accessibility_target headless must not claim target-host bridge")
+		}
+		if target.Inspector != "deterministic-accessibility-tree-inspector-v1" {
+			issues = append(issues, fmt.Sprintf("accessibility_target inspector is %q, want deterministic-accessibility-tree-inspector-v1", target.Inspector))
+		}
+	default:
+		issues = append(issues, fmt.Sprintf("accessibility_target target %q is unsupported", report.Target))
+	}
+	issues = append(issues, validateAccessibilityTargetNegativeGuards(target.NegativeGuards)...)
+	for _, required := range []string{
+		"full screen-reader parity",
+		"desktop aria bridge",
+		"metadata platform overclaim",
+		"unnamed focusable block",
+		"AT-SPI full support",
+	} {
+		if !stringSliceContainsFold(target.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("accessibility_target nonclaims missing %q", required))
+		}
+	}
+	return issues
+}
+
+func validateAccessibilityTargetNegativeGuards(guards AccessibilityTargetNegativeGuardsReport) []string {
+	var issues []string
+	if !guards.FocusableUnnamedRejected {
+		issues = append(issues, "accessibility_target must reject focusable unnamed blocks")
+	}
+	if !guards.ARIADOMDesktopBridgeRejected {
+		issues = append(issues, "accessibility_target must reject ARIA/DOM evidence as desktop bridge proof")
+	}
+	if !guards.FullATSPIWithoutScreenReaderRejected {
+		issues = append(issues, "accessibility_target must reject full AT-SPI without screen-reader validation")
+	}
+	if !guards.MetadataPlatformOverclaimRejected {
+		issues = append(issues, "accessibility_target must reject metadata platform overclaim")
+	}
+	if !guards.ShuffledFocusOrderRejected {
+		issues = append(issues, "accessibility_target must reject shuffled focus order")
+	}
+	if !guards.ShuffledReadingOrderRejected {
+		issues = append(issues, "accessibility_target must reject shuffled reading order")
+	}
+	return issues
+}
+
+func countNamedAccessibilityNodes(nodes []AccessibilityNodeReport) int {
+	count := 0
+	for _, node := range nodes {
+		if strings.TrimSpace(node.Name) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func countStatefulAccessibilityNodes(nodes []AccessibilityNodeReport) int {
+	count := 0
+	for _, node := range nodes {
+		if node.Visible || node.Enabled || node.Focusable || node.Focused || node.Editable ||
+			node.Readonly || node.Required || node.Pressed || node.Invalid ||
+			node.ValueKind != "" || node.ValueLen != 0 {
+			count++
+		}
+	}
+	return count
 }
 
 func validateLinuxReleaseWindowAccessibilityBridgeEvidence(report Report, tree *AccessibilityTreeReport) []string {
@@ -4264,6 +6660,8 @@ func validateBlockGraphEvidence(report Report) []string {
 	if graph.APILevel != "block-tree-builder-v1" {
 		issues = append(issues, fmt.Sprintf("block_graph api_level is %q, want block-tree-builder-v1", graph.APILevel))
 	}
+	issues = append(issues, validateBlockGraphABI(graph)...)
+	issues = append(issues, validateBlockResolvedScene(graph)...)
 	if normalizeEvidencePath(graph.Source) != normalizeEvidencePath(report.Source) {
 		issues = append(issues, fmt.Sprintf("block_graph source %q must match report source %q", graph.Source, report.Source))
 	}
@@ -4417,6 +6815,93 @@ func validateBlockGraphEvidence(report Report) []string {
 		if !caseNameContains(report.Cases, required) {
 			issues = append(issues, fmt.Sprintf("block_graph report requires %s evidence", required))
 		}
+	}
+	return issues
+}
+
+func validateBlockGraphABI(graph *BlockGraphReport) []string {
+	if graph.ABI == nil {
+		return []string{"block_graph abi is required"}
+	}
+	abi := graph.ABI
+	var issues []string
+	if abi.Schema != "tetra.surface.block-abi.v1" {
+		issues = append(issues, fmt.Sprintf("block_graph abi schema is %q, want tetra.surface.block-abi.v1", abi.Schema))
+	}
+	if strings.TrimSpace(abi.Version) == "" {
+		issues = append(issues, "block_graph abi version is required")
+	}
+	for _, check := range []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{field: "block_type", got: abi.BlockType, want: "lib.core.block.Block"},
+		{field: "tree_type", got: abi.TreeType, want: "lib.core.block.BlockTree"},
+		{field: "props_type", got: abi.PropsType, want: "lib.core.block.BlockProps"},
+		{field: "resolved_block_type", got: abi.ResolvedBlockType, want: "tetra.surface.renderer.ResolvedBlock"},
+		{field: "resolved_scene_type", got: abi.ResolvedSceneType, want: "tetra.surface.renderer.ResolvedScene"},
+	} {
+		if check.got != check.want {
+			issues = append(issues, fmt.Sprintf("block_graph abi %s is %q, want %q", check.field, check.got, check.want))
+		}
+	}
+	for _, field := range []string{"id", "parent_id", "child_index", "bounds", "layout_order", "draw_order", "hit_test_order", "focus_order", "accessibility_order"} {
+		if !containsNormalized(abi.StableFields, field) {
+			issues = append(issues, fmt.Sprintf("block_graph abi stable_fields require %s", field))
+		}
+	}
+	for _, item := range []string{"semver-compatible", "additive-fields-only", "same-commit-validator"} {
+		if !containsNormalized(abi.Compatibility, item) {
+			issues = append(issues, fmt.Sprintf("block_graph abi compatibility require %s", item))
+		}
+	}
+	return issues
+}
+
+func validateBlockResolvedScene(graph *BlockGraphReport) []string {
+	if graph.ResolvedScene == nil {
+		return []string{"block_graph resolved_scene is required"}
+	}
+	scene := graph.ResolvedScene
+	var issues []string
+	if scene.Schema != "tetra.surface.resolved-scene.v1" {
+		issues = append(issues, fmt.Sprintf("block_graph resolved_scene schema is %q, want tetra.surface.resolved-scene.v1", scene.Schema))
+	}
+	if scene.SourceGraphSchema != graph.Schema {
+		issues = append(issues, "block_graph resolved_scene source_graph_schema must match block_graph schema")
+	}
+	if scene.RootID != graph.RootID {
+		issues = append(issues, fmt.Sprintf("block_graph resolved_scene root_id = %d, want %d", scene.RootID, graph.RootID))
+	}
+	nodeOrder := make([]int, 0, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		nodeOrder = append(nodeOrder, node.ID)
+	}
+	if !intSlicesEqual(scene.NodeOrder, nodeOrder) {
+		issues = append(issues, fmt.Sprintf("block_graph resolved_scene node_order = %v, want %v", scene.NodeOrder, nodeOrder))
+	}
+	if !intSlicesEqual(scene.LayoutOrder, graph.LayoutOrder) {
+		issues = append(issues, "block_graph resolved_scene layout_order must match block_graph layout_order")
+	}
+	if !intSlicesEqual(scene.DrawOrder, graph.DrawOrder) {
+		issues = append(issues, "block_graph resolved_scene draw_order must match block_graph draw_order")
+	}
+	expectedHitOrder := make([]int, 0, len(graph.HitTests))
+	for _, hit := range graph.HitTests {
+		expectedHitOrder = append(expectedHitOrder, hit.TargetID)
+	}
+	if !intSlicesEqual(scene.HitTestOrder, expectedHitOrder) {
+		issues = append(issues, fmt.Sprintf("block_graph resolved_scene hit_test_order = %v, want %v", scene.HitTestOrder, expectedHitOrder))
+	}
+	if !intSlicesEqual(scene.FocusOrder, graph.FocusOrder) {
+		issues = append(issues, "block_graph resolved_scene focus_order must match block_graph focus_order")
+	}
+	if !intSlicesEqual(scene.AccessibilityOrder, graph.AccessibilityOrder) {
+		issues = append(issues, "block_graph resolved_scene accessibility_order must match block_graph accessibility_order")
+	}
+	if !scene.TreeOrderStable || !scene.DrawOrderStable || !scene.HitTestOrderStable || !scene.FocusOrderStable || !scene.AccessibilityOrderStable {
+		issues = append(issues, "block_graph resolved_scene must mark tree, draw, hit-test, focus, and accessibility order stable")
 	}
 	return issues
 }
@@ -4883,6 +7368,7 @@ func validateMorphEvidence(report Report) []string {
 	}
 	issues = append(issues, validateMorphCapsule(morph.Capsule)...)
 	issues = append(issues, validateMorphTokenGraph(morph)...)
+	issues = append(issues, validateMorphStyleTokenBoundaryIssues(morph)...)
 	issues = append(issues, validateMorphMaterials(morph.Materials)...)
 	issues = append(issues, validateMorphLayoutModes(morph.LayoutModes)...)
 	issues = append(issues, validateMorphTypographyRoles(morph.TypographyRoles)...)
@@ -4943,6 +7429,19 @@ func validateMorphCapsule(capsule MorphCapsuleReport) []string {
 			issues = append(issues, fmt.Sprintf("morph capsule imports must include %s", required))
 		}
 	}
+	for _, imp := range capsule.Imports {
+		normalized := strings.ToLower(strings.TrimSpace(imp))
+		if normalized == "" {
+			issues = append(issues, "morph capsule import is required")
+			continue
+		}
+		if normalized != "lib.core.block" && normalized != "lib.core.morph" {
+			issues = append(issues, fmt.Sprintf("morph capsule forbidden import %q rejected", imp))
+		}
+		if containsAnySubstring(normalized, []string{"react", "electron", "dom", "css", "chromium", "javascript", "js"}) {
+			issues = append(issues, fmt.Sprintf("morph capsule forbidden import %q rejected", imp))
+		}
+	}
 	return issues
 }
 
@@ -4964,7 +7463,7 @@ func validateMorphTokenGraph(morph *MorphReport) []string {
 	if !validSHA256Digest(graph.Hash) {
 		issues = append(issues, "morph token_graph hash must be sha256 evidence")
 	}
-	for _, category := range []string{"color", "space", "radius", "border", "elevation", "opacity", "typography", "motion", "z", "assets", "density"} {
+	for _, category := range []string{"color", "space", "spacing", "radius", "border", "elevation", "opacity", "typography", "type", "motion", "z", "assets", "density"} {
 		if !containsNormalized(graph.Categories, category) {
 			issues = append(issues, fmt.Sprintf("morph token_graph categories require %s", category))
 		}
@@ -5006,6 +7505,176 @@ func validateMorphTokenGraph(morph *MorphReport) []string {
 	}
 	if !graph.AliasCycleRejected || !graph.DuplicateSourceRejected || !graph.UnresolvedFallbackRejected {
 		issues = append(issues, "morph token_graph negative guards require alias_cycle, duplicate_source, and unresolved_fallback rejection")
+	}
+	return issues
+}
+
+func ValidateMorphStyleTokenBoundary(morph *MorphReport) error {
+	issues := validateMorphStyleTokenBoundaryIssues(morph)
+	if len(issues) > 0 {
+		return errors.New(strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateMorphStyleTokenBoundaryIssues(morph *MorphReport) []string {
+	if morph == nil {
+		return []string{"morph evidence is required"}
+	}
+	var issues []string
+	issues = append(issues, validateMorphStyleGraph(morph)...)
+	issues = append(issues, validateMorphAuthoring(morph)...)
+	return issues
+}
+
+func validateMorphStyleGraph(morph *MorphReport) []string {
+	if morph.StyleGraph == nil {
+		return []string{"morph style_graph is required"}
+	}
+	styleGraph := morph.StyleGraph
+	var issues []string
+	if styleGraph.Schema != "tetra.surface.morph.style-graph.v1" {
+		issues = append(issues, fmt.Sprintf("morph style_graph schema is %q, want tetra.surface.morph.style-graph.v1", styleGraph.Schema))
+	}
+	if styleGraph.Namespace != morph.Capsule.Namespace {
+		issues = append(issues, "morph style_graph namespace must match capsule namespace")
+	}
+	if strings.TrimSpace(styleGraph.Version) == "" {
+		issues = append(issues, "morph style_graph version is required")
+	}
+	if styleGraph.CSSReplacementLevel != "typed-style-graph-candidate-v1" {
+		issues = append(issues, fmt.Sprintf("morph style_graph css_replacement_level is %q, want typed-style-graph-candidate-v1", styleGraph.CSSReplacementLevel))
+	}
+	if !styleGraph.VocabularyFrozen {
+		issues = append(issues, "morph style_graph vocabulary_frozen must be true")
+	}
+	for _, category := range []string{"color", "space", "spacing", "radius", "border", "elevation", "opacity", "typography", "type", "motion", "z", "assets", "density"} {
+		if !containsNormalized(styleGraph.TokenCategories, category) {
+			issues = append(issues, fmt.Sprintf("morph style_graph token_categories require %s", category))
+		}
+	}
+	for _, slot := range []string{"fill", "border", "radius", "shadow", "overlay"} {
+		if !containsNormalized(styleGraph.MaterialSlots, slot) {
+			issues = append(issues, fmt.Sprintf("morph style_graph material_slots require %s", slot))
+		}
+	}
+	for _, role := range []string{"action", "field.text", "toggle", "navigation", "region", "overlay", "status"} {
+		if !containsNormalized(styleGraph.AffordanceRoles, role) {
+			issues = append(issues, fmt.Sprintf("morph style_graph affordance_roles require %s", role))
+		}
+	}
+	for _, output := range []string{"Block"} {
+		if !contains(styleGraph.RecipeOutputs, output) {
+			issues = append(issues, fmt.Sprintf("morph style_graph recipe_outputs require %s", output))
+		}
+	}
+	for _, selector := range []string{"hover", "pressed", "focusVisible", "selected", "disabled", "error", "loading"} {
+		if !containsNormalized(styleGraph.StateSelectors, selector) {
+			issues = append(issues, fmt.Sprintf("morph style_graph state_selectors require %s", selector))
+		}
+	}
+	for _, property := range []string{"fill", "opacity", "transform"} {
+		if !containsNormalized(styleGraph.MotionProperties, property) {
+			issues = append(issues, fmt.Sprintf("morph style_graph motion_properties require %s", property))
+		}
+	}
+	requiredOverrideOrder := []string{"capsule", "tokens", "materials", "affordances", "state_lenses", "motion", "recipes", "accessibility_safety"}
+	for _, phase := range requiredOverrideOrder {
+		if !containsNormalized(styleGraph.OverrideOrder, phase) {
+			issues = append(issues, fmt.Sprintf("morph style_graph override_order require %s", phase))
+		}
+	}
+	if !sameNormalizedSequence(styleGraph.OverrideOrder, requiredOverrideOrder) {
+		issues = append(issues, "morph style_graph override_order must be fixed and deterministic")
+	}
+	for _, diagnostic := range []string{"alias_cycle", "duplicate_recipe", "duplicate_token_source", "unresolved_token", "raw_literal", "unsupported_css_cascade", "forbidden_runtime_import", "global_style_leak", "specificity_ambiguity", "raw_css_runtime_import"} {
+		if !containsNormalized(styleGraph.ConflictDiagnostics, diagnostic) {
+			issues = append(issues, fmt.Sprintf("morph style_graph conflict_diagnostics require %s", diagnostic))
+		}
+	}
+	for _, required := range []string{"lib.core.block", "lib.core.morph"} {
+		if !contains(styleGraph.ImportAllowlist, required) {
+			issues = append(issues, fmt.Sprintf("morph style_graph import_allowlist require %s", required))
+		}
+	}
+	if !styleGraph.CSSCascadeImportsRejected {
+		issues = append(issues, "morph style_graph css cascade imports must be rejected")
+	}
+	if !styleGraph.DOMRuntimeImportsRejected || !styleGraph.ReactRuntimeImportsRejected || !styleGraph.ElectronRuntimeImportsRejected {
+		issues = append(issues, "morph style_graph DOM/React/Electron runtime imports must be rejected")
+	}
+	if !styleGraph.SelectorEngineAbsent {
+		issues = append(issues, "morph style_graph selector engine must be absent")
+	}
+	if !styleGraph.NoSpecificityScoring {
+		issues = append(issues, "morph style_graph specificity scoring must be absent")
+	}
+	if !styleGraph.GlobalStyleLeakRejected {
+		issues = append(issues, "morph style_graph global style leak must be rejected")
+	}
+	if !styleGraph.SpecificityAmbiguityRejected {
+		issues = append(issues, "morph style_graph specificity ambiguity must be rejected")
+	}
+	if !styleGraph.RawCSSRuntimeImportRejected {
+		issues = append(issues, "morph style_graph raw CSS runtime import must be rejected")
+	}
+	return issues
+}
+
+func validateMorphAuthoring(morph *MorphReport) []string {
+	if morph.Authoring == nil {
+		return []string{"morph authoring evidence is required"}
+	}
+	authoring := morph.Authoring
+	var issues []string
+	if authoring.Schema != "tetra.surface.morph.authoring.v1" {
+		issues = append(issues, fmt.Sprintf("morph authoring schema is %q, want tetra.surface.morph.authoring.v1", authoring.Schema))
+	}
+	if authoring.Level != "production-recipe-authoring-v1" {
+		issues = append(issues, fmt.Sprintf("morph authoring level is %q, want production-recipe-authoring-v1", authoring.Level))
+	}
+	if authoring.RecipeCount != len(morph.Recipes) || authoring.RecipeCount < len(requiredMorphRecipeFamilies()) {
+		issues = append(issues, fmt.Sprintf("morph authoring recipe_count = %d, want len(recipes) >= %d", authoring.RecipeCount, len(requiredMorphRecipeFamilies())))
+	}
+	if authoring.PolishedRecipeCount < len(requiredMorphRecipeFamilies()) {
+		issues = append(issues, fmt.Sprintf("morph authoring polished_recipe_count = %d, want >= %d", authoring.PolishedRecipeCount, len(requiredMorphRecipeFamilies())))
+	}
+	if authoring.MaxAuthorFields <= 0 || authoring.MaxAuthorFields > 16 {
+		issues = append(issues, fmt.Sprintf("morph authoring max_author_fields = %d, want 1..16", authoring.MaxAuthorFields))
+	}
+	if authoring.RawBlockFieldCount < 80 {
+		issues = append(issues, fmt.Sprintf("morph authoring raw_block_field_count = %d, want >= 80", authoring.RawBlockFieldCount))
+	}
+	if !authoring.Raw80FieldBlocksRejected {
+		issues = append(issues, "morph authoring raw 80-field Blocks must be rejected")
+	}
+	if !authoring.RecipesRequired {
+		issues = append(issues, "morph authoring recipes_required must be true")
+	}
+	if authoring.DirectBlockPropEditing {
+		issues = append(issues, "morph authoring direct Block prop editing must be rejected")
+	}
+	if !authoring.RecipeFirstAuthoring {
+		issues = append(issues, "morph authoring recipe_first_authoring must be true")
+	}
+	if !authoring.DesignerTokenInputs {
+		issues = append(issues, "morph authoring designer_token_inputs must be true")
+	}
+	if !authoring.GeneratedBlockPropsOnly {
+		issues = append(issues, "morph authoring generated_block_props_only must be true")
+	}
+	if !authoring.RawLiteralStylesRejected {
+		issues = append(issues, "morph authoring raw_literal_styles_rejected must be true")
+	}
+	for _, required := range []string{
+		"raw 80-field Block authoring",
+		"CSS cascade",
+		"selector engine",
+		"specificity scoring",
+	} {
+		if !containsTextFold(authoring.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("morph authoring nonclaims missing %q", required))
+		}
 	}
 	return issues
 }
@@ -5192,6 +7861,7 @@ func validateMorphRecipes(recipes []MorphRecipeReport) []string {
 		return []string{"morph recipes are required"}
 	}
 	seen := map[string]bool{}
+	seenFamily := map[string]bool{}
 	for _, recipe := range recipes {
 		name := strings.TrimSpace(recipe.Name)
 		if name == "" {
@@ -5216,6 +7886,17 @@ func validateMorphRecipes(recipes []MorphRecipeReport) []string {
 		if len(recipe.Inputs) == 0 {
 			issues = append(issues, fmt.Sprintf("morph recipe %q must declare inputs", name))
 		}
+		if len(recipe.State) == 0 {
+			issues = append(issues, fmt.Sprintf("morph recipe %q must declare state", name))
+		}
+		if len(recipe.Accessibility) == 0 {
+			issues = append(issues, fmt.Sprintf("morph recipe %q must declare a11y projection", name))
+		}
+		family := strings.TrimSpace(recipe.Family)
+		if family == "" {
+			family = strings.TrimSuffix(name, "@1")
+		}
+		seenFamily[family] = true
 		if !recipe.ExpandsToBlockGraph {
 			issues = append(issues, fmt.Sprintf("morph recipe %q must expand to Block graph", name))
 		}
@@ -5229,9 +7910,14 @@ func validateMorphRecipes(recipes []MorphRecipeReport) []string {
 			issues = append(issues, fmt.Sprintf("morph recipe %q core primitive promotion rejected", name))
 		}
 	}
-	for _, required := range []string{"control.action@1", "field.text@1", "command.item@1", "region.panel@1"} {
+	for _, required := range requiredMorphRecipeNames() {
 		if !seen[required] {
 			issues = append(issues, fmt.Sprintf("morph recipes require %s", required))
+		}
+	}
+	for _, required := range requiredMorphRecipeFamilies() {
+		if !seenFamily[required] {
+			issues = append(issues, fmt.Sprintf("morph recipes require stable family %s", required))
 		}
 	}
 	return issues
@@ -5271,12 +7957,37 @@ func validateMorphRecipeExpansions(expansions []MorphRecipeExpansionReport, repo
 			issues = append(issues, fmt.Sprintf("morph recipe_expansions %q must be reported", expansion.Recipe))
 		}
 	}
-	for _, required := range []string{"control.action@1", "field.text@1", "command.item@1", "region.panel@1"} {
+	for _, required := range requiredMorphRecipeNames() {
 		if !seenRecipe[required] {
 			issues = append(issues, fmt.Sprintf("morph recipe_expansions require %s", required))
 		}
 	}
 	return issues
+}
+
+func requiredMorphRecipeFamilies() []string {
+	return []string{
+		"control.action",
+		"field.text",
+		"control.toggle",
+		"command.item",
+		"navigation.item",
+		"region.panel",
+		"overlay.dialog",
+		"navigation.tabs",
+		"collection.list",
+		"collection.table-lite",
+		"status.message",
+	}
+}
+
+func requiredMorphRecipeNames() []string {
+	families := requiredMorphRecipeFamilies()
+	names := make([]string, 0, len(families))
+	for _, family := range families {
+		names = append(names, family+"@1")
+	}
+	return names
 }
 
 func validateMorphAccessibilityProjection(projection MorphAccessibilityProjectionReport, report Report) []string {
@@ -5795,6 +8506,15 @@ func containsTextFold(values []string, want string) bool {
 	return false
 }
 
+func containsAnySubstring(text string, needles []string) bool {
+	for _, needle := range needles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
+}
+
 func forbiddenBlockPerformanceClaimIssues(label string, fields ...string) []string {
 	var issues []string
 	for _, field := range fields {
@@ -5869,6 +8589,18 @@ func containsNormalized(values []string, value string) bool {
 	return false
 }
 
+func sameNormalizedSequence(values []string, want []string) bool {
+	if len(values) != len(want) {
+		return false
+	}
+	for i := range want {
+		if strings.ToLower(strings.TrimSpace(values[i])) != strings.ToLower(strings.TrimSpace(want[i])) {
+			return false
+		}
+	}
+	return true
+}
+
 func validateBlockPaintEvidence(report Report) []string {
 	if !hasBlockPaintEvidence(report) {
 		return nil
@@ -5884,6 +8616,7 @@ func validateBlockPaintEvidence(report Report) []string {
 	if report.PaintUnsupportedBlur {
 		issues = append(issues, "paint unsupported blur claim must be false")
 	}
+	issues = append(issues, validateRendererSceneEvidence(report)...)
 	if len(report.PaintLayers) == 0 {
 		issues = append(issues, "paint_layers evidence is required")
 	}
@@ -6004,9 +8737,325 @@ func hasBlockPaintEvidence(report Report) bool {
 	return len(report.PaintLayers) > 0 ||
 		len(report.PaintCommands) > 0 ||
 		len(report.VisualFeatures) > 0 ||
+		report.RendererScene != nil ||
 		strings.TrimSpace(report.PaintQualityLevel) != "" ||
 		report.PaintCacheBudgetBytes != 0 ||
 		report.PaintUnsupportedBlur
+}
+
+func validateRendererSceneEvidence(report Report) []string {
+	if report.RendererScene == nil {
+		return []string{"renderer_scene evidence is required"}
+	}
+	scene := report.RendererScene
+	var issues []string
+	if scene.Schema != "tetra.surface.renderer-scene.v1" {
+		issues = append(issues, fmt.Sprintf("renderer_scene schema is %q, want tetra.surface.renderer-scene.v1", scene.Schema))
+	}
+	if strings.TrimSpace(scene.Version) == "" {
+		issues = append(issues, "renderer_scene version is required")
+	}
+	if normalizeEvidencePath(scene.Source) != normalizeEvidencePath(report.Source) {
+		issues = append(issues, fmt.Sprintf("renderer_scene source %q must match report source %q", scene.Source, report.Source))
+	}
+	expectedRenderer := "software-rgba-headless"
+	if report.BlockSystem != nil && strings.TrimSpace(report.BlockSystem.Renderer) != "" {
+		expectedRenderer = report.BlockSystem.Renderer
+	}
+	if scene.Renderer != expectedRenderer {
+		issues = append(issues, fmt.Sprintf("renderer_scene renderer is %q, want %s", scene.Renderer, expectedRenderer))
+	}
+	if scene.ResolvedSceneSchema != "tetra.surface.resolved-scene.v1" {
+		issues = append(issues, fmt.Sprintf("renderer_scene resolved_scene_schema is %q, want tetra.surface.resolved-scene.v1", scene.ResolvedSceneSchema))
+	}
+	if scene.PaintCommandSchema != "tetra.surface.paint-command.v1" {
+		issues = append(issues, fmt.Sprintf("renderer_scene paint_command_schema is %q, want tetra.surface.paint-command.v1", scene.PaintCommandSchema))
+	}
+	if !scene.Deterministic {
+		issues = append(issues, "renderer_scene deterministic must be true")
+	}
+	if scene.CommandCount != len(scene.Commands) {
+		issues = append(issues, fmt.Sprintf("renderer_scene command_count = %d, want len(commands) %d", scene.CommandCount, len(scene.Commands)))
+	}
+	if !validChecksumLike(scene.CommandHash) {
+		issues = append(issues, "renderer_scene command_hash must be sha256 evidence")
+	}
+
+	requiredCommands := []string{"fill", "gradient", "border", "radius", "shadow", "outline", "image", "text", "clip", "transform"}
+	seenCommands := map[string]bool{}
+	commandOrder := make([]string, 0, len(scene.Commands))
+	lastOrder := 0
+	for i, command := range scene.Commands {
+		name := normalizePaintToken(command.Command)
+		commandOrder = append(commandOrder, name)
+		if command.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] order %d is not strictly greater than previous order %d", i, command.Order, lastOrder))
+		}
+		lastOrder = command.Order
+		if name == "" {
+			issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] command is required", i))
+		}
+		if command.BlockID <= 0 {
+			issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] block_id must be positive", i))
+		}
+		if command.Rect.W <= 0 || command.Rect.H <= 0 {
+			issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] rect dimensions must be positive", i))
+		}
+		if command.Clip.W <= 0 || command.Clip.H <= 0 {
+			issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] clip dimensions must be positive", i))
+		}
+		if strings.TrimSpace(command.Quality) == "" {
+			issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] quality is required", i))
+		}
+		if !validChecksumLike(command.Checksum) {
+			issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] checksum must be sha256 evidence", i))
+		}
+		switch name {
+		case "fill", "gradient", "border", "radius", "shadow", "outline":
+			if strings.TrimSpace(command.LayerID) == "" {
+				issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] %s requires layer_id", i, name))
+			}
+		case "image":
+			if strings.TrimSpace(command.AssetID) == "" {
+				issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] image requires asset_id", i))
+			}
+		case "text":
+			if strings.TrimSpace(command.TextMeasurementID) == "" {
+				issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] text requires text_measurement_id", i))
+			}
+		case "transform":
+			if strings.TrimSpace(command.Transform) == "" {
+				issues = append(issues, fmt.Sprintf("renderer_scene commands[%d] transform requires transform evidence", i))
+			}
+		}
+		seenCommands[name] = true
+	}
+	if !stringSlicesEqualNormalized(scene.CommandOrder, commandOrder) {
+		issues = append(issues, fmt.Sprintf("renderer_scene command_order = %v, want commands order %v", scene.CommandOrder, commandOrder))
+	}
+	for _, command := range requiredCommands {
+		if !seenCommands[command] {
+			issues = append(issues, fmt.Sprintf("renderer_scene commands require %s command", command))
+		}
+	}
+	for _, feature := range []string{"blur", "backdrop_blur"} {
+		if !rendererUnsupportedVisualRejected(scene.UnsupportedVisuals, feature) {
+			issues = append(issues, fmt.Sprintf("renderer_scene unsupported_visuals require rejected %s evidence", feature))
+		}
+	}
+	return issues
+}
+
+func rendererUnsupportedVisualRejected(unsupported []RendererUnsupportedVisualReport, feature string) bool {
+	feature = normalizePaintToken(feature)
+	for _, current := range unsupported {
+		if normalizePaintToken(current.Feature) == feature && current.Rejected && strings.TrimSpace(current.Reason) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func stringSlicesEqualNormalized(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if normalizePaintToken(got[i]) != normalizePaintToken(want[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func validateSoftwareRendererEvidence(report Report) []string {
+	if report.SoftwareRenderer == nil {
+		if report.RendererScene != nil || report.BlockSystem != nil {
+			return []string{"software_renderer evidence is required"}
+		}
+		return nil
+	}
+	renderer := report.SoftwareRenderer
+	var issues []string
+	if renderer.Schema != "tetra.surface.software-renderer.v1" {
+		issues = append(issues, fmt.Sprintf("software_renderer schema is %q, want tetra.surface.software-renderer.v1", renderer.Schema))
+	}
+	if renderer.QualityLevel != "software-rgba-production-hardening-v1" {
+		issues = append(issues, fmt.Sprintf("software_renderer quality_level is %q, want software-rgba-production-hardening-v1", renderer.QualityLevel))
+	}
+	if normalizeEvidencePath(renderer.Source) != normalizeEvidencePath(report.Source) {
+		issues = append(issues, fmt.Sprintf("software_renderer source %q must match report source %q", renderer.Source, report.Source))
+	}
+	if renderer.Target != report.Target {
+		issues = append(issues, fmt.Sprintf("software_renderer target is %q, want %q", renderer.Target, report.Target))
+	}
+	expectedBackend := expectedSoftwareRendererBackend(report)
+	if renderer.Backend != expectedBackend {
+		issues = append(issues, fmt.Sprintf("software_renderer backend is %q, want %s", renderer.Backend, expectedBackend))
+	}
+	if renderer.PixelFormat != "rgba8" {
+		issues = append(issues, fmt.Sprintf("software_renderer pixel_format is %q, want rgba8", renderer.PixelFormat))
+	}
+	if renderer.AlphaBlendMode != "source-over-rgba8-v1" {
+		issues = append(issues, fmt.Sprintf("software_renderer alpha_blend_mode is %q, want source-over-rgba8-v1", renderer.AlphaBlendMode))
+	}
+	if renderer.ClipMode != "rect-scissor-v1" {
+		issues = append(issues, fmt.Sprintf("software_renderer clip_mode is %q, want rect-scissor-v1", renderer.ClipMode))
+	}
+	if !renderer.RasterDeterministic {
+		issues = append(issues, "software_renderer raster_deterministic must be true")
+	}
+	if !renderer.GoldenExport {
+		issues = append(issues, "software_renderer golden_export must be true")
+	}
+	if !renderer.ResizeScaleDPI {
+		issues = append(issues, "software_renderer resize_scale_dpi must be true")
+	}
+	if !renderer.NoUseAfterPresent {
+		issues = append(issues, "software_renderer no_use_after_present must be true")
+	}
+	if !renderer.NoFrameAlias {
+		issues = append(issues, "software_renderer no_frame_alias must be true")
+	}
+	for _, feature := range []string{"deterministic-raster", "alpha-blending", "clipping", "frame-checksum", "golden-export", "resize", "scale", "dpi"} {
+		if !containsNormalized(renderer.FeatureSummary, feature) {
+			issues = append(issues, fmt.Sprintf("software_renderer feature_summary require %s", feature))
+		}
+	}
+
+	reportFrames := map[int]FrameReport{}
+	for _, frame := range report.Frames {
+		reportFrames[frame.Order] = frame
+	}
+	if len(renderer.Frames) != len(report.Frames) {
+		issues = append(issues, fmt.Sprintf("software_renderer frames length %d must match runtime frames length %d", len(renderer.Frames), len(report.Frames)))
+	}
+	lastOrder := 0
+	for i, frame := range renderer.Frames {
+		if frame.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("software_renderer frames[%d] order %d is not strictly greater than previous order %d", i, frame.Order, lastOrder))
+		}
+		lastOrder = frame.Order
+		if frame.Width <= 0 || frame.Height <= 0 || frame.Stride <= 0 {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d dimensions and stride must be positive", frame.Order))
+		}
+		if frame.Scale <= 0 {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d scale must be positive", frame.Order))
+		}
+		if frame.DPI <= 0 {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d dpi must be positive", frame.Order))
+		}
+		for _, check := range []struct {
+			name  string
+			value string
+		}{
+			{name: "pixel_checksum", value: frame.PixelChecksum},
+			{name: "repeat_checksum", value: frame.RepeatChecksum},
+			{name: "golden_checksum", value: frame.GoldenChecksum},
+			{name: "alpha_checksum", value: frame.AlphaChecksum},
+			{name: "clip_checksum", value: frame.ClipChecksum},
+		} {
+			if !validChecksumLike(check.value) {
+				issues = append(issues, fmt.Sprintf("software_renderer frame %d %s must be sha256 evidence", frame.Order, check.name))
+			}
+		}
+		if strings.TrimSpace(frame.GoldenArtifact) == "" {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d golden_artifact is required", frame.Order))
+		}
+		if !frame.Presented {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d presented must be true", frame.Order))
+		}
+		if !frame.UseAfterPresentRejected {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d use_after_present_rejected must be true", frame.Order))
+		}
+		if !frame.AliasViolationRejected {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d alias_violation_rejected must be true", frame.Order))
+		}
+		reportFrame, ok := reportFrames[frame.Order]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d missing from runtime frame evidence", frame.Order))
+			continue
+		}
+		if reportFrame.Width != frame.Width || reportFrame.Height != frame.Height || reportFrame.Stride != frame.Stride {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d dimensions must match runtime frame evidence", frame.Order))
+		}
+		if reportFrame.Checksum != frame.PixelChecksum {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d pixel_checksum %q must match runtime frame checksum %q", frame.Order, frame.PixelChecksum, reportFrame.Checksum))
+		}
+		if frame.PixelChecksum != frame.RepeatChecksum {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d repeat_checksum %q must equal pixel_checksum %q", frame.Order, frame.RepeatChecksum, frame.PixelChecksum))
+		}
+		if frame.PixelChecksum != frame.GoldenChecksum {
+			issues = append(issues, fmt.Sprintf("software_renderer frame %d golden_checksum %q must equal pixel_checksum %q", frame.Order, frame.GoldenChecksum, frame.PixelChecksum))
+		}
+	}
+	issues = append(issues, validateSoftwareRendererNegativeGuards(renderer.NegativeGuards)...)
+	for _, required := range []string{
+		"software renderer deterministic raster",
+		"software renderer alpha clipping",
+		"software renderer golden export",
+		"software renderer resize scale dpi",
+		"software renderer use-after-present rejected",
+		"software renderer frame alias rejected",
+		"software renderer browser promotion without runtime rejected",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("software_renderer report requires %s evidence", required))
+		}
+	}
+	return issues
+}
+
+func expectedSoftwareRendererBackend(report Report) string {
+	if report.BlockSystem != nil && strings.TrimSpace(report.BlockSystem.Renderer) != "" {
+		return report.BlockSystem.Renderer
+	}
+	if report.RendererScene != nil && strings.TrimSpace(report.RendererScene.Renderer) != "" {
+		return report.RendererScene.Renderer
+	}
+	switch report.Target {
+	case "linux-x64":
+		return "wayland-shm-rgba"
+	case "wasm32-web":
+		return "browser-canvas-rgba"
+	default:
+		return "software-rgba-headless"
+	}
+}
+
+func validateSoftwareRendererNegativeGuards(guards SoftwareRendererNegativeGuardsReport) []string {
+	var missing []string
+	if !guards.MetadataOnlyFrameRejected {
+		missing = append(missing, "metadata_only_frame_rejected")
+	}
+	if !guards.UnchangedChecksumRejected {
+		missing = append(missing, "unchanged_checksum_rejected")
+	}
+	if !guards.MissingGoldenRejected {
+		missing = append(missing, "missing_golden_rejected")
+	}
+	if !guards.MissingAlphaRejected {
+		missing = append(missing, "missing_alpha_rejected")
+	}
+	if !guards.MissingClipRejected {
+		missing = append(missing, "missing_clip_rejected")
+	}
+	if !guards.MissingDPIRejected {
+		missing = append(missing, "missing_dpi_rejected")
+	}
+	if !guards.UseAfterPresentRejected {
+		missing = append(missing, "use_after_present_rejected")
+	}
+	if !guards.FrameAliasRejected {
+		missing = append(missing, "frame_alias_rejected")
+	}
+	if !guards.NodeOnlyBrowserPromotionRejected {
+		missing = append(missing, "node_only_browser_promotion_rejected")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return []string{fmt.Sprintf("software_renderer negative_guards missing %s", strings.Join(missing, ", "))}
 }
 
 func validateBlockTextEvidence(report Report) []string {
@@ -6227,6 +9276,7 @@ func validateBlockLayoutEvidence(report Report) []string {
 	if len(report.LayoutScrolls) == 0 {
 		issues = append(issues, "layout_scrolls evidence is required")
 	}
+	issues = append(issues, validateBlockLayoutEngineEvidence(report.LayoutEngine, report)...)
 
 	for _, feature := range []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"} {
 		if !layoutFeatureContains(report.LayoutFeatures, feature) {
@@ -6420,11 +9470,240 @@ func validateBlockLayoutEvidence(report Report) []string {
 	return issues
 }
 
+func validateBlockLayoutEngineEvidence(engine *BlockLayoutEngineReport, report Report) []string {
+	if engine == nil {
+		return []string{"layout_engine evidence is required"}
+	}
+
+	var issues []string
+	if engine.Schema != LayoutEngineSchemaV1 {
+		issues = append(issues, fmt.Sprintf("layout_engine schema is %q, want %s", engine.Schema, LayoutEngineSchemaV1))
+	}
+	if engine.Level != "production-layout-engine-v1" {
+		issues = append(issues, fmt.Sprintf("layout_engine level is %q, want production-layout-engine-v1", engine.Level))
+	}
+	if strings.TrimSpace(engine.Producer) == "" {
+		issues = append(issues, "layout_engine producer is required")
+	}
+	if strings.TrimSpace(engine.Target) == "" || engine.Target != report.Target {
+		issues = append(issues, fmt.Sprintf("layout_engine target is %q, want %q", engine.Target, report.Target))
+	}
+	if engine.Quality != "deterministic-responsive-layout-v1" {
+		issues = append(issues, fmt.Sprintf("layout_engine quality is %q, want deterministic-responsive-layout-v1", engine.Quality))
+	}
+	if engine.CSSFlexboxGridParity {
+		issues = append(issues, "layout_engine CSS flexbox/grid parity claim must be false")
+	}
+	if engine.PlatformWidgetLayout {
+		issues = append(issues, "layout_engine platform widget layout claim must be false")
+	}
+	for _, mode := range []string{"row", "column", "stack", "grid", "dock", "absolute", "overlay", "scroll"} {
+		if !containsNormalized(engine.Modes, mode) {
+			issues = append(issues, fmt.Sprintf("layout_engine modes require %s", mode))
+		}
+	}
+	for _, profile := range []string{"app shell", "settings forms", "dashboards", "editor shells"} {
+		if !containsNormalized(engine.ResponsiveProfiles, profile) {
+			issues = append(issues, fmt.Sprintf("layout_engine responsive_profiles require %s", profile))
+		}
+	}
+	for _, feature := range []string{"min", "max", "fit", "fill", "fixed", "density", "overflow", "clip"} {
+		if !containsNormalized(engine.ConstraintFeatures, feature) {
+			issues = append(issues, fmt.Sprintf("layout_engine constraint_features require %s", feature))
+		}
+	}
+	if !engine.MinMaxConstraints {
+		issues = append(issues, "layout_engine min_max_constraints evidence is required")
+	}
+	if !engine.FitFillFixed {
+		issues = append(issues, "layout_engine fit_fill_fixed evidence is required")
+	}
+	if !engine.DensityIndependent {
+		issues = append(issues, "layout_engine density_independent evidence is required")
+	}
+	if !engine.StableUnderResize {
+		issues = append(issues, "layout_engine stable_under_resize evidence is required")
+	}
+	if !engine.LayoutCacheKeyedByDPI {
+		issues = append(issues, "layout_engine layout_cache_keyed_by_dpi evidence is required")
+	}
+	issues = append(issues, validateBlockLayoutDensityEvidence(engine.Density)...)
+	issues = append(issues, validateBlockLayoutOverflowEvidence(engine.OverflowRules)...)
+	issues = append(issues, validateBlockLayoutInvalidationEvidence(engine.Invalidations)...)
+	issues = append(issues, validateBlockLayoutCacheBudgetEvidence(engine.CacheBudget)...)
+	issues = append(issues, validateBlockLayoutEngineNegativeGuards(engine.NegativeGuards)...)
+	for _, nonclaim := range []string{"CSS flexbox/grid parity", "browser CSS layout engine", "platform widget layout", "unbounded layout cache"} {
+		if !containsTextFold(engine.NonClaims, nonclaim) {
+			issues = append(issues, fmt.Sprintf("layout_engine nonclaims require %s", nonclaim))
+		}
+	}
+	for _, required := range []string{
+		"block layout DPI density",
+		"block layout invalidation cache budget",
+		"block layout responsive app shell settings dashboard editor",
+		"block layout overflow explicit clip scroll",
+		"block layout no css grid parity",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("layout_engine report requires %s evidence", required))
+		}
+	}
+	return issues
+}
+
+func validateBlockLayoutDensityEvidence(density BlockLayoutDensityReport) []string {
+	var issues []string
+	if density.Schema != "tetra.surface.layout-density.v1" {
+		issues = append(issues, fmt.Sprintf("layout_engine density schema is %q, want tetra.surface.layout-density.v1", density.Schema))
+	}
+	if density.Scale <= 0 || density.DPI < 72 || density.DevicePixelRatio <= 0 {
+		issues = append(issues, "layout_engine density requires positive scale/device_pixel_ratio and dpi >= 72")
+	}
+	if !density.SnapToPixelGrid {
+		issues = append(issues, "layout_engine density requires snap_to_pixel_grid evidence")
+	}
+	if !density.TargetIndependent {
+		issues = append(issues, "layout_engine density requires target_independent evidence")
+	}
+	for _, required := range []string{"headless scale", "linux-x64 scale", "wasm32-web devicepixelratio"} {
+		if !containsTextFold(density.Cases, required) {
+			issues = append(issues, fmt.Sprintf("layout_engine density cases require %s", required))
+		}
+	}
+	return issues
+}
+
+func validateBlockLayoutOverflowEvidence(overflow BlockLayoutOverflowRulesReport) []string {
+	var issues []string
+	if !overflow.Explicit {
+		issues = append(issues, "layout_engine overflow rules require explicit evidence")
+	}
+	if !overflow.ClipRequired {
+		issues = append(issues, "layout_engine overflow rules require clip_required evidence")
+	}
+	if !overflow.ScrollBoundsChecked {
+		issues = append(issues, "layout_engine overflow rules require scroll_bounds_checked evidence")
+	}
+	if overflow.AccidentalHidden {
+		issues = append(issues, "layout_engine overflow accidental_hidden must be false")
+	}
+	if !overflow.HiddenRequiresExplicitClip {
+		issues = append(issues, "layout_engine overflow rules require hidden_requires_explicit_clip evidence")
+	}
+	if !overflow.VisibleOverflowPreserved {
+		issues = append(issues, "layout_engine overflow rules require visible_overflow_preserved evidence")
+	}
+	if len(overflow.ClippedBlockIDs) == 0 {
+		issues = append(issues, "layout_engine overflow rules require clipped_block_ids evidence")
+	}
+	return issues
+}
+
+func validateBlockLayoutInvalidationEvidence(invalidations []BlockLayoutInvalidationReport) []string {
+	if len(invalidations) == 0 {
+		return []string{"layout_engine invalidation evidence is required"}
+	}
+	var issues []string
+	seenCause := map[string]bool{}
+	for i, invalidation := range invalidations {
+		cause := strings.ToLower(strings.TrimSpace(invalidation.Cause))
+		if cause == "" {
+			issues = append(issues, fmt.Sprintf("layout_engine invalidations[%d] cause is required", i))
+		}
+		seenCause[cause] = true
+		if strings.TrimSpace(invalidation.DirtyRoot) == "" {
+			issues = append(issues, fmt.Sprintf("layout_engine invalidations[%d] dirty_root is required", i))
+		}
+		if len(invalidation.AffectedModes) == 0 {
+			issues = append(issues, fmt.Sprintf("layout_engine invalidations[%d] affected_modes evidence is required", i))
+		}
+		for _, mode := range invalidation.AffectedModes {
+			if !validLayoutMode(mode) {
+				issues = append(issues, fmt.Sprintf("layout_engine invalidations[%d] affected mode %q is not supported", i, mode))
+			}
+		}
+		if !validChecksumLike(invalidation.BeforeChecksum) || !validChecksumLike(invalidation.AfterChecksum) {
+			issues = append(issues, fmt.Sprintf("layout_engine invalidations[%d] checksums must be sha256 evidence", i))
+		}
+		if strings.TrimSpace(invalidation.BeforeChecksum) == strings.TrimSpace(invalidation.AfterChecksum) {
+			issues = append(issues, fmt.Sprintf("layout_engine invalidations[%d] before_checksum and after_checksum must differ", i))
+		}
+		if invalidation.CacheEntriesReused < 0 || invalidation.CacheEntriesInvalidated < 0 {
+			issues = append(issues, fmt.Sprintf("layout_engine invalidations[%d] cache entry counts must be non-negative", i))
+		}
+		if invalidation.CacheEntriesInvalidated == 0 {
+			issues = append(issues, fmt.Sprintf("layout_engine invalidations[%d] must invalidate at least one cache entry", i))
+		}
+		if cause == "resize" && !invalidation.FullTreeRelayout {
+			issues = append(issues, "layout_engine resize invalidation requires full_tree_relayout evidence")
+		}
+	}
+	for _, cause := range []string{"resize", "scroll"} {
+		if !seenCause[cause] {
+			issues = append(issues, fmt.Sprintf("layout_engine invalidation evidence requires %s cause", cause))
+		}
+	}
+	return issues
+}
+
+func validateBlockLayoutCacheBudgetEvidence(cache BlockLayoutCacheBudgetReport) []string {
+	var issues []string
+	if cache.Schema != "tetra.surface.layout-cache.v1" {
+		issues = append(issues, fmt.Sprintf("layout_engine cache_budget schema is %q, want tetra.surface.layout-cache.v1", cache.Schema))
+	}
+	if strings.TrimSpace(cache.Strategy) == "" {
+		issues = append(issues, "layout_engine cache_budget strategy is required")
+	}
+	if cache.BudgetBytes <= 0 {
+		issues = append(issues, "layout_engine cache_budget budget_bytes must be positive")
+	}
+	if cache.UsedBytes < 0 || cache.UsedBytes > cache.BudgetBytes {
+		issues = append(issues, "layout_engine cache_budget used_bytes must fit within budget_bytes")
+	}
+	if cache.MaxEntries <= 0 || cache.EntryCount <= 0 || cache.EntryCount > cache.MaxEntries {
+		issues = append(issues, "layout_engine cache_budget entry_count must be positive and within max_entries")
+	}
+	if !cache.Bounded {
+		issues = append(issues, "layout_engine cache_budget bounded evidence is required")
+	}
+	if strings.TrimSpace(cache.Eviction) == "" {
+		issues = append(issues, "layout_engine cache_budget eviction evidence is required")
+	}
+	if !cache.UnboundedCacheRejected {
+		issues = append(issues, "layout_engine cache_budget unbounded_cache_rejected evidence is required")
+	}
+	return issues
+}
+
+func validateBlockLayoutEngineNegativeGuards(guards BlockLayoutEngineNegativeGuardsReport) []string {
+	var missing []string
+	if !guards.CSSFlexboxGridParityRejected {
+		missing = append(missing, "css_flexbox_grid_parity_rejected")
+	}
+	if !guards.AccidentalOverflowHiddenRejected {
+		missing = append(missing, "accidental_overflow_hidden_rejected")
+	}
+	if !guards.UnboundedLayoutCacheRejected {
+		missing = append(missing, "unbounded_layout_cache_rejected")
+	}
+	if !guards.MissingDPIDensityRejected {
+		missing = append(missing, "missing_dpi_density_rejected")
+	}
+	if !guards.InvalidInvalidationRejected {
+		missing = append(missing, "invalid_invalidation_rejected")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return []string{fmt.Sprintf("layout_engine negative_guards missing %s", strings.Join(missing, ", "))}
+}
+
 func hasBlockLayoutEvidence(report Report) bool {
 	return len(report.LayoutConstraints) > 0 ||
 		len(report.LayoutPasses) > 0 ||
 		len(report.LayoutScrolls) > 0 ||
 		len(report.LayoutFeatures) > 0 ||
+		report.LayoutEngine != nil ||
 		strings.TrimSpace(report.LayoutQualityLevel) != "" ||
 		report.LayoutUnsupportedCSSFlexbox
 }
@@ -6780,6 +10059,1121 @@ func hasBlockStateEvidence(report Report) bool {
 		report.BlockStateUnsupportedCSSPseudos
 }
 
+func validateSurfaceAppModelEvidence(report Report) []string {
+	if report.AppModel == nil {
+		if report.BlockSystem != nil {
+			return []string{"app_model evidence is required for block_system reports"}
+		}
+		return nil
+	}
+	app := report.AppModel
+	var issues []string
+	if app.Schema != AppModelSchemaV1 {
+		issues = append(issues, fmt.Sprintf("app_model schema is %q, want %s", app.Schema, AppModelSchemaV1))
+	}
+	if app.Level != "production-app-model-v1" {
+		issues = append(issues, fmt.Sprintf("app_model level is %q, want production-app-model-v1", app.Level))
+	}
+	if app.Target != report.Target {
+		issues = append(issues, fmt.Sprintf("app_model target is %q, want report target %q", app.Target, report.Target))
+	}
+	if report.BlockSystem == nil {
+		issues = append(issues, "app_model evidence requires block_system evidence")
+	}
+	if report.BlockGraph == nil {
+		issues = append(issues, "app_model evidence requires block_graph evidence")
+	}
+	if len(report.Events) == 0 {
+		issues = append(issues, "app_model evidence requires Surface event trace")
+	}
+	if len(report.StateTransitions) == 0 {
+		issues = append(issues, "app_model evidence requires state transition trace")
+	}
+	requiredPolicies := map[string]string{
+		"state_store_level":        app.StateStoreLevel,
+		"command_policy":           app.CommandPolicy,
+		"event_routing_policy":     app.EventRoutingPolicy,
+		"async_command_policy":     app.AsyncCommandPolicy,
+		"navigation_focus_policy":  app.NavigationFocusPolicy,
+		"shortcut_scope_policy":    app.ShortcutScopePolicy,
+		"error_propagation_policy": app.ErrorPropagationPolicy,
+		"redraw_scheduling_policy": app.RedrawSchedulingPolicy,
+		"actor_task_boundary":      app.ActorTaskBoundary,
+	}
+	expectedPolicies := map[string]string{
+		"state_store_level":        "owned-state-store-v1",
+		"command_policy":           "typed-command-dispatch-v1",
+		"event_routing_policy":     "block-event-trace-v1",
+		"async_command_policy":     "actor-task-safe-boundary-v1",
+		"navigation_focus_policy":  "navigation-focus-scopes-v1",
+		"shortcut_scope_policy":    "scoped-shortcuts-v1",
+		"error_propagation_policy": "command-error-propagation-v1",
+		"redraw_scheduling_policy": "explicit-redraw-invalidation-v1",
+		"actor_task_boundary":      "safe-app-model-boundary-v1",
+	}
+	for field, got := range requiredPolicies {
+		if got != expectedPolicies[field] {
+			issues = append(issues, fmt.Sprintf("app_model %s is %q, want %s", field, got, expectedPolicies[field]))
+		}
+	}
+	for _, surface := range []string{"command_palette", "dashboard", "settings", "editor_shell"} {
+		if !containsNormalized(app.AppSurfaces, surface) {
+			issues = append(issues, fmt.Sprintf("app_model app_surfaces require %s", surface))
+		}
+	}
+
+	componentIDs := map[string]bool{}
+	for _, component := range report.Components {
+		componentIDs[component.ID] = true
+	}
+	stores := map[string]AppStateStoreReport{}
+	for i, store := range app.StateStores {
+		if strings.TrimSpace(store.ID) == "" {
+			issues = append(issues, fmt.Sprintf("app_model state_stores[%d].id is required", i))
+		}
+		if strings.TrimSpace(store.Owner) == "" || strings.TrimSpace(store.Scope) == "" {
+			issues = append(issues, fmt.Sprintf("app_model state store %q owner and scope are required", store.ID))
+		}
+		if len(store.Fields) == 0 {
+			issues = append(issues, fmt.Sprintf("app_model state store %q fields are required", store.ID))
+		}
+		if strings.TrimSpace(store.SnapshotBefore) == "" || strings.TrimSpace(store.SnapshotAfter) == "" {
+			issues = append(issues, fmt.Sprintf("app_model state store %q snapshots are required", store.ID))
+		}
+		if store.ReactState {
+			issues = append(issues, fmt.Sprintf("app_model state store %q must not use React state", store.ID))
+		}
+		if _, exists := stores[store.ID]; exists {
+			issues = append(issues, fmt.Sprintf("app_model duplicate state store %q", store.ID))
+		}
+		stores[store.ID] = store
+	}
+	if len(stores) < 4 {
+		issues = append(issues, "app_model requires at least four state stores for command palette, dashboard, settings, and editor shell")
+	}
+
+	commands := map[string]AppCommandReport{}
+	hasAsyncCommand := false
+	hasShortcutCommand := false
+	hasNavigationCommand := false
+	hasUndoCommand := false
+	hasRedoCommand := false
+	hasTextCommand := false
+	for i, command := range app.Commands {
+		if strings.TrimSpace(command.ID) == "" {
+			issues = append(issues, fmt.Sprintf("app_model commands[%d].id is required", i))
+		}
+		if strings.TrimSpace(command.Kind) == "" {
+			issues = append(issues, fmt.Sprintf("app_model command %q kind is required", command.ID))
+		}
+		if _, ok := stores[command.StoreID]; !ok {
+			issues = append(issues, fmt.Sprintf("app_model command %q store_id %q is not in state_stores", command.ID, command.StoreID))
+		}
+		if !componentIDs[command.Target] {
+			issues = append(issues, fmt.Sprintf("app_model command %q target %q is not in component evidence", command.ID, command.Target))
+		}
+		if len(command.Mutates) == 0 && !command.RequestsRedraw {
+			issues = append(issues, fmt.Sprintf("app_model command %q must mutate state or request redraw", command.ID))
+		}
+		if !command.SafeBoundary {
+			issues = append(issues, fmt.Sprintf("app_model command %q must prove safe app boundary", command.ID))
+		}
+		if command.ReactHook {
+			issues = append(issues, fmt.Sprintf("app_model command %q must not use React hooks", command.ID))
+		}
+		if _, exists := commands[command.ID]; exists {
+			issues = append(issues, fmt.Sprintf("app_model duplicate command %q", command.ID))
+		}
+		commands[command.ID] = command
+		switch normalizeStateToken(command.Kind) {
+		case "async":
+			hasAsyncCommand = true
+		case "shortcut":
+			hasShortcutCommand = true
+		case "navigation":
+			hasNavigationCommand = true
+		case "undo":
+			hasUndoCommand = true
+		case "redo":
+			hasRedoCommand = true
+		case "text_edit":
+			hasTextCommand = true
+		}
+	}
+	if len(commands) < 8 {
+		issues = append(issues, "app_model requires at least eight typed commands")
+	}
+	for _, requirement := range []struct {
+		ok   bool
+		name string
+	}{
+		{hasAsyncCommand, "async command"},
+		{hasShortcutCommand, "shortcut command"},
+		{hasNavigationCommand, "navigation command"},
+		{hasUndoCommand, "undo command"},
+		{hasRedoCommand, "redo command"},
+		{hasTextCommand, "text edit command"},
+	} {
+		if !requirement.ok {
+			issues = append(issues, "app_model requires "+requirement.name+" evidence")
+		}
+	}
+
+	eventTraceIDs := map[string]bool{}
+	lastEventOrder := 0
+	hasDeliveredTrace := false
+	hasDisabledReject := false
+	hasUnfocusedTextReject := false
+	hasShortcutTrace := false
+	for _, trace := range app.EventTraces {
+		if trace.Order <= lastEventOrder {
+			issues = append(issues, fmt.Sprintf("app_model event_traces order %d is not strictly greater than previous order %d", trace.Order, lastEventOrder))
+		}
+		lastEventOrder = trace.Order
+		if strings.TrimSpace(trace.ID) == "" {
+			issues = append(issues, fmt.Sprintf("app_model event_traces[%d].id is required", trace.Order))
+		}
+		if _, ok := commands[trace.CommandID]; !ok {
+			issues = append(issues, fmt.Sprintf("app_model event trace %q command_id %q is not in commands", trace.ID, trace.CommandID))
+		}
+		if _, ok := stores[trace.StoreID]; !ok {
+			issues = append(issues, fmt.Sprintf("app_model event trace %q store_id %q is not in state_stores", trace.ID, trace.StoreID))
+		}
+		if !componentIDs[trace.TargetBlock] {
+			issues = append(issues, fmt.Sprintf("app_model event trace %q target_block %q is not in component evidence", trace.ID, trace.TargetBlock))
+		}
+		if len(trace.DispatchPath) == 0 {
+			issues = append(issues, fmt.Sprintf("app_model event trace %q dispatch_path is required", trace.ID))
+		}
+		if trace.Delivered == trace.Rejected {
+			issues = append(issues, fmt.Sprintf("app_model event trace %q must be exactly one of delivered or rejected", trace.ID))
+		}
+		if trace.Delivered {
+			hasDeliveredTrace = true
+			if strings.TrimSpace(trace.StateBefore) == "" || strings.TrimSpace(trace.StateAfter) == "" || trace.StateBefore == trace.StateAfter {
+				issues = append(issues, fmt.Sprintf("app_model delivered event trace %q requires changed state snapshots", trace.ID))
+			}
+		}
+		reason := strings.ToLower(trace.RejectReason)
+		if trace.Rejected && strings.Contains(reason, "disabled") {
+			hasDisabledReject = true
+		}
+		if trace.Rejected && strings.Contains(reason, "unfocused") && (normalizeEventToken(trace.EventKind) == "text" || normalizeEventToken(trace.EventKind) == "text_input") {
+			hasUnfocusedTextReject = true
+		}
+		if normalizeEventToken(trace.EventKind) == "key" && strings.Contains(normalizeStateToken(trace.CommandID), "shortcut") {
+			hasShortcutTrace = true
+		}
+		eventTraceIDs[trace.ID] = true
+	}
+	if len(app.EventTraces) < 6 {
+		issues = append(issues, "app_model event trace evidence requires at least six traces")
+	}
+	if !hasDeliveredTrace {
+		issues = append(issues, "app_model event trace evidence requires delivered command trace")
+	}
+	if !hasDisabledReject {
+		issues = append(issues, "app_model event trace evidence requires disabled dispatch rejection")
+	}
+	if !hasUnfocusedTextReject {
+		issues = append(issues, "app_model event trace evidence requires unfocused text rejection")
+	}
+	if !hasShortcutTrace {
+		issues = append(issues, "app_model event trace evidence requires shortcut scope dispatch")
+	}
+	for _, command := range app.Commands {
+		if strings.TrimSpace(command.EventTraceID) != "" && !eventTraceIDs[command.EventTraceID] {
+			issues = append(issues, fmt.Sprintf("app_model command %q event_trace_id %q is not in event_traces", command.ID, command.EventTraceID))
+		}
+	}
+
+	hasSafeAsync := false
+	for _, async := range app.AsyncCommands {
+		command, ok := commands[async.CommandID]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("app_model async command %q command_id %q is not in commands", async.ID, async.CommandID))
+			continue
+		}
+		if !command.Async {
+			issues = append(issues, fmt.Sprintf("app_model async command %q references non-async command %q", async.ID, async.CommandID))
+		}
+		if async.Policy != "actor-task-safe-boundary-v1" || async.Boundary != "safe-app-model-boundary-v1" {
+			issues = append(issues, fmt.Sprintf("app_model async command %q has unsafe policy/boundary", async.ID))
+		}
+		if !async.Started || !async.Completed || !async.ErrorPropagated || !async.SafeBoundary {
+			issues = append(issues, fmt.Sprintf("app_model async command %q must prove start/completion/error/safe-boundary", async.ID))
+		}
+		hasSafeAsync = true
+	}
+	if !hasSafeAsync {
+		issues = append(issues, "app_model requires safe async command evidence")
+	}
+
+	hasFocusTrap := false
+	hasGraphNavigation := false
+	lastNavigationOrder := 0
+	for _, step := range app.NavigationSteps {
+		if step.Order <= lastNavigationOrder {
+			issues = append(issues, fmt.Sprintf("app_model navigation_steps order %d is not strictly greater than previous order %d", step.Order, lastNavigationOrder))
+		}
+		lastNavigationOrder = step.Order
+		if strings.TrimSpace(step.Before) == "" || strings.TrimSpace(step.After) == "" || strings.TrimSpace(step.FocusScope) == "" {
+			issues = append(issues, fmt.Sprintf("app_model navigation step %d requires before/after/focus_scope", step.Order))
+		}
+		if step.GraphDerived {
+			hasGraphNavigation = true
+		}
+		if step.FocusTrap {
+			hasFocusTrap = true
+		}
+	}
+	if !hasGraphNavigation || !hasFocusTrap {
+		issues = append(issues, "app_model requires graph-derived navigation and focus trap evidence")
+	}
+
+	for _, scope := range []string{"global", "command_palette", "editor_shell"} {
+		if !appHasShortcutScope(app.ShortcutScopes, scope) {
+			issues = append(issues, fmt.Sprintf("app_model shortcut_scopes require %s", scope))
+		}
+	}
+	hasHandledError := false
+	for _, report := range app.ErrorReports {
+		if _, ok := commands[report.CommandID]; !ok {
+			issues = append(issues, fmt.Sprintf("app_model error report command_id %q is not in commands", report.CommandID))
+		}
+		if _, ok := stores[report.StoreID]; !ok {
+			issues = append(issues, fmt.Sprintf("app_model error report store_id %q is not in state_stores", report.StoreID))
+		}
+		if report.Propagated && report.Handled {
+			hasHandledError = true
+		}
+	}
+	if !hasHandledError {
+		issues = append(issues, "app_model requires propagated and handled command error evidence")
+	}
+
+	lastRedrawOrder := 0
+	hasRedraw := false
+	for _, redraw := range app.RedrawRequests {
+		if redraw.Order <= lastRedrawOrder {
+			issues = append(issues, fmt.Sprintf("app_model redraw_requests order %d is not strictly greater than previous order %d", redraw.Order, lastRedrawOrder))
+		}
+		lastRedrawOrder = redraw.Order
+		if _, ok := stores[redraw.StoreID]; !ok {
+			issues = append(issues, fmt.Sprintf("app_model redraw request %d store_id %q is not in state_stores", redraw.Order, redraw.StoreID))
+		}
+		if redraw.FrameAfter <= redraw.FrameBefore {
+			issues = append(issues, fmt.Sprintf("app_model redraw request %d frame_after must be greater than frame_before", redraw.Order))
+		}
+		if strings.TrimSpace(redraw.BeforeChecksum) == "" || strings.TrimSpace(redraw.AfterChecksum) == "" || redraw.BeforeChecksum == redraw.AfterChecksum {
+			issues = append(issues, fmt.Sprintf("app_model redraw request %d requires changed frame checksums", redraw.Order))
+		}
+		hasRedraw = true
+	}
+	if !hasRedraw {
+		issues = append(issues, "app_model requires explicit redraw request evidence")
+	}
+
+	if !app.ReactRuntimeAbsent || !app.ReactHooksAbsent || !app.DOMEventsAbsent || !app.UserJSAbsent {
+		issues = append(issues, "app_model must prove React runtime, React hooks, DOM events, and user JS are absent")
+	}
+	if !app.MissingEventTraceRejected {
+		issues = append(issues, "app_model missing event trace must be rejected")
+	}
+	if !app.DisabledDispatchRejected {
+		issues = append(issues, "app_model disabled dispatch must be rejected")
+	}
+	if !app.UnfocusedTextRejected {
+		issues = append(issues, "app_model unfocused text input must be rejected")
+	}
+	if !app.UnsafeTaskBoundaryRejected {
+		issues = append(issues, "app_model unsafe actor/task boundary must be rejected")
+	}
+	if !app.ReactRuntimeClaimRejected {
+		issues = append(issues, "app_model React runtime claim must be rejected")
+	}
+	for _, required := range []string{"React runtime", "React hooks", "DOM events", "user-authored script logic", "unsafe actor/task boundary"} {
+		if !containsTextFold(app.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("app_model nonclaims missing %q", required))
+		}
+	}
+	for _, required := range []string{
+		"app model owned state stores",
+		"app model typed commands",
+		"app model Block event trace",
+		"app model async safe boundary",
+		"app model navigation focus scopes",
+		"app model shortcut scopes",
+		"app model error propagation",
+		"app model redraw scheduling",
+		"app model disabled dispatch rejected",
+		"app model unfocused text rejected",
+		"app model no React runtime",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("app_model report requires %s evidence", required))
+		}
+	}
+	return issues
+}
+
+func appHasShortcutScope(scopes []AppShortcutScopeReport, want string) bool {
+	want = normalizeStateToken(want)
+	for _, scope := range scopes {
+		if normalizeStateToken(scope.Scope) == want && len(scope.Commands) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func validateSurfaceKeyboardUXEvidence(report Report) []string {
+	if report.BlockSystem == nil {
+		return nil
+	}
+	var issues []string
+	ux := report.KeyboardUX
+	if ux == nil {
+		return []string{"keyboard_ux evidence is required for Block System reports"}
+	}
+	if ux.Schema != KeyboardUXSchemaV1 {
+		issues = append(issues, fmt.Sprintf("keyboard_ux schema is %q, want %s", ux.Schema, KeyboardUXSchemaV1))
+	}
+	if ux.Level != "production-keyboard-ux-v1" {
+		issues = append(issues, fmt.Sprintf("keyboard_ux level is %q, want production-keyboard-ux-v1", ux.Level))
+	}
+	if ux.Target != report.Target {
+		issues = append(issues, fmt.Sprintf("keyboard_ux target is %q, want report target %q", ux.Target, report.Target))
+	}
+	if report.AppModel == nil {
+		issues = append(issues, "keyboard_ux evidence requires app_model evidence")
+	}
+	if report.BlockGraph == nil {
+		issues = append(issues, "keyboard_ux evidence requires block_graph evidence")
+	}
+	expectedPolicies := map[string]string{
+		"focus_order_policy":         "graph-focus-order-v1",
+		"focus_trap_policy":          "overlay-focus-trap-v1",
+		"roving_focus_policy":        "roving-focus-v1",
+		"keyboard_activation_policy": "keyboard-activation-v1",
+		"shortcut_conflict_policy":   "scoped-shortcut-conflict-v1",
+		"undo_redo_policy":           "bounded-undo-redo-stack-v1",
+	}
+	gotPolicies := map[string]string{
+		"focus_order_policy":         ux.FocusOrderPolicy,
+		"focus_trap_policy":          ux.FocusTrapPolicy,
+		"roving_focus_policy":        ux.RovingFocusPolicy,
+		"keyboard_activation_policy": ux.KeyboardActivationPolicy,
+		"shortcut_conflict_policy":   ux.ShortcutConflictPolicy,
+		"undo_redo_policy":           ux.UndoRedoPolicy,
+	}
+	for field, want := range expectedPolicies {
+		if gotPolicies[field] != want {
+			issues = append(issues, fmt.Sprintf("keyboard_ux %s is %q, want %s", field, gotPolicies[field], want))
+		}
+	}
+	for _, surface := range []string{"command_palette", "search", "settings_form", "editor_shell"} {
+		if !containsNormalized(ux.Surfaces, surface) {
+			issues = append(issues, fmt.Sprintf("keyboard_ux surfaces require %s", surface))
+		}
+	}
+
+	blockIDs := map[int]BlockGraphNodeReport{}
+	if report.BlockGraph != nil {
+		for _, node := range report.BlockGraph.Nodes {
+			blockIDs[node.ID] = node
+		}
+	}
+	commandIDs := map[string]bool{}
+	storeIDs := map[string]bool{}
+	if report.AppModel != nil {
+		for _, command := range report.AppModel.Commands {
+			commandIDs[command.ID] = true
+		}
+		for _, store := range report.AppModel.StateStores {
+			storeIDs[store.ID] = true
+		}
+	}
+
+	focusOrderIDs := []int{}
+	lastOrder := 0
+	hasKeyboardReachable := false
+	for _, node := range ux.FocusOrder {
+		if node.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("keyboard_ux focus_order order %d is not strictly greater than previous order %d", node.Order, lastOrder))
+		}
+		lastOrder = node.Order
+		graphNode, ok := blockIDs[node.BlockID]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("keyboard_ux focus_order block_id %d is not in block_graph", node.BlockID))
+		} else if !graphNode.Focusable {
+			issues = append(issues, fmt.Sprintf("keyboard_ux focus_order block_id %d is not focusable in block_graph", node.BlockID))
+		}
+		if strings.TrimSpace(node.Name) == "" || strings.TrimSpace(node.Role) == "" || strings.TrimSpace(node.Scope) == "" {
+			issues = append(issues, fmt.Sprintf("keyboard_ux focus_order block_id %d requires name, role, and scope", node.BlockID))
+		}
+		if strings.TrimSpace(node.AccessibleName) == "" && strings.TrimSpace(node.LabelledBy) == "" {
+			issues = append(issues, fmt.Sprintf("keyboard_ux focusable block_id %d requires accessible name or labelled_by", node.BlockID))
+		}
+		if node.KeyboardReachable {
+			hasKeyboardReachable = true
+		}
+		focusOrderIDs = append(focusOrderIDs, node.BlockID)
+	}
+	if len(ux.FocusOrder) < 2 || !hasKeyboardReachable {
+		issues = append(issues, "keyboard_ux requires at least two keyboard-reachable focus_order entries")
+	}
+	if report.BlockGraph != nil && len(report.BlockGraph.FocusOrder) > 0 && !sameIntSet(focusOrderIDs, report.BlockGraph.FocusOrder) {
+		issues = append(issues, "keyboard_ux focus_order must match block_graph focus_order")
+	}
+
+	hasTab := false
+	hasShiftTab := false
+	hasGraphTransition := false
+	hasWrappedTransition := false
+	for _, transition := range ux.FocusTransitions {
+		if !blockIDs[transition.Before].Focusable || !blockIDs[transition.After].Focusable {
+			issues = append(issues, fmt.Sprintf("keyboard_ux focus transition %d references non-focusable block", transition.Order))
+		}
+		key := normalizeStateToken(transition.Key)
+		if key == "tab" {
+			hasTab = true
+		}
+		if key == "shift_tab" {
+			hasShiftTab = true
+		}
+		if transition.GraphDerived {
+			hasGraphTransition = true
+		}
+		if transition.Wrapped {
+			hasWrappedTransition = true
+		}
+	}
+	if !hasTab || !hasShiftTab || !hasGraphTransition || !hasWrappedTransition {
+		issues = append(issues, "keyboard_ux requires Tab, Shift+Tab, graph-derived, and wrapped focus transition evidence")
+	}
+
+	hasTrap := false
+	for _, trap := range ux.FocusTraps {
+		for _, id := range []int{trap.OverlayBlock, trap.EntryBlock, trap.FirstBlock, trap.LastBlock, trap.RestoreBlock} {
+			if _, ok := blockIDs[id]; !ok {
+				issues = append(issues, fmt.Sprintf("keyboard_ux focus trap %q block_id %d is not in block_graph", trap.ID, id))
+			}
+		}
+		if trap.LeakRejected && trap.EscapeCloses && strings.TrimSpace(trap.Scope) != "" {
+			hasTrap = true
+		}
+	}
+	if !hasTrap {
+		issues = append(issues, "keyboard_ux requires overlay focus trap with leak rejection and Escape close evidence")
+	}
+
+	hasRoving := false
+	for _, group := range ux.RovingFocusGroups {
+		if len(group.Items) < 2 {
+			issues = append(issues, fmt.Sprintf("keyboard_ux roving group %q requires at least two items", group.ID))
+		}
+		activeInItems := false
+		for _, id := range group.Items {
+			if !blockIDs[id].Focusable {
+				issues = append(issues, fmt.Sprintf("keyboard_ux roving group %q item %d is not focusable", group.ID, id))
+			}
+			if id == group.ActiveBlock {
+				activeInItems = true
+			}
+		}
+		if activeInItems && group.ArrowKeys && group.HomeEnd && group.Wrap && strings.TrimSpace(group.ConflictScope) != "" {
+			hasRoving = true
+		}
+	}
+	if !hasRoving {
+		issues = append(issues, "keyboard_ux requires roving focus group with arrow/home/end/wrap evidence")
+	}
+
+	requiredKeys := map[string]bool{"enter": false, "space": false, "tab": false, "shift_tab": false, "escape": false, "ctrl_k": false, "ctrl_z": false, "ctrl_y": false}
+	for _, binding := range ux.KeyBindings {
+		if strings.TrimSpace(binding.ID) == "" || strings.TrimSpace(binding.Scope) == "" {
+			issues = append(issues, "keyboard_ux key binding id and scope are required")
+		}
+		if !commandIDs[binding.CommandID] {
+			issues = append(issues, fmt.Sprintf("keyboard_ux key binding %q command_id %q is not in app_model commands", binding.ID, binding.CommandID))
+		}
+		if _, ok := blockIDs[binding.BlockID]; !ok {
+			issues = append(issues, fmt.Sprintf("keyboard_ux key binding %q block_id %d is not in block_graph", binding.ID, binding.BlockID))
+		}
+		if !binding.Delivered {
+			issues = append(issues, fmt.Sprintf("keyboard_ux key binding %q must be delivered", binding.ID))
+		}
+		key := normalizeStateToken(binding.Key)
+		if _, ok := requiredKeys[key]; ok {
+			requiredKeys[key] = true
+		}
+	}
+	for key, found := range requiredKeys {
+		if !found {
+			issues = append(issues, fmt.Sprintf("keyboard_ux key_bindings require %s", key))
+		}
+	}
+
+	hasConflict := false
+	for _, conflict := range ux.ShortcutConflicts {
+		if len(conflict.CommandIDs) < 2 {
+			issues = append(issues, fmt.Sprintf("keyboard_ux shortcut conflict %s/%s requires at least two commands", conflict.Scope, conflict.Key))
+		}
+		for _, commandID := range conflict.CommandIDs {
+			if !commandIDs[commandID] {
+				issues = append(issues, fmt.Sprintf("keyboard_ux shortcut conflict command_id %q is not in app_model commands", commandID))
+			}
+		}
+		if conflict.Diagnosed && conflict.Rejected && strings.TrimSpace(conflict.Message) != "" {
+			hasConflict = true
+		}
+	}
+	if !hasConflict {
+		issues = append(issues, "keyboard_ux requires diagnosed and rejected shortcut conflict evidence")
+	}
+
+	hasUndoRedo := false
+	for _, stack := range ux.UndoRedoStacks {
+		if !storeIDs[stack.StoreID] {
+			issues = append(issues, fmt.Sprintf("keyboard_ux undo stack %q store_id %q is not in app_model state_stores", stack.ID, stack.StoreID))
+		}
+		if !commandIDs[stack.UndoCommandID] || !commandIDs[stack.RedoCommandID] {
+			issues = append(issues, fmt.Sprintf("keyboard_ux undo stack %q undo/redo commands must be app_model commands", stack.ID))
+		}
+		if len(stack.Units) > 0 && stack.Bounded && stack.KeyboardDriven && stack.Before != stack.AfterUndo && stack.AfterUndo != stack.AfterRedo {
+			hasUndoRedo = true
+		}
+	}
+	if !hasUndoRedo {
+		issues = append(issues, "keyboard_ux requires bounded keyboard-driven undo/redo stack evidence")
+	}
+
+	scripts := map[string]bool{}
+	for _, script := range ux.KeyboardScripts {
+		if script.KeyboardOnly && script.Pass && len(script.Steps) >= 3 && strings.TrimSpace(script.FinalFocus) != "" {
+			scripts[normalizeStateToken(script.Surface)] = true
+		}
+	}
+	for _, required := range []string{"command_palette", "search", "settings_form", "editor_shell"} {
+		if !scripts[required] {
+			issues = append(issues, fmt.Sprintf("keyboard_ux requires passing keyboard script for %s", required))
+		}
+	}
+
+	if !ux.FocusableNameRejected {
+		issues = append(issues, "keyboard_ux focusable element without accessible name must be rejected")
+	}
+	if !ux.OverlayFocusLeakRejected {
+		issues = append(issues, "keyboard_ux overlay focus leak must be rejected")
+	}
+	if !ux.ShortcutConflictRejected {
+		issues = append(issues, "keyboard_ux shortcut conflict must be rejected")
+	}
+	if !ux.PointerOnlyActionRejected {
+		issues = append(issues, "keyboard_ux pointer-only action must be rejected")
+	}
+	if !ux.UnknownShortcutRejected {
+		issues = append(issues, "keyboard_ux unknown shortcut must be rejected")
+	}
+	if !ux.UndoWithoutStackRejected {
+		issues = append(issues, "keyboard_ux undo without stack must be rejected")
+	}
+	for _, required := range []string{"pointer-only app", "global shortcut bypass", "screen-reader parity", "native platform widgets"} {
+		if !containsTextFold(ux.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("keyboard_ux nonclaims missing %q", required))
+		}
+	}
+	for _, required := range []string{
+		"keyboard ux focus order",
+		"keyboard ux focus trap",
+		"keyboard ux roving focus",
+		"keyboard ux activation",
+		"keyboard ux shortcut conflict rejected",
+		"keyboard ux undo redo",
+		"keyboard ux command palette script",
+		"keyboard ux settings script",
+		"keyboard ux editor script",
+		"keyboard ux accessible names",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("keyboard_ux report requires %s evidence", required))
+		}
+	}
+	return issues
+}
+
+func validateSurfaceAppShellEvidence(report Report) []string {
+	if report.BlockSystem == nil {
+		return nil
+	}
+	shell := report.AppShell
+	if shell == nil {
+		return []string{"app_shell evidence is required for Block System reports"}
+	}
+	var issues []string
+	if shell.Schema != AppShellSchemaV1 {
+		issues = append(issues, fmt.Sprintf("app_shell schema is %q, want %s", shell.Schema, AppShellSchemaV1))
+	}
+	if shell.Level != "production-app-shell-host-abi-v1" {
+		issues = append(issues, fmt.Sprintf("app_shell level is %q, want production-app-shell-host-abi-v1", shell.Level))
+	}
+	if shell.Target != report.Target {
+		issues = append(issues, fmt.Sprintf("app_shell target is %q, want report target %q", shell.Target, report.Target))
+	}
+	if shell.HostABI != report.HostABI || shell.HostABI != "tetra.surface.host-abi.v1" {
+		issues = append(issues, fmt.Sprintf("app_shell host_abi is %q, want report host_abi %q", shell.HostABI, report.HostABI))
+	}
+	if shell.ShellPolicy != "block-app-shell-host-abi-v1" {
+		issues = append(issues, fmt.Sprintf("app_shell shell_policy is %q, want block-app-shell-host-abi-v1", shell.ShellPolicy))
+	}
+	if report.AppModel == nil {
+		issues = append(issues, "app_shell evidence requires app_model evidence")
+	}
+	if report.KeyboardUX == nil {
+		issues = append(issues, "app_shell evidence requires keyboard_ux evidence")
+	}
+
+	hostReports := map[string]AppShellHostReport{}
+	hostReportsByKind := map[string]int{}
+	for _, host := range shell.HostReports {
+		if strings.TrimSpace(host.ID) == "" {
+			issues = append(issues, "app_shell host_reports require id")
+			continue
+		}
+		if _, exists := hostReports[host.ID]; exists {
+			issues = append(issues, fmt.Sprintf("app_shell duplicate host_report id %q", host.ID))
+		}
+		if strings.TrimSpace(host.Kind) == "" || strings.TrimSpace(host.TraceID) == "" || strings.TrimSpace(host.Action) == "" {
+			issues = append(issues, fmt.Sprintf("app_shell host_report %q requires kind, trace_id, and action", host.ID))
+		}
+		if host.Target != shell.Target {
+			issues = append(issues, fmt.Sprintf("app_shell host_report %q target is %q, want %q", host.ID, host.Target, shell.Target))
+		}
+		if host.Delivered == host.Rejected {
+			issues = append(issues, fmt.Sprintf("app_shell host_report %q must be exactly one of delivered or rejected", host.ID))
+		}
+		hostReports[host.ID] = host
+		hostReportsByKind[normalizeStateToken(host.Kind)]++
+	}
+	if len(hostReports) < 12 {
+		issues = append(issues, "app_shell requires target-host action traces for shell ABI features")
+	}
+
+	diagnostics := map[string]AppShellDiagnosticReport{}
+	diagnosticsByCapability := map[string]bool{}
+	for _, diagnostic := range shell.Diagnostics {
+		if strings.TrimSpace(diagnostic.ID) == "" {
+			issues = append(issues, "app_shell diagnostics require id")
+			continue
+		}
+		if diagnostic.Target != shell.Target {
+			issues = append(issues, fmt.Sprintf("app_shell diagnostic %q target is %q, want %q", diagnostic.ID, diagnostic.Target, shell.Target))
+		}
+		if diagnostic.Unsupported && (!diagnostic.Rejected || diagnostic.SilentNoop) {
+			issues = append(issues, fmt.Sprintf("app_shell unsupported diagnostic %q must be rejected and not silent no-op", diagnostic.ID))
+		}
+		diagnostics[diagnostic.ID] = diagnostic
+		diagnosticsByCapability[normalizeStateToken(diagnostic.Capability)] = true
+	}
+
+	requiredCapabilities := []string{
+		"window", "lifecycle", "menu", "context_menu", "dialog", "notification", "tray", "cursor",
+		"drag_drop", "permission", "clipboard", "ime", "dpi_scale", "open_url", "open_file",
+	}
+	capabilities := map[string]AppShellCapabilityReport{}
+	for _, capability := range shell.Capabilities {
+		kind := normalizeStateToken(capability.Kind)
+		if kind == "" {
+			issues = append(issues, "app_shell capabilities require kind")
+			continue
+		}
+		if _, exists := capabilities[kind]; exists {
+			issues = append(issues, fmt.Sprintf("app_shell duplicate capability %q", capability.Kind))
+		}
+		if (strings.Contains(kind, "platform_widget") || strings.Contains(kind, "electron") ||
+			strings.Contains(kind, "react") || strings.Contains(kind, "dom")) && capability.Supported {
+			issues = append(issues, fmt.Sprintf("app_shell forbidden capability %q must not be supported", capability.Kind))
+		}
+		if capability.Supported && capability.HostTraceRequired && hostReportsByKind[kind] == 0 {
+			issues = append(issues, fmt.Sprintf("app_shell capability %q requires target-host action trace", capability.Kind))
+		}
+		if !capability.Supported && (capability.DiagnosticRequired || capability.HostTraceRequired) && !diagnosticsByCapability[kind] {
+			issues = append(issues, fmt.Sprintf("app_shell unsupported capability %q requires rejected diagnostic", capability.Kind))
+		}
+		capabilities[kind] = capability
+	}
+	for _, required := range requiredCapabilities {
+		capability, ok := capabilities[required]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("app_shell capabilities require %s", required))
+			continue
+		}
+		if !capability.Supported {
+			issues = append(issues, fmt.Sprintf("app_shell capability %s must be supported in production app shell ABI", required))
+		}
+		if !capability.HostTraceRequired {
+			issues = append(issues, fmt.Sprintf("app_shell capability %s must require target-host action trace", required))
+		}
+	}
+
+	componentIDs := map[string]bool{}
+	for _, component := range report.Components {
+		componentIDs[component.ID] = true
+	}
+	commandIDs := map[string]bool{}
+	if report.AppModel != nil {
+		for _, command := range report.AppModel.Commands {
+			commandIDs[command.ID] = true
+		}
+	}
+
+	issues = append(issues, validateAppShellWindows(shell.Windows, hostReports)...)
+	issues = append(issues, validateAppShellLifecycle(shell.Lifecycle, hostReports)...)
+	issues = append(issues, validateAppShellMenus(shell.Menus, hostReports, componentIDs, commandIDs)...)
+	issues = append(issues, validateAppShellDialogs(shell.Dialogs, hostReports)...)
+	issues = append(issues, validateAppShellTray(shell.TrayItems, shell.Menus, hostReports)...)
+	issues = append(issues, validateAppShellNotifications(shell.Notifications, hostReports, shell.Permissions)...)
+	issues = append(issues, validateAppShellCursors(shell.Cursors, hostReports, componentIDs)...)
+	issues = append(issues, validateAppShellDragDrop(shell.DragDrop, hostReports, componentIDs)...)
+	issues = append(issues, validateAppShellPermissions(shell.Permissions, diagnostics)...)
+	issues = append(issues, validateAppShellOpenRequests(shell.OpenRequests, hostReports)...)
+	issues = append(issues, validateAppShellDPI(shell.DPI, hostReports)...)
+
+	guards := shell.NegativeGuards
+	if !guards.MissingMenuHostTraceRejected {
+		issues = append(issues, "app_shell missing menu host trace must be rejected")
+	}
+	if !guards.NotificationWithoutHostReportRejected {
+		issues = append(issues, "app_shell notification without host report must be rejected")
+	}
+	if !guards.UnsupportedFeatureSilentNoopRejected {
+		issues = append(issues, "app_shell unsupported feature silent no-op must be rejected")
+	}
+	if !guards.WindowWithoutLifecycleRejected {
+		issues = append(issues, "app_shell window without lifecycle must be rejected")
+	}
+	if !guards.PermissionWithoutDiagnosticRejected {
+		issues = append(issues, "app_shell permission denial without diagnostic must be rejected")
+	}
+	if !guards.PlatformWidgetShellRejected {
+		issues = append(issues, "app_shell platform widget shell must be rejected")
+	}
+
+	for _, required := range []string{
+		"app shell window lifecycle",
+		"app shell menu action trace",
+		"app shell dialog picker trace",
+		"app shell notification host report",
+		"app shell tray cursor drag drop",
+		"app shell permissions diagnostics",
+		"app shell unsupported feature rejected",
+		"app shell menu claim without host trace rejected",
+		"app shell notification claim without host report rejected",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("app_shell report requires %s evidence", required))
+		}
+	}
+	for _, required := range []string{
+		"Electron shell dependency",
+		"React runtime",
+		"DOM-rendered interface",
+		"platform-native widgets",
+		"silent no-op unsupported host features",
+	} {
+		if !containsTextFold(shell.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("app_shell nonclaims missing %q", required))
+		}
+	}
+	return issues
+}
+
+func validateAppShellWindows(windows []AppShellWindowReport, hostReports map[string]AppShellHostReport) []string {
+	var issues []string
+	if len(windows) == 0 {
+		return []string{"app_shell requires window evidence"}
+	}
+	for _, window := range windows {
+		if strings.TrimSpace(window.ID) == "" || strings.TrimSpace(window.Title) == "" {
+			issues = append(issues, "app_shell windows require id and title")
+		}
+		if window.Width <= 0 || window.Height <= 0 || window.MinWidth <= 0 || window.MinHeight <= 0 {
+			issues = append(issues, fmt.Sprintf("app_shell window %q requires positive dimensions and min size", window.ID))
+		}
+		if !window.Visible || !window.Focused || !window.Resizable || !window.DPIAware {
+			issues = append(issues, fmt.Sprintf("app_shell window %q requires visible, focused, resizable, and dpi-aware evidence", window.ID))
+		}
+		if !appShellHostReportHasKind(hostReports, window.HostReportID, "window") || strings.TrimSpace(window.ActionTraceID) == "" {
+			issues = append(issues, fmt.Sprintf("app_shell window %q requires target-host window action trace", window.ID))
+		}
+	}
+	return issues
+}
+
+func validateAppShellLifecycle(lifecycle []AppShellLifecycleReport, hostReports map[string]AppShellHostReport) []string {
+	var issues []string
+	required := map[string]bool{"app_start": false, "ready": false, "activate": false, "before_quit": false, "quit": false}
+	lastOrder := 0
+	for _, event := range lifecycle {
+		if event.Order <= lastOrder {
+			issues = append(issues, fmt.Sprintf("app_shell lifecycle order %d is not strictly greater than previous order %d", event.Order, lastOrder))
+		}
+		lastOrder = event.Order
+		kind := normalizeStateToken(event.Kind)
+		if _, ok := required[kind]; ok {
+			required[kind] = true
+		}
+		if !event.Delivered || !appShellHostReportHasKind(hostReports, event.HostReportID, "lifecycle") || strings.TrimSpace(event.ActionTraceID) == "" {
+			issues = append(issues, fmt.Sprintf("app_shell lifecycle %q requires delivered target-host trace", event.Kind))
+		}
+	}
+	for kind, seen := range required {
+		if !seen {
+			issues = append(issues, fmt.Sprintf("app_shell lifecycle requires %s", kind))
+		}
+	}
+	return issues
+}
+
+func validateAppShellMenus(menus []AppShellMenuReport, hostReports map[string]AppShellHostReport, componentIDs map[string]bool, commandIDs map[string]bool) []string {
+	var issues []string
+	seenAppMenu := false
+	seenContextMenu := false
+	for _, menu := range menus {
+		kind := normalizeStateToken(menu.Kind)
+		if kind == "menu" || kind == "app_menu" {
+			seenAppMenu = true
+		}
+		if kind == "context_menu" {
+			seenContextMenu = true
+		}
+		if strings.TrimSpace(menu.ID) == "" || len(menu.Items) == 0 {
+			issues = append(issues, "app_shell menus require id and items")
+		}
+		if !componentIDs[menu.TargetBlock] {
+			issues = append(issues, fmt.Sprintf("app_shell menu %q target_block %q is not in component evidence", menu.ID, menu.TargetBlock))
+		}
+		if !commandIDs[menu.CommandID] {
+			issues = append(issues, fmt.Sprintf("app_shell menu %q command_id %q is not in app_model commands", menu.ID, menu.CommandID))
+		}
+		if !menu.Delivered || !appShellHostReportHasKind(hostReports, menu.HostReportID, kind) || strings.TrimSpace(menu.ActionTraceID) == "" {
+			issues = append(issues, fmt.Sprintf("app_shell menu %q requires target-host action trace", menu.ID))
+		}
+	}
+	if !seenAppMenu || !seenContextMenu {
+		issues = append(issues, "app_shell requires app menu and context menu evidence")
+	}
+	return issues
+}
+
+func validateAppShellDialogs(dialogs []AppShellDialogReport, hostReports map[string]AppShellHostReport) []string {
+	var issues []string
+	seenFilePicker := false
+	seenMessage := false
+	for _, dialog := range dialogs {
+		kind := normalizeStateToken(dialog.Kind)
+		if kind == "file_open" || kind == "file_picker" {
+			seenFilePicker = true
+		}
+		if kind == "message" || kind == "message_box" {
+			seenMessage = true
+		}
+		if strings.TrimSpace(dialog.ID) == "" || strings.TrimSpace(dialog.Title) == "" || strings.TrimSpace(dialog.Result) == "" {
+			issues = append(issues, "app_shell dialogs require id, title, and result")
+		}
+		if !dialog.Delivered || !appShellHostReportHasKind(hostReports, dialog.HostReportID, "dialog") || strings.TrimSpace(dialog.ActionTraceID) == "" {
+			issues = append(issues, fmt.Sprintf("app_shell dialog %q requires target-host picker/message trace", dialog.ID))
+		}
+	}
+	if !seenFilePicker || !seenMessage {
+		issues = append(issues, "app_shell requires file picker and message dialog evidence")
+	}
+	return issues
+}
+
+func validateAppShellTray(trayItems []AppShellTrayReport, menus []AppShellMenuReport, hostReports map[string]AppShellHostReport) []string {
+	var issues []string
+	menuIDs := map[string]bool{}
+	for _, menu := range menus {
+		menuIDs[menu.ID] = true
+	}
+	if len(trayItems) == 0 {
+		return []string{"app_shell requires tray/status item evidence"}
+	}
+	for _, tray := range trayItems {
+		if strings.TrimSpace(tray.ID) == "" || strings.TrimSpace(tray.Tooltip) == "" || strings.TrimSpace(tray.ClickAction) == "" {
+			issues = append(issues, "app_shell tray items require id, tooltip, and click action")
+		}
+		if !menuIDs[tray.MenuID] {
+			issues = append(issues, fmt.Sprintf("app_shell tray %q menu_id %q is not in menus", tray.ID, tray.MenuID))
+		}
+		if !tray.Delivered || !appShellHostReportHasKind(hostReports, tray.HostReportID, "tray") || strings.TrimSpace(tray.ActionTraceID) == "" {
+			issues = append(issues, fmt.Sprintf("app_shell tray %q requires target-host action trace", tray.ID))
+		}
+	}
+	return issues
+}
+
+func validateAppShellNotifications(notifications []AppShellNotificationReport, hostReports map[string]AppShellHostReport, permissions []AppShellPermissionReport) []string {
+	var issues []string
+	permissionIDs := map[string]bool{}
+	for _, permission := range permissions {
+		permissionIDs[permission.ID] = true
+	}
+	if len(notifications) == 0 {
+		return []string{"app_shell requires notification evidence"}
+	}
+	for _, notification := range notifications {
+		if strings.TrimSpace(notification.ID) == "" || strings.TrimSpace(notification.Title) == "" || strings.TrimSpace(notification.Body) == "" {
+			issues = append(issues, "app_shell notifications require id, title, and body")
+		}
+		if !permissionIDs[notification.PermissionID] {
+			issues = append(issues, fmt.Sprintf("app_shell notification %q permission_id %q is not in permissions", notification.ID, notification.PermissionID))
+		}
+		if !notification.Delivered || !appShellHostReportHasKind(hostReports, notification.HostReportID, "notification") {
+			issues = append(issues, fmt.Sprintf("app_shell notification %q requires delivered host report", notification.ID))
+		}
+	}
+	return issues
+}
+
+func validateAppShellCursors(cursors []AppShellCursorReport, hostReports map[string]AppShellHostReport, componentIDs map[string]bool) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, cursor := range cursors {
+		kind := normalizeStateToken(cursor.Kind)
+		seen[kind] = true
+		if !componentIDs[cursor.TargetBlock] {
+			issues = append(issues, fmt.Sprintf("app_shell cursor %q target_block %q is not in component evidence", cursor.Kind, cursor.TargetBlock))
+		}
+		if !cursor.Applied || !appShellHostReportHasKind(hostReports, cursor.HostReportID, "cursor") {
+			issues = append(issues, fmt.Sprintf("app_shell cursor %q requires applied host trace", cursor.Kind))
+		}
+	}
+	for _, required := range []string{"pointer", "text", "grab"} {
+		if !seen[required] {
+			issues = append(issues, fmt.Sprintf("app_shell cursors require %s", required))
+		}
+	}
+	return issues
+}
+
+func validateAppShellDragDrop(dragDrop []AppShellDragDropReport, hostReports map[string]AppShellHostReport, componentIDs map[string]bool) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, drag := range dragDrop {
+		kind := normalizeStateToken(drag.Kind)
+		seen[kind] = true
+		if !componentIDs[drag.SourceBlock] || !componentIDs[drag.TargetBlock] {
+			issues = append(issues, fmt.Sprintf("app_shell drag_drop %q requires source and target blocks in component evidence", drag.ID))
+		}
+		if strings.TrimSpace(drag.MIME) == "" {
+			issues = append(issues, fmt.Sprintf("app_shell drag_drop %q requires MIME evidence", drag.ID))
+		}
+		if !drag.Delivered || !appShellHostReportHasKind(hostReports, drag.HostReportID, "drag_drop") || strings.TrimSpace(drag.ActionTraceID) == "" {
+			issues = append(issues, fmt.Sprintf("app_shell drag_drop %q requires target-host trace", drag.ID))
+		}
+	}
+	for _, required := range []string{"drag_enter", "drop"} {
+		if !seen[required] {
+			issues = append(issues, fmt.Sprintf("app_shell drag_drop requires %s", required))
+		}
+	}
+	return issues
+}
+
+func validateAppShellPermissions(permissions []AppShellPermissionReport, diagnostics map[string]AppShellDiagnosticReport) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, permission := range permissions {
+		kind := normalizeStateToken(permission.Kind)
+		seen[kind] = true
+		if strings.TrimSpace(permission.ID) == "" || strings.TrimSpace(permission.Mode) == "" {
+			issues = append(issues, "app_shell permissions require id and mode")
+		}
+		if permission.Granted && permission.Rejected {
+			issues = append(issues, fmt.Sprintf("app_shell permission %q cannot be both granted and rejected", permission.ID))
+		}
+		if permission.Rejected {
+			diagnostic, ok := diagnostics[permission.DiagnosticID]
+			if !ok || !diagnostic.Rejected || diagnostic.SilentNoop {
+				issues = append(issues, fmt.Sprintf("app_shell permission %q denial requires rejected diagnostic and no silent no-op", permission.ID))
+			}
+		}
+	}
+	for _, required := range []string{"notification", "filesystem", "clipboard"} {
+		if !seen[required] {
+			issues = append(issues, fmt.Sprintf("app_shell permissions require %s", required))
+		}
+	}
+	return issues
+}
+
+func validateAppShellOpenRequests(openRequests []AppShellOpenRequestReport, hostReports map[string]AppShellHostReport) []string {
+	var issues []string
+	seen := map[string]bool{}
+	for _, request := range openRequests {
+		kind := normalizeStateToken(request.Kind)
+		seen[kind] = true
+		if strings.TrimSpace(request.ID) == "" || strings.TrimSpace(request.Target) == "" {
+			issues = append(issues, "app_shell open requests require id and target")
+		}
+		if !request.Delivered || !appShellHostReportHasKind(hostReports, request.HostReportID, kind) {
+			issues = append(issues, fmt.Sprintf("app_shell open request %q requires host report", request.ID))
+		}
+	}
+	for _, required := range []string{"open_url", "open_file"} {
+		if !seen[required] {
+			issues = append(issues, fmt.Sprintf("app_shell open requests require %s", required))
+		}
+	}
+	return issues
+}
+
+func validateAppShellDPI(dpi []AppShellDPIReport, hostReports map[string]AppShellHostReport) []string {
+	var issues []string
+	if len(dpi) == 0 {
+		return []string{"app_shell requires DPI/scale evidence"}
+	}
+	for _, sample := range dpi {
+		if sample.ScaleMille <= 0 || sample.Width <= 0 || sample.Height <= 0 {
+			issues = append(issues, fmt.Sprintf("app_shell dpi sample %q requires positive scale and dimensions", sample.ID))
+		}
+		if !appShellHostReportHasKind(hostReports, sample.HostReportID, "dpi_scale") {
+			issues = append(issues, fmt.Sprintf("app_shell dpi sample %q requires host report", sample.ID))
+		}
+	}
+	return issues
+}
+
+func appShellHostReportHasKind(hostReports map[string]AppShellHostReport, id string, kind string) bool {
+	report, ok := hostReports[id]
+	if !ok || !report.Delivered {
+		return false
+	}
+	got := normalizeStateToken(report.Kind)
+	want := normalizeStateToken(kind)
+	return got == want || (want == "app_menu" && got == "menu") || (want == "menu" && got == "app_menu")
+}
+
+func sameIntSet(left []int, right []int) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	counts := map[int]int{}
+	for _, value := range left {
+		counts[value]++
+	}
+	for _, value := range right {
+		counts[value]--
+		if counts[value] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func validateBlockMotionEvidence(report Report) []string {
 	if !hasBlockMotionEvidence(report) {
 		return nil
@@ -6931,6 +11325,191 @@ func hasBlockMotionEvidence(report Report) bool {
 		report.MotionUnsupportedCSSAnimations
 }
 
+func validateAnimationSchedulerEvidence(report Report) []string {
+	if !isSurfaceBlockMotionSource(report.Source) && report.AnimationScheduler == nil {
+		return nil
+	}
+	if report.AnimationScheduler == nil {
+		return []string{"animation_scheduler evidence is required for production Surface motion reports"}
+	}
+
+	var issues []string
+	scheduler := report.AnimationScheduler
+	if scheduler.Schema != AnimationSchedulerSchemaV1 {
+		issues = append(issues, fmt.Sprintf("animation_scheduler schema is %q, want %s", scheduler.Schema, AnimationSchedulerSchemaV1))
+	}
+	if scheduler.Level != "production-animation-scheduler-v1" {
+		issues = append(issues, fmt.Sprintf("animation_scheduler level is %q, want production-animation-scheduler-v1", scheduler.Level))
+	}
+	if normalizeEvidencePath(scheduler.Source) != normalizeEvidencePath(report.Source) {
+		issues = append(issues, "animation_scheduler source must match report source")
+	}
+	if scheduler.ReleaseScope != ReleaseScopeSurfaceV1LinuxWeb {
+		issues = append(issues, "animation_scheduler requires surface-v1-linux-web release scope")
+	}
+	if !hasBlockMotionEvidence(report) {
+		issues = append(issues, "animation_scheduler requires motion frame evidence")
+	}
+	if scheduler.MotionQualityLevel != report.MotionQualityLevel || scheduler.MotionQualityLevel != "deterministic-block-motion-v1" {
+		issues = append(issues, "animation_scheduler motion_quality_level must match deterministic-block-motion-v1")
+	}
+	if scheduler.MotionClock != report.MotionClock || scheduler.MotionClock != "deterministic-test-clock-v1" {
+		issues = append(issues, "animation_scheduler motion_clock must match deterministic-test-clock-v1")
+	}
+	for _, requirement := range []struct {
+		got  string
+		want string
+		name string
+	}{
+		{scheduler.SchedulerPolicy, "deterministic-motion-frame-scheduler-v1", "scheduler_policy"},
+		{scheduler.TimelinePolicy, "stable-motion-timeline-v1", "timeline_policy"},
+		{scheduler.InvalidationPolicy, "motion-dirty-block-invalidation-v1", "invalidation_policy"},
+		{scheduler.LifecyclePolicy, "start-interpolate-settle-stop-v1", "lifecycle_policy"},
+		{scheduler.ReducedMotionPolicy, "instant-settle-no-schedule-v1", "reduced_motion_policy"},
+	} {
+		if requirement.got != requirement.want {
+			issues = append(issues, fmt.Sprintf("animation_scheduler %s is %q, want %s", requirement.name, requirement.got, requirement.want))
+		}
+	}
+
+	scheduled, settled, reduced := motionFrameCounts(report.MotionFrames)
+	maxDelta := maxMotionFrameDeltaMS(report.MotionFrames)
+	if scheduler.FrameCount != len(report.MotionFrames) || scheduler.FrameCount <= 0 {
+		issues = append(issues, fmt.Sprintf("animation_scheduler frame_count = %d, want %d", scheduler.FrameCount, len(report.MotionFrames)))
+	}
+	if scheduler.FrameBudget != report.MotionFrameBudget || scheduler.FrameBudget <= 0 || scheduler.FrameBudget > 16 {
+		issues = append(issues, "animation_scheduler frame_budget must match bounded motion_frame_budget")
+	}
+	if scheduler.ScheduledFrameCount != scheduled {
+		issues = append(issues, fmt.Sprintf("animation_scheduler scheduled_frame_count = %d, want %d", scheduler.ScheduledFrameCount, scheduled))
+	}
+	if scheduler.SettledFrameCount != settled {
+		issues = append(issues, fmt.Sprintf("animation_scheduler settled_frame_count = %d, want %d", scheduler.SettledFrameCount, settled))
+	}
+	if scheduler.ReducedMotionFrameCount != reduced || reduced == 0 {
+		issues = append(issues, "animation_scheduler reduced_motion_frame_count must match reduced-motion instant-settle frames")
+	}
+	if scheduler.TargetFrameIntervalMS != 16 {
+		issues = append(issues, fmt.Sprintf("animation_scheduler target_frame_interval_ms = %d, want 16", scheduler.TargetFrameIntervalMS))
+	}
+	if scheduler.MaxFrameDeltaMS != maxDelta || scheduler.MaxFrameDeltaMS <= 0 {
+		issues = append(issues, fmt.Sprintf("animation_scheduler max_frame_delta_ms = %d, want %d", scheduler.MaxFrameDeltaMS, maxDelta))
+	}
+	if scheduler.JitterBudgetMS < 0 || scheduler.JitterBudgetMS > 8 {
+		issues = append(issues, "animation_scheduler jitter_budget_ms must be bounded to 0..8")
+	}
+	for _, property := range []string{"opacity", "color", "transform", "translate", "scale"} {
+		if !stringSliceContainsFold(scheduler.TransitionProperties, property) {
+			issues = append(issues, fmt.Sprintf("animation_scheduler transition_properties missing %q", property))
+		}
+	}
+	if !scheduler.DeterministicTimeline || !scheduler.FrameTimingEvidence || !scheduler.InvalidationEvidence ||
+		!scheduler.LifecycleEvidence || !scheduler.ReducedMotionEvidence || !scheduler.VisualDeltaEvidence ||
+		!scheduler.CSSAnimationParityRejected || !scheduler.HiddenLoopRejected {
+		issues = append(issues, "animation_scheduler requires deterministic timeline, frame timing, invalidation, lifecycle, reduced-motion, visual-delta, CSS parity rejection, and hidden-loop rejection evidence")
+	}
+	if len(scheduler.TargetSmoke) == 0 {
+		issues = append(issues, "animation_scheduler target_smoke evidence is required")
+	}
+	smokeMatchesReport := false
+	for _, smoke := range scheduler.TargetSmoke {
+		if strings.TrimSpace(smoke.Target) == "" || strings.TrimSpace(smoke.Runtime) == "" {
+			issues = append(issues, "animation_scheduler target_smoke requires target and runtime")
+		}
+		if smoke.FrameCount != scheduler.FrameCount || smoke.FrameCount <= 0 {
+			issues = append(issues, "animation_scheduler target_smoke frame_count must match scheduler frame_count")
+		}
+		if !smoke.FrameTimingEvidence || !smoke.VisualDeltaEvidence || !smoke.ArtifactHashEvidence || !smoke.Pass {
+			issues = append(issues, "animation_scheduler target_smoke requires frame timing, visual delta, artifact hash, and pass evidence")
+		}
+		if smoke.Target == report.Target && smoke.Runtime == report.Runtime {
+			smokeMatchesReport = true
+		}
+	}
+	if !smokeMatchesReport {
+		issues = append(issues, "animation_scheduler target_smoke must include the report target/runtime")
+	}
+	issues = append(issues, validateAnimationSchedulerNegativeGuards(scheduler.NegativeGuards)...)
+	for _, required := range []string{
+		"CSS animation runtime",
+		"global animation cascade",
+		"requestAnimationFrame parity",
+		"GPU compositor timing",
+		"unbounded hidden animation loops",
+	} {
+		if !stringSliceContainsFold(scheduler.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("animation_scheduler nonclaims missing %q", required))
+		}
+	}
+	for _, required := range []string{
+		"block motion frame scheduler timeline",
+		"block motion invalidation lifecycle",
+		"block motion frame timing evidence",
+		"block motion hidden loop rejected",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("animation_scheduler report requires %s evidence", required))
+		}
+	}
+	return issues
+}
+
+func validateAnimationSchedulerNegativeGuards(guards AnimationSchedulerNegativeGuardsReport) []string {
+	var issues []string
+	if !guards.CSSAnimationParityRejected {
+		issues = append(issues, "animation_scheduler must reject CSS animation parity claims")
+	}
+	if !guards.HiddenLoopRejected {
+		issues = append(issues, "animation_scheduler must reject hidden animation loops")
+	}
+	if !guards.MissingReducedMotion {
+		issues = append(issues, "animation_scheduler must reject missing reduced-motion evidence")
+	}
+	if !guards.MissingFrameTiming {
+		issues = append(issues, "animation_scheduler must reject missing frame timing evidence")
+	}
+	if !guards.UnboundedFrameSchedule {
+		issues = append(issues, "animation_scheduler must reject unbounded frame schedules")
+	}
+	if !guards.UnchangedVisualFrame {
+		issues = append(issues, "animation_scheduler must reject unchanged visual frame evidence")
+	}
+	return issues
+}
+
+func motionFrameCounts(frames []MotionFrameReport) (scheduled int, settled int, reduced int) {
+	for _, frame := range frames {
+		if frame.Scheduled {
+			scheduled++
+		}
+		if frame.Settled {
+			settled++
+		}
+		if frame.ReducedMotion {
+			reduced++
+		}
+	}
+	return scheduled, settled, reduced
+}
+
+func maxMotionFrameDeltaMS(frames []MotionFrameReport) int {
+	if len(frames) < 2 {
+		return 0
+	}
+	maxDelta := 0
+	for i := 1; i < len(frames); i++ {
+		delta := frames[i].TimestampMS - frames[i-1].TimestampMS
+		if delta > maxDelta {
+			maxDelta = delta
+		}
+	}
+	return maxDelta
+}
+
+func isSurfaceBlockMotionSource(source string) bool {
+	return strings.HasSuffix(normalizeEvidencePath(source), "examples/surface_block_motion.tetra")
+}
+
 func validateBlockAssetEvidence(report Report) []string {
 	if !hasBlockAssetEvidence(report) {
 		return nil
@@ -6967,8 +11546,8 @@ func validateBlockAssetEvidence(report Report) []string {
 		if !manifest.LocalOnly || manifest.RemoteCount != 0 {
 			issues = append(issues, "block_asset_manifest must be local-only with remote_count 0")
 		}
-		if manifest.FontCount <= 0 || manifest.IconCount <= 0 || manifest.ImageCount <= 0 {
-			issues = append(issues, "block_asset_manifest requires font, icon, and image counts")
+		if manifest.FontCount <= 0 || manifest.IconCount <= 0 || manifest.ImageCount <= 0 || manifest.VectorCount <= 0 {
+			issues = append(issues, "block_asset_manifest requires font, icon, image, and vector counts")
 		}
 		if manifest.EmbeddedCount <= 0 {
 			issues = append(issues, "block_asset_manifest requires embedded/local sample asset evidence")
@@ -6987,7 +11566,7 @@ func validateBlockAssetEvidence(report Report) []string {
 			}
 			assetIDs[id] = asset
 			if !validBlockAssetKind(kind) {
-				issues = append(issues, fmt.Sprintf("block_asset_manifest asset %q kind is %q, want font, icon, or image", id, asset.Kind))
+				issues = append(issues, fmt.Sprintf("block_asset_manifest asset %q kind is %q, want font, icon, image, or vector", id, asset.Kind))
 			}
 			kindCounts[kind]++
 			if strings.TrimSpace(asset.Path) == "" {
@@ -7011,11 +11590,11 @@ func validateBlockAssetEvidence(report Report) []string {
 			if kind == "font" && strings.TrimSpace(asset.Family) == "" {
 				issues = append(issues, fmt.Sprintf("block_asset_manifest font asset %q family is required", id))
 			}
-			if (kind == "icon" || kind == "image") && (asset.Width <= 0 || asset.Height <= 0) {
+			if (kind == "icon" || kind == "image" || kind == "vector") && (asset.Width <= 0 || asset.Height <= 0) {
 				issues = append(issues, fmt.Sprintf("block_asset_manifest %s asset %q width/height must be positive", kind, id))
 			}
 		}
-		if kindCounts["font"] < manifest.FontCount || kindCounts["icon"] < manifest.IconCount || kindCounts["image"] < manifest.ImageCount {
+		if kindCounts["font"] < manifest.FontCount || kindCounts["icon"] < manifest.IconCount || kindCounts["image"] < manifest.ImageCount || kindCounts["vector"] < manifest.VectorCount {
 			issues = append(issues, "block_asset_manifest counts must be backed by matching asset entries")
 		}
 	}
@@ -7118,7 +11697,7 @@ func validateBlockAssetEvidence(report Report) []string {
 			issues = append(issues, "block_asset_render_commands scale_image requires scale evidence")
 		}
 	}
-	for _, required := range []string{"load_font", "tint_icon", "scale_image", "fallback_missing"} {
+	for _, required := range []string{"load_font", "tint_icon", "scale_image", "render_vector", "fallback_missing"} {
 		if !commands[required] {
 			issues = append(issues, fmt.Sprintf("block_asset_render_commands require %s command", required))
 		}
@@ -7158,6 +11737,169 @@ func validateBlockAssetEvidence(report Report) []string {
 	return issues
 }
 
+func validateAssetPipelineEvidence(report Report) []string {
+	if !isSurfaceBlockAssetsSource(report.Source) && report.AssetPipeline == nil {
+		return nil
+	}
+	if report.AssetPipeline == nil {
+		return []string{"asset_pipeline evidence is required for production Surface asset reports"}
+	}
+	var issues []string
+	pipeline := report.AssetPipeline
+	manifest := report.BlockAssetManifest
+	if pipeline.Schema != AssetPipelineSchemaV1 {
+		issues = append(issues, fmt.Sprintf("asset_pipeline schema is %q, want %s", pipeline.Schema, AssetPipelineSchemaV1))
+	}
+	if pipeline.Level != "production-asset-pipeline-v1" {
+		issues = append(issues, fmt.Sprintf("asset_pipeline level is %q, want production-asset-pipeline-v1", pipeline.Level))
+	}
+	if normalizeEvidencePath(pipeline.Source) != normalizeEvidencePath(report.Source) {
+		issues = append(issues, "asset_pipeline source must match report source")
+	}
+	if pipeline.ReleaseScope != ReleaseScopeSurfaceV1LinuxWeb {
+		issues = append(issues, "asset_pipeline requires surface-v1-linux-web release scope")
+	}
+	if manifest == nil {
+		issues = append(issues, "asset_pipeline requires block_asset_manifest evidence")
+	} else {
+		if pipeline.ManifestSchema != manifest.Schema || manifest.Schema != "tetra.surface.block-assets.v1" {
+			issues = append(issues, "asset_pipeline manifest_schema must match tetra.surface.block-assets.v1")
+		}
+		if pipeline.ManifestHash != manifest.ManifestHash || !validSHA256Digest(pipeline.ManifestHash) {
+			issues = append(issues, "asset_pipeline manifest_hash must match block_asset_manifest sha256 evidence")
+		}
+		if pipeline.HashAlgorithm != manifest.HashAlgorithm || manifest.HashAlgorithm != "sha256" {
+			issues = append(issues, "asset_pipeline hash_algorithm must be sha256 and match block_asset_manifest")
+		}
+		if pipeline.LocalOnly != manifest.LocalOnly || !pipeline.LocalOnly {
+			issues = append(issues, "asset_pipeline requires local_only asset manifest")
+		}
+		if pipeline.NetworkFetchAllowed || report.BlockAssetNetworkFetchAllowed || manifest.RemoteCount != 0 {
+			issues = append(issues, "asset_pipeline network fetch must be disabled with remote_count 0")
+		}
+		if pipeline.FontCount != manifest.FontCount || pipeline.FontCount != countBlockAssetsByKind(manifest.Assets, "font") {
+			issues = append(issues, "asset_pipeline font_count must match manifest font assets")
+		}
+		if pipeline.IconCount != manifest.IconCount || pipeline.IconCount != countBlockAssetsByKind(manifest.Assets, "icon") {
+			issues = append(issues, "asset_pipeline icon_count must match manifest icon assets")
+		}
+		if pipeline.ImageCount != manifest.ImageCount || pipeline.ImageCount != countBlockAssetsByKind(manifest.Assets, "image") {
+			issues = append(issues, "asset_pipeline image_count must match manifest image assets")
+		}
+		if pipeline.VectorCount != manifest.VectorCount || pipeline.VectorCount != countBlockAssetsByKind(manifest.Assets, "vector") {
+			issues = append(issues, "asset_pipeline vector_count must match manifest vector assets")
+		}
+		if pipeline.AssetCount != len(manifest.Assets) {
+			issues = append(issues, fmt.Sprintf("asset_pipeline asset_count = %d, want %d", pipeline.AssetCount, len(manifest.Assets)))
+		}
+		for _, asset := range manifest.Assets {
+			if normalizeStateToken(asset.Kind) == "font" && isNetworkAssetPath(asset.Path) {
+				issues = append(issues, "asset_pipeline remote font assets are rejected in release reports")
+			}
+			if !validSHA256Digest(asset.SHA256) {
+				issues = append(issues, fmt.Sprintf("asset_pipeline asset %q requires sha256 before decode", asset.ID))
+			}
+		}
+	}
+	for _, requirement := range []struct {
+		got  string
+		want string
+		name string
+	}{
+		{pipeline.DecoderPolicy, "safe-local-asset-decoders-v1", "decoder_policy"},
+		{pipeline.FontDecoder, "font-table-hash-verified-v1", "font_decoder"},
+		{pipeline.IconDecoder, "icon-mask-tint-rgba-v1", "icon_decoder"},
+		{pipeline.ImageDecoder, "png-rgba-bounds-checked-v1", "image_decoder"},
+		{pipeline.VectorDecoder, "svg-tiny-static-sanitized-v1", "vector_decoder"},
+	} {
+		if requirement.got != requirement.want {
+			issues = append(issues, fmt.Sprintf("asset_pipeline %s is %q, want %s", requirement.name, requirement.got, requirement.want))
+		}
+	}
+	if !pipeline.FontHashesVerified || !pipeline.IconTintPipeline || !pipeline.ImageBoundsChecked ||
+		!pipeline.RasterDecodeBoundsChecked || !pipeline.VectorSanitized ||
+		!pipeline.SVGScriptRejected || !pipeline.SVGExternalRefRejected {
+		issues = append(issues, "asset_pipeline requires font hash, icon tint, image bounds, raster bounds, sanitized vector, SVG script, and SVG external-reference evidence")
+	}
+	cache := report.BlockAssetCache
+	if pipeline.CacheStrategy != cache.Strategy || normalizeStateToken(cache.Strategy) != "bounded_lru" {
+		issues = append(issues, "asset_pipeline cache_strategy must match bounded-lru block_asset_cache")
+	}
+	if pipeline.CacheBudgetBytes != cache.BudgetBytes || pipeline.CacheUsedBytes != cache.UsedBytes ||
+		pipeline.CacheEntryCount != cache.EntryCount || pipeline.CacheBudgetBytes <= 0 ||
+		pipeline.CacheUsedBytes > pipeline.CacheBudgetBytes || !pipeline.CacheBounded || !cache.Bounded {
+		issues = append(issues, "asset_pipeline cache counts must match bounded block_asset_cache evidence")
+	}
+	if pipeline.RenderCommandCount != len(report.BlockAssetRenderCommands) {
+		issues = append(issues, fmt.Sprintf("asset_pipeline render_command_count = %d, want %d", pipeline.RenderCommandCount, len(report.BlockAssetRenderCommands)))
+	}
+	if pipeline.DiagnosticCount != len(report.BlockAssetDiagnostics) {
+		issues = append(issues, fmt.Sprintf("asset_pipeline diagnostic_count = %d, want %d", pipeline.DiagnosticCount, len(report.BlockAssetDiagnostics)))
+	}
+	issues = append(issues, validateAssetPipelineNegativeGuards(pipeline.NegativeGuards)...)
+	for _, required := range []string{
+		"network assets",
+		"remote fonts",
+		"untrusted svg scripting",
+		"full SVG/CSS/SMIL",
+		"arbitrary image codecs",
+	} {
+		if !stringSliceContainsFold(pipeline.NonClaims, required) {
+			issues = append(issues, fmt.Sprintf("asset_pipeline nonclaims missing %q", required))
+		}
+	}
+	for _, required := range []string{
+		"block asset vector safe decode",
+		"block asset unsafe SVG rejected",
+		"block asset remote font rejected",
+	} {
+		if !caseNameContains(report.Cases, required) {
+			issues = append(issues, fmt.Sprintf("asset_pipeline report requires %s evidence", required))
+		}
+	}
+	return issues
+}
+
+func validateAssetPipelineNegativeGuards(guards AssetPipelineNegativeGuardsReport) []string {
+	var issues []string
+	if !guards.MissingHashRejected {
+		issues = append(issues, "asset_pipeline must reject missing asset hashes")
+	}
+	if !guards.RemoteFontRejected {
+		issues = append(issues, "asset_pipeline must reject remote fonts in release reports")
+	}
+	if !guards.NetworkFetchRejected {
+		issues = append(issues, "asset_pipeline must reject network fetches")
+	}
+	if !guards.UnboundedCacheRejected {
+		issues = append(issues, "asset_pipeline must reject unbounded caches")
+	}
+	if !guards.MissingAssetFallbackRequired {
+		issues = append(issues, "asset_pipeline must require missing asset fallback diagnostics")
+	}
+	if !guards.UnsafeSVGRejected {
+		issues = append(issues, "asset_pipeline must reject unsafe SVG payloads")
+	}
+	if !guards.OversizedRasterRejected {
+		issues = append(issues, "asset_pipeline must reject oversized raster decode")
+	}
+	if !guards.DecoderWithoutHashRejected {
+		issues = append(issues, "asset_pipeline must reject decoder execution without hash validation")
+	}
+	return issues
+}
+
+func countBlockAssetsByKind(assets []BlockAssetReport, kind string) int {
+	count := 0
+	kind = normalizeStateToken(kind)
+	for _, asset := range assets {
+		if normalizeStateToken(asset.Kind) == kind {
+			count++
+		}
+	}
+	return count
+}
+
 func hasBlockAssetEvidence(report Report) bool {
 	return report.BlockAssetManifest != nil ||
 		strings.TrimSpace(report.BlockAssetQualityLevel) != "" ||
@@ -7168,7 +11910,7 @@ func hasBlockAssetEvidence(report Report) bool {
 }
 
 func validBlockAssetKind(kind string) bool {
-	return kind == "font" || kind == "icon" || kind == "image"
+	return kind == "font" || kind == "icon" || kind == "image" || kind == "vector"
 }
 
 func isNetworkAssetPath(path string) bool {
@@ -7455,6 +12197,10 @@ func isSurfaceBlockAccessibilitySource(source string) bool {
 	return strings.HasSuffix(source, "examples/surface_block_accessibility.tetra") ||
 		strings.HasSuffix(source, "examples/surface_block_system.tetra") ||
 		strings.HasSuffix(source, "examples/surface_morph_command_palette.tetra")
+}
+
+func isSurfaceBlockAssetsSource(source string) bool {
+	return strings.HasSuffix(normalizeEvidencePath(source), "examples/surface_block_assets.tetra")
 }
 
 func isPlatformBridgeAccessibilityReport(report Report) bool {
@@ -7901,6 +12647,26 @@ func artifactKindContains(artifacts []ArtifactReport, marker string) bool {
 	marker = strings.ToLower(strings.TrimSpace(marker))
 	for _, artifact := range artifacts {
 		if strings.Contains(strings.ToLower(strings.TrimSpace(artifact.Kind)), marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func countPresentedFrameChecksums(frames []FrameReport) int {
+	count := 0
+	for _, frame := range frames {
+		if frame.Presented && strings.TrimSpace(frame.Checksum) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func stringSliceContainsFold(values []string, want string) bool {
+	want = strings.ToLower(strings.TrimSpace(want))
+	for _, value := range values {
+		if strings.Contains(strings.ToLower(strings.TrimSpace(value)), want) {
 			return true
 		}
 	}

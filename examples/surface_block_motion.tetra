@@ -7,6 +7,8 @@ import lib.core.block as block
 struct BlockMotionApp:
     quality: Int
     clock: Int
+    frame_interval: Int
+    frame_budget: Int
 
 struct MotionBlock:
     id: Int
@@ -19,6 +21,8 @@ struct MotionBlock:
     schedule_mid: Bool
     schedule_done: Bool
     reduced_done: Bool
+    timing_mid: Bool
+    lifecycle_stops: Bool
 
 func main() -> Int:
     let rect: surface.Rect = surface.Rect(x: 24, y: 44, w: 176, h: 64)
@@ -41,10 +45,11 @@ func main() -> Int:
 
     let props: block.BlockProps = block.props(block.layout_fixed(rect), block.paint_empty(), block.text_label(6, surface.Color(r: color_done, g: 174, b: 244, a: opacity_done)), block.image_none(), block.input_clickable(), block.event_click(block.action_primary()), block.state_interactive(), motion, block.accessibility_button(6), block.asset_none())
     let block_value: block.Block = block.make(block.id(2), block.id(1), props)
-    let app: BlockMotionApp = BlockMotionApp(quality: block.motion_quality_level(), clock: block.motion_clock_deterministic())
-    let motion_block: MotionBlock = MotionBlock(id: block.id_value(block_value.id), opacity_mid: opacity_mid, color_mid: color_mid, translate_mid: translate_mid, scale_mid: scale_mid, progress_done: progress_done, complete: block.motion_is_complete(motion, 120), schedule_mid: block.motion_should_schedule(motion, 60), schedule_done: block.motion_should_schedule(motion, 120), reduced_done: reduced.reduced && reduced_progress == 1000 && reduced_opacity == 200)
+    let app: BlockMotionApp = BlockMotionApp(quality: block.motion_quality_level(), clock: block.motion_clock_deterministic(), frame_interval: block.motion_frame_interval_ms(), frame_budget: block.motion_frame_budget_default())
+    let motion_block: MotionBlock = MotionBlock(id: block.id_value(block_value.id), opacity_mid: opacity_mid, color_mid: color_mid, translate_mid: translate_mid, scale_mid: scale_mid, progress_done: progress_done, complete: block.motion_is_complete(motion, 120), schedule_mid: block.motion_should_schedule(motion, 60), schedule_done: block.motion_should_schedule(motion, 120), reduced_done: reduced.reduced && reduced_progress == 1000 && reduced_opacity == 200 && block.motion_reduced_stops_schedule(motion), timing_mid: block.motion_frame_timing_ok(0, 60), lifecycle_stops: block.motion_lifecycle_complete_stops(motion, 120))
 
     if app.quality == 1 && app.clock == 1 &&
+       app.frame_interval == 16 && app.frame_budget == 4 &&
        motion.duration_ms == 120 && block.motion_delay(motion) == 0 &&
        progress_start == 0 && progress_mid == 500 &&
        motion_block.id == 2 && motion_block.opacity_mid == 140 &&
@@ -53,6 +58,7 @@ func main() -> Int:
        motion_block.scale_mid == 104 && scale_done == 108 &&
        motion_block.progress_done == 1000 && motion_block.complete &&
        motion_block.schedule_mid && !motion_block.schedule_done &&
-       motion_block.reduced_done:
+       motion_block.reduced_done && motion_block.timing_mid &&
+       motion_block.lifecycle_stops:
         return 1
     return 0

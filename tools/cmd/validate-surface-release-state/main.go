@@ -16,6 +16,7 @@ import (
 )
 
 const surfaceArtifactHashSchema = "tetra.release-artifact-hashes.v1alpha1"
+const surfaceProdStableScopedLinuxWeb = "PROD_STABLE_SCOPED_LINUX_WEB_APP_UI"
 
 type surfaceReleaseStateOptions struct {
 	ReportDir      string
@@ -62,6 +63,63 @@ type surfaceMorphGateSummary struct {
 	ArtifactHashesValidated bool     `json:"artifact_hashes_validated"`
 }
 
+type surfaceProdGateReport struct {
+	Schema                  string                      `json:"schema"`
+	Status                  string                      `json:"status"`
+	Level                   string                      `json:"level"`
+	Scope                   string                      `json:"scope"`
+	ReleaseScope            string                      `json:"release_scope"`
+	Producer                string                      `json:"producer"`
+	GitHead                 string                      `json:"git_head"`
+	SameCommit              bool                        `json:"same_commit"`
+	CIJobs                  []surfaceProdCIJob          `json:"ci_jobs"`
+	Gates                   []surfaceProdGateEvidence   `json:"gates"`
+	Targets                 []surfaceProdTargetEvidence `json:"targets"`
+	ArtifactHashesValidated bool                        `json:"artifact_hashes_validated"`
+	NegativeGuards          surfaceProdNegativeGuards   `json:"negative_guards"`
+	Cases                   []surfaceProdCaseReport     `json:"cases"`
+}
+
+type surfaceProdCIJob struct {
+	Workflow        string `json:"workflow"`
+	Job             string `json:"job"`
+	Required        bool   `json:"required"`
+	ContinueOnError bool   `json:"continue_on_error"`
+	Command         string `json:"command"`
+	ArtifactUpload  string `json:"artifact_upload"`
+}
+
+type surfaceProdGateEvidence struct {
+	Name                 string `json:"name"`
+	ReportDir            string `json:"report_dir"`
+	Ran                  bool   `json:"ran"`
+	Pass                 bool   `json:"pass"`
+	Skipped              bool   `json:"skipped"`
+	ArtifactHashManifest string `json:"artifact_hash_manifest"`
+}
+
+type surfaceProdTargetEvidence struct {
+	Target  string `json:"target"`
+	Tier    string `json:"tier"`
+	Ran     bool   `json:"ran"`
+	Pass    bool   `json:"pass"`
+	Skipped bool   `json:"skipped"`
+}
+
+type surfaceProdNegativeGuards struct {
+	MissingJobRejected                  bool `json:"missing_job_rejected"`
+	ContinueOnErrorRejected             bool `json:"continue_on_error_rejected"`
+	SkippedTargetAsPassRejected         bool `json:"skipped_target_as_pass_rejected"`
+	MissingArtifactHashManifestRejected bool `json:"missing_artifact_hash_manifest_rejected"`
+}
+
+type surfaceProdCaseReport struct {
+	Name string `json:"name"`
+	Kind string `json:"kind"`
+	Ran  bool   `json:"ran"`
+	Pass bool   `json:"pass"`
+}
+
 func main() {
 	var opt surfaceReleaseStateOptions
 	flag.StringVar(&opt.ReportDir, "report-dir", "", "Surface release report directory")
@@ -96,21 +154,225 @@ func validateSurfaceReleaseState(opt surfaceReleaseStateOptions) error {
 	if expectedStatus != "current" {
 		issues = append(issues, fmt.Sprintf("expected-status is %q, want current", expectedStatus))
 	}
-	if scope != surface.ReleaseScopeSurfaceV1LinuxWeb {
-		issues = append(issues, fmt.Sprintf("scope is %q, want %q", scope, surface.ReleaseScopeSurfaceV1LinuxWeb))
+	prodClaimScope := scope == surfaceProdStableScopedLinuxWeb
+	if scope != surface.ReleaseScopeSurfaceV1LinuxWeb && !prodClaimScope {
+		issues = append(issues, fmt.Sprintf("scope is %q, want %q or %q", scope, surface.ReleaseScopeSurfaceV1LinuxWeb, surfaceProdStableScopedLinuxWeb))
 	}
-	issues = append(issues, validateReleaseSummaryFile(filepath.Join(reportDir, "surface-release-summary.json"), scope, expectedStatus)...)
+	releaseScope := surface.ReleaseScopeSurfaceV1LinuxWeb
+	issues = append(issues, validateReleaseSummaryFile(filepath.Join(reportDir, "surface-release-summary.json"), releaseScope, expectedStatus)...)
 	issues = append(issues, validateReleaseTextInputFile(filepath.Join(reportDir, "surface-headless-release-text-input.json"))...)
 	issues = append(issues, validateReleaseRuntimeEnvelopeFile(filepath.Join(reportDir, "surface-wasm32-web-release-browser.json"), "wasm32-web")...)
 	issues = append(issues, validateReleaseRuntimeEnvelopeFile(filepath.Join(reportDir, "surface-linux-x64-release-window.json"), "linux-x64")...)
 	issues = append(issues, validateReleaseMorphGateFile(filepath.Join(reportDir, "morph", "surface-morph-gate-summary.json"))...)
 	issues = append(issues, validateReleaseMorphReportFile(filepath.Join(reportDir, "morph", "headless", "surface-headless-morph.json"))...)
 	issues = append(issues, validateSurfaceArtifactHashes(filepath.Join(reportDir, "artifact-hashes.json"))...)
-	issues = append(issues, validateSurfaceReleaseManifest(opt.ManifestPath, scope, expectedStatus)...)
+	issues = append(issues, validateSurfaceReleaseManifest(opt.ManifestPath, releaseScope, expectedStatus)...)
+	if prodClaimScope {
+		issues = append(issues, validateSurfaceProdGateReportFile(filepath.Join(reportDir, "surface-prod-gate-report.json"))...)
+	}
 	if len(issues) > 0 {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func validateSurfaceProdGateReportFile(path string) []string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return []string{fmt.Sprintf("%s read failed: %v", filepath.Base(path), err)}
+	}
+	var report surfaceProdGateReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return []string{fmt.Sprintf("%s decode failed: %v", filepath.Base(path), err)}
+	}
+	var issues []string
+	for _, check := range []struct {
+		field string
+		got   string
+		want  string
+	}{
+		{field: "schema", got: report.Schema, want: "tetra.surface.prod-gate-report.v1"},
+		{field: "status", got: report.Status, want: "pass"},
+		{field: "level", got: report.Level, want: "surface-production-ci-release-gate-v1"},
+		{field: "scope", got: report.Scope, want: surfaceProdStableScopedLinuxWeb},
+		{field: "release_scope", got: report.ReleaseScope, want: surface.ReleaseScopeSurfaceV1LinuxWeb},
+		{field: "producer", got: report.Producer, want: "scripts/release/surface/prod-gate.sh"},
+	} {
+		if check.got != check.want {
+			issues = append(issues, fmt.Sprintf("%s %s is %q, want %q", filepath.Base(path), check.field, check.got, check.want))
+		}
+	}
+	if !validSurfaceReleaseGitHead(report.GitHead) {
+		issues = append(issues, fmt.Sprintf("%s git_head must be a 40-hex revision", filepath.Base(path)))
+	}
+	if !report.SameCommit {
+		issues = append(issues, fmt.Sprintf("%s same_commit must be true", filepath.Base(path)))
+	}
+	if !report.ArtifactHashesValidated {
+		issues = append(issues, fmt.Sprintf("%s artifact hashes must be validated", filepath.Base(path)))
+	}
+	issues = append(issues, validateSurfaceProdCIJobs(path, report.CIJobs)...)
+	issues = append(issues, validateSurfaceProdGates(path, report.Gates)...)
+	issues = append(issues, validateSurfaceProdTargets(path, report.Targets)...)
+	issues = append(issues, validateSurfaceProdNegativeGuards(path, report.NegativeGuards)...)
+	issues = append(issues, validateSurfaceProdCases(path, report.Cases)...)
+	return issues
+}
+
+func validateSurfaceProdCIJobs(path string, jobs []surfaceProdCIJob) []string {
+	if len(jobs) == 0 {
+		return []string{fmt.Sprintf("%s missing production gate CI job", filepath.Base(path))}
+	}
+	var issues []string
+	foundRequired := false
+	for _, job := range jobs {
+		if strings.TrimSpace(job.Workflow) == "" || strings.TrimSpace(job.Job) == "" {
+			issues = append(issues, fmt.Sprintf("%s CI job workflow and job are required", filepath.Base(path)))
+		}
+		if job.ContinueOnError {
+			issues = append(issues, fmt.Sprintf("%s CI job %s uses continue-on-error", filepath.Base(path), job.Job))
+		}
+		if strings.Contains(job.Command, "prod-gate.sh") && job.Required && strings.Contains(job.Workflow, "release-packages.yml") {
+			foundRequired = true
+		}
+		if strings.Contains(job.Command, "prod-gate.sh") && !strings.Contains(job.ArtifactUpload, "surface-production-final") {
+			issues = append(issues, fmt.Sprintf("%s production gate CI job must upload surface-production-final artifacts", filepath.Base(path)))
+		}
+	}
+	if !foundRequired {
+		issues = append(issues, fmt.Sprintf("%s missing production gate CI job for release-packages.yml", filepath.Base(path)))
+	}
+	return issues
+}
+
+func validateSurfaceProdGates(path string, gates []surfaceProdGateEvidence) []string {
+	required := map[string]bool{
+		"surface-release":     false,
+		"block-system":        false,
+		"morph":               false,
+		"visual":              false,
+		"package":             false,
+		"security":            false,
+		"ipc-lifecycle":       false,
+		"crash-diagnostics":   false,
+		"i18n-localization":   false,
+		"performance-memory":  false,
+		"widget-migration":    false,
+		"example-suite":       false,
+		"api-stability":       false,
+		"electron-comparison": false,
+		"prod-claim":          false,
+	}
+	if len(gates) == 0 {
+		return []string{fmt.Sprintf("%s production gates are required", filepath.Base(path))}
+	}
+	var issues []string
+	for _, gate := range gates {
+		name := strings.TrimSpace(gate.Name)
+		if _, ok := required[name]; ok {
+			required[name] = true
+		}
+		if !gate.Ran || !gate.Pass {
+			issues = append(issues, fmt.Sprintf("%s gate %s must run and pass", filepath.Base(path), name))
+		}
+		if gate.Skipped && gate.Pass {
+			issues = append(issues, fmt.Sprintf("%s skipped gate %s counted as pass", filepath.Base(path), name))
+		}
+		if strings.TrimSpace(gate.ReportDir) == "" {
+			issues = append(issues, fmt.Sprintf("%s gate %s report_dir is required", filepath.Base(path), name))
+		}
+		if strings.TrimSpace(gate.ArtifactHashManifest) == "" {
+			issues = append(issues, fmt.Sprintf("%s gate %s artifact hash manifest is required", filepath.Base(path), name))
+		}
+	}
+	for name, found := range required {
+		if !found {
+			issues = append(issues, fmt.Sprintf("%s missing production gate %s", filepath.Base(path), name))
+		}
+	}
+	return issues
+}
+
+func validateSurfaceProdTargets(path string, targets []surfaceProdTargetEvidence) []string {
+	required := map[string]string{
+		"linux-x64":   "prod",
+		"wasm32-web":  "prod",
+		"windows-x64": "beta",
+		"macos-x64":   "beta",
+	}
+	if len(targets) == 0 {
+		return []string{fmt.Sprintf("%s target tier evidence is required", filepath.Base(path))}
+	}
+	var issues []string
+	seen := map[string]bool{}
+	for _, target := range targets {
+		name := strings.TrimSpace(target.Target)
+		seen[name] = true
+		wantTier, ok := required[name]
+		if !ok {
+			issues = append(issues, fmt.Sprintf("%s unsupported target %s", filepath.Base(path), name))
+			continue
+		}
+		if target.Tier != wantTier {
+			issues = append(issues, fmt.Sprintf("%s target %s tier is %q, want %q", filepath.Base(path), name, target.Tier, wantTier))
+		}
+		if target.Skipped && target.Pass {
+			issues = append(issues, fmt.Sprintf("%s skipped target %s counted as pass", filepath.Base(path), name))
+		}
+		if wantTier == "prod" && (!target.Ran || !target.Pass || target.Skipped) {
+			issues = append(issues, fmt.Sprintf("%s production target %s must run and pass without skip", filepath.Base(path), name))
+		}
+	}
+	for name := range required {
+		if !seen[name] {
+			issues = append(issues, fmt.Sprintf("%s missing target tier %s", filepath.Base(path), name))
+		}
+	}
+	return issues
+}
+
+func validateSurfaceProdNegativeGuards(path string, guards surfaceProdNegativeGuards) []string {
+	required := map[string]bool{
+		"missing job":                    guards.MissingJobRejected,
+		"continue-on-error":              guards.ContinueOnErrorRejected,
+		"skipped target as pass":         guards.SkippedTargetAsPassRejected,
+		"missing artifact hash manifest": guards.MissingArtifactHashManifestRejected,
+	}
+	var issues []string
+	for name, ok := range required {
+		if !ok {
+			issues = append(issues, fmt.Sprintf("%s %s rejection guard is required", filepath.Base(path), name))
+		}
+	}
+	return issues
+}
+
+func validateSurfaceProdCases(path string, cases []surfaceProdCaseReport) []string {
+	required := map[string]bool{
+		"release-packages production gate job required": false,
+		"no continue-on-error production jobs":          false,
+		"skipped target counted as pass rejected":       false,
+		"artifact hash manifest missing rejected":       false,
+	}
+	var issues []string
+	for _, c := range cases {
+		name := strings.TrimSpace(c.Name)
+		if _, ok := required[name]; ok {
+			required[name] = true
+		}
+		if name == "" || strings.TrimSpace(c.Kind) == "" {
+			issues = append(issues, fmt.Sprintf("%s case name and kind are required", filepath.Base(path)))
+		}
+		if !c.Ran || !c.Pass {
+			issues = append(issues, fmt.Sprintf("%s case %s must run and pass", filepath.Base(path), name))
+		}
+	}
+	for name, found := range required {
+		if !found {
+			issues = append(issues, fmt.Sprintf("%s missing case %s", filepath.Base(path), name))
+		}
+	}
+	return issues
 }
 
 func validateReleaseSummaryFile(path string, scope string, expectedStatus string) []string {
@@ -381,6 +643,9 @@ func validateSurfaceReleaseManifest(path string, scope string, expectedStatus st
 	}
 	requiredSurfaceFeatures := map[string]string{
 		"ui.surface-core":             expectedStatus,
+		"ui.surface-block-system":     "experimental",
+		"ui.surface-morph-capsule":    "experimental",
+		"ui.surface-gpu":              "experimental",
 		"ui.surface-headless":         expectedStatus,
 		"ui.surface-linux-x64":        expectedStatus,
 		"ui.surface-web-wasm":         expectedStatus,
@@ -388,7 +653,6 @@ func validateSurfaceReleaseManifest(path string, scope string, expectedStatus st
 		"ui.surface-toolkit-v1":       expectedStatus,
 		"ui.surface-text-input-v1":    expectedStatus,
 		"ui.surface-accessibility-v1": expectedStatus,
-		"ui.surface-morph-capsule":    expectedStatus,
 		"ui.surface-macos-x64":        "unsupported",
 		"ui.surface-windows-x64":      "unsupported",
 		"ui.surface-wasm32-wasi":      "unsupported",
@@ -419,6 +683,14 @@ func stringListEqual(got []string, want []string) bool {
 		}
 	}
 	return true
+}
+
+func validSurfaceReleaseGitHead(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }
 
 func hashFile(path string) (int64, string, error) {

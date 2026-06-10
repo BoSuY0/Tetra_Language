@@ -26,6 +26,15 @@ Block-system evidence is scoped to the same-commit
 move toward recipes/compatibility over Block rather than becoming a larger
 built-in widget kit.
 
+P32 records that migration path with
+`tetra.surface.migration-report.v1` / `surface-widget-block-migration-v1`.
+Run `scripts/release/surface/migration-gate.sh` to validate that
+`lib.core.widgets` remains a compatibility layer, Panel/Button/TextBox/
+StatusText map to Block/Morph recipe equivalents, existing Surface v1 widget
+examples still pass, migration diagnostics exist, and new production UI docs
+recommend Block/Morph recipes. This is not a deprecation announcement and not a
+claim that widgets are the core final architecture.
+
 The first available slice is the `lib.core.block` data model:
 
 ```text
@@ -43,6 +52,15 @@ That creates a Block model value only. The separate Block-system gate now
 proves scoped Block graph, rendering, state/motion/input, accessibility, target
 runtime report, and memory-budget evidence for the current scenes. It still
 does not promote Block to production support.
+
+The same Block-system runtime report now includes `tetra.surface.app-shell.v1`
+evidence at `production-app-shell-host-abi-v1` level. That schema covers
+windows, lifecycle, menus/context menus, dialogs/file pickers, tray/status
+items, notifications, cursors, drag/drop, permissions, clipboard, IME,
+DPI/scale, and open URL/file requests with target-host action traces and
+rejected diagnostics for unsupported host features. Menu support without a host
+trace, notification support without a delivered host report, and silent no-op
+host features are rejected.
 
 The current polished Block-only example set is release-gated by
 `scripts/release/surface/surface-headless-block-system-smoke.sh`, which now also
@@ -66,6 +84,33 @@ button-like, card-like, input-like, command-item-like, and overlay-like shapes
 as Block configurations rather than core `Button`, `Card`, `TextField`,
 `Sidebar`, or `Modal` abstractions.
 
+The production example-suite gate is
+`scripts/release/surface/example-suite-gate.sh`. It writes
+`tetra.surface.example-suite-report.v1` /
+`surface-production-example-suite-v1` evidence for ten executable
+`examples/surface_prod_*.tetra` app shapes: command palette, settings, project
+dashboard, editor shell, file manager shell, multi-window notes, system
+tray/status, notification/dialog, localized form, and accessibility-heavy form.
+These examples are Block/Morph-only production examples with
+headless/linux-x64/wasm32-web target coverage, event/state/accessibility/
+performance-budget evidence, and ecosystem seed metadata. Screenshot-only
+examples, examples requiring React/Electron/DOM runtime UI, widgets where
+Block/Morph is required, missing app shapes, missing scoped target coverage,
+and toy visual-only examples are rejected.
+
+The final scoped production gate is
+`scripts/release/surface/prod-gate.sh`. It writes
+`tetra.surface.prod-gate-report.v1` /
+`surface-production-ci-release-gate-v1` evidence and validates
+`PROD_STABLE_SCOPED_LINUX_WEB_APP_UI` through
+`validate-surface-release-state --scope PROD_STABLE_SCOPED_LINUX_WEB_APP_UI`.
+The gate aggregates release, Block/Morph, visual, package, security,
+IPC/lifecycle, crash, i18n, performance, migration, example-suite, API
+stability, prod-claim governance, and artifact hashes, then expects the release
+workflow to upload `surface-production-final/**` without `continue-on-error`.
+Skipped Linux/web production targets, missing CI wiring, and missing artifact
+hash manifests are rejected.
+
 Block-system runtime reports include bounded local memory/cache facts under
 `block_system.memory_budget`: component count, deterministic stress count,
 render/state/motion/input loop counts, framebuffer byte totals, paint/text/asset
@@ -73,6 +118,155 @@ cache usage, cache budgets, and explicit nonclaims. Treat that section as
 evidence that the current Block scene is budgeted and cache-bounded. It is not
 an Electron comparison benchmark, and RSS is recorded only when host evidence is
 available.
+
+Block asset reports include `asset_pipeline` evidence with schema
+`tetra.surface.asset-pipeline.v1` and level `production-asset-pipeline-v1`.
+For `examples/surface_block_assets.tetra`, expect local font/icon/image/vector
+manifest entries with sha256 hashes, `safe-local-asset-decoders-v1`, bounded
+asset cache evidence, `render_vector`, missing fallback diagnostics, unsafe SVG
+rejection, remote font rejection, network asset rejection, and oversized raster
+rejection. The asset slice is intentionally local-only: network assets, remote
+fonts, full SVG/CSS/SMIL, arbitrary image codecs, and untrusted SVG scripting
+are nonclaims.
+
+Block motion reports include `animation_scheduler` evidence with schema
+`tetra.surface.animation-scheduler.v1` and level
+`production-animation-scheduler-v1`. For
+`examples/surface_block_motion.tetra`, expect deterministic frame scheduling,
+stable timeline policy, dirty-Block invalidation, lifecycle stop-after-settle
+behavior, reduced-motion instant settle, frame timing, visual delta evidence,
+and target smoke rows. `lib.core.block` exposes compact helpers such as
+`motion_frame_interval_ms`, `motion_frame_budget_default`,
+`motion_max_frame_delta_ms`, `motion_frame_timing_ok`,
+`motion_lifecycle_complete_stops`, and `motion_reduced_stops_schedule`. This
+is not a CSS animation runtime, requestAnimationFrame parity claim, or GPU
+compositor timing claim.
+
+Developer inspector snapshots use schema
+`tetra.surface.inspector-snapshot.v1` and level
+`surface-inspector-json-mvp-v1`. Generate them from a valid runtime report with
+`surface-inspect` or `tetra surface inspect --report REPORT --out SNAPSHOT`.
+The snapshot is JSON-first evidence for Block tree, Morph
+style resolution or Block-only style diagnostics, layout boxes, paint layers,
+events, focus, accessibility, performance counters, and source locations. It is
+not an interactive devtools UI, perfect source maps, production profiler, or
+browser devtools parity claim.
+
+Surface dev-loop reports use schema `tetra.surface.dev-loop.v1` and level
+`surface-fast-dev-loop-v1`. Create a scaffold with `tetra new surface-app`,
+then run `tetra surface dev --project APP --once` once to record
+`tetra.surface.dev-state.v1`; edit the source and rerun the same command to
+write a reload report with previous/current source hashes, source mtimes,
+compiler check evidence, inspector-update evidence, and
+`schema-compatible-owned-state-only` preservation rules. The required template
+set is `surface-minimal`, `surface-dashboard`, `surface-form`,
+`surface-editor-shell`, `surface-tray-app`, and `surface-web-canvas`. Validate
+the report with `validate-surface-dev-report`. `--require-change` rejects a
+hot-reload claim when no file hash changed. This is not an Electron dev server,
+React Fast Refresh, CSS HMR, DOM hot reload, browser devtools parity, or state
+preservation across incompatible schemas.
+
+Surface visual regression reports use schema
+`tetra.surface.visual-regression.v1` and level
+`surface-visual-golden-v1`. Generate the deterministic visual set with
+`surface-golden` or run the full gate with
+`scripts/release/surface/visual-gate.sh`; validate the report with
+`validate-surface-visual-report`. The gate writes source scenes, baseline PNGs,
+current PNGs, diff PNGs, software RGBA frame checksums, renderer version,
+font manifest hashes, and asset manifest hashes for command palette,
+dashboard, settings, editor, and glass scenes. It rejects screenshot-only
+evidence without a source scene hash and changed goldens without the
+`surface-visual-review-approved` review marker. This is not Electron/Chromium
+pixel parity, CSS rendering parity, or GPU compositor parity. It does not
+promote the Block System support level.
+
+Surface package distribution reports use schema
+`tetra.surface.package-report.v1` and level
+`surface-package-distribution-v1`. Run
+`scripts/release/surface/package-gate.sh` to create a scoped
+`surface-linux-tar-v1` package root, `.tdx` Surface app package file,
+asset manifest, permissions manifest, host-adapter metadata, install smoke,
+launcher smoke, and artifact hashes; validate the result with
+`validate-surface-package-report`. The validator rejects unsigned macOS
+production packages, Windows production packages without signed installer
+evidence, omitted package assets, and updater production claims without channel
+signature verification. This is not Windows/macOS production packaging,
+auto-update production, or multi-target desktop installer parity.
+
+Surface security reports use schema `tetra.surface.security-report.v1` and
+level `surface-security-sandbox-v1`. Run
+`scripts/release/surface/security-gate.sh` to validate
+explicit-deny-by-default permissions, safe-local-assets-only asset sandboxing,
+typed-host-abi-only IPC, package/capsule hash supply-chain checks, and
+rejections for network/filesystem/clipboard host calls without permission,
+unsafe SVG/font/image acceptance, user JavaScript, remote code execution,
+packages without hashes, and untyped IPC. This is not browser plugin sandbox
+parity, Node/Electron process sandbox parity, or arbitrary untrusted decoder
+support.
+
+Surface IPC/lifecycle reports use schema
+`tetra.surface.ipc-lifecycle-report.v1` and level
+`surface-ipc-lifecycle-v1`. Run
+`scripts/release/surface/ipc-lifecycle-gate.sh` to validate app main,
+single-owner UI isolate, supervised background services, owned message passing,
+dispatcher-routed UI updates, Surface handle/frame/event actor transfer
+rejection, borrowed payload rejection, untyped channel rejection, background UI
+mutation without dispatcher rejection, and scoped crash-isolation policy with
+`validate-surface-ipc-report`. This is not Electron main/renderer parity,
+process sandbox parity, or a broad crash recovery claim.
+
+Surface crash diagnostics reports use schema `tetra.surface.crash-report.v1`
+and level `surface-crash-diagnostics-v1`. Run
+`scripts/release/surface/crash-gate.sh` to validate structured crash
+diagnostics, source locations, sanitized diagnostic bundles, production error
+hook, dev-only panic/error overlay, secret scrubbing, expected-negative/crash
+separation, crash swallowed as pass rejection, secret leak rejection, missing
+diagnostic bundle rejection, and unsurfaced error rejection with
+`validate-surface-crash-report`. This is not automatic crash recovery,
+telemetry upload, or Electron crash reporter compatibility.
+
+Surface i18n/localization reports use schema
+`tetra.surface.i18n-report.v1` and level `surface-i18n-l10n-v1`. Run
+`scripts/release/surface/i18n-gate.sh` to validate locale resources, stable
+string IDs, number/date/plural formatting hooks, translation asset packaging,
+LTR/RTL layout direction metadata, missing locale resource rejection, silent
+fallback rejection, unsupported host localization rejection, and full ICU/CLDR
+claim rejection with `validate-surface-i18n-report`. This is not full bidi
+production shaping, full ICU/CLDR database support, full Unicode editor-grade
+localization semantics, or platform-native localization framework parity.
+
+Surface performance/memory reports use schema `tetra.surface.perf-report.v1`
+and level `surface-performance-memory-v1`. Run
+`scripts/release/surface/perf-gate.sh` to validate startup time, first frame
+time, steady frame p95, peak RSS, frame allocations, layout/glyph/asset cache
+bytes, binary size, CPU idle power proxy, input latency, animation frame
+jitter, baseline environment capture, bounded cache evidence, and fake-claim
+rejection with `validate-surface-perf-report`. This is not a fastest UI
+framework claim, zero memory overhead claim, broad Electron replacement
+performance claim, or cross-platform desktop performance parity claim.
+
+Block-system runtime reports may also include `app_model` evidence with schema
+`tetra.surface.app-model.v1` and level `production-app-model-v1`. That section
+is the Surface boundary for React-style app state and event ergonomics inside
+the scoped architecture: owned state stores, typed commands, ordered Block
+event traces, safe actor/task async boundaries, navigation/focus scopes,
+shortcut scopes, error propagation, and explicit redraw invalidation.
+`lib.core.block` exposes compact helpers such as `app_state_store`,
+`app_command`, `app_command_dispatch_status`, `app_event_trace`,
+`app_async_boundary_safe`, `app_navigation_step`, and `app_redraw_valid`. The
+validator rejects missing traces, disabled controls that still dispatch, text
+input sent to an unfocused Block, unsafe actor/task boundaries, and React
+runtime claims.
+
+The same Block-system reports may include `keyboard_ux` evidence with schema
+`tetra.surface.keyboard-ux.v1` and level `production-keyboard-ux-v1`. That
+section records graph focus order, overlay focus traps, roving focus, keyboard
+activation, scoped shortcut conflict diagnostics, bounded undo/redo stacks, and
+keyboard-only scripts for command palette, search, settings, and editor shell
+surfaces. `lib.core.block` exposes compact helpers such as
+`keyboard_focus_node`, `keyboard_binding`, `keyboard_shortcut_conflict`,
+`keyboard_undo_redo_stack`, `keyboard_script`, `keyboard_focus_trap_valid`, and
+`keyboard_roving_group_valid`.
 
 Run the complete Block-system gate with:
 
@@ -86,12 +280,20 @@ bash scripts/release/surface/block-system-gate.sh \
 Morph Capsule is the next experimental authoring layer over Block. It gathers
 scoped design tokens, materials, affordances, state lenses, motion presets, and
 recipes in `lib.core.morph`, then expands those recipes into `Block` values.
-It does not add new core widget primitives or a separate runtime.
+Its `typed-style-graph-candidate-v1` report is the scoped CSS replacement
+boundary: explicit imports, fixed override order, no selector engine, no
+specificity scoring, and recipe-first authoring that rejects raw 80-field Block
+editing. Its `production-recipe-authoring-v1` evidence records 11 stable recipe
+families with declared inputs, slots, state, accessibility projection, and
+reported Block-only expansions. It does not add new core widget primitives or a
+separate runtime.
 
 The current Morph example is
 `examples/surface_morph_command_palette.tetra`. It builds the same kind of
 command-palette scene as the Block example, but routes panel, field, label, and
-action rows through Morph recipes before they become a `BlockTree`.
+action rows through Morph recipes before they become a `BlockTree`; the report
+also records the toggle, nav item, dialog overlay, tabs, list, table-lite, and
+status recipe families as Block-only expansions.
 
 Run the Morph evidence gate with:
 
@@ -156,7 +358,11 @@ relationships, values, states, bounds, focus order, reading order, actions,
 status updates, snapshots, and resize-bound updates as metadata-only evidence.
 It is metadata-only evidence; no platform accessibility host integration,
 no DOM/ARIA accessibility, no screen-reader validation, and no production
-accessibility support are claimed.
+accessibility support are claimed by that fixture. The release-supported
+accessibility path is `examples/surface_release_accessibility.tetra`, which
+emits `tetra.surface.accessibility-target.v1` /
+`production-accessibility-target-v1` evidence for the supported headless,
+linux-x64, and wasm32-web targets.
 
 ## Target Order
 
@@ -299,6 +505,20 @@ presents a 400x240 RGBA frame, records
 `host_evidence.level = linux-x64-real-window`, and rejects headless, memfd-only,
 docs-only, metadata-only, legacy `.ui.*`, DOM/web-only, fake, or stale evidence
 for that promotion level.
+
+The stricter Linux production host-adapter gate is:
+
+```text
+bash scripts/release/surface/surface-linux-x64-release-window-smoke.sh
+```
+
+That gate validates `linux-x64-release-window-v1` plus
+`tetra.surface.linux-host-adapter.v1` / `linux-x64-production-host-adapter-v1`
+evidence for real window, native input, text input, IME/composition, clipboard,
+accessibility bridge, app-shell ABI, and `linux-x64-unpacked-binary-v1`
+packaging scope. If the target host has no `WAYLAND_DISPLAY` or `DISPLAY`, the
+script writes a blocked report and exits non-zero; blocked display state is not
+pass evidence.
 
 Surface runtime gates reject reports that mention legacy `.ui.html`,
 `.ui.web.mjs`, `.ui.json`, `tetra.ui.v1`, DOM UI, HTML UI, user JavaScript, or
@@ -479,6 +699,12 @@ caller-owned `[]u8` storage copied from host text input; do not store borrowed
 String or slice views inside widget state. The host only provides events and
 RGBA presentation.
 
+For new production-oriented UI, prefer Block/Morph recipes over expanding this
+widget helper layer. `examples/surface_migration_widgets_to_block.tetra` shows
+the compatibility path: existing widgets remain valid, while Panel/Button/
+TextBox/StatusText map to Block layout and Morph recipes. Use
+`validate-surface-migration-report` before claiming a migration is covered.
+
 ## Using lib.core.accessibility
 
 The accessibility metadata slice uses stable integer roles, values, and action
@@ -629,7 +855,9 @@ tree milestone fixture: it uses `lib.core.widgets` and
 `lib.core.accessibility` helpers for the settings form metadata tree, records
 `tetra.surface.accessibility-tree.v1` evidence, and remains experimental
 metadata-only accessibility evidence rather than platform accessibility or
-production accessibility support.
+production accessibility support. Use `examples/surface_release_accessibility.tetra`
+for the current scoped production accessibility report with
+`tetra.surface.accessibility-target.v1` evidence.
 
 ## Migration
 

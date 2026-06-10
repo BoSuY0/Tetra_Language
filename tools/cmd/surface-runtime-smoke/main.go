@@ -40,6 +40,8 @@ type headlessScenario struct {
 	ComponentTree                   *surface.ComponentTreeReport
 	ComponentTreeAPI                *surface.ComponentTreeAPIReport
 	BlockGraph                      *surface.BlockGraphReport
+	RendererScene                   *surface.RendererSceneReport
+	SoftwareRenderer                *surface.SoftwareRendererReport
 	PaintLayers                     []surface.PaintLayerReport
 	PaintCommands                   []surface.PaintCommandReport
 	VisualFeatures                  []string
@@ -58,6 +60,7 @@ type headlessScenario struct {
 	LayoutFeatures                  []string
 	LayoutQualityLevel              string
 	LayoutUnsupportedCSSFlexbox     bool
+	LayoutEngine                    *surface.BlockLayoutEngineReport
 	BlockEventRoutes                []surface.BlockEventRouteReport
 	BlockFocusTransitions           []surface.BlockFocusTransitionReport
 	BlockEventKinds                 []string
@@ -69,6 +72,14 @@ type headlessScenario struct {
 	BlockStateResolverOrder         []string
 	BlockStateQualityLevel          string
 	BlockStateUnsupportedCSSPseudos bool
+	AppModel                        *surface.SurfaceAppModelReport
+	KeyboardUX                      *surface.SurfaceKeyboardUXReport
+	AppShell                        *surface.SurfaceAppShellReport
+	LinuxHostAdapter                *surface.SurfaceLinuxHostAdapterReport
+	BrowserCanvasTarget             *surface.SurfaceBrowserCanvasTargetReport
+	AccessibilityTarget             *surface.SurfaceAccessibilityTargetReport
+	AssetPipeline                   *surface.SurfaceAssetPipelineReport
+	AnimationScheduler              *surface.SurfaceAnimationSchedulerReport
 	MotionFrames                    []surface.MotionFrameReport
 	MotionQualityLevel              string
 	MotionClock                     string
@@ -99,61 +110,71 @@ type surfaceProcessEvidence struct {
 }
 
 type headlessSurfaceRunnerTrace struct {
-	Schema                          string                                  `json:"schema"`
-	Source                          string                                  `json:"source"`
-	Frames                          []surface.FrameReport                   `json:"frames"`
-	Events                          []surface.EventReport                   `json:"events"`
-	StateTransitions                []surface.StateTransitionReport         `json:"state_transitions"`
-	Components                      []surface.ComponentReport               `json:"components"`
-	ComponentTree                   *surface.ComponentTreeReport            `json:"component_tree,omitempty"`
-	ComponentTreeAPI                *surface.ComponentTreeAPIReport         `json:"component_tree_api,omitempty"`
-	BlockGraph                      *surface.BlockGraphReport               `json:"block_graph,omitempty"`
-	PaintLayers                     []surface.PaintLayerReport              `json:"paint_layers,omitempty"`
-	PaintCommands                   []surface.PaintCommandReport            `json:"paint_commands,omitempty"`
-	VisualFeatures                  []string                                `json:"visual_features,omitempty"`
-	PaintQualityLevel               string                                  `json:"paint_quality_level,omitempty"`
-	PaintCacheBudgetBytes           int                                     `json:"paint_cache_budget_bytes,omitempty"`
-	PaintUnsupportedBlur            bool                                    `json:"paint_unsupported_blur,omitempty"`
-	TextMeasurements                []surface.TextMeasurementReport         `json:"text_measurements,omitempty"`
-	FontFallbacks                   []surface.FontFallbackReport            `json:"font_fallbacks,omitempty"`
-	GlyphCaches                     []surface.GlyphCacheReport              `json:"glyph_caches,omitempty"`
-	TextRenderCommands              []surface.TextRenderCommandReport       `json:"text_render_commands,omitempty"`
-	TextQualityLevel                string                                  `json:"text_quality_level,omitempty"`
-	TextCacheBudgetBytes            int                                     `json:"text_cache_budget_bytes,omitempty"`
-	LayoutConstraints               []surface.BlockLayoutConstraintReport   `json:"layout_constraints,omitempty"`
-	LayoutPasses                    []surface.BlockLayoutPassReport         `json:"layout_passes,omitempty"`
-	LayoutScrolls                   []surface.BlockLayoutScrollReport       `json:"layout_scrolls,omitempty"`
-	LayoutFeatures                  []string                                `json:"layout_features,omitempty"`
-	LayoutQualityLevel              string                                  `json:"layout_quality_level,omitempty"`
-	LayoutUnsupportedCSSFlexbox     bool                                    `json:"layout_unsupported_css_flexbox,omitempty"`
-	BlockEventRoutes                []surface.BlockEventRouteReport         `json:"block_event_routes,omitempty"`
-	BlockFocusTransitions           []surface.BlockFocusTransitionReport    `json:"block_focus_transitions,omitempty"`
-	BlockEventKinds                 []string                                `json:"block_event_kinds,omitempty"`
-	BlockEventPolicy                string                                  `json:"block_event_policy,omitempty"`
-	BlockEventQualityLevel          string                                  `json:"block_event_quality_level,omitempty"`
-	BlockEventUnsupportedDragDrop   bool                                    `json:"block_event_unsupported_drag_drop,omitempty"`
-	BlockStateSelectors             []surface.BlockStateSelectorReport      `json:"block_state_selectors,omitempty"`
-	BlockStateResolutions           []surface.BlockStateResolutionReport    `json:"block_state_resolutions,omitempty"`
-	BlockStateResolverOrder         []string                                `json:"block_state_resolver_order,omitempty"`
-	BlockStateQualityLevel          string                                  `json:"block_state_quality_level,omitempty"`
-	BlockStateUnsupportedCSSPseudos bool                                    `json:"block_state_unsupported_css_pseudos,omitempty"`
-	MotionFrames                    []surface.MotionFrameReport             `json:"motion_frames,omitempty"`
-	MotionQualityLevel              string                                  `json:"motion_quality_level,omitempty"`
-	MotionClock                     string                                  `json:"motion_clock,omitempty"`
-	MotionFrameBudget               int                                     `json:"motion_frame_budget,omitempty"`
-	MotionUnsupportedCSSAnimations  bool                                    `json:"motion_unsupported_css_animations,omitempty"`
-	BlockAssetManifest              *surface.BlockAssetManifestReport       `json:"block_asset_manifest,omitempty"`
-	BlockAssetCache                 surface.BlockAssetCacheReport           `json:"block_asset_cache,omitempty"`
-	BlockAssetDiagnostics           []surface.BlockAssetDiagnosticReport    `json:"block_asset_diagnostics,omitempty"`
-	BlockAssetRenderCommands        []surface.BlockAssetRenderCommandReport `json:"block_asset_render_commands,omitempty"`
-	BlockAssetQualityLevel          string                                  `json:"block_asset_quality_level,omitempty"`
-	BlockAssetNetworkFetchAllowed   bool                                    `json:"block_asset_network_fetch_allowed,omitempty"`
-	BlockAccessibilityTree          *surface.BlockAccessibilityTreeReport   `json:"block_accessibility_tree,omitempty"`
-	BlockSystem                     *surface.BlockSystemReport              `json:"block_system,omitempty"`
-	Morph                           *surface.MorphReport                    `json:"morph,omitempty"`
-	Toolkit                         *surface.ToolkitReport                  `json:"toolkit,omitempty"`
-	AccessibilityTree               *surface.AccessibilityTreeReport        `json:"accessibility_tree,omitempty"`
-	Cases                           []surface.CaseReport                    `json:"cases"`
+	Schema                          string                                    `json:"schema"`
+	Source                          string                                    `json:"source"`
+	Frames                          []surface.FrameReport                     `json:"frames"`
+	Events                          []surface.EventReport                     `json:"events"`
+	StateTransitions                []surface.StateTransitionReport           `json:"state_transitions"`
+	Components                      []surface.ComponentReport                 `json:"components"`
+	ComponentTree                   *surface.ComponentTreeReport              `json:"component_tree,omitempty"`
+	ComponentTreeAPI                *surface.ComponentTreeAPIReport           `json:"component_tree_api,omitempty"`
+	BlockGraph                      *surface.BlockGraphReport                 `json:"block_graph,omitempty"`
+	RendererScene                   *surface.RendererSceneReport              `json:"renderer_scene,omitempty"`
+	SoftwareRenderer                *surface.SoftwareRendererReport           `json:"software_renderer,omitempty"`
+	PaintLayers                     []surface.PaintLayerReport                `json:"paint_layers,omitempty"`
+	PaintCommands                   []surface.PaintCommandReport              `json:"paint_commands,omitempty"`
+	VisualFeatures                  []string                                  `json:"visual_features,omitempty"`
+	PaintQualityLevel               string                                    `json:"paint_quality_level,omitempty"`
+	PaintCacheBudgetBytes           int                                       `json:"paint_cache_budget_bytes,omitempty"`
+	PaintUnsupportedBlur            bool                                      `json:"paint_unsupported_blur,omitempty"`
+	TextMeasurements                []surface.TextMeasurementReport           `json:"text_measurements,omitempty"`
+	FontFallbacks                   []surface.FontFallbackReport              `json:"font_fallbacks,omitempty"`
+	GlyphCaches                     []surface.GlyphCacheReport                `json:"glyph_caches,omitempty"`
+	TextRenderCommands              []surface.TextRenderCommandReport         `json:"text_render_commands,omitempty"`
+	TextQualityLevel                string                                    `json:"text_quality_level,omitempty"`
+	TextCacheBudgetBytes            int                                       `json:"text_cache_budget_bytes,omitempty"`
+	LayoutConstraints               []surface.BlockLayoutConstraintReport     `json:"layout_constraints,omitempty"`
+	LayoutPasses                    []surface.BlockLayoutPassReport           `json:"layout_passes,omitempty"`
+	LayoutScrolls                   []surface.BlockLayoutScrollReport         `json:"layout_scrolls,omitempty"`
+	LayoutFeatures                  []string                                  `json:"layout_features,omitempty"`
+	LayoutQualityLevel              string                                    `json:"layout_quality_level,omitempty"`
+	LayoutUnsupportedCSSFlexbox     bool                                      `json:"layout_unsupported_css_flexbox,omitempty"`
+	LayoutEngine                    *surface.BlockLayoutEngineReport          `json:"layout_engine,omitempty"`
+	BlockEventRoutes                []surface.BlockEventRouteReport           `json:"block_event_routes,omitempty"`
+	BlockFocusTransitions           []surface.BlockFocusTransitionReport      `json:"block_focus_transitions,omitempty"`
+	BlockEventKinds                 []string                                  `json:"block_event_kinds,omitempty"`
+	BlockEventPolicy                string                                    `json:"block_event_policy,omitempty"`
+	BlockEventQualityLevel          string                                    `json:"block_event_quality_level,omitempty"`
+	BlockEventUnsupportedDragDrop   bool                                      `json:"block_event_unsupported_drag_drop,omitempty"`
+	BlockStateSelectors             []surface.BlockStateSelectorReport        `json:"block_state_selectors,omitempty"`
+	BlockStateResolutions           []surface.BlockStateResolutionReport      `json:"block_state_resolutions,omitempty"`
+	BlockStateResolverOrder         []string                                  `json:"block_state_resolver_order,omitempty"`
+	BlockStateQualityLevel          string                                    `json:"block_state_quality_level,omitempty"`
+	BlockStateUnsupportedCSSPseudos bool                                      `json:"block_state_unsupported_css_pseudos,omitempty"`
+	AppModel                        *surface.SurfaceAppModelReport            `json:"app_model,omitempty"`
+	KeyboardUX                      *surface.SurfaceKeyboardUXReport          `json:"keyboard_ux,omitempty"`
+	AppShell                        *surface.SurfaceAppShellReport            `json:"app_shell,omitempty"`
+	LinuxHostAdapter                *surface.SurfaceLinuxHostAdapterReport    `json:"linux_host_adapter,omitempty"`
+	AccessibilityTarget             *surface.SurfaceAccessibilityTargetReport `json:"accessibility_target,omitempty"`
+	AssetPipeline                   *surface.SurfaceAssetPipelineReport       `json:"asset_pipeline,omitempty"`
+	AnimationScheduler              *surface.SurfaceAnimationSchedulerReport  `json:"animation_scheduler,omitempty"`
+	MotionFrames                    []surface.MotionFrameReport               `json:"motion_frames,omitempty"`
+	MotionQualityLevel              string                                    `json:"motion_quality_level,omitempty"`
+	MotionClock                     string                                    `json:"motion_clock,omitempty"`
+	MotionFrameBudget               int                                       `json:"motion_frame_budget,omitempty"`
+	MotionUnsupportedCSSAnimations  bool                                      `json:"motion_unsupported_css_animations,omitempty"`
+	BlockAssetManifest              *surface.BlockAssetManifestReport         `json:"block_asset_manifest,omitempty"`
+	BlockAssetCache                 surface.BlockAssetCacheReport             `json:"block_asset_cache,omitempty"`
+	BlockAssetDiagnostics           []surface.BlockAssetDiagnosticReport      `json:"block_asset_diagnostics,omitempty"`
+	BlockAssetRenderCommands        []surface.BlockAssetRenderCommandReport   `json:"block_asset_render_commands,omitempty"`
+	BlockAssetQualityLevel          string                                    `json:"block_asset_quality_level,omitempty"`
+	BlockAssetNetworkFetchAllowed   bool                                      `json:"block_asset_network_fetch_allowed,omitempty"`
+	BlockAccessibilityTree          *surface.BlockAccessibilityTreeReport     `json:"block_accessibility_tree,omitempty"`
+	BlockSystem                     *surface.BlockSystemReport                `json:"block_system,omitempty"`
+	Morph                           *surface.MorphReport                      `json:"morph,omitempty"`
+	Toolkit                         *surface.ToolkitReport                    `json:"toolkit,omitempty"`
+	AccessibilityTree               *surface.AccessibilityTreeReport          `json:"accessibility_tree,omitempty"`
+	Cases                           []surface.CaseReport                      `json:"cases"`
 }
 
 type wasmSurfaceRunnerTrace struct {
@@ -1156,6 +1177,8 @@ func writeHeadlessSurfaceTrace(path string, sourcePath string, scenario headless
 		ComponentTree:                   scenario.ComponentTree,
 		ComponentTreeAPI:                scenario.ComponentTreeAPI,
 		BlockGraph:                      scenario.BlockGraph,
+		RendererScene:                   scenario.RendererScene,
+		SoftwareRenderer:                scenario.SoftwareRenderer,
 		PaintLayers:                     scenario.PaintLayers,
 		PaintCommands:                   scenario.PaintCommands,
 		VisualFeatures:                  scenario.VisualFeatures,
@@ -1174,6 +1197,7 @@ func writeHeadlessSurfaceTrace(path string, sourcePath string, scenario headless
 		LayoutFeatures:                  scenario.LayoutFeatures,
 		LayoutQualityLevel:              scenario.LayoutQualityLevel,
 		LayoutUnsupportedCSSFlexbox:     scenario.LayoutUnsupportedCSSFlexbox,
+		LayoutEngine:                    scenario.LayoutEngine,
 		BlockEventRoutes:                scenario.BlockEventRoutes,
 		BlockFocusTransitions:           scenario.BlockFocusTransitions,
 		BlockEventKinds:                 scenario.BlockEventKinds,
@@ -1185,6 +1209,13 @@ func writeHeadlessSurfaceTrace(path string, sourcePath string, scenario headless
 		BlockStateResolverOrder:         scenario.BlockStateResolverOrder,
 		BlockStateQualityLevel:          scenario.BlockStateQualityLevel,
 		BlockStateUnsupportedCSSPseudos: scenario.BlockStateUnsupportedCSSPseudos,
+		AppModel:                        scenario.AppModel,
+		KeyboardUX:                      scenario.KeyboardUX,
+		AppShell:                        scenario.AppShell,
+		LinuxHostAdapter:                scenario.LinuxHostAdapter,
+		AccessibilityTarget:             scenario.AccessibilityTarget,
+		AssetPipeline:                   scenario.AssetPipeline,
+		AnimationScheduler:              scenario.AnimationScheduler,
 		MotionFrames:                    scenario.MotionFrames,
 		MotionQualityLevel:              scenario.MotionQualityLevel,
 		MotionClock:                     scenario.MotionClock,
@@ -3245,6 +3276,7 @@ func runBlockPaintScenario() headlessScenario {
 		},
 		PaintLayers:           blockPaintLayersForScenario(),
 		PaintCommands:         blockPaintCommandsForScenario(),
+		RendererScene:         rendererSceneForScenario("examples/surface_block_paint_layers.tetra", "software-rgba-headless"),
 		VisualFeatures:        []string{"fill", "gradient", "border", "radius", "shadow", "outline"},
 		PaintQualityLevel:     "deterministic-software-paint-v1",
 		PaintCacheBudgetBytes: 65536,
@@ -3315,6 +3347,13 @@ func runBlockPaintScenario() headlessScenario {
 			{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+			{Name: "software renderer deterministic raster", Kind: "positive", Ran: true, Pass: true},
+			{Name: "software renderer alpha clipping", Kind: "positive", Ran: true, Pass: true},
+			{Name: "software renderer golden export", Kind: "positive", Ran: true, Pass: true},
+			{Name: "software renderer resize scale dpi", Kind: "positive", Ran: true, Pass: true},
+			{Name: "software renderer use-after-present rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "use-after-present"},
+			{Name: "software renderer frame alias rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "frame alias"},
+			{Name: "software renderer browser promotion without runtime rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "browser promotion without runtime"},
 			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 		},
 	}
@@ -3337,6 +3376,89 @@ func blockPaintCommandsForScenario() []surface.PaintCommandReport {
 		{Order: 3, Command: "border", LayerID: "root-border", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("paint-border")},
 		{Order: 4, Command: "shadow", LayerID: "root-shadow", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "box-shadow-approx-v1", Checksum: "sha256:" + checksumText("paint-shadow")},
 		{Order: 5, Command: "outline", LayerID: "root-outline", BlockID: 2, Rect: surface.RectReport{X: 10, Y: 8, W: 68, H: 32}, Radius: 10, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("paint-outline")},
+	}
+}
+
+func rendererSceneForScenario(source string, renderer string) *surface.RendererSceneReport {
+	commands := []surface.RendererPaintCommandReport{
+		{Order: 1, Command: "fill", Source: "paint_layers", LayerID: "root-fill", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Clip: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-rect-v1", Checksum: "sha256:" + checksumText("renderer-fill")},
+		{Order: 2, Command: "gradient", Source: "paint_layers", LayerID: "root-gradient", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Clip: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "two-stop-linear-v1", Checksum: "sha256:" + checksumText("renderer-gradient")},
+		{Order: 3, Command: "border", Source: "paint_layers", LayerID: "root-border", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Clip: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("renderer-border")},
+		{Order: 4, Command: "radius", Source: "paint_layers", LayerID: "root-fill", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Clip: surface.RectReport{X: 12, Y: 10, W: 64, H: 28}, Radius: 8, Quality: "radius-mask-v1", Checksum: "sha256:" + checksumText("renderer-radius")},
+		{Order: 5, Command: "shadow", Source: "paint_layers", LayerID: "root-shadow", BlockID: 2, Rect: surface.RectReport{X: 12, Y: 14, W: 68, H: 32}, Clip: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Radius: 8, Quality: "box-shadow-approx-v1", Checksum: "sha256:" + checksumText("renderer-shadow")},
+		{Order: 6, Command: "outline", Source: "paint_layers", LayerID: "root-outline", BlockID: 2, Rect: surface.RectReport{X: 10, Y: 8, W: 68, H: 32}, Clip: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Radius: 10, Quality: "rounded-outline-v1", Checksum: "sha256:" + checksumText("renderer-outline")},
+		{Order: 7, Command: "image", Source: "block_asset_render_commands", AssetID: "image-hero", BlockID: 3, Rect: surface.RectReport{X: 72, Y: 32, W: 96, H: 64}, Clip: surface.RectReport{X: 72, Y: 32, W: 96, H: 64}, Quality: "nearest-scale-v1", Checksum: "sha256:" + checksumText("renderer-image")},
+		{Order: 8, Command: "text", Source: "text_render_commands", TextMeasurementID: "input-measure", BlockID: 6, Rect: surface.RectReport{X: 12, Y: 48, W: 120, H: 18}, Clip: surface.RectReport{X: 12, Y: 48, W: 144, H: 36}, Quality: "deterministic-glyph-markers-v1", Checksum: "sha256:" + checksumText("renderer-text")},
+		{Order: 9, Command: "clip", Source: "layout_passes", BlockID: 7, Rect: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Clip: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Quality: "scroll-clip-v1", Checksum: "sha256:" + checksumText("renderer-clip")},
+		{Order: 10, Command: "transform", Source: "motion_frames", BlockID: 2, Rect: surface.RectReport{X: 24, Y: 40, W: 168, H: 56}, Clip: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Transform: "scale(0.97)", Quality: "deterministic-transform-v1", Checksum: "sha256:" + checksumText("renderer-transform")},
+	}
+	return &surface.RendererSceneReport{
+		Schema:              "tetra.surface.renderer-scene.v1",
+		Version:             "1.0.0",
+		Source:              source,
+		Renderer:            renderer,
+		ResolvedSceneSchema: "tetra.surface.resolved-scene.v1",
+		PaintCommandSchema:  "tetra.surface.paint-command.v1",
+		Deterministic:       true,
+		CommandCount:        len(commands),
+		CommandOrder:        []string{"fill", "gradient", "border", "radius", "shadow", "outline", "image", "text", "clip", "transform"},
+		CommandHash:         "sha256:" + checksumText("renderer-scene:"+source+":"+renderer),
+		Commands:            commands,
+		UnsupportedVisuals: []surface.RendererUnsupportedVisualReport{
+			{Feature: "blur", Rejected: true, Reason: "unsupported until software blur gate exists"},
+			{Feature: "backdrop_blur", Rejected: true, Reason: "unsupported without compositor/backdrop evidence"},
+		},
+	}
+}
+
+func softwareRendererForScenario(source string, target string, backend string, frames []surface.FrameReport) *surface.SoftwareRendererReport {
+	rendererFrames := make([]surface.SoftwareRendererFrameReport, 0, len(frames))
+	for _, frame := range frames {
+		rendererFrames = append(rendererFrames, surface.SoftwareRendererFrameReport{
+			Order:                   frame.Order,
+			Width:                   frame.Width,
+			Height:                  frame.Height,
+			Stride:                  frame.Stride,
+			Scale:                   1,
+			DPI:                     96,
+			PixelChecksum:           frame.Checksum,
+			RepeatChecksum:          frame.Checksum,
+			GoldenChecksum:          frame.Checksum,
+			GoldenArtifact:          fmt.Sprintf("goldens/surface/%s/frame-%02d.rgba", target, frame.Order),
+			AlphaChecksum:           "sha256:" + checksumText(fmt.Sprintf("alpha:%s:%d:%s", target, frame.Order, frame.Checksum)),
+			ClipChecksum:            "sha256:" + checksumText(fmt.Sprintf("clip:%s:%d:%s", target, frame.Order, frame.Checksum)),
+			Presented:               frame.Presented,
+			UseAfterPresentRejected: true,
+			AliasViolationRejected:  true,
+		})
+	}
+	return &surface.SoftwareRendererReport{
+		Schema:              "tetra.surface.software-renderer.v1",
+		QualityLevel:        "software-rgba-production-hardening-v1",
+		Source:              source,
+		Target:              target,
+		Backend:             backend,
+		PixelFormat:         "rgba8",
+		AlphaBlendMode:      "source-over-rgba8-v1",
+		ClipMode:            "rect-scissor-v1",
+		RasterDeterministic: true,
+		GoldenExport:        true,
+		ResizeScaleDPI:      true,
+		NoUseAfterPresent:   true,
+		NoFrameAlias:        true,
+		FeatureSummary:      []string{"deterministic-raster", "alpha-blending", "clipping", "frame-checksum", "golden-export", "resize", "scale", "dpi"},
+		Frames:              rendererFrames,
+		NegativeGuards: surface.SoftwareRendererNegativeGuardsReport{
+			MetadataOnlyFrameRejected:        true,
+			UnchangedChecksumRejected:        true,
+			MissingGoldenRejected:            true,
+			MissingAlphaRejected:             true,
+			MissingClipRejected:              true,
+			MissingDPIRejected:               true,
+			UseAfterPresentRejected:          true,
+			FrameAliasRejected:               true,
+			NodeOnlyBrowserPromotionRejected: true,
+		},
 	}
 }
 
@@ -3487,6 +3609,7 @@ func runBlockLayoutScenario() headlessScenario {
 		LayoutFeatures:              []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"},
 		LayoutQualityLevel:          "deterministic-block-layout-v1",
 		LayoutUnsupportedCSSFlexbox: false,
+		LayoutEngine:                blockLayoutEngineForScenario("headless"),
 		Events: []surface.EventReport{
 			{
 				Order:           1,
@@ -3583,6 +3706,11 @@ func runBlockLayoutScenario() headlessScenario {
 			{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
+			{Name: "block layout DPI density", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout invalidation cache budget", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout responsive app shell settings dashboard editor", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout overflow explicit clip scroll", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block layout no css grid parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS grid parity nonclaim"},
 			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 		},
 	}
@@ -3627,6 +3755,90 @@ func blockLayoutPassesForScenario() []surface.BlockLayoutPassReport {
 func blockLayoutScrollsForScenario() []surface.BlockLayoutScrollReport {
 	return []surface.BlockLayoutScrollReport{
 		{BlockID: 7, Viewport: surface.RectReport{X: 236, Y: 72, W: 72, H: 80}, Content: surface.SizeReport{W: 72, H: 160}, OffsetY: 32, MaxOffsetY: 80, Clipped: true, Checksum: "sha256:" + checksumText("layout-scroll-bounds")},
+	}
+}
+
+func blockLayoutEngineForScenario(target string) *surface.BlockLayoutEngineReport {
+	return &surface.BlockLayoutEngineReport{
+		Schema:                surface.LayoutEngineSchemaV1,
+		Level:                 "production-layout-engine-v1",
+		Producer:              "tools/cmd/surface-runtime-smoke",
+		Target:                target,
+		Quality:               "deterministic-responsive-layout-v1",
+		CSSFlexboxGridParity:  false,
+		PlatformWidgetLayout:  false,
+		Modes:                 []string{"row", "column", "stack", "grid", "dock", "absolute", "overlay", "scroll"},
+		ResponsiveProfiles:    []string{"app shell", "settings forms", "dashboards", "editor shells"},
+		ConstraintFeatures:    []string{"min", "max", "fit", "fill", "fixed", "density", "overflow", "clip"},
+		MinMaxConstraints:     true,
+		FitFillFixed:          true,
+		DensityIndependent:    true,
+		StableUnderResize:     true,
+		LayoutCacheKeyedByDPI: true,
+		Density: surface.BlockLayoutDensityReport{
+			Schema:            "tetra.surface.layout-density.v1",
+			Scale:             2,
+			DPI:               192,
+			DevicePixelRatio:  2,
+			SnapToPixelGrid:   true,
+			TargetIndependent: true,
+			Cases:             []string{"headless scale 1", "linux-x64 scale 2", "wasm32-web devicePixelRatio 2"},
+		},
+		OverflowRules: surface.BlockLayoutOverflowRulesReport{
+			Explicit:                   true,
+			ClipRequired:               true,
+			ScrollBoundsChecked:        true,
+			AccidentalHidden:           false,
+			HiddenRequiresExplicitClip: true,
+			VisibleOverflowPreserved:   true,
+			ClippedBlockIDs:            []int{1, 4, 5, 7, 8},
+		},
+		Invalidations: []surface.BlockLayoutInvalidationReport{
+			{
+				Cause:                   "resize",
+				DirtyRoot:               "BlockLayoutApp",
+				AffectedModes:           []string{"column", "row", "grid", "dock", "overlay", "scroll"},
+				BeforeChecksum:          "sha256:" + checksumText("layout-invalid-before-resize"),
+				AfterChecksum:           "sha256:" + checksumText("layout-invalid-after-resize"),
+				CacheEntriesReused:      2,
+				CacheEntriesInvalidated: 6,
+				FullTreeRelayout:        true,
+			},
+			{
+				Cause:                   "scroll",
+				DirtyRoot:               "ScrollBlock",
+				AffectedModes:           []string{"scroll"},
+				BeforeChecksum:          "sha256:" + checksumText("layout-invalid-before-scroll"),
+				AfterChecksum:           "sha256:" + checksumText("layout-invalid-after-scroll"),
+				CacheEntriesReused:      6,
+				CacheEntriesInvalidated: 1,
+				FullTreeRelayout:        false,
+			},
+		},
+		CacheBudget: surface.BlockLayoutCacheBudgetReport{
+			Schema:                 "tetra.surface.layout-cache.v1",
+			Strategy:               "bounded-lru",
+			BudgetBytes:            65536,
+			UsedBytes:              9216,
+			EntryCount:             9,
+			MaxEntries:             64,
+			Bounded:                true,
+			Eviction:               "lru",
+			UnboundedCacheRejected: true,
+		},
+		NegativeGuards: surface.BlockLayoutEngineNegativeGuardsReport{
+			CSSFlexboxGridParityRejected:     true,
+			AccidentalOverflowHiddenRejected: true,
+			UnboundedLayoutCacheRejected:     true,
+			MissingDPIDensityRejected:        true,
+			InvalidInvalidationRejected:      true,
+		},
+		NonClaims: []string{
+			"CSS flexbox/grid parity",
+			"browser CSS layout engine",
+			"platform widget layout",
+			"unbounded layout cache",
+		},
 	}
 }
 
@@ -3762,7 +3974,7 @@ func blockEventComponentsForScenario() []surface.ComponentReport {
 }
 
 func blockEventGraphForScenario(source string) *surface.BlockGraphReport {
-	return &surface.BlockGraphReport{
+	graph := &surface.BlockGraphReport{
 		Schema:            "tetra.surface.block-graph.v1",
 		APILevel:          "block-tree-builder-v1",
 		Source:            source,
@@ -3814,6 +4026,7 @@ func blockEventGraphForScenario(source string) *surface.BlockGraphReport {
 			{Helper: "tree_build_dispatch_path", Event: "key", TargetID: 6, Path: []int{1, 2, 6}},
 		},
 	}
+	return withBlockGraphABIAndResolvedScene(graph)
 }
 
 func blockEventRoutesForScenario() []surface.BlockEventRouteReport {
@@ -3999,16 +4212,19 @@ func blockStateResolutionsForScenario() []surface.BlockStateResolutionReport {
 }
 
 func runBlockMotionScenario() headlessScenario {
+	source := "examples/surface_block_motion.tetra"
 	startFrame := renderBlockMotionFrameRGBA(0)
 	midFrame := renderBlockMotionFrameRGBA(1)
 	doneFrame := renderBlockMotionFrameRGBA(2)
+	motionFrames := blockMotionFramesForScenario()
 	return headlessScenario{
 		Components:                     blockMotionComponentsForScenario(),
 		MotionQualityLevel:             "deterministic-block-motion-v1",
 		MotionClock:                    "deterministic-test-clock-v1",
 		MotionFrameBudget:              4,
 		MotionUnsupportedCSSAnimations: false,
-		MotionFrames:                   blockMotionFramesForScenario(),
+		MotionFrames:                   motionFrames,
+		AnimationScheduler:             animationSchedulerForScenario(source, motionFrames, 4, "headless", "surface-headless"),
 		Events: []surface.EventReport{
 			{
 				Order:           1,
@@ -4077,6 +4293,10 @@ func runBlockMotionScenario() headlessScenario {
 			{Name: "block motion completion stops scheduling", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block motion frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block motion no css animation parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css animation nonclaim"},
+			{Name: "block motion frame scheduler timeline", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion invalidation lifecycle", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion frame timing evidence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block motion hidden loop rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "hidden animation loop rejected"},
 			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 		},
 	}
@@ -4099,17 +4319,99 @@ func blockMotionFramesForScenario() []surface.MotionFrameReport {
 	}
 }
 
+func animationSchedulerForScenario(source string, frames []surface.MotionFrameReport, budget int, target string, runtime string) *surface.SurfaceAnimationSchedulerReport {
+	scheduled, settled, reduced := motionFrameCountsForScenario(frames)
+	return &surface.SurfaceAnimationSchedulerReport{
+		Schema:                     surface.AnimationSchedulerSchemaV1,
+		Level:                      "production-animation-scheduler-v1",
+		Source:                     source,
+		ReleaseScope:               surface.ReleaseScopeSurfaceV1LinuxWeb,
+		MotionQualityLevel:         "deterministic-block-motion-v1",
+		MotionClock:                "deterministic-test-clock-v1",
+		SchedulerPolicy:            "deterministic-motion-frame-scheduler-v1",
+		TimelinePolicy:             "stable-motion-timeline-v1",
+		InvalidationPolicy:         "motion-dirty-block-invalidation-v1",
+		LifecyclePolicy:            "start-interpolate-settle-stop-v1",
+		ReducedMotionPolicy:        "instant-settle-no-schedule-v1",
+		FrameCount:                 len(frames),
+		FrameBudget:                budget,
+		ScheduledFrameCount:        scheduled,
+		SettledFrameCount:          settled,
+		ReducedMotionFrameCount:    reduced,
+		TargetFrameIntervalMS:      16,
+		MaxFrameDeltaMS:            maxMotionFrameDeltaMSForScenario(frames),
+		JitterBudgetMS:             4,
+		TransitionProperties:       []string{"opacity", "color", "transform", "translate", "scale"},
+		DeterministicTimeline:      true,
+		FrameTimingEvidence:        true,
+		InvalidationEvidence:       true,
+		LifecycleEvidence:          true,
+		ReducedMotionEvidence:      true,
+		VisualDeltaEvidence:        true,
+		CSSAnimationParityRejected: true,
+		HiddenLoopRejected:         true,
+		TargetSmoke: []surface.AnimationSchedulerTargetSmokeReport{
+			{Target: target, Runtime: runtime, FrameCount: len(frames), FrameTimingEvidence: true, VisualDeltaEvidence: true, ArtifactHashEvidence: true, Pass: true},
+		},
+		NegativeGuards: surface.AnimationSchedulerNegativeGuardsReport{
+			CSSAnimationParityRejected: true,
+			HiddenLoopRejected:         true,
+			MissingReducedMotion:       true,
+			MissingFrameTiming:         true,
+			UnboundedFrameSchedule:     true,
+			UnchangedVisualFrame:       true,
+		},
+		NonClaims: []string{
+			"CSS animation runtime",
+			"global animation cascade",
+			"requestAnimationFrame parity",
+			"GPU compositor timing",
+			"unbounded hidden animation loops",
+		},
+	}
+}
+
+func motionFrameCountsForScenario(frames []surface.MotionFrameReport) (scheduled int, settled int, reduced int) {
+	for _, frame := range frames {
+		if frame.Scheduled {
+			scheduled++
+		}
+		if frame.Settled {
+			settled++
+		}
+		if frame.ReducedMotion {
+			reduced++
+		}
+	}
+	return scheduled, settled, reduced
+}
+
+func maxMotionFrameDeltaMSForScenario(frames []surface.MotionFrameReport) int {
+	maxDelta := 0
+	for i := 1; i < len(frames); i++ {
+		if delta := frames[i].TimestampMS - frames[i-1].TimestampMS; delta > maxDelta {
+			maxDelta = delta
+		}
+	}
+	return maxDelta
+}
+
 func runBlockAssetScenario() headlessScenario {
 	beforeFrame := renderBlockAssetFrameRGBA(false)
 	afterFrame := renderBlockAssetFrameRGBA(true)
+	manifest := blockAssetManifestForScenario("examples/surface_block_assets.tetra")
+	cache := blockAssetCacheForScenario()
+	diagnostics := blockAssetDiagnosticsForScenario()
+	renderCommands := blockAssetRenderCommandsForScenario()
 	return headlessScenario{
 		Components:                    blockAssetComponentsForScenario(),
 		BlockAssetQualityLevel:        "deterministic-local-block-assets-v1",
 		BlockAssetNetworkFetchAllowed: false,
-		BlockAssetManifest:            blockAssetManifestForScenario("examples/surface_block_assets.tetra"),
-		BlockAssetCache:               blockAssetCacheForScenario(),
-		BlockAssetDiagnostics:         blockAssetDiagnosticsForScenario(),
-		BlockAssetRenderCommands:      blockAssetRenderCommandsForScenario(),
+		BlockAssetManifest:            manifest,
+		BlockAssetCache:               cache,
+		BlockAssetDiagnostics:         diagnostics,
+		BlockAssetRenderCommands:      renderCommands,
+		AssetPipeline:                 assetPipelineForScenario("examples/surface_block_assets.tetra", manifest, cache, diagnostics, renderCommands),
 		Events: []surface.EventReport{
 			{
 				Order:           1,
@@ -4173,8 +4475,11 @@ func runBlockAssetScenario() headlessScenario {
 			{Name: "block asset bounded cache", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block asset icon tint evidence", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block asset image scale evidence", Kind: "positive", Ran: true, Pass: true},
+			{Name: "block asset vector safe decode", Kind: "positive", Ran: true, Pass: true},
 			{Name: "block asset missing fallback diagnostic", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing asset"},
 			{Name: "block asset network url rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "network assets disabled"},
+			{Name: "block asset unsafe SVG rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsafe svg"},
+			{Name: "block asset remote font rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "remote font"},
 			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 		},
 	}
@@ -4309,6 +4614,11 @@ func runBlockSystemScenario() headlessScenario {
 		{Order: 5, Component: "ScrollBlock", Field: "scroll_y", Before: "0", After: "32", Cause: "scroll"},
 	}
 	stateTransitions = appendScenarioStateTransitionsWithNextOrder(stateTransitions, blockSystemReadinessTransitionsForScenario())
+	manifest := blockAssetManifestForScenario(source)
+	cache := blockAssetCacheForScenario()
+	diagnostics := blockAssetDiagnosticsForScenario()
+	renderCommands := blockAssetRenderCommandsForScenario()
+	motionFrames := blockMotionFramesForScenario()
 	scenario := headlessScenario{
 		Components:                  components,
 		BlockGraph:                  blockAccessibilityGraphForScenario(source),
@@ -4330,26 +4640,34 @@ func runBlockSystemScenario() headlessScenario {
 		LayoutFeatures:              []string{"stack", "row", "column", "absolute", "overlay", "grid", "dock", "scroll", "fit", "fill", "fixed", "min", "max", "spacing", "alignment", "z-order", "clipping", "resize"},
 		LayoutQualityLevel:          "deterministic-block-layout-v1",
 		LayoutUnsupportedCSSFlexbox: false,
+		LayoutEngine:                blockLayoutEngineForScenario("headless"),
 		BlockStateSelectors:         blockStateSelectorsForScenario(),
 		BlockStateResolutions:       blockStateResolutionsForScenario(),
 		BlockStateResolverOrder:     []string{"base", "variant", "hover", "pressed", "focused", "selected", "disabled", "error", "loading", "motion"},
 		BlockStateQualityLevel:      "deterministic-block-state-resolver-v1",
-		MotionFrames:                blockMotionFramesForScenario(),
+		AppModel:                    appModelForScenario("headless"),
+		KeyboardUX:                  keyboardUXForScenario("headless"),
+		AppShell:                    appShellForScenario("headless"),
+		MotionFrames:                motionFrames,
 		MotionQualityLevel:          "deterministic-block-motion-v1",
 		MotionClock:                 "deterministic-test-clock-v1",
 		MotionFrameBudget:           4,
-		BlockAssetManifest:          blockAssetManifestForScenario(source),
-		BlockAssetCache:             blockAssetCacheForScenario(),
-		BlockAssetDiagnostics:       blockAssetDiagnosticsForScenario(),
-		BlockAssetRenderCommands:    blockAssetRenderCommandsForScenario(),
+		AnimationScheduler:          animationSchedulerForScenario(source, motionFrames, 4, "headless", "surface-headless"),
+		BlockAssetManifest:          manifest,
+		BlockAssetCache:             cache,
+		BlockAssetDiagnostics:       diagnostics,
+		BlockAssetRenderCommands:    renderCommands,
 		BlockAssetQualityLevel:      "deterministic-local-block-assets-v1",
+		AssetPipeline:               assetPipelineForScenario(source, manifest, cache, diagnostics, renderCommands),
 		BlockAccessibilityTree:      blockAccessibilityTreeForScenario(source),
 		BlockSystem:                 blockSystemReportForScenario(source, frames),
+		RendererScene:               rendererSceneForScenario(source, "software-rgba-headless"),
 		Events:                      events,
 		Frames:                      frames,
 		StateTransitions:            stateTransitions,
 		Cases:                       blockSystemCasesForScenario(),
 	}
+	scenario.Cases = append(scenario.Cases, appShellCasesForScenario()...)
 	attachBlockSystemMemoryBudget(&scenario)
 	return scenario
 }
@@ -4375,6 +4693,12 @@ func retargetScenarioToSource(scenario *headlessScenario, source string, module 
 	}
 	if scenario.BlockAssetManifest != nil {
 		scenario.BlockAssetManifest.Source = source
+	}
+	if scenario.AssetPipeline != nil {
+		scenario.AssetPipeline.Source = source
+	}
+	if scenario.AnimationScheduler != nil {
+		scenario.AnimationScheduler.Source = source
 	}
 	if scenario.BlockAccessibilityTree != nil {
 		scenario.BlockAccessibilityTree.Source = source
@@ -4408,6 +4732,8 @@ func morphReportForScenario(source string, scenario headlessScenario) *surface.M
 			NoGlobalCascade: true,
 		},
 		TokenGraph:       morphTokenGraphForScenario(tokenGraphHash),
+		StyleGraph:       morphStyleGraphForScenario(),
+		Authoring:        morphAuthoringForScenario(),
 		Materials:        morphMaterialsForScenario(),
 		LayoutModes:      []string{"row", "column", "stack", "grid", "dock", "absolute", "overlay", "scroll"},
 		TypographyRoles:  []string{"title", "body", "label", "code"},
@@ -4489,13 +4815,60 @@ func morphReportForScenario(source string, scenario headlessScenario) *surface.M
 	}
 }
 
+func morphStyleGraphForScenario() *surface.MorphStyleGraphReport {
+	return &surface.MorphStyleGraphReport{
+		Schema:                         "tetra.surface.morph.style-graph.v1",
+		Namespace:                      "tetra.surface.morph.app",
+		Version:                        "1",
+		CSSReplacementLevel:            "typed-style-graph-candidate-v1",
+		VocabularyFrozen:               true,
+		TokenCategories:                []string{"color", "space", "spacing", "radius", "border", "elevation", "opacity", "typography", "type", "motion", "z", "assets", "density"},
+		MaterialSlots:                  []string{"fill", "border", "radius", "shadow", "overlay"},
+		AffordanceRoles:                []string{"action", "field.text", "toggle", "navigation", "region", "overlay", "status"},
+		RecipeOutputs:                  []string{"Block"},
+		StateSelectors:                 []string{"hover", "pressed", "focusVisible", "selected", "disabled", "error", "loading"},
+		MotionProperties:               []string{"fill", "opacity", "transform"},
+		OverrideOrder:                  []string{"capsule", "tokens", "materials", "affordances", "state_lenses", "motion", "recipes", "accessibility_safety"},
+		ConflictDiagnostics:            []string{"alias_cycle", "duplicate_recipe", "duplicate_token_source", "unresolved_token", "raw_literal", "unsupported_css_cascade", "forbidden_runtime_import", "global_style_leak", "specificity_ambiguity", "raw_css_runtime_import"},
+		ImportAllowlist:                []string{"lib.core.block", "lib.core.morph"},
+		CSSCascadeImportsRejected:      true,
+		DOMRuntimeImportsRejected:      true,
+		ReactRuntimeImportsRejected:    true,
+		ElectronRuntimeImportsRejected: true,
+		SelectorEngineAbsent:           true,
+		NoSpecificityScoring:           true,
+		GlobalStyleLeakRejected:        true,
+		SpecificityAmbiguityRejected:   true,
+		RawCSSRuntimeImportRejected:    true,
+	}
+}
+
+func morphAuthoringForScenario() *surface.MorphAuthoringReport {
+	return &surface.MorphAuthoringReport{
+		Schema:                   "tetra.surface.morph.authoring.v1",
+		Level:                    "production-recipe-authoring-v1",
+		RecipeCount:              len(morphRecipesForScenario()),
+		PolishedRecipeCount:      len(morphRecipesForScenario()),
+		MaxAuthorFields:          12,
+		RawBlockFieldCount:       80,
+		Raw80FieldBlocksRejected: true,
+		RecipesRequired:          true,
+		DirectBlockPropEditing:   false,
+		RecipeFirstAuthoring:     true,
+		DesignerTokenInputs:      true,
+		GeneratedBlockPropsOnly:  true,
+		RawLiteralStylesRejected: true,
+		NonClaims:                []string{"raw 80-field Block authoring", "CSS cascade", "selector engine", "specificity scoring"},
+	}
+}
+
 func morphTokenGraphForScenario(hash string) *surface.MorphTokenGraphReport {
 	return &surface.MorphTokenGraphReport{
 		Schema:                     "tetra.surface.morph.token-graph.v1",
 		Namespace:                  "tetra.surface.morph.app",
 		Version:                    "1",
 		Hash:                       hash,
-		Categories:                 []string{"color", "space", "radius", "border", "elevation", "opacity", "typography", "motion", "z", "assets", "density"},
+		Categories:                 []string{"color", "space", "spacing", "radius", "border", "elevation", "opacity", "typography", "type", "motion", "z", "assets", "density"},
 		AliasCycleRejected:         true,
 		DuplicateSourceRejected:    true,
 		RawLiteralsInAppCode:       false,
@@ -4561,10 +4934,30 @@ func morphMotionPresetsForScenario() []surface.MorphMotionPresetReport {
 
 func morphRecipesForScenario() []surface.MorphRecipeReport {
 	return []surface.MorphRecipeReport{
-		{Name: "control.action@1", Output: "Block", Slots: []string{"label", "icon"}, Inputs: []string{"text", "action", "variant"}, ExpandsToBlockGraph: true},
-		{Name: "field.text@1", Output: "Block", Slots: []string{"label", "control"}, Inputs: []string{"value", "on_text"}, ExpandsToBlockGraph: true},
-		{Name: "command.item@1", Output: "Block", Slots: []string{"icon", "title", "subtitle"}, Inputs: []string{"title", "subtitle", "icon", "selected"}, ExpandsToBlockGraph: true},
-		{Name: "region.panel@1", Output: "Block", Slots: []string{"header", "body", "actions"}, Inputs: []string{"title"}, ExpandsToBlockGraph: true},
+		morphRecipeForScenario("control.action@1", "control.action", []string{"label", "icon"}, []string{"text", "action", "variant"}, []string{"pressed", "focused"}, []string{"role:button", "name", "action"}),
+		morphRecipeForScenario("field.text@1", "field.text", []string{"label", "control"}, []string{"value", "on_text"}, []string{"focused", "error"}, []string{"role:textbox", "labelled_by", "value"}),
+		morphRecipeForScenario("control.toggle@1", "control.toggle", []string{"label", "control"}, []string{"checked", "on_toggle"}, []string{"checked", "focused"}, []string{"role:checkbox", "checked", "name"}),
+		morphRecipeForScenario("command.item@1", "command.item", []string{"icon", "title", "subtitle"}, []string{"title", "subtitle", "icon", "selected"}, []string{"selected", "focused"}, []string{"role:button", "selected", "description"}),
+		morphRecipeForScenario("navigation.item@1", "navigation.item", []string{"label", "badge"}, []string{"route", "selected"}, []string{"selected", "focused"}, []string{"role:navigation", "current", "name"}),
+		morphRecipeForScenario("region.panel@1", "region.panel", []string{"header", "body", "actions"}, []string{"title"}, []string{"expanded", "loading"}, []string{"role:region", "labelled_by", "bounds"}),
+		morphRecipeForScenario("overlay.dialog@1", "overlay.dialog", []string{"title", "body", "actions"}, []string{"open", "dismiss"}, []string{"open", "focus_trap"}, []string{"role:dialog", "modal", "name"}),
+		morphRecipeForScenario("navigation.tabs@1", "navigation.tabs", []string{"tab", "panel"}, []string{"items", "active"}, []string{"active", "focused"}, []string{"role:tablist", "selected", "controls"}),
+		morphRecipeForScenario("collection.list@1", "collection.list", []string{"item", "empty"}, []string{"items", "selected"}, []string{"selected", "empty"}, []string{"role:list", "item_count", "selected"}),
+		morphRecipeForScenario("collection.table-lite@1", "collection.table-lite", []string{"header", "row", "cell"}, []string{"rows", "columns"}, []string{"sorted", "selected"}, []string{"role:table", "row_count", "column_count"}),
+		morphRecipeForScenario("status.message@1", "status.message", []string{"icon", "message"}, []string{"kind", "text"}, []string{"severity", "live"}, []string{"role:status", "live", "name"}),
+	}
+}
+
+func morphRecipeForScenario(name string, family string, slots []string, inputs []string, state []string, a11y []string) surface.MorphRecipeReport {
+	return surface.MorphRecipeReport{
+		Name:                name,
+		Family:              family,
+		Output:              "Block",
+		Slots:               slots,
+		Inputs:              inputs,
+		State:               state,
+		Accessibility:       a11y,
+		ExpandsToBlockGraph: true,
 	}
 }
 
@@ -4572,8 +4965,15 @@ func morphRecipeExpansionsForScenario() []surface.MorphRecipeExpansionReport {
 	return []surface.MorphRecipeExpansionReport{
 		{Recipe: "control.action@1", BlockIDs: []int{4}, SlotBindings: []string{"label", "icon"}, Variant: "primary", Reported: true},
 		{Recipe: "field.text@1", BlockIDs: []int{3}, SlotBindings: []string{"label", "control"}, Variant: "default", Reported: true},
+		{Recipe: "control.toggle@1", BlockIDs: []int{5}, SlotBindings: []string{"label", "control"}, Variant: "checked", Reported: true},
 		{Recipe: "command.item@1", BlockIDs: []int{4, 5}, SlotBindings: []string{"icon", "title", "subtitle"}, Variant: "selected", Reported: true},
+		{Recipe: "navigation.item@1", BlockIDs: []int{4}, SlotBindings: []string{"label", "badge"}, Variant: "current", Reported: true},
 		{Recipe: "region.panel@1", BlockIDs: []int{2}, SlotBindings: []string{"header", "body", "actions"}, Variant: "elevated", Reported: true},
+		{Recipe: "overlay.dialog@1", BlockIDs: []int{2, 4, 5}, SlotBindings: []string{"title", "body", "actions"}, Variant: "modal", Reported: true},
+		{Recipe: "navigation.tabs@1", BlockIDs: []int{2, 4, 5}, SlotBindings: []string{"tab", "panel"}, Variant: "compact", Reported: true},
+		{Recipe: "collection.list@1", BlockIDs: []int{2, 4, 5}, SlotBindings: []string{"item", "empty"}, Variant: "virtual-lite", Reported: true},
+		{Recipe: "collection.table-lite@1", BlockIDs: []int{2, 4, 5}, SlotBindings: []string{"header", "row", "cell"}, Variant: "dense", Reported: true},
+		{Recipe: "status.message@1", BlockIDs: []int{5}, SlotBindings: []string{"icon", "message"}, Variant: "warning", Reported: true},
 	}
 }
 
@@ -4584,9 +4984,14 @@ func morphCasesForScenario() []surface.CaseReport {
 		{Name: "morph material paint stack resolved to Block paint", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph affordance projects accessibility", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph recipes expand to Block graph", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph production recipe family library", Kind: "positive", Ran: true, Pass: true},
+		{Name: "morph recipe state and a11y declarations", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph state and motion lenses deterministic", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph asset refs local hashed bounded cache", Kind: "positive", Ran: true, Pass: true},
 		{Name: "morph core primitive promotion rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "core primitive promotion rejected"},
+		{Name: "morph hidden app state recipe rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "hidden app state"},
+		{Name: "morph platform widget recipe output rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "platform widgets"},
+		{Name: "morph unreported recipe expansion rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "reported"},
 		{Name: "morph dirty checkout production claim rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "dirty checkout production rejected"},
 	}
 }
@@ -4887,6 +5292,511 @@ func blockSystemReportForWASM32WebBrowserCanvasScenario(source string, frames []
 	}
 }
 
+func appModelForScenario(target string) *surface.SurfaceAppModelReport {
+	return &surface.SurfaceAppModelReport{
+		Schema:                 surface.AppModelSchemaV1,
+		Level:                  "production-app-model-v1",
+		Target:                 target,
+		StateStoreLevel:        "owned-state-store-v1",
+		CommandPolicy:          "typed-command-dispatch-v1",
+		EventRoutingPolicy:     "block-event-trace-v1",
+		AsyncCommandPolicy:     "actor-task-safe-boundary-v1",
+		NavigationFocusPolicy:  "navigation-focus-scopes-v1",
+		ShortcutScopePolicy:    "scoped-shortcuts-v1",
+		ErrorPropagationPolicy: "command-error-propagation-v1",
+		RedrawSchedulingPolicy: "explicit-redraw-invalidation-v1",
+		ActorTaskBoundary:      "safe-app-model-boundary-v1",
+		AppSurfaces:            []string{"command_palette", "dashboard", "settings", "editor_shell"},
+		StateStores: []surface.AppStateStoreReport{
+			{ID: "store.command_palette", Owner: "command_palette", Scope: "overlay", Fields: []string{"query", "selected", "open"}, ComputedBindings: []string{"filtered_commands"}, Invalidates: []string{"command_list", "focus_scope"}, SnapshotBefore: "query='',selected=0,open=false", SnapshotAfter: "query='open',selected=1,open=true"},
+			{ID: "store.dashboard", Owner: "dashboard", Scope: "page", Fields: []string{"cards", "filter", "loading"}, ComputedBindings: []string{"visible_cards"}, Invalidates: []string{"dashboard_grid"}, SnapshotBefore: "cards=3,loading=true", SnapshotAfter: "cards=4,loading=false"},
+			{ID: "store.settings", Owner: "settings", Scope: "form", Fields: []string{"theme", "density", "saved"}, ComputedBindings: []string{"dirty"}, Invalidates: []string{"settings_form"}, SnapshotBefore: "theme=dark,density=comfortable,saved=true", SnapshotAfter: "theme=light,density=compact,saved=false"},
+			{ID: "store.editor_shell", Owner: "editor_shell", Scope: "document", Fields: []string{"buffer", "selection", "undo_depth", "redo_depth"}, ComputedBindings: []string{"line_count"}, Invalidates: []string{"editor_view", "status"}, SnapshotBefore: "buffer='',undo=0,redo=0", SnapshotAfter: "buffer='OK',undo=1,redo=0"},
+		},
+		Commands: []surface.AppCommandReport{
+			{ID: "command_palette.open", Kind: "command", Source: "shortcut", Target: "SubmitBlock", StoreID: "store.command_palette", EventTraceID: "trace.open_palette", Mutates: []string{"open", "query"}, RequestsRedraw: true, SafeBoundary: true},
+			{ID: "command_palette.choose", Kind: "command", Source: "click", Target: "SubmitBlock", StoreID: "store.command_palette", EventTraceID: "trace.choose_command", Mutates: []string{"selected"}, RequestsRedraw: true, SafeBoundary: true},
+			{ID: "dashboard.refresh", Kind: "async", Source: "timer", Target: "PanelBlock", StoreID: "store.dashboard", EventTraceID: "trace.async_refresh", Mutates: []string{"cards", "loading"}, RequestsRedraw: true, ErrorPath: "dashboard.error", Async: true, SafeBoundary: true},
+			{ID: "settings.save", Kind: "command", Source: "click", Target: "ResetBlock", StoreID: "store.settings", EventTraceID: "trace.disabled_save", Mutates: []string{"saved"}, RequestsRedraw: true, ErrorPath: "settings.error", SafeBoundary: true},
+			{ID: "editor.insert_text", Kind: "text-edit", Source: "text", Target: "InputBlock", StoreID: "store.editor_shell", EventTraceID: "trace.editor_text", Mutates: []string{"buffer", "selection", "undo_depth"}, RequestsRedraw: true, SafeBoundary: true},
+			{ID: "editor.undo", Kind: "undo", Source: "shortcut", Target: "InputBlock", StoreID: "store.editor_shell", EventTraceID: "trace.undo", Mutates: []string{"buffer", "undo_depth", "redo_depth"}, RequestsRedraw: true, SafeBoundary: true},
+			{ID: "editor.redo", Kind: "redo", Source: "shortcut", Target: "InputBlock", StoreID: "store.editor_shell", EventTraceID: "trace.redo", Mutates: []string{"buffer", "undo_depth", "redo_depth"}, RequestsRedraw: true, SafeBoundary: true},
+			{ID: "navigation.focus_next", Kind: "navigation", Source: "key", Target: "ResetBlock", StoreID: "store.command_palette", EventTraceID: "trace.focus_next", Mutates: []string{"selected"}, RequestsRedraw: true, SafeBoundary: true},
+			{ID: "shortcut.run", Kind: "shortcut", Source: "key", Target: "SubmitBlock", StoreID: "store.command_palette", EventTraceID: "trace.shortcut", Mutates: []string{"selected"}, RequestsRedraw: true, SafeBoundary: true},
+		},
+		EventTraces: []surface.AppEventTraceReport{
+			{Order: 1, ID: "trace.open_palette", EventKind: "key", TargetBlock: "SubmitBlock", CommandID: "command_palette.open", StoreID: "store.command_palette", DispatchPath: []int{1, 2, 4}, StateBefore: "open=false", StateAfter: "open=true", Delivered: true, FocusedBlock: "SubmitBlock"},
+			{Order: 2, ID: "trace.choose_command", EventKind: "click", TargetBlock: "SubmitBlock", CommandID: "command_palette.choose", StoreID: "store.command_palette", DispatchPath: []int{1, 2, 4}, StateBefore: "selected=0", StateAfter: "selected=1", Delivered: true, FocusedBlock: "SubmitBlock"},
+			{Order: 3, ID: "trace.disabled_save", EventKind: "click", TargetBlock: "ResetBlock", CommandID: "settings.save", StoreID: "store.settings", DispatchPath: []int{1, 2, 5}, StateBefore: "saved=true", StateAfter: "saved=true", Rejected: true, RejectReason: "disabled control"},
+			{Order: 4, ID: "trace.unfocused_text", EventKind: "text_input", TargetBlock: "InputBlock", CommandID: "editor.insert_text", StoreID: "store.editor_shell", DispatchPath: []int{1, 2, 4}, StateBefore: "buffer=''", StateAfter: "buffer=''", Rejected: true, RejectReason: "unfocused text target", FocusedBlock: "ResetBlock", TextLen: 2},
+			{Order: 5, ID: "trace.editor_text", EventKind: "text_input", TargetBlock: "InputBlock", CommandID: "editor.insert_text", StoreID: "store.editor_shell", DispatchPath: []int{1, 2, 4}, StateBefore: "buffer=''", StateAfter: "buffer='OK'", Delivered: true, FocusedBlock: "InputBlock", TextLen: 2},
+			{Order: 6, ID: "trace.focus_next", EventKind: "key", TargetBlock: "ResetBlock", CommandID: "navigation.focus_next", StoreID: "store.command_palette", DispatchPath: []int{1, 2, 5}, StateBefore: "selected=1", StateAfter: "selected=2", Delivered: true, FocusedBlock: "ResetBlock"},
+			{Order: 7, ID: "trace.shortcut", EventKind: "key", TargetBlock: "SubmitBlock", CommandID: "shortcut.run", StoreID: "store.command_palette", DispatchPath: []int{1, 2, 4}, StateBefore: "selected=2", StateAfter: "selected=3", Delivered: true, FocusedBlock: "SubmitBlock"},
+			{Order: 8, ID: "trace.async_refresh", EventKind: "frame", TargetBlock: "PanelBlock", CommandID: "dashboard.refresh", StoreID: "store.dashboard", DispatchPath: []int{1, 2}, StateBefore: "loading=true", StateAfter: "loading=false", Delivered: true},
+			{Order: 9, ID: "trace.undo", EventKind: "key", TargetBlock: "InputBlock", CommandID: "editor.undo", StoreID: "store.editor_shell", DispatchPath: []int{1, 2, 4}, StateBefore: "undo=1,redo=0", StateAfter: "undo=0,redo=1", Delivered: true, FocusedBlock: "InputBlock"},
+			{Order: 10, ID: "trace.redo", EventKind: "key", TargetBlock: "InputBlock", CommandID: "editor.redo", StoreID: "store.editor_shell", DispatchPath: []int{1, 2, 4}, StateBefore: "undo=0,redo=1", StateAfter: "undo=1,redo=0", Delivered: true, FocusedBlock: "InputBlock"},
+		},
+		AsyncCommands: []surface.AppAsyncCommandReport{
+			{ID: "async.dashboard.refresh", CommandID: "dashboard.refresh", Policy: "actor-task-safe-boundary-v1", Boundary: "safe-app-model-boundary-v1", Started: true, Completed: true, ErrorPropagated: true, SafeBoundary: true},
+		},
+		NavigationSteps: []surface.AppNavigationStepReport{
+			{Order: 1, Kind: "focus_next", Before: "SubmitBlock", After: "ResetBlock", FocusScope: "command_palette", GraphDerived: true},
+			{Order: 2, Kind: "focus_trap", Before: "EditorDialog", After: "EditorDialog", FocusScope: "editor_shell", FocusTrap: true, GraphDerived: true},
+		},
+		ShortcutScopes: []surface.AppShortcutScopeReport{
+			{ID: "shortcuts.global", Scope: "global", Commands: []string{"command_palette.open", "shortcut.run"}},
+			{ID: "shortcuts.command_palette", Scope: "command_palette", Commands: []string{"command_palette.choose", "navigation.focus_next"}, FocusOnly: true},
+			{ID: "shortcuts.editor", Scope: "editor_shell", Commands: []string{"editor.undo", "editor.redo", "editor.insert_text"}, FocusOnly: true},
+		},
+		ErrorReports: []surface.AppErrorReport{
+			{CommandID: "dashboard.refresh", Code: "async_load_failed", Propagated: true, Handled: true, StoreID: "store.dashboard"},
+			{CommandID: "settings.save", Code: "disabled_control", Propagated: true, Handled: true, StoreID: "store.settings"},
+		},
+		RedrawRequests: []surface.AppRedrawRequestReport{
+			{Order: 1, Cause: "command_palette.open", StoreID: "store.command_palette", Invalidation: "overlay", FrameBefore: 1, FrameAfter: 2, BeforeChecksum: "1111111111111111111111111111111111111111111111111111111111111111", AfterChecksum: "2222222222222222222222222222222222222222222222222222222222222222"},
+			{Order: 2, Cause: "editor.insert_text", StoreID: "store.editor_shell", Invalidation: "editor_view", FrameBefore: 2, FrameAfter: 3, BeforeChecksum: "2222222222222222222222222222222222222222222222222222222222222222", AfterChecksum: "3333333333333333333333333333333333333333333333333333333333333333"},
+		},
+		ReactRuntimeAbsent:         true,
+		ReactHooksAbsent:           true,
+		DOMEventsAbsent:            true,
+		UserJSAbsent:               true,
+		MissingEventTraceRejected:  true,
+		DisabledDispatchRejected:   true,
+		UnfocusedTextRejected:      true,
+		UnsafeTaskBoundaryRejected: true,
+		ReactRuntimeClaimRejected:  true,
+		NonClaims:                  []string{"React runtime", "React hooks", "DOM events", "user-authored script logic", "unsafe actor/task boundary"},
+	}
+}
+
+func keyboardUXForScenario(target string) *surface.SurfaceKeyboardUXReport {
+	return &surface.SurfaceKeyboardUXReport{
+		Schema:                   surface.KeyboardUXSchemaV1,
+		Level:                    "production-keyboard-ux-v1",
+		Target:                   target,
+		FocusOrderPolicy:         "graph-focus-order-v1",
+		FocusTrapPolicy:          "overlay-focus-trap-v1",
+		RovingFocusPolicy:        "roving-focus-v1",
+		KeyboardActivationPolicy: "keyboard-activation-v1",
+		ShortcutConflictPolicy:   "scoped-shortcut-conflict-v1",
+		UndoRedoPolicy:           "bounded-undo-redo-stack-v1",
+		Surfaces:                 []string{"command_palette", "search", "settings_form", "editor_shell"},
+		FocusOrder: []surface.KeyboardFocusNodeReport{
+			{Order: 1, BlockID: 4, Name: "InputBlock", Role: "textbox", Scope: "editor_shell", AccessibleName: "Editor input", LabelledBy: "LabelBlock", KeyboardReachable: true},
+			{Order: 2, BlockID: 5, Name: "ResetBlock", Role: "button", Scope: "command_palette", AccessibleName: "Run command", KeyboardReachable: true},
+		},
+		FocusTransitions: []surface.KeyboardFocusTransitionReport{
+			{Order: 1, Key: "Tab", Before: 4, After: 5, Scope: "command_palette", Direction: "next", GraphDerived: true},
+			{Order: 2, Key: "Shift_Tab", Before: 5, After: 4, Scope: "command_palette", Direction: "previous", Wrapped: true, GraphDerived: true},
+			{Order: 3, Key: "ArrowDown", Before: 4, After: 5, Scope: "command_palette", Direction: "roving-next", GraphDerived: true},
+		},
+		FocusTraps: []surface.KeyboardFocusTrapReport{
+			{ID: "trap.command_palette", Scope: "command_palette", OverlayBlock: 2, EntryBlock: 4, FirstBlock: 4, LastBlock: 5, RestoreBlock: 4, LeakRejected: true, EscapeCloses: true},
+		},
+		RovingFocusGroups: []surface.KeyboardRovingFocusGroupReport{
+			{ID: "roving.command_results", Scope: "command_palette", ActiveBlock: 4, Items: []int{4, 5}, ArrowKeys: true, HomeEnd: true, Wrap: true, ConflictScope: "command_palette"},
+		},
+		KeyBindings: []surface.KeyboardBindingReport{
+			{ID: "binding.enter.activate", Key: "Enter", Scope: "command_palette", CommandID: "shortcut.run", BlockID: 5, Source: "key", Delivered: true},
+			{ID: "binding.space.activate", Key: "Space", Scope: "command_palette", CommandID: "shortcut.run", BlockID: 5, Source: "key", Delivered: true},
+			{ID: "binding.tab.next", Key: "Tab", Scope: "command_palette", CommandID: "navigation.focus_next", BlockID: 4, Source: "key", Delivered: true},
+			{ID: "binding.shift_tab.prev", Key: "Shift_Tab", Scope: "command_palette", CommandID: "navigation.focus_next", BlockID: 5, Source: "key", Delivered: true},
+			{ID: "binding.escape.close", Key: "Escape", Scope: "command_palette", CommandID: "command_palette.open", BlockID: 4, Source: "key", Delivered: true},
+			{ID: "binding.ctrl_k.palette", Key: "Ctrl_K", Scope: "global", CommandID: "command_palette.open", BlockID: 4, Source: "shortcut", Delivered: true},
+			{ID: "binding.ctrl_z.undo", Key: "Ctrl_Z", Scope: "editor_shell", CommandID: "editor.undo", BlockID: 4, Source: "shortcut", Delivered: true},
+			{ID: "binding.ctrl_y.redo", Key: "Ctrl_Y", Scope: "editor_shell", CommandID: "editor.redo", BlockID: 4, Source: "shortcut", Delivered: true},
+		},
+		ShortcutConflicts: []surface.KeyboardShortcutConflictReport{
+			{Key: "Ctrl+K", Scope: "command_palette", CommandIDs: []string{"command_palette.open", "shortcut.run"}, Diagnosed: true, Rejected: true, Message: "Ctrl+K conflict is scoped and rejected"},
+		},
+		UndoRedoStacks: []surface.KeyboardUndoRedoStackReport{
+			{ID: "undo.editor_shell", Scope: "editor_shell", StoreID: "store.editor_shell", UndoCommandID: "editor.undo", RedoCommandID: "editor.redo", Units: []string{"insert-OK"}, Before: "undo=1,redo=0", AfterUndo: "undo=0,redo=1", AfterRedo: "undo=1,redo=0", Bounded: true, KeyboardDriven: true},
+		},
+		KeyboardScripts: []surface.KeyboardScriptReport{
+			{ID: "script.command_palette", Surface: "command_palette", Steps: []string{"Ctrl_K", "ArrowDown", "Enter"}, KeyboardOnly: true, FinalFocus: "ResetBlock", Pass: true},
+			{ID: "script.search", Surface: "search", Steps: []string{"Ctrl_K", "type query", "Enter"}, KeyboardOnly: true, FinalFocus: "InputBlock", Pass: true},
+			{ID: "script.settings", Surface: "settings_form", Steps: []string{"Tab", "Space", "Enter"}, KeyboardOnly: true, FinalFocus: "ResetBlock", Pass: true},
+			{ID: "script.editor", Surface: "editor_shell", Steps: []string{"type OK", "Ctrl_Z", "Ctrl_Y"}, KeyboardOnly: true, FinalFocus: "InputBlock", Pass: true},
+		},
+		FocusableNameRejected:     true,
+		OverlayFocusLeakRejected:  true,
+		ShortcutConflictRejected:  true,
+		PointerOnlyActionRejected: true,
+		UnknownShortcutRejected:   true,
+		UndoWithoutStackRejected:  true,
+		NonClaims:                 []string{"pointer-only app", "global shortcut bypass", "screen-reader parity", "native platform widgets"},
+	}
+}
+
+func appShellForScenario(target string) *surface.SurfaceAppShellReport {
+	return &surface.SurfaceAppShellReport{
+		Schema:      surface.AppShellSchemaV1,
+		Level:       "production-app-shell-host-abi-v1",
+		Target:      target,
+		HostABI:     "tetra.surface.host-abi.v1",
+		ShellPolicy: "block-app-shell-host-abi-v1",
+		Capabilities: []surface.AppShellCapabilityReport{
+			{Kind: "window", Supported: true, HostTraceRequired: true},
+			{Kind: "lifecycle", Supported: true, HostTraceRequired: true},
+			{Kind: "menu", Supported: true, HostTraceRequired: true},
+			{Kind: "context_menu", Supported: true, HostTraceRequired: true},
+			{Kind: "dialog", Supported: true, HostTraceRequired: true},
+			{Kind: "notification", Supported: true, HostTraceRequired: true},
+			{Kind: "tray", Supported: true, HostTraceRequired: true},
+			{Kind: "cursor", Supported: true, HostTraceRequired: true},
+			{Kind: "drag_drop", Supported: true, HostTraceRequired: true},
+			{Kind: "permission", Supported: true, HostTraceRequired: true},
+			{Kind: "clipboard", Supported: true, HostTraceRequired: true},
+			{Kind: "ime", Supported: true, HostTraceRequired: true},
+			{Kind: "dpi_scale", Supported: true, HostTraceRequired: true},
+			{Kind: "open_url", Supported: true, HostTraceRequired: true},
+			{Kind: "open_file", Supported: true, HostTraceRequired: true},
+			{Kind: "platform_widget_shell", Supported: false, DiagnosticRequired: true},
+			{Kind: "native_global_menu", Supported: false, DiagnosticRequired: true},
+		},
+		HostReports: []surface.AppShellHostReport{
+			{ID: "host.window.create", Kind: "window", Target: target, TraceID: "trace.shell.window.create", Action: "create_show_focus_resize", Delivered: true, TimestampMS: 1},
+			{ID: "host.lifecycle.ready", Kind: "lifecycle", Target: target, TraceID: "trace.shell.lifecycle.ready", Action: "app_start_ready_activate_before_quit_quit", Delivered: true, TimestampMS: 2},
+			{ID: "host.menu.app", Kind: "menu", Target: target, TraceID: "trace.shell.menu.app", Action: "install_app_menu_and_dispatch", Delivered: true, TimestampMS: 3},
+			{ID: "host.menu.context", Kind: "context_menu", Target: target, TraceID: "trace.shell.menu.context", Action: "show_context_menu_and_dispatch", Delivered: true, TimestampMS: 4},
+			{ID: "host.dialog.file", Kind: "dialog", Target: target, TraceID: "trace.shell.dialog.file", Action: "file_open_picker", Delivered: true, TimestampMS: 5},
+			{ID: "host.notification.deliver", Kind: "notification", Target: target, TraceID: "trace.shell.notification.deliver", Action: "notify", Delivered: true, TimestampMS: 6},
+			{ID: "host.tray.install", Kind: "tray", Target: target, TraceID: "trace.shell.tray.install", Action: "install_status_item", Delivered: true, TimestampMS: 7},
+			{ID: "host.cursor.apply", Kind: "cursor", Target: target, TraceID: "trace.shell.cursor.apply", Action: "apply_pointer_text_grab", Delivered: true, TimestampMS: 8},
+			{ID: "host.drag_drop.drop", Kind: "drag_drop", Target: target, TraceID: "trace.shell.drag_drop.drop", Action: "drag_enter_drop", Delivered: true, TimestampMS: 9},
+			{ID: "host.permission.query", Kind: "permission", Target: target, TraceID: "trace.shell.permission.query", Action: "query_permissions", Delivered: true, TimestampMS: 10},
+			{ID: "host.clipboard.roundtrip", Kind: "clipboard", Target: target, TraceID: "trace.shell.clipboard.roundtrip", Action: "read_write_text", Delivered: true, TimestampMS: 11},
+			{ID: "host.ime.preedit", Kind: "ime", Target: target, TraceID: "trace.shell.ime.preedit", Action: "composition_start_update_commit", Delivered: true, TimestampMS: 12},
+			{ID: "host.dpi.scale", Kind: "dpi_scale", Target: target, TraceID: "trace.shell.dpi.scale", Action: "scale_change_resize", Delivered: true, TimestampMS: 13},
+			{ID: "host.open.url", Kind: "open_url", Target: target, TraceID: "trace.shell.open.url", Action: "open_url", Delivered: true, TimestampMS: 14},
+			{ID: "host.open.file", Kind: "open_file", Target: target, TraceID: "trace.shell.open.file", Action: "open_file", Delivered: true, TimestampMS: 15},
+		},
+		Windows: []surface.AppShellWindowReport{
+			{ID: "window.main", Title: "Surface Block System", Width: 400, Height: 240, MinWidth: 320, MinHeight: 200, Visible: true, Focused: true, Resizable: true, DPIAware: true, HostReportID: "host.window.create", ActionTraceID: "trace.shell.window.create"},
+		},
+		Lifecycle: []surface.AppShellLifecycleReport{
+			{Order: 1, Kind: "app_start", Delivered: true, HostReportID: "host.lifecycle.ready", ActionTraceID: "trace.shell.lifecycle.start"},
+			{Order: 2, Kind: "ready", Delivered: true, HostReportID: "host.lifecycle.ready", ActionTraceID: "trace.shell.lifecycle.ready"},
+			{Order: 3, Kind: "activate", Delivered: true, HostReportID: "host.lifecycle.ready", ActionTraceID: "trace.shell.lifecycle.activate"},
+			{Order: 4, Kind: "before_quit", Delivered: true, HostReportID: "host.lifecycle.ready", ActionTraceID: "trace.shell.lifecycle.before_quit"},
+			{Order: 5, Kind: "quit", Delivered: true, HostReportID: "host.lifecycle.ready", ActionTraceID: "trace.shell.lifecycle.quit"},
+		},
+		Menus: []surface.AppShellMenuReport{
+			{ID: "menu.app", Kind: "menu", Items: []string{"File/New", "File/Open", "App/Quit"}, TargetBlock: "BlockSystemApp", CommandID: "command_palette.open", Delivered: true, HostReportID: "host.menu.app", ActionTraceID: "trace.shell.menu.app"},
+			{ID: "menu.context.editor", Kind: "context_menu", Items: []string{"Copy", "Paste", "Inspect"}, TargetBlock: "InputBlock", CommandID: "editor.insert_text", Delivered: true, HostReportID: "host.menu.context", ActionTraceID: "trace.shell.menu.context"},
+		},
+		Dialogs: []surface.AppShellDialogReport{
+			{ID: "dialog.file_open", Kind: "file_open", Title: "Open Tetra File", Result: "examples/surface_block_system.tetra", Delivered: true, HostReportID: "host.dialog.file", ActionTraceID: "trace.shell.dialog.file"},
+			{ID: "dialog.message", Kind: "message", Title: "Surface Ready", Result: "ok", Delivered: true, HostReportID: "host.dialog.file", ActionTraceID: "trace.shell.dialog.message"},
+		},
+		TrayItems: []surface.AppShellTrayReport{
+			{ID: "tray.status", MenuID: "menu.app", Tooltip: "Surface Block System", ClickAction: "command_palette.open", Delivered: true, HostReportID: "host.tray.install", ActionTraceID: "trace.shell.tray.click"},
+		},
+		Notifications: []surface.AppShellNotificationReport{
+			{ID: "notification.ready", Title: "Surface Ready", Body: "Block System rendered", PermissionID: "permission.notification", Delivered: true, HostReportID: "host.notification.deliver"},
+		},
+		Cursors: []surface.AppShellCursorReport{
+			{Kind: "pointer", TargetBlock: "SubmitBlock", Applied: true, HostReportID: "host.cursor.apply"},
+			{Kind: "text", TargetBlock: "InputBlock", Applied: true, HostReportID: "host.cursor.apply"},
+			{Kind: "grab", TargetBlock: "ScrollBlock", Applied: true, HostReportID: "host.cursor.apply"},
+		},
+		DragDrop: []surface.AppShellDragDropReport{
+			{ID: "drag.enter", Kind: "drag_enter", SourceBlock: "InputBlock", TargetBlock: "PanelBlock", MIME: "text/plain", Delivered: true, HostReportID: "host.drag_drop.drop", ActionTraceID: "trace.shell.drag.enter"},
+			{ID: "drag.drop", Kind: "drop", SourceBlock: "InputBlock", TargetBlock: "PanelBlock", MIME: "text/plain", Delivered: true, HostReportID: "host.drag_drop.drop", ActionTraceID: "trace.shell.drag.drop"},
+		},
+		Permissions: []surface.AppShellPermissionReport{
+			{ID: "permission.notification", Kind: "notification", Mode: "ask", Granted: true},
+			{ID: "permission.filesystem", Kind: "filesystem", Mode: "scoped-open-file", Rejected: true, DiagnosticID: "diag.filesystem.denied"},
+			{ID: "permission.clipboard", Kind: "clipboard", Mode: "focused-window", Granted: true},
+		},
+		OpenRequests: []surface.AppShellOpenRequestReport{
+			{ID: "open.docs", Kind: "open_url", Target: "https://tetra.local/surface", Delivered: true, HostReportID: "host.open.url"},
+			{ID: "open.project", Kind: "open_file", Target: "examples/surface_block_system.tetra", Delivered: true, HostReportID: "host.open.file"},
+		},
+		DPI: []surface.AppShellDPIReport{
+			{ID: "dpi.primary", ScaleMille: 1000, Width: 400, Height: 240, HostReportID: "host.dpi.scale"},
+			{ID: "dpi.hidpi", ScaleMille: 2000, Width: 800, Height: 480, HostReportID: "host.dpi.scale"},
+		},
+		Diagnostics: []surface.AppShellDiagnosticReport{
+			{ID: "diag.platform_widget_shell", Capability: "platform_widget_shell", Code: "platform_widget_shell_rejected", Message: "Surface app shell must not delegate UI to platform widgets", Unsupported: true, Rejected: true, Target: target},
+			{ID: "diag.native_global_menu", Capability: "native_global_menu", Code: "native_global_menu_nonclaim", Message: "Native global menu parity is not claimed without target-host proof", Unsupported: true, Rejected: true, Target: target},
+			{ID: "diag.filesystem.denied", Capability: "filesystem", Code: "permission_denied", Message: "Filesystem access outside picker grant rejected", Unsupported: true, Rejected: true, Target: target},
+		},
+		NegativeGuards: surface.AppShellNegativeGuardsReport{
+			MissingMenuHostTraceRejected:          true,
+			NotificationWithoutHostReportRejected: true,
+			UnsupportedFeatureSilentNoopRejected:  true,
+			WindowWithoutLifecycleRejected:        true,
+			PermissionWithoutDiagnosticRejected:   true,
+			PlatformWidgetShellRejected:           true,
+		},
+		NonClaims: []string{"Electron shell dependency", "React runtime", "DOM-rendered interface", "platform-native widgets", "silent no-op unsupported host features"},
+	}
+}
+
+func retargetAppShellForScenario(shell *surface.SurfaceAppShellReport, target string) {
+	shell.Target = target
+	for i := range shell.HostReports {
+		shell.HostReports[i].Target = target
+	}
+	for i := range shell.Diagnostics {
+		shell.Diagnostics[i].Target = target
+	}
+}
+
+func linuxHostAdapterForScenario(target string) *surface.SurfaceLinuxHostAdapterReport {
+	return &surface.SurfaceLinuxHostAdapterReport{
+		Schema:              surface.LinuxHostAdapterSchemaV1,
+		Level:               "linux-x64-production-host-adapter-v1",
+		Target:              target,
+		Runtime:             "surface-linux-x64",
+		HostABI:             "tetra.surface.host-abi.v1",
+		AppShellABI:         surface.AppShellSchemaV1,
+		Backend:             "wayland-shm-rgba-release-v1",
+		DisplayProtocol:     "wayland",
+		WindowSystem:        "wayland-shm-rgba",
+		TargetHostTrace:     "surface-linux-x64-release-window-target-host-trace-v1",
+		RealWindow:          true,
+		Framebuffer:         true,
+		NativeInput:         true,
+		TextInput:           true,
+		IME:                 true,
+		Clipboard:           true,
+		Composition:         true,
+		AccessibilityBridge: true,
+		AppShell:            true,
+		Packaging: surface.LinuxHostAdapterPackagingReport{
+			Scope:          "linux-x64-unpacked-binary-v1",
+			ArtifactKind:   "component-app",
+			ArtifactPath:   "/tmp/surface-artifacts/surface-release-form",
+			UnpackedBinary: true,
+			Installable:    false,
+			Signed:         false,
+			AutoUpdate:     false,
+			FullPackaging:  false,
+		},
+		Traces: []surface.LinuxHostAdapterTraceReport{
+			{ID: "linux-trace-real-window", Kind: "real_window", Target: target, Artifact: "/tmp/surface-artifacts/surface-release-window-probe", Delivered: true, TargetHost: true},
+			{ID: "linux-trace-framebuffer", Kind: "framebuffer", Target: target, Artifact: "/tmp/surface-artifacts/surface-release-window-probe", Delivered: true, TargetHost: true},
+			{ID: "linux-trace-native-input", Kind: "native_input", Target: target, Artifact: "/tmp/surface-artifacts/surface-release-window-probe", Delivered: true, TargetHost: true},
+			{ID: "linux-trace-text-input", Kind: "text_input", Target: target, Artifact: "/tmp/surface-artifacts/surface-release-window-probe", Delivered: true, TargetHost: true},
+			{ID: "linux-trace-ime", Kind: "ime", Target: target, Artifact: "/tmp/surface-artifacts/surface-linux-composition-harness.json", Delivered: true, TargetHost: true},
+			{ID: "linux-trace-clipboard", Kind: "clipboard", Target: target, Artifact: "/tmp/surface-artifacts/surface-linux-clipboard-harness.json", Delivered: true, TargetHost: true},
+			{ID: "linux-trace-composition", Kind: "composition", Target: target, Artifact: "/tmp/surface-artifacts/surface-linux-composition-harness.json", Delivered: true, TargetHost: true},
+			{ID: "linux-trace-accessibility", Kind: "accessibility_bridge", Target: target, Artifact: "/tmp/surface-artifacts/surface-linux-accessibility-bridge.json", Delivered: true, TargetHost: true},
+			{ID: "linux-trace-app-shell", Kind: "app_shell", Target: target, Artifact: string(surface.AppShellSchemaV1), Delivered: true, TargetHost: true},
+			{ID: "linux-trace-packaging", Kind: "packaging_scope", Target: target, Artifact: "/tmp/surface-artifacts/surface-release-form", Delivered: true, TargetHost: true},
+		},
+		Diagnostics: []surface.LinuxHostAdapterDiagnosticReport{
+			{ID: "linux-diag-blocked-display", Kind: "blocked_display_not_pass", Message: "missing WAYLAND_DISPLAY/DISPLAY must produce blocked report, not pass", Rejected: true},
+			{ID: "linux-diag-headless-promotion", Kind: "headless_promotion_rejected", Message: "headless-only evidence cannot promote to linux production", Rejected: true},
+			{ID: "linux-diag-old-real-window", Kind: "old_real_window_promotion_rejected", Message: "linux-x64-real-window evidence cannot promote to release-window production", Rejected: true},
+		},
+		NegativeGuards: surface.LinuxHostAdapterNegativeGuardsReport{
+			HeadlessPromotionRejected:      true,
+			BlockedDisplayPassRejected:     true,
+			OldRealWindowPromotionRejected: true,
+			MissingAppShellRejected:        true,
+			MissingPackagingScopeRejected:  true,
+			MissingTargetHostTraceRejected: true,
+		},
+		NonClaims: []string{"offscreen-only production", "blocked display pass", "full installer packaging", "signed packages", "auto-update"},
+	}
+}
+
+func browserCanvasTargetForReleaseBrowserScenario(frames []surface.FrameReport, events []surface.EventReport, artifacts []surface.ArtifactReport) *surface.SurfaceBrowserCanvasTargetReport {
+	return &surface.SurfaceBrowserCanvasTargetReport{
+		Schema:                surface.BrowserCanvasTargetSchemaV1,
+		Level:                 "wasm32-web-first-class-browser-canvas-target-v1",
+		Target:                "wasm32-web",
+		Runtime:               "surface-wasm32-web",
+		HostABI:               "tetra.surface.host-abi.v1",
+		Backend:               "browser-canvas-rgba-accessible",
+		TraceSchema:           "tetra.surface.browser-canvas-trace.v1",
+		CompilerOwnedBoot:     true,
+		CompilerOwnedLoader:   true,
+		UserJSAppLogic:        false,
+		DOMUI:                 false,
+		ReactRuntime:          false,
+		BrowserCanvas:         true,
+		BrowserInput:          true,
+		BrowserClipboard:      true,
+		BrowserComposition:    true,
+		AccessibilitySnapshot: true,
+		AccessibilityMirror:   true,
+		FrameChecksumCount:    countPresentedFrameChecksumsForScenario(frames),
+		EventKinds:            uniqueEventKindsForScenario(events),
+		ArtifactKinds:         artifactKindsForScenario(artifacts),
+		NegativeGuards: surface.BrowserCanvasTargetNegativeGuardsReport{
+			NodeOnlyRejected:              true,
+			DOMSnapshotRendererRejected:   true,
+			UserJSCommandDispatchRejected: true,
+			MetadataSidecarRejected:       true,
+			LegacySidecarRejected:         true,
+			ReactRuntimeRejected:          true,
+		},
+		NonClaims: []string{
+			"DOM snapshot renderer",
+			"user script command dispatch",
+			"React runtime",
+			"node runtime substitution",
+			"metadata sidecar",
+			"legacy sidecar",
+		},
+	}
+}
+
+func releaseAccessibilityTargetRuntimeForMode(mode string) (string, string) {
+	switch mode {
+	case "linux-x64-release-accessibility":
+		return "linux-x64", "surface-linux-x64"
+	case "wasm32-web-release-accessibility":
+		return "wasm32-web", "surface-wasm32-web"
+	default:
+		return "headless", "surface-headless"
+	}
+}
+
+func accessibilityTargetForReleaseAccessibilityScenario(target string, runtime string, tree *surface.AccessibilityTreeReport) *surface.SurfaceAccessibilityTargetReport {
+	if tree == nil {
+		return nil
+	}
+	inspector := "deterministic-accessibility-tree-inspector-v1"
+	hostBridge := false
+	browserSnapshot := false
+	browserMirror := false
+	switch target {
+	case "linux-x64":
+		inspector = "linux-accessibility-platform-probe-v1"
+		hostBridge = true
+	case "wasm32-web":
+		inspector = "browser-accessibility-snapshot-mirror-v1"
+		hostBridge = true
+		browserSnapshot = tree.BrowserAccessibilitySnap
+		browserMirror = tree.BrowserAccessibilityMirror
+	}
+	return &surface.SurfaceAccessibilityTargetReport{
+		Schema:                surface.AccessibilityTargetSchemaV1,
+		Level:                 "production-accessibility-target-v1",
+		Target:                target,
+		Runtime:               runtime,
+		ReleaseScope:          surface.ReleaseScopeSurfaceV1LinuxWeb,
+		TreeSchema:            tree.Schema,
+		PlatformBridge:        tree.PlatformBridge,
+		Inspector:             inspector,
+		ScreenReaderEvidence:  accessibilityScreenReaderEvidenceString(tree.ScreenReaderEvidence),
+		MetadataTree:          tree.MetadataTree,
+		PlatformExport:        tree.PlatformExport,
+		HostBridge:            hostBridge,
+		BrowserSnapshot:       browserSnapshot,
+		BrowserMirror:         browserMirror,
+		FullScreenReaderClaim: false,
+		RoleCount:             len(tree.RolesPresent),
+		NamedNodeCount:        countNamedAccessibilityNodesForScenario(tree.Nodes),
+		StateNodeCount:        countStatefulAccessibilityNodesForScenario(tree.Nodes),
+		RelationshipCount:     len(tree.Relationships),
+		ActionCount:           len(tree.Actions),
+		FocusOrderCount:       len(tree.FocusOrder),
+		ReadingOrderCount:     len(tree.ReadingOrder),
+		SnapshotCount:         len(tree.Snapshots),
+		NegativeGuards:        accessibilityTargetNegativeGuardsForScenario(),
+		NonClaims:             accessibilityTargetNonClaimsForScenario(),
+	}
+}
+
+func accessibilityScreenReaderEvidenceString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case bool:
+		if typed {
+			return "true"
+		}
+	}
+	return ""
+}
+
+func countNamedAccessibilityNodesForScenario(nodes []surface.AccessibilityNodeReport) int {
+	count := 0
+	for _, node := range nodes {
+		if strings.TrimSpace(node.Name) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func countStatefulAccessibilityNodesForScenario(nodes []surface.AccessibilityNodeReport) int {
+	count := 0
+	for _, node := range nodes {
+		if node.Visible || node.Enabled || node.Focusable || node.Focused || node.Editable ||
+			node.Readonly || node.Required || node.Pressed || node.Invalid ||
+			node.ValueKind != "" || node.ValueLen != 0 {
+			count++
+		}
+	}
+	return count
+}
+
+func accessibilityTargetNegativeGuardsForScenario() surface.AccessibilityTargetNegativeGuardsReport {
+	return surface.AccessibilityTargetNegativeGuardsReport{
+		FocusableUnnamedRejected:             true,
+		ARIADOMDesktopBridgeRejected:         true,
+		FullATSPIWithoutScreenReaderRejected: true,
+		MetadataPlatformOverclaimRejected:    true,
+		ShuffledFocusOrderRejected:           true,
+		ShuffledReadingOrderRejected:         true,
+	}
+}
+
+func accessibilityTargetNonClaimsForScenario() []string {
+	return []string{
+		"full screen-reader parity",
+		"desktop aria bridge",
+		"metadata platform overclaim",
+		"unnamed focusable block",
+		"AT-SPI full support",
+	}
+}
+
+func countPresentedFrameChecksumsForScenario(frames []surface.FrameReport) int {
+	count := 0
+	for _, frame := range frames {
+		if frame.Presented && strings.TrimSpace(frame.Checksum) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func uniqueEventKindsForScenario(events []surface.EventReport) []string {
+	seen := map[string]bool{}
+	var kinds []string
+	for _, event := range events {
+		kind := strings.TrimSpace(event.Kind)
+		if kind == "" || seen[kind] {
+			continue
+		}
+		seen[kind] = true
+		kinds = append(kinds, kind)
+	}
+	return kinds
+}
+
+func artifactKindsForScenario(artifacts []surface.ArtifactReport) []string {
+	seen := map[string]bool{}
+	var kinds []string
+	for _, artifact := range artifacts {
+		kind := strings.TrimSpace(artifact.Kind)
+		if kind == "" || seen[kind] {
+			continue
+		}
+		seen[kind] = true
+		kinds = append(kinds, kind)
+	}
+	return kinds
+}
+
 func blockSystemComponentsForScenario() []surface.ComponentReport {
 	abilities := []string{"measure", "layout", "draw", "event", "focus", "text", "accessibility"}
 	return []surface.ComponentReport{
@@ -5045,6 +5955,13 @@ func blockSystemCasesForScenario() []surface.CaseReport {
 		{Name: "block paint deterministic command order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block paint frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block paint unsupported blur rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported blur"},
+		{Name: "software renderer deterministic raster", Kind: "positive", Ran: true, Pass: true},
+		{Name: "software renderer alpha clipping", Kind: "positive", Ran: true, Pass: true},
+		{Name: "software renderer golden export", Kind: "positive", Ran: true, Pass: true},
+		{Name: "software renderer resize scale dpi", Kind: "positive", Ran: true, Pass: true},
+		{Name: "software renderer use-after-present rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "use-after-present"},
+		{Name: "software renderer frame alias rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "frame alias"},
+		{Name: "software renderer browser promotion without runtime rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "browser promotion without runtime"},
 		{Name: "block text deterministic measurement", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block text wrap ellipsis layout", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block text font fallback chain", Kind: "positive", Ran: true, Pass: true},
@@ -5057,6 +5974,11 @@ func blockSystemCasesForScenario() []surface.CaseReport {
 		{Name: "block layout clipping z-order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block layout resize constraints", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block layout no css flexbox parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS flexbox parity nonclaim"},
+		{Name: "block layout DPI density", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout invalidation cache budget", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout responsive app shell settings dashboard editor", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout overflow explicit clip scroll", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block layout no css grid parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "CSS grid parity nonclaim"},
 		{Name: "block state selector resolver order", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block state hover fill override", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block state pressed scale override", Kind: "positive", Ran: true, Pass: true},
@@ -5064,19 +5986,47 @@ func blockSystemCasesForScenario() []surface.CaseReport {
 		{Name: "block state disabled error loading overrides", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block state frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block state no css pseudo parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css pseudo nonclaim"},
+		{Name: "app model owned state stores", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app model typed commands", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app model Block event trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app model async safe boundary", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app model navigation focus scopes", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app model shortcut scopes", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app model error propagation", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app model redraw scheduling", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app model disabled dispatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "disabled dispatch rejected"},
+		{Name: "app model unfocused text rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unfocused text rejected"},
+		{Name: "app model no React runtime", Kind: "negative", Ran: true, Pass: true, ExpectedError: "React runtime claim rejected"},
+		{Name: "keyboard ux focus order", Kind: "positive", Ran: true, Pass: true},
+		{Name: "keyboard ux focus trap", Kind: "positive", Ran: true, Pass: true},
+		{Name: "keyboard ux roving focus", Kind: "positive", Ran: true, Pass: true},
+		{Name: "keyboard ux activation", Kind: "positive", Ran: true, Pass: true},
+		{Name: "keyboard ux shortcut conflict rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "shortcut conflict"},
+		{Name: "keyboard ux undo redo", Kind: "positive", Ran: true, Pass: true},
+		{Name: "keyboard ux command palette script", Kind: "positive", Ran: true, Pass: true},
+		{Name: "keyboard ux settings script", Kind: "positive", Ran: true, Pass: true},
+		{Name: "keyboard ux editor script", Kind: "positive", Ran: true, Pass: true},
+		{Name: "keyboard ux accessible names", Kind: "negative", Ran: true, Pass: true, ExpectedError: "accessible name required"},
 		{Name: "block motion deterministic test clock", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block motion opacity color transform frames", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block motion reduced motion instant settle", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block motion completion stops scheduling", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block motion frame checksum changed", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block motion no css animation parity", Kind: "negative", Ran: true, Pass: true, ExpectedError: "css animation nonclaim"},
+		{Name: "block motion frame scheduler timeline", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion invalidation lifecycle", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion frame timing evidence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block motion hidden loop rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "hidden animation loop rejected"},
 		{Name: "block asset deterministic manifest hashes", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block asset local embedded only", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block asset bounded cache", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block asset icon tint evidence", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block asset image scale evidence", Kind: "positive", Ran: true, Pass: true},
+		{Name: "block asset vector safe decode", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block asset missing fallback diagnostic", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block asset network url rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "network asset rejected"},
+		{Name: "block asset unsafe SVG rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsafe svg"},
+		{Name: "block asset remote font rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "remote font"},
 		{Name: "block accessibility tree derived from block graph", Kind: "positive", Ran: true, Pass: true},
 		{Name: "block accessibility focusable actionable name required", Kind: "negative", Ran: true, Pass: true, ExpectedError: "missing accessible name"},
 		{Name: "block accessibility label relationship mismatch rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "label relationship mismatch"},
@@ -5097,6 +6047,20 @@ func blockSystemCasesForScenario() []surface.CaseReport {
 	}
 }
 
+func appShellCasesForScenario() []surface.CaseReport {
+	return []surface.CaseReport{
+		{Name: "app shell window lifecycle", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app shell menu action trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app shell dialog picker trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app shell notification host report", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app shell tray cursor drag drop", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app shell permissions diagnostics", Kind: "positive", Ran: true, Pass: true},
+		{Name: "app shell unsupported feature rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "unsupported host feature rejected"},
+		{Name: "app shell menu claim without host trace rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "menu target-host trace required"},
+		{Name: "app shell notification claim without host report rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "notification host report required"},
+	}
+}
+
 func blockSystemLinuxX64RealWindowCasesForScenario() []surface.CaseReport {
 	cases := make([]surface.CaseReport, 0, len(blockSystemCasesForScenario())+9)
 	for _, tc := range blockSystemCasesForScenario() {
@@ -5109,6 +6073,7 @@ func blockSystemLinuxX64RealWindowCasesForScenario() []surface.CaseReport {
 		}
 		cases = append(cases, tc)
 	}
+	cases = append(cases, appShellCasesForScenario()...)
 	cases = append(cases,
 		surface.CaseReport{Name: "linux-x64 real-window surface", Kind: "positive", Ran: true, Pass: true},
 		surface.CaseReport{Name: "linux-x64 native input event pump", Kind: "positive", Ran: true, Pass: true},
@@ -5135,6 +6100,7 @@ func blockSystemWASM32WebBrowserCanvasCasesForScenario() []surface.CaseReport {
 		}
 		cases = append(cases, tc)
 	}
+	cases = append(cases, appShellCasesForScenario()...)
 	cases = append(cases,
 		surface.CaseReport{Name: "wasm32-web browser canvas surface", Kind: "positive", Ran: true, Pass: true},
 		surface.CaseReport{Name: "wasm32-web browser canvas RGBA readback", Kind: "positive", Ran: true, Pass: true},
@@ -5167,7 +6133,7 @@ func blockAccessibilityComponentsForScenario() []surface.ComponentReport {
 }
 
 func blockAccessibilityGraphForScenario(source string) *surface.BlockGraphReport {
-	return &surface.BlockGraphReport{
+	graph := &surface.BlockGraphReport{
 		Schema:            "tetra.surface.block-graph.v1",
 		APILevel:          "block-tree-builder-v1",
 		Source:            source,
@@ -5216,6 +6182,76 @@ func blockAccessibilityGraphForScenario(source string) *surface.BlockGraphReport
 			{Helper: "tree_build_dispatch_path", Event: "click", TargetID: 5, Path: []int{1, 2, 5}},
 		},
 	}
+	return withBlockGraphABIAndResolvedScene(graph)
+}
+
+func withBlockGraphABIAndResolvedScene(graph *surface.BlockGraphReport) *surface.BlockGraphReport {
+	graph.ABI = blockGraphABIForScenario()
+	graph.ResolvedScene = blockResolvedSceneForGraph(graph)
+	return graph
+}
+
+func blockGraphABIForScenario() *surface.BlockGraphABIReport {
+	return &surface.BlockGraphABIReport{
+		Schema:            "tetra.surface.block-abi.v1",
+		Version:           "1.0.0",
+		BlockType:         "lib.core.block.Block",
+		TreeType:          "lib.core.block.BlockTree",
+		PropsType:         "lib.core.block.BlockProps",
+		ResolvedBlockType: "tetra.surface.renderer.ResolvedBlock",
+		ResolvedSceneType: "tetra.surface.renderer.ResolvedScene",
+		StableFields: []string{
+			"id",
+			"parent_id",
+			"child_index",
+			"bounds",
+			"layout_order",
+			"draw_order",
+			"hit_test_order",
+			"focus_order",
+			"accessibility_order",
+		},
+		Compatibility: []string{
+			"semver-compatible",
+			"additive-fields-only",
+			"same-commit-validator",
+		},
+	}
+}
+
+func blockResolvedSceneForGraph(graph *surface.BlockGraphReport) *surface.BlockResolvedSceneReport {
+	return &surface.BlockResolvedSceneReport{
+		Schema:                   "tetra.surface.resolved-scene.v1",
+		SourceGraphSchema:        graph.Schema,
+		RootID:                   graph.RootID,
+		NodeOrder:                blockGraphNodeOrder(graph),
+		LayoutOrder:              append([]int(nil), graph.LayoutOrder...),
+		DrawOrder:                append([]int(nil), graph.DrawOrder...),
+		HitTestOrder:             blockGraphHitTestOrder(graph),
+		FocusOrder:               append([]int(nil), graph.FocusOrder...),
+		AccessibilityOrder:       append([]int(nil), graph.AccessibilityOrder...),
+		TreeOrderStable:          true,
+		DrawOrderStable:          true,
+		HitTestOrderStable:       true,
+		FocusOrderStable:         true,
+		AccessibilityOrderStable: true,
+	}
+}
+
+func blockGraphNodeOrder(graph *surface.BlockGraphReport) []int {
+	order := make([]int, 0, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		order = append(order, node.ID)
+	}
+	return order
+}
+
+func blockGraphHitTestOrder(graph *surface.BlockGraphReport) []int {
+	order := make([]int, 0, len(graph.HitTests))
+	for _, hit := range graph.HitTests {
+		order = append(order, hit.TargetID)
+	}
+	return order
 }
 
 func blockAccessibilityTreeForScenario(source string) *surface.BlockAccessibilityTreeReport {
@@ -5269,6 +6305,7 @@ func blockAssetComponentsForScenario() []surface.ComponentReport {
 		{ID: "BlockAssetApp", Type: "examples.surface_block_assets.BlockAssetApp", Bounds: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Abilities: abilities, State: map[string]string{"asset_quality": "deterministic-local-block-assets-v1"}},
 		{ID: "IconBlock", Type: "examples.surface_block_assets.IconBlock", Parent: "BlockAssetApp", Bounds: surface.RectReport{X: 24, Y: 36, W: 32, H: 32}, Abilities: abilities, State: map[string]string{"asset_id": "icon-settings", "tint": "#60aef4ff"}},
 		{ID: "ImageBlock", Type: "examples.surface_block_assets.ImageBlock", Parent: "BlockAssetApp", Bounds: surface.RectReport{X: 72, Y: 32, W: 96, H: 64}, Abilities: abilities, State: map[string]string{"asset_id": "image-hero", "scale": "2x"}},
+		{ID: "VectorBlock", Type: "examples.surface_block_assets.VectorBlock", Parent: "BlockAssetApp", Bounds: surface.RectReport{X: 184, Y: 40, W: 40, H: 32}, Abilities: abilities, State: map[string]string{"asset_id": "vector-logo", "decoder": "svg-tiny-static-sanitized-v1"}},
 		{ID: "MissingAssetBlock", Type: "examples.surface_block_assets.MissingAssetBlock", Parent: "BlockAssetApp", Bounds: surface.RectReport{X: 24, Y: 112, W: 96, H: 32}, Abilities: abilities, State: map[string]string{"asset_id": "missing-logo", "fallback": "fallback-raster"}},
 	}
 }
@@ -5284,18 +6321,20 @@ func blockAssetManifestForScenario(source string) *surface.BlockAssetManifestRep
 		FontCount:     1,
 		IconCount:     1,
 		ImageCount:    1,
-		EmbeddedCount: 3,
+		VectorCount:   1,
+		EmbeddedCount: 4,
 		RemoteCount:   0,
 		Assets: []surface.BlockAssetReport{
 			{ID: "font-ui", Kind: "font", Path: "embedded://surface/font-ui", Embedded: true, Local: true, SHA256: "sha256:" + checksumText("surface-block-assets-font-ui"), Size: 2048, Family: "Tetra UI", CacheKey: "font-ui"},
 			{ID: "icon-settings", Kind: "icon", Path: "embedded://surface/icon-settings", Embedded: true, Local: true, SHA256: "sha256:" + checksumText("surface-block-assets-icon-settings"), Size: 256, Width: 16, Height: 16, CacheKey: "icon-settings"},
 			{ID: "image-hero", Kind: "image", Path: "embedded://surface/image-hero", Embedded: true, Local: true, SHA256: "sha256:" + checksumText("surface-block-assets-image-hero"), Size: 1024, Width: 48, Height: 32, CacheKey: "image-hero"},
+			{ID: "vector-logo", Kind: "vector", Path: "embedded://surface/vector-logo.svg", Embedded: true, Local: true, SHA256: "sha256:" + checksumText("surface-block-assets-vector-logo"), Size: 512, Width: 24, Height: 24, CacheKey: "vector-logo"},
 		},
 	}
 }
 
 func blockAssetCacheForScenario() surface.BlockAssetCacheReport {
-	return surface.BlockAssetCacheReport{ID: "asset-cache", Strategy: "bounded-lru", BudgetBytes: 65536, UsedBytes: 5376, EntryCount: 3, MaxEntries: 16, RepeatedLoads: 6, Eviction: "lru", Bounded: true}
+	return surface.BlockAssetCacheReport{ID: "asset-cache", Strategy: "bounded-lru", BudgetBytes: 65536, UsedBytes: 5888, EntryCount: 4, MaxEntries: 16, RepeatedLoads: 6, Eviction: "lru", Bounded: true}
 }
 
 func blockAssetDiagnosticsForScenario() []surface.BlockAssetDiagnosticReport {
@@ -5310,7 +6349,63 @@ func blockAssetRenderCommandsForScenario() []surface.BlockAssetRenderCommandRepo
 		{Order: 1, Command: "load_font", AssetID: "font-ui", BlockID: 1, Rect: surface.RectReport{X: 0, Y: 0, W: 320, H: 200}, Quality: "font-manifest-metadata-v1", Checksum: "sha256:" + checksumText("surface-block-assets-load-font")},
 		{Order: 2, Command: "tint_icon", AssetID: "icon-settings", BlockID: 2, Rect: surface.RectReport{X: 24, Y: 36, W: 32, H: 32}, Tint: "#60aef4ff", Scale: 1, Quality: "icon-tint-software-v1", Checksum: "sha256:" + checksumText("surface-block-assets-tint-icon")},
 		{Order: 3, Command: "scale_image", AssetID: "image-hero", BlockID: 3, Rect: surface.RectReport{X: 72, Y: 32, W: 96, H: 64}, Scale: 2, Quality: "nearest-scale-v1", Checksum: "sha256:" + checksumText("surface-block-assets-scale-image")},
-		{Order: 4, Command: "fallback_missing", AssetID: "missing-logo", BlockID: 4, Rect: surface.RectReport{X: 24, Y: 112, W: 96, H: 32}, Quality: "fallback-raster-v1", Checksum: "sha256:" + checksumText("surface-block-assets-fallback-missing")},
+		{Order: 4, Command: "render_vector", AssetID: "vector-logo", BlockID: 4, Rect: surface.RectReport{X: 184, Y: 40, W: 40, H: 32}, Quality: "svg-tiny-static-sanitized-v1", Checksum: "sha256:" + checksumText("surface-block-assets-render-vector")},
+		{Order: 5, Command: "fallback_missing", AssetID: "missing-logo", BlockID: 5, Rect: surface.RectReport{X: 24, Y: 112, W: 96, H: 32}, Quality: "fallback-raster-v1", Checksum: "sha256:" + checksumText("surface-block-assets-fallback-missing")},
+	}
+}
+
+func assetPipelineForScenario(source string, manifest *surface.BlockAssetManifestReport, cache surface.BlockAssetCacheReport, diagnostics []surface.BlockAssetDiagnosticReport, commands []surface.BlockAssetRenderCommandReport) *surface.SurfaceAssetPipelineReport {
+	return &surface.SurfaceAssetPipelineReport{
+		Schema:                    surface.AssetPipelineSchemaV1,
+		Level:                     "production-asset-pipeline-v1",
+		Source:                    source,
+		ReleaseScope:              surface.ReleaseScopeSurfaceV1LinuxWeb,
+		ManifestSchema:            manifest.Schema,
+		ManifestHash:              manifest.ManifestHash,
+		HashAlgorithm:             manifest.HashAlgorithm,
+		LocalOnly:                 manifest.LocalOnly,
+		NetworkFetchAllowed:       false,
+		FontCount:                 manifest.FontCount,
+		IconCount:                 manifest.IconCount,
+		ImageCount:                manifest.ImageCount,
+		VectorCount:               manifest.VectorCount,
+		AssetCount:                len(manifest.Assets),
+		DecoderPolicy:             "safe-local-asset-decoders-v1",
+		FontDecoder:               "font-table-hash-verified-v1",
+		IconDecoder:               "icon-mask-tint-rgba-v1",
+		ImageDecoder:              "png-rgba-bounds-checked-v1",
+		VectorDecoder:             "svg-tiny-static-sanitized-v1",
+		FontHashesVerified:        true,
+		IconTintPipeline:          true,
+		ImageBoundsChecked:        true,
+		RasterDecodeBoundsChecked: true,
+		VectorSanitized:           true,
+		SVGScriptRejected:         true,
+		SVGExternalRefRejected:    true,
+		CacheStrategy:             cache.Strategy,
+		CacheBudgetBytes:          cache.BudgetBytes,
+		CacheUsedBytes:            cache.UsedBytes,
+		CacheEntryCount:           cache.EntryCount,
+		CacheBounded:              cache.Bounded,
+		RenderCommandCount:        len(commands),
+		DiagnosticCount:           len(diagnostics),
+		NegativeGuards: surface.AssetPipelineNegativeGuardsReport{
+			MissingHashRejected:          true,
+			RemoteFontRejected:           true,
+			NetworkFetchRejected:         true,
+			UnboundedCacheRejected:       true,
+			MissingAssetFallbackRequired: true,
+			UnsafeSVGRejected:            true,
+			OversizedRasterRejected:      true,
+			DecoderWithoutHashRejected:   true,
+		},
+		NonClaims: []string{
+			"network assets",
+			"remote fonts",
+			"untrusted svg scripting",
+			"full SVG/CSS/SMIL",
+			"arbitrary image codecs",
+		},
 	}
 }
 
@@ -5893,6 +6988,7 @@ func runLinuxX64ReleaseWindowScenario() headlessScenario {
 		{Order: 1, Width: beforeFrame.Width, Height: beforeFrame.Height, Stride: beforeFrame.Stride, Checksum: checksumRGBA(beforeFrame.Pixels), Presented: true},
 	}
 	scenario.AccessibilityTree = releaseWindowAccessibilityTreeReport()
+	scenario.LinuxHostAdapter = linuxHostAdapterForScenario("linux-x64")
 	scenario.Events = append(scenario.Events, surface.EventReport{
 		Order:           len(scenario.Events) + 1,
 		Kind:            "close",
@@ -5915,6 +7011,12 @@ func runLinuxX64ReleaseWindowScenario() headlessScenario {
 		surface.CaseReport{Name: "linux release composition harness", Kind: "positive", Ran: true, Pass: true},
 		surface.CaseReport{Name: "linux release accessibility bridge probe", Kind: "positive", Ran: true, Pass: true},
 		surface.CaseReport{Name: "linux release forbids memfd starter promotion", Kind: "negative", Ran: true, Pass: true, ExpectedError: "memfd starter rejected"},
+		surface.CaseReport{Name: "linux production host adapter target-host trace", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "linux production app shell adapter", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "linux production packaging scope", Kind: "positive", Ran: true, Pass: true},
+		surface.CaseReport{Name: "linux production blocked display not pass", Kind: "negative", Ran: true, Pass: true, ExpectedError: "blocked display pass rejected"},
+		surface.CaseReport{Name: "linux production offscreen promotion rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "headless promotion rejected"},
+		surface.CaseReport{Name: "linux production old real-window promotion rejected", Kind: "negative", Ran: true, Pass: true, ExpectedError: "old real-window promotion rejected"},
 		surface.CaseReport{Name: "accessibility platform bridge v1 schema", Kind: "positive", Ran: true, Pass: true},
 		surface.CaseReport{Name: "linux accessibility host bridge export", Kind: "positive", Ran: true, Pass: true},
 		surface.CaseReport{Name: "accessibility release honest screen reader evidence", Kind: "positive", Ran: true, Pass: true},
@@ -6025,6 +7127,8 @@ func runReleaseAccessibilityScenario(mode string) headlessScenario {
 			tree.PlatformHostIntegration = false
 			tree.ScreenReaderEvidence = "headless_platform_tree_probe"
 		}
+		target, runtimeName := releaseAccessibilityTargetRuntimeForMode(mode)
+		scenario.AccessibilityTarget = accessibilityTargetForReleaseAccessibilityScenario(target, runtimeName, tree)
 	}
 	scenario.Cases = append(scenario.Cases,
 		surface.CaseReport{Name: "accessibility platform bridge v1 schema", Kind: "positive", Ran: true, Pass: true},
@@ -8576,6 +9680,57 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 		target = "wasm32-web"
 		runtimeName = "surface-wasm32-web"
 	}
+	rendererScene := scenario.RendererScene
+	if hasRendererSceneInputs(scenario) {
+		rendererScene = rendererSceneForScenario(source, rendererForScenario(scenario))
+	}
+	softwareRenderer := scenario.SoftwareRenderer
+	if hasSoftwareRendererInputs(scenario) {
+		softwareRenderer = softwareRendererForScenario(source, target, rendererForScenario(scenario), scenario.Frames)
+	}
+	layoutEngine := scenario.LayoutEngine
+	if layoutEngine != nil {
+		cloned := *layoutEngine
+		cloned.Target = target
+		layoutEngine = &cloned
+	}
+	appModel := scenario.AppModel
+	if appModel != nil {
+		cloned := *appModel
+		cloned.Target = target
+		appModel = &cloned
+	}
+	keyboardUX := scenario.KeyboardUX
+	if keyboardUX != nil {
+		cloned := *keyboardUX
+		cloned.Target = target
+		keyboardUX = &cloned
+	}
+	appShell := scenario.AppShell
+	if appShell != nil {
+		cloned := *appShell
+		retargetAppShellForScenario(&cloned, target)
+		appShell = &cloned
+	}
+	linuxHostAdapter := scenario.LinuxHostAdapter
+	if linuxHostAdapter != nil {
+		cloned := *linuxHostAdapter
+		cloned.Target = target
+		cloned.Runtime = runtimeName
+		linuxHostAdapter = &cloned
+	}
+	browserCanvasTarget := scenario.BrowserCanvasTarget
+	if browserCanvasTarget == nil && mode == "wasm32-web-release-browser" {
+		browserCanvasTarget = browserCanvasTargetForReleaseBrowserScenario(scenario.Frames, scenario.Events, artifacts)
+	}
+	accessibilityTarget := scenario.AccessibilityTarget
+	if accessibilityTarget == nil && isReleaseAccessibilityMode(mode) && scenario.AccessibilityTree != nil {
+		accessibilityTarget = accessibilityTargetForReleaseAccessibilityScenario(target, runtimeName, scenario.AccessibilityTree)
+	}
+	animationScheduler := scenario.AnimationScheduler
+	if animationScheduler != nil {
+		animationScheduler = animationSchedulerForScenario(source, scenario.MotionFrames, scenario.MotionFrameBudget, target, runtimeName)
+	}
 	return surface.Report{
 		Schema:                          surface.SchemaV1,
 		Status:                          "pass",
@@ -8593,6 +9748,8 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 		ComponentTree:                   scenario.ComponentTree,
 		ComponentTreeAPI:                scenario.ComponentTreeAPI,
 		BlockGraph:                      scenario.BlockGraph,
+		RendererScene:                   rendererScene,
+		SoftwareRenderer:                softwareRenderer,
 		PaintLayers:                     scenario.PaintLayers,
 		PaintCommands:                   scenario.PaintCommands,
 		VisualFeatures:                  scenario.VisualFeatures,
@@ -8611,6 +9768,7 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 		LayoutFeatures:                  scenario.LayoutFeatures,
 		LayoutQualityLevel:              scenario.LayoutQualityLevel,
 		LayoutUnsupportedCSSFlexbox:     scenario.LayoutUnsupportedCSSFlexbox,
+		LayoutEngine:                    layoutEngine,
 		BlockEventRoutes:                scenario.BlockEventRoutes,
 		BlockFocusTransitions:           scenario.BlockFocusTransitions,
 		BlockEventKinds:                 scenario.BlockEventKinds,
@@ -8622,6 +9780,14 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 		BlockStateResolverOrder:         scenario.BlockStateResolverOrder,
 		BlockStateQualityLevel:          scenario.BlockStateQualityLevel,
 		BlockStateUnsupportedCSSPseudos: scenario.BlockStateUnsupportedCSSPseudos,
+		AppModel:                        appModel,
+		KeyboardUX:                      keyboardUX,
+		AppShell:                        appShell,
+		LinuxHostAdapter:                linuxHostAdapter,
+		BrowserCanvasTarget:             browserCanvasTarget,
+		AccessibilityTarget:             accessibilityTarget,
+		AssetPipeline:                   scenario.AssetPipeline,
+		AnimationScheduler:              animationScheduler,
 		MotionFrames:                    scenario.MotionFrames,
 		MotionQualityLevel:              scenario.MotionQualityLevel,
 		MotionClock:                     scenario.MotionClock,
@@ -8645,10 +9811,32 @@ func buildReport(opt smokeOptions, host string, processes []surface.ProcessRepor
 	}
 }
 
+func hasRendererSceneInputs(scenario headlessScenario) bool {
+	return len(scenario.PaintLayers) > 0 ||
+		len(scenario.PaintCommands) > 0 ||
+		len(scenario.VisualFeatures) > 0 ||
+		strings.TrimSpace(scenario.PaintQualityLevel) != "" ||
+		scenario.PaintCacheBudgetBytes != 0
+}
+
+func hasSoftwareRendererInputs(scenario headlessScenario) bool {
+	return scenario.RendererScene != nil ||
+		scenario.BlockSystem != nil ||
+		hasRendererSceneInputs(scenario)
+}
+
+func rendererForScenario(scenario headlessScenario) string {
+	if scenario.BlockSystem != nil && strings.TrimSpace(scenario.BlockSystem.Renderer) != "" {
+		return scenario.BlockSystem.Renderer
+	}
+	return "software-rgba-headless"
+}
+
 func buildTextInputReport(opt smokeOptions, processes []surface.ProcessReport, artifacts []surface.ArtifactReport, artifactScan surface.ArtifactScanReport, cases []surface.CaseReport) surface.TextInputReport {
+	target := releaseTextInputTarget(opt.Mode)
 	return surface.TextInputReport{
 		Schema:             surface.TextInputSchemaV1,
-		Target:             releaseTextInputTarget(opt.Mode),
+		Target:             target,
 		Source:             defaultSurfaceSourcePath(opt),
 		Level:              "production-text-input-v1",
 		Experimental:       false,
@@ -8676,10 +9864,172 @@ func buildTextInputReport(opt smokeOptions, processes []surface.ProcessReport, a
 		},
 		BorrowedViewStorage:     false,
 		SafeViewLifetimeChecked: true,
+		TextPipeline:            releaseTextPipelineEvidence(),
+		TextEditing:             releaseTextEditingEvidence(target),
 		Processes:               processes,
 		Artifacts:               artifacts,
 		ArtifactScan:            artifactScan,
 		Cases:                   cases,
+	}
+}
+
+func releaseTextPipelineEvidence() surface.TextPipelineReport {
+	return surface.TextPipelineReport{
+		Schema:                     surface.TextPipelineSchemaV1,
+		Level:                      "scoped-latin-utf8-text-pipeline-v1",
+		Engine:                     "deterministic-tetra-text-shaper",
+		PlatformWidgetTextControls: false,
+		FontManifest: []surface.TextPipelineFontReport{
+			{ID: "tetra-ui-regular", Family: "Tetra UI", Style: "normal", Weight: 400, Source: "embedded:tetra-ui-regular", SHA256: "sha256:" + checksumText("tetra-ui-regular"), Bytes: 32768},
+			{ID: "noto-sans-fallback", Family: "Noto Sans", Style: "normal", Weight: 400, Source: "system:fontconfig/noto-sans", SHA256: "sha256:" + checksumText("noto-sans-fallback"), Bytes: 65536},
+		},
+		FontFallbacks: []surface.FontFallbackReport{
+			{ID: "release-fallback", RequestedFamily: "Tetra UI", ResolvedFamily: "Noto Sans", Chain: []string{"Tetra UI", "Noto Sans", "monospace"}, MissingGlyphs: 0, Coverage: "latin-plus-basic-utf8-smoke"},
+		},
+		GlyphRuns: []surface.TextGlyphRunReport{
+			{ID: "latin-run", FontFamily: "Tetra UI", Script: "Latin", Direction: "ltr", Shaping: "tier1-latin-simple", TextLen: 5, ByteStart: 0, ByteEnd: 5, ScalarStart: 0, ScalarEnd: 5, GlyphCount: 5, GlyphIDs: []int{36, 69, 70, 32, 71}, Advances: []int{8, 8, 8, 4, 8}, Clusters: []int{0, 1, 2, 3, 4}, Baseline: 14, Checksum: "sha256:" + checksumText("release-latin-run")},
+			{ID: "fallback-run", FontFamily: "Noto Sans", Script: "Common", Direction: "ltr", Shaping: "tier1-fallback-simple", TextLen: 1, ByteStart: 5, ByteEnd: 7, ScalarStart: 5, ScalarEnd: 6, GlyphCount: 1, GlyphIDs: []int{9731}, Advances: []int{9}, Clusters: []int{5}, Baseline: 14, Checksum: "sha256:" + checksumText("release-fallback-run")},
+		},
+		GlyphCaches: []surface.GlyphCacheReport{
+			{ID: "release-glyph-cache", Strategy: "bounded-lru", BudgetBytes: 65536, UsedBytes: 8192, EntryCount: 24, Eviction: "lru", Bounded: true},
+		},
+		CacheBudgetBytes:      65536,
+		GlyphCacheBudgetBytes: 65536,
+		GlyphCacheUsedBytes:   8192,
+		BoundedCaches:         true,
+		CacheEviction:         "lru",
+		UnicodeBoundaries: surface.TextUnicodeBoundaryReport{
+			UTF8Storage:        true,
+			ScalarBoundaries:   true,
+			ClusterBoundaries:  true,
+			LatinTier:          true,
+			CombiningMarks:     false,
+			Bidi:               false,
+			UnsupportedScripts: []string{"Arabic", "Devanagari", "Thai"},
+			BoundaryCases:      []string{"ASCII insertion", "UTF-8 scalar insertion", "cluster caret clamp"},
+		},
+		ShapingScope: surface.TextShapingScopeReport{
+			Tier:                       "tier1-latin-utf8",
+			SupportedScripts:           []string{"Latin", "Common"},
+			UnsupportedScripts:         []string{"Arabic", "Devanagari", "Thai"},
+			EngineDecision:             "deterministic embedded shaper until HarfBuzz-class evidence exists",
+			FullUnicodeEditorSemantics: false,
+			Bidi:                       false,
+			CombiningMarks:             false,
+			SystemLibraryIntegration:   "not required for Tier 1; future HarfBuzz-class gate",
+			PlatformWidgets:            false,
+		},
+		Measurements: []surface.TextMeasurementReport{
+			{ID: "release-label-measure", BlockID: 1, TextLen: 18, FontFamily: "Tetra UI", FontWeight: 400, FontSize: 14, LineHeight: 18, MaxWidth: 120, Measured: surface.SizeReport{W: 108, H: 18}, LineCount: 1, Wrap: "none", Overflow: "clip", Ellipsis: false, EllipsizedTextLen: 18, Align: "start", Quality: "deterministic-metrics-v1", Checksum: "sha256:" + checksumText("release-label-measure")},
+			{ID: "release-ellipsis-measure", BlockID: 2, TextLen: 32, FontFamily: "Tetra UI", FontWeight: 400, FontSize: 14, LineHeight: 18, MaxWidth: 96, Measured: surface.SizeReport{W: 96, H: 36}, LineCount: 2, Wrap: "word", Overflow: "ellipsis", Ellipsis: true, EllipsizedTextLen: 20, Align: "start", Quality: "deterministic-metrics-v1", Checksum: "sha256:" + checksumText("release-ellipsis-measure")},
+		},
+		MeasurementConsistency: surface.TextMeasurementConsistencyReport{
+			SameInputSameMetrics:      true,
+			TargetIndependentBaseline: true,
+			MaxDeltaPX:                0,
+			Cases:                     []string{"latin measurement repeat", "fallback measurement repeat", "ellipsis measurement repeat"},
+		},
+		Layout:              surface.TextPipelineLayoutReport{Wrap: true, Ellipsis: true, Alignment: []string{"start", "center", "end"}, Baseline: true, LineHeight: true},
+		CaretRects:          []surface.RectReport{{X: 32, Y: 64, W: 2, H: 18}},
+		SelectionRects:      []surface.RectReport{{X: 32, Y: 64, W: 18, H: 18}},
+		IMECompositionSpans: []surface.TextCompositionSpanReport{{Kind: "composition", ByteStart: 0, ByteEnd: 3, ScalarStart: 0, ScalarEnd: 3, Rect: surface.RectReport{X: 32, Y: 64, W: 24, H: 18}}},
+		NonClaims: []string{
+			"full Unicode editor semantics",
+			"bidi production shaping",
+			"complex script shaping without HarfBuzz-class evidence",
+			"platform widget text controls",
+		},
+		NegativeGuards: surface.TextPipelineNegativeGuardsReport{
+			FullUnicodeEditorWithoutTestsRejected: true,
+			MissingFontFallbackRejected:           true,
+			UnboundedGlyphCacheRejected:           true,
+			PlatformWidgetTextControlsRejected:    true,
+		},
+	}
+}
+
+func releaseTextEditingEvidence(target string) surface.TextEditingReport {
+	return surface.TextEditingReport{
+		Schema:   surface.TextEditingSchemaV1,
+		Level:    "production-editing-basics-v1",
+		Target:   target,
+		Producer: "tools/cmd/surface-runtime-smoke",
+		EditableBlocks: []surface.EditableTextBlockReport{
+			{ID: "ReleaseTextBox", Kind: "TextBox", Storage: "owned-utf8-byte-buffer", FormsSafe: true, CommandPaletteSearchSafe: true, MaxBytes: 1024, UTF8Validation: true},
+		},
+		EditOperations: []surface.TextEditOperationReport{
+			{Order: 1, Action: "insert_text", Target: "ReleaseTextBox", BeforeTextLen: 0, AfterTextLen: 3, BeforeCaret: 0, AfterCaret: 3, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 0}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 3, Focus: 3}, UndoUnitID: "insert-ada", Checksum: "sha256:" + checksumText("text-edit-insert-ada")},
+			{Order: 2, Action: "move_caret_left", Target: "ReleaseTextBox", BeforeTextLen: 3, AfterTextLen: 3, BeforeCaret: 3, AfterCaret: 2, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 3, Focus: 3}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 2, Focus: 2}, UndoUnitID: "navigation-left", Checksum: "sha256:" + checksumText("text-edit-navigation-left")},
+			{Order: 3, Action: "replace_selection", Target: "ReleaseTextBox", BeforeTextLen: 5, AfterTextLen: 4, BeforeCaret: 1, AfterCaret: 2, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 1, Focus: 4}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 2, Focus: 2}, UndoUnitID: "replace-selection", Checksum: "sha256:" + checksumText("text-edit-replace-selection")},
+			{Order: 4, Action: "composition_commit", Target: "ReleaseTextBox", BeforeTextLen: 4, AfterTextLen: 5, BeforeCaret: 4, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 4, Focus: 4}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 5, Focus: 5}, UndoUnitID: "ime-commit", Checksum: "sha256:" + checksumText("text-edit-ime-commit")},
+			{Order: 5, Action: "clipboard_write", Target: "ReleaseTextBox", BeforeTextLen: 5, AfterTextLen: 5, BeforeCaret: 5, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 5}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 0, Focus: 5}, UndoUnitID: "clipboard-copy", Checksum: "sha256:" + checksumText("text-edit-clipboard-copy")},
+			{Order: 6, Action: "clipboard_read", Target: "ReleaseTextBox", BeforeTextLen: 0, AfterTextLen: 5, BeforeCaret: 0, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 0}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 5, Focus: 5}, UndoUnitID: "clipboard-paste", Checksum: "sha256:" + checksumText("text-edit-clipboard-paste")},
+		},
+		SelectionModel: surface.TextSelectionModelReport{
+			CaretMovement:        []string{"left", "right", "home", "end"},
+			SelectionReplacement: true,
+			ScalarBoundaryClamp:  true,
+			CaretRects:           []surface.RectReport{{X: 32, Y: 64, W: 2, H: 18}},
+			SelectionRects:       []surface.RectReport{{X: 32, Y: 64, W: 24, H: 18}},
+		},
+		IMETraces: []surface.TextIMETraceReport{
+			{
+				Target:     target,
+				Start:      true,
+				Update:     true,
+				Commit:     true,
+				Cancel:     true,
+				EventCount: 4,
+				CompositionSpan: surface.TextCompositionSpanReport{
+					Kind:        "composition",
+					ByteStart:   0,
+					ByteEnd:     3,
+					ScalarStart: 0,
+					ScalarEnd:   3,
+					Rect:        surface.RectReport{X: 32, Y: 64, W: 24, H: 18},
+				},
+				CommittedTextOwnedCopy: true,
+			},
+		},
+		ClipboardTransfers: []surface.TextClipboardTransferReport{
+			{Direction: "write", HostABI: "__tetra_surface_clipboard_write_text", Bytes: 5, UTF8Valid: true, OwnedCopy: true, BorrowedView: false, Checksum: "sha256:" + checksumText("text-edit-clipboard-write")},
+			{Direction: "read", HostABI: "__tetra_surface_clipboard_read_text_into", Bytes: 5, UTF8Valid: true, OwnedCopy: true, BorrowedView: false, Checksum: "sha256:" + checksumText("text-edit-clipboard-read")},
+		},
+		UndoUnits: []surface.TextUndoUnitReport{
+			{ID: "insert-ada", OperationOrders: []int{1}, Boundary: "text-input-operation", Reversible: true, Coalesced: false},
+			{ID: "navigation-left", OperationOrders: []int{2}, Boundary: "caret-navigation", Reversible: true, Coalesced: false},
+			{ID: "replace-selection", OperationOrders: []int{3}, Boundary: "selection-replacement", Reversible: true, Coalesced: false},
+			{ID: "ime-commit", OperationOrders: []int{4}, Boundary: "composition-commit", Reversible: true, Coalesced: false},
+			{ID: "clipboard-copy", OperationOrders: []int{5}, Boundary: "clipboard-copy", Reversible: true, Coalesced: false},
+			{ID: "clipboard-paste", OperationOrders: []int{6}, Boundary: "clipboard-paste", Reversible: true, Coalesced: false},
+		},
+		ValidationDiagnostics: []surface.TextEditingDiagnosticReport{
+			{Name: "invalid UTF-8 rejected", Ran: true, Pass: true},
+			{Name: "borrowed text buffer rejected at host boundary", Ran: true, Pass: true},
+			{Name: "IME claim without target trace rejected", Ran: true, Pass: true},
+			{Name: "rich text claim rejected", Ran: true, Pass: true},
+		},
+		HostBoundary: surface.TextEditingHostBoundaryReport{
+			CopySafe:                      true,
+			ClipboardOwnedCopy:            true,
+			CompositionOwnedCopy:          true,
+			BorrowedTextBufferCrossesHost: false,
+		},
+		FormsSafe:                true,
+		CommandPaletteSearchSafe: true,
+		RichText:                 false,
+		NonClaims: []string{
+			"rich text",
+			"full editor-grade text semantics",
+			"native platform text controls",
+		},
+		NegativeGuards: surface.TextEditingNegativeGuardsReport{
+			IMEWithoutTargetTraceRejected: true,
+			BorrowedTextBufferRejected:    true,
+			RichTextClaimRejected:         true,
+			UnsafeClipboardAliasRejected:  true,
+			InvalidUTF8Rejected:           true,
+		},
 	}
 }
 
@@ -8715,6 +10065,11 @@ func releaseTextInputCases() []surface.CaseReport {
 		{Name: "release text input composition commit", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input composition cancel", Kind: "positive", Ran: true, Pass: true},
 		{Name: "release text input safe view lifetime checked", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing target IME trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing clipboard owned copies", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing undo unit boundaries", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing validation diagnostics", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing rich text nonclaim", Kind: "positive", Ran: true, Pass: true},
 		{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 	}
 }

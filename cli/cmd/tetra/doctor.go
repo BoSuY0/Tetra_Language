@@ -480,7 +480,7 @@ func sameDoctorInts(a []int, b []int) bool {
 }
 
 func toolingCommandsCheck() doctorCheck {
-	commands := []string{"check", "build", "run", "fmt", "test", "doc", "interface", "smoke", "targets", "formats", "doctor", "actor-net", "project", "new", "lsp", "eco", "clean", "version"}
+	commands := []string{"check", "build", "run", "fmt", "test", "doc", "interface", "smoke", "surface", "targets", "formats", "doctor", "actor-net", "project", "new", "lsp", "eco", "clean", "version"}
 	if len(commands) == 0 {
 		return failCheck("tooling commands", "no commands registered")
 	}

@@ -21,6 +21,26 @@ func surfaceBlockBeautyExamplePaths() []string {
 	}
 }
 
+type surfaceProductionExample struct {
+	path  string
+	shape string
+}
+
+func surfaceProductionExampleShapes() []surfaceProductionExample {
+	return []surfaceProductionExample{
+		{path: "examples/surface_prod_command_palette.tetra", shape: "command_palette"},
+		{path: "examples/surface_prod_settings_app.tetra", shape: "settings"},
+		{path: "examples/surface_prod_project_dashboard.tetra", shape: "project_dashboard"},
+		{path: "examples/surface_prod_editor_shell.tetra", shape: "editor_shell"},
+		{path: "examples/surface_prod_file_manager_shell.tetra", shape: "file_manager_shell"},
+		{path: "examples/surface_prod_multi_window_notes.tetra", shape: "multi_window_notes"},
+		{path: "examples/surface_prod_system_tray_status.tetra", shape: "system_tray_status"},
+		{path: "examples/surface_prod_notification_dialog.tetra", shape: "notification_dialog"},
+		{path: "examples/surface_prod_localized_form.tetra", shape: "localized_form"},
+		{path: "examples/surface_prod_accessibility_heavy_form.tetra", shape: "accessibility_heavy_form"},
+	}
+}
+
 func TestSurfaceCounterExampleLoadsCoreSurfaceAndDrawModules(t *testing.T) {
 	entry := testkit.RepoPath(t, "examples", "surface_counter.tetra")
 	world, err := compiler.LoadWorld(entry)
@@ -126,6 +146,48 @@ uses alloc, mem:
 	}
 }
 
+func TestSurfaceI18nModuleDefinesLocalizationHooks(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.i18n as i18n
+
+func main() -> Int:
+    let en: i18n.Locale = i18n.locale_en_us()
+    let es: i18n.Locale = i18n.locale_es_es()
+    let ar: i18n.Locale = i18n.locale_ar_eg()
+    let title: i18n.StringID = i18n.string_id(1, 10)
+    let resource: i18n.LocaleResource = i18n.locale_resource(ar, 5, 4103, true, true)
+    let formats: i18n.FormatPolicy = i18n.format_policy(true, true, true, false)
+    let policy: i18n.LocalizationPolicy = i18n.localization_policy(3, true, true, false, false, i18n.direction_rtl(), false)
+    let text_len: Int = i18n.localized_text_len(resource, title, 12)
+    if i18n.locale_valid(en) &&
+       i18n.locale_valid(es) &&
+       i18n.locale_valid(ar) &&
+       i18n.string_id_valid(title) &&
+       i18n.locale_resource_valid(resource) &&
+       i18n.format_policy_valid(formats) &&
+       i18n.localization_policy_valid(policy) &&
+       text_len > 0:
+        return i18n.direction_ltr() - i18n.direction_ltr()
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.i18n consumer): %v", err)
+	}
+}
+
 func TestSurfaceProductionToolkitDefinesStyleAndWidgetAPI(t *testing.T) {
 	tmp := t.TempDir()
 	testkit.WriteFiles(t, tmp, map[string]string{
@@ -193,6 +255,127 @@ uses alloc, mem:
 	}
 }
 
+func TestSurfaceWidgetMigrationMapsCompatibilityLayerToBlockMorphRecipes(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+import lib.core.component as component
+import lib.core.widgets as widgets
+import lib.core.block as block
+import lib.core.morph as morph
+
+func main() -> Int:
+    let rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 320, h: 200)
+    let panel: widgets.WidgetMigration = widgets.migration_panel()
+    let button: widgets.WidgetMigration = widgets.migration_button()
+    let textbox: widgets.WidgetMigration = widgets.migration_textbox()
+    let status: widgets.WidgetMigration = widgets.migration_status_text()
+    let mapped_block: block.Block = widgets.migration_expand_button_to_block(7, 1, rect, 6)
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(morph.recipe_control_action(), block.id(7))
+
+    if widgets.widgets_are_compatibility_layer() &&
+       !widgets.widgets_are_core_final_architecture() &&
+       widgets.migration_valid(panel) &&
+       widgets.migration_valid(button) &&
+       widgets.migration_valid(textbox) &&
+       widgets.migration_valid(status) &&
+       panel.component_kind == component.kind_panel() &&
+       panel.block_layout_mode == block.layout_mode_column() &&
+       button.recipe_hash == morph.recipe_control_action_hash() &&
+       textbox.recipe_hash == morph.recipe_field_text_hash() &&
+       status.recipe_hash == morph.recipe_status_message_hash() &&
+       block.id_value(mapped_block.id) == 7 &&
+       morph.expansion_valid(expansion) &&
+       widgets.migration_diagnostic_for_core_final_claim() == widgets.migration_error_core_final_architecture_claim():
+        return widgets.migration_level() - widgets.migration_level()
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.widgets migration consumer): %v", err)
+	}
+}
+
+func TestSurfaceMigrationWidgetsToBlockExampleLoads(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_migration_widgets_to_block.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.widgets", "lib.core.block", "lib.core.morph"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface migration widgets-to-block example did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface migration widgets-to-block): %v", err)
+	}
+}
+
+func TestSurfaceMorphDefinesProductionRecipeAuthoringAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.morph as morph
+
+func main() -> Int:
+    let action: morph.Recipe = morph.recipe_control_action()
+    let field: morph.Recipe = morph.recipe_field_text()
+    let toggle: morph.Recipe = morph.recipe_control_toggle()
+    let command: morph.Recipe = morph.recipe_command_item()
+    let nav: morph.Recipe = morph.recipe_navigation_item()
+    let panel: morph.Recipe = morph.recipe_region_panel()
+    let dialog: morph.Recipe = morph.recipe_overlay_dialog()
+    let tabs: morph.Recipe = morph.recipe_navigation_tabs()
+    let list: morph.Recipe = morph.recipe_collection_list()
+    let table: morph.Recipe = morph.recipe_collection_table_lite()
+    let status: morph.Recipe = morph.recipe_status_message()
+    let contract: morph.AuthoringContract = morph.authoring_contract_default()
+
+    if morph.recipe_expands_to_block(action) &&
+       morph.recipe_expands_to_block(field) &&
+       morph.recipe_expands_to_block(toggle) &&
+       morph.recipe_expands_to_block(command) &&
+       morph.recipe_expands_to_block(nav) &&
+       morph.recipe_expands_to_block(panel) &&
+       morph.recipe_expands_to_block(dialog) &&
+       morph.recipe_expands_to_block(tabs) &&
+       morph.recipe_expands_to_block(list) &&
+       morph.recipe_expands_to_block(table) &&
+       morph.recipe_expands_to_block(status) &&
+       morph.authoring_contract_valid(contract):
+        return morph.production_recipe_authoring_v1() - morph.production_recipe_authoring_v1()
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt: %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.morph production recipe authoring consumer): %v", err)
+	}
+}
+
 func TestSurfaceBlockMinimalExampleLoadsBlockModel(t *testing.T) {
 	entry := testkit.RepoPath(t, "examples", "surface_block_minimal.tetra")
 	world, err := compiler.LoadWorld(entry)
@@ -208,6 +391,24 @@ func TestSurfaceBlockMinimalExampleLoadsBlockModel(t *testing.T) {
 
 	if _, err := compiler.CheckWorld(world); err != nil {
 		t.Fatalf("CheckWorld(surface block minimal): %v", err)
+	}
+}
+
+func TestSurfaceI18nDashboardExampleLoadsLocalizationModel(t *testing.T) {
+	entry := testkit.RepoPath(t, "examples", "surface_i18n_dashboard.tetra")
+	world, err := compiler.LoadWorld(entry)
+	if err != nil {
+		t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+	}
+
+	for _, module := range []string{"lib.core.surface", "lib.core.block", "lib.core.i18n"} {
+		if _, ok := world.ByModule[module]; !ok {
+			t.Fatalf("surface i18n dashboard did not load module %s; modules=%v", module, world.ByModule)
+		}
+	}
+
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(surface i18n dashboard): %v", err)
 	}
 }
 
@@ -252,6 +453,69 @@ func main() -> Int:
 	}
 	if _, err := compiler.CheckWorld(world); err != nil {
 		t.Fatalf("CheckWorld(lib.core.block consumer): %v", err)
+	}
+}
+
+func TestSurfaceProductionExamplesLoadAndRun(t *testing.T) {
+	for _, example := range surfaceProductionExampleShapes() {
+		example := example
+		t.Run(filepath.Base(example.path), func(t *testing.T) {
+			entry := testkit.RepoPath(t, strings.Split(example.path, "/")...)
+			raw, err := os.ReadFile(entry)
+			if err != nil {
+				t.Fatalf("read %s: %v", example.path, err)
+			}
+			text := string(raw)
+			for _, want := range []string{
+				"import lib.core.surface as surface",
+				"import lib.core.block as block",
+				"import lib.core.morph as morph",
+				"production_example_shape",
+				example.shape,
+				"block.tree_validate",
+				"morph.recipe_",
+				"block.accessibility_",
+				"block.state_",
+				"block.event_",
+				"block.motion_",
+				"performance_budget_ok",
+			} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("%s missing production example marker %q", example.path, want)
+				}
+			}
+			lower := strings.ToLower(text)
+			for _, forbidden := range []string{
+				"import lib.core.widgets",
+				"widgets.",
+				"react",
+				"electron",
+				"dom runtime",
+				"platform widget",
+				"external css",
+			} {
+				if strings.Contains(lower, forbidden) {
+					t.Fatalf("%s contains forbidden production example dependency marker %q", example.path, forbidden)
+				}
+			}
+
+			world, err := compiler.LoadWorld(entry)
+			if err != nil {
+				t.Fatalf("LoadWorld(%s): %v", filepath.ToSlash(entry), err)
+			}
+			if _, err := compiler.CheckWorld(world); err != nil {
+				t.Fatalf("CheckWorld(%s): %v", filepath.ToSlash(entry), err)
+			}
+
+			out := filepath.Join(t.TempDir(), strings.TrimSuffix(filepath.Base(example.path), ".tetra"))
+			if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+				t.Fatalf("BuildFileWithStatsOpt(%s): %v", example.path, err)
+			}
+			output, err := exec.Command(out).CombinedOutput()
+			if err != nil {
+				t.Fatalf("%s exited with %v\n%s", example.path, err, output)
+			}
+		})
 	}
 }
 
@@ -687,6 +951,128 @@ func main() -> Int:
 	}
 }
 
+func TestSurfaceBlockStateEventsAppModelDefinesCommandAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.block as block
+
+func main() -> Int:
+    let palette: block.AppStateStore = block.app_state_store(1, block.app_surface_command_palette(), block.app_state_scope_overlay(), 3, 10, 20, 2)
+    let dashboard: block.AppStateStore = block.app_state_store(2, block.app_surface_dashboard(), block.app_state_scope_page(), 3, 30, 40, 1)
+    let settings: block.AppStateStore = block.app_state_store(3, block.app_surface_settings(), block.app_state_scope_form(), 3, 50, 60, 1)
+    let editor: block.AppStateStore = block.app_state_store(4, block.app_surface_editor_shell(), block.app_state_scope_document(), 4, 70, 80, 2)
+
+    let open_cmd: block.AppCommand = block.app_command(block.app_command_kind_command(), block.app_source_key(), block.id(4), palette, 2, true, false)
+    let save_cmd: block.AppCommand = block.app_command(block.app_command_kind_command(), block.app_source_click(), block.id(5), settings, 1, true, false)
+    let text_cmd: block.AppCommand = block.app_command(block.app_command_kind_text_edit(), block.app_source_text(), block.id(4), editor, 3, true, false)
+    let refresh_cmd: block.AppCommand = block.app_command(block.app_command_kind_async(), block.app_source_timer(), block.id(2), dashboard, 2, true, true)
+
+    let disabled_status: Int = block.app_command_dispatch_status(save_cmd, block.input_disabled(block.input_clickable()), block.event_kind_click(), true)
+    let unfocused_status: Int = block.app_command_dispatch_status(text_cmd, block.input_text(), block.event_kind_text(), false)
+    let focused_status: Int = block.app_command_dispatch_status(text_cmd, block.input_text(), block.event_kind_text(), true)
+    let delivered: block.AppEventTrace = block.app_event_trace(1, text_cmd, block.event_kind_text(), focused_status, block.id(4), 2)
+    let rejected_disabled: block.AppEventTrace = block.app_event_trace(2, save_cmd, block.event_kind_click(), disabled_status, block.id(4), 0)
+    let rejected_unfocused: block.AppEventTrace = block.app_event_trace(3, text_cmd, block.event_kind_text(), unfocused_status, block.id(5), 2)
+
+    let policy: block.AppModelPolicy = block.app_model_policy_production()
+    let nav: block.AppNavigationStep = block.app_navigation_step(block.id(4), block.id(5), block.app_surface_command_palette(), false)
+    let trap: block.AppNavigationStep = block.app_navigation_step(block.id(4), block.id(4), block.app_surface_editor_shell(), true)
+    let redraw: block.AppRedrawRequest = block.app_redraw_request(editor, 1, 2, 111, 222)
+
+    if block.app_model_policy_valid(policy) &&
+       block.app_state_store_valid(palette) && block.app_state_store_valid(dashboard) && block.app_state_store_valid(settings) && block.app_state_store_valid(editor) &&
+       block.app_command_safe(open_cmd) && block.app_command_safe(text_cmd) && block.app_async_boundary_safe(refresh_cmd) &&
+       disabled_status == block.event_route_rejected_disabled() &&
+       unfocused_status == block.event_route_rejected_unfocused() &&
+       focused_status == block.event_route_delivered() &&
+       block.app_event_trace_valid(delivered) && block.app_event_trace_valid(rejected_disabled) && block.app_event_trace_valid(rejected_unfocused) &&
+       block.app_navigation_valid(nav) && block.app_navigation_valid(trap) && trap.focus_trap &&
+       block.app_shortcut_scope_allows(block.app_surface_command_palette(), block.app_surface_command_palette(), true) &&
+       !block.app_shortcut_scope_allows(block.app_surface_settings(), block.app_surface_command_palette(), true) &&
+       block.app_error_propagated_handled(true, true) &&
+       block.app_redraw_valid(redraw):
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt(lib.core.block app model consumer): %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block app model consumer): %v", err)
+	}
+}
+
+func TestSurfaceBlockKeyboardUXDefinesFocusShortcutUndoAPI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.block as block
+
+func main() -> Int:
+    let palette: block.AppStateStore = block.app_state_store(1, block.app_surface_command_palette(), block.app_state_scope_overlay(), 3, 10, 20, 2)
+    let editor: block.AppStateStore = block.app_state_store(2, block.app_surface_editor_shell(), block.app_state_scope_document(), 4, 30, 40, 2)
+
+    let action_cmd: block.AppCommand = block.app_command(block.app_command_kind_shortcut(), block.app_source_key(), block.id(5), palette, 1, true, false)
+    let open_cmd: block.AppCommand = block.app_command(block.app_command_kind_command(), block.app_source_key(), block.id(4), palette, 2, true, false)
+    let undo_cmd: block.AppCommand = block.app_command(block.app_command_kind_undo(), block.app_source_key(), block.id(4), editor, 2, true, false)
+    let redo_cmd: block.AppCommand = block.app_command(block.app_command_kind_redo(), block.app_source_key(), block.id(4), editor, 2, true, false)
+
+    let input_node: block.KeyboardFocusNode = block.keyboard_focus_node(block.id(4), block.app_surface_editor_shell(), block.accessibility_role_textbox(), 0, block.id(3))
+    let action_node: block.KeyboardFocusNode = block.keyboard_focus_node(block.id(5), block.app_surface_command_palette(), block.accessibility_role_button(), 11, block.id_none())
+
+    let enter_binding: block.KeyboardBinding = block.keyboard_binding(block.keyboard_key_enter(), block.app_surface_command_palette(), action_cmd, true)
+    let palette_binding: block.KeyboardBinding = block.keyboard_binding(block.keyboard_key_ctrl_k(), block.app_surface_command_palette(), open_cmd, true)
+    let undo_binding: block.KeyboardBinding = block.keyboard_binding(block.keyboard_key_ctrl_z(), block.app_surface_editor_shell(), undo_cmd, true)
+    let redo_binding: block.KeyboardBinding = block.keyboard_binding(block.keyboard_key_ctrl_y(), block.app_surface_editor_shell(), redo_cmd, true)
+
+    let conflict: block.KeyboardShortcutConflict = block.keyboard_shortcut_conflict(block.keyboard_key_ctrl_k(), block.app_surface_command_palette(), 2, true, true)
+    let stack: block.KeyboardUndoRedoStack = block.keyboard_undo_redo_stack(editor, 1, 0, true, true)
+    let command_script: block.KeyboardScript = block.keyboard_script(block.app_surface_command_palette(), 3, true, true)
+    let settings_script: block.KeyboardScript = block.keyboard_script(block.app_surface_settings(), 3, true, true)
+    let trap: block.AppNavigationStep = block.app_navigation_step(block.id(4), block.id(4), block.app_surface_command_palette(), true)
+
+    if block.keyboard_policy_focus_order_graph() == 1 &&
+       block.keyboard_policy_focus_trap_overlay() == 2 &&
+       block.keyboard_policy_roving_focus() == 3 &&
+       block.keyboard_policy_activation() == 4 &&
+       block.keyboard_policy_shortcut_conflict() == 5 &&
+       block.keyboard_policy_undo_redo_stack() == 6 &&
+       block.keyboard_focus_node_valid(input_node) && block.keyboard_focus_node_valid(action_node) &&
+       block.keyboard_binding_valid(enter_binding) && block.keyboard_binding_valid(palette_binding) &&
+       block.keyboard_binding_valid(undo_binding) && block.keyboard_binding_valid(redo_binding) &&
+       block.keyboard_shortcut_conflict_valid(conflict) &&
+       block.keyboard_undo_redo_valid(stack) &&
+       block.keyboard_script_valid(command_script) && block.keyboard_script_valid(settings_script) &&
+       block.keyboard_focus_trap_valid(trap, true, true) &&
+       block.keyboard_roving_group_valid(block.id(4), block.id(4), block.id(5), true, true, true):
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	world, err := compiler.LoadWorldOpt(entry, compiler.WorldOptions{
+		DependencyRoots: []compiler.ModuleRoot{{
+			Root: testkit.RepoRoot(t),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("LoadWorldOpt(lib.core.block keyboard UX consumer): %v", err)
+	}
+	if _, err := compiler.CheckWorld(world); err != nil {
+		t.Fatalf("CheckWorld(lib.core.block keyboard UX consumer): %v", err)
+	}
+}
+
 func TestSurfaceBlockMotionExampleLoadsTransitionModel(t *testing.T) {
 	entry := testkit.RepoPath(t, "examples", "surface_block_motion.tetra")
 	world, err := compiler.LoadWorld(entry)
@@ -739,10 +1125,16 @@ func main() -> Int:
     let tx_mid: Int = block.motion_resolve_translate_x(motion, 60)
     let scale_mid: Int = block.motion_resolve_scale(motion, 60)
     let reduced_progress: Int = block.motion_progress(reduced, 0)
+    let timing_mid: Bool = block.motion_frame_timing_ok(0, 60)
+    let lifecycle_stops: Bool = block.motion_lifecycle_complete_stops(motion, 120)
+    let reduced_stops: Bool = block.motion_reduced_stops_schedule(motion)
 
     if block.motion_duration(motion) == 120 &&
        block.motion_delay(motion) == 0 &&
        block.motion_easing(motion) == block.motion_ease_linear() &&
+       block.motion_frame_interval_ms() == 16 &&
+       block.motion_frame_budget_default() == 4 &&
+       block.motion_max_frame_delta_ms() == 60 &&
        progress0 == 0 && progress_mid == 500 && progress_done == 1000 &&
        opacity_mid == 140 && color_mid == 64 &&
        tx_mid == 6 && scale_mid == 104 &&
@@ -750,6 +1142,7 @@ func main() -> Int:
        !block.motion_should_schedule(motion, 120) &&
        block.motion_is_complete(motion, 120) &&
        reduced.reduced && reduced_progress == 1000 &&
+       timing_mid && lifecycle_stops && reduced_stops &&
        !block.motion_should_schedule(reduced, 0):
         return 0
     return 1
@@ -816,27 +1209,33 @@ func main() -> Int:
     let font: block.AssetRef = block.asset_embedded(block.asset_kind_font(), 1, 0, 0, 101)
     let icon: block.AssetRef = block.asset_icon(2, 16, 16, 202)
     let image: block.AssetRef = block.asset_image(3, 48, 32, 303)
+    let vector: block.AssetRef = block.asset_vector(4, 24, 24, 404)
     let missing: block.AssetRef = block.asset_missing(block.asset_kind_image(), 9)
     let remote: block.AssetRef = block.asset_remote_url(block.asset_kind_image(), 10)
-    let manifest: block.AssetManifest = block.asset_manifest(font, icon, image, block.asset_cache_budget_bytes(), block.asset_cache_entry_limit())
+    let manifest: block.AssetManifest = block.asset_manifest(font, icon, image, vector, block.asset_cache_budget_bytes(), block.asset_cache_entry_limit())
     let tinted: block.ImageSpec = block.image_asset_tinted_scaled(icon, 32, 32, surface.Color(r: 96, g: 174, b: 244, a: 255), 1)
     let scaled: block.ImageSpec = block.image_asset_tinted_scaled(image, 96, 64, surface.Color(r: 255, g: 255, b: 255, a: 255), 2)
+    let vector_image: block.ImageSpec = block.image_asset_tinted_scaled(vector, 40, 32, surface.Color(r: 96, g: 174, b: 244, a: 255), 1)
 
     if block.asset_manifest_validate(manifest) == block.asset_error_ok() &&
        block.asset_manifest_hash(manifest) > 0 &&
        block.asset_is_embedded(font) &&
        block.asset_is_local(icon) &&
+       block.asset_is_local(vector) &&
        block.asset_hash(icon) == 202 &&
        block.asset_width(image) == 48 && block.asset_height(image) == 32 &&
-       block.asset_cache_validate(block.asset_cache_budget_bytes(), 4096, 3, 6) == block.asset_error_ok() &&
+       block.asset_cache_validate(block.asset_cache_budget_bytes(), 4096, 4, 6) == block.asset_error_ok() &&
        block.asset_cache_validate(0, 0, 0, 0) == block.asset_error_unbounded_cache() &&
        block.asset_resolve_status(missing) == block.asset_error_missing_fallback() &&
        block.asset_resolve_status(remote) == block.asset_error_network_rejected() &&
+       block.asset_vector_sanitize_status(vector) == block.asset_error_ok() &&
+       block.asset_vector_sanitize_status(remote) == block.asset_error_unsafe_svg() &&
        block.asset_diagnostic_missing_asset() > 0 &&
        block.asset_diagnostic_network_rejected() > 0 &&
        tinted.asset_kind == block.asset_kind_icon() &&
        tinted.tint_b == 244 &&
-       scaled.width == 96 && scaled.height == 64 && scaled.fit == 2:
+       scaled.width == 96 && scaled.height == 64 && scaled.fit == 2 &&
+       vector_image.asset_kind == block.asset_kind_vector() && vector_image.width == 40:
         return 0
     return 1
 `,
@@ -1220,6 +1619,34 @@ uses alloc, mem, surface:
 		Jobs:            1,
 	}); err != nil {
 		t.Fatalf("BuildFileWithStatsOpt(lib.core.surface clipboard/IME consumer): %v", err)
+	}
+}
+
+func TestSurfaceModuleDefinesAppShellHostABI(t *testing.T) {
+	tmp := t.TempDir()
+	testkit.WriteFiles(t, tmp, map[string]string{
+		"app/main.t4": `module app.main
+import lib.core.surface as surface
+
+func main() -> Int:
+    let window: surface.ShellWindowSpec = surface.shell_window_spec(20, 400, 240, 320, 200, surface.shell_window_resizable())
+    let cap: surface.ShellCapability = surface.shell_capability(surface.shell_cap_menu(), true, true, false)
+    let trace: surface.ShellActionTrace = surface.shell_action_trace(surface.shell_cap_menu(), 1, true, false, 0)
+    let denied: surface.ShellPermission = surface.shell_permission(surface.shell_cap_permission(), surface.shell_permission_scoped(), false, true, 1)
+    let diagnostic: surface.ShellDiagnostic = surface.shell_unsupported_diagnostic(surface.shell_cap_platform_widget_shell(), 1)
+    let dpi: surface.ShellDPI = surface.shell_dpi(2000, 800, 480)
+    if surface.shell_window_spec_valid(window) && surface.shell_capability_valid(cap) && surface.shell_action_trace_valid(trace) && surface.shell_permission_valid(denied) && surface.shell_diagnostic_valid(diagnostic) && surface.shell_dpi_valid(dpi):
+        return 0
+    return 1
+`,
+	})
+
+	entry := filepath.Join(tmp, "app", "main.t4")
+	if _, err := compiler.BuildFileWithStatsOpt(entry, filepath.Join(t.TempDir(), "surface-app-shell-abi"), "linux-x64", compiler.BuildOptions{
+		DependencyRoots: []compiler.ModuleRoot{{Root: testkit.RepoRoot(t)}},
+		Jobs:            1,
+	}); err != nil {
+		t.Fatalf("BuildFileWithStatsOpt(lib.core.surface app shell ABI consumer): %v", err)
 	}
 }
 

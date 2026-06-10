@@ -1,0 +1,38 @@
+// Production Surface example shape: settings.
+module examples.surface_prod_settings_app
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func production_example_shape() -> Int:
+    return 3302
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 460, h: 320)
+    let toggle_rect: surface.Rect = surface.Rect(x: 32, y: 48, w: 220, h: 44)
+    let field_rect: surface.Rect = surface.Rect(x: 32, y: 112, w: 280, h: 44)
+    var tree: block.BlockTree = block.tree_init(5)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 12), root_rect)
+    let toggle: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(2, 1, toggle_rect, 14, 9201, true), toggle_rect)
+    let field: Int = block.tree_add_child(tree, block.id(1), morph.expand_field_text(3, 1, 4, field_rect, 18, 11), field_rect)
+    let recipe: morph.Recipe = morph.recipe_control_toggle()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(2))
+    let event: block.EventSpec = block.event_click(block.action_secondary())
+    let state: block.StateSelector = block.state_selector_selected()
+    let motion: block.MotionSpec = block.motion_transition(140, 0, block.motion_ease_standard(), true, true, true, 0, -1, 101)
+    if root == 1 && toggle == 2 && field == 3 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.click_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_total_ms(motion) == 140 &&
+       block.accessibility_focusable_has_name(block.accessibility_textbox_labelled_by(18, block.id(4))) &&
+       performance_budget_ok(3, 1):
+        return 0
+    return 1

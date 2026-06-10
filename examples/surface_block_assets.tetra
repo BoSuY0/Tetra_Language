@@ -20,45 +20,55 @@ struct AssetBlock:
 func main() -> Int:
     let icon_rect: surface.Rect = surface.Rect(x: 24, y: 36, w: 32, h: 32)
     let image_rect: surface.Rect = surface.Rect(x: 72, y: 32, w: 96, h: 64)
+    let vector_rect: surface.Rect = surface.Rect(x: 184, y: 40, w: 40, h: 32)
     let missing_rect: surface.Rect = surface.Rect(x: 24, y: 112, w: 96, h: 32)
 
     let font: block.AssetRef = block.asset_embedded(block.asset_kind_font(), 1, 0, 0, 101)
     let icon: block.AssetRef = block.asset_icon(2, 16, 16, 202)
     let image: block.AssetRef = block.asset_image(3, 48, 32, 303)
+    let vector: block.AssetRef = block.asset_vector(4, 24, 24, 404)
     let missing: block.AssetRef = block.asset_missing(block.asset_kind_image(), 9)
     let remote: block.AssetRef = block.asset_remote_url(block.asset_kind_image(), 10)
-    let manifest: block.AssetManifest = block.asset_manifest(font, icon, image, block.asset_cache_budget_bytes(), block.asset_cache_entry_limit())
+    let manifest: block.AssetManifest = block.asset_manifest(font, icon, image, vector, block.asset_cache_budget_bytes(), block.asset_cache_entry_limit())
 
     let icon_image: block.ImageSpec = block.image_asset_tinted_scaled(icon, 32, 32, surface.Color(r: 96, g: 174, b: 244, a: 255), 1)
     let hero_image: block.ImageSpec = block.image_asset_tinted_scaled(image, 96, 64, surface.Color(r: 255, g: 255, b: 255, a: 255), 2)
+    let vector_image: block.ImageSpec = block.image_asset_tinted_scaled(vector, 40, 32, surface.Color(r: 96, g: 174, b: 244, a: 255), 1)
     let fallback_image: block.ImageSpec = block.image_asset_tinted_scaled(missing, 96, 32, surface.Color(r: 180, g: 190, b: 200, a: 255), 1)
 
     let icon_props: block.BlockProps = block.props(block.layout_fixed(icon_rect), block.paint_empty(), block.text_none(), icon_image, block.input_clickable(), block.event_click(block.action_primary()), block.state_interactive(), block.motion_none(), block.accessibility_button(4), icon)
     let hero_props: block.BlockProps = block.props(block.layout_fixed(image_rect), block.paint_empty(), block.text_none(), hero_image, block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(5), image)
+    let vector_props: block.BlockProps = block.props(block.layout_fixed(vector_rect), block.paint_empty(), block.text_none(), vector_image, block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(6), vector)
     let missing_props: block.BlockProps = block.props(block.layout_fixed(missing_rect), block.paint_empty(), block.text_label(7, surface.Color(r: 238, g: 242, b: 247, a: 255)), fallback_image, block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(7), missing)
 
     let icon_block: block.Block = block.make(block.id(2), block.id(1), icon_props)
     let image_block: block.Block = block.make(block.id(3), block.id(1), hero_props)
-    let missing_block: block.Block = block.make(block.id(4), block.id(1), missing_props)
+    let vector_block: block.Block = block.make(block.id(4), block.id(1), vector_props)
+    let missing_block: block.Block = block.make(block.id(5), block.id(1), missing_props)
     let app: BlockAssetApp = BlockAssetApp(quality: block.asset_quality_level(), manifest_hash: block.asset_manifest_hash(manifest), cache_budget: block.asset_cache_budget_bytes())
     let icon_state: AssetBlock = AssetBlock(id: block.id_value(icon_block.id), asset_kind: block.asset_kind(icon), asset_hash: block.asset_hash(icon), resolved_status: block.asset_resolve_status(icon), width: icon_image.width, height: icon_image.height)
     let image_state: AssetBlock = AssetBlock(id: block.id_value(image_block.id), asset_kind: block.asset_kind(image), asset_hash: block.asset_hash(image), resolved_status: block.asset_resolve_status(image), width: hero_image.width, height: hero_image.height)
+    let vector_state: AssetBlock = AssetBlock(id: block.id_value(vector_block.id), asset_kind: block.asset_kind(vector), asset_hash: block.asset_hash(vector), resolved_status: block.asset_vector_sanitize_status(vector), width: vector_image.width, height: vector_image.height)
     let missing_state: AssetBlock = AssetBlock(id: block.id_value(missing_block.id), asset_kind: block.asset_kind(missing), asset_hash: block.asset_hash(missing), resolved_status: block.asset_resolve_status(missing), width: fallback_image.width, height: fallback_image.height)
 
     if app.quality == 1 &&
        app.manifest_hash > 0 &&
        app.cache_budget == 65536 &&
        block.asset_manifest_validate(manifest) == block.asset_error_ok() &&
-       block.asset_cache_validate(block.asset_cache_budget_bytes(), 4096, 3, 6) == block.asset_error_ok() &&
+       block.asset_cache_validate(block.asset_cache_budget_bytes(), 4096, 4, 6) == block.asset_error_ok() &&
        block.asset_cache_validate(0, 0, 0, 0) == block.asset_error_unbounded_cache() &&
        block.asset_is_embedded(font) &&
        block.asset_is_local(icon) &&
        block.asset_is_local(image) &&
+       block.asset_is_local(vector) &&
        icon_state.id == 2 && icon_state.asset_kind == block.asset_kind_icon() &&
        icon_state.asset_hash == 202 && icon_image.tint_b == 244 &&
        image_state.id == 3 && image_state.width == 96 && image_state.height == 64 && hero_image.fit == 2 &&
-       missing_state.id == 4 && missing_state.resolved_status == block.asset_error_missing_fallback() &&
+       vector_state.id == 4 && vector_state.asset_kind == block.asset_kind_vector() &&
+       vector_state.resolved_status == block.asset_error_ok() && vector_state.width == 40 &&
+       missing_state.id == 5 && missing_state.resolved_status == block.asset_error_missing_fallback() &&
        block.asset_resolve_status(remote) == block.asset_error_network_rejected() &&
+       block.asset_vector_sanitize_status(remote) == block.asset_error_unsafe_svg() &&
        block.asset_diagnostic_missing_asset() > 0 &&
        block.asset_diagnostic_network_rejected() > 0:
         return 1

@@ -60,6 +60,167 @@ claim, no full formal proof, no full target parity claim, no all-target Surface
 claim, and not a clean release-candidate checkout claim unless a final release
 audit proves that separate checkout state.
 
+## Surface Production Platform Boundary
+
+The planned Surface production platform contract is defined in
+`docs/spec/surface_production_platform.md` as
+`PROD_STABLE_SCOPED_LINUX_WEB_APP_UI` with machine scope
+`surface-prod-scoped-linux-web`. That contract describes what it would mean for
+Surface to replace Electron/React/CSS runtime dependencies inside the scoped
+linux-x64 and wasm32-web Surface target matrix. It is not a current broad
+Electron replacement claim.
+
+The current release truth remains `surface-v1-linux-web`: headless release
+evidence, linux-x64 real-window evidence, and wasm32-web browser-canvas
+evidence. Morph and Block System evidence are bounded by their status entries.
+The following remain unsupported nonclaims until their dedicated gates pass:
+macOS, Windows, wasm32-wasi, GPU rendering, full accessibility parity, and
+drop-in Electron compatibility.
+
+Surface developer-loop evidence is experimental under `ui.surface-block-system`.
+`tetra new surface-app`, `tetra surface dev --once`,
+`validate-surface-dev-report`, and `tetra surface package` provide a scoped
+template/reload/package workflow with `tetra.surface.dev-loop.v1` reports and
+source hash reload traces. This is developer-experience evidence only: it is
+not Electron dev-server parity, React Fast Refresh, CSS HMR, DOM hot reload,
+browser devtools parity, or production signing/notarization.
+
+Surface visual regression evidence is experimental under
+`ui.surface-block-system`. `surface-golden`,
+`validate-surface-visual-report`, and
+`scripts/release/surface/visual-gate.sh` provide deterministic
+`tetra.surface.visual-regression.v1` / `surface-visual-golden-v1` evidence for
+command-palette, dashboard, settings, editor, and glass golden baselines with
+source scene hashes, software RGBA frame checksums, renderer version,
+baseline/current/diff PNG hashes, font manifest hashes, and asset manifest
+hashes. This is regression evidence only: it is not Electron/Chromium pixel
+parity, CSS browser rendering parity, or GPU compositor parity. It does not
+promote the Block System support level.
+
+Surface package distribution evidence is experimental under
+`ui.surface-block-system`. `package-gate.sh`, `surface-package-report`, and
+`validate-surface-package-report` provide
+`tetra.surface.package-report.v1` / `surface-package-distribution-v1` evidence
+for a scoped `surface-linux-tar-v1` Linux package with `.tdx` app package,
+asset manifest, permissions manifest, host-adapter metadata, install smoke,
+launcher smoke, and artifact hashes. Unsigned macOS production packages,
+Windows production packages without signed installer evidence, omitted package
+assets, and updater production claims without channel signature verification
+are rejected. This is not Windows/macOS production packaging, auto-update
+production, or multi-target desktop installer parity.
+
+Surface security/sandbox evidence is experimental under
+`ui.surface-block-system`. `security-gate.sh` and
+`validate-surface-security-report` provide
+`tetra.surface.security-report.v1` / `surface-security-sandbox-v1` evidence for
+`explicit-deny-by-default` permissions, safe-local-assets-only asset sandboxing,
+typed-host-abi-only IPC, capsule/package hash supply-chain checks, and
+rejection of network/filesystem/clipboard host calls without permission,
+unsafe SVG/font/image acceptance, user JavaScript, remote code execution,
+packages without hashes, and untyped IPC. This is not a browser plugin sandbox,
+Node/Electron process sandbox parity, or arbitrary untrusted decoder support.
+
+Surface IPC/lifecycle evidence is experimental under `ui.surface-block-system`.
+`ipc-lifecycle-gate.sh` and `validate-surface-ipc-report` provide
+`tetra.surface.ipc-lifecycle-report.v1` / `surface-ipc-lifecycle-v1` evidence
+for app main, single-owner UI isolate, supervised background services, owned
+message passing, dispatcher-routed UI updates, Surface handle/frame/event
+actor transfer rejection, borrowed payload rejection, untyped channel
+rejection, and scoped crash-isolation policy. This is not Electron
+main/renderer parity, process sandbox parity, or a broad crash recovery claim.
+
+Surface crash diagnostics evidence is experimental under
+`ui.surface-block-system`. `crash-gate.sh` and
+`validate-surface-crash-report` provide `tetra.surface.crash-report.v1` /
+`surface-crash-diagnostics-v1` evidence for structured crash diagnostics,
+source locations, sanitized diagnostic bundles, production error hook,
+dev-only panic/error overlay, secret scrubbing, expected-negative/crash
+separation, crash swallowed as pass rejection, secret leak rejection, missing
+diagnostic bundle rejection, and unsurfaced error rejection. This is not
+automatic crash recovery, telemetry upload, or Electron crash reporter
+compatibility.
+
+Surface i18n/localization evidence is experimental under
+`ui.surface-block-system`. `i18n-gate.sh` and
+`validate-surface-i18n-report` provide `tetra.surface.i18n-report.v1` /
+`surface-i18n-l10n-v1` evidence for locale resources, stable string IDs,
+number/date/plural formatting hooks, translation asset packaging, LTR/RTL
+layout direction metadata, missing locale resource rejection, silent fallback
+rejection, unsupported host localization rejection, and full ICU/CLDR claim
+rejection. This is a full bidi shaping nonclaim, full ICU/CLDR nonclaim, and
+not platform-native localization framework parity.
+
+Surface performance/memory evidence is experimental under
+`ui.surface-block-system`. `perf-gate.sh`, `surface-perf-smoke`, and
+`validate-surface-perf-report` provide `tetra.surface.perf-report.v1` /
+`surface-performance-memory-v1` evidence for startup time, first frame time,
+steady frame p95, peak RSS, frame allocations, layout/glyph/asset cache bytes,
+binary size, CPU idle power proxy, input latency, animation frame jitter,
+baseline environment capture, bounded cache evidence, and fair Electron
+comparison nonclaims. This is not a fastest UI framework claim, zero memory
+overhead claim, broad Electron replacement performance claim, or
+cross-platform desktop performance parity claim.
+
+Surface widget/component migration evidence is experimental under
+`ui.surface-block-system`. `migration-gate.sh` and
+`validate-surface-migration-report` provide
+`tetra.surface.migration-report.v1` / `surface-widget-block-migration-v1`
+evidence that `lib.core.widgets` remains a compatibility layer, maps to
+Block/Morph recipe equivalents, keeps existing Surface v1 widget examples
+passing, emits migration diagnostics, and recommends Block/Morph recipes for
+new production UI. This is not a claim that widgets are the core final
+architecture and not a deprecation before production examples and gates cover
+replacement.
+
+Surface production example-suite evidence is experimental under
+`ui.surface-block-system`. `example-suite-gate.sh` and
+`validate-surface-example-suite` provide
+`tetra.surface.example-suite-report.v1` /
+`surface-production-example-suite-v1` evidence for ten realistic Surface app
+shapes, executable `examples/surface_prod_*.tetra` examples,
+Block/Morph-only production examples, headless/linux-x64/wasm32-web target
+coverage, event/state/accessibility/performance-budget evidence, and ecosystem
+seed metadata. Screenshot-only examples, examples requiring React/Electron/DOM
+runtime, widgets where Block/Morph is required, missing app shapes, missing
+scoped target coverage, and toy visual-only examples are rejected. This is a
+broad cross-platform parity nonclaim.
+
+Surface production CI/release gate evidence is the scoped promotion boundary
+for `ui.surface-production-platform`. `prod-gate.sh` and
+`validate-surface-release-state --scope PROD_STABLE_SCOPED_LINUX_WEB_APP_UI`
+provide `tetra.surface.prod-gate-report.v1` /
+`surface-production-ci-release-gate-v1` evidence that the release job in
+`.github/workflows/release-packages.yml` runs
+`scripts/release/surface/prod-gate.sh`, uploads `surface-production-final/**`,
+and keeps production evidence out of `continue-on-error`. It aggregates Surface
+release, Block/Morph, visual, package, security, IPC/lifecycle, crash, i18n,
+performance, migration, example-suite, API stability, prod-claim governance,
+and artifact hash manifests. Missing production CI job, skipped production
+target counted as pass, and missing artifact hash manifest are rejected.
+`linux-x64` and `wasm32-web` are the production targets for this tier;
+`windows-x64` and `macos-x64` remain beta/unsupported boundaries.
+
+Surface final same-commit audit evidence is the public-claim boundary for the
+same feature. `docs/release/surface_prod_release_audit.md` embeds
+`tetra.surface.prod-audit.v1` /
+`surface-prod-final-same-commit-audit-v1` evidence validated by
+`validate-surface-prod-audit`. The verdict enum is
+`PROD_STABLE_SCOPED/NEAR_READY_WITH_BLOCKERS/BETA_ONLY/EXPERIMENTAL_ONLY/FAIL`.
+Clean checkout rejection, report from different git head rejection, missing
+unsupported-target nonclaims rejection, and public claim generated from audit
+result are required before any production wording is accepted.
+
+Surface-vs-Electron comparison evidence is method-first and scoped to public
+positioning, not superiority hype. `scripts/release/surface/electron-comparison-gate.sh`
+produces `tetra.surface.electron-comparison-report.v1` /
+`surface-electron-comparison-method-v1` evidence through
+`surface-electron-comparison` and
+`validate-surface-electron-comparison-report`. The only allowed wording is
+competitive with Electron in the supported scope. Public benchmark-superiority
+claim rejection, cherry-picked hardware rejection, missing variance rejection,
+unfair app shape rejection, missing environment rejection, and single-smoke
+faster-than-Electron claim rejection remain required.
+
 ## Supported Now
 
 - Flow indentation syntax for the examples, standard library sources, runtime
@@ -1218,20 +1379,26 @@ audit proves that separate checkout state.
 - Tetra Surface v1 is current for the bounded `surface-v1-linux-web` release
   scope: pure-Tetra UI, tiny Surface Host ABI, headless as a release evidence
   target, linux-x64 real-window Wayland shm presentation, and wasm32-web
-  browser-canvas presentation. macOS Surface, Windows Surface, and wasm32-wasi
-  Surface UI are unsupported in this release.
+  browser-canvas presentation with `tetra.surface.browser-canvas-target.v1`
+  / `wasm32-web-first-class-browser-canvas-target-v1` evidence, and supported
+  target accessibility with `tetra.surface.accessibility-target.v1` /
+  `production-accessibility-target-v1` evidence. macOS Surface, Windows
+  Surface, and wasm32-wasi Surface UI are unsupported in this release.
 
   | Feature | Status | Scope |
   | --- | --- | --- |
   | Surface core | current | pure-Tetra UI, Host ABI |
-  | Surface Block System | experimental | Block-first Surface architecture; `lib.core.block` exists; Block is the core Surface primitive direction; helpers are recipes/compatibility; same-commit `tetra.surface.block-system.gate.v1` reports include `block_system.memory_budget` under `reports/surface-block/p18-budget`; not production support and no production Block claim |
-  | Surface Morph Capsule | experimental | `lib.core.morph` capsule/token/material/recipe layer over Block; recipes expand to Block evidence for `examples/surface_morph_command_palette.tetra`; `tetra.surface.morph.gate.v1` is deterministic headless evidence only; not production support |
+  | Surface Block System | experimental | Block-first Surface architecture; `lib.core.block` exists; Block is the core Surface primitive direction; `tetra.surface.block-abi.v1` freezes Block/BlockTree/BlockProps and ResolvedBlock/ResolvedScene evidence; `tetra.surface.resolved-scene.v1` records stable tree/draw/hit-test/focus/accessibility order; `tetra.surface.layout-engine.v1` records deterministic-responsive-layout-v1 evidence for row/column/stack/grid/dock/absolute/overlay/scroll, min/max/fit/fill/fixed constraints, DPI/density, explicit overflow/clip/scroll rules, resize/scroll invalidation, bounded layout cache, and app shell/settings forms/dashboards/editor shells resize stability; `tetra.surface.app-model.v1` records `production-app-model-v1`, `owned-state-store-v1`, `typed-command-dispatch-v1`, `block-event-trace-v1`, `actor-task-safe-boundary-v1`, scoped shortcuts, navigation focus scopes, command error propagation, explicit redraw scheduling, command palette/dashboard/settings/editor shell surfaces, without React runtime, disabled dispatch rejection, and unfocused text rejection; `tetra.surface.keyboard-ux.v1` records `production-keyboard-ux-v1` evidence for graph focus order, overlay focus traps, roving focus, keyboard activation, scoped shortcut conflict diagnostics, bounded undo/redo stacks, and command palette/search/settings/editor keyboard scripts; `tetra.surface.app-shell.v1` records `production-app-shell-host-abi-v1` evidence for windows, lifecycle, menus, context menus, dialogs/file pickers, tray/status items, notifications, cursors, drag/drop, permissions, clipboard, IME, DPI/scale, open URL/file, target-host action traces, rejected unsupported diagnostics, rejected silent no-op host features, rejected menu claims without host traces, and rejected notification claims without host reports; `tetra.surface.renderer-scene.v1` records deterministic `tetra.surface.paint-command.v1` fill/gradient/border/radius/shadow/outline/image/text/clip/transform command evidence; `tetra.surface.software-renderer.v1` records software RGBA deterministic raster, alpha, clipping, golden/checksum, resize/scale/DPI, and frame-lifetime hardening; `tetra.surface.asset-pipeline.v1` records `production-asset-pipeline-v1` evidence for local font/icon/image/vector manifests, sha256-before-decode, `safe-local-asset-decoders-v1`, bounded-lru asset cache, missing fallback diagnostics, unsafe SVG rejection, remote font rejection, network asset rejection, and oversized raster rejection; `tetra.surface.inspector-snapshot.v1` records `surface-inspector-json-mvp-v1` developer inspector JSON snapshots for Block tree, Morph style resolution, layout boxes, paint layers, events, focus, accessibility, performance counters, source locations, `surface-inspect`, and `tetra surface inspect`; `tetra.surface.package-report.v1` records `surface-package-distribution-v1` evidence for `surface-linux-tar-v1`, package-gate.sh, install/launcher smoke, unsigned macOS production rejection, omitted package asset rejection, and updater without channel signature rejection; `tetra.surface.security-report.v1` records `surface-security-sandbox-v1`, explicit-deny-by-default permissions, safe-local-assets-only sandboxing, typed-host-abi-only IPC, network/filesystem/clipboard without permission rejection, user JavaScript rejection, remote code execution rejection, package without hashes rejection, and untyped IPC rejection; `tetra.surface.ipc-lifecycle-report.v1` records `surface-ipc-lifecycle-v1`, ipc-lifecycle-gate.sh, validate-surface-ipc-report, single-owner UI isolate, owned message passing, dispatcher-routed UI updates, Surface handle/frame/event actor transfer rejection, borrowed payload rejection, background UI mutation without dispatcher rejection, and Electron main/renderer parity nonclaim; `tetra.surface.crash-report.v1` records `surface-crash-diagnostics-v1`, crash-gate.sh, validate-surface-crash-report, structured crash diagnostics, sanitized diagnostic bundles, production error hook, dev-only panic/error overlay, secret scrubbing, crash swallowed as pass rejection, secret leak rejection, missing diagnostic bundle rejection, unsurfaced error rejection, automatic crash recovery nonclaim, and Electron crash reporter compatibility nonclaim; `tetra.surface.i18n-report.v1` records `surface-i18n-l10n-v1`, i18n-gate.sh, validate-surface-i18n-report, locale resources, stable string IDs, number/date/plural formatting hooks, translation asset packaging, LTR/RTL layout direction metadata, missing locale resource rejection, silent fallback rejection, unsupported host localization rejection, full ICU/CLDR claim rejection, full bidi shaping nonclaim, and full ICU/CLDR nonclaim; helpers are recipes/compatibility; same-commit `tetra.surface.block-system.gate.v1` reports include `block_system.memory_budget` under `reports/surface-block/p18-budget`; not production support and no production Block claim |
+  | Surface Morph Capsule | experimental | `lib.core.morph` capsule/token/material/recipe layer over Block; versioned recipes expand to Block evidence for `examples/surface_morph_command_palette.tetra`; `tetra.surface.morph.style-graph.v1` records `typed-style-graph-candidate-v1` as the scoped CSS replacement boundary with no selector engine, no specificity scoring, no global cascade, fixed override order, explicit imports, global style leak rejection, specificity ambiguity rejection, raw CSS runtime import rejection, and `tetra.surface.morph.authoring.v1` `production-recipe-authoring-v1` evidence for 11 stable recipe families, declared inputs/slots/state/a11y projections, reported Block-only expansions, component bloat rejected, hidden app state rejected, platform widget recipe output rejected, unreported expansion rejected, core primitive promotion rejected, and raw 80-field Block authoring rejection; `tetra.surface.morph.gate.v1` is deterministic headless evidence only; not production support |
+  | Surface GPU/compositor | experimental/nonclaim | `tetra.surface.renderer-backend.v1` records the `software-only-prod-go-gpu-experimental` decision as a GPU nonclaim; software RGBA remains the production rendering baseline; accelerated-backend promotion requires real target-host GPU backend reports, same-scene equivalence, fallback behavior, linux target-host GPU smoke, web compositor/canvas evidence, and Windows/macOS GPU evidence if claimed |
+  | Surface text/glyph pipeline | current scoped Tier 1 | `tetra.surface.text-pipeline.v1` is embedded in production text-input reports; it records Latin/UTF-8 shaping scope, font manifest hashes, fallback chain, glyph runs, bounded glyph cache, Unicode scalar and cluster boundaries, deterministic measurement, wrap/ellipsis/alignment/baseline evidence, caret and selection rectangles, IME composition spans, and nonclaims for unsupported complex scripts, bidi shaping, platform widget text controls, and full Unicode editor semantics |
+  | Surface text editing | current scoped editing basics | `tetra.surface.text-editing.v1` is embedded in production text-input reports; it records owned editable TextBox storage, forms and command palette search safety, target IME traces, clipboard owned-copy transfers, selection replacement, undo unit boundaries, validation diagnostics, and nonclaims for rich text, full editor-grade text semantics, and native platform text controls |
   | Headless Surface | current/test | deterministic evidence target |
   | Linux-x64 Surface | current | Wayland shm real-window release path |
-  | wasm32-web Surface | current | browser canvas release path |
+  | wasm32-web Surface | current | browser canvas release path with `tetra.surface.browser-canvas-target.v1`, compiler-owned boot, frame checksum/event/artifact evidence, accessibility snapshot/mirror, DOM snapshot renderer rejection, and user script command dispatch rejection |
   | Surface toolkit v1 | current | Text/Label/Button/TextBox/Checkbox/Row/Column/Panel/Stack/Scroll/Spacer |
-  | Surface text input v1 | current | UTF-8/caret/selection/clipboard/composition baseline |
-  | Surface accessibility v1 | current | metadata plus platform bridge for supported targets |
+  | Surface text input v1 | current | UTF-8/caret/selection/clipboard/composition baseline plus scoped text-pipeline and text-editing evidence |
+  | Surface accessibility v1 | current | `tetra.surface.accessibility-tree.v1` plus `tetra.surface.accessibility-target.v1` / `production-accessibility-target-v1`; roles, names, values, states, relationships, actions, bounds, focus order, reading order, snapshots, Linux accessibility host bridge/probe evidence, wasm32-web browser accessibility snapshot/mirror evidence, deterministic headless inspector evidence, and validator rejection for unnamed focusable blocks, shuffled focus/read order, metadata platform overclaims, desktop ARIA/DOM bridge proof, and full screen-reader parity claims |
   | macOS Surface | unsupported | no production target evidence |
   | Windows Surface | unsupported | no production target evidence |
   | wasm32-wasi Surface UI | unsupported | no production UI runtime evidence |
@@ -1243,8 +1410,67 @@ audit proves that separate checkout state.
   `ui.surface-accessibility-v1`; they are not separate current release APIs.
   The experimental `ui.surface-block-system` row is the implementation track for
   moving Surface from the current component/tree/widget helper layer to Block as
-  the core primitive. The current code slice is `lib.core.block` plus the
-  Block-system scenes and reports validated by
+  the core primitive. The current code slice is `lib.core.block` plus
+  `tetra.surface.block-abi.v1` / `tetra.surface.resolved-scene.v1` evidence for
+  Block/BlockTree/BlockProps and renderer-order stability, plus
+  `tetra.surface.layout-engine.v1` evidence for deterministic responsive layout
+  across row/column/stack/grid/dock/absolute/overlay/scroll modes,
+  min/max/fit/fill/fixed constraints, DPI/density-independent layout, explicit
+  overflow/clip/scroll rules, resize/scroll invalidation traces, bounded layout
+  cache evidence, and app shell/settings forms/dashboards/editor shells resize
+  stability. The Block slice also carries `tetra.surface.asset-pipeline.v1` /
+  `production-asset-pipeline-v1` evidence for local font/icon/image/vector
+  manifests, sha256-before-decode, `safe-local-asset-decoders-v1`, bounded-lru
+  asset cache, missing fallback diagnostics, unsafe SVG rejection, remote font
+  rejection, network asset rejection, and oversized raster rejection. The
+  Block slice also carries `tetra.surface.animation-scheduler.v1` /
+  `production-animation-scheduler-v1` evidence for deterministic motion frame
+  scheduling, a stable motion timeline, dirty-Block invalidation, lifecycle
+  stop-after-settle behavior, reduced-motion instant settle, frame timing,
+  visual delta evidence, target smoke rows, and validator rejections for hidden
+  animation loops, missing reduced motion, missing frame timing, unbounded
+  frame schedules, unchanged visual frames, and CSS animation parity claims.
+  The scheduler evidence is not a CSS animation runtime, requestAnimationFrame
+  parity claim, or GPU compositor timing claim. The
+  Block slice now also carries `tetra.surface.inspector-snapshot.v1` /
+  `surface-inspector-json-mvp-v1` developer inspector JSON evidence. The
+  snapshot records Block tree, Morph style resolution or Block-only style
+  diagnostic, layout boxes, paint layers, events, focus order, accessibility
+  nodes, performance counters, source locations, and exports through
+  `surface-inspect` plus `tetra surface inspect`. The validator rejects
+  docs-only trees, missing source locations, missing layout boxes, missing
+  accessibility views, missing performance counters, and browser devtools
+  parity claims. This is not an interactive devtools UI, perfect source maps,
+  or a production profiler.
+  The
+  validator rejects CSS flexbox/grid parity claims, accidental
+  overflow-hidden behavior, unbounded layout cache evidence, and missing
+  DPI/density evidence. The Block slice also carries
+  `tetra.surface.app-model.v1` evidence at `production-app-model-v1` level for
+  owned state stores, typed command dispatch, ordered Block event traces, safe
+  actor/task async boundaries, graph-derived navigation/focus scopes, scoped
+  shortcuts, propagated command errors, explicit redraw scheduling, and the
+  command palette/dashboard/settings/editor shell acceptance surfaces. The
+  validator rejects missing event traces, disabled controls that still
+  dispatch, text input delivered to an unfocused Block, unsafe actor/task
+  boundaries, and React runtime claims. The Block slice also carries
+  `tetra.surface.keyboard-ux.v1` evidence at `production-keyboard-ux-v1` level
+  for graph focus order, overlay focus traps, roving focus, keyboard
+  activation, scoped shortcut conflict diagnostics, bounded undo/redo stacks,
+  and command palette/search/settings/editor keyboard scripts. The validator
+  rejects focusable elements without accessible names, overlay focus leaks,
+  shortcut conflicts that are not diagnosed, pointer-only actions, unknown
+  shortcuts, and undo/redo commands without a stack. The Block slice also
+  carries
+  `tetra.surface.renderer-scene.v1` / `tetra.surface.paint-command.v1` evidence
+  for deterministic fill/gradient/border/radius/shadow/outline/image/text/clip/
+  transform command order and checksums, plus
+  `tetra.surface.software-renderer.v1` evidence for deterministic software RGBA
+  raster output, source-over alpha blending, scissor clipping, pixel/repeat/golden
+  checksums, golden artifact paths, resize/scale/DPI facts, use-after-present
+  rejection, frame-alias rejection, and fake renderer promotion rejection. The
+  Block-system
+  scenes and reports are validated by
   `scripts/release/surface/block-system-gate.sh --report-dir reports/surface-block/p18-budget`.
   That gate emits same-commit headless,
   linux-x64 real-window, and wasm32-web browser-canvas Block reports, artifact
@@ -1253,13 +1479,83 @@ audit proves that separate checkout state.
   helpers remain release-scoped Surface v1 helpers and are documented as
   recipes/compatibility over Block rather than required core primitives.
   Button/Card/TextField/Sidebar/Modal are not core Surface primitives.
+  The Block slice also carries `tetra.surface.ipc-lifecycle-report.v1` /
+  `surface-ipc-lifecycle-v1` evidence for app main, single-owner UI isolate,
+  supervised background services, owned message passing, dispatcher-routed UI
+  updates, Surface handle/frame/event actor transfer rejection, borrowed payload
+  rejection, untyped channel rejection, background UI mutation without
+  dispatcher rejection, and scoped crash-isolation policy. The validator is
+  `validate-surface-ipc-report`; the release evidence gate is
+  `scripts/release/surface/ipc-lifecycle-gate.sh`. This is not Electron
+  main/renderer parity or process sandbox parity.
+  The Block slice also carries `tetra.surface.crash-report.v1` /
+  `surface-crash-diagnostics-v1` evidence for structured crash diagnostics,
+  source locations, sanitized diagnostic bundles, production error hook,
+  dev-only panic/error overlay, secret scrubbing, expected-negative/crash
+  separation, crash swallowed as pass rejection, secret leak rejection, missing
+  diagnostic bundle rejection, and unsurfaced error rejection. The validator is
+  `validate-surface-crash-report`; the release evidence gate is
+  `scripts/release/surface/crash-gate.sh`. This is not automatic crash
+  recovery, telemetry upload, or Electron crash reporter compatibility.
+  The Block slice also carries `tetra.surface.i18n-report.v1` /
+  `surface-i18n-l10n-v1` evidence for locale resources, stable string IDs,
+  number/date/plural formatting hooks, translation asset packaging, LTR/RTL
+  layout direction metadata, missing locale resource rejection, silent fallback
+  rejection, unsupported host localization rejection, and full ICU/CLDR claim
+  rejection. The validator is `validate-surface-i18n-report`; the release
+  evidence gate is `scripts/release/surface/i18n-gate.sh`. This is a full bidi
+  shaping nonclaim, full ICU/CLDR nonclaim, and not platform-native
+  localization framework parity.
+  The Block slice also carries `tetra.surface.perf-report.v1` /
+  `surface-performance-memory-v1` evidence for startup time, first frame time,
+  steady frame p95, peak RSS, frame allocations, layout/glyph/asset cache
+  bytes, binary size, CPU idle power proxy, input latency, animation frame
+  jitter, baseline environment capture, bounded cache evidence, and fair
+  Electron comparison nonclaims. The validator is
+  `validate-surface-perf-report`; the smoke generator is `surface-perf-smoke`;
+  the release evidence gate is `scripts/release/surface/perf-gate.sh`. This is
+  not a fastest UI framework claim, zero memory overhead claim, broad Electron
+  replacement performance claim, or cross-platform desktop performance parity
+  claim.
+  The Block slice also carries `tetra.surface.migration-report.v1` /
+  `surface-widget-block-migration-v1` evidence that `lib.core.widgets` remains
+  a compatibility layer, maps Panel/Button/TextBox/StatusText to Block/Morph
+  recipe equivalents, keeps existing Surface v1 widget examples still passing,
+  emits migration diagnostics, and recommends Block/Morph recipes for new
+  production UI. The validator is `validate-surface-migration-report`; the
+  release evidence gate is `scripts/release/surface/migration-gate.sh`. This
+  rejects widgets declared as the core final architecture and breaking Surface
+  v1 examples without migration.
   The experimental `ui.surface-morph-capsule` row sits one layer above Block:
   `lib.core.morph` records scoped capsule tokens, materials, affordances,
   state lenses, motion presets, and recipes that expand into Block graph
-  evidence for `examples/surface_morph_command_palette.tetra`. Its gate is
+  evidence for `examples/surface_morph_command_palette.tetra`.
+  `tetra.surface.morph.style-graph.v1` now records
+  `typed-style-graph-candidate-v1`: token categories include color, spacing,
+  radius, type, motion, elevation, z, density, and assets; imports are explicit;
+  override order is fixed from capsule/tokens/materials through recipes and
+  accessibility safety; selector engine, specificity scoring, global cascade,
+  global style leaks, specificity ambiguity, and raw CSS runtime imports are
+  rejected. `tetra.surface.morph.authoring.v1` records
+  `production-recipe-authoring-v1` evidence for 11 stable recipe families,
+  declared inputs/slots/state/a11y projections, reported Block-only expansions,
+  recipe-first authoring, bounded author fields, generated Block props, hidden
+  app state rejection, platform widget recipe output rejected, unreported
+  expansion rejection, component bloat rejected, core primitive promotion
+  rejection, and rejection of raw 80-field Block authoring.
+  Its gate is
   `scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph/gate`
   and writes `tetra.surface.morph.gate.v1` plus artifact hashes. This is
   headless experimental evidence and carries no production Morph claim.
+  The experimental `ui.surface-gpu` row is a renderer decision gate, not a GPU
+  implementation. `docs/spec/surface_renderer_backend.md` defines
+  `tetra.surface.renderer-backend.v1`; the valid decision is
+  `software-only-prod-go-gpu-experimental`, recorded as a GPU nonclaim.
+  Accelerated renderer promotion is forbidden until
+  `validate-surface-renderer-report` sees target-host backend reports,
+  same-scene equivalence against software RGBA, fallback behavior, and the
+  required layer compositing, transforms, clipping, texture atlas, and
+  vsync/frame timing capabilities.
   The component-model slice now includes static component
   evidence plus experimental component-tree helper API evidence: runtime reports prove
   ordinary structs with `measure`, `layout`, `draw`, `event`, `focus`,
@@ -1329,10 +1625,11 @@ audit proves that separate checkout state.
   platform widgets, no platform accessibility host claim, and no legacy
   sidecars across headless, linux real-window, and wasm32-web browser-canvas
   evidence levels.
-  Full dynamic trait-object child lists, full IME/String text editing,
-  clipboard/rich text, platform accessibility integration, screen-reader
-  validation, production widget toolkit claims, production accessibility
-  claims, and witness-table dispatch are not claimed and remain future work. The
+  Full dynamic trait-object child lists, full String/editor-grade text editing,
+  rich text, native platform text controls, platform accessibility integration,
+  screen-reader host validation, widget toolkit promotion claims,
+  accessibility promotion claims, and witness-table dispatch are not claimed and
+  remain future work. The
   headless starter gate
   `scripts/release/surface/surface-headless-smoke.sh` now emits
   `tetra.surface.runtime.v1` evidence with deterministic pre/post
@@ -1362,6 +1659,15 @@ audit proves that separate checkout state.
   `host_evidence.level:"linux-x64-real-window"`, and rejects headless,
   memfd-only, docs-only, metadata-only, legacy `.ui.*`, DOM/web-only, fake, or
   stale evidence for that promotion level.
+  The stricter Linux release-window host adapter gate
+  `scripts/release/surface/surface-linux-x64-release-window-smoke.sh` emits
+  `host_evidence.level:"linux-x64-release-window-v1"` plus
+  `linux_host_adapter.schema:"tetra.surface.linux-host-adapter.v1"` and
+  `linux_host_adapter.level:"linux-x64-production-host-adapter-v1"` evidence.
+  It requires target-host traces for real window, native input, text input,
+  IME/composition, clipboard, accessibility bridge, app-shell ABI, and
+  `linux-x64-unpacked-binary-v1` packaging scope. Missing display state is a
+  blocked report, not pass evidence.
   The wasm32-web starter gate
   `scripts/release/surface/surface-wasm32-web-smoke.sh` builds and runs
   `examples/surface_counter.tetra` through compiler-owned
@@ -1377,7 +1683,23 @@ audit proves that separate checkout state.
   records `host_evidence.level:"wasm32-web-browser-canvas-input"` and
   `tetra.surface.browser-canvas-trace.v1` source/canvas checksums, and rejects
   Node-only, DOM-only, user-JS, metadata-only, fake, stale, or legacy sidecar
-  evidence for that level. The TextBox focus/text input gates
+  evidence for that level. The release browser-canvas target also requires
+  `tetra.surface.browser-canvas-target.v1` /
+  `wasm32-web-first-class-browser-canvas-target-v1` evidence so DOM snapshot
+  renderer promotion, user script command dispatch promotion, Node runtime
+  substitution, metadata sidecars, legacy sidecars, and React runtime evidence
+  remain rejected. The TextBox focus/text input gates
+  The release accessibility gates emit
+  `tetra.surface.accessibility-target.v1` /
+  `production-accessibility-target-v1` beside the platform-bridge
+  `tetra.surface.accessibility-tree.v1` report. The headless mode uses a
+  deterministic accessibility tree inspector, the Linux mode requires
+  `linux_accessibility_host_bridge_v1` plus the Linux accessibility platform
+  probe, and the wasm32-web mode requires browser accessibility snapshot/mirror
+  evidence. Validators reject unnamed focusable blocks, shuffled focus/read
+  order, desktop ARIA/DOM evidence used as a Linux bridge proof, metadata
+  platform overclaims, and full screen-reader parity claims.
+  The TextBox focus/text input gates
   `scripts/release/surface/surface-headless-text-focus-input-smoke.sh`,
   `scripts/release/surface/surface-linux-x64-real-window-text-focus-input-smoke.sh`,
   and
@@ -1458,7 +1780,18 @@ audit proves that separate checkout state.
   and `TETRA_MACOS_UI_RUNTIME_REPORT`; blocked reports from a Linux host,
   build-only artifacts, metadata-only bundles, native-shell sidecars,
   fake/mock/placeholder reports, runtime-less reports, and `startup_failure`
-  diagnostics are explicit blockers rather than production evidence.
+  diagnostics are explicit blockers rather than production evidence. Build-only
+  Windows artifacts and generic `tetra.ui.v1` runtime reports do not promote
+  Windows Surface. Build-only macOS artifacts, non-notarized production
+  distribution, full accessibility without screen-reader bridge, and generic
+  `tetra.ui.v1` runtime reports do not promote macOS Surface. Surface-specific
+  macOS status is governed by `docs/spec/surface_macos_target_boundary.md` and
+  `tools/cmd/validate-surface-macos-target`, which currently accept a nonclaim
+  boundary or future `BETA_TARGET_HOST_MACOS` evidence only. Surface-specific
+  Windows status is governed by
+  `docs/spec/surface_windows_target_boundary.md` and
+  `tools/cmd/validate-surface-windows-target`, which currently accept a
+  nonclaim boundary or future `BETA_TARGET_HOST_WINDOWS` evidence only.
 - Build-only Linux x86/x32 target metadata uses `run_mode: "host_probed"`:
   `run_supported` is true only when the current host can execute that exact
   ABI (`i386` compatibility for x86, Linux x32 ABI support for x32), and

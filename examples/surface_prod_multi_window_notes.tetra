@@ -1,0 +1,42 @@
+// Production Surface example shape: multi_window_notes.
+module examples.surface_prod_multi_window_notes
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func production_example_shape() -> Int:
+    return 3306
+
+func performance_budget_ok(block_count: Int, asset_count: Int) -> Bool:
+    return morph.memory_budget_ok(block_count, asset_count, 32768)
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 520, h: 320)
+    let note_rect: surface.Rect = surface.Rect(x: 28, y: 42, w: 220, h: 160)
+    let side_rect: surface.Rect = surface.Rect(x: 270, y: 42, w: 190, h: 160)
+    var tree: block.BlockTree = block.tree_init(5)
+    let root: Int = block.tree_add_root(tree, morph.expand_region_panel(1, -1, root_rect, 18), root_rect)
+    let note: Int = block.tree_add_child(tree, block.id(1), morph.expand_field_text(2, 1, 4, note_rect, 28, 12), note_rect)
+    let side: Int = block.tree_add_child(tree, block.id(1), morph.expand_control_action(3, 1, side_rect, 14, 9601, false), side_rect)
+    let recipe: morph.Recipe = morph.recipe_region_panel()
+    let expansion: morph.RecipeExpansion = morph.recipe_expansion(recipe, block.id(1))
+    let event: block.EventSpec = block.event_click(block.action_primary())
+    let state: block.StateSelector = block.state_selector_focused()
+    let motion: block.MotionSpec = block.motion_fast()
+    let primary: surface.ShellWindowSpec = surface.shell_window_spec(12, 520, 320, 360, 240, surface.shell_window_resizable())
+    let secondary: surface.ShellWindowSpec = surface.shell_window_spec(10, 360, 260, 300, 220, surface.shell_window_resizable())
+    if root == 1 && note == 2 && side == 3 &&
+       block.tree_validate(tree) == block.tree_error_ok() &&
+       morph.recipe_expands_to_block(recipe) &&
+       morph.expansion_valid(expansion) &&
+       event.key_action > 0 &&
+       block.state_selector_matches(state, state) &&
+       block.motion_duration(motion) > 0 &&
+       block.accessibility_focusable_has_name(block.accessibility_textbox_labelled_by(28, block.id(4))) &&
+       surface.shell_window_spec_valid(primary) &&
+       surface.shell_window_spec_valid(secondary) &&
+       performance_budget_ok(3, 1):
+        return 0
+    return 1

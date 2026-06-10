@@ -1,0 +1,6 @@
+{
+  "id": "editor",
+  "title": "Editor shell",
+  "blocks": ["toolbar", "tab-strip", "gutter", "text-surface", "diagnostic-panel"],
+  "interaction": "type select command"
+}

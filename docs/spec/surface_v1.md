@@ -5,6 +5,18 @@ browser-canvas release scope. Headless is a release evidence target.
 macOS/Windows Surface and wasm32-wasi Surface UI are not production-supported
 in this release.
 
+macOS uses the `docs/spec/surface_macos_target_boundary.md` nonclaim/beta
+contract: `tetra.surface.macos-target.v1` and
+`validate-surface-macos-target` reject build-only macOS artifacts,
+linux-host synthetic reports, non-notarized production distribution, full
+accessibility without screen-reader bridge, and production claims without real
+macOS target-host Surface evidence. Windows uses the
+`docs/spec/surface_windows_target_boundary.md` nonclaim/beta contract:
+`tetra.surface.windows-target.v1` and
+`validate-surface-windows-target` reject build-only Windows artifacts,
+linux-host synthetic reports, and production claims without real Windows
+target-host Surface evidence.
+
 This is the release contract for the Tetra Surface Object System in the
 bounded `surface-v1-linux-web` scope: pure-Tetra user UI, tiny Surface Host ABI,
 software RGBA framebuffer presentation, production widget subset, text/input
@@ -24,12 +36,76 @@ strict validator evidence.
 The next Surface architecture track is the experimental
 `ui.surface-block-system`: a Block-first Surface architecture where `Block` is
 the core Surface primitive for layout, paint, text, images/assets,
-input/events, state selectors, motion, and accessibility metadata. This remains
+input/events, state selectors, motion, and accessibility metadata. The
+experimental `tetra.surface.block-abi.v1` evidence freezes the Block-facing ABI:
+`lib.core.block.Block`, `lib.core.block.BlockTree`, `lib.core.block.BlockProps`,
+`tetra.surface.renderer.ResolvedBlock`, and
+`tetra.surface.renderer.ResolvedScene`. The paired
+`tetra.surface.resolved-scene.v1` evidence records stable tree, draw, hit-test,
+focus, and accessibility order for the renderer boundary. The
+`tetra.surface.layout-engine.v1` evidence records deterministic-responsive
+layout for row, column, stack, grid, dock, absolute, overlay, and scroll modes;
+min/max/fit/fill/fixed constraints; DPI/density-independent sizing; explicit
+overflow, clip, and scroll rules; resize/scroll invalidation traces; bounded
+layout cache evidence; and app shell/settings forms/dashboards/editor shells
+resize stability. The validator rejects CSS flexbox/grid parity claims,
+accidental overflow-hidden behavior, unbounded layout cache evidence, and
+missing DPI/density evidence. The
+`tetra.surface.renderer-scene.v1` evidence records the deterministic
+`tetra.surface.paint-command.v1` command buffer for fill, gradient, border,
+radius, shadow, outline, image, text, clip, and transform commands, including
+command order, command hash, per-command checksums, and rejected blur/backdrop
+blur nonclaims. The companion `tetra.surface.software-renderer.v1` evidence
+records deterministic software RGBA raster output, source-over alpha blending,
+scissor clipping, pixel/repeat/golden checksums, golden artifact paths,
+resize/scale/DPI facts, use-after-present rejection, frame-alias rejection, and
+fake renderer promotion rejection. This remains
 experimental and is not current Surface v1 production support. The current
 evidence is scoped to same-commit `tetra.surface.block-system.gate.v1` reports,
 validators, artifact hashes, and Block memory-budget evidence under
 `reports/surface-block/p18-budget`; it does not create a production Block
 claim.
+
+The Block System app model is recorded as `tetra.surface.app-model.v1` at
+`production-app-model-v1` level. It replaces React-style app-state ergonomics
+inside the scoped Surface architecture with owned state stores, typed command
+dispatch, ordered Block event traces, safe actor/task async command boundaries,
+graph-derived navigation/focus scopes, scoped shortcuts, propagated command
+errors, and explicit redraw invalidation. The required acceptance surfaces are
+command palette, dashboard, settings, and editor shell. The validator rejects
+missing event traces, disabled dispatch, text input delivered to an unfocused
+Block, unsafe actor/task boundaries, and React runtime claims.
+
+Keyboard UX evidence is recorded as `tetra.surface.keyboard-ux.v1` at
+`production-keyboard-ux-v1` level. It covers graph focus order, overlay focus
+traps, roving focus, keyboard activation, scoped shortcut conflict diagnostics,
+bounded undo/redo stacks, and keyboard-only scripts for command palette, search,
+settings, and editor shell surfaces. The validator rejects focusable elements
+without accessible names, overlay focus leaks, shortcut conflicts that are not
+diagnosed, pointer-only actions, unknown shortcuts, and undo/redo commands
+without a stack. This is not a screen-reader parity or native widget claim.
+
+App shell host ABI evidence is recorded as `tetra.surface.app-shell.v1` at
+`production-app-shell-host-abi-v1` level. It covers windows, lifecycle, menus,
+context menus, dialogs/file pickers, tray/status items, notifications, cursors,
+drag/drop, permissions, clipboard, IME, DPI/scale, and open URL/file requests.
+Every supported capability requires target-host action traces. Unsupported host
+features must report rejected diagnostics with `silent_noop:false`; menu claims
+without host traces and notification claims without delivered host reports are
+rejected. This is still part of the experimental Block System evidence track,
+not a broad desktop production promotion.
+
+Asset pipeline evidence is recorded as `tetra.surface.asset-pipeline.v1` at
+`production-asset-pipeline-v1` level. It covers local font/icon/image/vector
+manifests, sha256 hashes before decode, `safe-local-asset-decoders-v1`,
+font-table hash verification, icon tinting, bounded PNG raster decode,
+static SVG Tiny vector sanitization, bounded-lru asset cache evidence, missing
+asset fallback diagnostics, unsafe SVG rejection, remote font rejection,
+network asset rejection, and oversized raster rejection. The full schema is
+defined in `docs/spec/surface_asset_pipeline.md`. This is scoped asset
+evidence inside the experimental Block System track, not a claim for network
+assets, remote fonts, untrusted SVG scripting, full SVG/CSS/SMIL, arbitrary
+image codecs, or production Block support.
 
 In that model, a button-like, card-like, input-like, sidebar-like, or modal-like
 control is a `Block` configuration with properties and behavior. `Button`,
@@ -53,6 +129,46 @@ loop counts, frame buffer bytes, paint/text/asset cache usage, cache budgets,
 and an explicit performance nonclaim. RSS is optional host evidence and is not
 required for this scoped budget. This is not an official benchmark against
 Electron or any other desktop shell.
+
+Block motion reports for `examples/surface_block_motion.tetra` now require
+`animation_scheduler` evidence with schema
+`tetra.surface.animation-scheduler.v1` and level
+`production-animation-scheduler-v1`. The scheduler binds deterministic motion
+frames to `deterministic-motion-frame-scheduler-v1`,
+`stable-motion-timeline-v1`, `motion-dirty-block-invalidation-v1`,
+`start-interpolate-settle-stop-v1`, `instant-settle-no-schedule-v1`, frame
+timing evidence, reduced-motion evidence, visual delta evidence, target smoke
+rows, and negative guards for hidden animation loops, missing reduced motion,
+missing frame timing, unbounded frame schedules, unchanged visual frames, and
+CSS animation parity claims. It is not a CSS animation runtime or GPU
+compositor timing claim.
+
+Developer inspector snapshots are recorded as
+`tetra.surface.inspector-snapshot.v1` at `surface-inspector-json-mvp-v1`
+level. The JSON-first inspector exports Block tree, Morph style resolution or
+Block-only style diagnostic, layout boxes, paint layers, event routing, focus
+order, accessibility nodes, performance counters, and source locations from a
+valid Surface runtime report. The standalone generator is
+`tools/cmd/surface-inspect`, the validator is
+`tools/cmd/validate-surface-inspector-snapshot`, and the user-facing wrapper is
+`tetra surface inspect`. This remains an experimental developer workflow slice:
+docs-only trees, missing source locations, missing layout boxes, missing
+accessibility views, missing performance counters, and browser devtools parity
+claims are rejected, while interactive devtools UI, perfect source maps, and
+production profiler claims remain nonclaims.
+
+Surface visual regression reports are recorded as
+`tetra.surface.visual-regression.v1` at `surface-visual-golden-v1` level.
+`tools/cmd/surface-golden` renders deterministic software RGBA golden PNG,
+current PNG, and diff PNG artifacts for the required command-palette,
+dashboard, settings, editor, and glass scenes. Each scene records the source
+scene hash, target, renderer version, frame checksum, font manifest hash, and
+asset manifest hash. `tools/cmd/validate-surface-visual-report` and
+`scripts/release/surface/visual-gate.sh` reject screenshot-only evidence
+without a scene hash, missing baselines, tampered PNG checksums, and changed
+goldens without the `surface-visual-review-approved` review marker. This is not
+Electron/Chromium pixel parity, CSS browser rendering parity, or GPU compositor
+parity. It does not promote the Block System support level.
 
 The strict Block gate is:
 
@@ -108,6 +224,9 @@ let root: block.Block = block.make(id, block.id_none(), props)
   browser-canvas release path with compiler-owned boot and no user JS/DOM UI.
 - Browser Surface forbids DOM UI and user JS. A compiler-owned minimal boot
   layer may be reported only as boot, not as UI or user application logic.
+  `docs/spec/surface_web_browser_canvas.md` defines the required
+  `tetra.surface.browser-canvas-target.v1` object for
+  `wasm32-web-first-class-browser-canvas-target-v1` evidence.
 
 ## Core Types
 
@@ -195,8 +314,10 @@ buffers through `poll_event_text_into`; no borrowed host text lifetime is
 exposed to user code. The first editable TextBox milestone is pure Tetra:
 focus routing, focused keyboard routing, component-owned byte-buffer insertion,
 caret movement, backspace/delete, and redraw evidence are implemented in
-`examples/surface_textbox_app.tetra`. Full IME composition, clipboard, rich
-text, and a String-level `Event.text_input(str)` model remain future work.
+`examples/surface_textbox_app.tetra`. The production text-input release path
+adds scoped IME/clipboard evidence through `docs/spec/surface_text_editing.md`;
+native platform text controls, rich text, full editor-grade text semantics, and
+a String-level `Event.text_input(str)` model remain unsupported future work.
 
 ## Host ABI
 
@@ -237,6 +358,20 @@ validated.
 Target hosts must not know about `Button`, `Input`, `List`, or any other
 component type. They do not perform layout, hit testing, platform widget
 creation, or text rendering as a platform widget service.
+
+## Renderer Backend Decision
+
+The current renderer production baseline is software RGBA. The GPU/compositor
+path is experimental/nonclaim and is governed by
+`docs/spec/surface_renderer_backend.md`.
+
+`tetra.surface.renderer-backend.v1` records the
+`software-only-prod-go-gpu-experimental` decision as a GPU nonclaim. Under that
+decision, scoped linux/web production can proceed on the software renderer.
+Accelerated renderer promotion is forbidden until target-host backend reports
+prove layer compositing, transforms, clipping, texture atlas,
+vsync/frame timing, fallback behavior, and same-scene equivalence against the
+software baseline.
 
 ## Component Model
 
@@ -291,6 +426,23 @@ text dispatch with caller-owned byte buffers, static focus dispatch, and static
 accessibility metadata inside Tetra component state, not dynamic trait-object
 children, a platform focus manager, full IME/String editing model, clipboard,
 rich text, or platform accessibility API claim.
+
+`docs/spec/surface_text_pipeline.md` defines the current scoped text/glyph
+evidence block embedded in production text-input reports. The block uses
+`tetra.surface.text-pipeline.v1` and records the Tier 1 Latin/UTF-8 shaping
+scope, font manifest hashes, fallback chain, glyph runs, bounded glyph cache,
+Unicode scalar and cluster boundaries, deterministic measurement consistency,
+wrap/ellipsis/alignment/baseline evidence, caret and selection rectangles, and
+IME composition spans. Unsupported complex scripts, bidi shaping, platform
+widget text controls, and full Unicode editor semantics remain explicit
+nonclaims until wider shaping-tier evidence exists.
+
+`docs/spec/surface_text_editing.md` defines the current scoped text-editing
+evidence block embedded in production text-input reports. The block uses
+`tetra.surface.text-editing.v1` and records owned editable TextBox storage,
+forms and command palette search safety, target IME traces, clipboard owned-copy
+transfers, selection replacement, undo unit boundaries, validation diagnostics,
+and explicit rich text nonclaim enforcement.
 
 ## Component Tree Evidence
 
@@ -362,9 +514,9 @@ Column/Row layout helper use, focus helper traversal including
 `ResetButton -> TextBox`, helper-routed hit tests, and dispatch path helper
 output for TextBox, SubmitButton, and ResetButton. This hardening milestone is
 not a final trait-object ABI, not witness-table dispatch, not a reactive tree,
-not virtual DOM, not a production widget toolkit, not full IME, not clipboard,
-not rich text, not a platform accessibility tree, not a GPU renderer, not
-Windows/macOS Surface, and not production Surface promotion.
+not virtual DOM, not a production widget toolkit, not native text-control
+integration, not rich text, not a platform accessibility tree, not a GPU
+renderer, not Windows/macOS Surface, and not production Surface promotion.
 
 The validator rejects missing or fake tree evidence, path claims that skip a
 parent container, unknown IDs, non-leaf click targets, child bounds outside a
@@ -429,9 +581,10 @@ backspace/delete, Tab focus cycling
 routed through focused root-to-leaf paths, Reset clearing the TextBox,
 StatusText updates, resize relayout, and changed frame checksums on headless,
 linux-x64 real-window, and wasm32-web browser-canvas targets. It remains
-experimental minimal widget evidence; no IME, no clipboard, no rich text, no
-platform accessibility integration, no reactive UI framework support, and no
-production Surface toolkit support are claimed.
+experimental minimal widget evidence; it does not add new IME or clipboard host
+semantics beyond the scoped `ui.surface-text-input-v1` evidence, and it does
+not claim rich text, platform accessibility integration, reactive UI framework
+support, or production Surface toolkit support.
 
 ## Toolkit Hardening + Reuse v1
 
@@ -487,9 +640,10 @@ TextBox mutation, missing StatusText updates, resize claims without changed
 bounds, unchanged frame checksums, Node-only browser claims, DOM/user-JS
 claims, and missing artifact scans.
 
-This milestone is still experimental. It does not include IME, clipboard, rich
-text, Unicode grapheme editing, platform accessibility host trees, GPU
-rendering, a virtual DOM, dynamic trait-object widgets, witness-table
+This milestone is still experimental. It does not include new IME or clipboard
+host semantics beyond the scoped `ui.surface-text-input-v1` evidence, and it
+does not claim rich text, Unicode grapheme editing, platform accessibility host
+trees, GPU rendering, a virtual DOM, dynamic trait-object widgets, witness-table
 component dispatch, or production toolkit promotion.
 
 ## Accessibility Metadata Tree v1
@@ -554,10 +708,29 @@ DOM/ARIA or user-JS evidence, legacy `.ui.*` sidecars, platform accessibility
 host claims, no screen-reader claims, and no production accessibility claims;
 those claims are rejected, not promoted.
 
-The evidence runs on headless, linux-x64 real-window, and wasm32-web
-browser-canvas/input targets. It remains experimental metadata evidence;
-production accessibility support, platform accessibility integration, browser
-ARIA/DOM accessibility, and screen-reader validation are not claimed.
+The `examples/surface_accessibility_settings.tetra` evidence runs on headless,
+linux-x64 real-window, and wasm32-web browser-canvas/input targets as
+experimental metadata evidence.
+
+Release accessibility evidence uses
+`examples/surface_release_accessibility.tetra` and upgrades the tree to
+`accessibility_level = platform-bridge-v1`. Those reports must add
+`accessibility_target.schema = tetra.surface.accessibility-target.v1` with
+`level = production-accessibility-target-v1`, `release_scope =
+surface-v1-linux-web`, role/name/state/action/order/snapshot counts derived
+from the same tree, and target-specific inspector evidence:
+
+- `headless`: `deterministic-accessibility-tree-inspector-v1`;
+- `linux-x64`: `linux-accessibility-platform-probe-v1` plus
+  `linux_accessibility_host_bridge_v1`;
+- `wasm32-web`: `browser-accessibility-snapshot-mirror-v1` plus browser
+  accessibility snapshot/mirror evidence.
+
+The target object rejects unnamed focusable blocks, shuffled focus/read order,
+metadata platform overclaims, desktop ARIA/DOM evidence used as a Linux bridge
+proof, and full AT-SPI or full screen-reader parity without real screen-reader
+validation. macOS and Windows accessibility remain unsupported Surface v1
+claims.
 
 ## Evidence
 
@@ -627,6 +800,16 @@ checksums, and strict validator rejection for:
   snapshots for text, focus, save, reset, and resize, metadata and bounds
   checksum changes, or rejection of production/platform-host/DOM/ARIA/
   screen-reader/user-JS/Node-only/legacy-sidecar/manual-bookkeeping evidence.
+- for `examples/surface_release_accessibility.tetra`, missing
+  `accessibility_tree.accessibility_level = platform-bridge-v1`, missing
+  `accessibility_target` schema `tetra.surface.accessibility-target.v1`,
+  missing `production-accessibility-target-v1`, mismatched target/runtime/tree
+  bridge evidence, missing Linux accessibility host bridge/probe evidence,
+  missing browser accessibility snapshot/mirror evidence for wasm32-web,
+  mismatched role/name/state/action/focus/reading/snapshot counts, unnamed
+  focusable nodes, shuffled focus or reading order, desktop ARIA/DOM evidence
+  used as a Linux bridge proof, metadata platform overclaims, or full
+  screen-reader/AT-SPI parity claims.
 
 `host_evidence` names the evidence level and backend instead of relying only on
 target names:
@@ -635,6 +818,7 @@ target names:
 {"level":"deterministic-headless","backend":"software-rgba","framebuffer":true,"real_window":false,"native_input":false,"user_facing_platform_widgets":false}
 {"level":"linux-x64-memfd-starter","backend":"memfd-rgba","framebuffer":true,"real_window":false,"native_input":false,"user_facing_platform_widgets":false}
 {"level":"linux-x64-real-window","backend":"wayland-shm-rgba","framebuffer":true,"real_window":true,"native_input":true,"user_facing_platform_widgets":false}
+{"level":"linux-x64-release-window-v1","backend":"wayland-shm-rgba-release-v1","framebuffer":true,"real_window":true,"native_input":true,"text_input":true,"clipboard":true,"composition":true,"accessibility_bridge":true,"user_facing_platform_widgets":false}
 {"level":"wasm32-web-compiler-owned-loader","backend":"node-surface-host","framebuffer":true,"real_window":false,"native_input":false,"user_facing_platform_widgets":false}
 {"level":"wasm32-web-browser-canvas-input","backend":"browser-canvas-rgba","framebuffer":true,"real_window":false,"native_input":true,"user_facing_platform_widgets":false}
 ```
@@ -650,6 +834,14 @@ satisfied by the memfd starter: an app process named like
 `linux-x64 real-window resize event`, and `linux-x64 real-window close event`
 case evidence, plus a presented 400x240 frame checksum.
 
+The Linux production host adapter is stricter than the older real-window
+promotion level. `docs/spec/surface_linux_host_adapter.md` defines the required
+`tetra.surface.linux-host-adapter.v1` object with
+`linux-x64-production-host-adapter-v1` evidence, app-shell ABI linkage,
+clipboard/IME/composition/accessibility traces, and
+`linux-x64-unpacked-binary-v1` packaging scope. A blocked display run must
+remain a blocked report and must not be counted as pass evidence.
+
 The first required scripts are:
 
 ```text
@@ -657,6 +849,7 @@ scripts/release/surface/gate.sh
 scripts/release/surface/surface-headless-smoke.sh
 scripts/release/surface/surface-linux-x64-smoke.sh
 scripts/release/surface/surface-linux-x64-real-window-smoke.sh
+scripts/release/surface/surface-linux-x64-release-window-smoke.sh
 scripts/release/surface/surface-wasm32-web-smoke.sh
 scripts/release/surface/surface-wasm32-web-browser-canvas-smoke.sh
 scripts/release/surface/surface-headless-minimal-toolkit-smoke.sh
@@ -846,6 +1039,12 @@ import allowlist, hashed `.wasm`, compiler-owned loader, and runner-trace
 artifacts, plus the same no-legacy-sidecar scan. Starter Node evidence,
 DOM-only/user-JS evidence, metadata-only evidence, build-only evidence, fake,
 stale, and legacy `.ui.*` sidecars do not satisfy this evidence level.
+The release browser-canvas target additionally requires
+`browser_canvas_target.schema:"tetra.surface.browser-canvas-target.v1"` with
+`level:"wasm32-web-first-class-browser-canvas-target-v1"`, compiler-owned boot,
+frame checksum, event, artifact, accessibility snapshot/mirror, and rejection
+evidence for DOM snapshot renderer promotion and user script command dispatch
+promotion.
 The companion
 `surface-wasm32-web-browser-canvas-text-focus-input-smoke.sh` builds
 `examples/surface_textbox_app.tetra`, dispatches real browser pointer,

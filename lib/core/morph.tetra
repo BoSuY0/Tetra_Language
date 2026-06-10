@@ -1,5 +1,13 @@
 // Experimental Surface Morph Capsule layer.
 // Morph recipes project into lib.core.block Blocks; they do not add runtime primitives.
+// Effects: none
+// ```tetra doctest
+// func morph_doctest() -> Int:
+//     let recipe: lib.core.morph.Recipe = lib.core.morph.recipe_control_action()
+//     if lib.core.morph.recipe_expands_to_block(recipe):
+//         return 1
+//     return 0
+// ```
 module lib.core.morph
 
 import lib.core.surface as surface
@@ -55,6 +63,8 @@ struct Recipe:
     output_kind: Int
     slot_count: Int
     input_count: Int
+    state_count: Int
+    a11y_projection_count: Int
     hidden_app_state: Bool
     platform_widgets: Bool
     core_primitive_promotion: Bool
@@ -68,6 +78,21 @@ struct RecipeExpansion:
     reported: Bool
     deterministic: Bool
     used_block_graph: Bool
+
+struct StyleGraphContract:
+    css_replacement_level: Int
+    token_category_count: Int
+    override_order_hash: Int
+    conflict_diagnostic_count: Int
+    guard_flags: Int
+
+struct AuthoringContract:
+    level: Int
+    recipe_count: Int
+    polished_recipe_count: Int
+    max_author_fields: Int
+    raw_block_field_count: Int
+    guard_flags: Int
 
 func schema_v1() -> Int:
     return 1001
@@ -87,6 +112,9 @@ func token_color() -> Int:
 func token_space() -> Int:
     return 2
 
+func token_spacing() -> Int:
+    return 12
+
 func token_radius() -> Int:
     return 3
 
@@ -101,6 +129,9 @@ func token_opacity() -> Int:
 
 func token_typography() -> Int:
     return 7
+
+func token_type() -> Int:
+    return 13
 
 func token_motion() -> Int:
     return 8
@@ -126,14 +157,55 @@ func recipe_command_item_hash() -> Int:
 func recipe_region_panel_hash() -> Int:
     return 1104
 
+func recipe_control_toggle_hash() -> Int:
+    return 1105
+
+func recipe_navigation_item_hash() -> Int:
+    return 1106
+
+func recipe_overlay_dialog_hash() -> Int:
+    return 1107
+
+func recipe_navigation_tabs_hash() -> Int:
+    return 1108
+
+func recipe_collection_list_hash() -> Int:
+    return 1109
+
+func recipe_collection_table_lite_hash() -> Int:
+    return 1110
+
+func recipe_status_message_hash() -> Int:
+    return 1111
+
+func css_replacement_level_candidate_v1() -> Int:
+    return 2101
+
+func recipe_authoring_candidate_v1() -> Int:
+    return 2201
+
+func production_recipe_authoring_v1() -> Int:
+    return 2202
+
+func override_order_hash_v1() -> Int:
+    return 2301
+
+func style_graph_guard_flags_v1() -> Int:
+    return 31
+
+func authoring_guard_flags_v1() -> Int:
+    return 63
+
 func token_ref(category: Int, index: Int, hash: Int) -> TokenRef:
     return TokenRef(category: category, index: index, hash: hash)
 
 func token_category_supported(category: Int) -> Bool:
     return category == token_color() || category == token_space() ||
+           category == token_spacing() ||
            category == token_radius() || category == token_border() ||
            category == token_elevation() || category == token_opacity() ||
-           category == token_typography() || category == token_motion() ||
+           category == token_typography() || category == token_type() ||
+           category == token_motion() ||
            category == token_z() || category == token_asset() ||
            category == token_density()
 
@@ -141,13 +213,13 @@ func token_valid(token: TokenRef) -> Bool:
     return token_category_supported(token.category) && token.index >= 0 && token.hash > 0
 
 func capsule_default() -> Capsule:
-    return Capsule(schema: schema_v1(), version: 1, token_graph_hash: 760031, recipe_count: 4, explicit_imports: true, isolated_scope: true, no_global_cascade: true, alias_cycle_rejected: true, duplicate_recipe_rejected: true, output_kind: output_block())
+    return Capsule(schema: schema_v1(), version: 1, token_graph_hash: 760031, recipe_count: 11, explicit_imports: true, isolated_scope: true, no_global_cascade: true, alias_cycle_rejected: true, duplicate_recipe_rejected: true, output_kind: output_block())
 
 func capsule_valid(capsule: Capsule) -> Bool:
     return capsule.schema == schema_v1() &&
            capsule.version == 1 &&
            capsule.token_graph_hash > 0 &&
-           capsule.recipe_count == 4 &&
+           capsule.recipe_count == 11 &&
            capsule.explicit_imports &&
            capsule.isolated_scope &&
            capsule.no_global_cascade &&
@@ -208,22 +280,45 @@ func motion_preset_valid(preset: MotionPreset) -> Bool:
     return preset.duration_ms >= 0 && preset.easing == block.motion_ease_standard() && preset.deterministic_clock && preset.reduced_motion_supported
 
 func recipe_control_action() -> Recipe:
-    return Recipe(name_hash: recipe_control_action_hash(), output_kind: output_block(), slot_count: 8, input_count: 4, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+    return Recipe(name_hash: recipe_control_action_hash(), output_kind: output_block(), slot_count: 2, input_count: 4, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
 
 func recipe_field_text() -> Recipe:
-    return Recipe(name_hash: recipe_field_text_hash(), output_kind: output_block(), slot_count: 8, input_count: 6, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+    return Recipe(name_hash: recipe_field_text_hash(), output_kind: output_block(), slot_count: 2, input_count: 6, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
 
 func recipe_command_item() -> Recipe:
-    return Recipe(name_hash: recipe_command_item_hash(), output_kind: output_block(), slot_count: 8, input_count: 6, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+    return Recipe(name_hash: recipe_command_item_hash(), output_kind: output_block(), slot_count: 3, input_count: 6, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
 
 func recipe_region_panel() -> Recipe:
-    return Recipe(name_hash: recipe_region_panel_hash(), output_kind: output_block(), slot_count: 8, input_count: 4, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+    return Recipe(name_hash: recipe_region_panel_hash(), output_kind: output_block(), slot_count: 3, input_count: 4, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_control_toggle() -> Recipe:
+    return Recipe(name_hash: recipe_control_toggle_hash(), output_kind: output_block(), slot_count: 2, input_count: 4, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_navigation_item() -> Recipe:
+    return Recipe(name_hash: recipe_navigation_item_hash(), output_kind: output_block(), slot_count: 2, input_count: 3, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_overlay_dialog() -> Recipe:
+    return Recipe(name_hash: recipe_overlay_dialog_hash(), output_kind: output_block(), slot_count: 3, input_count: 4, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_navigation_tabs() -> Recipe:
+    return Recipe(name_hash: recipe_navigation_tabs_hash(), output_kind: output_block(), slot_count: 2, input_count: 4, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_collection_list() -> Recipe:
+    return Recipe(name_hash: recipe_collection_list_hash(), output_kind: output_block(), slot_count: 2, input_count: 4, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_collection_table_lite() -> Recipe:
+    return Recipe(name_hash: recipe_collection_table_lite_hash(), output_kind: output_block(), slot_count: 3, input_count: 4, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
+
+func recipe_status_message() -> Recipe:
+    return Recipe(name_hash: recipe_status_message_hash(), output_kind: output_block(), slot_count: 2, input_count: 3, state_count: 2, a11y_projection_count: 3, hidden_app_state: false, platform_widgets: false, core_primitive_promotion: false, deterministic: true)
 
 func recipe_safe(recipe: Recipe) -> Bool:
     return recipe.name_hash > 0 &&
            recipe.output_kind == output_block() &&
            recipe.slot_count <= 8 &&
            recipe.input_count > 0 &&
+           recipe.state_count > 0 &&
+           recipe.a11y_projection_count > 0 &&
            !recipe.hidden_app_state &&
            !recipe.platform_widgets &&
            !recipe.core_primitive_promotion &&
@@ -243,6 +338,28 @@ func expansion_valid(expansion: RecipeExpansion) -> Bool:
            expansion.reported &&
            expansion.deterministic &&
            expansion.used_block_graph
+
+func style_graph_contract_default() -> StyleGraphContract:
+    return StyleGraphContract(css_replacement_level: css_replacement_level_candidate_v1(), token_category_count: 13, override_order_hash: override_order_hash_v1(), conflict_diagnostic_count: 10, guard_flags: style_graph_guard_flags_v1())
+
+func style_graph_contract_valid(contract: StyleGraphContract) -> Bool:
+    return contract.css_replacement_level == css_replacement_level_candidate_v1() &&
+           contract.token_category_count == 13 &&
+           contract.override_order_hash == override_order_hash_v1() &&
+           contract.conflict_diagnostic_count >= 10 &&
+           contract.guard_flags == style_graph_guard_flags_v1()
+
+func authoring_contract_default() -> AuthoringContract:
+    return AuthoringContract(level: production_recipe_authoring_v1(), recipe_count: 11, polished_recipe_count: 11, max_author_fields: 12, raw_block_field_count: 80, guard_flags: authoring_guard_flags_v1())
+
+func authoring_contract_valid(contract: AuthoringContract) -> Bool:
+    return contract.level == production_recipe_authoring_v1() &&
+           contract.recipe_count == 11 &&
+           contract.polished_recipe_count >= 11 &&
+           contract.max_author_fields > 0 &&
+           contract.max_author_fields <= 16 &&
+           contract.raw_block_field_count >= 80 &&
+           contract.guard_flags == authoring_guard_flags_v1()
 
 func accent() -> surface.Color:
     return surface.Color(r: 96, g: 174, b: 244, a: 255)
@@ -340,4 +457,13 @@ func capsule_self_check() -> Bool:
            recipe_safe(recipe_control_action()) &&
            recipe_safe(recipe_field_text()) &&
            recipe_safe(recipe_command_item()) &&
-           recipe_safe(recipe_region_panel())
+           recipe_safe(recipe_region_panel()) &&
+           recipe_safe(recipe_control_toggle()) &&
+           recipe_safe(recipe_navigation_item()) &&
+           recipe_safe(recipe_overlay_dialog()) &&
+           recipe_safe(recipe_navigation_tabs()) &&
+           recipe_safe(recipe_collection_list()) &&
+           recipe_safe(recipe_collection_table_lite()) &&
+           recipe_safe(recipe_status_message()) &&
+           style_graph_contract_valid(style_graph_contract_default()) &&
+           authoring_contract_valid(authoring_contract_default())

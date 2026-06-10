@@ -1,0 +1,6 @@
+{
+  "id": "command-palette",
+  "title": "Command palette",
+  "blocks": ["overlay", "search-input", "command-row", "shortcut-badge", "empty-state"],
+  "interaction": "open search select"
+}

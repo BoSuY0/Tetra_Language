@@ -618,10 +618,7 @@ func validateArtifactIntegrity(reportDir string, report surface.Report) error {
 		if path == "" {
 			continue
 		}
-		actualPath := path
-		if !filepath.IsAbs(actualPath) {
-			actualPath = filepath.Join(reportDir, actualPath)
-		}
+		actualPath := resolveReportEvidencePath(reportDir, path)
 		size, digest, err := hashFile(actualPath)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("artifact integrity %s: %v", path, err))
@@ -648,6 +645,25 @@ func validateArtifactIntegrity(reportDir string, report surface.Report) error {
 		return errors.New(strings.Join(issues, "; "))
 	}
 	return nil
+}
+
+func resolveReportEvidencePath(reportDir string, path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return path
+	}
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path)
+	}
+	cleanPath := filepath.Clean(path)
+	reportRelative := filepath.Join(reportDir, cleanPath)
+	if _, err := os.Stat(reportRelative); err == nil {
+		return reportRelative
+	}
+	if _, err := os.Stat(cleanPath); err == nil {
+		return cleanPath
+	}
+	return reportRelative
 }
 
 func validateCompilerOwnedLoaderArtifact(path string) error {
@@ -988,10 +1004,7 @@ func validateArtifactScanIntegrity(reportDir string, report surface.Report) erro
 	if root == "" {
 		return nil
 	}
-	actualRoot := root
-	if !filepath.IsAbs(actualRoot) {
-		actualRoot = filepath.Join(reportDir, actualRoot)
-	}
+	actualRoot := resolveReportEvidencePath(reportDir, root)
 	filesChecked, forbiddenPaths, err := scanArtifactFiles(actualRoot, compilerOwnedLoaderPaths(reportDir, report.Artifacts))
 	if err != nil {
 		return fmt.Errorf("artifact_scan integrity %s: %v", root, err)
@@ -1019,9 +1032,7 @@ func compilerOwnedLoaderPaths(reportDir string, artifacts []surface.ArtifactRepo
 		if path == "" {
 			continue
 		}
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(reportDir, path)
-		}
+		path = resolveReportEvidencePath(reportDir, path)
 		paths[filepath.Clean(path)] = true
 	}
 	return paths

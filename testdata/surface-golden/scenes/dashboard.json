@@ -1,0 +1,6 @@
+{
+  "id": "dashboard",
+  "title": "Dashboard",
+  "blocks": ["sidebar", "metric-card", "chart-panel", "activity-list", "status-pill"],
+  "interaction": "resize filter drilldown"
+}

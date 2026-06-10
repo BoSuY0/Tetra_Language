@@ -1,0 +1,58 @@
+// Scoped localized Surface app example: string IDs, locale resources, and
+// layout direction metadata without claiming full bidi shaping.
+module examples.surface_i18n_dashboard
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.i18n as i18n
+
+func panel_color() -> surface.Color:
+    return surface.Color(r: 34, g: 39, b: 46, a: 255)
+
+func accent_color() -> surface.Color:
+    return surface.Color(r: 72, g: 165, b: 255, a: 255)
+
+func make_label(id_value: Int, parent_value: Int, rect: surface.Rect, text_len: Int, direction: Int) -> block.Block:
+    var align: Int = block.text_align_start()
+    if direction == i18n.direction_rtl():
+        align = block.text_align_end()
+    let text: block.TextSpec = block.text_styled(text_len, surface.Color(r: 244, g: 247, b: 250, a: 255), block.text_family_ui(), 16, 700, 22, align, block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    let props: block.BlockProps = block.props(block.layout_fixed(rect), block.paint_empty(), text, block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(text_len), block.asset_none())
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func localized_scene(locale: i18n.Locale, resource: i18n.LocaleResource) -> Int
+uses alloc, mem:
+    let title_id: i18n.StringID = i18n.string_id(1, 10)
+    let status_id: i18n.StringID = i18n.string_id(1, 11)
+    let policy: i18n.LocalizationPolicy = i18n.localization_policy(3, true, true, false, false, locale.direction, false)
+    let formats: i18n.FormatPolicy = i18n.format_policy(true, true, true, false)
+    let title_len: Int = i18n.localized_text_len(resource, title_id, 12)
+    let status_len: Int = i18n.localized_text_len(resource, status_id, 12)
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 420, h: 220)
+    let title_rect: surface.Rect = surface.Rect(x: 28, y: 28, w: 364, h: 32)
+    let status_rect: surface.Rect = surface.Rect(x: 28, y: 74, w: 364, h: 28)
+    var tree: block.BlockTree = block.tree_init(4)
+    let root_props: block.BlockProps = block.props(block.layout_column(root_rect, 12), block.paint_stack3(block.paint_layer_fill_radius(panel_color(), 12), block.paint_layer_border(accent_color(), 1, 12), block.paint_layer_shadow(surface.Color(r: 0, g: 0, b: 0, a: 64), 14, 0, 6)), block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(18), block.asset_none())
+    let root: Int = block.tree_add_root(tree, block.make(block.id(1), block.id_none(), root_props), root_rect)
+    let title: Int = block.tree_add_child(tree, block.id(1), make_label(2, 1, title_rect, title_len, locale.direction), title_rect)
+    let status: Int = block.tree_add_child(tree, block.id(1), make_label(3, 1, status_rect, status_len, locale.direction), status_rect)
+    let valid: Int = block.tree_validate(tree)
+    if root == 1 && title == 2 && status == 3 && valid == block.tree_error_ok() &&
+       i18n.locale_valid(locale) &&
+       i18n.locale_resource_valid(resource) &&
+       i18n.localization_policy_valid(policy) &&
+       i18n.format_policy_valid(formats):
+        return title_len + status_len + locale.direction - locale.direction
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let english: i18n.LocaleResource = i18n.locale_resource(i18n.locale_en_us(), 5, 4101, true, true)
+    let spanish: i18n.LocaleResource = i18n.locale_resource(i18n.locale_es_es(), 5, 4102, true, true)
+    let arabic: i18n.LocaleResource = i18n.locale_resource(i18n.locale_ar_eg(), 5, 4103, true, true)
+    let en_score: Int = localized_scene(i18n.locale_en_us(), english)
+    let es_score: Int = localized_scene(i18n.locale_es_es(), spanish)
+    let ar_score: Int = localized_scene(i18n.locale_ar_eg(), arabic)
+    if en_score > 0 && es_score > 0 && ar_score > 0:
+        return 0
+    return 1

@@ -136,6 +136,62 @@ jobs:
           report_dir="${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1"
           bash scripts/release/surface/api-stability-gate.sh --report-dir "$report_dir"
 
+      - name: Surface package distribution gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-package-distribution"
+          bash scripts/release/surface/package-gate.sh --report-dir "$report_dir"
+
+      - name: Surface security sandbox gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-security-sandbox"
+          bash scripts/release/surface/security-gate.sh --report-dir "$report_dir"
+
+      - name: Surface IPC lifecycle gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-ipc-lifecycle"
+          bash scripts/release/surface/ipc-lifecycle-gate.sh --report-dir "$report_dir"
+
+      - name: Surface crash diagnostics gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-crash-diagnostics"
+          bash scripts/release/surface/crash-gate.sh --report-dir "$report_dir"
+
+      - name: Surface i18n localization gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-i18n-localization"
+          bash scripts/release/surface/i18n-gate.sh --report-dir "$report_dir"
+
+      - name: Surface performance memory gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-performance-memory"
+          bash scripts/release/surface/perf-gate.sh --report-dir "$report_dir"
+
+      - name: Surface widget migration gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-widget-migration"
+          bash scripts/release/surface/migration-gate.sh --report-dir "$report_dir"
+
+      - name: Surface production final gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${{ steps.meta.outputs.out_dir }}/surface-production-final"
+          bash scripts/release/surface/prod-gate.sh --report-dir "$report_dir"
+
       - name: Integrated Memory/Islands/Surface release gate
         shell: bash
         run: |
@@ -180,6 +236,14 @@ jobs:
             ${{ steps.meta.outputs.out_dir }}/surface-experimental-regression/**
             ${{ steps.meta.outputs.out_dir }}/safe-view-lifetime/**
             ${{ steps.meta.outputs.out_dir }}/surface-api-stability-v1/**
+            ${{ steps.meta.outputs.out_dir }}/surface-package-distribution/**
+            ${{ steps.meta.outputs.out_dir }}/surface-security-sandbox/**
+            ${{ steps.meta.outputs.out_dir }}/surface-ipc-lifecycle/**
+            ${{ steps.meta.outputs.out_dir }}/surface-crash-diagnostics/**
+            ${{ steps.meta.outputs.out_dir }}/surface-i18n-localization/**
+            ${{ steps.meta.outputs.out_dir }}/surface-performance-memory/**
+            ${{ steps.meta.outputs.out_dir }}/surface-widget-migration/**
+            ${{ steps.meta.outputs.out_dir }}/surface-production-final/**
             ${{ steps.meta.outputs.out_dir }}/memory-islands-surface-production/**
             ${{ steps.meta.outputs.out_dir }}/ram-contract-linux-x64/**
             ${{ steps.meta.outputs.out_dir }}/actor-runtime-foundation-linux-x64/**
@@ -211,6 +275,14 @@ jobs:
           RAM Contract Compiler evidence runs the strict Linux-x64 RAM contract release gate before publishing and uploads its `ram-contract-report.json`, `memory-grade-report.json`, `proof-store-summary.json`, `validation-pipeline-coverage.json`, `heap-blockers.json`, `copy-blockers.json`, and `ram-contract-fuzz-oracle.json` evidence.
           Memory production evidence remains Linux-x64 scoped unless a target-specific runtime gate says otherwise.
           Surface v1 release evidence runs the Surface release gate, experimental regression gate, safe-view lifetime gate, and API stability gate before publishing.
+          Surface package distribution evidence runs the scoped package gate and uploads `surface-package-report.json`, package-root artifacts, install smoke evidence, and `artifact-hashes.json`; Windows/macOS signing/notarization and auto-update production remain nonclaims until target-specific evidence exists.
+          Surface security sandbox evidence runs the scoped security gate and uploads `surface-security-report.json`, `surface-permissions.json`, and `artifact-hashes.json`; network/filesystem/clipboard host calls without permission, unsafe assets, user JavaScript, remote code execution, packages without hashes, and untyped IPC remain rejected.
+          Surface IPC/lifecycle evidence runs the scoped IPC lifecycle gate and uploads `surface-ipc-lifecycle-report.json` and `artifact-hashes.json`; Surface handle/frame/event actor transfers, borrowed payload transfer, untyped IPC, and background UI mutation without dispatcher remain rejected.
+          Surface crash diagnostics evidence runs the scoped crash gate and uploads `surface-crash-report.json`, sanitized diagnostic bundles, and `artifact-hashes.json`; swallowed crashes, secret leaks, missing source locations, missing diagnostic bundles, unsurfaced errors, and production dev overlays remain rejected.
+          Surface i18n localization evidence runs the scoped i18n gate and uploads `surface-i18n-report.json`, locale resources, locale manifest, and `artifact-hashes.json`; full bidi shaping, silent locale fallback, full ICU/CLDR, and unsupported host localization claims remain rejected.
+          Surface performance memory evidence runs the scoped perf gate and uploads `surface-perf-report.json`, baseline artifacts, Electron comparison nonclaim artifacts, and `artifact-hashes.json`; unsupported faster-than-Electron claims, fastest UI framework claims, zero memory overhead claims, missing baseline environments, impossible numbers, and unbounded caches remain rejected.
+          Surface widget migration evidence runs the scoped migration gate and uploads `surface-migration-report.json`, existing Surface v1 widget example evidence, widget-to-Block/Morph mapping evidence, and `artifact-hashes.json`; widgets as the core final architecture, breaking Surface v1 examples without migration, missing widget mappings, and deprecation before replacement coverage remain rejected.
+          Surface production final evidence runs `prod-gate.sh`, uploads `surface-production-final/**`, and validates `PROD_STABLE_SCOPED_LINUX_WEB_APP_UI` only when release, Block/Morph, visual, package, security, IPC/lifecycle, crash, i18n, performance, migration, example-suite, API stability, prod-claim governance, artifact hashes, and CI wiring all pass without `continue-on-error`.
           Integrated Memory/Islands/Surface evidence runs the strict integrated gate before publishing and uploads its `memory-islands-surface-production-manifest.json`, `artifact-hashes.json`, `islands-debug-smoke.json`, `island-proof-verifier.json`, and `island-proof-fuzz-summary.json` evidence.
           Actor runtime foundation evidence runs the strict Linux-x64 gate before publishing and uploads its `actor-runtime-foundation-manifest.json`, `artifact-hashes.json`, `distributed-actors-linux-x64/distributed-actors-linux-x64.json`, and `parallel-production-linux-x64/parallel-production-linux-x64.json` evidence.
           Actor runtime foundation evidence remains Linux-x64 scoped; Erlang/OTP, cluster membership, reconnect/retry production, non-Linux distributed runtime, distributed zero-copy transfer, and formal race proof are not claimed.

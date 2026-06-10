@@ -1,0 +1,11 @@
+{
+  "schema": "tetra.surface.template.v1",
+  "template": "surface-tray-app",
+  "level": "surface-fast-dev-loop-v1",
+  "commands": [
+    "tetra check .",
+    "tetra surface dev --project . --once",
+    "tetra surface inspect --report reports/surface-runtime.json --out reports/surface-inspector.json",
+    "tetra surface package . -o dist/surface-app.tdx"
+  ]
+}

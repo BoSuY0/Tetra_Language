@@ -25,13 +25,27 @@ func scene_recipe_checksum() -> Int:
     let action: morph.Recipe = morph.recipe_control_action()
     let field: morph.Recipe = morph.recipe_field_text()
     let panel: morph.Recipe = morph.recipe_region_panel()
+    let toggle: morph.Recipe = morph.recipe_control_toggle()
+    let nav_item: morph.Recipe = morph.recipe_navigation_item()
+    let dialog: morph.Recipe = morph.recipe_overlay_dialog()
+    let tabs: morph.Recipe = morph.recipe_navigation_tabs()
+    let list: morph.Recipe = morph.recipe_collection_list()
+    let table: morph.Recipe = morph.recipe_collection_table_lite()
+    let status: morph.Recipe = morph.recipe_status_message()
     let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(action, block.id(5))
     if morph.capsule_valid(capsule) &&
        morph.recipe_expands_to_block(action) &&
        morph.recipe_expands_to_block(field) &&
        morph.recipe_expands_to_block(panel) &&
+       morph.recipe_expands_to_block(toggle) &&
+       morph.recipe_expands_to_block(nav_item) &&
+       morph.recipe_expands_to_block(dialog) &&
+       morph.recipe_expands_to_block(tabs) &&
+       morph.recipe_expands_to_block(list) &&
+       morph.recipe_expands_to_block(table) &&
+       morph.recipe_expands_to_block(status) &&
        morph.expansion_valid(action_expansion):
-        return capsule.token_graph_hash + action.name_hash + field.name_hash + panel.name_hash
+        return capsule.token_graph_hash + action.name_hash + field.name_hash + panel.name_hash + toggle.name_hash + nav_item.name_hash + dialog.name_hash + tabs.name_hash + list.name_hash + table.name_hash + status.name_hash
     return 0
 
 func main() -> Int
@@ -49,6 +63,13 @@ uses alloc, mem:
     let field_recipe: morph.Recipe = morph.recipe_field_text()
     let item_recipe: morph.Recipe = morph.recipe_command_item()
     let action_recipe: morph.Recipe = morph.recipe_control_action()
+    let toggle_recipe: morph.Recipe = morph.recipe_control_toggle()
+    let nav_item_recipe: morph.Recipe = morph.recipe_navigation_item()
+    let dialog_recipe: morph.Recipe = morph.recipe_overlay_dialog()
+    let tabs_recipe: morph.Recipe = morph.recipe_navigation_tabs()
+    let list_recipe: morph.Recipe = morph.recipe_collection_list()
+    let table_recipe: morph.Recipe = morph.recipe_collection_table_lite()
+    let status_recipe: morph.Recipe = morph.recipe_status_message()
 
     var tree: block.BlockTree = block.tree_init(8)
     let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
@@ -63,7 +84,14 @@ uses alloc, mem:
     let field_expansion: morph.RecipeExpansion = morph.recipe_expansion(field_recipe, block.id(4))
     let item_expansion: morph.RecipeExpansion = morph.recipe_expansion(item_recipe, block.id(5))
     let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(action_recipe, block.id(6))
-    let app: MorphCommandPaletteApp = MorphCommandPaletteApp(capsule_hash: morph.schema_v1(), token_graph_hash: capsule.token_graph_hash, expanded_recipe_count: 4, block_count: block.tree_len(tree), a11y_projection: morph.accessibility_projection_ok(3, 4, 6))
+    let toggle_expansion: morph.RecipeExpansion = morph.recipe_expansion(toggle_recipe, block.id(6))
+    let nav_item_expansion: morph.RecipeExpansion = morph.recipe_expansion(nav_item_recipe, block.id(5))
+    let dialog_expansion: morph.RecipeExpansion = morph.recipe_expansion(dialog_recipe, block.id(2))
+    let tabs_expansion: morph.RecipeExpansion = morph.recipe_expansion(tabs_recipe, block.id(2))
+    let list_expansion: morph.RecipeExpansion = morph.recipe_expansion(list_recipe, block.id(2))
+    let table_expansion: morph.RecipeExpansion = morph.recipe_expansion(table_recipe, block.id(2))
+    let status_expansion: morph.RecipeExpansion = morph.recipe_expansion(status_recipe, block.id(7))
+    let app: MorphCommandPaletteApp = MorphCommandPaletteApp(capsule_hash: morph.schema_v1(), token_graph_hash: capsule.token_graph_hash, expanded_recipe_count: 11, block_count: block.tree_len(tree), a11y_projection: morph.accessibility_projection_ok(3, 4, 6))
     let valid: Int = block.tree_validate(tree)
     let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
     let focus1: Int = block.id_value(block.focus_order_at(tree, 1))
@@ -75,7 +103,7 @@ uses alloc, mem:
        a11y0 == 1 &&
        app.capsule_hash == morph.schema_v1() &&
        app.token_graph_hash > 0 &&
-       app.expanded_recipe_count == 4 &&
+       app.expanded_recipe_count == 11 &&
        app.block_count == 7 &&
        app.a11y_projection &&
        morph.capsule_self_check() &&
@@ -84,6 +112,13 @@ uses alloc, mem:
        morph.expansion_valid(field_expansion) &&
        morph.expansion_valid(item_expansion) &&
        morph.expansion_valid(action_expansion) &&
+       morph.expansion_valid(toggle_expansion) &&
+       morph.expansion_valid(nav_item_expansion) &&
+       morph.expansion_valid(dialog_expansion) &&
+       morph.expansion_valid(tabs_expansion) &&
+       morph.expansion_valid(list_expansion) &&
+       morph.expansion_valid(table_expansion) &&
+       morph.expansion_valid(status_expansion) &&
        morph.memory_budget_ok(app.block_count, 3, 400 * 260 * 4) &&
        scene_recipe_checksum() > 0:
         return 0

@@ -26,9 +26,8 @@ struct AssetManifest:
     font_hash: Int
     icon_hash: Int
     image_hash: Int
-    font_count: Int
-    icon_count: Int
-    image_count: Int
+    vector_hash: Int
+    asset_count: Int
     budget_bytes: Int
     max_entries: Int
     local_only: Bool
@@ -104,6 +103,102 @@ struct EventSpec:
     key_action: Int
     text_action: Int
     submit_action: Int
+
+struct AppStateStore:
+    id: Int
+    owner: Int
+    scope: Int
+    field_count: Int
+    snapshot_before: Int
+    snapshot_after: Int
+    invalidation_count: Int
+    react_state: Bool
+
+struct AppCommand:
+    kind: Int
+    source: Int
+    target: BlockID
+    store_id: Int
+    mutates: Int
+    requests_redraw: Bool
+    is_async: Bool
+    safe_boundary: Bool
+    react_hook: Bool
+
+struct AppEventTrace:
+    order: Int
+    kind: Int
+    target: BlockID
+    command_kind: Int
+    store_id: Int
+    delivered: Bool
+    rejected: Bool
+    focused: BlockID
+    text_len: Int
+    reject_status: Int
+
+struct AppModelPolicy:
+    state_store: Int
+    command: Int
+    event_routing: Int
+    async_boundary: Int
+    nav_focus: Int
+    shortcut_scope: Int
+    error_propagation: Int
+    redraw: Int
+    actor_task_boundary: Int
+    no_react: Bool
+
+struct AppNavigationStep:
+    before: BlockID
+    after: BlockID
+    scope: Int
+    focus_trap: Bool
+    graph_derived: Bool
+
+struct AppRedrawRequest:
+    store_id: Int
+    frame_before: Int
+    frame_after: Int
+    checksum_before: Int
+    checksum_after: Int
+    invalidation_count: Int
+
+struct KeyboardFocusNode:
+    block_id: BlockID
+    scope: Int
+    role: Int
+    accessible_name_len: Int
+    labelled_by: BlockID
+    keyboard_reachable: Bool
+
+struct KeyboardBinding:
+    key: Int
+    scope: Int
+    command_kind: Int
+    block_id: BlockID
+    delivered: Bool
+    conflict_checked: Bool
+
+struct KeyboardShortcutConflict:
+    key: Int
+    scope: Int
+    command_count: Int
+    diagnosed: Bool
+    rejected: Bool
+
+struct KeyboardUndoRedoStack:
+    store_id: Int
+    undo_depth: Int
+    redo_depth: Int
+    bounded: Bool
+    keyboard_driven: Bool
+
+struct KeyboardScript:
+    surface: Int
+    step_count: Int
+    keyboard_only: Bool
+    pass: Bool
 
 struct StateSelector:
     hovered: Bool
@@ -192,6 +287,9 @@ func asset_kind_image() -> Int:
 func asset_kind_icon() -> Int:
     return 3
 
+func asset_kind_vector() -> Int:
+    return 4
+
 func asset_quality_level() -> Int:
     return 1
 
@@ -213,6 +311,12 @@ func asset_error_missing_fallback() -> Int:
 func asset_error_network_rejected() -> Int:
     return 5
 
+func asset_error_unsafe_svg() -> Int:
+    return 6
+
+func asset_error_oversized_raster() -> Int:
+    return 7
+
 func asset_none() -> AssetRef:
     return AssetRef(kind: asset_kind_none(), index: -1, width: 0, height: 0, hash: 0)
 
@@ -227,6 +331,9 @@ func asset_icon(index: Int, width: Int, height: Int, hash: Int) -> AssetRef:
 
 func asset_image(index: Int, width: Int, height: Int, hash: Int) -> AssetRef:
     return asset_embedded(asset_kind_image(), index, width, height, hash)
+
+func asset_vector(index: Int, width: Int, height: Int, hash: Int) -> AssetRef:
+    return asset_embedded(asset_kind_vector(), index, width, height, hash)
 
 func asset_missing(kind: Int, index: Int) -> AssetRef:
     return AssetRef(kind: kind, index: index, width: 0, height: 0, hash: -1)
@@ -262,6 +369,13 @@ func asset_resolve_status(asset: AssetRef) -> Int:
         return asset_error_missing_fallback()
     return asset_error_ok()
 
+func asset_vector_sanitize_status(asset: AssetRef) -> Int:
+    if asset.kind != asset_kind_vector():
+        return asset_error_unsafe_svg()
+    if asset.hash <= 0 || asset.width <= 0 || asset.height <= 0:
+        return asset_error_unsafe_svg()
+    return asset_error_ok()
+
 func asset_cache_budget_bytes() -> Int:
     return 65536
 
@@ -279,7 +393,7 @@ func asset_cache_validate(budget_bytes: Int, used_bytes: Int, entry_count: Int, 
         return asset_error_unbounded_cache()
     return asset_error_ok()
 
-func asset_manifest(font: AssetRef, icon: AssetRef, image: AssetRef, budget_bytes: Int, max_entries: Int) -> AssetManifest:
+func asset_manifest(font: AssetRef, icon: AssetRef, image: AssetRef, vector: AssetRef, budget_bytes: Int, max_entries: Int) -> AssetManifest:
     var local_only: Bool = true
     if !asset_is_local(font):
         local_only = false
@@ -287,19 +401,21 @@ func asset_manifest(font: AssetRef, icon: AssetRef, image: AssetRef, budget_byte
         local_only = false
     if !asset_is_local(image):
         local_only = false
-    return AssetManifest(font_hash: font.hash, icon_hash: icon.hash, image_hash: image.hash, font_count: 1, icon_count: 1, image_count: 1, budget_bytes: budget_bytes, max_entries: max_entries, local_only: local_only, remote_count: 0)
+    if !asset_is_local(vector):
+        local_only = false
+    return AssetManifest(font_hash: font.hash, icon_hash: icon.hash, image_hash: image.hash, vector_hash: vector.hash, asset_count: 4, budget_bytes: budget_bytes, max_entries: max_entries, local_only: local_only, remote_count: 0)
 
 func asset_manifest_hash(manifest: AssetManifest) -> Int:
-    return manifest.font_hash + manifest.icon_hash + manifest.image_hash + manifest.font_count + manifest.icon_count + manifest.image_count
+    return manifest.font_hash + manifest.icon_hash + manifest.image_hash + manifest.vector_hash + manifest.asset_count
 
 func asset_manifest_validate(manifest: AssetManifest) -> Int:
     if !manifest.local_only || manifest.remote_count != 0:
         return asset_error_network_rejected()
-    if manifest.font_count <= 0 || manifest.icon_count <= 0 || manifest.image_count <= 0:
+    if manifest.asset_count < 4:
         return asset_error_missing_fallback()
-    if manifest.font_hash <= 0 || manifest.icon_hash <= 0 || manifest.image_hash <= 0:
+    if manifest.font_hash <= 0 || manifest.icon_hash <= 0 || manifest.image_hash <= 0 || manifest.vector_hash <= 0:
         return asset_error_missing_fallback()
-    return asset_cache_validate(manifest.budget_bytes, manifest.font_count + manifest.icon_count + manifest.image_count, manifest.font_count + manifest.icon_count + manifest.image_count, manifest.font_count + manifest.icon_count + manifest.image_count)
+    return asset_cache_validate(manifest.budget_bytes, manifest.asset_count, manifest.asset_count, manifest.asset_count)
 
 func asset_diagnostic_missing_asset() -> Int:
     return 1
@@ -1219,19 +1335,253 @@ func event_dispatch_status(input: InputSpec, kind: Int, focused: Bool) -> Int:
         return event_route_delivered()
     if kind == event_kind_key():
         if !input.accepts_keyboard:
-            return event_route_rejected_not_accepted()
+            return 3
         if !focused:
             return event_route_rejected_unfocused()
         return event_route_delivered()
     if event_kind_is_pointer(kind):
         if input.accepts_pointer:
             return event_route_delivered()
-        return event_route_rejected_not_accepted()
+        return 3
     if kind == event_kind_focus() || kind == event_kind_blur():
         if input.focusable:
             return event_route_delivered()
-        return event_route_rejected_not_accepted()
+            return 3
     return event_route_delivered()
+
+func app_surface_command_palette() -> Int:
+    return 1
+
+func app_surface_dashboard() -> Int:
+    return 2
+
+func app_surface_settings() -> Int:
+    return 3
+
+func app_surface_editor_shell() -> Int:
+    return 4
+
+func app_state_scope_overlay() -> Int:
+    return 1
+
+func app_state_scope_page() -> Int:
+    return 2
+
+func app_state_scope_form() -> Int:
+    return 3
+
+func app_state_scope_document() -> Int:
+    return 4
+
+func app_command_kind_command() -> Int:
+    return 1
+
+func app_command_kind_async() -> Int:
+    return 2
+
+func app_command_kind_shortcut() -> Int:
+    return 3
+
+func app_command_kind_navigation() -> Int:
+    return 4
+
+func app_command_kind_text_edit() -> Int:
+    return 5
+
+func app_command_kind_undo() -> Int:
+    return 6
+
+func app_command_kind_redo() -> Int:
+    return 7
+
+func app_source_click() -> Int:
+    return 1
+
+func app_source_key() -> Int:
+    return 2
+
+func app_source_text() -> Int:
+    return 3
+
+func app_source_timer() -> Int:
+    return 4
+
+func app_policy_owned_state_store() -> Int:
+    return 1
+
+func app_policy_typed_command_dispatch() -> Int:
+    return 2
+
+func app_policy_block_event_trace() -> Int:
+    return 3
+
+func app_policy_safe_actor_task_boundary() -> Int:
+    return 4
+
+func app_policy_navigation_focus_scopes() -> Int:
+    return 5
+
+func app_policy_scoped_shortcuts() -> Int:
+    return 6
+
+func app_policy_error_propagation() -> Int:
+    return 7
+
+func app_policy_redraw_invalidation() -> Int:
+    return 8
+
+func app_model_policy_production() -> AppModelPolicy:
+    return AppModelPolicy(state_store: app_policy_owned_state_store(), command: app_policy_typed_command_dispatch(), event_routing: app_policy_block_event_trace(), async_boundary: app_policy_safe_actor_task_boundary(), nav_focus: app_policy_navigation_focus_scopes(), shortcut_scope: app_policy_scoped_shortcuts(), error_propagation: app_policy_error_propagation(), redraw: app_policy_redraw_invalidation(), actor_task_boundary: app_policy_safe_actor_task_boundary(), no_react: true)
+
+func app_model_policy_valid(policy: AppModelPolicy) -> Bool:
+    return policy.state_store == app_policy_owned_state_store() &&
+        policy.command == app_policy_typed_command_dispatch() &&
+        policy.event_routing == app_policy_block_event_trace() &&
+        policy.async_boundary == app_policy_safe_actor_task_boundary() &&
+        policy.nav_focus == app_policy_navigation_focus_scopes() &&
+        policy.shortcut_scope == app_policy_scoped_shortcuts() &&
+        policy.error_propagation == app_policy_error_propagation() &&
+        policy.redraw == app_policy_redraw_invalidation() &&
+        policy.actor_task_boundary == app_policy_safe_actor_task_boundary() &&
+        policy.no_react
+
+func app_state_store(id: Int, owner: Int, scope: Int, field_count: Int, snapshot_before: Int, snapshot_after: Int, invalidation_count: Int) -> AppStateStore:
+    return AppStateStore(id: id, owner: owner, scope: scope, field_count: field_count, snapshot_before: snapshot_before, snapshot_after: snapshot_after, invalidation_count: invalidation_count, react_state: false)
+
+func app_state_store_valid(store: AppStateStore) -> Bool:
+    return store.id > 0 && store.owner > 0 && store.scope > 0 && store.field_count > 0 && store.invalidation_count > 0 && store.snapshot_before != store.snapshot_after && !store.react_state
+
+func app_command(kind: Int, source: Int, target: BlockID, store: AppStateStore, mutates: Int, requests_redraw: Bool, is_async: Bool) -> AppCommand:
+    return AppCommand(kind: kind, source: source, target: target, store_id: store.id, mutates: mutates, requests_redraw: requests_redraw, is_async: is_async, safe_boundary: true, react_hook: false)
+
+func app_command_safe(command: AppCommand) -> Bool:
+    return command.kind > 0 && id_value(command.target) != tree_none() && command.store_id > 0 && (command.mutates > 0 || command.requests_redraw) && command.safe_boundary && !command.react_hook
+
+func app_command_dispatch_status(command: AppCommand, input: InputSpec, event_kind: Int, focused: Bool) -> Int:
+    if !app_command_safe(command):
+        return 3
+    return event_dispatch_status(input, event_kind, focused)
+
+func app_event_trace(order: Int, command: AppCommand, event_kind: Int, status: Int, focused: BlockID, text_len: Int) -> AppEventTrace:
+    return AppEventTrace(order: order, kind: event_kind, target: command.target, command_kind: command.kind, store_id: command.store_id, delivered: status == event_route_delivered(), rejected: status != event_route_delivered(), focused: focused, text_len: text_len, reject_status: status)
+
+func app_event_trace_valid(trace: AppEventTrace) -> Bool:
+    if trace.order <= 0 || id_value(trace.target) == tree_none() || trace.command_kind <= 0 || trace.store_id <= 0:
+        return false
+    if trace.delivered == trace.rejected:
+        return false
+    if trace.delivered && trace.reject_status != event_route_delivered():
+        return false
+    if trace.rejected && trace.reject_status == event_route_delivered():
+        return false
+    return true
+
+func app_async_boundary_safe(command: AppCommand) -> Bool:
+    return command.is_async && command.safe_boundary && !command.react_hook && command.kind == app_command_kind_async()
+
+func app_navigation_step(before: BlockID, after: BlockID, scope: Int, focus_trap: Bool) -> AppNavigationStep:
+    return AppNavigationStep(before: before, after: after, scope: scope, focus_trap: focus_trap, graph_derived: true)
+
+func app_navigation_valid(step: AppNavigationStep) -> Bool:
+    return id_value(step.before) != tree_none() && id_value(step.after) != tree_none() && step.scope > 0 && step.graph_derived
+
+func app_shortcut_scope_allows(active_scope: Int, required_scope: Int, focused: Bool) -> Bool:
+    if required_scope == 0:
+        return true
+    if active_scope != required_scope:
+        return false
+    return focused
+
+func app_error_propagated_handled(propagated: Bool, handled: Bool) -> Bool:
+    return propagated && handled
+
+func app_redraw_request(store: AppStateStore, frame_before: Int, frame_after: Int, checksum_before: Int, checksum_after: Int) -> AppRedrawRequest:
+    return AppRedrawRequest(store_id: store.id, frame_before: frame_before, frame_after: frame_after, checksum_before: checksum_before, checksum_after: checksum_after, invalidation_count: store.invalidation_count)
+
+func app_redraw_valid(redraw: AppRedrawRequest) -> Bool:
+    return redraw.store_id > 0 && redraw.frame_after > redraw.frame_before && redraw.checksum_before != redraw.checksum_after && redraw.invalidation_count > 0
+
+func keyboard_key_tab() -> Int:
+    return 1
+
+func keyboard_key_shift_tab() -> Int:
+    return 2
+
+func keyboard_key_enter() -> Int:
+    return 3
+
+func keyboard_key_space() -> Int:
+    return 4
+
+func keyboard_key_escape() -> Int:
+    return 5
+
+func keyboard_key_ctrl_k() -> Int:
+    return 6
+
+func keyboard_key_ctrl_z() -> Int:
+    return 7
+
+func keyboard_key_ctrl_y() -> Int:
+    return 8
+
+func keyboard_key_arrow_down() -> Int:
+    return 9
+
+func keyboard_policy_focus_order_graph() -> Int:
+    return 1
+
+func keyboard_policy_focus_trap_overlay() -> Int:
+    return 2
+
+func keyboard_policy_roving_focus() -> Int:
+    return 3
+
+func keyboard_policy_activation() -> Int:
+    return 4
+
+func keyboard_policy_shortcut_conflict() -> Int:
+    return 5
+
+func keyboard_policy_undo_redo_stack() -> Int:
+    return 6
+
+func keyboard_focus_node(block_id: BlockID, scope: Int, role: Int, accessible_name_len: Int, labelled_by: BlockID) -> KeyboardFocusNode:
+    return KeyboardFocusNode(block_id: block_id, scope: scope, role: role, accessible_name_len: accessible_name_len, labelled_by: labelled_by, keyboard_reachable: true)
+
+func keyboard_focus_node_valid(node: KeyboardFocusNode) -> Bool:
+    let has_name: Bool = node.accessible_name_len > 0 || id_value(node.labelled_by) != tree_none()
+    return id_value(node.block_id) != tree_none() && node.scope > 0 && node.role > 0 && node.keyboard_reachable && has_name
+
+func keyboard_binding(key: Int, scope: Int, command: AppCommand, delivered: Bool) -> KeyboardBinding:
+    return KeyboardBinding(key: key, scope: scope, command_kind: command.kind, block_id: command.target, delivered: delivered, conflict_checked: true)
+
+func keyboard_binding_valid(binding: KeyboardBinding) -> Bool:
+    return binding.key > 0 && binding.scope > 0 && binding.command_kind > 0 && id_value(binding.block_id) != tree_none() && binding.delivered && binding.conflict_checked
+
+func keyboard_shortcut_conflict(key: Int, scope: Int, command_count: Int, diagnosed: Bool, rejected: Bool) -> KeyboardShortcutConflict:
+    return KeyboardShortcutConflict(key: key, scope: scope, command_count: command_count, diagnosed: diagnosed, rejected: rejected)
+
+func keyboard_shortcut_conflict_valid(conflict: KeyboardShortcutConflict) -> Bool:
+    return conflict.key > 0 && conflict.scope > 0 && conflict.command_count > 1 && conflict.diagnosed && conflict.rejected
+
+func keyboard_undo_redo_stack(store: AppStateStore, undo_depth: Int, redo_depth: Int, bounded: Bool, keyboard_driven: Bool) -> KeyboardUndoRedoStack:
+    return KeyboardUndoRedoStack(store_id: store.id, undo_depth: undo_depth, redo_depth: redo_depth, bounded: bounded, keyboard_driven: keyboard_driven)
+
+func keyboard_undo_redo_valid(stack: KeyboardUndoRedoStack) -> Bool:
+    return stack.store_id > 0 && stack.undo_depth >= 0 && stack.redo_depth >= 0 && stack.bounded && stack.keyboard_driven
+
+func keyboard_script(surface: Int, step_count: Int, keyboard_only: Bool, pass: Bool) -> KeyboardScript:
+    return KeyboardScript(surface: surface, step_count: step_count, keyboard_only: keyboard_only, pass: pass)
+
+func keyboard_script_valid(script: KeyboardScript) -> Bool:
+    return script.surface > 0 && script.step_count >= 3 && script.keyboard_only && script.pass
+
+func keyboard_focus_trap_valid(step: AppNavigationStep, leak_rejected: Bool, escape_closes: Bool) -> Bool:
+    return app_navigation_valid(step) && step.focus_trap && leak_rejected && escape_closes
+
+func keyboard_roving_group_valid(active: BlockID, first: BlockID, last: BlockID, arrow_keys: Bool, home_end: Bool, wrap: Bool) -> Bool:
+    return id_value(active) != tree_none() && id_value(first) != tree_none() && id_value(last) != tree_none() && id_value(first) != id_value(last) && arrow_keys && home_end && wrap
 
 func event_none() -> EventSpec:
     return EventSpec(click_action: action_none(), pointer_action: action_none(), key_action: action_none(), text_action: action_none(), submit_action: action_none())
@@ -1489,6 +1839,29 @@ func motion_should_schedule(motion: MotionSpec, elapsed_ms: Int) -> Bool:
     if motion.reduced:
         return false
     return !motion_is_complete(motion, elapsed_ms)
+
+func motion_frame_interval_ms() -> Int:
+    return 16
+
+func motion_frame_budget_default() -> Int:
+    return 4
+
+func motion_max_frame_delta_ms() -> Int:
+    return 60
+
+func motion_frame_timing_ok(previous_ms: Int, current_ms: Int) -> Bool:
+    if previous_ms < 0:
+        return false
+    if current_ms < previous_ms:
+        return false
+    return current_ms - previous_ms <= motion_max_frame_delta_ms()
+
+func motion_lifecycle_complete_stops(motion: MotionSpec, elapsed_ms: Int) -> Bool:
+    return motion_is_complete(motion, elapsed_ms) && !motion_should_schedule(motion, elapsed_ms)
+
+func motion_reduced_stops_schedule(motion: MotionSpec) -> Bool:
+    let reduced: MotionSpec = motion_reduced(motion)
+    return motion_progress(reduced, 0) == 1000 && !motion_should_schedule(reduced, 0)
 
 func accessibility_role_none() -> Int:
     return 0

@@ -654,12 +654,12 @@ func TestFeatureRegistryDeclaresSurfaceDirectionAndLegacyMetadataBoundary(t *tes
 	wantCurrentSurface := map[string][]string{
 		"ui.surface-core":             {"surface-v1-linux-web", "pure-Tetra UI", "Host ABI"},
 		"ui.surface-headless":         {"release-test target", "deterministic"},
-		"ui.surface-linux-x64":        {"linux-x64-release-window-v1", "Wayland shm"},
-		"ui.surface-web-wasm":         {"wasm32-web-browser-canvas-release-v1", "browser canvas"},
+		"ui.surface-linux-x64":        {"linux-x64-release-window-v1", "Wayland shm", "tetra.surface.linux-host-adapter.v1", "linux-x64-production-host-adapter-v1"},
+		"ui.surface-web-wasm":         {"wasm32-web-browser-canvas-release-v1", "browser canvas", "tetra.surface.browser-canvas-target.v1", "wasm32-web-first-class-browser-canvas-target-v1", "DOM snapshot renderer", "user script command dispatch"},
 		"ui.surface-component-model":  {"component-tree-api", "release subset"},
 		"ui.surface-toolkit-v1":       {"production-widgets-v1", "TextBox", "Checkbox"},
-		"ui.surface-text-input-v1":    {"production-text-input-v1", "clipboard", "composition"},
-		"ui.surface-accessibility-v1": {"platform-bridge-v1", "supported targets"},
+		"ui.surface-text-input-v1":    {"production-text-input-v1", "clipboard", "composition", "tetra.surface.text-pipeline.v1", "bounded glyph cache", "tetra.surface.text-editing.v1", "production-editing-basics-v1", "target IME trace", "clipboard owned-copy", "undo unit boundaries", "full Unicode editor semantics"},
+		"ui.surface-accessibility-v1": {"platform-bridge-v1", "tetra.surface.accessibility-target.v1", "production-accessibility-target-v1", "Linux accessibility host bridge", "browser accessibility snapshot/mirror", "full screen-reader parity"},
 	}
 	for id, wantPhrases := range wantCurrentSurface {
 		feature, ok := byID[id]
@@ -688,6 +688,101 @@ func TestFeatureRegistryDeclaresSurfaceDirectionAndLegacyMetadataBoundary(t *tes
 	}
 	for _, want := range []string{
 		"tetra.surface.block-system.gate.v1",
+		"tetra.surface.layout-engine.v1",
+		"deterministic-responsive-layout-v1",
+		"app shell/settings forms/dashboards/editor shells",
+		"rejected CSS flexbox/grid parity claims",
+		"rejected accidental overflow-hidden behavior",
+		"rejected unbounded layout cache evidence",
+		"tetra.surface.app-model.v1",
+		"production-app-model-v1",
+		"owned-state-store-v1",
+		"typed-command-dispatch-v1",
+		"block-event-trace-v1",
+		"actor-task-safe-boundary-v1",
+		"command palette/dashboard/settings/editor shell",
+		"disabled dispatch rejection",
+		"unfocused text rejection",
+		"React runtime claim rejection",
+		"tetra.surface.keyboard-ux.v1",
+		"production-keyboard-ux-v1",
+		"graph focus order",
+		"overlay focus traps",
+		"roving focus",
+		"keyboard activation",
+		"scoped shortcut conflict diagnostics",
+		"bounded undo/redo stacks",
+		"command palette/search/settings/editor keyboard scripts",
+		"focusable accessible name rejection",
+		"overlay focus leak rejection",
+		"shortcut conflict rejection",
+		"undo-without-stack rejection",
+		"tetra.surface.app-shell.v1",
+		"production-app-shell-host-abi-v1",
+		"menus, context menus",
+		"dialogs/file pickers",
+		"tray/status items",
+		"notifications, cursors, drag/drop, permissions",
+		"target-host action traces",
+		"rejected silent no-op host features",
+		"rejected menu claims without host traces",
+		"rejected notification claims without host reports",
+		"tetra.surface.asset-pipeline.v1",
+		"production-asset-pipeline-v1",
+		"safe-local-asset-decoders-v1",
+		"font-table-hash-verified-v1",
+		"icon-mask-tint-rgba-v1",
+		"png-rgba-bounds-checked-v1",
+		"svg-tiny-static-sanitized-v1",
+		"remote font rejection",
+		"network asset rejection",
+		"unbounded cache rejection",
+		"oversized raster rejection",
+		"tetra.surface.animation-scheduler.v1",
+		"production-animation-scheduler-v1",
+		"deterministic-motion-frame-scheduler-v1",
+		"stable-motion-timeline-v1",
+		"motion-dirty-block-invalidation-v1",
+		"start-interpolate-settle-stop-v1",
+		"instant-settle-no-schedule-v1",
+		"frame timing evidence",
+		"visual delta evidence",
+		"target smoke rows",
+		"missing reduced-motion rejection",
+		"unbounded frame schedule rejection",
+		"hidden animation loop rejection",
+		"CSS animation parity rejection",
+		"tetra.surface.inspector-snapshot.v1",
+		"surface-inspector-json-mvp-v1",
+		"Block tree",
+		"Morph style resolution",
+		"layout boxes",
+		"paint layers",
+		"performance counters",
+		"source locations",
+		"tetra surface inspect",
+		"docs-only tree rejection",
+		"missing source locations rejection",
+		"missing performance counters rejection",
+		"browser devtools parity nonclaim",
+		"tetra.surface.dev-loop.v1",
+		"surface-fast-dev-loop-v1",
+		"tetra new surface-app",
+		"surface-dashboard",
+		"surface-editor-shell",
+		"surface-web-canvas",
+		"tetra surface dev --once",
+		"source hash reload traces",
+		"tetra.surface.dev-state.v1",
+		"schema-compatible-owned-state-only",
+		"validate-surface-dev-report",
+		"tetra surface package",
+		"source change trace rejection",
+		"Electron dev-server rejection",
+		"React Fast Refresh rejection",
+		"CSS HMR rejection",
+		"DOM hot reload rejection",
+		"incompatible state preservation rejection",
 		"block_system.memory_budget",
 		"reports/surface-block/p18-budget",
 		"same-commit target evidence",
@@ -696,6 +791,84 @@ func TestFeatureRegistryDeclaresSurfaceDirectionAndLegacyMetadataBoundary(t *tes
 		if !strings.Contains(blockSystem.Scope+" "+blockSystem.Stability, want) {
 			t.Fatalf("ui.surface-block-system missing P19 truth-boundary phrase %q: %#v", want, blockSystem)
 		}
+	}
+	if !hasFeatureDoc(blockSystem.Docs, "docs/spec/surface_app_model.md") {
+		t.Fatalf("ui.surface-block-system docs = %#v, want docs/spec/surface_app_model.md", blockSystem.Docs)
+	}
+	if !hasFeatureDoc(blockSystem.Docs, "docs/spec/surface_keyboard_ux.md") {
+		t.Fatalf("ui.surface-block-system docs = %#v, want docs/spec/surface_keyboard_ux.md", blockSystem.Docs)
+	}
+	if !hasFeatureDoc(blockSystem.Docs, "docs/spec/surface_host_abi.md") {
+		t.Fatalf("ui.surface-block-system docs = %#v, want docs/spec/surface_host_abi.md", blockSystem.Docs)
+	}
+	if !hasFeatureDoc(blockSystem.Docs, "docs/spec/surface_asset_pipeline.md") {
+		t.Fatalf("ui.surface-block-system docs = %#v, want docs/spec/surface_asset_pipeline.md", blockSystem.Docs)
+	}
+	if !hasFeatureDoc(blockSystem.Docs, "docs/spec/surface_animation_scheduler.md") {
+		t.Fatalf("ui.surface-block-system docs = %#v, want docs/spec/surface_animation_scheduler.md", blockSystem.Docs)
+	}
+	if !hasFeatureDoc(blockSystem.Docs, "docs/spec/surface_inspector.md") {
+		t.Fatalf("ui.surface-block-system docs = %#v, want docs/spec/surface_inspector.md", blockSystem.Docs)
+	}
+	if !hasFeatureDoc(blockSystem.Docs, "docs/spec/surface_dev_loop.md") {
+		t.Fatalf("ui.surface-block-system docs = %#v, want docs/spec/surface_dev_loop.md", blockSystem.Docs)
+	}
+
+	morph, ok := byID["ui.surface-morph-capsule"]
+	if !ok {
+		t.Fatal("feature registry missing ui.surface-morph-capsule")
+	}
+	if morph.Status != compiler.FeatureStatusExperimental {
+		t.Fatalf("ui.surface-morph-capsule status = %q, want experimental", morph.Status)
+	}
+	for _, want := range []string{
+		"typed-style-graph-candidate-v1",
+		"css_replacement_level",
+		"tetra.surface.morph.authoring.v1",
+		"production-recipe-authoring-v1",
+		"11 stable recipe families",
+		"declared inputs/slots/state/a11y projections",
+		"reported Block-only expansions",
+		"hidden app state rejected",
+		"platform widget recipe output rejected",
+		"unreported expansion rejected",
+		"component bloat rejected",
+		"core primitive promotion rejected",
+		"no selector engine",
+		"no specificity scoring",
+		"global style leak rejection",
+		"specificity ambiguity rejection",
+		"raw CSS runtime import rejection",
+		"raw 80-field Block authoring rejection",
+		"not CSS runtime parity",
+	} {
+		if !strings.Contains(morph.Scope+" "+morph.Stability, want) {
+			t.Fatalf("ui.surface-morph-capsule missing P11 boundary phrase %q: %#v", want, morph)
+		}
+	}
+
+	gpu, ok := byID["ui.surface-gpu"]
+	if !ok {
+		t.Fatal("feature registry missing ui.surface-gpu")
+	}
+	if gpu.Status != compiler.FeatureStatusExperimental {
+		t.Fatalf("ui.surface-gpu status = %q, want experimental", gpu.Status)
+	}
+	for _, want := range []string{
+		"experimental/nonclaim",
+		"tetra.surface.renderer-backend.v1",
+		"software-only-prod-go-gpu-experimental",
+		"layer_compositing",
+		"texture_atlas",
+		"target-host GPU backend reports",
+		"software RGBA remains the production rendering baseline",
+	} {
+		if !strings.Contains(gpu.Scope+" "+gpu.Stability, want) {
+			t.Fatalf("ui.surface-gpu missing P07 truth-boundary phrase %q: %#v", want, gpu)
+		}
+	}
+	if !hasFeatureDoc(gpu.Docs, "docs/spec/surface_renderer_backend.md") {
+		t.Fatalf("ui.surface-gpu docs = %#v, want docs/spec/surface_renderer_backend.md", gpu.Docs)
 	}
 
 	for _, id := range []string{
@@ -732,6 +905,18 @@ func TestFeatureRegistryDeclaresSurfaceDirectionAndLegacyMetadataBoundary(t *tes
 			t.Fatalf("unsupported Surface target %s missing evidence boundary: %#v", id, feature)
 		}
 	}
+	windowsSurface := byID["ui.surface-windows-x64"]
+	for _, want := range []string{"tetra.surface.windows-target.v1", "validate-surface-windows-target", "BETA_TARGET_HOST_WINDOWS", "build-only Windows artifacts", "linux-host synthetic reports"} {
+		if !strings.Contains(windowsSurface.Scope+" "+windowsSurface.Stability, want) {
+			t.Fatalf("Windows Surface target missing %q boundary: %#v", want, windowsSurface)
+		}
+	}
+	macOSSurface := byID["ui.surface-macos-x64"]
+	for _, want := range []string{"tetra.surface.macos-target.v1", "validate-surface-macos-target", "BETA_TARGET_HOST_MACOS", "build-only macOS artifacts", "linux-host synthetic reports", "non-notarized production distribution", "full accessibility without screen-reader bridge"} {
+		if !strings.Contains(macOSSurface.Scope+" "+macOSSurface.Stability, want) {
+			t.Fatalf("macOS Surface target missing %q boundary: %#v", want, macOSSurface)
+		}
+	}
 
 	metadata := byID["ui.metadata-v1"]
 	for _, want := range []string{
@@ -740,6 +925,44 @@ func TestFeatureRegistryDeclaresSurfaceDirectionAndLegacyMetadataBoundary(t *tes
 	} {
 		if !strings.Contains(metadata.Scope+" "+metadata.Stability, want) {
 			t.Fatalf("ui.metadata-v1 missing legacy boundary %q: %#v", want, metadata)
+		}
+	}
+}
+
+func TestFeatureRegistryDeclaresSurfaceProductionPlatformContract(t *testing.T) {
+	byID := map[string]compiler.FeatureInfo{}
+	for _, feature := range compiler.FeatureRegistry() {
+		byID[feature.ID] = feature
+	}
+
+	feature, ok := byID["ui.surface-production-platform"]
+	if !ok {
+		t.Fatal("feature registry missing ui.surface-production-platform")
+	}
+	if feature.Status != compiler.FeatureStatusPlanned {
+		t.Fatalf("ui.surface-production-platform status = %q, want planned until final production gates pass", feature.Status)
+	}
+	for _, want := range []string{
+		"PROD_STABLE_SCOPED_LINUX_WEB_APP_UI",
+		"surface-prod-scoped-linux-web",
+		"linux-x64",
+		"wasm32-web",
+		"validate-surface-prod-claim",
+		"not a broad Electron replacement",
+		"not cross-platform desktop parity",
+	} {
+		if !strings.Contains(feature.Scope+" "+feature.Stability, want) {
+			t.Fatalf("ui.surface-production-platform missing %q: %#v", want, feature)
+		}
+	}
+	for _, doc := range []string{
+		"docs/spec/surface_production_platform.md",
+		"docs/spec/current_supported_surface.md",
+		"docs/spec/surface_v1.md",
+		"docs/spec/surface_morph.md",
+	} {
+		if !hasFeatureDoc(feature.Docs, doc) {
+			t.Fatalf("ui.surface-production-platform docs = %#v, want %s", feature.Docs, doc)
 		}
 	}
 }

@@ -1,0 +1,41 @@
+// Surface widget compatibility migration smoke.
+module examples.surface_migration_widgets_to_block
+
+import lib.core.surface as surface
+import lib.core.component as component
+import lib.core.widgets as widgets
+import lib.core.block as block
+import lib.core.morph as morph
+
+func main() -> Int:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 360, h: 220)
+    let button_rect: surface.Rect = surface.Rect(x: 24, y: 32, w: 140, h: 44)
+    let field_rect: surface.Rect = surface.Rect(x: 24, y: 92, w: 220, h: 44)
+    let panel_map: widgets.WidgetMigration = widgets.migration_panel()
+    let button_map: widgets.WidgetMigration = widgets.migration_button()
+    let textbox_map: widgets.WidgetMigration = widgets.migration_textbox()
+    let status_map: widgets.WidgetMigration = widgets.migration_status_text()
+
+    let panel_block: block.Block = widgets.migration_expand_panel_to_block(1, -1, root_rect, 12)
+    let button_block: block.Block = widgets.migration_expand_button_to_block(2, 1, button_rect, 6)
+    let textbox_block: block.Block = widgets.migration_expand_textbox_to_block(3, 1, 4, field_rect, 0, 8)
+    let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(morph.recipe_control_action(), block.id(2))
+    let field_expansion: morph.RecipeExpansion = morph.recipe_expansion(morph.recipe_field_text(), block.id(3))
+
+    if widgets.widgets_are_compatibility_layer() &&
+       !widgets.widgets_are_core_final_architecture() &&
+       widgets.migration_valid(panel_map) &&
+       widgets.migration_valid(button_map) &&
+       widgets.migration_valid(textbox_map) &&
+       widgets.migration_valid(status_map) &&
+       panel_map.component_kind == component.kind_panel() &&
+       button_map.block_layout_mode == block.layout_mode_row() &&
+       textbox_map.recipe_hash == morph.recipe_field_text_hash() &&
+       status_map.recipe_hash == morph.recipe_status_message_hash() &&
+       block.id_value(panel_block.id) == 1 &&
+       block.id_value(button_block.id) == 2 &&
+       block.id_value(textbox_block.id) == 3 &&
+       morph.expansion_valid(action_expansion) &&
+       morph.expansion_valid(field_expansion):
+        return 42
+    return 1

@@ -1,0 +1,6 @@
+{
+  "id": "glass",
+  "title": "Glass material",
+  "blocks": ["window", "blur-nonclaim", "translucent-panel", "highlight", "shadow"],
+  "interaction": "compose inspect"
+}

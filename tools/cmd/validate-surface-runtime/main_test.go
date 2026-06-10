@@ -27,6 +27,35 @@ func TestValidateSurfaceRuntimeReportAcceptsHeadlessEvidence(t *testing.T) {
 	}
 }
 
+func TestValidateSurfaceRuntimeReportAcceptsCWDRelativeArtifactEvidence(t *testing.T) {
+	if err := os.MkdirAll(".cache", 0o755); err != nil {
+		t.Fatalf("create repo-local cache dir: %v", err)
+	}
+	root, err := os.MkdirTemp(".cache", "validate-surface-runtime-cwd-relative-")
+	if err != nil {
+		t.Fatalf("create repo-local fixture dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(root)
+	})
+
+	artifactDir := surfaceArtifactFixtureDir(t, root)
+	artifactPath, artifactSHA, artifactSize := writeSurfaceArtifactFixture(t, artifactDir)
+	tracePath, traceSHA, traceSize := writeSurfaceTraceFixture(t, artifactDir)
+	reportDir := filepath.Join(root, "reports", "nested")
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
+		t.Fatalf("create nested report dir: %v", err)
+	}
+	reportPath := filepath.Join(reportDir, "surface-headless.json")
+	if err := os.WriteFile(reportPath, validSurfaceRuntimeReportJSON(artifactPath, artifactSHA, artifactSize, tracePath, traceSHA, traceSize), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+
+	if err := validateSurfaceRuntimeReport(reportPath); err != nil {
+		t.Fatalf("validateSurfaceRuntimeReport failed for cwd-relative artifact paths: %v", err)
+	}
+}
+
 func TestValidateSurfaceRuntimeReportAcceptsProductionTextInputSchema(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "surface-text-input.json")
@@ -55,6 +84,80 @@ func TestValidateSurfaceRuntimeReportAcceptsProductionTextInputSchema(t *testing
   "composition_trace": {"start":true,"update":true,"commit":true,"cancel":true},
   "borrowed_view_storage": false,
   "safe_view_lifetime_checked": true,
+  "text_pipeline": {
+    "schema": "tetra.surface.text-pipeline.v1",
+    "level": "scoped-latin-utf8-text-pipeline-v1",
+    "engine": "deterministic-tetra-text-shaper",
+    "platform_widget_text_controls": false,
+    "font_manifest": [
+      {"id":"tetra-ui-regular","family":"Tetra UI","style":"normal","weight":400,"source":"embedded:tetra-ui-regular","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","bytes":32768},
+      {"id":"noto-sans-fallback","family":"Noto Sans","style":"normal","weight":400,"source":"system:fontconfig/noto-sans","sha256":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","bytes":65536}
+    ],
+    "font_fallbacks": [
+      {"id":"release-fallback","requested_family":"Tetra UI","resolved_family":"Noto Sans","chain":["Tetra UI","Noto Sans","monospace"],"missing_glyphs":0,"coverage":"latin-plus-basic-utf8-smoke"}
+    ],
+    "glyph_runs": [
+      {"id":"latin-run","font_family":"Tetra UI","script":"Latin","direction":"ltr","shaping":"tier1-latin-simple","text_len":5,"byte_start":0,"byte_end":5,"scalar_start":0,"scalar_end":5,"glyph_count":5,"glyph_ids":[36,69,70,32,71],"advances":[8,8,8,4,8],"clusters":[0,1,2,3,4],"baseline":14,"checksum":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+      {"id":"fallback-run","font_family":"Noto Sans","script":"Common","direction":"ltr","shaping":"tier1-fallback-simple","text_len":1,"byte_start":5,"byte_end":7,"scalar_start":5,"scalar_end":6,"glyph_count":1,"glyph_ids":[9731],"advances":[9],"clusters":[5],"baseline":14,"checksum":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+    ],
+    "glyph_caches": [
+      {"id":"release-glyph-cache","strategy":"bounded-lru","budget_bytes":65536,"used_bytes":8192,"entry_count":24,"eviction":"lru","bounded":true}
+    ],
+    "cache_budget_bytes": 65536,
+    "glyph_cache_budget_bytes": 65536,
+    "glyph_cache_used_bytes": 8192,
+    "bounded_caches": true,
+    "cache_eviction": "lru",
+    "unicode_boundaries": {
+      "utf8_storage": true,
+      "scalar_boundaries": true,
+      "cluster_boundaries": true,
+      "latin_tier": true,
+      "combining_marks": false,
+      "bidi": false,
+      "unsupported_scripts": ["Arabic","Devanagari","Thai"],
+      "boundary_cases": ["ASCII insertion","UTF-8 scalar insertion","cluster caret clamp"]
+    },
+    "shaping_scope": {
+      "tier": "tier1-latin-utf8",
+      "supported_scripts": ["Latin","Common"],
+      "unsupported_scripts": ["Arabic","Devanagari","Thai"],
+      "engine_decision": "deterministic embedded shaper until HarfBuzz-class evidence exists",
+      "full_unicode_editor_semantics": false,
+      "bidi": false,
+      "combining_marks": false,
+      "system_library_integration": "not required for Tier 1; future HarfBuzz-class gate",
+      "platform_widgets": false
+    },
+    "measurements": [
+      {"id":"release-label-measure","block_id":1,"text_len":18,"font_family":"Tetra UI","font_weight":400,"font_size":14,"line_height":18,"max_width":120,"measured":{"w":108,"h":18},"line_count":1,"wrap":"none","overflow":"clip","ellipsis":false,"ellipsized_text_len":18,"align":"start","quality":"deterministic-metrics-v1","checksum":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+      {"id":"release-ellipsis-measure","block_id":2,"text_len":32,"font_family":"Tetra UI","font_weight":400,"font_size":14,"line_height":18,"max_width":96,"measured":{"w":96,"h":36},"line_count":2,"wrap":"word","overflow":"ellipsis","ellipsis":true,"ellipsized_text_len":20,"align":"start","quality":"deterministic-metrics-v1","checksum":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}
+    ],
+    "measurement_consistency": {
+      "same_input_same_metrics": true,
+      "target_independent_baseline": true,
+      "max_delta_px": 0,
+      "cases": ["latin measurement repeat","fallback measurement repeat","ellipsis measurement repeat"]
+    },
+    "layout": {"wrap":true,"ellipsis":true,"alignment":["start","center","end"],"baseline":true,"line_height":true},
+    "caret_rects": [{"x":32,"y":64,"w":2,"h":18}],
+    "selection_rects": [{"x":32,"y":64,"w":18,"h":18}],
+    "ime_composition_spans": [
+      {"kind":"composition","byte_start":0,"byte_end":3,"scalar_start":0,"scalar_end":3,"rect":{"x":32,"y":64,"w":24,"h":18}}
+    ],
+    "nonclaims": [
+      "full Unicode editor semantics",
+      "bidi production shaping",
+      "complex script shaping without HarfBuzz-class evidence",
+      "platform widget text controls"
+    ],
+    "negative_guards": {
+      "full_unicode_editor_without_tests_rejected": true,
+      "missing_font_fallback_rejected": true,
+      "unbounded_glyph_cache_rejected": true,
+      "platform_widget_text_controls_rejected": true
+    }
+  },
   "processes": [
     {"name":"tetra build","kind":"build","path":"tetra build --target linux-x64 examples/surface_release_text_input.tetra -o /tmp/surface-artifacts/surface-release-text-input","ran":true,"pass":true,"exit_code":0},
     {"name":"surface component app","kind":"app","path":"/tmp/surface-artifacts/surface-release-text-input","ran":true,"pass":true,"exit_code":1,"expected_exit_code":1},
@@ -88,6 +191,7 @@ func TestValidateSurfaceRuntimeReportAcceptsProductionTextInputSchema(t *testing
     {"name":"reject legacy UI evidence","kind":"negative","ran":true,"pass":true,"expected_error":"legacy UI evidence rejected"}
   ]
 }`)
+	raw = withProductionTextEditingReport(t, raw, "headless")
 	if err := os.WriteFile(reportPath, raw, 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
@@ -138,6 +242,8 @@ func TestValidateSurfaceRuntimeReportAcceptsReleaseSummarySchema(t *testing.T) {
   "linux_surface": "linux-x64-release-window-v1",
   "block_system": "block-system",
   "block_system_gate": "tetra.surface.block-system.gate.v1",
+  "morph": "morph-capsule",
+  "morph_gate": "tetra.surface.morph.gate.v1",
   "artifact_hashes_validated": true,
   "legacy_sidecars": false,
   "dom_ui": false,
@@ -1067,6 +1173,8 @@ func validProductionTextInputReportJSON(t *testing.T) []byte {
 		},
 		BorrowedViewStorage:     false,
 		SafeViewLifetimeChecked: true,
+		TextPipeline:            validProductionTextPipelineReport(),
+		TextEditing:             validProductionTextEditingReport("headless"),
 		Processes: []surface.ProcessReport{
 			{Name: "tetra build", Kind: "build", Path: "tetra build --target linux-x64 examples/surface_release_text_input.tetra -o /tmp/surface-artifacts/surface-release-text-input", Ran: true, Pass: true, ExitCode: intRef(0)},
 			{Name: "surface component app", Kind: "app", Path: "/tmp/surface-artifacts/surface-release-text-input", Ran: true, Pass: true, ExitCode: intRef(1), ExpectedExitCode: intRef(1)},
@@ -1097,6 +1205,11 @@ func validProductionTextInputReportJSON(t *testing.T) []byte {
 			{Name: "release text input composition commit", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input composition cancel", Kind: "positive", Ran: true, Pass: true},
 			{Name: "release text input safe view lifetime checked", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text editing target IME trace", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text editing clipboard owned copies", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text editing undo unit boundaries", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text editing validation diagnostics", Kind: "positive", Ran: true, Pass: true},
+			{Name: "release text editing rich text nonclaim", Kind: "positive", Ran: true, Pass: true},
 			{Name: "reject legacy UI evidence", Kind: "negative", Ran: true, Pass: true, ExpectedError: "legacy UI evidence rejected"},
 		},
 	}
@@ -1105,6 +1218,178 @@ func validProductionTextInputReportJSON(t *testing.T) []byte {
 		t.Fatalf("marshal text input report: %v", err)
 	}
 	return raw
+}
+
+func withProductionTextEditingReport(t *testing.T, raw []byte, target string) []byte {
+	t.Helper()
+	var report surface.TextInputReport
+	if err := json.Unmarshal(raw, &report); err != nil {
+		t.Fatalf("decode text input report: %v", err)
+	}
+	report.TextEditing = validProductionTextEditingReport(target)
+	for _, c := range productionTextEditingCases() {
+		report.Cases = append(report.Cases, c)
+	}
+	out, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal text input report: %v", err)
+	}
+	return out
+}
+
+func validProductionTextEditingReport(target string) surface.TextEditingReport {
+	return surface.TextEditingReport{
+		Schema:   surface.TextEditingSchemaV1,
+		Level:    "production-editing-basics-v1",
+		Target:   target,
+		Producer: "tools/cmd/surface-runtime-smoke",
+		EditableBlocks: []surface.EditableTextBlockReport{
+			{ID: "ReleaseTextBox", Kind: "TextBox", Storage: "owned-utf8-byte-buffer", FormsSafe: true, CommandPaletteSearchSafe: true, MaxBytes: 1024, UTF8Validation: true},
+		},
+		EditOperations: []surface.TextEditOperationReport{
+			{Order: 1, Action: "insert_text", Target: "ReleaseTextBox", BeforeTextLen: 0, AfterTextLen: 3, BeforeCaret: 0, AfterCaret: 3, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 0}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 3, Focus: 3}, UndoUnitID: "insert-ada", Checksum: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+			{Order: 2, Action: "move_caret_left", Target: "ReleaseTextBox", BeforeTextLen: 3, AfterTextLen: 3, BeforeCaret: 3, AfterCaret: 2, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 3, Focus: 3}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 2, Focus: 2}, UndoUnitID: "navigation-left", Checksum: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+			{Order: 3, Action: "replace_selection", Target: "ReleaseTextBox", BeforeTextLen: 5, AfterTextLen: 4, BeforeCaret: 1, AfterCaret: 2, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 1, Focus: 4}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 2, Focus: 2}, UndoUnitID: "replace-selection", Checksum: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+			{Order: 4, Action: "composition_commit", Target: "ReleaseTextBox", BeforeTextLen: 4, AfterTextLen: 5, BeforeCaret: 4, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 4, Focus: 4}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 5, Focus: 5}, UndoUnitID: "ime-commit", Checksum: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+			{Order: 5, Action: "clipboard_write", Target: "ReleaseTextBox", BeforeTextLen: 5, AfterTextLen: 5, BeforeCaret: 5, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 5}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 0, Focus: 5}, UndoUnitID: "clipboard-copy", Checksum: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+			{Order: 6, Action: "clipboard_read", Target: "ReleaseTextBox", BeforeTextLen: 0, AfterTextLen: 5, BeforeCaret: 0, AfterCaret: 5, SelectionBefore: surface.TextSelectionRangeReport{Anchor: 0, Focus: 0}, SelectionAfter: surface.TextSelectionRangeReport{Anchor: 5, Focus: 5}, UndoUnitID: "clipboard-paste", Checksum: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+		},
+		SelectionModel: surface.TextSelectionModelReport{
+			CaretMovement:        []string{"left", "right", "home", "end"},
+			SelectionReplacement: true,
+			ScalarBoundaryClamp:  true,
+			CaretRects:           []surface.RectReport{{X: 32, Y: 64, W: 2, H: 18}},
+			SelectionRects:       []surface.RectReport{{X: 32, Y: 64, W: 24, H: 18}},
+		},
+		IMETraces: []surface.TextIMETraceReport{
+			{
+				Target:     target,
+				Start:      true,
+				Update:     true,
+				Commit:     true,
+				Cancel:     true,
+				EventCount: 4,
+				CompositionSpan: surface.TextCompositionSpanReport{
+					Kind:        "composition",
+					ByteStart:   0,
+					ByteEnd:     3,
+					ScalarStart: 0,
+					ScalarEnd:   3,
+					Rect:        surface.RectReport{X: 32, Y: 64, W: 24, H: 18},
+				},
+				CommittedTextOwnedCopy: true,
+			},
+		},
+		ClipboardTransfers: []surface.TextClipboardTransferReport{
+			{Direction: "write", HostABI: "__tetra_surface_clipboard_write_text", Bytes: 5, UTF8Valid: true, OwnedCopy: true, BorrowedView: false, Checksum: "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
+			{Direction: "read", HostABI: "__tetra_surface_clipboard_read_text_into", Bytes: 5, UTF8Valid: true, OwnedCopy: true, BorrowedView: false, Checksum: "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
+		},
+		UndoUnits: []surface.TextUndoUnitReport{
+			{ID: "insert-ada", OperationOrders: []int{1}, Boundary: "text-input-operation", Reversible: true, Coalesced: false},
+			{ID: "navigation-left", OperationOrders: []int{2}, Boundary: "caret-navigation", Reversible: true, Coalesced: false},
+			{ID: "replace-selection", OperationOrders: []int{3}, Boundary: "selection-replacement", Reversible: true, Coalesced: false},
+			{ID: "ime-commit", OperationOrders: []int{4}, Boundary: "composition-commit", Reversible: true, Coalesced: false},
+			{ID: "clipboard-copy", OperationOrders: []int{5}, Boundary: "clipboard-copy", Reversible: true, Coalesced: false},
+			{ID: "clipboard-paste", OperationOrders: []int{6}, Boundary: "clipboard-paste", Reversible: true, Coalesced: false},
+		},
+		ValidationDiagnostics: []surface.TextEditingDiagnosticReport{
+			{Name: "invalid UTF-8 rejected", Ran: true, Pass: true},
+			{Name: "borrowed text buffer rejected at host boundary", Ran: true, Pass: true},
+			{Name: "IME claim without target trace rejected", Ran: true, Pass: true},
+			{Name: "rich text claim rejected", Ran: true, Pass: true},
+		},
+		HostBoundary: surface.TextEditingHostBoundaryReport{
+			CopySafe:                      true,
+			ClipboardOwnedCopy:            true,
+			CompositionOwnedCopy:          true,
+			BorrowedTextBufferCrossesHost: false,
+		},
+		FormsSafe:                true,
+		CommandPaletteSearchSafe: true,
+		RichText:                 false,
+		NonClaims: []string{
+			"rich text",
+			"full editor-grade text semantics",
+			"native platform text controls",
+		},
+		NegativeGuards: surface.TextEditingNegativeGuardsReport{
+			IMEWithoutTargetTraceRejected: true,
+			BorrowedTextBufferRejected:    true,
+			RichTextClaimRejected:         true,
+			UnsafeClipboardAliasRejected:  true,
+			InvalidUTF8Rejected:           true,
+		},
+	}
+}
+
+func productionTextEditingCases() []surface.CaseReport {
+	return []surface.CaseReport{
+		{Name: "release text editing target IME trace", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing clipboard owned copies", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing undo unit boundaries", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing validation diagnostics", Kind: "positive", Ran: true, Pass: true},
+		{Name: "release text editing rich text nonclaim", Kind: "positive", Ran: true, Pass: true},
+	}
+}
+
+func validProductionTextPipelineReport() surface.TextPipelineReport {
+	return surface.TextPipelineReport{
+		Schema:                     surface.TextPipelineSchemaV1,
+		Level:                      "scoped-latin-utf8-text-pipeline-v1",
+		Engine:                     "deterministic-tetra-text-shaper",
+		PlatformWidgetTextControls: false,
+		FontManifest: []surface.TextPipelineFontReport{
+			{ID: "tetra-ui-regular", Family: "Tetra UI", Style: "normal", Weight: 400, Source: "embedded:tetra-ui-regular", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Bytes: 32768},
+			{ID: "noto-sans-fallback", Family: "Noto Sans", Style: "normal", Weight: 400, Source: "system:fontconfig/noto-sans", SHA256: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Bytes: 65536},
+		},
+		FontFallbacks: []surface.FontFallbackReport{
+			{ID: "release-fallback", RequestedFamily: "Tetra UI", ResolvedFamily: "Noto Sans", Chain: []string{"Tetra UI", "Noto Sans", "monospace"}, MissingGlyphs: 0, Coverage: "latin-plus-basic-utf8-smoke"},
+		},
+		GlyphRuns: []surface.TextGlyphRunReport{
+			{ID: "latin-run", FontFamily: "Tetra UI", Script: "Latin", Direction: "ltr", Shaping: "tier1-latin-simple", TextLen: 5, ByteStart: 0, ByteEnd: 5, ScalarStart: 0, ScalarEnd: 5, GlyphCount: 5, GlyphIDs: []int{36, 69, 70, 32, 71}, Advances: []int{8, 8, 8, 4, 8}, Clusters: []int{0, 1, 2, 3, 4}, Baseline: 14, Checksum: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+			{ID: "fallback-run", FontFamily: "Noto Sans", Script: "Common", Direction: "ltr", Shaping: "tier1-fallback-simple", TextLen: 1, ByteStart: 5, ByteEnd: 7, ScalarStart: 5, ScalarEnd: 6, GlyphCount: 1, GlyphIDs: []int{9731}, Advances: []int{9}, Clusters: []int{5}, Baseline: 14, Checksum: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+		},
+		GlyphCaches: []surface.GlyphCacheReport{
+			{ID: "release-glyph-cache", Strategy: "bounded-lru", BudgetBytes: 65536, UsedBytes: 8192, EntryCount: 24, Eviction: "lru", Bounded: true},
+		},
+		CacheBudgetBytes:      65536,
+		GlyphCacheBudgetBytes: 65536,
+		GlyphCacheUsedBytes:   8192,
+		BoundedCaches:         true,
+		CacheEviction:         "lru",
+		UnicodeBoundaries: surface.TextUnicodeBoundaryReport{
+			UTF8Storage:        true,
+			ScalarBoundaries:   true,
+			ClusterBoundaries:  true,
+			LatinTier:          true,
+			UnsupportedScripts: []string{"Arabic", "Devanagari", "Thai"},
+			BoundaryCases:      []string{"ASCII insertion", "UTF-8 scalar insertion", "cluster caret clamp"},
+		},
+		ShapingScope: surface.TextShapingScopeReport{
+			Tier:                       "tier1-latin-utf8",
+			SupportedScripts:           []string{"Latin", "Common"},
+			UnsupportedScripts:         []string{"Arabic", "Devanagari", "Thai"},
+			EngineDecision:             "deterministic embedded shaper until HarfBuzz-class evidence exists",
+			FullUnicodeEditorSemantics: false,
+			SystemLibraryIntegration:   "not required for Tier 1; future HarfBuzz-class gate",
+		},
+		Measurements: []surface.TextMeasurementReport{
+			{ID: "release-label-measure", BlockID: 1, TextLen: 18, FontFamily: "Tetra UI", FontWeight: 400, FontSize: 14, LineHeight: 18, MaxWidth: 120, Measured: surface.SizeReport{W: 108, H: 18}, LineCount: 1, Wrap: "none", Overflow: "clip", Ellipsis: false, EllipsizedTextLen: 18, Align: "start", Quality: "deterministic-metrics-v1", Checksum: "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+			{ID: "release-ellipsis-measure", BlockID: 2, TextLen: 32, FontFamily: "Tetra UI", FontWeight: 400, FontSize: 14, LineHeight: 18, MaxWidth: 96, Measured: surface.SizeReport{W: 96, H: 36}, LineCount: 2, Wrap: "word", Overflow: "ellipsis", Ellipsis: true, EllipsizedTextLen: 20, Align: "start", Quality: "deterministic-metrics-v1", Checksum: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+		},
+		MeasurementConsistency: surface.TextMeasurementConsistencyReport{SameInputSameMetrics: true, TargetIndependentBaseline: true, Cases: []string{"latin measurement repeat", "fallback measurement repeat", "ellipsis measurement repeat"}},
+		Layout:                 surface.TextPipelineLayoutReport{Wrap: true, Ellipsis: true, Alignment: []string{"start", "center", "end"}, Baseline: true, LineHeight: true},
+		CaretRects:             []surface.RectReport{{X: 32, Y: 64, W: 2, H: 18}},
+		SelectionRects:         []surface.RectReport{{X: 32, Y: 64, W: 18, H: 18}},
+		IMECompositionSpans:    []surface.TextCompositionSpanReport{{Kind: "composition", ByteStart: 0, ByteEnd: 3, ScalarStart: 0, ScalarEnd: 3, Rect: surface.RectReport{X: 32, Y: 64, W: 24, H: 18}}},
+		NonClaims:              []string{"full Unicode editor semantics", "bidi production shaping", "complex script shaping without HarfBuzz-class evidence", "platform widget text controls"},
+		NegativeGuards: surface.TextPipelineNegativeGuardsReport{
+			FullUnicodeEditorWithoutTestsRejected: true,
+			MissingFontFallbackRejected:           true,
+			UnboundedGlyphCacheRejected:           true,
+			PlatformWidgetTextControlsRejected:    true,
+		},
+	}
 }
 
 func headlessReleaseRuntimeReportJSON(artifactPath string, artifactSHA string, artifactSize int64, tracePath string, traceSHA string, traceSize int64) []byte {
@@ -1265,6 +1550,8 @@ func validSurfaceRuntimeReleaseSummaryJSON() []byte {
   "linux_surface": "linux-x64-release-window-v1",
   "block_system": "block-system",
   "block_system_gate": "tetra.surface.block-system.gate.v1",
+  "morph": "morph-capsule",
+  "morph_gate": "tetra.surface.morph.gate.v1",
   "artifact_hashes_validated": true,
   "legacy_sidecars": false,
   "dom_ui": false,

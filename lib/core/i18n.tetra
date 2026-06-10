@@ -1,0 +1,114 @@
+// Surface i18n/l10n hooks for scoped locale resources and string IDs.
+// Effects: none
+// ```tetra doctest
+// func i18n_doctest() -> Int:
+//     let locale: lib.core.i18n.Locale = lib.core.i18n.locale_en_us()
+//     if lib.core.i18n.locale_valid(locale):
+//         return lib.core.i18n.direction_ltr()
+//     return 0
+// ```
+module lib.core.i18n
+
+struct Locale:
+    language: Int
+    region: Int
+    direction: Int
+
+struct StringID:
+    namespace: Int
+    key: Int
+
+struct LocaleResource:
+    locale: Locale
+    string_count: Int
+    hash: Int
+    packaged: Bool
+    diagnostic_on_missing: Bool
+
+struct FormatPolicy:
+    number_hook: Bool
+    date_hook: Bool
+    plural_hook: Bool
+    full_icu_claim: Bool
+
+struct LocalizationPolicy:
+    resource_count: Int
+    string_ids_required: Bool
+    diagnostic_fallback: Bool
+    silent_fallback_allowed: Bool
+    full_bidi_claim: Bool
+    layout_direction: Int
+    full_unicode_editor_claim: Bool
+
+func language_en() -> Int:
+    return 101
+
+func language_es() -> Int:
+    return 102
+
+func language_ar() -> Int:
+    return 103
+
+func region_us() -> Int:
+    return 201
+
+func region_es() -> Int:
+    return 202
+
+func region_eg() -> Int:
+    return 203
+
+func direction_ltr() -> Int:
+    return 1
+
+func direction_rtl() -> Int:
+    return 2
+
+func locale_en_us() -> Locale:
+    return Locale(language: language_en(), region: region_us(), direction: direction_ltr())
+
+func locale_es_es() -> Locale:
+    return Locale(language: language_es(), region: region_es(), direction: direction_ltr())
+
+func locale_ar_eg() -> Locale:
+    return Locale(language: language_ar(), region: region_eg(), direction: direction_rtl())
+
+func locale_valid(locale: Locale) -> Bool:
+    if locale.language <= 0 || locale.region <= 0:
+        return false
+    return locale.direction == direction_ltr() || locale.direction == direction_rtl()
+
+func string_id(namespace: Int, key: Int) -> StringID:
+    return StringID(namespace: namespace, key: key)
+
+func string_id_valid(id: StringID) -> Bool:
+    return id.namespace > 0 && id.key > 0
+
+func locale_resource(locale: Locale, string_count: Int, hash: Int, packaged: Bool, diagnostic_on_missing: Bool) -> LocaleResource:
+    return LocaleResource(locale: locale, string_count: string_count, hash: hash, packaged: packaged, diagnostic_on_missing: diagnostic_on_missing)
+
+func locale_resource_valid(resource: LocaleResource) -> Bool:
+    return locale_valid(resource.locale) && resource.string_count > 0 && resource.hash > 0 && resource.packaged && resource.diagnostic_on_missing
+
+func format_policy(number_hook: Bool, date_hook: Bool, plural_hook: Bool, full_icu_claim: Bool) -> FormatPolicy:
+    return FormatPolicy(number_hook: number_hook, date_hook: date_hook, plural_hook: plural_hook, full_icu_claim: full_icu_claim)
+
+func format_policy_valid(policy: FormatPolicy) -> Bool:
+    if policy.full_icu_claim:
+        return false
+    return policy.number_hook && policy.date_hook && policy.plural_hook
+
+func localization_policy(resource_count: Int, string_ids_required: Bool, diagnostic_fallback: Bool, silent_fallback_allowed: Bool, full_bidi_claim: Bool, layout_direction: Int, full_unicode_editor_claim: Bool) -> LocalizationPolicy:
+    return LocalizationPolicy(resource_count: resource_count, string_ids_required: string_ids_required, diagnostic_fallback: diagnostic_fallback, silent_fallback_allowed: silent_fallback_allowed, full_bidi_claim: full_bidi_claim, layout_direction: layout_direction, full_unicode_editor_claim: full_unicode_editor_claim)
+
+func localization_policy_valid(policy: LocalizationPolicy) -> Bool:
+    if policy.silent_fallback_allowed || policy.full_bidi_claim || policy.full_unicode_editor_claim:
+        return false
+    if policy.layout_direction != direction_ltr() && policy.layout_direction != direction_rtl():
+        return false
+    return policy.resource_count >= 2 && policy.string_ids_required && policy.diagnostic_fallback
+
+func localized_text_len(resource: LocaleResource, id: StringID, fallback_len: Int) -> Int:
+    if !locale_resource_valid(resource) || !string_id_valid(id):
+        return fallback_len
+    return resource.string_count + id.key

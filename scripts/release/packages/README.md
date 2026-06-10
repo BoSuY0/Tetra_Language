@@ -10,3 +10,9 @@ Release packaging helpers for installable Tetra distributions.
 The GitHub Actions workflow `.github/workflows/release-packages.yml` wires these
 helpers into GitHub Releases, GHCR image publishing, and optional Homebrew tap
 updates.
+
+Surface package distribution evidence is produced separately by
+`scripts/release/surface/package-gate.sh`. That gate creates the scoped
+`surface-linux-tar-v1` app package report and keeps Windows/macOS signing,
+macOS notarization, and auto-update production as explicit nonclaims until
+target-specific evidence exists.

@@ -46,6 +46,7 @@ generated docs run.
 | Slice summation helpers (`sum_i32`, `weighted_sum_i32`, `sum_u8`) | `import lib.core.slices as slices` | `examples/core_slices_smoke.tetra` | `mem` |
 | ASCII length, ASCII sum, and empty checks (`ascii_len`, `ascii_sum`, `is_empty`) | `import lib.core.strings as strings` | `examples/core_strings_smoke.tetra` | none |
 | Caller-owned UTF-8 text buffer helpers | `import lib.core.text as text` | `examples/core_text_smoke.tetra` | none |
+| Surface localization resource and string-ID hooks | `import lib.core.i18n as i18n` | `examples/core_i18n_smoke.tetra` | none |
 | Generic collection views and `[]i32` scans | `import lib.core.collections as collections` | `examples/core_collections_smoke.tetra` | `mem` |
 | Tiny serialization combinators | `import lib.core.serialization as serialization` | `examples/core_serialization_smoke.tetra` | `mem` |
 | Filesystem path helpers and host-backed `exists` | `import lib.core.filesystem as filesystem` | `examples/core_filesystem_smoke.tetra` | `io` |
@@ -62,8 +63,8 @@ generated docs run.
 | Planned Tetra Surface software draw helpers | `import lib.core.draw as draw` | `examples/core_draw_smoke.tetra` | `mem` |
 | Stable Surface v1 widget style and theme helpers | `import lib.core.style as style` | `examples/core_style_smoke.tetra` | none |
 | Planned Tetra Surface static component helpers | `import lib.core.component as component` | `examples/core_component_smoke.tetra` | none |
-| Experimental Surface Block System data model | `import lib.core.block as block` | `examples/core_block_smoke.tetra` | alloc, mem |
-| Experimental Surface Morph Capsule recipe layer | `import lib.core.morph as morph` | `examples/surface_morph_command_palette.tetra` | alloc, mem in consuming scenes |
+| Experimental Surface Block System data/app model | `import lib.core.block as block` | `examples/core_block_smoke.tetra` | alloc, mem |
+| Experimental Surface Morph Capsule recipe/style graph layer with 11 Block-only recipe families | `import lib.core.morph as morph` | `examples/core_morph_smoke.tetra` | none |
 | Experimental Tetra Surface accessibility metadata helpers | `import lib.core.accessibility as accessibility` | `examples/core_accessibility_smoke.tetra` | none |
 | Experimental Tetra Surface minimal widget helpers | `import lib.core.widgets as widgets` | `examples/core_widgets_smoke.tetra` | none |
 
@@ -129,6 +130,54 @@ probe reports plus Linux-x64 real-window Wayland shm evidence for
 `examples/surface_window_counter.tetra`; browser runtime, full IME/String text
 editing, production widget toolkit support, and accessibility Surface support
 remain unpromoted.
+Within the experimental Block System track, `lib.core.block` now also exposes
+compact app-model helpers for `tetra.surface.app-model.v1` evidence:
+`app_state_store`, `app_command`, `app_command_dispatch_status`,
+`app_event_trace`, `app_async_boundary_safe`, `app_navigation_step`,
+`app_shortcut_scope_allows`, `app_error_propagated_handled`, and
+`app_redraw_valid`. These helpers are for owned state stores, typed commands,
+ordered Block event traces, safe actor/task boundaries, navigation/focus
+scopes, scoped shortcuts, error propagation, and explicit redraw invalidation;
+they are not a React runtime compatibility layer.
+
+The same module exposes compact keyboard UX helpers for
+`tetra.surface.keyboard-ux.v1` evidence: `keyboard_focus_node`,
+`keyboard_binding`, `keyboard_shortcut_conflict`, `keyboard_undo_redo_stack`,
+`keyboard_script`, `keyboard_focus_trap_valid`, and
+`keyboard_roving_group_valid`. These helpers describe graph focus order,
+overlay focus traps, roving focus, keyboard activation, scoped shortcut
+conflict diagnostics, and bounded undo/redo stacks without DOM keyboard events
+or native platform widgets.
+
+For `tetra.surface.animation-scheduler.v1` evidence, `lib.core.block` exposes
+compact motion scheduler helpers: `motion_frame_interval_ms`,
+`motion_frame_budget_default`, `motion_max_frame_delta_ms`,
+`motion_frame_timing_ok`, `motion_lifecycle_complete_stops`, and
+`motion_reduced_stops_schedule`. These helpers keep Surface motion tied to
+deterministic Block frames, bounded frame timing, lifecycle stop-after-settle
+behavior, and reduced-motion instant settle. They do not add a CSS animation
+runtime, requestAnimationFrame parity, or GPU compositor timing proof.
+
+For `tetra.surface.asset-pipeline.v1` evidence, `lib.core.block` exposes local
+asset helpers for `asset_font`, `asset_icon`, `asset_image`, `asset_vector`,
+`asset_manifest(font, icon, image, vector, budget, max_entries)`,
+`asset_manifest_validate`, `asset_cache_validate`, and
+`asset_vector_sanitize_status`. The API models local-only font/icon/image/vector
+manifests, sha256-like positive hashes before decode, bounded asset cache
+checks, missing fallback status, network rejection status, and static vector
+sanitization status. It does not add network assets, remote fonts, arbitrary
+image codecs, or full SVG/CSS/SMIL support.
+
+`lib.core.surface` also exposes compact app-shell Host ABI value helpers for
+`tetra.surface.app-shell.v1` evidence: `ShellWindowSpec`,
+`ShellCapability`, `ShellActionTrace`, `ShellPermission`, `ShellDiagnostic`,
+`ShellDPI`, `shell_window_spec`, `shell_capability`, `shell_action_trace`,
+`shell_permission`, `shell_unsupported_diagnostic`, and `shell_dpi`. These
+helpers describe windows, lifecycle, menus, dialogs, tray/status items,
+notifications, cursors, drag/drop, permissions, clipboard, IME, DPI/scale,
+and open URL/file requests as reportable ABI facts. Real host behavior still
+comes from runtime reports and target adapters; unsupported host features must
+be rejected diagnostics, never silent no-ops.
 `lib.core.net` is a stable linux-x64 TCP socket client/server I/O slice for
 open/bind/connect/listen/accept/read/recv/write/send/nonblocking/close, `SO_REUSEPORT`,
 `TCP_NODELAY`, plus epoll
@@ -641,6 +690,13 @@ Prefer examples already tracked in `examples/` or documented in
 - Coverage in `bash scripts/ci/test-all.sh --full --keep-going` or the current
   release gate.
 
+Surface localization helpers live in `lib.core.i18n`. They expose locale
+resources, stable string IDs, number/date/plural formatting hooks, translation
+asset packaging alignment, and LTR/RTL layout direction metadata for
+`tetra.surface.i18n-report.v1` / `surface-i18n-l10n-v1`. The helpers are not a
+full ICU/CLDR database, full bidi production shaping, or full Unicode
+editor-grade localization semantics.
+
 ## Verification
 
 Use this stdlib completeness workflow before changing the release-covered module
@@ -660,6 +716,7 @@ mkdir -p reports
   examples/core_crypto_smoke.tetra \
   examples/core_filesystem_smoke.tetra \
   examples/core_http_smoke.tetra \
+  examples/core_i18n_smoke.tetra \
   examples/core_io_smoke.tetra \
   examples/core_json_smoke.tetra \
   examples/core_math_smoke.tetra \
