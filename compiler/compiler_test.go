@@ -1415,6 +1415,21 @@ func TestBuildCoreCryptoSmoke(t *testing.T) {
 	}
 }
 
+func TestBuildCoreMorphSmoke(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("linux/amd64 only")
+	}
+
+	root := projectRoot(t)
+	stdout, exitCode := buildAndRunFile(t, filepath.Join(root, "examples", "core_morph_smoke.tetra"))
+	if stdout != "" {
+		t.Fatalf("stdout mismatch: %q", stdout)
+	}
+	if exitCode != 42 {
+		t.Fatalf("exit code mismatch: got %d, want 42", exitCode)
+	}
+}
+
 func TestBuildExtensionSmoke(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("linux/amd64 only")

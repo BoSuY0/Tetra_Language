@@ -34,6 +34,9 @@ func scene_recipe_checksum() -> Int:
         return capsule.token_graph_hash + action.name_hash + field.name_hash + panel.name_hash
     return 0
 
+func scene_checksum() -> Int:
+    return scene_recipe_checksum()
+
 func main() -> Int
 uses alloc, mem:
     let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 400, h: 260)
@@ -85,6 +88,6 @@ uses alloc, mem:
        morph.expansion_valid(item_expansion) &&
        morph.expansion_valid(action_expansion) &&
        morph.memory_budget_ok(app.block_count, 3, 400 * 260 * 4) &&
-       scene_recipe_checksum() > 0:
-        return 0
-    return 1
+       scene_checksum() > 0:
+        return 1
+    return 0

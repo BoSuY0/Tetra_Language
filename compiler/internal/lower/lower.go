@@ -4506,25 +4506,25 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			if total != 2 {
 				return 0, fmt.Errorf("%s: island_make_u8 expects 2 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceU8, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceU8, Name: inlineAllocationName("alloc", e.At), Pos: e.At})
 			return 2, nil
 		case "core.island_make_u16":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: island_make_u16 expects 2 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceU16, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceU16, Name: inlineAllocationName("alloc", e.At), Pos: e.At})
 			return 2, nil
 		case "core.island_make_i32":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: island_make_i32 expects 2 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Name: inlineAllocationName("alloc", e.At), Pos: e.At})
 			return 2, nil
 		case "core.island_make_bool":
 			if total != 2 {
 				return 0, fmt.Errorf("%s: island_make_bool expects 2 arguments", frontend.FormatPos(e.At))
 			}
-			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Pos: e.At})
+			l.emit(ir.IRInstr{Kind: ir.IRIslandMakeSliceI32, Name: inlineAllocationName("alloc", e.At), Pos: e.At})
 			return 2, nil
 		case "core.island_reset":
 			if total != 1 {
@@ -5741,6 +5741,13 @@ func allocationElementSizeByBuiltin(name string) (int, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func inlineAllocationName(prefix string, pos frontend.Position) string {
+	if pos.Line != 0 || pos.Col != 0 {
+		return fmt.Sprintf("%s_%d_%d", prefix, pos.Line, pos.Col)
+	}
+	return prefix
 }
 
 func evalConstInt64ForAllocation(expr frontend.Expr) (int64, bool) {

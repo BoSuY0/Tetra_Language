@@ -70,17 +70,23 @@ production support.
   image/icon assets, overlay paint, rounded capsules, focus order, and
   motion-backed interaction evidence.
 
-## Experimental Morph Capsule Example
+## Experimental Morph Capsule Examples
 
-`examples/surface_morph_command_palette.tetra` is the current
-`ui.surface-morph-capsule` evidence source. It imports `lib.core.morph`, uses
-capsule recipes for a panel, editable field, label, and command rows, and then
-validates the resulting `BlockTree`. The gate is
+The `surface_morph_*` examples are the current `ui.surface-morph-capsule`
+evidence sources. They import `lib.core.morph`, use capsule recipes for
+panels, editable fields, labels, command rows, shell controls, and translucent
+control surfaces, and then validate the resulting `BlockTree`. The gate is
 `scripts/release/surface/morph-gate.sh --report-dir reports/surface-morph/gate`.
 It writes `tetra.surface.morph.v1` headless evidence plus a
 `tetra.surface.morph.gate.v1` summary. This example is not Surface v1
 production support and does not introduce core Button/Card/TextField/Sidebar
 or Modal primitives.
+
+- `examples/surface_morph_command_palette.tetra`
+- `examples/surface_morph_project_dashboard.tetra`
+- `examples/surface_morph_settings.tetra`
+- `examples/surface_morph_editor_shell.tetra`
+- `examples/surface_morph_control_panel.tetra`
 
 ## Legacy Metadata UI Examples
 
@@ -154,7 +160,12 @@ Legacy `tetra.ui.v1` metadata examples are compatibility evidence for
 | `examples/core_accessibility_smoke.tetra` | Experimental Tetra Surface accessibility metadata smoke for role, action, value, and validation helper counts through `lib.core.accessibility`. | native | exits 42 through pure metadata helper calls; does not claim production accessibility tree runtime support |
 | `examples/core_capability_smoke.tetra` | Current core capability token acquisition smoke for `cap.mem` and `cap.io`. | native | exits 42 using only caller-owned heap memory and local MMIO storage; does not imply host permission grant |
 | `examples/core_block_smoke.tetra` | Current Block primitive data model smoke for fixed layout, paint, text, input, event, state, motion, accessibility, and asset metadata through `lib.core.block`. | native | exits 0 |
-| `examples/surface_morph_command_palette.tetra` | Experimental Morph Capsule command palette over `lib.core.morph`, expanding capsule recipes into Block graph evidence. | native headless | exits 0 through Morph self-checks, recipe expansions, BlockTree validation, accessibility projection, and memory-budget checks; release evidence comes from `surface-headless-morph-smoke.sh` |
+| `examples/core_morph_smoke.tetra` | Experimental Surface Morph Capsule metadata smoke for capsule validity, recipe safety, material grammar, and bounded Morph memory-budget helpers through `lib.core.morph`. | native | exits 42 through pure Morph helper calls; full BlockTree Morph scene evidence lives in `examples/surface_morph_*.tetra` |
+| `examples/surface_morph_command_palette.tetra` | Experimental Morph Capsule command palette over `lib.core.morph`, expanding capsule recipes into Block graph evidence. | native headless | exits 1 as Surface runtime success after Morph self-checks, recipe expansions, BlockTree validation, accessibility projection, and memory-budget checks; release evidence comes from `surface-headless-morph-smoke.sh` |
+| `examples/surface_morph_project_dashboard.tetra` | Experimental Morph Capsule dashboard shell over `lib.core.morph`, expanding region and action recipes into Block graph evidence. | native | exits 0 through capsule validation, recipe expansion checks, focus order, accessibility order, and memory-budget checks |
+| `examples/surface_morph_settings.tetra` | Experimental Morph Capsule settings form over `lib.core.morph`, expanding region, text field, label, and action recipes into Block graph evidence. | native | exits 0 through capsule validation, labelled-field accessibility projection, focus order, recipe expansion checks, and memory-budget checks |
+| `examples/surface_morph_editor_shell.tetra` | Experimental Morph Capsule editor shell over `lib.core.morph`, expanding rail, editor panel, tab actions, and code text Blocks without claiming full rich-text editor support. | native | exits 0 through capsule validation, recipe expansion checks, focus order, deterministic motion/state checksum, and memory-budget checks |
+| `examples/surface_morph_control_panel.tetra` | Experimental Morph Capsule translucent control panel over `lib.core.morph`, using alpha fill, border, shadow, and overlay evidence without backdrop-blur claims. | native | exits 0 through capsule validation, material validation, recipe expansion checks, focus order, and memory-budget checks |
 | `examples/core_collections_smoke.tetra` | Current core collections smoke for stable generic `Vec<T>`/`HashMap<K,V>` source views plus legacy `[]i32` length, contains, count, and first-or helpers. | native | exits 42 |
 | `examples/core_component_smoke.tetra` | Planned Tetra Surface static component helper smoke for `clamp_size`, `inset_rect`, and `center_rect`. | native | exits 42 through pure measurement/layout helpers; does not claim dynamic component lists or runtime widget dispatch |
 | `examples/core_widgets_smoke.tetra` | Experimental Tetra Surface minimal widget helper smoke for `Panel` initialization and content bounds through `lib.core.widgets`. | native | exits 42 through pure widget helper calls; does not claim production widget toolkit support |

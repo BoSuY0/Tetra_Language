@@ -577,7 +577,7 @@ func verifySummaryReturnMetadata(fn Function, values map[string]Value) error {
 		}
 		for _, input := range op.Inputs {
 			for _, value := range summaryValuesForPath(input, values) {
-				if !borrowedRegionSummaryType(value.Type) || !summaryReturnIsBorrowed(value) {
+				if !borrowedRegionSummaryType(value.Type) || !summaryReturnIsBorrowed(fn, value) {
 					continue
 				}
 				if fn.Summary.ReturnOwnership != "borrow" {
@@ -657,14 +657,42 @@ func summaryParamNameForValue(value Value) string {
 	return name
 }
 
-func summaryReturnIsBorrowed(value Value) bool {
+func summaryReturnIsBorrowed(fn Function, value Value) bool {
+	if value.Kind == ValueParam && value.Provenance.Kind == ProvenanceParam {
+		return summaryParamOwnershipIsBorrowed(fn.Summary, summaryParamNameForValue(value))
+	}
 	if value.Borrow != BorrowNone {
 		return true
 	}
-	if value.Provenance.Kind == ProvenanceParam && strings.TrimSpace(value.Provenance.Root) != "" {
-		return true
+	owner := summaryOwnerPath(value.Provenance.Root)
+	if value.Provenance.Kind == ProvenanceParam {
+		return summaryParamOwnershipIsBorrowed(fn.Summary, summaryRootOwner(owner))
 	}
-	return strings.Contains(summaryOwnerPath(value.Provenance.Root), ".")
+	return strings.Contains(owner, ".")
+}
+
+func summaryRootOwner(owner string) string {
+	owner = strings.TrimSpace(owner)
+	if dot := strings.Index(owner, "."); dot >= 0 {
+		owner = owner[:dot]
+	}
+	return owner
+}
+
+func summaryParamOwnershipIsBorrowed(summary *FunctionSummary, name string) bool {
+	if summary == nil {
+		return false
+	}
+	index := indexOfString(summary.ParamNames, name)
+	if index < 0 || index >= len(summary.ParamOwnership) {
+		return false
+	}
+	switch strings.TrimSpace(summary.ParamOwnership[index]) {
+	case "borrow", "inout":
+		return true
+	default:
+		return false
+	}
 }
 
 func memoryBearingSummaryType(typeName string) bool {
@@ -679,9 +707,7 @@ func memoryBearingSummaryType(typeName string) bool {
 func borrowedRegionSummaryType(typeName string) bool {
 	typeName = strings.TrimSpace(typeName)
 	return typeName == "String" ||
-		typeName == "island" ||
-		strings.HasPrefix(typeName, "[]") ||
-		strings.Contains(strings.ToLower(typeName), "resource")
+		strings.HasPrefix(typeName, "[]")
 }
 
 func isTaskSummaryOperation(op Operation) bool {

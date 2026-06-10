@@ -1,5 +1,13 @@
 // Experimental Surface Morph Capsule layer.
 // Morph recipes project into lib.core.block Blocks; they do not add runtime primitives.
+// Effects: none
+// ```tetra doctest
+// func morph_doctest() -> Int:
+//     let capsule: lib.core.morph.Capsule = lib.core.morph.capsule_default()
+//     if lib.core.morph.capsule_valid(capsule):
+//         return lib.core.morph.schema_v1()
+//     return 0
+// ```
 module lib.core.morph
 
 import lib.core.surface as surface
@@ -322,7 +330,7 @@ func accessibility_projection_ok(label_id_value: Int, field_id_value: Int, label
            block.accessibility_relationship_matches(label, field, label_id, field_id)
 
 func memory_budget_ok(block_count: Int, asset_count: Int, framebuffer_bytes: Int) -> Bool:
-    return block_count <= 64 && asset_count <= block.asset_cache_entry_limit() && framebuffer_bytes <= block.asset_cache_budget_bytes()
+    return block_count <= 64 && asset_count <= block.asset_cache_entry_limit() && framebuffer_bytes <= 1048576
 
 func capsule_self_check() -> Bool:
     let capsule: Capsule = capsule_default()

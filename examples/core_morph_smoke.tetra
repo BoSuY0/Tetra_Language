@@ -1,0 +1,17 @@
+// Core lib.core.morph capsule metadata smoke.
+module examples.core_morph_smoke
+
+import lib.core.morph as morph
+
+func main() -> Int:
+    let capsule: morph.Capsule = morph.capsule_default()
+    let action: morph.Recipe = morph.recipe_control_action()
+    let field: morph.Recipe = morph.recipe_field_text()
+    let panel: morph.Material = morph.material_panel()
+    if morph.capsule_valid(capsule) &&
+       morph.recipe_expands_to_block(action) &&
+       morph.recipe_expands_to_block(field) &&
+       morph.material_valid(panel) &&
+       morph.memory_budget_ok(4, 1, 4096):
+        return 42
+    return 0

@@ -412,8 +412,7 @@ func forbiddenRAMContractClaims(text string) []string {
 			}
 			absolute := searchFrom + index
 			clause := clauseAround(lower, absolute, len(phrase), 260)
-			sentence := sentenceAround(lower, absolute, len(phrase), 320)
-			if !explicitNonClaimContext(clause) && !explicitNonClaimContext(sentence) {
+			if !explicitNonClaimContext(clause) {
 				claims = append(claims, phrase)
 			}
 			searchFrom = absolute + len(phrase)
@@ -921,6 +920,15 @@ func explicitNonClaimContext(lower string) bool {
 		"no memory 100",
 		"no arbitrary unsafe",
 		"no broad memory",
+		"no zero heap",
+		"no zero-heap",
+		"no zero copy",
+		"no zero-copy",
+		"no heap-free",
+		"no copy-free",
+		"no all-target ram parity",
+		"no all target ram parity",
+		"no ram parity across all targets",
 		"no full",
 		"makes no",
 		"model-only",

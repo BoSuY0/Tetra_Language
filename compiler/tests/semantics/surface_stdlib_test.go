@@ -21,6 +21,16 @@ func surfaceBlockBeautyExamplePaths() []string {
 	}
 }
 
+func surfaceMorphExamplePaths() []string {
+	return []string{
+		"examples/surface_morph_command_palette.tetra",
+		"examples/surface_morph_project_dashboard.tetra",
+		"examples/surface_morph_settings.tetra",
+		"examples/surface_morph_editor_shell.tetra",
+		"examples/surface_morph_control_panel.tetra",
+	}
+}
+
 func TestSurfaceCounterExampleLoadsCoreSurfaceAndDrawModules(t *testing.T) {
 	entry := testkit.RepoPath(t, "examples", "surface_counter.tetra")
 	world, err := compiler.LoadWorld(entry)
@@ -997,6 +1007,89 @@ func TestSurfaceBlockExamplesAreBlockOnlyBeautifulScenes(t *testing.T) {
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("%s exited with %v\n%s", rel, err, output)
+			}
+		})
+	}
+}
+
+func TestSurfaceMorphExamplesAreBlockFirstCapsuleScenes(t *testing.T) {
+	for _, rel := range surfaceMorphExamplePaths() {
+		rel := rel
+		t.Run(filepath.Base(rel), func(t *testing.T) {
+			entry := testkit.RepoPath(t, strings.Split(rel, "/")...)
+			raw, err := os.ReadFile(entry)
+			if err != nil {
+				t.Fatalf("read %s: %v", rel, err)
+			}
+			text := string(raw)
+			lower := strings.ToLower(text)
+			for _, want := range []string{
+				"import lib.core.surface as surface",
+				"import lib.core.block as block",
+				"import lib.core.morph as morph",
+				"morph.capsule_default()",
+				"morph.recipe_",
+				"morph.recipe_expansion",
+				"morph.expansion_valid",
+				"morph.expand_",
+				"block.tree_validate",
+				"block.focus_order_at",
+				"morph.memory_budget_ok",
+				"scene_checksum",
+			} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("%s missing Morph capsule evidence marker %q", rel, want)
+				}
+			}
+			for _, forbidden := range []string{
+				"import lib.core.widgets",
+				"widgets.",
+				"widgets.Button",
+				"widgets.TextBox",
+				"Button(",
+				"Card(",
+				"TextField(",
+				"TextBox(",
+				"Modal(",
+				"react",
+				"electron",
+				"dom ui",
+				"user js",
+				"backdropblur",
+			} {
+				if strings.Contains(text, forbidden) || strings.Contains(lower, forbidden) {
+					t.Fatalf("%s contains forbidden non-Morph marker %q", rel, forbidden)
+				}
+			}
+
+			world, err := compiler.LoadWorld(entry)
+			if err != nil {
+				t.Fatalf("LoadWorld(%s): %v", rel, err)
+			}
+			for _, module := range []string{"lib.core.surface", "lib.core.block", "lib.core.morph"} {
+				if _, ok := world.ByModule[module]; !ok {
+					t.Fatalf("%s did not load module %s; modules=%v", rel, module, world.ByModule)
+				}
+			}
+			if _, err := compiler.CheckWorld(world); err != nil {
+				t.Fatalf("CheckWorld(%s): %v", rel, err)
+			}
+
+			out := filepath.Join(t.TempDir(), strings.TrimSuffix(filepath.Base(rel), ".tetra"))
+			if _, err := compiler.BuildFileWithStatsOpt(entry, out, "linux-x64", compiler.BuildOptions{Jobs: 1}); err != nil {
+				t.Fatalf("BuildFileWithStatsOpt(%s): %v", rel, err)
+			}
+			cmd := exec.Command(out)
+			output, err := cmd.CombinedOutput()
+			if rel == "examples/surface_morph_command_palette.tetra" {
+				exit, ok := err.(*exec.ExitError)
+				if !ok || exit.ExitCode() != 1 {
+					t.Fatalf("%s exited with %v, want Surface runtime success exit 1\n%s", rel, err, output)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("%s exited with %v, want exit 0\n%s", rel, err, output)
 			}
 		})
 	}

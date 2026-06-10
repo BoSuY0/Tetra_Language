@@ -1,0 +1,75 @@
+// Translucent control panel scene built through the experimental Morph Capsule recipe layer.
+module examples.surface_morph_control_panel
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func root_block(rect: surface.Rect) -> block.Block:
+    let bg_asset: block.AssetRef = block.asset_image(1, 420, 280, 9301)
+    let paint: block.PaintSpec = block.paint_stack3(
+        block.paint_layer_fill_radius(surface.Color(r: 10, g: 14, b: 18, a: 255), 0),
+        block.paint_layer_linear_gradient(surface.Color(r: 18, g: 24, b: 34, a: 255), surface.Color(r: 28, g: 54, b: 68, a: 255), 0),
+        block.paint_layer_overlay(morph.accent(), 24, 0)
+    )
+    let props: block.BlockProps = block.props(block.layout_overlay(rect, 0), paint, block.text_none(), block.image_asset(bg_asset, 420, 280), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(13), bg_asset)
+    return block.make(block.id(1), block.id_none(), props)
+
+func heading_block(rect: surface.Rect) -> block.Block:
+    let text: block.TextSpec = block.text_styled(16, morph.theme_light(), block.text_family_ui(), 18, 800, 24, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    let props: block.BlockProps = block.props(block.layout_fixed(rect), block.paint_empty(), text, block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(16), block.asset_font(1, 9302))
+    return block.make(block.id(3), block.id(2), props)
+
+func scene_checksum() -> Int:
+    let hover: block.StateSelector = block.state_selector_hover()
+    let focus: block.StateSelector = block.state_selector_focused()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let motion: block.MotionSpec = block.motion_transition(180, 0, block.motion_ease_standard(), true, true, true, 0, 10, 100)
+    let paint: block.PaintSpec = morph.panel_paint()
+    let hover_opacity: Int = block.state_resolve_int(190, 226, hover, hover)
+    let focus_glow: Int = block.state_resolve_int(1, 3, focus, focus)
+    let pressed_shift: Int = block.motion_resolve_translate_y(motion, 90)
+    if block.state_selector_matches(pressed, pressed):
+        return block.paint_feature_flags(paint) + hover_opacity + focus_glow + pressed_shift
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 420, h: 280)
+    let panel_rect: surface.Rect = surface.Rect(x: 30, y: 28, w: 360, h: 224)
+    let heading_rect: surface.Rect = surface.Rect(x: 58, y: 54, w: 220, h: 28)
+    let mode_rect: surface.Rect = surface.Rect(x: 58, y: 100, w: 118, h: 46)
+    let intensity_rect: surface.Rect = surface.Rect(x: 190, y: 100, w: 118, h: 46)
+    let sync_rect: surface.Rect = surface.Rect(x: 58, y: 154, w: 118, h: 46)
+    let mute_rect: surface.Rect = surface.Rect(x: 190, y: 154, w: 118, h: 46)
+
+    let capsule: morph.Capsule = morph.capsule_default()
+    let panel_recipe: morph.Recipe = morph.recipe_region_panel()
+    let action_recipe: morph.Recipe = morph.recipe_control_action()
+
+    var tree: block.BlockTree = block.tree_init(9)
+    let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
+    let panel: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, panel_rect, 13), panel_rect)
+    let heading: Int = block.tree_add_child(tree, block.id(2), heading_block(heading_rect), heading_rect)
+    let mode: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(4, 2, mode_rect, 4, 9401, true), mode_rect)
+    let intensity: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(5, 2, intensity_rect, 9, 9402, false), intensity_rect)
+    let sync: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(6, 2, sync_rect, 4, 9403, false), sync_rect)
+    let mute: Int = block.tree_add_child(tree, block.id(2), morph.expand_control_action(7, 2, mute_rect, 4, 9404, false), mute_rect)
+
+    let panel_expansion: morph.RecipeExpansion = morph.recipe_expansion(panel_recipe, block.id(2))
+    let action_expansion: morph.RecipeExpansion = morph.recipe_expansion(action_recipe, block.id(4))
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus_next: Int = block.id_value(block.focus_next(tree, block.id(4)))
+
+    if root == 1 && panel == 2 && heading == 3 && mode == 4 && intensity == 5 && sync == 6 && mute == 7 &&
+       valid == block.tree_error_ok() &&
+       focus0 == 4 && focus_next == 5 &&
+       morph.capsule_valid(capsule) &&
+       morph.expansion_valid(panel_expansion) &&
+       morph.expansion_valid(action_expansion) &&
+       morph.material_valid(morph.material_panel()) &&
+       morph.memory_budget_ok(block.tree_len(tree), 5, 420 * 280 * 4) &&
+       scene_checksum() > 0:
+        return 0
+    return 1

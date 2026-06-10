@@ -352,10 +352,8 @@ func findRepoRoot() (string, error) {
 	}
 	var moduleRoot string
 	for {
-		if _, err := os.Stat(filepath.Join(wd, "AGENTS.md")); err == nil {
-			if _, err := os.Stat(filepath.Join(wd, "graphify-out")); err == nil {
-				return wd, nil
-			}
+		if looksLikeRepoRoot(wd) {
+			return wd, nil
 		}
 		if moduleRoot == "" {
 			if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
@@ -371,6 +369,27 @@ func findRepoRoot() (string, error) {
 		}
 		wd = parent
 	}
+}
+
+func looksLikeRepoRoot(dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(dir, "go.work")); err == nil {
+		return true
+	}
+	required := []string{
+		filepath.Join(".git"),
+		filepath.Join("compiler"),
+		filepath.Join("lib", "core"),
+		filepath.Join("tools"),
+	}
+	for _, rel := range required {
+		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func memoryChecklist(audit []memoryprod.AuditReport) []ChecklistItem {

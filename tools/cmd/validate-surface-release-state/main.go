@@ -381,6 +381,7 @@ func validateSurfaceReleaseManifest(path string, scope string, expectedStatus st
 	}
 	requiredSurfaceFeatures := map[string]string{
 		"ui.surface-core":             expectedStatus,
+		"ui.surface-block-system":     "experimental",
 		"ui.surface-headless":         expectedStatus,
 		"ui.surface-linux-x64":        expectedStatus,
 		"ui.surface-web-wasm":         expectedStatus,
@@ -388,7 +389,7 @@ func validateSurfaceReleaseManifest(path string, scope string, expectedStatus st
 		"ui.surface-toolkit-v1":       expectedStatus,
 		"ui.surface-text-input-v1":    expectedStatus,
 		"ui.surface-accessibility-v1": expectedStatus,
-		"ui.surface-morph-capsule":    expectedStatus,
+		"ui.surface-morph-capsule":    "experimental",
 		"ui.surface-macos-x64":        "unsupported",
 		"ui.surface-windows-x64":      "unsupported",
 		"ui.surface-wasm32-wasi":      "unsupported",

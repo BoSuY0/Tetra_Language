@@ -1,0 +1,76 @@
+// Editor shell scene built through the experimental Morph Capsule recipe layer.
+module examples.surface_morph_editor_shell
+
+import lib.core.surface as surface
+import lib.core.block as block
+import lib.core.morph as morph
+
+func root_block(rect: surface.Rect) -> block.Block:
+    let paint: block.PaintSpec = block.paint_stack2(
+        block.paint_layer_fill_radius(surface.Color(r: 16, g: 19, b: 24, a: 255), 0),
+        block.paint_layer_overlay(surface.Color(r: 144, g: 126, b: 244, a: 255), 28, 0)
+    )
+    let props: block.BlockProps = block.props(block.layout_row(rect, 12), paint, block.text_none(), block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(12), block.asset_none())
+    return block.make(block.id(1), block.id_none(), props)
+
+func code_line(id_value: Int, parent_value: Int, rect: surface.Rect, text_len: Int) -> block.Block:
+    let text: block.TextSpec = block.text_styled(text_len, morph.accent(), block.text_family_monospace(), 13, 500, 18, block.text_align_start(), block.text_wrap_none(), block.text_overflow_ellipsis(), 255)
+    let props: block.BlockProps = block.props(block.layout_row(rect, 6), block.paint_empty(), text, block.image_none(), block.input_none(), block.event_none(), block.state_base(), block.motion_none(), block.accessibility_text(text_len), block.asset_font(3, 8303))
+    return block.make(block.id(id_value), block.id(parent_value), props)
+
+func scene_checksum() -> Int:
+    let hover: block.StateSelector = block.state_selector_hover()
+    let focus: block.StateSelector = block.state_selector_focused()
+    let pressed: block.StateSelector = block.state_selector_pressed()
+    let motion: block.MotionSpec = block.motion_transition(120, 0, block.motion_ease_standard(), true, true, true, 0, -2, 102)
+    let paint: block.PaintSpec = morph.control_paint(true)
+    let hover_tint: Int = block.state_resolve_int(122, 160, hover, hover)
+    let focus_outline: Int = block.state_resolve_int(1, 2, focus, focus)
+    let pressed_y: Int = block.motion_resolve_translate_y(motion, 60)
+    if block.state_selector_matches(pressed, pressed):
+        return block.paint_feature_flags(paint) + hover_tint + focus_outline + pressed_y
+    return 0
+
+func main() -> Int
+uses alloc, mem:
+    let root_rect: surface.Rect = surface.Rect(x: 0, y: 0, w: 500, h: 300)
+    let rail_rect: surface.Rect = surface.Rect(x: 16, y: 16, w: 126, h: 268)
+    let editor_rect: surface.Rect = surface.Rect(x: 154, y: 16, w: 330, h: 268)
+    let tab_a_rect: surface.Rect = surface.Rect(x: 172, y: 34, w: 112, h: 34)
+    let tab_b_rect: surface.Rect = surface.Rect(x: 292, y: 34, w: 112, h: 34)
+    let code_rect: surface.Rect = surface.Rect(x: 174, y: 84, w: 288, h: 166)
+    let line_a_rect: surface.Rect = surface.Rect(x: 184, y: 102, w: 260, h: 22)
+    let line_b_rect: surface.Rect = surface.Rect(x: 184, y: 130, w: 260, h: 22)
+
+    let capsule: morph.Capsule = morph.capsule_default()
+    let panel_recipe: morph.Recipe = morph.recipe_region_panel()
+    let tab_recipe: morph.Recipe = morph.recipe_control_action()
+
+    var tree: block.BlockTree = block.tree_init(10)
+    let root: Int = block.tree_add_root(tree, root_block(root_rect), root_rect)
+    let rail: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(2, 1, rail_rect, 13), rail_rect)
+    let editor: Int = block.tree_add_child(tree, block.id(1), morph.expand_region_panel(3, 1, editor_rect, 12), editor_rect)
+    let tab_a: Int = block.tree_add_child(tree, block.id(3), morph.expand_control_action(4, 3, tab_a_rect, 10, 801, true), tab_a_rect)
+    let tab_b: Int = block.tree_add_child(tree, block.id(3), morph.expand_control_action(5, 3, tab_b_rect, 9, 802, false), tab_b_rect)
+    let code_panel: Int = block.tree_add_child(tree, block.id(3), morph.expand_region_panel(6, 3, code_rect, 10), code_rect)
+    let line_a: Int = block.tree_add_child(tree, block.id(6), code_line(7, 6, line_a_rect, 24), line_a_rect)
+    let line_b: Int = block.tree_add_child(tree, block.id(6), code_line(8, 6, line_b_rect, 32), line_b_rect)
+
+    let rail_expansion: morph.RecipeExpansion = morph.recipe_expansion(panel_recipe, block.id(2))
+    let editor_expansion: morph.RecipeExpansion = morph.recipe_expansion(panel_recipe, block.id(3))
+    let tab_expansion: morph.RecipeExpansion = morph.recipe_expansion(tab_recipe, block.id(4))
+    let valid: Int = block.tree_validate(tree)
+    let focus0: Int = block.id_value(block.focus_order_at(tree, 0))
+    let focus1: Int = block.id_value(block.focus_order_at(tree, 1))
+
+    if root == 1 && rail == 2 && editor == 3 && tab_a == 4 && tab_b == 5 && code_panel == 6 && line_a == 7 && line_b == 8 &&
+       valid == block.tree_error_ok() &&
+       focus0 == 4 && focus1 == 5 &&
+       morph.capsule_valid(capsule) &&
+       morph.expansion_valid(rail_expansion) &&
+       morph.expansion_valid(editor_expansion) &&
+       morph.expansion_valid(tab_expansion) &&
+       morph.memory_budget_ok(block.tree_len(tree), 3, 500 * 300 * 4) &&
+       scene_checksum() > 0:
+        return 0
+    return 1
