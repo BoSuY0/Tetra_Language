@@ -500,6 +500,7 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 		return nil
 	}
 	var allocationPlan *allocplan.Plan
+	var allocationValidationIR *ir.IRProgram
 	if targetSupportsStackAllocationLowering(native.triple) {
 		plirProg, err := plir.FromCheckedProgram(checked)
 		if err != nil {
@@ -509,6 +510,10 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 			return err
 		}
 		allocationPlan, err = allocplan.FromPLIRWithOptions(plirProg, allocationPlanOptionsForTarget(native.triple))
+		if err != nil {
+			return err
+		}
+		allocationValidationIR, err = lower.LowerWithOptions(checked, lowerOptionsForTarget(native.triple))
 		if err != nil {
 			return err
 		}
@@ -563,7 +568,7 @@ func compileNativeModulePlan(world *World, checked *semantics.CheckedProgram, na
 				continue
 			}
 			if allocationPlan != nil {
-				if err := validation.ValidateAllocationLowering(allocationPlanForIRFuncs(allocationPlan, funcs), &ir.IRProgram{Funcs: funcs}); err != nil {
+				if err := validation.ValidateAllocationLoweringWithSummaryProgram(allocationPlanForIRFuncs(allocationPlan, funcs), &ir.IRProgram{Funcs: funcs}, allocationValidationIR); err != nil {
 					setErr(err)
 					continue
 				}

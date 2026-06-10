@@ -299,11 +299,22 @@ func ValidateAllocationPlan(plan *allocplan.Plan) error {
 }
 
 func ValidateAllocationLowering(plan *allocplan.Plan, prog *ir.IRProgram) error {
+	return validateAllocationLowering(plan, prog, prog)
+}
+
+func ValidateAllocationLoweringWithSummaryProgram(plan *allocplan.Plan, prog *ir.IRProgram, summaryProg *ir.IRProgram) error {
+	return validateAllocationLowering(plan, prog, summaryProg)
+}
+
+func validateAllocationLowering(plan *allocplan.Plan, prog *ir.IRProgram, summaryProg *ir.IRProgram) error {
 	if err := ValidateAllocationPlan(plan); err != nil {
 		return err
 	}
 	if prog == nil {
 		return fmt.Errorf("allocation lowering validation: missing IR program")
+	}
+	if summaryProg == nil {
+		summaryProg = prog
 	}
 	if prog.MainName == "" {
 		for _, fn := range prog.Funcs {
@@ -446,7 +457,7 @@ func ValidateAllocationLowering(plan *allocplan.Plan, prog *ir.IRProgram) error 
 	if err := validateFunctionTempRegionResets(prog, regionAllocs); err != nil {
 		return err
 	}
-	if err := validateExplicitIslandLifetimes(prog, expectedIsland); err != nil {
+	if err := validateExplicitIslandLifetimes(prog, summaryProg, expectedIsland); err != nil {
 		return err
 	}
 	for fn, allocs := range expected {
@@ -606,8 +617,8 @@ func stepFunctionTempRegionResetState(fn ir.IRFunc, cur functionTempRegionResetS
 	}
 }
 
-func validateExplicitIslandLifetimes(prog *ir.IRProgram, expected map[string]map[string]islandExpectation) error {
-	summaries := inferIslandReturnSummaries(prog)
+func validateExplicitIslandLifetimes(prog *ir.IRProgram, summaryProg *ir.IRProgram, expected map[string]map[string]islandExpectation) error {
+	summaries := inferIslandReturnSummaries(summaryProg)
 	for _, fn := range prog.Funcs {
 		tracked := expected[fn.Name]
 		if len(tracked) == 0 {

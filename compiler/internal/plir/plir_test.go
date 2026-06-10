@@ -400,6 +400,94 @@ func TestVerifyFunctionRejectsModuleBoundaryBorrowedReturnWithoutRegionSummary(t
 	}
 }
 
+func TestVerifyFunctionAcceptsModuleBoundaryOwnedSliceParamReturnWithoutBorrowedRegionOwnership(t *testing.T) {
+	err := VerifyFunction(Function{
+		Name:   "lib.async_slice_memory.pass",
+		Module: "lib.async_slice_memory",
+		Summary: &FunctionSummary{
+			Public:         true,
+			Async:          true,
+			ParamNames:     []string{"bytes"},
+			ParamTypes:     []string{"[]u8"},
+			ParamOwnership: []string{""},
+			ReturnType:     "[]u8",
+		},
+		Values: []Value{{
+			ID:         "param:bytes",
+			Kind:       ValueParam,
+			Type:       "[]u8",
+			Source:     "async_slice_memory.tetra:9:17",
+			Provenance: Provenance{Kind: ProvenanceParam, Root: "bytes"},
+			Lifetime:   Lifetime{Birth: "entry", Death: "return", Owner: "bytes"},
+			Borrow:     BorrowImm,
+			Escape:     EscapeReturn,
+		}},
+		Ops:   []Operation{{ID: "return_bytes", Kind: OpReturn, Source: "async_slice_memory.tetra:10:5", Inputs: []string{"bytes"}}},
+		Facts: []Fact{{ID: "prov_bytes", Kind: FactProvenanceKnown, ValueID: "param:bytes", Source: "async_slice_memory.tetra:9:17", Reason: "parameter provenance"}},
+	})
+	if err != nil {
+		t.Fatalf("VerifyFunction failed for owned slice param return without borrowed region ownership: %v", err)
+	}
+}
+
+func TestVerifyFunctionAcceptsModuleBoundaryResourceReturnWithoutBorrowedRegionOwnership(t *testing.T) {
+	err := VerifyFunction(Function{
+		Name:   "lib.resources.pass",
+		Module: "lib.resources",
+		Summary: &FunctionSummary{
+			Public:                true,
+			ParamNames:            []string{"msg"},
+			ParamTypes:            []string{"lib.resources.MoveMsg"},
+			ParamOwnership:        []string{""},
+			ReturnType:            "lib.resources.MoveMsg",
+			ReturnResourceSummary: map[string][]ResourceProvenance{"": {{ParamIndex: 0}}},
+		},
+		Values: []Value{{
+			ID:         "param:msg",
+			Kind:       ValueParam,
+			Type:       "lib.resources.MoveMsg",
+			Source:     "resources.tetra:16:11",
+			Provenance: Provenance{Kind: ProvenanceParam, Root: "msg"},
+			Lifetime:   Lifetime{Birth: "entry", Death: "return", Owner: "msg"},
+			Escape:     EscapeReturn,
+		}},
+		Ops:   []Operation{{ID: "return_msg", Kind: OpReturn, Source: "resources.tetra:17:5", Inputs: []string{"msg"}}},
+		Facts: []Fact{{ID: "prov_msg", Kind: FactProvenanceKnown, ValueID: "param:msg", Source: "resources.tetra:16:11", Reason: "parameter provenance"}},
+	})
+	if err != nil {
+		t.Fatalf("VerifyFunction failed for resource return without borrowed region ownership: %v", err)
+	}
+}
+
+func TestVerifyFunctionAcceptsModuleBoundaryIslandHandleReturnWithoutBorrowedRegionOwnership(t *testing.T) {
+	err := VerifyFunction(Function{
+		Name:   "examples.microservices.memory_island_alias_region_service.alias_region",
+		Module: "examples.microservices.memory_island_alias_region_service",
+		Summary: &FunctionSummary{
+			Public:                true,
+			ParamNames:            []string{"region"},
+			ParamTypes:            []string{"island"},
+			ParamOwnership:        []string{""},
+			ReturnType:            "island",
+			ReturnResourceSummary: map[string][]ResourceProvenance{"": {{ParamIndex: 0}}},
+		},
+		Values: []Value{{
+			ID:         "param:region",
+			Kind:       ValueParam,
+			Type:       "island",
+			Source:     "memory_island_alias_region_service.tetra:7:19",
+			Provenance: Provenance{Kind: ProvenanceParam, Root: "region"},
+			Lifetime:   Lifetime{Birth: "entry", Death: "return", Owner: "region"},
+			Escape:     EscapeReturn,
+		}},
+		Ops:   []Operation{{ID: "return_region", Kind: OpReturn, Source: "memory_island_alias_region_service.tetra:8:5", Inputs: []string{"region"}}},
+		Facts: []Fact{{ID: "prov_region", Kind: FactProvenanceKnown, ValueID: "param:region", Source: "memory_island_alias_region_service.tetra:7:19", Reason: "parameter provenance"}},
+	})
+	if err != nil {
+		t.Fatalf("VerifyFunction failed for island handle return without borrowed region ownership: %v", err)
+	}
+}
+
 func TestFromCheckedProgramRecordsWhileRangeCFGAndProofUse(t *testing.T) {
 	checked := checkedProgram(t, `
 func sum(xs: []i32) -> Int

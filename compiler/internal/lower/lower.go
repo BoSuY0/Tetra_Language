@@ -2771,6 +2771,44 @@ func (l *lowerer) lowerExplicitIslandAllocationLet(name string, info semantics.L
 	return true, 2, nil
 }
 
+func (l *lowerer) lowerExplicitIslandAllocationCall(call *frontend.CallExpr) (int, bool, error) {
+	if call == nil || len(call.Args) != 2 {
+		return 0, false, nil
+	}
+	kind, ok := islandSliceKindByBuiltin(call.Name)
+	if !ok {
+		return 0, false, nil
+	}
+	name := syntheticAllocationCallName("alloc", call)
+	alloc, ok := l.allocationPlan[name]
+	if !ok || alloc.ActualLoweringStorage != allocplan.StorageExplicitIsland {
+		return 0, false, nil
+	}
+	islandSlots, err := l.lowerExpr(call.Args[0])
+	if err != nil {
+		return 0, true, err
+	}
+	if islandSlots != 1 {
+		return 0, true, fmt.Errorf("%s: %s expects island handle argument", frontend.FormatPos(call.At), call.Name)
+	}
+	lengthSlots, err := l.lowerExpr(call.Args[1])
+	if err != nil {
+		return 0, true, err
+	}
+	if lengthSlots != 1 {
+		return 0, true, fmt.Errorf("%s: %s expects length argument", frontend.FormatPos(call.At), call.Name)
+	}
+	l.emit(ir.IRInstr{Kind: kind, Name: name, Pos: call.At})
+	return 2, true, nil
+}
+
+func syntheticAllocationCallName(prefix string, call *frontend.CallExpr) string {
+	if call == nil || (call.At.Line == 0 && call.At.Col == 0) {
+		return prefix
+	}
+	return fmt.Sprintf("%s_%d_%d", prefix, call.At.Line, call.At.Col)
+}
+
 func (l *lowerer) ensureFunctionTempRegion(pos frontend.Position) {
 	if l.functionTempRegionEntered {
 		return
@@ -3956,6 +3994,9 @@ func (l *lowerer) lowerExpr(expr frontend.Expr) (int, error) {
 			return l.lowerGlobalStoredFunctionCall(e, global)
 		}
 		e = lowerCallExprWithBuiltinAlias(e)
+		if slots, ok, err := l.lowerExplicitIslandAllocationCall(e); ok {
+			return slots, err
+		}
 		if slots, ok, err := l.lowerRawOffsetCall(e); ok {
 			return slots, err
 		}

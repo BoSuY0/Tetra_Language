@@ -791,6 +791,56 @@ func TestValidateAllocationLoweringAcceptsExplicitIslandHandleReturnedFromCall(t
 	}
 }
 
+func TestValidateAllocationLoweringUsesSummaryProgramWithoutScanningIt(t *testing.T) {
+	plan := explicitIslandValidationPlan("main")
+	mainProg := &ir.IRProgram{Funcs: []ir.IRFunc{{
+		Name:       "main",
+		LocalSlots: 2,
+		Instrs: []ir.IRInstr{
+			{Kind: ir.IRConstI32, Imm: 1},
+			{Kind: ir.IRIslandNew},
+			{Kind: ir.IRCall, Name: "lib.wrap", ArgSlots: 1, RetSlots: 1},
+			{Kind: ir.IRConstI32, Imm: 4},
+			{Kind: ir.IRIslandMakeSliceI32, Name: "xs"},
+			{Kind: ir.IRStoreLocal, Local: 1},
+			{Kind: ir.IRStoreLocal, Local: 0},
+			{Kind: ir.IRReturn},
+		},
+	}}}
+	err := ValidateAllocationLowering(plan, mainProg)
+	if err == nil || !strings.Contains(err.Error(), "no active island handle operand") {
+		t.Fatalf("ValidateAllocationLowering error = %v, want missing cross-module summary rejection", err)
+	}
+	summaryProg := &ir.IRProgram{Funcs: []ir.IRFunc{
+		{
+			Name:        "lib.wrap",
+			ParamSlots:  1,
+			LocalSlots:  1,
+			ReturnSlots: 1,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRLoadLocal, Local: 0},
+				{Kind: ir.IRReturn},
+			},
+		},
+		{
+			Name:       "lib.unplanned",
+			LocalSlots: 2,
+			Instrs: []ir.IRInstr{
+				{Kind: ir.IRConstI32, Imm: 1},
+				{Kind: ir.IRIslandNew},
+				{Kind: ir.IRConstI32, Imm: 4},
+				{Kind: ir.IRIslandMakeSliceI32, Name: "foreign"},
+				{Kind: ir.IRStoreLocal, Local: 1},
+				{Kind: ir.IRStoreLocal, Local: 0},
+				{Kind: ir.IRReturn},
+			},
+		},
+	}}
+	if err := ValidateAllocationLoweringWithSummaryProgram(plan, mainProg, summaryProg); err != nil {
+		t.Fatalf("ValidateAllocationLoweringWithSummaryProgram: %v", err)
+	}
+}
+
 func TestValidateAllocationLoweringAcceptsExplicitIslandSliceMovedByCall(t *testing.T) {
 	plan := explicitIslandValidationPlan("main")
 	prog := &ir.IRProgram{Funcs: []ir.IRFunc{{
